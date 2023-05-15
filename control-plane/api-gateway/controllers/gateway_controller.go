@@ -70,7 +70,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	err = r.Client.Get(ctx, types.NamespacedName{Name: string(gw.Spec.GatewayClassName)}, gwc)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			return r.cleanupGatewayResources(ctx, log, gw)
 		}
 		log.Error(err, "unable to get GatewayClass")
 		return ctrl.Result{}, err
@@ -78,27 +78,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if string(gwc.Spec.ControllerName) != GatewayClassControllerName || !gw.ObjectMeta.DeletionTimestamp.IsZero() {
 		// This Gateway is not for this controller or the gateway is being deleted.
-
-		// TODO: Delete configuration in Consul servers.
-		// TODO: Call gatekeeper delete.
-
-		_, err := RemoveFinalizer(ctx, r.Client, gw, gatewayFinalizer)
-		if err != nil {
-			log.Error(err, "unable to remove finalizer")
-		}
-
-		return ctrl.Result{}, err
-	}
-
-	if !gw.ObjectMeta.DeletionTimestamp.IsZero() {
-		// We have a deletion request. Remove our finalizer.
-		if _, err := RemoveFinalizer(ctx, r.Client, gw, gatewayFinalizer); err != nil {
-			log.Error(err, "unable to remove finalizer")
-			return ctrl.Result{}, err
-		}
-		// TODO: Delete configuration in Consul servers.
-		// TODO: Call gatekeeper delete.
-		return ctrl.Result{}, nil
+		return r.cleanupGatewayResources(ctx, log, gw)
 	}
 
 	// TODO: serialize gatewayClassConfig onto Gateway.
@@ -120,9 +100,19 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		- TCPRoutes
 		- Secrets
 		- Services which refer to routes.
+		Pull in the deployments that have been created through Gatekeeper previously to check their statuses.
+		Leverage health-checking.
+			OG impl: Any state change for the deployment/pods we subscribe to and set statuses on the gateway.
+			Do a health check on the service.
 	2. Compile the resources into Consul config entries, while respecting the requirement for ReferenceGrants when
 		moving across namespace.
+		We need to check if binding can occur outside of ReferenceGrants.
+		See "AllowedRoutes" on Listeners.
+		https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.AllowedRoutes
+		Error out if someone uses an unsupported feature:
+			- TLS mode type pass through
 	3. Sync the config entries into Consul.
+		Sync the health status of the deployment to Consul at the same time.
 	4. Run Gatekeeper Upsert with the GW, GWCC, HelmConfig.
 
 	*/
@@ -193,6 +183,19 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&source.Channel{Source: c.Subscribe(ctx, api.InlineCertificate, translator.BuildConsulInlineCertificateTranslator(ctx, r.transformSecret)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).Complete(r)
+}
+
+func (r *GatewayController) cleanupGatewayResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) (ctrl.Result, error) {
+
+	// TODO: Delete configuration in Consul servers.
+	// TODO: Call gatekeeper delete.
+
+	_, err := RemoveFinalizer(ctx, r.Client, gw, gatewayFinalizer)
+	if err != nil {
+		log.Error(err, "unable to remove finalizer")
+	}
+
+	return ctrl.Result{}, err
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
