@@ -398,7 +398,7 @@ func assignServiceVirtualIP(ctx context.Context, logger logr.Logger, consulClien
 
 	// Only assign the virtual IP for service routers and splitters. Every other type is skipped.
 	kubeKind := configEntry.KubeKind()
-	if kubeKind != common.ServiceRouter && kubeKind != common.ServiceSplitter {
+	if kubeKind != common.ServiceResolver && kubeKind != common.ServiceRouter && kubeKind != common.ServiceSplitter {
 		return nil
 	}
 
@@ -409,11 +409,10 @@ func assignServiceVirtualIP(ctx context.Context, logger logr.Logger, consulClien
 		},
 	}
 
-	err := crdCtrl.Get(ctx, namespacedName, &service)
-	if err != nil {
+	if err := crdCtrl.Get(ctx, namespacedName, &service); err != nil {
 		// It is non-fatal if the service does not exist. The ClusterIP will get added when the service is registered in
 		// the endpoints controller
-		if strings.Contains(err.Error(), "not found") {
+		if k8serr.IsNotFound(err) {
 			return nil
 		}
 		// Something is really wrong with the service
@@ -421,7 +420,7 @@ func assignServiceVirtualIP(ctx context.Context, logger logr.Logger, consulClien
 	}
 
 	logger.Info("adding manual ip to virtual ip table in Consul", "name", service.Name)
-	_, _, err = consulClient.Internal().AssignServiceVirtualIP(ctx, configEntry.KubernetesName(), []string{service.Spec.ClusterIP}, &capi.WriteOptions{})
+	_, _, err := consulClient.Internal().AssignServiceVirtualIP(ctx, configEntry.KubernetesName(), []string{service.Spec.ClusterIP}, &capi.WriteOptions{})
 	if err != nil {
 		// Maintain backwards compatibility with older versions of Consul that do not support the manual VIP improvements. With the older version, the mesh
 		// will still work.

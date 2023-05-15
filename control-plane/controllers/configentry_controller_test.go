@@ -1931,8 +1931,8 @@ func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:       "ServiceRouter no error and vip should be assigned",
-			kubeKind:   "ServiceRouter",
+			name:       "ServiceResolver no error and vip should be assigned",
+			kubeKind:   "ServiceResolver",
 			consulKind: capi.ServiceRouter,
 			consulPrereqs: []capi.ConfigEntry{
 				&capi.ServiceConfigEntry{
@@ -1965,6 +1965,61 @@ func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
 				},
 				Spec: corev1.ServiceSpec{
 					ClusterIP: "10.0.0.1",
+					Ports: []corev1.ServicePort{
+						{
+							Port: 8081,
+						},
+					},
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) Controller {
+				return &ServiceRouterController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			expectErr: false,
+		},
+		{
+			name:       "ServiceRouter no error and vip should be assigned",
+			kubeKind:   "ServiceRouter",
+			consulKind: capi.ServiceRouter,
+			consulPrereqs: []capi.ConfigEntry{
+				&capi.ServiceConfigEntry{
+					Kind:     capi.ServiceDefaults,
+					Name:     "bar",
+					Protocol: "http",
+				},
+			},
+			configEntryResource: &v1alpha1.ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ServiceRouterSpec{
+					Routes: []v1alpha1.ServiceRoute{
+						{
+							Match: &v1alpha1.ServiceRouteMatch{
+								HTTP: &v1alpha1.ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+						},
+					},
+				},
+			},
+			service: corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: kubeNS,
+				},
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "10.0.0.2",
 					Ports: []corev1.ServicePort{
 						{
 							Port: 8081,
