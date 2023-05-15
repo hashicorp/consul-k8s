@@ -18,7 +18,7 @@ func NewReferenceValidator(client client.Client) *ReferenceValidator {
 	}
 }
 
-func (rv ReferenceValidator) GatewayCanReferenceSecret(ctx context.Context, gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) (bool, error) {
+func (rv *ReferenceValidator) GatewayCanReferenceSecret(ctx context.Context, gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) (bool, error) {
 	fromNS := gateway.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: gateway.GroupVersionKind().Group,
@@ -32,7 +32,7 @@ func (rv ReferenceValidator) GatewayCanReferenceSecret(ctx context.Context, gate
 	return referenceAllowed(ctx, fromGK, fromNS, toGK, toNS, string(secretRef.Name), rv.Client)
 }
 
-func (rv ReferenceValidator) HTTPRouteCanReferenceGateway(ctx context.Context, httproute gwv1beta1.HTTPRoute, parentRef gwv1beta1.ParentReference) (bool, error) {
+func (rv *ReferenceValidator) HTTPRouteCanReferenceGateway(ctx context.Context, httproute gwv1beta1.HTTPRoute, parentRef gwv1beta1.ParentReference) (bool, error) {
 	fromNS := httproute.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: httproute.GroupVersionKind().Group,
@@ -46,7 +46,7 @@ func (rv ReferenceValidator) HTTPRouteCanReferenceGateway(ctx context.Context, h
 	return referenceAllowed(ctx, fromGK, fromNS, toGK, toNS, string(parentRef.Name), rv.Client)
 }
 
-func (rv ReferenceValidator) HTTPRouteCanReferenceBackend(ctx context.Context, httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) (bool, error) {
+func (rv *ReferenceValidator) HTTPRouteCanReferenceBackend(ctx context.Context, httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) (bool, error) {
 	fromNS := httproute.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: httproute.GroupVersionKind().Group,
@@ -61,7 +61,7 @@ func (rv ReferenceValidator) HTTPRouteCanReferenceBackend(ctx context.Context, h
 
 }
 
-func (rv ReferenceValidator) TCPRouteCanReferenceGateway(ctx context.Context, tcpRoute gwv1alpha2.TCPRoute, parentRef gwv1beta1.ParentReference) (bool, error) {
+func (rv *ReferenceValidator) TCPRouteCanReferenceGateway(ctx context.Context, tcpRoute gwv1alpha2.TCPRoute, parentRef gwv1beta1.ParentReference) (bool, error) {
 	fromNS := tcpRoute.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: tcpRoute.GroupVersionKind().Group,
@@ -75,7 +75,7 @@ func (rv ReferenceValidator) TCPRouteCanReferenceGateway(ctx context.Context, tc
 	return referenceAllowed(ctx, fromGK, fromNS, toGK, toNS, string(parentRef.Name), rv.Client)
 }
 
-func (rv ReferenceValidator) TCPRouteCanReferenceBackend(ctx context.Context, tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) (bool, error) {
+func (rv *ReferenceValidator) TCPRouteCanReferenceBackend(ctx context.Context, tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) (bool, error) {
 	fromNS := tcpRoute.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: tcpRoute.GroupVersionKind().Group,

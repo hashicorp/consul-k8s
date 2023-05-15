@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	toNamespace      = "toNamespace"
-	fromNamespace    = "fromNamespace"
-	invalidNamespace = "invalidNamespace"
+	ToNamespace      = "toNamespace"
+	FromNamespace    = "fromNamespace"
+	InvalidNamespace = "invalidNamespace"
 	Group            = "gateway.networking.k8s.io"
 	V1Beta1          = "/v1beta1"
 	V1Alpha2         = "/v1alpha2"
@@ -34,14 +34,14 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: toNamespace,
+			Namespace: ToNamespace,
 		},
 		Spec: gwv1beta1.ReferenceGrantSpec{
 			From: []gwv1beta1.ReferenceGrantFrom{
 				{
 					Group:     Group,
 					Kind:      GatewayKind,
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 			},
 			To: []gwv1beta1.ReferenceGrantTo{
@@ -56,7 +56,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 
 	secretRefGroup := gwv1beta1.Group(Group)
 	secretRefKind := gwv1beta1.Kind(SecretKind)
-	secretRefNamespace := gwv1beta1.Namespace(toNamespace)
+	secretRefNamespace := gwv1beta1.Namespace(ToNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
@@ -76,7 +76,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 					APIVersion: Group + V1Beta1,
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 				Spec:   gwv1beta1.GatewaySpec{},
 				Status: gwv1beta1.GatewayStatus{},
@@ -117,14 +117,14 @@ func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: toNamespace,
+			Namespace: ToNamespace,
 		},
 		Spec: gwv1beta1.ReferenceGrantSpec{
 			From: []gwv1beta1.ReferenceGrantFrom{
 				{
 					Group:     Group,
 					Kind:      HTTPRouteKind,
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 			},
 			To: []gwv1beta1.ReferenceGrantTo{
@@ -139,7 +139,7 @@ func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 
 	gatewayRefGroup := gwv1beta1.Group(Group)
 	gatewayRefKind := gwv1beta1.Kind(GatewayKind)
-	gatewayRefNamespace := gwv1beta1.Namespace(toNamespace)
+	gatewayRefNamespace := gwv1beta1.Namespace(ToNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
@@ -159,7 +159,7 @@ func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 					APIVersion: Group + V1Beta1,
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 				Spec:   gwv1beta1.HTTPRouteSpec{},
 				Status: gwv1beta1.HTTPRouteStatus{},
@@ -202,14 +202,14 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: toNamespace,
+			Namespace: ToNamespace,
 		},
 		Spec: gwv1beta1.ReferenceGrantSpec{
 			From: []gwv1beta1.ReferenceGrantFrom{
 				{
 					Group:     Group,
 					Kind:      HTTPRouteKind,
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 			},
 			To: []gwv1beta1.ReferenceGrantTo{
@@ -224,7 +224,7 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 
 	backendRefGroup := gwv1beta1.Group(Group)
 	backendRefKind := gwv1beta1.Kind(BackendRefKind)
-	backendRefNamespace := gwv1beta1.Namespace(toNamespace)
+	backendRefNamespace := gwv1beta1.Namespace(ToNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
@@ -244,7 +244,7 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 					APIVersion: Group + V1Beta1,
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 				Spec:   gwv1beta1.HTTPRouteSpec{},
 				Status: gwv1beta1.HTTPRouteStatus{},
@@ -289,14 +289,14 @@ func TestTCPRouteCanReferenceGateway(t *testing.T) {
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: toNamespace,
+			Namespace: ToNamespace,
 		},
 		Spec: gwv1beta1.ReferenceGrantSpec{
 			From: []gwv1beta1.ReferenceGrantFrom{
 				{
 					Group:     Group,
 					Kind:      TCPRouteKind,
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 			},
 			To: []gwv1beta1.ReferenceGrantTo{
@@ -311,7 +311,7 @@ func TestTCPRouteCanReferenceGateway(t *testing.T) {
 
 	gatewayRefGroup := gwv1beta1.Group(Group)
 	gatewayRefKind := gwv1beta1.Kind(GatewayKind)
-	gatewayRefNamespace := gwv1beta1.Namespace(toNamespace)
+	gatewayRefNamespace := gwv1beta1.Namespace(ToNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
@@ -331,7 +331,7 @@ func TestTCPRouteCanReferenceGateway(t *testing.T) {
 					APIVersion: Group + V1Alpha2,
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 				Spec:   gwv1alpha2.TCPRouteSpec{},
 				Status: gwv1alpha2.TCPRouteStatus{},
@@ -374,14 +374,14 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: toNamespace,
+			Namespace: ToNamespace,
 		},
 		Spec: gwv1beta1.ReferenceGrantSpec{
 			From: []gwv1beta1.ReferenceGrantFrom{
 				{
 					Group:     Group,
 					Kind:      TCPRouteKind,
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 			},
 			To: []gwv1beta1.ReferenceGrantTo{
@@ -396,7 +396,7 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 
 	backendRefGroup := gwv1beta1.Group(Group)
 	backendRefKind := gwv1beta1.Kind(BackendRefKind)
-	backendRefNamespace := gwv1beta1.Namespace(toNamespace)
+	backendRefNamespace := gwv1beta1.Namespace(ToNamespace)
 
 	cases := map[string]struct {
 		canReference       bool
@@ -416,7 +416,7 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 					APIVersion: Group + V1Alpha2,
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 				Spec:   gwv1alpha2.TCPRouteSpec{},
 				Status: gwv1alpha2.TCPRouteStatus{},
@@ -461,14 +461,14 @@ func TestReferenceAllowed(t *testing.T) {
 	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: toNamespace,
+			Namespace: ToNamespace,
 		},
 		Spec: gwv1beta1.ReferenceGrantSpec{
 			From: []gwv1beta1.ReferenceGrantFrom{
 				{
 					Group:     Group,
 					Kind:      HTTPRouteKind,
-					Namespace: fromNamespace,
+					Namespace: FromNamespace,
 				},
 			},
 			To: []gwv1beta1.ReferenceGrantTo{
@@ -500,25 +500,25 @@ func TestReferenceAllowed(t *testing.T) {
 				Group: Group,
 				Kind:  HTTPRouteKind,
 			},
-			fromNamespace: fromNamespace,
+			fromNamespace: FromNamespace,
 			toGK: metav1.GroupKind{
 				Group: Group,
 				Kind:  GatewayKind,
 			},
-			toNamespace: fromNamespace,
+			toNamespace: FromNamespace,
 			toName:      string(objName),
 			k8sReferenceGrants: []runtime.Object{
 				&gwv1beta1.ReferenceGrant{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: fromNamespace,
+						Namespace: FromNamespace,
 					},
 					Spec: gwv1beta1.ReferenceGrantSpec{
 						From: []gwv1beta1.ReferenceGrantFrom{
 							{
 								Group:     Group,
 								Kind:      HTTPRouteKind,
-								Namespace: fromNamespace,
+								Namespace: FromNamespace,
 							},
 						},
 						To: []gwv1beta1.ReferenceGrantTo{
@@ -540,12 +540,12 @@ func TestReferenceAllowed(t *testing.T) {
 				Group: Group,
 				Kind:  HTTPRouteKind,
 			},
-			fromNamespace: fromNamespace,
+			fromNamespace: FromNamespace,
 			toGK: metav1.GroupKind{
 				Group: Group,
 				Kind:  GatewayKind,
 			},
-			toNamespace: toNamespace,
+			toNamespace: ToNamespace,
 			toName:      string(objName),
 			k8sReferenceGrants: []runtime.Object{
 				basicValidReferenceGrant,
@@ -559,12 +559,12 @@ func TestReferenceAllowed(t *testing.T) {
 				Group: Group,
 				Kind:  HTTPRouteKind,
 			},
-			fromNamespace: invalidNamespace,
+			fromNamespace: InvalidNamespace,
 			toGK: metav1.GroupKind{
 				Group: Group,
 				Kind:  GatewayKind,
 			},
-			toNamespace: toNamespace,
+			toNamespace: ToNamespace,
 			toName:      string(objName),
 			k8sReferenceGrants: []runtime.Object{
 				basicValidReferenceGrant,
@@ -578,12 +578,12 @@ func TestReferenceAllowed(t *testing.T) {
 				Group: Group,
 				Kind:  HTTPRouteKind,
 			},
-			fromNamespace: fromNamespace,
+			fromNamespace: FromNamespace,
 			toGK: metav1.GroupKind{
 				Group: Group,
 				Kind:  GatewayKind,
 			},
-			toNamespace:        toNamespace,
+			toNamespace:        ToNamespace,
 			toName:             string(objName),
 			k8sReferenceGrants: nil,
 		},
@@ -595,25 +595,25 @@ func TestReferenceAllowed(t *testing.T) {
 				Group: Group,
 				Kind:  HTTPRouteKind,
 			},
-			fromNamespace: fromNamespace,
+			fromNamespace: FromNamespace,
 			toGK: metav1.GroupKind{
 				Group: Group,
 				Kind:  GatewayKind,
 			},
-			toNamespace: toNamespace,
+			toNamespace: ToNamespace,
 			toName:      string(objName),
 			k8sReferenceGrants: []runtime.Object{
 				&gwv1beta1.ReferenceGrant{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: toNamespace,
+						Namespace: ToNamespace,
 					},
 					Spec: gwv1beta1.ReferenceGrantSpec{
 						From: []gwv1beta1.ReferenceGrantFrom{
 							{
 								Group:     Group,
 								Kind:      HTTPRouteKind,
-								Namespace: fromNamespace,
+								Namespace: FromNamespace,
 							},
 						},
 						To: []gwv1beta1.ReferenceGrantTo{
