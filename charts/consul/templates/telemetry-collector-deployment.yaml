@@ -71,7 +71,9 @@ spec:
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-telemetry-collector
       initContainers:
-      - name: consul-connect-inject-init
+      # We're manually managing this init container instead of using the connect injector so that we don't run into
+      # any race conditions on the connect-injector deployment or upgrade
+      - name: consul-connect-init
         env:
           - name: POD_NAMESPACE
             valueFrom:
