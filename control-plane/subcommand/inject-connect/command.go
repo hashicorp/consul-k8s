@@ -30,6 +30,7 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -101,6 +102,8 @@ type Command struct {
 	// Transparent proxy flags.
 	flagDefaultEnableTransparentProxy          bool
 	flagTransparentProxyDefaultOverwriteProbes bool
+
+	// TODO Pass Helm config for API Gateway into this subcommand.
 
 	// CNI flag.
 	flagEnableCNI bool
@@ -206,6 +209,8 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+
+	// TODO Add the requisite flag logic here.
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -477,6 +482,9 @@ func (c *Command) Run(args []string) int {
 	}
 
 	cache, err := controllers.SetupGatewayControllerWithManager(ctx, mgr, controllers.GatewayControllerConfig{
+		HelmConfig: apigateway.HelmConfig{
+			// TODO pass in the Helm Config here.
+		},
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,
 		NamespacesEnabled:   c.flagEnableNamespaces,

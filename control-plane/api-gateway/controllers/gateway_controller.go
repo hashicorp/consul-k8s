@@ -33,6 +33,7 @@ const (
 
 // GatewayControllerConfig holds the values necessary for configuring the GatewayController.
 type GatewayControllerConfig struct {
+	HelmConfig          apigateway.HelmConfig
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
 	NamespacesEnabled   bool
@@ -77,7 +78,10 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if string(gwc.Spec.ControllerName) != GatewayClassControllerName || !gw.ObjectMeta.DeletionTimestamp.IsZero() {
 		// This Gateway is not for this controller or the gateway is being deleted.
-		// TODO: Cleanup Consul resources.
+
+		// TODO: Delete configuration in Consul servers.
+		// TODO: Call gatekeeper delete.
+
 		_, err := RemoveFinalizer(ctx, r.Client, gw, gatewayFinalizer)
 		if err != nil {
 			log.Error(err, "unable to remove finalizer")
@@ -92,6 +96,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Error(err, "unable to remove finalizer")
 			return ctrl.Result{}, err
 		}
+		// TODO: Delete configuration in Consul servers.
+		// TODO: Call gatekeeper delete.
 		return ctrl.Result{}, nil
 	}
 
@@ -107,7 +113,19 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	// TODO: Handle reconciliation.
+	/* TODO:
+
+	1. Get all resources from Kubernetes which refer to this Gateway:
+		- HTTPRoutes
+		- TCPRoutes
+		- Secrets
+		- Services which refer to routes.
+	2. Compile the resources into Consul config entries, while respecting the requirement for ReferenceGrants when
+		moving across namespace.
+	3. Sync the config entries into Consul.
+	4. Run Gatekeeper Upsert with the GW, GWCC, HelmConfig.
+
+	*/
 
 	return ctrl.Result{}, nil
 }
