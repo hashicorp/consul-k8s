@@ -1,0 +1,3 @@
+```release-note:feature
+Add support for consul-telemetry-collector to forward envoy metrics to an otelhttp compatible receiver or HCP
+```
