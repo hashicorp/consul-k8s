@@ -17,6 +17,7 @@ import (
 )
 
 func TestTranslator_GatewayToAPIGateway(t *testing.T) {
+	t.Parallel()
 	k8sObjectName := "my-k8s-gw"
 	k8sNamespace := "my-k8s-namespace"
 
@@ -182,6 +183,7 @@ func TestTranslator_GatewayToAPIGateway(t *testing.T) {
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          k8sNamespace,
 					metaKeyKubeServiceName: k8sObjectName,
+					metaKeyKubeName:        k8sObjectName,
 				},
 				Listeners: []capi.APIGatewayListener{
 					{
@@ -218,7 +220,7 @@ func TestTranslator_GatewayToAPIGateway(t *testing.T) {
 				Status:    capi.ConfigEntryStatus{},
 				Namespace: k8sNamespace,
 			}
-			translator := Translator{
+			translator := K8sToConsulTranslator{
 				EnableConsulNamespaces: true,
 				ConsulDestNamespace:    "",
 				EnableK8sMirroring:     true,
@@ -246,6 +248,7 @@ func TestTranslator_GatewayToAPIGateway(t *testing.T) {
 }
 
 func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		k8sHTTPRoute gwv1beta1.HTTPRoute
 		parentRefs   map[types.NamespacedName]consulIdentifier
@@ -465,6 +468,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          "k8s-ns",
 					metaKeyKubeServiceName: "k8s-http-route",
+					metaKeyKubeName:        "k8s-http-route",
 				},
 				Namespace: "k8s-ns",
 			},
@@ -682,6 +686,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          "k8s-ns",
 					metaKeyKubeServiceName: "k8s-http-route",
+					metaKeyKubeName:        "k8s-http-route",
 				},
 				Namespace: "k8s-ns",
 			},
@@ -899,6 +904,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          "k8s-ns",
 					metaKeyKubeServiceName: "k8s-http-route",
+					metaKeyKubeName:        "k8s-http-route",
 				},
 				Namespace: "k8s-ns",
 			},
@@ -1122,6 +1128,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          "k8s-ns",
 					metaKeyKubeServiceName: "k8s-http-route",
+					metaKeyKubeName:        "k8s-http-route",
 				},
 				Namespace: "k8s-ns",
 			},
@@ -1336,6 +1343,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          "k8s-ns",
 					metaKeyKubeServiceName: "k8s-http-route",
+					metaKeyKubeName:        "k8s-http-route",
 				},
 				Namespace: "k8s-ns",
 			},
@@ -1343,7 +1351,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			tr := Translator{
+			tr := K8sToConsulTranslator{
 				EnableConsulNamespaces: true,
 				EnableK8sMirroring:     true,
 			}
@@ -1356,6 +1364,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 }
 
 func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		k8sRoute   gwv1alpha2.TCPRoute
 		parentRefs map[types.NamespacedName]consulIdentifier
@@ -1448,6 +1457,7 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          "k8s-ns",
 					metaKeyKubeServiceName: "tcp-route",
+					metaKeyKubeName:        "tcp-route",
 				},
 			},
 		},
@@ -1539,13 +1549,14 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          "k8s-ns",
 					metaKeyKubeServiceName: "tcp-route",
+					metaKeyKubeName:        "tcp-route",
 				},
 			},
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tr := Translator{
+			tr := K8sToConsulTranslator{
 				EnableConsulNamespaces: true,
 				EnableK8sMirroring:     true,
 			}
@@ -1559,6 +1570,7 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 }
 
 func TestTranslator_SecretToInlineCertificate(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		k8sSecret gwv1beta1.SecretObjectReference
 		certs     map[types.NamespacedName]consulIdentifier
@@ -1591,6 +1603,7 @@ func TestTranslator_SecretToInlineCertificate(t *testing.T) {
 					metaKeyManagedBy:       metaValueManagedBy,
 					metaKeyKubeNS:          "k8s-ns",
 					metaKeyKubeServiceName: "my-secret",
+					metaKeyKubeName:        "my-secret",
 				},
 				Namespace: "my-ns",
 			},
@@ -1598,7 +1611,7 @@ func TestTranslator_SecretToInlineCertificate(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tr := Translator{
+			tr := K8sToConsulTranslator{
 				EnableConsulNamespaces: true,
 				EnableK8sMirroring:     true,
 			}

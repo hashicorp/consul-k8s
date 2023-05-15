@@ -5,11 +5,10 @@ package controllers
 
 import (
 	"context"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	"testing"
 	"time"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 func TestGatewayClassConfigSetup(t *testing.T) {
@@ -102,7 +102,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 			// Create the gateway class config controller.
 			gcc := &GatewayClassConfigController{
 				Client: fakeClient,
-				Log:    logrtest.NewTestLogger(t),
+				Log:    logrtest.New(t),
 			}
 
 			resp, err := gcc.Reconcile(context.Background(), ctrl.Request{

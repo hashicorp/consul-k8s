@@ -18,6 +18,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
+	"github.com/hashicorp/consul-k8s/control-plane/cache"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul/api"
 )
 
 const (
@@ -26,11 +31,20 @@ const (
 	kindGateway = "Gateway"
 )
 
+// GatewayControllerConfig holds the values necessary for configuring the GatewayController.
+type GatewayControllerConfig struct {
+	ConsulClientConfig  *consul.Config
+	ConsulServerConnMgr consul.ServerConnectionManager
+	NamespacesEnabled   bool
+	Partition           string
+}
+
 // GatewayController reconciles a Gateway object.
 // The Gateway is responsible for defining the behavior of API gateways.
 type GatewayController struct {
 	HelmConfig apigateway.HelmConfig
 	Log        logr.Logger
+	cache      *cache.Cache
 	client.Client
 }
 
@@ -81,7 +95,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	//TODO: serialize gatewayClassConfig onto Gateway.
+	// TODO: serialize gatewayClassConfig onto Gateway.
 
 	didUpdate, err := EnsureFinalizer(ctx, r.Client, gw, gatewayFinalizer)
 	if err != nil {
@@ -93,14 +107,30 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	//TODO: Handle reconciliation.
+	// TODO: Handle reconciliation.
 
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager registers the controller with the given manager.
-func (r *GatewayController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+// SetupWithGatewayControllerManager registers the controller with the given manager.
+func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, error) {
+	c := cache.New(cache.Config{
+		ConsulClientConfig:  config.ConsulClientConfig,
+		ConsulServerConnMgr: config.ConsulServerConnMgr,
+		NamespacesEnabled:   config.NamespacesEnabled,
+		Partition:           config.Partition,
+		Logger:              mgr.GetLogger(),
+	})
+
+	r := &GatewayController{
+		Client: mgr.GetClient(),
+		cache:  c,
+		Log:    mgr.GetLogger(),
+	}
+
+	translator := translation.NewConsulToNamespaceNameTranslator(c)
+
+	return c, ctrl.NewControllerManagedBy(mgr).
 		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
@@ -125,8 +155,26 @@ func (r *GatewayController) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			source.NewKindWithCache(&gwv1beta1.ReferenceGrant{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant(ctx)),
 		).
-		// TODO: Watches for consul resources.
-		Complete(r)
+		Watches(
+			// Subscribe to changes from Consul for APIGateways
+			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulGatewayTranslator(ctx)).Events()},
+			&handler.EnqueueRequestForObject{},
+		).
+		Watches(
+			// Subscribe to changes from Consul for HTTPRoutes
+			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulHTTPRouteTranslator(ctx)).Events()},
+			&handler.EnqueueRequestForObject{},
+		).
+		Watches(
+			// Subscribe to changes from Consul for TCPRoutes
+			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulTCPRouteTranslator(ctx)).Events()},
+			&handler.EnqueueRequestForObject{},
+		).
+		Watches(
+			// Subscribe to changes from Consul for InlineCertificates
+			&source.Channel{Source: c.Subscribe(ctx, api.InlineCertificate, translator.BuildConsulInlineCertificateTranslator(ctx, r.transformSecret)).Events()},
+			&handler.EnqueueRequestForObject{},
+		).Complete(r)
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
