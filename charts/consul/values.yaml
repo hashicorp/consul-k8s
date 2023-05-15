@@ -3095,7 +3095,7 @@ telemetryCollector:
   # The name of the Docker image (including any tag) for the containers running
   # the consul-telemetry-collector
   # @type: string
-  image: "hashicorp/consul-telemetry-collector:0.0.1-dev"
+  image: "hashicorp/consul-telemetry-collector:0.0.1"
 
   # The resource settings for consul-telemetry-collector pods.
   # @recurse: false
@@ -3136,7 +3136,7 @@ telemetryCollector:
     annotations: null
 
   serviceAccount:
-    # This value defines additional annotations for the ingress gateways' service account. This should be formatted
+    # This value defines additional annotations for the telemetry-collector's service account. This should be formatted
     # as a multi-line string.
     #
     # ```yaml
