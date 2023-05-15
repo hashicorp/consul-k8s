@@ -89,9 +89,9 @@ spec:
             # The auth method should be k8s-component-auth-method but we would need to modify the acl-init job. We'll follow up with that
           - name: CONSUL_LOGIN_AUTH_METHOD
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-            value: {{ template "consul.fullname" . }}-k8s-auth-method-{{ .Values.global.datacenter }}
+            value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
             {{- else }}
-            value: {{ template "consul.fullname" . }}-k8s-auth-method
+            value: {{ template "consul.fullname" . }}-k8s-component-auth-method
             {{- end }}
           - name: CONSUL_LOGIN_DATACENTER
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
