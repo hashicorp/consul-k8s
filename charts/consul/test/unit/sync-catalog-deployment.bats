@@ -366,6 +366,54 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# sync ingress
+
+@test "syncCatalog/Deployment: enable ingress sync flag not passed when disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.ingress.enabled=false' \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-ingress=true"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+@test "syncCatalog/Deployment: enable ingress sync flag passed when enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.ingress.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-ingress=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "syncCatalog/Deployment: enable loadbalancer IP sync flag not passed when  syncIngress disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.ingress.enabled=false' \
+      --set 'syncCatalog.ingress.loadBalancerIPs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-loadBalancer-ips=true"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "syncCatalog/Deployment: enable loadbalancer IP sync flag passed when enabled with ingress sync" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.ingress.enabled=true' \
+      --set 'syncCatalog.ingress.loadBalancerIPs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-loadBalancer-ips=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # affinity
 
 @test "syncCatalog/Deployment: affinity not set by default" {

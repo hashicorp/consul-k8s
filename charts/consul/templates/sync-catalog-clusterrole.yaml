@@ -11,31 +11,38 @@ metadata:
     release: {{ .Release.Name }}
     component: sync-catalog
 rules:
-  - apiGroups: [""]
-    resources:
-      - services
-      - endpoints
-    verbs:
-      - get
-      - list
-      - watch
+- apiGroups: [ "" ]
+  resources:
+  - services
+  - endpoints
+  verbs:
+  - get
+  - list
+  - watch
 {{- if .Values.syncCatalog.toK8S }}
-      - update
-      - patch
-      - delete
-      - create
+  - update
+  - patch
+  - delete
+  - create
 {{- end }}
-  - apiGroups: [""]
-    resources:
-      - nodes
-    verbs:
-      - get
+- apiGroups: [ "" ]
+  resources:
+  - nodes
+  verbs:
+  - get
 {{- if .Values.global.enablePodSecurityPolicies }}
-  - apiGroups: ["policy"]
-    resources: ["podsecuritypolicies"]
-    verbs:
-      - use
-    resourceNames:
-      - {{ template "consul.fullname" . }}-sync-catalog
+- apiGroups: [ "policy" ]
+  resources: [ "podsecuritypolicies" ]
+  verbs:
+  - use
+  resourceNames:
+  - {{ template "consul.fullname" . }}-sync-catalog
 {{- end }}
+- apiGroups: [ "networking.k8s.io" ]
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
 {{- end }}

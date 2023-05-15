@@ -13,7 +13,8 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
-	apiv1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -445,7 +446,7 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Status.LoadBalancer.Ingress = append(
 		svc.Status.LoadBalancer.Ingress,
-		apiv1.LoadBalancerIngress{IP: "2.3.4.5"},
+		corev1.LoadBalancerIngress{IP: "2.3.4.5"},
 	)
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
@@ -504,7 +505,7 @@ func TestServiceResource_lbPort(t *testing.T) {
 
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
-	svc.Spec.Ports = []apiv1.ServicePort{
+	svc.Spec.Ports = []corev1.ServicePort{
 		{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
 		{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
 	}
@@ -537,7 +538,7 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Annotations[annotationServicePort] = "rpc"
-	svc.Spec.Ports = []apiv1.ServicePort{
+	svc.Spec.Ports = []corev1.ServicePort{
 		{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
 		{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
 	}
@@ -628,17 +629,17 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 	// Insert the endpoints
 	_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(
 		context.Background(),
-		&apiv1.Endpoints{
+		&corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 
-			Subsets: []apiv1.EndpointSubset{
+			Subsets: []corev1.EndpointSubset{
 				{
-					Addresses: []apiv1.EndpointAddress{
+					Addresses: []corev1.EndpointAddress{
 						{NodeName: &node1.Name, IP: "8.8.8.8"},
 					},
-					Ports: []apiv1.EndpointPort{
+					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
 						{Name: "rpc", Port: 2000},
 					},
@@ -763,17 +764,17 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	// Insert the endpoints
 	_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(
 		context.Background(),
-		&apiv1.Endpoints{
+		&corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 
-			Subsets: []apiv1.EndpointSubset{
+			Subsets: []corev1.EndpointSubset{
 				{
-					Addresses: []apiv1.EndpointAddress{
+					Addresses: []corev1.EndpointAddress{
 						{NodeName: &node1.Name, IP: "1.2.3.4"},
 					},
-					Ports: []apiv1.EndpointPort{
+					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
 						{Name: "rpc", Port: 2000},
 					},
@@ -860,7 +861,7 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
 	// Override service ports
-	svc.Spec.Ports = []apiv1.ServicePort{
+	svc.Spec.Ports = []corev1.ServicePort{
 		{Port: 80, TargetPort: intstr.FromInt(8080), NodePort: 30000},
 		{Port: 8500, TargetPort: intstr.FromInt(2000), NodePort: 30001},
 	}
@@ -940,9 +941,9 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 
 	node1, _ := createNodes(t, client)
 
-	node1.Status = apiv1.NodeStatus{
-		Addresses: []apiv1.NodeAddress{
-			{Type: apiv1.NodeInternalIP, Address: "4.5.6.7"},
+	node1.Status = corev1.NodeStatus{
+		Addresses: []corev1.NodeAddress{
+			{Type: corev1.NodeInternalIP, Address: "4.5.6.7"},
 		},
 	}
 	_, err := client.CoreV1().Nodes().UpdateStatus(context.Background(), node1, metav1.UpdateOptions{})
@@ -1173,7 +1174,7 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 
 	// Insert the service
 	svc := clusterIPService("foo", metav1.NamespaceDefault)
-	svc.Spec.Ports = []apiv1.ServicePort{
+	svc.Spec.Ports = []corev1.ServicePort{
 		{Port: 80, TargetPort: intstr.FromInt(8080)},
 		{Port: 8500, TargetPort: intstr.FromInt(2000)},
 	}
@@ -1281,7 +1282,7 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	// Insert the service
 	svc := clusterIPService("foo", metav1.NamespaceDefault)
 	svc.Annotations[annotationServicePort] = "rpc"
-	svc.Spec.Ports = []apiv1.ServicePort{
+	svc.Spec.Ports = []corev1.ServicePort{
 		{Port: 80, TargetPort: intstr.FromString("httpPort"), Name: "http"},
 		{Port: 8500, TargetPort: intstr.FromString("rpcPort"), Name: "rpc"},
 	}
@@ -1531,22 +1532,323 @@ func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
 	})
 }
 
+// Test k8s namespace suffix is not appended
+// when the service name annotation is provided.
+func TestServiceResource_addIngress(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		enableIngress     bool
+		syncIngressIP     bool
+		ingress           *networkingv1.Ingress
+		expectIngressSync bool
+		expectedAddress   string
+		expectedPort      int
+	}{
+		"enable ingress on port 80": {
+			enableIngress: true,
+			ingress: &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-ingress",
+				},
+				Spec: networkingv1.IngressSpec{
+					TLS: []networkingv1.IngressTLS{
+						{
+							Hosts:      []string{"test.other.consul"},
+							SecretName: "test-other-tls-secret",
+						},
+					},
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "test.host.consul",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path: "/",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "test-service",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectIngressSync: true,
+			expectedAddress:   "test.host.consul",
+			expectedPort:      80,
+		},
+		"enable ingress on port 443": {
+			enableIngress: true,
+			ingress: &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-ingress",
+				},
+				Spec: networkingv1.IngressSpec{
+					TLS: []networkingv1.IngressTLS{
+						{
+							Hosts:      []string{"test.host.consul"},
+							SecretName: "test-tls-secret",
+						},
+					},
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "test.host.consul",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path: "/",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "test-service",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectIngressSync: true,
+			expectedAddress:   "test.host.consul",
+			expectedPort:      443,
+		},
+		"enable ingress on port 80 with loadbalancer IP": {
+			enableIngress: true,
+			syncIngressIP: true,
+			ingress: &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-ingress",
+				},
+				Spec: networkingv1.IngressSpec{
+					TLS: []networkingv1.IngressTLS{
+						{
+							Hosts:      []string{"test.other.consul"},
+							SecretName: "test-other-tls-secret",
+						},
+					},
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "test.host.consul",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path: "/",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "test-service",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: networkingv1.IngressStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{{IP: "1.2.3.4"}},
+					},
+				},
+			},
+			expectIngressSync: true,
+			expectedAddress:   "1.2.3.4",
+			expectedPort:      80,
+		},
+		"enable ingress on port 443 with loadbalancer IP": {
+			enableIngress: true,
+			syncIngressIP: true,
+			ingress: &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-ingress",
+				},
+				Spec: networkingv1.IngressSpec{
+					TLS: []networkingv1.IngressTLS{
+						{
+							Hosts:      []string{"test.host.consul"},
+							SecretName: "test-tls-secret",
+						},
+					},
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "test.host.consul",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path: "/",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "test-service",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: networkingv1.IngressStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{{IP: "1.2.3.4"}},
+					},
+				},
+			},
+			expectIngressSync: true,
+			expectedAddress:   "1.2.3.4",
+			expectedPort:      443,
+		},
+		"ingress disabled": {
+			enableIngress: false,
+			ingress: &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-ingress",
+				},
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "test.host.consul",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path: "/",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "test-service",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectIngressSync: false,
+			expectedAddress:   "1.1.1.1",
+			expectedPort:      8080,
+		},
+		"ignores ingress if host != /": {
+			enableIngress: true,
+			ingress: &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-ingress",
+				},
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "test.host.consul",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path: "/foo",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "test-service",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectIngressSync: false,
+			expectedAddress:   "1.1.1.1",
+			expectedPort:      8080,
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			syncer := newTestSyncer()
+			serviceResource := defaultServiceResource(client, syncer)
+			serviceResource.ClusterIPSync = true
+			serviceResource.EnableIngress = test.enableIngress
+			serviceResource.SyncLoadBalancerIPs = test.syncIngressIP
+
+			// Start the controller
+			closer := controller.TestControllerRun(&serviceResource)
+			defer closer()
+
+			// Create the service
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), clusterIPService("test-service", metav1.NamespaceDefault), metav1.CreateOptions{})
+			require.NoError(t, err)
+			// Create the ingress
+			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
+			require.NoError(t, err)
+			createEndpoints(t, client, "test-service", metav1.NamespaceDefault)
+			// Verify that the service name annotation is preferred
+			retry.Run(t, func(r *retry.R) {
+				syncer.Lock()
+				defer syncer.Unlock()
+				actual := syncer.Registrations
+				if test.expectIngressSync {
+					require.Len(r, actual, 1)
+					require.Equal(r, test.expectedAddress, actual[0].Service.Address)
+					require.Equal(r, test.expectedPort, actual[0].Service.Port)
+				} else {
+					require.Len(r, actual, 2)
+					require.Equal(r, test.expectedAddress, actual[0].Service.Address)
+					require.Equal(r, test.expectedPort, actual[0].Service.Port)
+				}
+
+			})
+		})
+	}
+}
+
 // lbService returns a Kubernetes service of type LoadBalancer.
-func lbService(name, namespace, lbIP string) *apiv1.Service {
-	return &apiv1.Service{
+func lbService(name, namespace, lbIP string) *corev1.Service {
+	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   namespace,
 			Annotations: map[string]string{},
 		},
 
-		Spec: apiv1.ServiceSpec{
-			Type: apiv1.ServiceTypeLoadBalancer,
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
 		},
 
-		Status: apiv1.ServiceStatus{
-			LoadBalancer: apiv1.LoadBalancerStatus{
-				Ingress: []apiv1.LoadBalancerIngress{
+		Status: corev1.ServiceStatus{
+			LoadBalancer: corev1.LoadBalancerStatus{
+				Ingress: []corev1.LoadBalancerIngress{
 					{
 						IP: lbIP,
 					},
@@ -1557,16 +1859,16 @@ func lbService(name, namespace, lbIP string) *apiv1.Service {
 }
 
 // nodePortService returns a Kubernetes service of type NodePort.
-func nodePortService(name, namespace string) *apiv1.Service {
-	return &apiv1.Service{
+func nodePortService(name, namespace string) *corev1.Service {
+	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 
-		Spec: apiv1.ServiceSpec{
-			Type: apiv1.ServiceTypeNodePort,
-			Ports: []apiv1.ServicePort{
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeNodePort,
+			Ports: []corev1.ServicePort{
 				{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080), NodePort: 30000},
 				{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000), NodePort: 30001},
 			},
@@ -1575,17 +1877,17 @@ func nodePortService(name, namespace string) *apiv1.Service {
 }
 
 // clusterIPService returns a Kubernetes service of type ClusterIP.
-func clusterIPService(name, namespace string) *apiv1.Service {
-	return &apiv1.Service{
+func clusterIPService(name, namespace string) *corev1.Service {
+	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   namespace,
 			Annotations: map[string]string{},
 		},
 
-		Spec: apiv1.ServiceSpec{
-			Type: apiv1.ServiceTypeClusterIP,
-			Ports: []apiv1.ServicePort{
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{
 				{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)},
 				{Name: "rpc", Port: 8500, TargetPort: intstr.FromInt(2000)},
 			},
@@ -1594,34 +1896,34 @@ func clusterIPService(name, namespace string) *apiv1.Service {
 }
 
 // createNodes calls the fake k8s client to create two Kubernetes nodes and returns them.
-func createNodes(t *testing.T, client *fake.Clientset) (*apiv1.Node, *apiv1.Node) {
+func createNodes(t *testing.T, client *fake.Clientset) (*corev1.Node, *corev1.Node) {
 	// Insert the nodes
-	node1 := &apiv1.Node{
+	node1 := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName1,
 		},
 
-		Status: apiv1.NodeStatus{
-			Addresses: []apiv1.NodeAddress{
-				{Type: apiv1.NodeExternalIP, Address: "1.2.3.4"},
-				{Type: apiv1.NodeInternalIP, Address: "4.5.6.7"},
-				{Type: apiv1.NodeInternalIP, Address: "7.8.9.10"},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeExternalIP, Address: "1.2.3.4"},
+				{Type: corev1.NodeInternalIP, Address: "4.5.6.7"},
+				{Type: corev1.NodeInternalIP, Address: "7.8.9.10"},
 			},
 		},
 	}
 	_, err := client.CoreV1().Nodes().Create(context.Background(), node1, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	node2 := &apiv1.Node{
+	node2 := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName2,
 		},
 
-		Status: apiv1.NodeStatus{
-			Addresses: []apiv1.NodeAddress{
-				{Type: apiv1.NodeExternalIP, Address: "2.3.4.5"},
-				{Type: apiv1.NodeInternalIP, Address: "3.4.5.6"},
-				{Type: apiv1.NodeInternalIP, Address: "6.7.8.9"},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeExternalIP, Address: "2.3.4.5"},
+				{Type: corev1.NodeInternalIP, Address: "3.4.5.6"},
+				{Type: corev1.NodeInternalIP, Address: "6.7.8.9"},
 			},
 		},
 	}
@@ -1635,31 +1937,31 @@ func createNodes(t *testing.T, client *fake.Clientset) (*apiv1.Node, *apiv1.Node
 func createEndpoints(t *testing.T, client *fake.Clientset, serviceName string, namespace string) {
 	node1 := nodeName1
 	node2 := nodeName2
-	targetRef := apiv1.ObjectReference{Kind: "pod", Name: "foobar"}
+	targetRef := corev1.ObjectReference{Kind: "pod", Name: "foobar"}
 	_, err := client.CoreV1().Endpoints(namespace).Create(
 		context.Background(),
-		&apiv1.Endpoints{
+		&corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: namespace,
 			},
 
-			Subsets: []apiv1.EndpointSubset{
+			Subsets: []corev1.EndpointSubset{
 				{
-					Addresses: []apiv1.EndpointAddress{
+					Addresses: []corev1.EndpointAddress{
 						{NodeName: &node1, IP: "1.1.1.1", TargetRef: &targetRef},
 					},
-					Ports: []apiv1.EndpointPort{
+					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
 						{Name: "rpc", Port: 2000},
 					},
 				},
 
 				{
-					Addresses: []apiv1.EndpointAddress{
+					Addresses: []corev1.EndpointAddress{
 						{NodeName: &node2, IP: "2.2.2.2"},
 					},
-					Ports: []apiv1.EndpointPort{
+					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
 						{Name: "rpc", Port: 2000},
 					},
