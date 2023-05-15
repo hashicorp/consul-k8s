@@ -17,6 +17,7 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -146,10 +147,31 @@ type ServiceResource struct {
 	// of each service.
 	endpointsMap map[string]*corev1.Endpoints
 
+	// EnableIngress enables syncing of the hostname from an Ingress resource
+	// to the service registration if an Ingress rule matches the service.
+	EnableIngress bool
+
+	// SyncLoadBalancerIPs enables syncing the IP of the Ingress LoadBalancer
+	// if we do not want to sync the hostname from the Ingress resource.
+	SyncLoadBalancerIPs bool
+
+	// ingressServiceMap uses the same keys as serviceMap but maps to the ingress
+	// of each service if it exists.
+	ingressServiceMap map[string]map[string]string
+
+	// serviceHostnameMap maps the name of a service to the hostName and port that
+	// is provided by the Ingress resource for the service.
+	serviceHostnameMap map[string]serviceAddress
+
 	// consulMap holds the services in Consul that we've registered from kube.
 	// It's populated via Consul's API and lets us diff what is actually in
 	// Consul vs. what we expect to be there.
 	consulMap map[string][]*consulapi.CatalogRegistration
+}
+
+type serviceAddress struct {
+	hostName string
+	port     int32
 }
 
 // Informer implements the controller.Resource interface.
@@ -256,9 +278,21 @@ func (t *ServiceResource) doDelete(key string) {
 // Run implements the controller.Backgrounder interface.
 func (t *ServiceResource) Run(ch <-chan struct{}) {
 	t.Log.Info("starting runner for endpoints")
+	// Register a controller for Endpoints which subsequently registers a
+	// controller for the Ingress resource.
 	(&controller.Controller{
-		Log:      t.Log.Named("controller/endpoints"),
-		Resource: &serviceEndpointsResource{Service: t, Ctx: t.Ctx},
+		Resource: &serviceEndpointsResource{
+			Service: t,
+			Ctx:     t.Ctx,
+			Log:     t.Log.Named("controller/endpoints"),
+			Resource: &serviceIngressResource{
+				Service:             t,
+				Ctx:                 t.Ctx,
+				SyncLoadBalancerIPs: t.SyncLoadBalancerIPs,
+				EnableIngress:       t.EnableIngress,
+			},
+		},
+		Log: t.Log.Named("controller/service"),
 	}).Run(ch)
 }
 
@@ -647,12 +681,21 @@ func (t *ServiceResource) registerServiceInstance(
 			}
 		}
 		for _, subsetAddr := range subset.Addresses {
-			addr := subsetAddr.IP
-			if addr == "" && useHostname {
-				addr = subsetAddr.Hostname
-			}
-			if addr == "" {
-				continue
+			var addr string
+			// Use the address and port from the Ingress resource if
+			// ingress-sync is enabled and the service has an ingress
+			// resource that references it.
+			if t.EnableIngress && t.isIngressService(key) {
+				addr = t.serviceHostnameMap[key].hostName
+				epPort = int(t.serviceHostnameMap[key].port)
+			} else {
+				addr = subsetAddr.IP
+				if addr == "" && useHostname {
+					addr = subsetAddr.Hostname
+				}
+				if addr == "" {
+					continue
+				}
 			}
 
 			// Its not clear whether K8S guarantees ready addresses to
@@ -719,8 +762,19 @@ func (t *ServiceResource) sync() {
 // a background watcher on endpoints that is used by the ServiceResource
 // to keep track of changing endpoints for registered services.
 type serviceEndpointsResource struct {
-	Service *ServiceResource
-	Ctx     context.Context
+	Service  *ServiceResource
+	Ctx      context.Context
+	Log      hclog.Logger
+	Resource controller.Resource
+}
+
+// Run implements the controller.Backgrounder interface.
+func (t *serviceEndpointsResource) Run(ch <-chan struct{}) {
+	t.Log.Info("starting runner for ingress")
+	(&controller.Controller{
+		Log:      t.Log.Named("controller/ingress"),
+		Resource: t.Resource,
+	}).Run(ch)
 }
 
 func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
@@ -796,6 +850,134 @@ func (t *serviceEndpointsResource) Delete(key string, _ interface{}) error {
 	return nil
 }
 
+// serviceIngressResource implements controller.Resource and starts
+// a background watcher on ingress resources that is used by the ServiceResource
+// to keep track of changing ingress for registered services.
+type serviceIngressResource struct {
+	Service             *ServiceResource
+	Resource            controller.Resource
+	Ctx                 context.Context
+	EnableIngress       bool
+	SyncLoadBalancerIPs bool
+}
+
+func (t *serviceIngressResource) Informer() cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return t.Service.Client.NetworkingV1().
+					Ingresses(metav1.NamespaceAll).
+					List(t.Ctx, options)
+			},
+
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return t.Service.Client.NetworkingV1().
+					Ingresses(metav1.NamespaceAll).
+					Watch(t.Ctx, options)
+			},
+		},
+		&networkingv1.Ingress{},
+		0,
+		cache.Indexers{},
+	)
+}
+
+func (t *serviceIngressResource) Upsert(key string, raw interface{}) error {
+	if !t.EnableIngress {
+		return nil
+	}
+	svc := t.Service
+	ingress, ok := raw.(*networkingv1.Ingress)
+	if !ok {
+		svc.Log.Warn("upsert got invalid type", "raw", raw)
+		return nil
+	}
+
+	svc.serviceLock.Lock()
+	defer svc.serviceLock.Unlock()
+
+	for _, rule := range ingress.Spec.Rules {
+		var svcName string
+		var hostName string
+		var svcPort int32
+		for _, path := range rule.HTTP.Paths {
+			if path.Path == "/" {
+				svcName = path.Backend.Service.Name
+				svcPort = 80
+			} else {
+				continue
+			}
+		}
+		if svcName == "" {
+			continue
+		}
+		if t.SyncLoadBalancerIPs {
+			if ingress.Status.LoadBalancer.Ingress[0].IP == "" {
+				continue
+			}
+			hostName = ingress.Status.LoadBalancer.Ingress[0].IP
+		} else {
+			hostName = rule.Host
+		}
+		for _, ingressTLS := range ingress.Spec.TLS {
+			for _, host := range ingressTLS.Hosts {
+				if rule.Host == host {
+					svcPort = 443
+				}
+			}
+		}
+
+		if svc.serviceHostnameMap == nil {
+			svc.serviceHostnameMap = make(map[string]serviceAddress)
+		}
+		// Maintain a list of the service name to the hostname from the Ingress resource.
+		svc.serviceHostnameMap[fmt.Sprintf("%s/%s", ingress.Namespace, svcName)] = serviceAddress{
+			hostName: hostName,
+			port:     svcPort,
+		}
+		if svc.ingressServiceMap == nil {
+			svc.ingressServiceMap = make(map[string]map[string]string)
+		}
+		if svc.ingressServiceMap[key] == nil {
+			svc.ingressServiceMap[key] = make(map[string]string)
+		}
+		// Maintain a list of all the service names that map to an Ingress resource.
+		svc.ingressServiceMap[key][fmt.Sprintf("%s/%s", ingress.Namespace, svcName)] = ""
+	}
+
+	// Update the registration for each matched service and trigger a sync
+	for svcName := range svc.ingressServiceMap[key] {
+		svc.Log.Info(fmt.Sprintf("generating registrations for %s", svcName))
+		svc.generateRegistrations(svcName)
+	}
+	svc.sync()
+	svc.Log.Info("upsert ingress", "key", key)
+
+	return nil
+}
+
+func (t *serviceIngressResource) Delete(key string, _ interface{}) error {
+	if !t.EnableIngress {
+		return nil
+	}
+	t.Service.serviceLock.Lock()
+	defer t.Service.serviceLock.Unlock()
+
+	// This is a bit of an optimization. We only want to force a resync
+	// if we were tracking this ingress to begin with and that ingress
+	// had associated registrations.
+	if _, ok := t.Service.ingressServiceMap[key]; ok {
+		for svcName := range t.Service.ingressServiceMap[key] {
+			delete(t.Service.serviceHostnameMap, svcName)
+		}
+		delete(t.Service.ingressServiceMap, key)
+		t.Service.sync()
+	}
+
+	t.Service.Log.Info("delete ingress", "key", key)
+	return nil
+}
+
 func (t *ServiceResource) addPrefixAndK8SNamespace(name, namespace string) string {
 	if t.ConsulServicePrefix != "" {
 		name = fmt.Sprintf("%s%s", t.ConsulServicePrefix, name)
@@ -806,6 +988,11 @@ func (t *ServiceResource) addPrefixAndK8SNamespace(name, namespace string) strin
 	}
 
 	return name
+}
+
+// isIngressService return if a service has an Ingress resource that references it.
+func (t *ServiceResource) isIngressService(key string) bool {
+	return t.serviceHostnameMap != nil && t.serviceHostnameMap[key].hostName != ""
 }
 
 // consulHealthCheckID deterministically generates a health check ID based on service ID and Kubernetes namespace.

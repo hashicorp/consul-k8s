@@ -1780,6 +1780,19 @@ syncCatalog:
   # Set this to false to skip syncing ClusterIP services.
   syncClusterIPServices: true
 
+  ingress:
+    # Syncs the hostname from a Kubernetes Ingress resource to service registrations
+    # when a rule matched a service. Currently only supports host based routing and
+    # not path based routing. The only supported path on an ingress rule is "/".
+    # Set this to false to skip syncing Ingress services.
+    #
+    # Currently, port 80 is synced if there is not TLS entry for the hostname. Syncs the port
+    # 443 if there is a TLS entry that matches the hostname.
+    enabled: false
+    # Requires syncIngress to be `true`. syncs the LoadBalancer IP from a Kubernetes Ingress
+    # resource instead of the hostname to service registrations when a rule matched a service.
+    loadBalancerIPs: false
+
   # Configures the type of syncing that happens for NodePort
   # services. The valid options are: ExternalOnly, InternalOnly, ExternalFirst.
   #
