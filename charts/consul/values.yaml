@@ -547,7 +547,9 @@ global:
     # @type: boolean
     enableGatewayMetrics: true
 
-    # If true, envoy instances will forward metrics to the consul-telemetry-collector
+    # Configures the Helm chart’s components to forward envoy metrics for the Consul service mesh to the
+    # consul-telemetry-collector. This includes gateway metrics and sidecar metrics.
+    # @type: boolean
     enableTelemetryCollector: true
 
   # The name (and tag) of the consul-dataplane Docker image used for the
@@ -3086,10 +3088,16 @@ tests:
   enabled: true
 
 telemetryCollector:
+  # Enables the consul-telemetry-collector deployment
+  # @type: boolean
   enabled: false
-  image: "clly/ctc2:latest"
 
-  # The resource settings for telemetry-collector pods.
+  # The name of the Docker image (including any tag) for the containers running
+  # the consul-telemetry-collector
+  # @type: string
+  image: "hashicorp/consul-telemetry-collector:0.0.1-dev"
+
+  # The resource settings for consul-telemetry-collector pods.
   # @recurse: false
   # @type: map
   resources:
@@ -3100,6 +3108,7 @@ telemetryCollector:
       memory: "512Mi"
       cpu: "1000m"
 
+  # This value sets the number of consul-telemetry-collector replicas to deploy.
   replicas: 1
 
   # This value defines additional configuration for the telemetry collector. It should be formatted as a multi-line
@@ -3148,13 +3157,10 @@ telemetryCollector:
       secretKey: null
 
   initContainer:
+    # The resource settings for consul-telemetry-collector initContainer.
+    # @recurse: false
+    # @type: map
     resources: {}
-
-  # This value defines the tolerations for api-gateway-controller pod, this should be a multi-line string matching the
-  # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
-  #
-  # @type: string
-  tolerations: null
 
   # Optional YAML string to specify a nodeSelector config.
   # @type: string
