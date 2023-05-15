@@ -88,13 +88,8 @@ spec:
               fieldRef:
                 fieldPath: spec.nodeName
           {{- if .Values.global.acls.manageSystemACLs }}
-            # The auth method should be k8s-component-auth-method but we would need to modify the acl-init job. We'll follow up with that
           - name: CONSUL_LOGIN_AUTH_METHOD
-            {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-            value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
-            {{- else }}
-            value: {{ template "consul.fullname" . }}-k8s-component-auth-method
-            {{- end }}
+            value: {{ template "consul.fullname" . }}-k8s-auth-method
           - name: CONSUL_LOGIN_DATACENTER
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
             value: {{ .Values.global.federation.primaryDatacenter }}
@@ -262,13 +257,7 @@ spec:
           {{- if .Values.global.acls.manageSystemACLs }}
           - -credential-type=login
           - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
-          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-          # fix this login method to use the component login method later
-          - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method-{{ .Values.global.datacenter }}
-          - -login-datacenter={{ .Values.global.federation.primaryDatacenter }}
-          {{- else }}
           - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method
-          {{- end }}
           {{- if .Values.global.adminPartitions.enabled }}
           - foo
           - -login-partition={{ .Values.global.adminPartitions.name }}
@@ -283,7 +272,6 @@ spec:
           - -log-level={{ default .Values.global.logLevel }}
           - -log-json={{ .Values.global.logJSON }}
           - -envoy-concurrency=2
-          - -login-meta=pod=consul/
           {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
           - -server-watch-disabled=true
           {{- end }}
@@ -325,13 +313,13 @@ spec:
         volumeMounts:
           - mountPath: /consul/connect-inject
             name: consul-connect-inject-data
-            {{- if .Values.global.tls.enabled }}
-            {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+          {{- if .Values.global.tls.enabled }}
+          {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
           - name: consul-ca-cert
             mountPath: /consul/tls/ca
             readOnly: true
-            {{- end }}
-            {{- end }}
+          {{- end }}
+          {{- end }}
 
       {{- if .Values.telemetryCollector.nodeSelector }}
       nodeSelector:
