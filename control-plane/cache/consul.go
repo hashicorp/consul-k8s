@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/exp/slices"
@@ -17,7 +18,10 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
-const namespaceWildcard = "*"
+const (
+	namespaceWildcard = "*"
+	apiTimeout        = 5 * time.Minute
+)
 
 var ErrStaleEntry = errors.New("entry is stale")
 
@@ -127,6 +131,7 @@ func New(config Config) *Cache {
 	for _, kind := range Kinds {
 		cache[kind] = make(resourceCache)
 	}
+	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
 		config:            config.ConsulClientConfig,
