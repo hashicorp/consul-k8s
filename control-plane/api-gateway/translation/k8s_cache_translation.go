@@ -20,12 +20,12 @@ type resourceGetter interface {
 	Get(api.ResourceReference) api.ConfigEntry
 }
 
-// ConsulToNamespaceNameTranslator handles translating consul config entries to k8s namespaced names
+// ConsulToNamespaceNameTranslator handles translating consul config entries to k8s namespaced names.
 type ConsulToNamespaceNameTranslator struct {
 	cache resourceGetter
 }
 
-// NewConsulToNamespaceNameTranslator creates an instance of the ConsulToNSNTranslator
+// NewConsulToNamespaceNameTranslator creates an instance of the ConsulToNSNTranslator.
 func NewConsulToNamespaceNameTranslator(cache resourceGetter) ConsulToNamespaceNameTranslator {
 	return ConsulToNamespaceNameTranslator{cache: cache}
 }
@@ -68,7 +68,7 @@ func (c ConsulToNamespaceNameTranslator) BuildConsulTCPRouteTranslator(ctx conte
 
 // BuildConsulInlineCertificateTranslator creates a slice of k8s types.NamespacedName from the meta fields of the secret. It does this
 // by using a secret transformer function to get a list of reconcile requests from k8s for the given secret and then converts
-// those requests to the slice of NamespaceName
+// those requests to the slice of NamespaceName.
 func (c ConsulToNamespaceNameTranslator) BuildConsulInlineCertificateTranslator(ctx context.Context, secretTransformer secretTransfomer) TranslatorFn {
 	return func(config api.ConfigEntry) []types.NamespacedName {
 		meta, ok := metaToK8sNamespacedName(config)

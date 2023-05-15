@@ -30,7 +30,7 @@ const (
 	kindGateway = "Gateway"
 )
 
-// GatewayControllerConfig holds the values necessary for configuring the GatewayController
+// GatewayControllerConfig holds the values necessary for configuring the GatewayController.
 type GatewayControllerConfig struct {
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
