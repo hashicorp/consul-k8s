@@ -37,24 +37,26 @@ func SerializeGatewayClassConfig(ctx context.Context, client client.Client, gw *
 			return false, ErrUnmarshallingGatewayClassConfig
 		}
 		annotated = true
-	}
-
-	// check if we own the gateway
-	config, managed, err = getConfigForGatewayClass(ctx, client, gwc)
-	if err != nil {
-		gw.Annotations[annotationConfigKey] = ""
-		if k8serrors.IsNotFound(err) {
-			// invalid config which means an invalid gatewayclass
-			// so pretend we don't exist
-			return false, nil
-		}
-		return false, err
+		managed = true
 	}
 
 	if !managed {
-		gw.Annotations[annotationConfigKey] = ""
-		// we don't own this gateway so we pretend it doesn't exist
-		return false, nil
+		// check if we own the gateway
+		config, managed, err = getConfigForGatewayClass(ctx, client, gwc)
+		if err != nil {
+			gw.Annotations[annotationConfigKey] = ""
+			if k8serrors.IsNotFound(err) {
+				// invalid config which means an invalid gatewayclass
+				// so pretend we don't exist
+				return false, nil
+			}
+			return false, err
+		}
+		if !managed {
+			gw.Annotations[annotationConfigKey] = ""
+			// we don't own this gateway so we pretend it doesn't exist
+			return false, nil
+		}
 	}
 
 	marshaled, err := json.Marshal(config.Spec)
