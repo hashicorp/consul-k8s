@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -648,8 +647,6 @@ func TestSerializeGatewayClassConfig_SadPath(t *testing.T) {
 			if err != nil {
 				return
 			}
-
-			fmt.Printf("%p\n", tt.args.gw)
 
 			require.Empty(t, tt.args.gw.Annotations[annotationConfigKey])
 		})

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -53,7 +52,6 @@ func SerializeGatewayClassConfig(ctx context.Context, client client.Client, gw *
 	}
 
 	if !managed {
-		fmt.Printf("gw: %p\n", gw)
 		gw.Annotations[annotationConfigKey] = ""
 		// we don't own this gateway so we pretend it doesn't exist
 		return false, nil
@@ -75,7 +73,6 @@ func SerializeGatewayClassConfig(ctx context.Context, client client.Client, gw *
 }
 
 func getConfigForGatewayClass(ctx context.Context, client client.Client, gwc *gwv1beta1.GatewayClass) (config v1alpha1.GatewayClassConfig, managed bool, err error) {
-	fmt.Println("HERE")
 	if ref := gwc.Spec.ParametersRef; ref != nil {
 		if string(ref.Group) != Group || ref.Kind != v1alpha1.GatewayClassConfigKind {
 			// pretend we have nothing because we don't support an untyped configuration
