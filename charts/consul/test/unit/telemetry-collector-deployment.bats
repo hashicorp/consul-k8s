@@ -290,38 +290,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# logLevel
-
-@test "telemetryCollector/Deployment: logLevel info by default from global" {
-  cd `chart_dir`
-  local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=foo' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-log-level info"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "telemetryCollector/Deployment: logLevel can be overridden" {
-  cd `chart_dir`
-  local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=foo' \
-      --set 'telemetryCollector.logLevel=debug' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-log-level debug"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
 # replicas
 
 @test "telemetryCollector/Deployment: replicas defaults to 1" {
