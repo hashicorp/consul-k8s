@@ -1271,7 +1271,8 @@ func assignServiceVirtualIP(ctx context.Context, apiClient *api.Client, svc *api
 	if ip == "" {
 		return nil
 	}
-	_, _, err := apiClient.Internal().AssignServiceVirtualIP(ctx, svc.Service, []string{ip}, &api.WriteOptions{})
+
+	_, _, err := apiClient.Internal().AssignServiceVirtualIP(ctx, svc.Service, []string{ip}, &api.WriteOptions{Namespace: svc.Namespace, Partition: svc.Partition})
 	if err != nil {
 		// Maintain backwards compatibility with older versions of Consul that do not support the VIP improvements. Tproxy
 		// will not work 100% correctly but the mesh will still work

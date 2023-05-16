@@ -271,7 +271,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 	// For resolvers and splitters, we need to set the ClusterIP of the matching service to Consul so that transparent
 	// proxy works correctly. Do not fail the reconcile if assigning the virtual IP returns an error.
 	if needsVirtualIPAssignment(configEntry) {
-		err = assignServiceVirtualIP(ctx, logger, consulClient, crdCtrl, req.NamespacedName, configEntry)
+		err = assignServiceVirtualIP(ctx, logger, consulClient, crdCtrl, req.NamespacedName, configEntry, r.DatacenterName)
 		if err != nil {
 			logger.Error(err, "failed assigning service virtual ip")
 		}
@@ -405,7 +405,7 @@ func needsVirtualIPAssignment(configEntry common.ConfigEntryResource) bool {
 // does not exist or if an older version of Consul is being used. Endpoints Controller, on service registration, also
 // manually sends a ClusterIP when a service is created. This increases the chance of a real IP ending up in the
 // discovery chain.
-func assignServiceVirtualIP(ctx context.Context, logger logr.Logger, consulClient *capi.Client, crdCtrl Controller, namespacedName types.NamespacedName, configEntry common.ConfigEntryResource) error {
+func assignServiceVirtualIP(ctx context.Context, logger logr.Logger, consulClient *capi.Client, crdCtrl Controller, namespacedName types.NamespacedName, configEntry common.ConfigEntryResource, datacenter string) error {
 	service := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configEntry.KubernetesName(),
@@ -422,8 +422,13 @@ func assignServiceVirtualIP(ctx context.Context, logger logr.Logger, consulClien
 		return err
 	}
 
+	wo := &capi.WriteOptions{
+		Namespace: configEntry.ToConsul(datacenter).GetNamespace(),
+		Partition: configEntry.ToConsul(datacenter).GetPartition(),
+	}
+
 	logger.Info("adding manual ip to virtual ip table in Consul", "name", service.Name)
-	_, _, err := consulClient.Internal().AssignServiceVirtualIP(ctx, configEntry.KubernetesName(), []string{service.Spec.ClusterIP}, &capi.WriteOptions{})
+	_, _, err := consulClient.Internal().AssignServiceVirtualIP(ctx, configEntry.KubernetesName(), []string{service.Spec.ClusterIP}, wo)
 	if err != nil {
 		// Maintain backwards compatibility with older versions of Consul that do not support the manual VIP improvements. With the older version, the mesh
 		// will still work.

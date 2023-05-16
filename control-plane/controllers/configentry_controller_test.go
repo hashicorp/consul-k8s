@@ -2115,7 +2115,7 @@ func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
 				Name:      c.configEntryResource.KubernetesName(),
 			}
 
-			err := assignServiceVirtualIP(ctx, ctrl.Logger(namespacedName), consulClient, ctrl, namespacedName, c.configEntryResource)
+			err := assignServiceVirtualIP(ctx, ctrl.Logger(namespacedName), consulClient, ctrl, namespacedName, c.configEntryResource, "dc1")
 			if err != nil {
 				require.True(t, c.expectErr)
 			} else {
