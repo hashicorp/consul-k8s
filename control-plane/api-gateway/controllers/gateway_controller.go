@@ -2,9 +2,9 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,6 +19,8 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul-k8s/control-plane/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -30,6 +32,11 @@ const (
 
 	kindGateway = "Gateway"
 )
+
+type cacheRetriever interface {
+	Get(api.ResourceReference) api.ConfigEntry
+	GetByKind(string) []api.ConfigEntry
+}
 
 // GatewayControllerConfig holds the values necessary for configuring the GatewayController.
 type GatewayControllerConfig struct {
@@ -45,7 +52,7 @@ type GatewayControllerConfig struct {
 type GatewayController struct {
 	HelmConfig apigateway.HelmConfig
 	Log        logr.Logger
-	cache      *cache.Cache
+	cache      cacheRetriever
 	client.Client
 }
 
@@ -186,7 +193,6 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 }
 
 func (r *GatewayController) cleanupGatewayResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) (ctrl.Result, error) {
-
 	// TODO: Delete configuration in Consul servers.
 	// TODO: Call gatekeeper delete.
 
@@ -332,4 +338,58 @@ func derefStringOr[T ~string, U ~string](v *T, val U) string {
 		return string(val)
 	}
 	return string(*v)
+}
+
+func (r *GatewayController) getAllRefsForGateway(gw api.APIGatewayConfigEntry) []api.ConfigEntry {
+	var ok bool
+
+	ref := api.ResourceReference{
+		Kind:      api.APIGateway,
+		Name:      gw.GetName(),
+		Partition: gw.GetPartition(),
+		Namespace: gw.GetNamespace(),
+	}
+	entryMap := make(map[api.ConfigEntry]struct{}, 0)
+
+	httpRoutes := r.cache.GetByKind(api.HTTPRoute)
+	for _, entry := range httpRoutes {
+		var httpRoute *api.HTTPRouteConfigEntry
+		if httpRoute, ok = entry.(*api.HTTPRouteConfigEntry); !ok {
+			continue
+		}
+
+		fmt.Println(httpRoute)
+
+		for _, parentRef := range httpRoute.Parents {
+			// we don't care about which listener it's attached to
+			parentRef.SectionName = ""
+			if parentRef == ref {
+				entryMap[httpRoute] = struct{}{}
+				break
+			}
+		}
+	}
+
+	tcpRoutes := r.cache.GetByKind(api.TCPRoute)
+	for _, entry := range tcpRoutes {
+		var tcpRoute *api.TCPRouteConfigEntry
+		if tcpRoute, ok = entry.(*api.TCPRouteConfigEntry); !ok {
+			continue
+		}
+
+		for _, parentRef := range tcpRoute.Parents {
+			parentRef.SectionName = ""
+			if parentRef == ref {
+				entryMap[tcpRoute] = struct{}{}
+				break
+			}
+		}
+	}
+
+	entries := make([]api.ConfigEntry, 0, len(entryMap))
+	for entry := range entryMap {
+		entries = append(entries, entry)
+	}
+	fmt.Println(entries)
+	return entries
 }

@@ -354,3 +354,24 @@ func (c *Cache) Get(ref api.ResourceReference) api.ConfigEntry {
 
 	return entry
 }
+
+// Get returns a config entry from the cache that corresponds to the given resource reference.
+func (c *Cache) GetByKind(kind string) []api.ConfigEntry {
+	if !slices.Contains(Kinds, kind) {
+		panic(fmt.Sprintf("You have passed an unsupported kind: %q, valid kinds are: %s", kind, Kinds))
+	}
+	c.cacheMutex.Lock()
+	defer c.cacheMutex.Unlock()
+
+	entryMap, ok := c.cache[kind]
+	if !ok {
+		return nil
+	}
+
+	entries := make([]api.ConfigEntry, 0, len(entryMap))
+	for _, entry := range entryMap {
+		entries = append(entries, entry)
+	}
+
+	return entries
+}

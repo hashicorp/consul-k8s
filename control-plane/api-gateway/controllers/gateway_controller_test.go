@@ -4,10 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,6 +13,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
 )
 
 func TestGatewayReconciler(t *testing.T) {
@@ -109,6 +109,7 @@ func TestGatewayReconciler(t *testing.T) {
 		})
 	}
 }
+
 func TestObjectsToRequests(t *testing.T) {
 	t.Parallel()
 
@@ -151,4 +152,128 @@ func TestObjectsToRequests(t *testing.T) {
 			require.Equal(t, tc.expectedResult, requests)
 		})
 	}
+}
+
+func TestGatewayController_getAllRefsForGateway(t *testing.T) {
+	gateway := api.APIGatewayConfigEntry{
+		Kind: api.APIGateway,
+		Name: "gateway",
+	}
+	httpRouteOnGWWithListener := api.HTTPRouteConfigEntry{
+		Kind: api.HTTPRoute,
+		Name: "route 1",
+		Parents: []api.ResourceReference{
+			{
+				Kind:        api.APIGateway,
+				Name:        "gateway",
+				SectionName: "listener-one",
+			},
+		},
+	}
+	httpRouteOnGWNoListener := api.HTTPRouteConfigEntry{
+		Kind: api.HTTPRoute,
+		Name: "route 2",
+		Parents: []api.ResourceReference{
+			{
+				Kind: api.APIGateway,
+				Name: "gateway",
+			},
+		},
+	}
+	httpRouteNOTOnGW := api.HTTPRouteConfigEntry{
+		Kind: api.HTTPRoute,
+		Name: "route 3",
+		Parents: []api.ResourceReference{
+			{
+				Kind: api.APIGateway,
+				Name: "another one",
+			},
+		},
+	}
+
+	tcpRouteOnGW := api.TCPRouteConfigEntry{
+		Kind: api.TCPRoute,
+		Name: "tcp route 1",
+		Parents: []api.ResourceReference{
+			{
+				Kind: api.APIGateway,
+				Name: "gateway",
+			},
+		},
+	}
+	tcpRouteNOTOnGW := api.TCPRouteConfigEntry{
+		Kind: api.TCPRoute,
+		Name: "tcp route 2",
+		Parents: []api.ResourceReference{
+			{
+				Kind: api.APIGateway,
+				Name: "another one",
+			},
+		},
+	}
+
+	controllerCache := mockCache{
+		cache: map[string]map[api.ResourceReference]api.ConfigEntry{
+			api.HTTPRoute: {
+				{
+					Kind: api.HTTPRoute,
+					Name: "route 1",
+				}: &httpRouteOnGWNoListener,
+				{
+					Kind:        api.HTTPRoute,
+					Name:        "route 2",
+					SectionName: "listener one",
+				}: &httpRouteOnGWWithListener,
+				{
+					Kind: api.HTTPRoute,
+					Name: "route 3",
+				}: &httpRouteNOTOnGW,
+			},
+
+			api.TCPRoute: {
+				{
+					Kind: api.TCPRoute,
+					Name: "tcp route 1",
+				}: &tcpRouteOnGW,
+				{
+					Kind: api.TCPRoute,
+					Name: "tcp route 2",
+				}: &tcpRouteNOTOnGW,
+			},
+			api.APIGateway: {
+				{
+					Kind: api.APIGateway,
+					Name: "gateway",
+				}: &gateway,
+			},
+		},
+	}
+
+	controller := GatewayController{
+		cache: controllerCache,
+	}
+
+	expectedEntries := []api.ConfigEntry{&httpRouteOnGWWithListener, &httpRouteOnGWNoListener, &tcpRouteOnGW}
+	actual := controller.getAllRefsForGateway(gateway)
+
+	require.ElementsMatch(t, expectedEntries, actual)
+}
+
+type mockCache struct {
+	cache map[string]map[api.ResourceReference]api.ConfigEntry
+}
+
+func (m mockCache) Get(ref api.ResourceReference) api.ConfigEntry {
+	// note does not handle when val isn't in map yet
+	entries := m.cache[ref.Kind]
+
+	return entries[ref]
+}
+
+func (m mockCache) GetByKind(kind string) []api.ConfigEntry {
+	ret := make([]api.ConfigEntry, 0)
+	for _, entry := range m.cache[kind] {
+		ret = append(ret, entry)
+	}
+	return ret
 }
