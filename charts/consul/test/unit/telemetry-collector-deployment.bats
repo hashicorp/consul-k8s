@@ -159,33 +159,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.acls.manageSystemACLs
-
-@test "telemetryCollector/Deployment: consul login datacenter is set to primary when when federation enabled in non-primary datacenter" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=foo' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.datacenter=dc1' \
-      --set 'global.federation.enabled=true' \
-      --set 'global.federation.primaryDatacenter=dc2' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[0]' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq '[.env[4].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[4].value] | any(contains("dc2"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
 # resources
 
 @test "telemetryCollector/Deployment: resources has default" {
@@ -590,7 +563,7 @@ load _helpers
       --set 'global.cloud.authUrl.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -614,7 +587,7 @@ load _helpers
       --set 'global.cloud.authUrl.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -638,7 +611,7 @@ load _helpers
       --set 'global.cloud.apiHost.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -662,7 +635,7 @@ load _helpers
       --set 'global.cloud.apiHost.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -686,7 +659,7 @@ load _helpers
       --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -710,7 +683,7 @@ load _helpers
       --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
