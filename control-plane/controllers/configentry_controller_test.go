@@ -1894,7 +1894,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 }
 
 func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
-	/* t.Parallel() */
+	t.Parallel()
 	kubeNS := "default"
 
 	cases := []struct {
@@ -1908,39 +1908,9 @@ func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
 		expectErr           bool
 	}{
 		{
-			name:       "ServiceDefaults should have no error because service defaults is not a supported vip CRD",
-			kubeKind:   "ServiceDefaults",
-			consulKind: capi.ServiceDefaults,
-			configEntryResource: &v1alpha1.ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: kubeNS,
-				},
-			},
-			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) Controller {
-				return &ServiceDefaultsController{
-					Client: client,
-					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
-						ConsulClientConfig:  cfg,
-						ConsulServerConnMgr: watcher,
-						DatacenterName:      datacenterName,
-					},
-				}
-			},
-			expectErr: false,
-		},
-		{
 			name:       "ServiceResolver no error and vip should be assigned",
 			kubeKind:   "ServiceResolver",
 			consulKind: capi.ServiceRouter,
-			consulPrereqs: []capi.ConfigEntry{
-				&capi.ServiceConfigEntry{
-					Kind:     capi.ServiceDefaults,
-					Name:     "foo",
-					Protocol: "http",
-				},
-			},
 			configEntryResource: &v1alpha1.ServiceRouter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -2087,7 +2057,6 @@ func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
 			},
 			expectErr: true,
 		},
-
 		{
 			name:       "ServiceSplitter no error because a matching service does not exist",
 			kubeKind:   "ServiceSplitter",

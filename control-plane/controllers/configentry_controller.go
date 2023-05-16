@@ -270,9 +270,11 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 
 	// For resolvers and splitters, we need to set the ClusterIP of the matching service to Consul so that transparent
 	// proxy works correctly. Do not fail the reconcile if assigning the virtual IP returns an error.
-	err = assignServiceVirtualIP(ctx, logger, consulClient, crdCtrl, req.NamespacedName, configEntry)
-	if err != nil {
-		logger.Error(err, "failed assigning service virtual ip")
+	if needsVirtualIPAssignment(configEntry) {
+		err = assignServiceVirtualIP(ctx, logger, consulClient, crdCtrl, req.NamespacedName, configEntry)
+		if err != nil {
+			logger.Error(err, "failed assigning service virtual ip")
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -389,26 +391,27 @@ func (r *ConfigEntryController) nonMatchingMigrationError(kubeEntry common.Confi
 	return fmt.Errorf("migration failed: Kubernetes resource does not match existing Consul config entry: consul=%s, kube=%s", consulJSON, kubeJSON)
 }
 
+// needsVirtualIPAssignment checks to see if a configEntry type needs to be assigned a virtual IP.
+func needsVirtualIPAssignment(configEntry common.ConfigEntryResource) bool {
+	kubeKind := configEntry.KubeKind()
+	if kubeKind == common.ServiceResolver || kubeKind == common.ServiceRouter || kubeKind == common.ServiceSplitter {
+		return true
+	}
+	return false
+}
+
 // assignServiceVirtualIPs manually sends the ClusterIP for a matching service for ServiceRouter or ServiceSplitter
 // CRDs to Consul so that it can be added to the virtual IP table. The assignment is skipped if the matching service
 // does not exist or if an older version of Consul is being used. Endpoints Controller, on service registration, also
 // manually sends a ClusterIP when a service is created. This increases the chance of a real IP ending up in the
 // discovery chain.
 func assignServiceVirtualIP(ctx context.Context, logger logr.Logger, consulClient *capi.Client, crdCtrl Controller, namespacedName types.NamespacedName, configEntry common.ConfigEntryResource) error {
-
-	// Only assign the virtual IP for service routers and splitters. Every other type is skipped.
-	kubeKind := configEntry.KubeKind()
-	if kubeKind != common.ServiceResolver && kubeKind != common.ServiceRouter && kubeKind != common.ServiceSplitter {
-		return nil
-	}
-
 	service := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configEntry.KubernetesName(),
 			Namespace: namespacedName.Namespace,
 		},
 	}
-
 	if err := crdCtrl.Get(ctx, namespacedName, &service); err != nil {
 		// It is non-fatal if the service does not exist. The ClusterIP will get added when the service is registered in
 		// the endpoints controller
