@@ -1751,47 +1751,6 @@ func Test_Run(t *testing.T) {
 	}
 }
 
-func TestCache_GetByKind(t *testing.T) {
-	c := New(Config{
-		ConsulClientConfig:  &consul.Config{},
-		ConsulServerConnMgr: consul.NewMockServerConnectionManager(t),
-		NamespacesEnabled:   false,
-		Logger:              logr.Logger{},
-	})
-
-	httpRouteOne, httpRouteTwo := setupHTTPRoutes()
-	tcpRoute := setupTCPRoute()
-	c.cache = map[string]resourceCache{
-		api.TCPRoute: {
-			{Kind: api.TCPRoute, Name: tcpRoute.Name}: tcpRoute,
-		},
-		api.HTTPRoute: {
-			{Kind: api.HTTPRoute, Name: httpRouteOne.Name}: httpRouteOne,
-			{Kind: api.HTTPRoute, Name: httpRouteTwo.Name}: httpRouteTwo,
-		},
-	}
-
-	// Test when kind key exists
-	httpRoutes := c.GetByKind(api.HTTPRoute)
-	require.ElementsMatch(t, httpRoutes, []api.ConfigEntry{httpRouteOne, httpRouteTwo})
-
-	tcpRoutes := c.GetByKind(api.TCPRoute)
-	require.ElementsMatch(t, tcpRoutes, []api.ConfigEntry{tcpRoute})
-
-	// Test when kind is not in cache but is still valid
-	gateways := c.GetByKind(api.APIGateway)
-	require.Nil(t, gateways)
-
-	// Test that it panics when an invalid type is passed, this can only happen via programmer error
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected call to get entries by invalid kind to panic, it did not")
-		}
-	}()
-
-	c.GetByKind("gonna panic")
-}
-
 func setupHTTPRoutes() (*api.HTTPRouteConfigEntry, *api.HTTPRouteConfigEntry) {
 	routeOne := &api.HTTPRouteConfigEntry{
 		Kind: api.HTTPRoute,

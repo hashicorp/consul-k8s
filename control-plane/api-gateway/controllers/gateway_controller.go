@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -16,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -33,11 +33,6 @@ const (
 	kindGateway = "Gateway"
 )
 
-type cacheRetriever interface {
-	Get(api.ResourceReference) api.ConfigEntry
-	GetByKind(string) []api.ConfigEntry
-}
-
 // GatewayControllerConfig holds the values necessary for configuring the GatewayController.
 type GatewayControllerConfig struct {
 	HelmConfig          apigateway.HelmConfig
@@ -52,7 +47,7 @@ type GatewayControllerConfig struct {
 type GatewayController struct {
 	HelmConfig apigateway.HelmConfig
 	Log        logr.Logger
-	cache      cacheRetriever
+	cache      *cache.Cache
 	client.Client
 }
 
@@ -340,56 +335,43 @@ func derefStringOr[T ~string, U ~string](v *T, val U) string {
 	return string(*v)
 }
 
-func (r *GatewayController) getAllRefsForGateway(gw api.APIGatewayConfigEntry) []api.ConfigEntry {
-	var ok bool
+func (r *GatewayController) getAllRefsForGateway(ctx context.Context, gw *gwv1beta1.Gateway) ([]metav1.Object, error) {
+	objs := make([]metav1.Object, 0)
 
-	ref := api.ResourceReference{
-		Kind:      api.APIGateway,
-		Name:      gw.GetName(),
-		Partition: gw.GetPartition(),
-		Namespace: gw.GetNamespace(),
+	// handle http routes
+	httpRouteList := &gwv1beta1.HTTPRouteList{}
+	err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, types.NamespacedName{Name: gw.Name, Namespace: gw.Namespace}.String()),
+	})
+	if err != nil {
+		return nil, err
 	}
-	entryMap := make(map[api.ConfigEntry]struct{}, 0)
+	for _, route := range httpRouteList.Items {
+		objs = append(objs, &route)
+	}
+	// handle http routes
+	tcpRouteList := &v1alpha2.TCPRouteList{}
+	err = r.Client.List(ctx, tcpRouteList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(TCPRoute_GatewayIndex, types.NamespacedName{Name: gw.Name, Namespace: gw.Namespace}.String()),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, route := range tcpRouteList.Items {
+		objs = append(objs, &route)
+	}
 
-	httpRoutes := r.cache.GetByKind(api.HTTPRoute)
-	for _, entry := range httpRoutes {
-		var httpRoute *api.HTTPRouteConfigEntry
-		if httpRoute, ok = entry.(*api.HTTPRouteConfigEntry); !ok {
-			continue
-		}
-
-		fmt.Println(httpRoute)
-
-		for _, parentRef := range httpRoute.Parents {
-			// we don't care about which listener it's attached to
-			parentRef.SectionName = ""
-			if parentRef == ref {
-				entryMap[httpRoute] = struct{}{}
-				break
+	// handle secrets
+	for _, listener := range gw.Spec.Listeners {
+		for _, secret := range listener.TLS.CertificateRefs {
+			secretObj := &corev1.Secret{}
+			err = r.Client.Get(ctx, indexedNamespacedNameWithDefault(secret.Name, secret.Namespace, gw.Namespace), secretObj)
+			if err != nil {
+				continue
 			}
+			objs = append(objs, secretObj)
 		}
 	}
 
-	tcpRoutes := r.cache.GetByKind(api.TCPRoute)
-	for _, entry := range tcpRoutes {
-		var tcpRoute *api.TCPRouteConfigEntry
-		if tcpRoute, ok = entry.(*api.TCPRouteConfigEntry); !ok {
-			continue
-		}
-
-		for _, parentRef := range tcpRoute.Parents {
-			parentRef.SectionName = ""
-			if parentRef == ref {
-				entryMap[tcpRoute] = struct{}{}
-				break
-			}
-		}
-	}
-
-	entries := make([]api.ConfigEntry, 0, len(entryMap))
-	for entry := range entryMap {
-		entries = append(entries, entry)
-	}
-	fmt.Println(entries)
-	return entries
+	return objs, nil
 }
