@@ -98,10 +98,30 @@ func (b *Binder) isGatewayDeleted() bool {
 	return isGatewayDeleted
 }
 
+func serviceMap(services []api.CatalogService) map[types.NamespacedName]api.CatalogService {
+	smap := make(map[types.NamespacedName]api.CatalogService)
+	for _, service := range services {
+		smap[serviceToNamespacedName(&service)] = service
+	}
+	return smap
+}
+
+func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
+	var (
+		metaKeyKubeNS          = "k8s-namespace"
+		metaKeyKubeServiceName = "k8s-service-name"
+	)
+	return types.NamespacedName{
+		Namespace: s.ServiceMeta[metaKeyKubeNS],
+		Name:      s.ServiceMeta[metaKeyKubeServiceName],
+	}
+}
+
 func (b *Binder) Snapshot() Snapshot {
 	// at this point we assume all tcp routes and http routes
 	// actually reference this gateway
 	tracker := b.references()
+	serviceMap := serviceMap(b.config.ConnectInjectedServices)
 	seenRoutes := map[api.ResourceReference]struct{}{}
 	snapshot := Snapshot{}
 
@@ -122,8 +142,8 @@ func (b *Binder) Snapshot() Snapshot {
 		}
 	}
 
-	httpRouteBinder := b.newHTTPRouteBinder(tracker)
-	tcpRouteBinder := b.newTCPRouteBinder(tracker)
+	httpRouteBinder := b.newHTTPRouteBinder(tracker, serviceMap)
+	tcpRouteBinder := b.newTCPRouteBinder(tracker, serviceMap)
 
 	for _, r := range b.config.HTTPRoutes {
 		snapshot = httpRouteBinder.bind(pointerTo(r), seenRoutes, snapshot)

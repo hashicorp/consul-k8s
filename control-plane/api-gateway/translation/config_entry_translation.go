@@ -263,7 +263,7 @@ func translateHTTPMatches(k8sMatches []gwv1beta1.HTTPRouteMatch) []capi.HTTPMatc
 				Value: k8sQuery.Value,
 			}
 			if k8sQuery.Type != nil {
-				query.Match = capi.HTTPQueryMatchType(*k8sQuery.Type)
+				query.Match = queryMatchTypeTranslation[*k8sQuery.Type]
 			}
 			queries = append(queries, query)
 		}
@@ -331,10 +331,14 @@ func (t K8sToConsulTranslator) translateHTTPServices(k8sBackendRefs []gwv1beta1.
 
 	for _, k8sRef := range k8sBackendRefs {
 		service := capi.HTTPService{
-			Name:      string(k8sRef.Name),
-			Weight:    int(*k8sRef.Weight),
-			Filters:   translateHTTPFilters(k8sRef.Filters),
-			Namespace: t.getConsulNamespace(string(*k8sRef.Namespace)),
+			Name:    string(k8sRef.Name),
+			Filters: translateHTTPFilters(k8sRef.Filters),
+		}
+		if k8sRef.Weight != nil {
+			service.Weight = int(*k8sRef.Weight)
+		}
+		if k8sRef.Namespace != nil {
+			service.Namespace = t.getConsulNamespace(string(*k8sRef.Namespace))
 		}
 		services = append(services, service)
 	}

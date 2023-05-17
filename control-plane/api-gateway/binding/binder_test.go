@@ -1016,6 +1016,160 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}},
+						}, {
+							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
+							Conditions: []metav1.Condition{{
+								Type:    "Accepted",
+								Status:  metav1.ConditionTrue,
+								Reason:  "Accepted",
+								Message: "route accepted",
+							}},
+						}},
+					},
+				},
+			},
+		},
+		"untargeted http route same namespace missing backend": {
+			httpRoute: &gwv1beta1.HTTPRoute{
+				TypeMeta: httpTypeMeta,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "route",
+					Finalizers: []string{gatewayFinalizer},
+				},
+				Spec: gwv1beta1.HTTPRouteSpec{
+					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+						ParentRefs: []gwv1beta1.ParentReference{{
+							Name: "gateway",
+						}},
+					},
+					Rules: []gwv1beta1.HTTPRouteRule{{
+						BackendRefs: []gwv1beta1.HTTPBackendRef{{
+							BackendRef: gwv1beta1.BackendRef{
+								BackendObjectReference: gwv1beta1.BackendObjectReference{
+									Name: gwv1beta1.ObjectName("backend"),
+								},
+							},
+						}},
+					}},
+				},
+			},
+			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
+				TypeMeta: httpTypeMeta,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "route",
+					Finalizers: []string{gatewayFinalizer},
+				},
+				Spec: gwv1beta1.HTTPRouteSpec{
+					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+						ParentRefs: []gwv1beta1.ParentReference{{
+							Name: "gateway",
+						}},
+					},
+					Rules: []gwv1beta1.HTTPRouteRule{{
+						BackendRefs: []gwv1beta1.HTTPBackendRef{{
+							BackendRef: gwv1beta1.BackendRef{
+								BackendObjectReference: gwv1beta1.BackendObjectReference{
+									Name: gwv1beta1.ObjectName("backend"),
+								},
+							},
+						}},
+					}},
+				},
+				Status: gwv1beta1.HTTPRouteStatus{
+					RouteStatus: gwv1beta1.RouteStatus{
+						Parents: []gwv1beta1.RouteParentStatus{{
+							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionFalse,
+								Reason:  "BackendNotFound",
+								Message: "/backend: backend not found",
+							}},
+						}, {
+							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
+							Conditions: []metav1.Condition{{
+								Type:    "Accepted",
+								Status:  metav1.ConditionTrue,
+								Reason:  "Accepted",
+								Message: "route accepted",
+							}},
+						}},
+					},
+				},
+			},
+		},
+		"untargeted http route same namespace invalid backend type": {
+			httpRoute: &gwv1beta1.HTTPRoute{
+				TypeMeta: httpTypeMeta,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "route",
+					Finalizers: []string{gatewayFinalizer},
+				},
+				Spec: gwv1beta1.HTTPRouteSpec{
+					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+						ParentRefs: []gwv1beta1.ParentReference{{
+							Name: "gateway",
+						}},
+					},
+					Rules: []gwv1beta1.HTTPRouteRule{{
+						BackendRefs: []gwv1beta1.HTTPBackendRef{{
+							BackendRef: gwv1beta1.BackendRef{
+								BackendObjectReference: gwv1beta1.BackendObjectReference{
+									Name:  gwv1beta1.ObjectName("backend"),
+									Group: pointerTo[gwv1beta1.Group]("invalid.foo.com"),
+								},
+							},
+						}},
+					}},
+				},
+			},
+			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
+				TypeMeta: httpTypeMeta,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "route",
+					Finalizers: []string{gatewayFinalizer},
+				},
+				Spec: gwv1beta1.HTTPRouteSpec{
+					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+						ParentRefs: []gwv1beta1.ParentReference{{
+							Name: "gateway",
+						}},
+					},
+					Rules: []gwv1beta1.HTTPRouteRule{{
+						BackendRefs: []gwv1beta1.HTTPBackendRef{{
+							BackendRef: gwv1beta1.BackendRef{
+								BackendObjectReference: gwv1beta1.BackendObjectReference{
+									Name:  gwv1beta1.ObjectName("backend"),
+									Group: pointerTo[gwv1beta1.Group]("invalid.foo.com"),
+								},
+							},
+						}},
+					}},
+				},
+				Status: gwv1beta1.HTTPRouteStatus{
+					RouteStatus: gwv1beta1.RouteStatus{
+						Parents: []gwv1beta1.RouteParentStatus{{
+							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionFalse,
+								Reason:  "InvalidKind",
+								Message: "/backend [Service.invalid.foo.com]: invalid backend kind",
+							}},
+						}, {
+							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name: "gateway",
 							},
@@ -1065,6 +1219,14 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 				Status: gwv1beta1.HTTPRouteStatus{
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
+							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}},
+						}, {
 							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:      "gateway",
@@ -1156,6 +1318,14 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 				Status: gwv1beta1.HTTPRouteStatus{
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
+							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}},
+						}, {
 							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:        "gateway",
@@ -1350,6 +1520,14 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}},
+						}, {
+							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:        "gateway",
 								Namespace:   defaultNamespacePointer,
@@ -1489,6 +1667,152 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}},
+						}, {
+							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
+							Conditions: []metav1.Condition{{
+								Type:    "Accepted",
+								Status:  metav1.ConditionTrue,
+								Reason:  "Accepted",
+								Message: "route accepted",
+							}},
+						}},
+					},
+				},
+			},
+		},
+		"untargeted tcp route same namespace missing backend": {
+			tcpRoute: &gwv1alpha2.TCPRoute{
+				TypeMeta: tcpTypeMeta,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "route",
+					Finalizers: []string{gatewayFinalizer},
+				},
+				Spec: gwv1alpha2.TCPRouteSpec{
+					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+						ParentRefs: []gwv1beta1.ParentReference{{
+							Name: "gateway",
+						}},
+					},
+					Rules: []gwv1alpha2.TCPRouteRule{{
+						BackendRefs: []gwv1beta1.BackendRef{{
+							BackendObjectReference: gwv1beta1.BackendObjectReference{
+								Name: gwv1beta1.ObjectName("backend"),
+							},
+						}},
+					}},
+				},
+			},
+			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
+				TypeMeta: tcpTypeMeta,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "route",
+					Finalizers: []string{gatewayFinalizer},
+				},
+				Spec: gwv1alpha2.TCPRouteSpec{
+					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+						ParentRefs: []gwv1beta1.ParentReference{{
+							Name: "gateway",
+						}},
+					},
+					Rules: []gwv1alpha2.TCPRouteRule{{
+						BackendRefs: []gwv1beta1.BackendRef{{
+							BackendObjectReference: gwv1beta1.BackendObjectReference{
+								Name: gwv1beta1.ObjectName("backend"),
+							},
+						}},
+					}},
+				},
+				Status: gwv1alpha2.TCPRouteStatus{
+					RouteStatus: gwv1beta1.RouteStatus{
+						Parents: []gwv1beta1.RouteParentStatus{{
+							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionFalse,
+								Reason:  "BackendNotFound",
+								Message: "/backend: backend not found",
+							}},
+						}, {
+							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
+							Conditions: []metav1.Condition{{
+								Type:    "Accepted",
+								Status:  metav1.ConditionTrue,
+								Reason:  "Accepted",
+								Message: "route accepted",
+							}},
+						}},
+					},
+				},
+			},
+		},
+		"untargeted tcp route same namespace invalid backend type": {
+			tcpRoute: &gwv1alpha2.TCPRoute{
+				TypeMeta: tcpTypeMeta,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "route",
+					Finalizers: []string{gatewayFinalizer},
+				},
+				Spec: gwv1alpha2.TCPRouteSpec{
+					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+						ParentRefs: []gwv1beta1.ParentReference{{
+							Name: "gateway",
+						}},
+					},
+					Rules: []gwv1alpha2.TCPRouteRule{{
+						BackendRefs: []gwv1beta1.BackendRef{{
+							BackendObjectReference: gwv1beta1.BackendObjectReference{
+								Name:  gwv1beta1.ObjectName("backend"),
+								Group: pointerTo[gwv1beta1.Group]("invalid.foo.com"),
+							},
+						}},
+					}},
+				},
+			},
+			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
+				TypeMeta: tcpTypeMeta,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "route",
+					Finalizers: []string{gatewayFinalizer},
+				},
+				Spec: gwv1alpha2.TCPRouteSpec{
+					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+						ParentRefs: []gwv1beta1.ParentReference{{
+							Name: "gateway",
+						}},
+					},
+					Rules: []gwv1alpha2.TCPRouteRule{{
+						BackendRefs: []gwv1beta1.BackendRef{{
+							BackendObjectReference: gwv1beta1.BackendObjectReference{
+								Name:  gwv1beta1.ObjectName("backend"),
+								Group: pointerTo[gwv1beta1.Group]("invalid.foo.com"),
+							},
+						}},
+					}},
+				},
+				Status: gwv1alpha2.TCPRouteStatus{
+					RouteStatus: gwv1beta1.RouteStatus{
+						Parents: []gwv1beta1.RouteParentStatus{{
+							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionFalse,
+								Reason:  "InvalidKind",
+								Message: "/backend [Service.invalid.foo.com]: invalid backend kind",
+							}},
+						}, {
+							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name: "gateway",
 							},
@@ -1538,6 +1862,14 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 				Status: gwv1alpha2.TCPRouteStatus{
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
+							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}},
+						}, {
 							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:      "gateway",
@@ -1623,6 +1955,14 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 				Status: gwv1alpha2.TCPRouteStatus{
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
+							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}},
+						}, {
 							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:        "gateway",
@@ -1796,6 +2136,14 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 				Status: gwv1alpha2.TCPRouteStatus{
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
+							ControllerName: gatewayClass.Spec.ControllerName,
+							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}},
+						}, {
 							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:        "gateway",

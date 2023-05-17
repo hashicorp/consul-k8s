@@ -1,6 +1,9 @@
 package binding
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -30,20 +33,23 @@ func (b *Binder) consulTCPRouteFor(ref api.ResourceReference) *api.TCPRouteConfi
 }
 
 type routeBinder[T client.Object, U api.ConfigEntry] struct {
-	isGatewayDeleted         bool
-	gateway                  *gwv1beta1.Gateway
-	gatewayRef               api.ResourceReference
-	tracker                  referenceTracker
-	namespaces               map[string]corev1.Namespace
-	translationReferenceFunc func(route T) api.ResourceReference
-	lookupFunc               func(api.ResourceReference) U
-	getParentsFunc           func(U) []api.ResourceReference
-	setParentsFunc           func(U, []api.ResourceReference)
-	removeStatusRefsFunc     func(T, []gwv1beta1.ParentReference) bool
-	getHostnamesFunc         func(T) []gwv1beta1.Hostname
-	getParentRefsFunc        func(T) []gwv1beta1.ParentReference
-	translationFunc          func(T, map[types.NamespacedName]api.ResourceReference) U
-	setRouteConditionFunc    func(T, gwv1beta1.ParentReference, metav1.Condition) bool
+	isGatewayDeleted           bool
+	gateway                    *gwv1beta1.Gateway
+	gatewayRef                 api.ResourceReference
+	tracker                    referenceTracker
+	namespaces                 map[string]corev1.Namespace
+	services                   map[types.NamespacedName]api.CatalogService
+	translationReferenceFunc   func(route T) api.ResourceReference
+	lookupFunc                 func(api.ResourceReference) U
+	getParentsFunc             func(U) []api.ResourceReference
+	setParentsFunc             func(U, []api.ResourceReference)
+	removeStatusRefsFunc       func(T, []gwv1beta1.ParentReference) bool
+	getHostnamesFunc           func(T) []gwv1beta1.Hostname
+	getParentRefsFunc          func(T) []gwv1beta1.ParentReference
+	translationFunc            func(T, map[types.NamespacedName]api.ResourceReference) U
+	setRouteConditionFunc      func(T, *gwv1beta1.ParentReference, metav1.Condition) bool
+	getBackendRefsFunc         func(T) []gwv1beta1.BackendRef
+	removeControllerStatusFunc func(T) bool
 }
 
 func newRouteBinder[T client.Object, U api.ConfigEntry](
@@ -51,6 +57,7 @@ func newRouteBinder[T client.Object, U api.ConfigEntry](
 	gateway *gwv1beta1.Gateway,
 	gatewayRef api.ResourceReference,
 	namespaces map[string]corev1.Namespace,
+	services map[types.NamespacedName]api.CatalogService,
 	tracker referenceTracker,
 	translationReferenceFunc func(route T) api.ResourceReference,
 	lookupFunc func(api.ResourceReference) U,
@@ -60,51 +67,188 @@ func newRouteBinder[T client.Object, U api.ConfigEntry](
 	getHostnamesFunc func(T) []gwv1beta1.Hostname,
 	getParentRefsFunc func(T) []gwv1beta1.ParentReference,
 	translationFunc func(T, map[types.NamespacedName]api.ResourceReference) U,
-	setRouteConditionFunc func(T, gwv1beta1.ParentReference, metav1.Condition) bool,
+	setRouteConditionFunc func(T, *gwv1beta1.ParentReference, metav1.Condition) bool,
+	getBackendRefsFunc func(T) []gwv1beta1.BackendRef,
+	removeControllerStatusFunc func(T) bool,
 ) *routeBinder[T, U] {
 	return &routeBinder[T, U]{
-		isGatewayDeleted:         isGatewayDeleted,
-		gateway:                  gateway,
-		gatewayRef:               gatewayRef,
-		namespaces:               namespaces,
-		tracker:                  tracker,
-		translationReferenceFunc: translationReferenceFunc,
-		lookupFunc:               lookupFunc,
-		getParentsFunc:           getParentsFunc,
-		setParentsFunc:           setParentsFunc,
-		removeStatusRefsFunc:     removeStatusRefsFunc,
-		getHostnamesFunc:         getHostnamesFunc,
-		getParentRefsFunc:        getParentRefsFunc,
-		translationFunc:          translationFunc,
-		setRouteConditionFunc:    setRouteConditionFunc,
+		isGatewayDeleted:           isGatewayDeleted,
+		gateway:                    gateway,
+		gatewayRef:                 gatewayRef,
+		namespaces:                 namespaces,
+		services:                   services,
+		tracker:                    tracker,
+		translationReferenceFunc:   translationReferenceFunc,
+		lookupFunc:                 lookupFunc,
+		getParentsFunc:             getParentsFunc,
+		setParentsFunc:             setParentsFunc,
+		removeStatusRefsFunc:       removeStatusRefsFunc,
+		getHostnamesFunc:           getHostnamesFunc,
+		getParentRefsFunc:          getParentRefsFunc,
+		translationFunc:            translationFunc,
+		setRouteConditionFunc:      setRouteConditionFunc,
+		getBackendRefsFunc:         getBackendRefsFunc,
+		removeControllerStatusFunc: removeControllerStatusFunc,
 	}
 }
 
-func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) Snapshot {
+var (
+	errInvalidKind     = errors.New("invalid backend kind")
+	errBackendNotFound = errors.New("backend not found")
+	errRefNotPermitted = errors.New("reference not permitted due to lack of ReferenceGrant")
+)
+
+type routeValidations struct {
+	namespace string
+	backend   gwv1beta1.BackendRef
+	err       error
+}
+
+func (v routeValidations) Type() string {
+	return (&metav1.GroupKind{
+		Group: valueOr(v.backend.Group, ""),
+		Kind:  valueOr(v.backend.Kind, "Service"),
+	}).String()
+}
+
+func (v routeValidations) String() string {
+	return (types.NamespacedName{Namespace: v.namespace, Name: string(v.backend.Name)}).String()
+}
+
+type routeValidationResult []routeValidations
+
+func (e routeValidationResult) Condition() metav1.Condition {
+	// we only use the first error due to the way the spec is structured
+	// where you can only have a single condition
+	for _, v := range e {
+		err := v.err
+		if err != nil {
+			switch err {
+			case errInvalidKind:
+				return metav1.Condition{
+					Type:    "ResolvedRefs",
+					Status:  metav1.ConditionFalse,
+					Reason:  "InvalidKind",
+					Message: fmt.Sprintf("%s [%s]: %s", v.String(), v.Type(), err.Error()),
+				}
+			case errBackendNotFound:
+				return metav1.Condition{
+					Type:    "ResolvedRefs",
+					Status:  metav1.ConditionFalse,
+					Reason:  "BackendNotFound",
+					Message: fmt.Sprintf("%s: %s", v.String(), err.Error()),
+				}
+			case errRefNotPermitted:
+				return metav1.Condition{
+					Type:    "ResolvedRefs",
+					Status:  metav1.ConditionFalse,
+					Reason:  "RefNotPermitted",
+					Message: fmt.Sprintf("%s: %s", v.String(), err.Error()),
+				}
+			default:
+				// this should never happen
+				return metav1.Condition{
+					Type:    "ResolvedRefs",
+					Status:  metav1.ConditionFalse,
+					Reason:  "UnhandledValidationError",
+					Message: err.Error(),
+				}
+			}
+		}
+	}
+	return metav1.Condition{
+		Type:    "ResolvedRefs",
+		Status:  metav1.ConditionTrue,
+		Reason:  "ResolvedRefs",
+		Message: "resolved backend references",
+	}
+}
+
+func (r *routeBinder[T, U]) validateRefs(namespace string, refs []gwv1beta1.BackendRef) routeValidationResult {
+	var result routeValidationResult
+	for _, ref := range refs {
+		nsn := types.NamespacedName{
+			Name:      string(ref.BackendObjectReference.Name),
+			Namespace: valueOr(ref.BackendObjectReference.Namespace, namespace),
+		}
+
+		// TODO: check reference grants
+
+		if !nilOrEqual(ref.BackendObjectReference.Group, "") ||
+			!nilOrEqual(ref.BackendObjectReference.Kind, "Service") {
+			result = append(result, routeValidations{
+				namespace: nsn.Namespace,
+				backend:   ref,
+				err:       errInvalidKind,
+			})
+			continue
+		}
+
+		if _, found := r.services[nsn]; !found {
+			result = append(result, routeValidations{
+				namespace: nsn.Namespace,
+				backend:   ref,
+				err:       errBackendNotFound,
+			})
+			continue
+		}
+
+		result = append(result, routeValidations{
+			namespace: nsn.Namespace,
+			backend:   ref,
+		})
+	}
+	return result
+}
+
+func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) (updatedSnapshot Snapshot) {
 	routeRef := r.translationReferenceFunc(route)
 	existing := r.lookupFunc(routeRef)
 	seenRoutes[routeRef] = struct{}{}
 
 	gatewayRefs := filterParentRefs(objectToMeta(r.gateway), route.GetNamespace(), r.getParentRefsFunc(route))
 
-	if isDeleted(route) {
-		snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, routeRef)
-		if removeFinalizer(route) {
+	var consulUpdate U
+	consulNeedsDelete := false
+	kubernetesNeedsUpdate := false
+	kubernetesNeedsStatusUpdate := false
+
+	defer func() {
+		if !isNil(consulUpdate) {
+			snapshot.Consul.Updates = append(snapshot.Consul.Updates, consulUpdate)
+		}
+		if consulNeedsDelete {
+			snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, routeRef)
+		}
+		if kubernetesNeedsUpdate {
 			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, route)
 		}
+		if kubernetesNeedsStatusUpdate {
+			snapshot.Kubernetes.StatusUpdates = append(snapshot.Kubernetes.StatusUpdates, route)
+		}
+
+		updatedSnapshot = snapshot
+	}()
+
+	if isDeleted(route) {
+		consulNeedsDelete = true
+		if removeFinalizer(route) {
+			kubernetesNeedsUpdate = true
+		}
 		// TODO: drop the number of bound routes from the gateway if necessary
-		return snapshot
+		return
 	}
 
 	if r.isGatewayDeleted {
 		// first check if this is our only ref for the route
 		if r.tracker.isLastReference(route) {
 			// if it is, then mark everything for deletion
-			snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, routeRef)
+			consulNeedsDelete = true
+			r.removeControllerStatusFunc(route)
 			if removeFinalizer(route) {
-				snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, route)
+				kubernetesNeedsUpdate = true
 			}
-			return snapshot
+			return
 		}
 
 		// otherwise remove the condition since we no longer know if we should
@@ -113,21 +257,25 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 			// this drops all the parent refs
 			r.setParentsFunc(existing, parentsForRoute(r.gatewayRef, r.getParentsFunc(existing), nil))
 			// and then we mark the route as needing updated
-			snapshot.Consul.Updates = append(snapshot.Consul.Updates, existing)
+			consulUpdate = existing
 			// drop the status conditions
 			if r.removeStatusRefsFunc(route, gatewayRefs) {
-				snapshot.Kubernetes.StatusUpdates = append(snapshot.Kubernetes.StatusUpdates, route)
+				kubernetesNeedsStatusUpdate = true
 			}
 		}
-		return snapshot
+		return
 	}
 
 	if ensureFinalizer(route) {
-		snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, route)
-		return snapshot
+		kubernetesNeedsUpdate = true
+		return
 	}
 
-	// TODO: add validation statuses for routes for referenced services
+	validation := r.validateRefs(route.GetNamespace(), r.getBackendRefsFunc(route))
+	if r.setRouteConditionFunc(route, nil, validation.Condition()) {
+		kubernetesNeedsStatusUpdate = true
+	}
+
 	results := make(parentBindResults, 0)
 	namespace := r.namespaces[route.GetNamespace()]
 	gk := route.GetObjectKind().GroupVersionKind().GroupKind()
@@ -180,13 +328,13 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 
 	updated := false
 	for _, result := range results {
-		if r.setRouteConditionFunc(route, result.parent, result.results.Condition()) {
+		if r.setRouteConditionFunc(route, &result.parent, result.results.Condition()) {
 			updated = true
 		}
 	}
 
 	if updated {
-		snapshot.Kubernetes.StatusUpdates = append(snapshot.Kubernetes.StatusUpdates, route)
+		kubernetesNeedsStatusUpdate = true
 	}
 
 	entry := r.translationFunc(route, nil)
@@ -196,17 +344,18 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 	} else {
 		r.setParentsFunc(entry, parentsForRoute(r.gatewayRef, r.getParentsFunc(existing), results))
 	}
-	snapshot.Consul.Updates = append(snapshot.Consul.Updates, entry)
+	consulUpdate = entry
 
-	return snapshot
+	return
 }
 
-func (b *Binder) newTCPRouteBinder(tracker referenceTracker) *routeBinder[*gwv1alpha2.TCPRoute, *api.TCPRouteConfigEntry] {
+func (b *Binder) newTCPRouteBinder(tracker referenceTracker, services map[types.NamespacedName]api.CatalogService) *routeBinder[*gwv1alpha2.TCPRoute, *api.TCPRouteConfigEntry] {
 	return newRouteBinder(
 		b.isGatewayDeleted(),
 		&b.config.Gateway,
 		b.gatewayRef(),
 		b.config.Namespaces,
+		services,
 		tracker,
 		b.config.Translator.ReferenceForTCPRoute,
 		b.consulTCPRouteFor,
@@ -217,15 +366,24 @@ func (b *Binder) newTCPRouteBinder(tracker referenceTracker) *routeBinder[*gwv1a
 		func(t *gwv1alpha2.TCPRoute) []gwv1beta1.ParentReference { return t.Spec.ParentRefs },
 		b.config.Translator.TCPRouteToTCPRoute,
 		b.config.Setter.SetTCPRouteCondition,
+		func(t *gwv1alpha2.TCPRoute) []gwv1beta1.BackendRef {
+			refs := []gwv1beta1.BackendRef{}
+			for _, rule := range t.Spec.Rules {
+				refs = append(refs, rule.BackendRefs...)
+			}
+			return refs
+		},
+		b.config.Setter.RemoveTCPStatuses,
 	)
 }
 
-func (b *Binder) newHTTPRouteBinder(tracker referenceTracker) *routeBinder[*gwv1beta1.HTTPRoute, *api.HTTPRouteConfigEntry] {
+func (b *Binder) newHTTPRouteBinder(tracker referenceTracker, services map[types.NamespacedName]api.CatalogService) *routeBinder[*gwv1beta1.HTTPRoute, *api.HTTPRouteConfigEntry] {
 	return newRouteBinder(
 		b.isGatewayDeleted(),
 		&b.config.Gateway,
 		b.gatewayRef(),
 		b.config.Namespaces,
+		services,
 		tracker,
 		b.config.Translator.ReferenceForHTTPRoute,
 		b.consulHTTPRouteFor,
@@ -236,6 +394,16 @@ func (b *Binder) newHTTPRouteBinder(tracker referenceTracker) *routeBinder[*gwv1
 		func(t *gwv1beta1.HTTPRoute) []gwv1beta1.ParentReference { return t.Spec.ParentRefs },
 		b.config.Translator.HTTPRouteToHTTPRoute,
 		b.config.Setter.SetHTTPRouteCondition,
+		func(t *gwv1beta1.HTTPRoute) []gwv1beta1.BackendRef {
+			refs := []gwv1beta1.BackendRef{}
+			for _, rule := range t.Spec.Rules {
+				for _, ref := range rule.BackendRefs {
+					refs = append(refs, ref.BackendRef)
+				}
+			}
+			return refs
+		},
+		b.config.Setter.RemoveHTTPStatuses,
 	)
 }
 

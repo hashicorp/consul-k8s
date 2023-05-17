@@ -292,14 +292,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Watches(
 			// Subscribe to changes from Consul Connect Services
 			&source.Channel{Source: c.SubscribeServices(ctx, func(service *api.CatalogService) []types.NamespacedName {
-				var (
-					metaKeyKubeNS          = "k8s-namespace"
-					metaKeyKubeServiceName = "k8s-service-name"
-				)
-				serviceNamespace := service.ServiceMeta[metaKeyKubeNS]
-				serviceName := service.ServiceMeta[metaKeyKubeServiceName]
-				if serviceNamespace != "" && serviceName != "" {
-					key := (types.NamespacedName{Namespace: serviceNamespace, Name: serviceName}).String()
+				nsn := serviceToNamespacedName(service)
+
+				if nsn.Namespace != "" && nsn.Name != "" {
+					key := nsn.String()
 
 					requestSet := make(map[types.NamespacedName]struct{})
 					tcpRouteList := &gwv1alpha2.TCPRouteList{}
@@ -370,6 +366,17 @@ func (r *GatewayController) cleanupGatewayResources(ctx context.Context, log log
 	}
 
 	return ctrl.Result{}, err
+}
+
+func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
+	var (
+		metaKeyKubeNS          = "k8s-namespace"
+		metaKeyKubeServiceName = "k8s-service-name"
+	)
+	return types.NamespacedName{
+		Namespace: s.ServiceMeta[metaKeyKubeNS],
+		Name:      s.ServiceMeta[metaKeyKubeServiceName],
+	}
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
