@@ -1253,7 +1253,12 @@ func TestCache_Subscribe(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := New(Config{
-				ConsulClientConfig:  &consul.Config{},
+				ConsulClientConfig: &consul.Config{
+					APIClientConfig: &api.Config{},
+					HTTPPort:        0,
+					GRPCPort:        0,
+					APITimeout:      0,
+				},
 				ConsulServerConnMgr: consul.NewMockServerConnectionManager(t),
 				NamespacesEnabled:   false,
 				Logger:              logr.Logger{},
@@ -1532,7 +1537,11 @@ func TestCache_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := New(Config{})
+			c := New(Config{
+				ConsulClientConfig: &consul.Config{
+					APIClientConfig: &api.Config{},
+				},
+			})
 			c.cache = tt.cache
 
 			got := c.Get(tt.args.ref)
