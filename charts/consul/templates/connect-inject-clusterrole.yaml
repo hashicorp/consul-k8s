@@ -137,12 +137,18 @@ rules:
   - gateway.networking.k8s.io
   resources:
   - gatewayclasses/finalizers
+  - gateways/finalizers
+  - httproutes/finalizers
+  - tcproutes/finalizers
   verbs:
   - update
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
   - gatewayclasses/status
+  - gateways/status
+  - httproutes/status
+  - tcproutes/status
   verbs:
   - get
   - patch

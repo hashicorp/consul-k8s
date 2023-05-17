@@ -193,12 +193,16 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, update := range updates.Kubernetes.Updates {
 		log.Info("update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
-		// TODO: the actual update
+		if err := r.Client.Update(ctx, update); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	for _, update := range updates.Kubernetes.StatusUpdates {
 		log.Info("update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
-		// TODO: the actual update
+		if err := r.Client.Status().Update(ctx, update); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	/* TODO:

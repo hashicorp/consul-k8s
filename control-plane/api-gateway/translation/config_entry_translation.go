@@ -246,9 +246,11 @@ func translateHTTPMatches(k8sMatches []gwv1beta1.HTTPRouteMatch) []capi.HTTPMatc
 		headers := make([]capi.HTTPHeaderMatch, 0, len(k8sMatch.Headers))
 		for _, k8sHeader := range k8sMatch.Headers {
 			header := capi.HTTPHeaderMatch{
-				Match: headerMatchTypeTranslation[*k8sHeader.Type],
 				Name:  string(k8sHeader.Name),
 				Value: k8sHeader.Value,
+			}
+			if k8sHeader.Type != nil {
+				header.Match = headerMatchTypeTranslation[*k8sHeader.Type]
 			}
 			headers = append(headers, header)
 		}
@@ -257,21 +259,29 @@ func translateHTTPMatches(k8sMatches []gwv1beta1.HTTPRouteMatch) []capi.HTTPMatc
 		queries := make([]capi.HTTPQueryMatch, 0, len(k8sMatch.QueryParams))
 		for _, k8sQuery := range k8sMatch.QueryParams {
 			query := capi.HTTPQueryMatch{
-				Match: queryMatchTypeTranslation[*k8sQuery.Type],
 				Name:  k8sQuery.Name,
 				Value: k8sQuery.Value,
+			}
+			if k8sQuery.Type != nil {
+				query.Match = capi.HTTPQueryMatchType(*k8sQuery.Type)
 			}
 			queries = append(queries, query)
 		}
 
 		match := capi.HTTPMatch{
 			Headers: headers,
-			Method:  capi.HTTPMatchMethod(*k8sMatch.Method),
-			Path: capi.HTTPPathMatch{
-				Match: headerPathMatchTypeTranslation[*k8sMatch.Path.Type],
-				Value: string(*k8sMatch.Path.Value),
-			},
-			Query: queries,
+			Query:   queries,
+		}
+		if k8sMatch.Method != nil {
+			match.Method = capi.HTTPMatchMethod(*k8sMatch.Method)
+		}
+		if k8sMatch.Path != nil {
+			if k8sMatch.Path.Type != nil {
+				match.Path.Match = headerPathMatchTypeTranslation[*k8sMatch.Path.Type]
+			}
+			if k8sMatch.Path.Value != nil {
+				match.Path.Value = string(*k8sMatch.Path.Value)
+			}
 		}
 		matches = append(matches, match)
 	}

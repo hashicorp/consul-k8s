@@ -285,6 +285,12 @@ func (c *Cache) Run(ctx context.Context) {
 		}()
 	}
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.subscribeToConsulServices(ctx)
+	}()
+
 	wg.Wait()
 }
 

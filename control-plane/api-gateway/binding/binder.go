@@ -44,7 +44,7 @@ var (
 			Kind:  "HTTPRoute",
 		}},
 		gwv1beta1.TCPProtocolType: {{
-			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
+			Group: (*gwv1alpha2.Group)(&gwv1alpha2.GroupVersion.Group),
 			Kind:  "TCPRoute",
 		}},
 	}

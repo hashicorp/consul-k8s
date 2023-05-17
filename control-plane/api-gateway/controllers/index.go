@@ -139,7 +139,7 @@ func gatewaysForTCPRoute(o client.Object) []string {
 }
 
 func servicesForHTTPRoute(o client.Object) []string {
-	route := o.(*gwv1alpha2.HTTPRoute)
+	route := o.(*gwv1beta1.HTTPRoute)
 	refs := []string{}
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:

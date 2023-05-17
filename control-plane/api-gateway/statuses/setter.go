@@ -22,7 +22,7 @@ func (s *Setter) SetHTTPRouteCondition(route *gwv1beta1.HTTPRoute, parent gwv1be
 	conditions, modified := setCondition(status.Conditions, condition)
 	if modified {
 		status.Conditions = conditions
-		route.Status.Parents = setParentStatus(route.Status.Parents, status)
+		route.Status.Parents = s.setParentStatus(route.Status.Parents, status)
 	}
 	return modified
 }
@@ -47,7 +47,7 @@ func (s *Setter) SetTCPRouteCondition(route *gwv1alpha2.TCPRoute, parent gwv1bet
 	conditions, modified := setCondition(status.Conditions, condition)
 	if modified {
 		status.Conditions = conditions
-		route.Status.Parents = setParentStatus(route.Status.Parents, status)
+		route.Status.Parents = s.setParentStatus(route.Status.Parents, status)
 	}
 	return modified
 }
@@ -80,7 +80,7 @@ func (s *Setter) removeParentStatus(statuses []gwv1beta1.RouteParentStatus, pare
 	found := false
 	filtered := []gwv1beta1.RouteParentStatus{}
 	for _, status := range statuses {
-		if status.ParentRef == parent && string(status.ControllerName) == s.controllerName {
+		if parentsEqual(status.ParentRef, parent) && string(status.ControllerName) == s.controllerName {
 			found = true
 			continue
 		}
@@ -104,12 +104,33 @@ func setCondition(conditions []metav1.Condition, condition metav1.Condition) ([]
 	return append(conditions, condition), true
 }
 
-func setParentStatus(statuses []gwv1beta1.RouteParentStatus, parent gwv1beta1.RouteParentStatus) []gwv1beta1.RouteParentStatus {
+func (s *Setter) setParentStatus(statuses []gwv1beta1.RouteParentStatus, parent gwv1beta1.RouteParentStatus) []gwv1beta1.RouteParentStatus {
 	for i, status := range statuses {
-		if status.ParentRef == parent.ParentRef && status.ControllerName == parent.ControllerName {
+		if parentsEqual(status.ParentRef, parent.ParentRef) && status.ControllerName == parent.ControllerName {
 			statuses[i] = parent
 			return statuses
 		}
 	}
 	return append(statuses, parent)
+}
+
+func parentsEqual(one, two gwv1beta1.ParentReference) bool {
+	return bothNilOrEqual(one.Group, two.Group) &&
+		bothNilOrEqual(one.Kind, two.Kind) &&
+		bothNilOrEqual(one.SectionName, two.SectionName) &&
+		bothNilOrEqual(one.Port, two.Port) &&
+		one.Name == two.Name
+}
+
+func bothNilOrEqual[T comparable](one, two *T) bool {
+	if one == nil && two == nil {
+		return true
+	}
+	if one == nil {
+		return false
+	}
+	if two == nil {
+		return false
+	}
+	return *one == *two
 }
