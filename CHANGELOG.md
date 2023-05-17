@@ -1,3 +1,34 @@
+## 1.0.7 (May 17, 2023)
+
+SECURITY:
+
+* Upgrade to use Go 1.19.9.
+This resolves vulnerabilities [CVE-2023-24537](https://github.com/advisories/GHSA-9f7g-gqwh-jpf5)(`go/scanner`),
+[CVE-2023-24538](https://github.com/advisories/GHSA-v4m2-x4rp-hv22)(`html/template`),
+[CVE-2023-24534](https://github.com/advisories/GHSA-8v5j-pwr7-w5f8)(`net/textproto`) and
+[CVE-2023-24536](https://github.com/advisories/GHSA-9f7g-gqwh-jpf5)(`mime/multipart`).
+Also, `golang.org/x/net` has been updated to v0.7.0 to resolve CVEs [CVE-2022-41721
+](https://github.com/advisories/GHSA-fxg5-wq6x-vr4w
+), [CVE-2022-27664](https://github.com/advisories/GHSA-69cg-p879-7622) and [CVE-2022-41723
+](https://github.com/advisories/GHSA-vvpx-j8f3-3w6h
+.) [[GH-2108](https://github.com/hashicorp/consul-k8s/issues/2108)]
+
+FEATURES:
+
+* sync-catalog: add ability to sync hostname from a Kubernetes Ingress resource to the Consul Catalog during service registration. [[GH-2098](https://github.com/hashicorp/consul-k8s/issues/2098)]
+
+IMPROVEMENTS:
+
+* cli: Add `consul-k8s config read` command that returns the helm configuration in yaml format. [[GH-2078](https://github.com/hashicorp/consul-k8s/issues/2078)]
+* helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.0.2`, `image` value to `hashicorp/consul:1.14.7`, 
+and `imageEnvoy` to `envoyproxy/envoy:v1.24.7`. [[GH-2140](https://github.com/hashicorp/consul-k8s/issues/2140)]
+
+BUG FIXES:
+
+* api-gateway: fix issue where the API Gateway controller is unable to start up successfully when Vault is configured as the secrets backend [[GH-2083](https://github.com/hashicorp/consul-k8s/issues/2083)]
+* helm: add missing  `$HOST_IP` environment variable to to mesh gateway deployments. [[GH-1808](https://github.com/hashicorp/consul-k8s/issues/1808)]
+* sync-catalog: fix issue where the sync-catalog ACL token were set with an incorrect ENV VAR. [[GH-2068](https://github.com/hashicorp/consul-k8s/issues/2068)]
+
 ## 1.0.6 (March 20, 2023)
 
 IMPROVEMENTS:
