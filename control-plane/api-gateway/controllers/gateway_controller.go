@@ -349,7 +349,7 @@ func (r *GatewayController) getAllRefsForGateway(ctx context.Context, gw *gwv1be
 	for _, route := range httpRouteList.Items {
 		objs = append(objs, &route)
 	}
-	// handle http routes
+	// handle tcp routes
 	tcpRouteList := &v1alpha2.TCPRouteList{}
 	err = r.Client.List(ctx, tcpRouteList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(TCPRoute_GatewayIndex, types.NamespacedName{Name: gw.Name, Namespace: gw.Namespace}.String()),
