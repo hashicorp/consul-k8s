@@ -118,6 +118,9 @@ type Command struct {
 
 	flagEnableAutoEncrypt bool
 
+	// Consul telemetry collector
+	flagEnableTelemetryCollector bool
+
 	// Consul DNS flags.
 	flagEnableConsulDNS bool
 	flagResourcePrefix  string
@@ -203,6 +206,8 @@ func (c *Command) init() {
 		"Enables updating the CABundle on the webhook within this controller rather than using the web cert manager.")
 	c.flagSet.BoolVar(&c.flagEnableAutoEncrypt, "enable-auto-encrypt", false,
 		"Indicates whether TLS with auto-encrypt should be used when talking to Consul clients.")
+	c.flagSet.BoolVar(&c.flagEnableTelemetryCollector, "enable-telemetry-collector", false,
+		"Indicates whether proxies should be registered with configuration to enable forwarding metrics to consul-telemetry-collector")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
@@ -449,6 +454,7 @@ func (c *Command) Run(args []string) int {
 		ReleaseName:                c.flagReleaseName,
 		ReleaseNamespace:           c.flagReleaseNamespace,
 		EnableAutoEncrypt:          c.flagEnableAutoEncrypt,
+		EnableTelemetryCollector:   c.flagEnableTelemetryCollector,
 		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", endpoints.Controller{})
