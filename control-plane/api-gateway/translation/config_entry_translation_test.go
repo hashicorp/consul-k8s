@@ -1356,8 +1356,8 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 				EnableConsulNamespaces: true,
 				EnableK8sMirroring:     true,
 			}
-			got := tr.HTTPRouteToHTTPRoute(tc.args.k8sHTTPRoute, tc.args.parentRefs)
-			if diff := cmp.Diff(tc.want, got); diff != "" {
+			got := tr.HTTPRouteToHTTPRoute(&tc.args.k8sHTTPRoute, tc.args.parentRefs)
+			if diff := cmp.Diff(&tc.want, got); diff != "" {
 				t.Errorf("Translator.HTTPRouteToHTTPRoute() mismatch (-want +got):\n%s", diff)
 			}
 		})
@@ -1562,8 +1562,8 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 				EnableK8sMirroring:     true,
 			}
 
-			got := tr.TCPRouteToTCPRoute(tt.args.k8sRoute, tt.args.parentRefs)
-			if diff := cmp.Diff(got, tt.want); diff != "" {
+			got := tr.TCPRouteToTCPRoute(&tt.args.k8sRoute, tt.args.parentRefs)
+			if diff := cmp.Diff(got, &tt.want); diff != "" {
 				t.Errorf("Translator.TCPRouteToTCPRoute() mismatch (-want +got):\n%s", diff)
 			}
 		})

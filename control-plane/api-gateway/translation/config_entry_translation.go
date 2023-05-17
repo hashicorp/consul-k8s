@@ -105,7 +105,7 @@ func (t K8sToConsulTranslator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, cert
 	}
 }
 
-func (t K8sToConsulTranslator) ReferenceForGateway(k8sGW gwv1beta1.Gateway) api.ResourceReference {
+func (t K8sToConsulTranslator) ReferenceForGateway(k8sGW *gwv1beta1.Gateway) api.ResourceReference {
 	gwName := k8sGW.Name
 	if gwNameFromAnnotation, ok := k8sGW.Annotations[AnnotationGateway]; ok && gwNameFromAnnotation != "" && !strings.Contains(gwNameFromAnnotation, ",") {
 		gwName = gwNameFromAnnotation
@@ -118,13 +118,13 @@ func (t K8sToConsulTranslator) ReferenceForGateway(k8sGW gwv1beta1.Gateway) api.
 }
 
 // HTTPRouteToHTTPRoute translates a k8s HTTPRoute into a Consul HTTPRoute Config Entry.
-func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, parentRefs map[types.NamespacedName]api.ResourceReference) capi.HTTPRouteConfigEntry {
+func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute *gwv1beta1.HTTPRoute, parentRefs map[types.NamespacedName]api.ResourceReference) *capi.HTTPRouteConfigEntry {
 	routeName := k8sHTTPRoute.Name
 	if routeNameFromAnnotation, ok := k8sHTTPRoute.Annotations[AnnotationHTTPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
 	}
 
-	consulHTTPRoute := capi.HTTPRouteConfigEntry{
+	consulHTTPRoute := &capi.HTTPRouteConfigEntry{
 		Kind: capi.HTTPRoute,
 		Name: routeName,
 		Meta: map[string]string{
@@ -154,7 +154,7 @@ func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPR
 	return consulHTTPRoute
 }
 
-func (t K8sToConsulTranslator) ReferenceForHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute) api.ResourceReference {
+func (t K8sToConsulTranslator) ReferenceForHTTPRoute(k8sHTTPRoute *gwv1beta1.HTTPRoute) api.ResourceReference {
 	routeName := k8sHTTPRoute.Name
 	if routeNameFromAnnotation, ok := k8sHTTPRoute.Annotations[AnnotationHTTPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
@@ -326,13 +326,13 @@ func (t K8sToConsulTranslator) translateHTTPServices(k8sBackendRefs []gwv1beta1.
 }
 
 // TCPRouteToTCPRoute translates a Kuberenetes TCPRoute into a Consul TCPRoute Config Entry.
-func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs map[types.NamespacedName]api.ResourceReference) capi.TCPRouteConfigEntry {
+func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute *gwv1alpha2.TCPRoute, parentRefs map[types.NamespacedName]api.ResourceReference) *capi.TCPRouteConfigEntry {
 	routeName := k8sRoute.Name
 	if routeNameFromAnnotation, ok := k8sRoute.Annotations[AnnotationTCPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
 	}
 
-	consulRoute := capi.TCPRouteConfigEntry{
+	consulRoute := &capi.TCPRouteConfigEntry{
 		Kind: capi.TCPRoute,
 		Name: routeName,
 		Meta: map[string]string{
@@ -369,7 +369,7 @@ func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, 
 	return consulRoute
 }
 
-func (t K8sToConsulTranslator) ReferenceForTCPRoute(k8sTCPRoute gwv1alpha2.TCPRoute) api.ResourceReference {
+func (t K8sToConsulTranslator) ReferenceForTCPRoute(k8sTCPRoute *gwv1alpha2.TCPRoute) api.ResourceReference {
 	routeName := k8sTCPRoute.Name
 	if routeNameFromAnnotation, ok := k8sTCPRoute.Annotations[AnnotationTCPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
