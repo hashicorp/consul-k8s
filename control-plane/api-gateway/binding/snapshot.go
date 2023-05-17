@@ -93,6 +93,9 @@ type BinderConfig struct {
 	ControlledGateways map[types.NamespacedName]gwv1beta1.Gateway
 }
 
+// TODO: DRY up a bunch of these implementations, the boilerplate is almost
+// identical for each route type
+
 type Binder struct {
 	config BinderConfig
 }
@@ -142,7 +145,7 @@ func (r referenceTracker) isLastReference(object client.Object) bool {
 }
 
 func (r referenceTracker) canGCSecret(key types.NamespacedName) bool {
-	return r.certificatesReferencedByGateways[key] == 0
+	return r.certificatesReferencedByGateways[key] == 1
 }
 
 func (b *Binder) references() referenceTracker {
@@ -253,7 +256,7 @@ func (b *Binder) Snapshot() Snapshot {
 	}
 
 	for _, r := range b.config.HTTPRoutes {
-		route := &r
+		route := pointerTo(r)
 		routeRef := b.config.Translator.ReferenceForHTTPRoute(r)
 
 		existing := b.consulHTTPRouteFor(routeRef)
@@ -296,7 +299,7 @@ func (b *Binder) Snapshot() Snapshot {
 		}
 
 		if ensureFinalizer(route) {
-			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates)
+			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, route)
 			continue
 		}
 
@@ -326,7 +329,7 @@ func (b *Binder) Snapshot() Snapshot {
 	}
 
 	for _, r := range b.config.TCPRoutes {
-		route := &r
+		route := pointerTo(r)
 		routeRef := b.config.Translator.ReferenceForTCPRoute(r)
 
 		existing := b.consulTCPRouteFor(routeRef)
@@ -369,7 +372,7 @@ func (b *Binder) Snapshot() Snapshot {
 		}
 
 		if ensureFinalizer(route) {
-			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates)
+			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, route)
 			continue
 		}
 

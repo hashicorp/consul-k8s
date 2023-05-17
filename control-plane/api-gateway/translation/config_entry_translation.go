@@ -68,9 +68,13 @@ func (t K8sToConsulTranslator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, cert
 			}
 			certificates = append(certificates, c)
 		}
+		hostname := ""
+		if listener.Hostname != nil {
+			hostname = string(*listener.Hostname)
+		}
 		l := capi.APIGatewayListener{
 			Name:     string(listener.Name),
-			Hostname: string(*listener.Hostname),
+			Hostname: hostname,
 			Port:     int(listener.Port),
 			Protocol: string(listener.Protocol),
 			TLS: capi.APIGatewayTLSConfiguration{
