@@ -199,6 +199,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 				fmt.Errorf("writing config entry to consul: %w", err))
 		}
+
 		logger.Info("config entry created", "request-time", writeMeta.RequestTime)
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
 	}
@@ -265,6 +266,15 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
 	} else if configEntry.SyncedConditionStatus() != corev1.ConditionTrue {
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
+	}
+
+	// For resolvers and splitters, we need to set the ClusterIP of the matching service to Consul so that transparent
+	// proxy works correctly. Do not fail the reconcile if assigning the virtual IP returns an error.
+	if needsVirtualIPAssignment(configEntry) {
+		err = assignServiceVirtualIP(ctx, logger, consulClient, crdCtrl, req.NamespacedName, configEntry, r.DatacenterName)
+		if err != nil {
+			logger.Error(err, "failed assigning service virtual ip")
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -379,6 +389,57 @@ func (r *ConfigEntryController) nonMatchingMigrationError(kubeEntry common.Confi
 	}
 
 	return fmt.Errorf("migration failed: Kubernetes resource does not match existing Consul config entry: consul=%s, kube=%s", consulJSON, kubeJSON)
+}
+
+// needsVirtualIPAssignment checks to see if a configEntry type needs to be assigned a virtual IP.
+func needsVirtualIPAssignment(configEntry common.ConfigEntryResource) bool {
+	kubeKind := configEntry.KubeKind()
+	if kubeKind == common.ServiceResolver || kubeKind == common.ServiceRouter || kubeKind == common.ServiceSplitter {
+		return true
+	}
+	return false
+}
+
+// assignServiceVirtualIPs manually sends the ClusterIP for a matching service for ServiceRouter or ServiceSplitter
+// CRDs to Consul so that it can be added to the virtual IP table. The assignment is skipped if the matching service
+// does not exist or if an older version of Consul is being used. Endpoints Controller, on service registration, also
+// manually sends a ClusterIP when a service is created. This increases the chance of a real IP ending up in the
+// discovery chain.
+func assignServiceVirtualIP(ctx context.Context, logger logr.Logger, consulClient *capi.Client, crdCtrl Controller, namespacedName types.NamespacedName, configEntry common.ConfigEntryResource, datacenter string) error {
+	service := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configEntry.KubernetesName(),
+			Namespace: namespacedName.Namespace,
+		},
+	}
+	if err := crdCtrl.Get(ctx, namespacedName, &service); err != nil {
+		// It is non-fatal if the service does not exist. The ClusterIP will get added when the service is registered in
+		// the endpoints controller
+		if k8serr.IsNotFound(err) {
+			return nil
+		}
+		// Something is really wrong with the service
+		return err
+	}
+
+	wo := &capi.WriteOptions{
+		Namespace: configEntry.ToConsul(datacenter).GetNamespace(),
+		Partition: configEntry.ToConsul(datacenter).GetPartition(),
+	}
+
+	logger.Info("adding manual ip to virtual ip table in Consul", "name", service.Name)
+	_, _, err := consulClient.Internal().AssignServiceVirtualIP(ctx, configEntry.KubernetesName(), []string{service.Spec.ClusterIP}, wo)
+	if err != nil {
+		// Maintain backwards compatibility with older versions of Consul that do not support the manual VIP improvements. With the older version, the mesh
+		// will still work.
+		if isNotFoundErr(err) {
+			logger.Error(err, "failed to add ip to virtual ip table. Please upgrade Consul to version 1.16 or higher", "name", service.Name)
+			return nil
+		} else {
+			return err
+		}
+	}
+	return nil
 }
 
 func isNotFoundErr(err error) bool {
