@@ -813,8 +813,6 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
 			tt.config.Setter = statuses.NewSetter(controllerName)
 
 			binder := NewBinder(tt.config)
