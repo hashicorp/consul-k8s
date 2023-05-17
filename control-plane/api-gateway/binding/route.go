@@ -272,8 +272,13 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 	}
 
 	validation := r.validateRefs(route.GetNamespace(), r.getBackendRefsFunc(route))
-	if r.setRouteConditionFunc(route, nil, validation.Condition()) {
-		kubernetesNeedsStatusUpdate = true
+	// the spec is dumb and makes you set a parent for any status, even when the
+	// status is not with respect to a parent, as is the case of resolved refs
+	// so we need to set the status on all parents
+	for _, ref := range gatewayRefs {
+		if r.setRouteConditionFunc(route, &ref, validation.Condition()) {
+			kubernetesNeedsStatusUpdate = true
+		}
 	}
 
 	results := make(parentBindResults, 0)

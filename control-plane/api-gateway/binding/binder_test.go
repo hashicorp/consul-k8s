@@ -1016,18 +1016,15 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
 							Conditions: []metav1.Condition{{
 								Type:    "ResolvedRefs",
 								Status:  metav1.ConditionTrue,
 								Reason:  "ResolvedRefs",
 								Message: "resolved backend references",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
-							ParentRef: gwv1beta1.ParentReference{
-								Name: "gateway",
-							},
-							Conditions: []metav1.Condition{{
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1088,18 +1085,15 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
 							Conditions: []metav1.Condition{{
 								Type:    "ResolvedRefs",
 								Status:  metav1.ConditionFalse,
 								Reason:  "BackendNotFound",
 								Message: "/backend: backend not found",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
-							ParentRef: gwv1beta1.ParentReference{
-								Name: "gateway",
-							},
-							Conditions: []metav1.Condition{{
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1162,18 +1156,15 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
 							Conditions: []metav1.Condition{{
 								Type:    "ResolvedRefs",
 								Status:  metav1.ConditionFalse,
 								Reason:  "InvalidKind",
 								Message: "/backend [Service.invalid.foo.com]: invalid backend kind",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
-							ParentRef: gwv1beta1.ParentReference{
-								Name: "gateway",
-							},
-							Conditions: []metav1.Condition{{
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1220,19 +1211,16 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
-							Conditions: []metav1.Condition{{
-								Type:    "ResolvedRefs",
-								Status:  metav1.ConditionTrue,
-								Reason:  "ResolvedRefs",
-								Message: "resolved backend references",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:      "gateway",
 								Namespace: defaultNamespacePointer,
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1319,19 +1307,16 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
-							Conditions: []metav1.Condition{{
-								Type:    "ResolvedRefs",
-								Status:  metav1.ConditionTrue,
-								Reason:  "ResolvedRefs",
-								Message: "resolved backend references",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:        "gateway",
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1344,6 +1329,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1356,6 +1346,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1368,6 +1363,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1380,6 +1380,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1392,6 +1397,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1404,6 +1414,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-tls"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1416,6 +1431,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1520,20 +1540,17 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
-							Conditions: []metav1.Condition{{
-								Type:    "ResolvedRefs",
-								Status:  metav1.ConditionTrue,
-								Reason:  "ResolvedRefs",
-								Message: "resolved backend references",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:        "gateway",
 								Namespace:   defaultNamespacePointer,
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1547,6 +1564,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1560,6 +1582,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1573,6 +1600,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1586,6 +1618,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1599,6 +1636,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1612,6 +1654,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-tls"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1625,6 +1672,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1667,18 +1719,15 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
 							Conditions: []metav1.Condition{{
 								Type:    "ResolvedRefs",
 								Status:  metav1.ConditionTrue,
 								Reason:  "ResolvedRefs",
 								Message: "resolved backend references",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
-							ParentRef: gwv1beta1.ParentReference{
-								Name: "gateway",
-							},
-							Conditions: []metav1.Condition{{
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1735,18 +1784,15 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
 							Conditions: []metav1.Condition{{
 								Type:    "ResolvedRefs",
 								Status:  metav1.ConditionFalse,
 								Reason:  "BackendNotFound",
 								Message: "/backend: backend not found",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
-							ParentRef: gwv1beta1.ParentReference{
-								Name: "gateway",
-							},
-							Conditions: []metav1.Condition{{
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1805,18 +1851,15 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
+							ParentRef: gwv1beta1.ParentReference{
+								Name: "gateway",
+							},
 							Conditions: []metav1.Condition{{
 								Type:    "ResolvedRefs",
 								Status:  metav1.ConditionFalse,
 								Reason:  "InvalidKind",
 								Message: "/backend [Service.invalid.foo.com]: invalid backend kind",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
-							ParentRef: gwv1beta1.ParentReference{
-								Name: "gateway",
-							},
-							Conditions: []metav1.Condition{{
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1863,19 +1906,16 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
-							Conditions: []metav1.Condition{{
-								Type:    "ResolvedRefs",
-								Status:  metav1.ConditionTrue,
-								Reason:  "ResolvedRefs",
-								Message: "resolved backend references",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:      "gateway",
 								Namespace: defaultNamespacePointer,
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1956,19 +1996,16 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
-							Conditions: []metav1.Condition{{
-								Type:    "ResolvedRefs",
-								Status:  metav1.ConditionTrue,
-								Reason:  "ResolvedRefs",
-								Message: "resolved backend references",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:        "gateway",
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -1981,6 +2018,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -1993,6 +2035,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -2005,6 +2052,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -2017,6 +2069,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -2029,6 +2086,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -2041,6 +2103,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -2137,20 +2204,17 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					RouteStatus: gwv1beta1.RouteStatus{
 						Parents: []gwv1beta1.RouteParentStatus{{
 							ControllerName: gatewayClass.Spec.ControllerName,
-							Conditions: []metav1.Condition{{
-								Type:    "ResolvedRefs",
-								Status:  metav1.ConditionTrue,
-								Reason:  "ResolvedRefs",
-								Message: "resolved backend references",
-							}},
-						}, {
-							ControllerName: gatewayClass.Spec.ControllerName,
 							ParentRef: gwv1beta1.ParentReference{
 								Name:        "gateway",
 								Namespace:   defaultNamespacePointer,
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -2164,6 +2228,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -2177,6 +2246,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -2190,6 +2264,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -2203,6 +2282,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionTrue,
 								Reason:  "Accepted",
@@ -2216,6 +2300,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
@@ -2229,6 +2318,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 								SectionName: pointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
 							},
 							Conditions: []metav1.Condition{{
+								Type:    "ResolvedRefs",
+								Status:  metav1.ConditionTrue,
+								Reason:  "ResolvedRefs",
+								Message: "resolved backend references",
+							}, {
 								Type:    "Accepted",
 								Status:  metav1.ConditionFalse,
 								Reason:  "NotAllowedByListeners",
