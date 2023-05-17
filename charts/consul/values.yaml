@@ -63,7 +63,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.14.5"
+  image: "hashicorp/consul:1.14.7"
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -569,7 +569,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: "hashicorp/consul-dataplane:1.1.0"
+  imageConsulDataplane: "hashicorp/consul-dataplane:1.0.2"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -2912,7 +2912,7 @@ apiGateway:
   # The name (and tag) of the Envoy Docker image used for the
   # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
   # @default: envoyproxy/envoy:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy:v1.23.1"
+  imageEnvoy: "envoyproxy/envoy:v1.24.7"
 
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
   # @type: string
