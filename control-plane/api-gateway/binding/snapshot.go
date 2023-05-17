@@ -300,6 +300,7 @@ func (b *Binder) Snapshot() Snapshot {
 			continue
 		}
 
+		// TODO: add validation statuses for routes for referenced services
 		results := bindRoute(&b.config.Gateway, b.config.Namespaces[route.GetNamespace()], route.GroupVersionKind().GroupKind(), route.Spec.Hostnames, route.Spec.ParentRefs)
 		// TODO: increment the number of bound routes if necessary
 
@@ -372,6 +373,7 @@ func (b *Binder) Snapshot() Snapshot {
 			continue
 		}
 
+		// TODO: add validation statuses for routes for referenced services
 		results := bindRoute(&b.config.Gateway, b.config.Namespaces[route.GetNamespace()], route.GroupVersionKind().GroupKind(), nil, route.Spec.ParentRefs)
 		// TODO: increment the number of bound routes if necessary
 
