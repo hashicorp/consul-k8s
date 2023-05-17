@@ -9,13 +9,18 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-type bindResult map[gwv1beta1.SectionName]error
+type bindResult struct {
+	section gwv1beta1.SectionName
+	err     error
+}
 
-func (b bindResult) Error() string {
+type bindResults []bindResult
+
+func (b bindResults) Error() string {
 	messages := []string{}
-	for section, err := range b {
-		if err != nil {
-			messages = append(messages, fmt.Sprintf("%s: %s", section, err.Error()))
+	for _, result := range b {
+		if result.err != nil {
+			messages = append(messages, fmt.Sprintf("%s: %s", result.section, result.err.Error()))
 		}
 	}
 
@@ -23,16 +28,16 @@ func (b bindResult) Error() string {
 	return strings.Join(messages, "; ")
 }
 
-func (b bindResult) DidBind() bool {
-	for _, err := range b {
-		if err == nil {
+func (b bindResults) DidBind() bool {
+	for _, result := range b {
+		if result.err == nil {
 			return true
 		}
 	}
 	return false
 }
 
-func (b bindResult) Condition() metav1.Condition {
+func (b bindResults) Condition() metav1.Condition {
 	// if we bound to any listeners, say we're accepted
 	if b.DidBind() {
 		return metav1.Condition{
@@ -48,9 +53,9 @@ func (b bindResult) Condition() metav1.Condition {
 
 	// if we only have a single binding error, we can get more specific
 	if len(b) == 1 {
-		for _, err := range b {
+		for _, result := range b {
 			// if we have a hostname mismatch error, then use the more specific reason
-			if err == errNoMatchingListenerHostname {
+			if result.err == errNoMatchingListenerHostname {
 				reason = "NoMatchingListenerHostname"
 			}
 		}
@@ -63,3 +68,10 @@ func (b bindResult) Condition() metav1.Condition {
 		Message: b.Error(),
 	}
 }
+
+type parentBindResult struct {
+	parent  gwv1beta1.ParentReference
+	results bindResults
+}
+
+type parentBindResults []parentBindResult

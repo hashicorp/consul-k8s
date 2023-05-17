@@ -271,6 +271,24 @@ func routeKindIsAllowedForListener(kinds []gwv1beta1.RouteGroupKind, gk schema.G
 	return false
 }
 
+func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRoutes, gk schema.GroupKind) bool {
+	if allowedRoutes == nil {
+		return true
+	}
+
+	if len(allowedRoutes.Kinds) == 0 {
+		return true
+	}
+
+	for _, kind := range allowedRoutes.Kinds {
+		if string(kind.Kind) == gk.Kind && nilOrEqual(kind.Group, gk.Group) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
 	// If namespace label is not set, implicitly insert it to support older Kubernetes versions
 	if labels[NamespaceNameLabel] == name {

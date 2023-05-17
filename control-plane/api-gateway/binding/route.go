@@ -128,38 +128,59 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 	}
 
 	// TODO: add validation statuses for routes for referenced services
-	results := map[gwv1beta1.ParentReference]bindResult{}
+	results := make(parentBindResults, 0)
 	namespace := r.namespaces[route.GetNamespace()]
 	gk := route.GetObjectKind().GroupVersionKind().GroupKind()
-	for _, ref := range filterParentRefs(objectToMeta(r.gateway), namespace.Name, gatewayRefs) {
-		result := make(bindResult)
-
+	for _, ref := range gatewayRefs {
+		result := make(bindResults, 0)
 		for _, listener := range listenersFor(r.gateway, ref.SectionName) {
 			if !routeKindIsAllowedForListener(supportedKindsForProtocol[listener.Protocol], gk) {
-				result[listener.Name] = errNotAllowedByListenerProtocol
+				result = append(result, bindResult{
+					section: listener.Name,
+					err:     errNotAllowedByListenerProtocol,
+				})
+				continue
+			}
+
+			if !routeKindIsAllowedForListenerExplicit(listener.AllowedRoutes, gk) {
+				result = append(result, bindResult{
+					section: listener.Name,
+					err:     errNotAllowedByListenerProtocol,
+				})
 				continue
 			}
 
 			if !routeAllowedForListenerNamespaces(r.gateway.Namespace, listener.AllowedRoutes, namespace) {
-				result[listener.Name] = errNotAllowedByListenerNamespace
+				result = append(result, bindResult{
+					section: listener.Name,
+					err:     errNotAllowedByListenerNamespace,
+				})
 				continue
 			}
 
 			if !routeAllowedForListenerHostname(listener.Hostname, r.getHostnamesFunc(route)) {
-				result[listener.Name] = errNoMatchingListenerHostname
+				result = append(result, bindResult{
+					section: listener.Name,
+					err:     errNoMatchingListenerHostname,
+				})
 				continue
 			}
 
-			result[listener.Name] = nil
+			result = append(result, bindResult{
+				section: listener.Name,
+			})
 		}
 
-		results[ref] = result
+		results = append(results, parentBindResult{
+			parent:  ref,
+			results: result,
+		})
 	}
 	// TODO: increment the number of bound routes if necessary
 
 	updated := false
-	for ref, result := range results {
-		if r.setRouteConditionFunc(route, ref, result.Condition()) {
+	for _, result := range results {
+		if r.setRouteConditionFunc(route, result.parent, result.results.Condition()) {
 			updated = true
 		}
 	}
@@ -170,7 +191,7 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 
 	entry := r.translationFunc(route, nil)
 	// make all parent refs explicit based on what actually bound
-	if !isNil(existing) {
+	if isNil(existing) {
 		r.setParentsFunc(entry, parentsForRoute(r.gatewayRef, nil, results))
 	} else {
 		r.setParentsFunc(entry, parentsForRoute(r.gatewayRef, r.getParentsFunc(existing), results))
@@ -256,13 +277,13 @@ func (b *Binder) cleanTCPRoute(route *api.TCPRouteConfigEntry, seenRoutes map[ap
 	)
 }
 
-func parentsForRoute(ref api.ResourceReference, existing []api.ResourceReference, results map[gwv1beta1.ParentReference]bindResult) []api.ResourceReference {
+func parentsForRoute(ref api.ResourceReference, existing []api.ResourceReference, results parentBindResults) []api.ResourceReference {
 	// store all section names that bound
 	parentSet := map[string]struct{}{}
 	for _, result := range results {
-		for section, err := range result {
-			if err != nil {
-				parentSet[string(section)] = struct{}{}
+		for _, r := range result.results {
+			if r.err != nil {
+				parentSet[string(r.section)] = struct{}{}
 			}
 		}
 	}

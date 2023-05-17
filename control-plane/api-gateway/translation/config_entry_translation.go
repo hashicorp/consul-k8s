@@ -47,26 +47,29 @@ type K8sToConsulTranslator struct {
 func (t K8sToConsulTranslator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types.NamespacedName]api.ResourceReference) capi.APIGatewayConfigEntry {
 	listeners := make([]capi.APIGatewayListener, 0, len(k8sGW.Spec.Listeners))
 	for _, listener := range k8sGW.Spec.Listeners {
-		certificates := make([]capi.ResourceReference, 0, len(listener.TLS.CertificateRefs))
-		for _, certificate := range listener.TLS.CertificateRefs {
-			k8sNS := ""
-			if certificate.Namespace != nil {
-				k8sNS = string(*certificate.Namespace)
+		var certificates []capi.ResourceReference
+		if listener.TLS != nil {
+			certificates = make([]capi.ResourceReference, 0, len(listener.TLS.CertificateRefs))
+			for _, certificate := range listener.TLS.CertificateRefs {
+				k8sNS := ""
+				if certificate.Namespace != nil {
+					k8sNS = string(*certificate.Namespace)
+				}
+				nsn := types.NamespacedName{Name: string(certificate.Name), Namespace: k8sNS}
+				certRef, ok := certs[nsn]
+				if !ok {
+					// we don't have a ref for this certificate in consul
+					// drop the ref from the created gateway
+					continue
+				}
+				c := capi.ResourceReference{
+					Kind:      capi.InlineCertificate,
+					Name:      certRef.Name,
+					Partition: certRef.Partition,
+					Namespace: certRef.Namespace,
+				}
+				certificates = append(certificates, c)
 			}
-			nsn := types.NamespacedName{Name: string(certificate.Name), Namespace: k8sNS}
-			certRef, ok := certs[nsn]
-			if !ok {
-				// we don't have a ref for this certificate in consul
-				// drop the ref from the created gateway
-				continue
-			}
-			c := capi.ResourceReference{
-				Kind:      capi.InlineCertificate,
-				Name:      certRef.Name,
-				Partition: certRef.Partition,
-				Namespace: certRef.Namespace,
-			}
-			certificates = append(certificates, c)
 		}
 		hostname := ""
 		if listener.Hostname != nil {
@@ -170,7 +173,11 @@ func (t K8sToConsulTranslator) ReferenceForHTTPRoute(k8sHTTPRoute *gwv1beta1.HTT
 func translateRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentRefs map[types.NamespacedName]api.ResourceReference) []capi.ResourceReference {
 	parents := make([]capi.ResourceReference, 0, len(k8sParentRefs))
 	for _, k8sParentRef := range k8sParentRefs {
-		parentRef, ok := parentRefs[types.NamespacedName{Name: string(k8sParentRef.Name), Namespace: string(*k8sParentRef.Namespace)}]
+		namespace := ""
+		if k8sParentRef.Namespace != nil {
+			namespace = string(*k8sParentRef.Namespace)
+		}
+		parentRef, ok := parentRefs[types.NamespacedName{Name: string(k8sParentRef.Name), Namespace: namespace}]
 		if !(ok && isRefAPIGateway(k8sParentRef)) {
 			// we drop any parent refs that consul does not know about
 			continue
