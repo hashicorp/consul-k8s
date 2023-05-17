@@ -6414,3 +6414,54 @@ func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Po
 	}
 	return pod
 }
+
+func TestReconcileAssignServiceVirtualIP(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	cases := []struct {
+		name      string
+		service   *api.AgentService
+		expectErr bool
+	}{
+		{
+			name: "valid service",
+			service: &api.AgentService{
+				ID:      "",
+				Service: "foo",
+				Port:    80,
+				Address: "1.2.3.4",
+				TaggedAddresses: map[string]api.ServiceAddress{
+					"virtual": {
+						Address: "1.2.3.4",
+						Port:    80,
+					},
+				},
+				Meta: map[string]string{constants.MetaKeyKubeNS: "default"},
+			},
+			expectErr: false,
+		},
+		{
+			name: "service missing IP should not error",
+			service: &api.AgentService{
+				ID:      "",
+				Service: "bar",
+				Meta:    map[string]string{constants.MetaKeyKubeNS: "default"},
+			},
+			expectErr: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+
+			// Create test consulServer server.
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			apiClient := testClient.APIClient
+			err := assignServiceVirtualIP(ctx, apiClient, c.service)
+			if err != nil {
+				require.True(t, c.expectErr)
+			} else {
+				require.False(t, c.expectErr)
+			}
+		})
+	}
+}
