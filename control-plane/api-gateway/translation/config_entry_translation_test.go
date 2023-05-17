@@ -13,6 +13,7 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 )
 
@@ -227,14 +228,14 @@ func TestTranslator_GatewayToAPIGateway(t *testing.T) {
 				MirroringPrefix:        "",
 			}
 
-			certs := map[types.NamespacedName]consulIdentifier{
+			certs := map[types.NamespacedName]api.ResourceReference{
 				{Name: listenerOneCertName, Namespace: listenerOneCertK8sNamespace}: {
-					name:      listenerOneCertName,
-					namespace: listenerOneCertConsulNamespace,
+					Name:      listenerOneCertName,
+					Namespace: listenerOneCertConsulNamespace,
 				},
 				{Name: listenerTwoCertName, Namespace: listenerTwoCertK8sNamespace}: {
-					name:      listenerTwoCertName,
-					namespace: listenerTwoCertConsulNamespace,
+					Name:      listenerTwoCertName,
+					Namespace: listenerTwoCertConsulNamespace,
 				},
 			}
 
@@ -251,7 +252,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		k8sHTTPRoute gwv1beta1.HTTPRoute
-		parentRefs   map[types.NamespacedName]consulIdentifier
+		parentRefs   map[types.NamespacedName]api.ResourceReference
 	}
 	tests := map[string]struct {
 		args args
@@ -378,8 +379,8 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 						},
 					},
 				},
-				parentRefs: map[types.NamespacedName]consulIdentifier{
-					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {name: "api-gw", partition: "part-1", namespace: "ns"},
+				parentRefs: map[types.NamespacedName]api.ResourceReference{
+					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
 				},
 			},
 			want: capi.HTTPRouteConfigEntry{
@@ -596,8 +597,8 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 						},
 					},
 				},
-				parentRefs: map[types.NamespacedName]consulIdentifier{
-					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {name: "api-gw", partition: "part-1", namespace: "ns"},
+				parentRefs: map[types.NamespacedName]api.ResourceReference{
+					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
 				},
 			},
 			want: capi.HTTPRouteConfigEntry{
@@ -815,8 +816,8 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 						},
 					},
 				},
-				parentRefs: map[types.NamespacedName]consulIdentifier{
-					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {name: "api-gw", partition: "part-1", namespace: "ns"},
+				parentRefs: map[types.NamespacedName]api.ResourceReference{
+					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
 				},
 			},
 			want: capi.HTTPRouteConfigEntry{
@@ -1038,8 +1039,8 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 						},
 					},
 				},
-				parentRefs: map[types.NamespacedName]consulIdentifier{
-					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {name: "api-gw", partition: "part-1", namespace: "ns"},
+				parentRefs: map[types.NamespacedName]api.ResourceReference{
+					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
 				},
 			},
 			want: capi.HTTPRouteConfigEntry{
@@ -1253,8 +1254,8 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 						},
 					},
 				},
-				parentRefs: map[types.NamespacedName]consulIdentifier{
-					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {name: "api-gw", partition: "part-1", namespace: "ns"},
+				parentRefs: map[types.NamespacedName]api.ResourceReference{
+					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
 				},
 			},
 			want: capi.HTTPRouteConfigEntry{
@@ -1367,7 +1368,7 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		k8sRoute   gwv1alpha2.TCPRoute
-		parentRefs map[types.NamespacedName]consulIdentifier
+		parentRefs map[types.NamespacedName]api.ResourceReference
 	}
 	tests := map[string]struct {
 		args args
@@ -1417,14 +1418,14 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 						},
 					},
 				},
-				parentRefs: map[types.NamespacedName]consulIdentifier{
+				parentRefs: map[types.NamespacedName]api.ResourceReference{
 					{
 						Namespace: "another-ns",
 						Name:      "mygw",
 					}: {
-						name:      "mygw",
-						namespace: "another-ns",
-						partition: "",
+						Name:      "mygw",
+						Namespace: "another-ns",
+						Partition: "",
 					},
 				},
 			},
@@ -1509,14 +1510,14 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 						},
 					},
 				},
-				parentRefs: map[types.NamespacedName]consulIdentifier{
+				parentRefs: map[types.NamespacedName]api.ResourceReference{
 					{
 						Namespace: "another-ns",
 						Name:      "mygw",
 					}: {
-						name:      "mygw",
-						namespace: "another-ns",
-						partition: "",
+						Name:      "mygw",
+						Namespace: "another-ns",
+						Partition: "",
 					},
 				},
 			},
@@ -1564,60 +1565,6 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 			got := tr.TCPRouteToTCPRoute(tt.args.k8sRoute, tt.args.parentRefs)
 			if diff := cmp.Diff(got, tt.want); diff != "" {
 				t.Errorf("Translator.TCPRouteToTCPRoute() mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestTranslator_SecretToInlineCertificate(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		k8sSecret gwv1beta1.SecretObjectReference
-		certs     map[types.NamespacedName]consulIdentifier
-	}
-	tests := map[string]struct {
-		args args
-		want capi.InlineCertificateConfigEntry
-	}{
-		"base test": {
-			args: args{
-				k8sSecret: gwv1beta1.SecretObjectReference{
-					Name:      "my-secret",
-					Namespace: ptrTo(gwv1beta1.Namespace("k8s-ns")),
-				},
-				certs: map[types.NamespacedName]consulIdentifier{
-					{
-						Namespace: "k8s-ns",
-						Name:      "my-secret",
-					}: {
-						name:      "inline certs",
-						namespace: "my-ns",
-						partition: "",
-					},
-				},
-			},
-			want: capi.InlineCertificateConfigEntry{
-				Kind: capi.InlineCertificate,
-				Name: "inline certs",
-				Meta: map[string]string{
-					metaKeyManagedBy:       metaValueManagedBy,
-					metaKeyKubeNS:          "k8s-ns",
-					metaKeyKubeServiceName: "my-secret",
-					metaKeyKubeName:        "my-secret",
-				},
-				Namespace: "my-ns",
-			},
-		},
-	}
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			tr := K8sToConsulTranslator{
-				EnableConsulNamespaces: true,
-				EnableK8sMirroring:     true,
-			}
-			got := tr.SecretToInlineCertificate(tt.args.k8sSecret, tt.args.certs)
-			if diff := cmp.Diff(got, tt.want); diff != "" {
-				t.Errorf("Translator.SecretToInlineCertificate() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

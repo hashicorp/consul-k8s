@@ -15,8 +15,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -95,8 +97,11 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			s := runtime.NewScheme()
-			k8sSchemaObjects := append(tt.k8sObjects(), &gwv1beta1.GatewayClass{}, &gwv1beta1.GatewayClassList{}, &v1alpha1.GatewayClassConfig{})
-			s.AddKnownTypes(v1alpha1.GroupVersion, k8sSchemaObjects...)
+			require.NoError(t, clientgoscheme.AddToScheme(s))
+			require.NoError(t, gwv1alpha2.Install(s))
+			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, v1alpha1.AddToScheme(s))
+
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.k8sObjects()...).Build()
 
 			// Create the gateway class config controller.

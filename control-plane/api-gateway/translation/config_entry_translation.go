@@ -7,11 +7,13 @@ package translation
 import (
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 )
 
@@ -32,12 +34,6 @@ const (
 	AnnotationInlineCertificate = "consul.hashicorp.com/inline-certificate"
 )
 
-type consulIdentifier struct {
-	name      string
-	namespace string
-	partition string
-}
-
 // K8sToConsulTranslator handles translating K8s resources into Consul config entries.
 type K8sToConsulTranslator struct {
 	EnableConsulNamespaces bool
@@ -48,7 +44,7 @@ type K8sToConsulTranslator struct {
 }
 
 // GatewayToAPIGateway translates a kuberenetes API gateway into a Consul APIGateway Config Entry.
-func (t K8sToConsulTranslator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types.NamespacedName]consulIdentifier) capi.APIGatewayConfigEntry {
+func (t K8sToConsulTranslator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, certs map[types.NamespacedName]api.ResourceReference) capi.APIGatewayConfigEntry {
 	listeners := make([]capi.APIGatewayListener, 0, len(k8sGW.Spec.Listeners))
 	for _, listener := range k8sGW.Spec.Listeners {
 		certificates := make([]capi.ResourceReference, 0, len(listener.TLS.CertificateRefs))
@@ -66,9 +62,9 @@ func (t K8sToConsulTranslator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, cert
 			}
 			c := capi.ResourceReference{
 				Kind:      capi.InlineCertificate,
-				Name:      certRef.name,
-				Partition: certRef.partition,
-				Namespace: certRef.namespace,
+				Name:      certRef.Name,
+				Partition: certRef.Partition,
+				Namespace: certRef.Namespace,
 			}
 			certificates = append(certificates, c)
 		}
@@ -105,8 +101,20 @@ func (t K8sToConsulTranslator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, cert
 	}
 }
 
+func (t K8sToConsulTranslator) ReferenceForGateway(k8sGW gwv1beta1.Gateway) api.ResourceReference {
+	gwName := k8sGW.Name
+	if gwNameFromAnnotation, ok := k8sGW.Annotations[AnnotationGateway]; ok && gwNameFromAnnotation != "" && !strings.Contains(gwNameFromAnnotation, ",") {
+		gwName = gwNameFromAnnotation
+	}
+	return api.ResourceReference{
+		Kind:      api.APIGateway,
+		Name:      gwName,
+		Namespace: t.getConsulNamespace(k8sGW.GetObjectMeta().GetNamespace()),
+	}
+}
+
 // HTTPRouteToHTTPRoute translates a k8s HTTPRoute into a Consul HTTPRoute Config Entry.
-func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, parentRefs map[types.NamespacedName]consulIdentifier) capi.HTTPRouteConfigEntry {
+func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute, parentRefs map[types.NamespacedName]api.ResourceReference) capi.HTTPRouteConfigEntry {
 	routeName := k8sHTTPRoute.Name
 	if routeNameFromAnnotation, ok := k8sHTTPRoute.Annotations[AnnotationHTTPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
@@ -142,8 +150,20 @@ func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPR
 	return consulHTTPRoute
 }
 
+func (t K8sToConsulTranslator) ReferenceForHTTPRoute(k8sHTTPRoute gwv1beta1.HTTPRoute) api.ResourceReference {
+	routeName := k8sHTTPRoute.Name
+	if routeNameFromAnnotation, ok := k8sHTTPRoute.Annotations[AnnotationHTTPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
+		routeName = routeNameFromAnnotation
+	}
+	return api.ResourceReference{
+		Kind:      api.HTTPRoute,
+		Name:      routeName,
+		Namespace: t.getConsulNamespace(k8sHTTPRoute.GetObjectMeta().GetNamespace()),
+	}
+}
+
 // translates parent refs for Routes into Consul Resource References.
-func translateRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentRefs map[types.NamespacedName]consulIdentifier) []capi.ResourceReference {
+func translateRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentRefs map[types.NamespacedName]api.ResourceReference) []capi.ResourceReference {
 	parents := make([]capi.ResourceReference, 0, len(k8sParentRefs))
 	for _, k8sParentRef := range k8sParentRefs {
 		parentRef, ok := parentRefs[types.NamespacedName{Name: string(k8sParentRef.Name), Namespace: string(*k8sParentRef.Namespace)}]
@@ -157,10 +177,10 @@ func translateRouteParentRefs(k8sParentRefs []gwv1beta1.ParentReference, parentR
 		}
 		ref := capi.ResourceReference{
 			Kind:        capi.APIGateway, // Will this ever not be a gateway? is that something we need to handle?
-			Name:        parentRef.name,
+			Name:        parentRef.Name,
 			SectionName: sectionName,
-			Partition:   parentRef.partition,
-			Namespace:   parentRef.namespace,
+			Partition:   parentRef.Partition,
+			Namespace:   parentRef.Namespace,
 		}
 		parents = append(parents, ref)
 	}
@@ -302,7 +322,7 @@ func (t K8sToConsulTranslator) translateHTTPServices(k8sBackendRefs []gwv1beta1.
 }
 
 // TCPRouteToTCPRoute translates a Kuberenetes TCPRoute into a Consul TCPRoute Config Entry.
-func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs map[types.NamespacedName]consulIdentifier) capi.TCPRouteConfigEntry {
+func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, parentRefs map[types.NamespacedName]api.ResourceReference) capi.TCPRouteConfigEntry {
 	routeName := k8sRoute.Name
 	if routeNameFromAnnotation, ok := k8sRoute.Annotations[AnnotationTCPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
@@ -345,30 +365,50 @@ func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute gwv1alpha2.TCPRoute, 
 	return consulRoute
 }
 
-// SecretToInlineCertificate translates a Kuberenetes Secret into a Consul Inline Certificate Config Entry.
-func (t K8sToConsulTranslator) SecretToInlineCertificate(k8sSecret gwv1beta1.SecretObjectReference, certs map[types.NamespacedName]consulIdentifier) capi.InlineCertificateConfigEntry {
-	inlineCert := capi.InlineCertificateConfigEntry{Kind: capi.InlineCertificate}
-
-	for namespaceName, consulIdentifier := range certs {
-		k8sSecretNS := ""
-		if k8sSecret.Namespace != nil {
-			k8sSecretNS = string(*k8sSecret.Namespace)
-		}
-		nsn := types.NamespacedName{Name: string(k8sSecret.Name), Namespace: k8sSecretNS}
-		if namespaceName == nsn {
-			inlineCert.Name = consulIdentifier.name
-			inlineCert.Namespace = consulIdentifier.namespace
-			inlineCert.Partition = consulIdentifier.partition
-			inlineCert.Meta = map[string]string{
-				metaKeyManagedBy:       metaValueManagedBy,
-				metaKeyKubeNS:          k8sSecretNS,
-				metaKeyKubeServiceName: string(k8sSecret.Name),
-				metaKeyKubeName:        string(k8sSecret.Name),
-			}
-			return inlineCert
-		}
+func (t K8sToConsulTranslator) ReferenceForTCPRoute(k8sTCPRoute gwv1alpha2.TCPRoute) api.ResourceReference {
+	routeName := k8sTCPRoute.Name
+	if routeNameFromAnnotation, ok := k8sTCPRoute.Annotations[AnnotationTCPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
+		routeName = routeNameFromAnnotation
 	}
-	return inlineCert
+	return api.ResourceReference{
+		Kind:      api.TCPRoute,
+		Name:      routeName,
+		Namespace: t.getConsulNamespace(k8sTCPRoute.GetObjectMeta().GetNamespace()),
+	}
+}
+
+// SecretToInlineCertificate translates a Kuberenetes Secret into a Consul Inline Certificate Config Entry.
+func (t K8sToConsulTranslator) SecretToInlineCertificate(k8sSecret corev1.Secret) capi.InlineCertificateConfigEntry {
+	namespace := t.getConsulNamespace(k8sSecret.GetObjectMeta().GetNamespace())
+	return capi.InlineCertificateConfigEntry{
+		Kind:        capi.InlineCertificate,
+		Namespace:   namespace,
+		Name:        k8sSecret.Name,
+		Certificate: k8sSecret.StringData[corev1.TLSCertKey],
+		PrivateKey:  k8sSecret.StringData[corev1.TLSPrivateKeyKey],
+		Meta: map[string]string{
+			metaKeyManagedBy:       metaValueManagedBy,
+			metaKeyKubeNS:          namespace,
+			metaKeyKubeServiceName: string(k8sSecret.Name),
+			metaKeyKubeName:        string(k8sSecret.Name),
+		},
+	}
+}
+
+func (t K8sToConsulTranslator) ReferenceForSecret(k8sSecret corev1.Secret) api.ResourceReference {
+	return api.ResourceReference{
+		Kind:      api.InlineCertificate,
+		Name:      k8sSecret.Name,
+		Namespace: t.getConsulNamespace(k8sSecret.GetObjectMeta().GetNamespace()),
+	}
+}
+
+func EntryToNamespacedName(entry capi.ConfigEntry) types.NamespacedName {
+	meta := entry.GetMeta()
+	return types.NamespacedName{
+		Name:      meta[metaKeyKubeName],
+		Namespace: meta[metaKeyKubeNS],
+	}
 }
 
 func (t K8sToConsulTranslator) getConsulNamespace(k8sNS string) string {
