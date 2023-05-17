@@ -1,3 +1,22 @@
+## 0.49.6 (May 17, 2023)
+
+SECURITY:
+
+* Upgrade to use Go 1.19.9.
+This resolves vulnerabilities [CVE-2023-24537](https://github.com/advisories/GHSA-9f7g-gqwh-jpf5)(`go/scanner`),
+[CVE-2023-24538](https://github.com/advisories/GHSA-v4m2-x4rp-hv22)(`html/template`),
+[CVE-2023-24534](https://github.com/advisories/GHSA-8v5j-pwr7-w5f8)(`net/textproto`) and
+[CVE-2023-24536](https://github.com/advisories/GHSA-9f7g-gqwh-jpf5)(`mime/multipart`).
+Also, `golang.org/x/net` has been updated to v0.7.0 to resolve CVEs [CVE-2022-41721
+](https://github.com/advisories/GHSA-fxg5-wq6x-vr4w
+), [CVE-2022-27664](https://github.com/advisories/GHSA-69cg-p879-7622) and [CVE-2022-41723
+](https://github.com/advisories/GHSA-vvpx-j8f3-3w6h
+.) [[GH-2110](https://github.com/hashicorp/consul-k8s/issues/2110)]
+
+IMPROVEMENTS:
+
+* helm: Set default `limits.cpu` resource setting to `null` for `consul-connect-inject-init` container to speed up registration times when onboarding services onto the mesh during the init container lifecycle. [[GH-2008](https://github.com/hashicorp/consul-k8s/issues/2008)]
+
 ## 0.49.5 (March 9, 2023)
 
 SECURITY:
