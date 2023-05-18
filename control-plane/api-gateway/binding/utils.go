@@ -3,7 +3,6 @@ package binding
 import (
 	"reflect"
 
-	"github.com/hashicorp/consul/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -100,23 +99,4 @@ func removeFinalizer(object client.Object) bool {
 
 	object.SetFinalizers(filtered)
 	return found
-}
-
-func serviceMap(services []api.CatalogService) map[types.NamespacedName]api.CatalogService {
-	smap := make(map[types.NamespacedName]api.CatalogService)
-	for _, service := range services {
-		smap[serviceToNamespacedName(&service)] = service
-	}
-	return smap
-}
-
-func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
-	var (
-		metaKeyKubeNS          = "k8s-namespace"
-		metaKeyKubeServiceName = "k8s-service-name"
-	)
-	return types.NamespacedName{
-		Namespace: s.ServiceMeta[metaKeyKubeNS],
-		Name:      s.ServiceMeta[metaKeyKubeServiceName],
-	}
 }

@@ -220,7 +220,7 @@ func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]i
 
 	// TODO: scrub route refs from statuses that no longer exist
 
-	validation := r.validateRefs(route.GetNamespace(), r.getBackendRefsFunc(route))
+	validation := validateRefs(route.GetNamespace(), r.getBackendRefsFunc(route), r.services)
 	// the spec is dumb and makes you set a parent for any status, even when the
 	// status is not with respect to a parent, as is the case of resolved refs
 	// so we need to set the status on all parents

@@ -238,3 +238,26 @@ func (b *Binder) Snapshot() Snapshot {
 
 	return snapshot
 }
+
+// serviceMap constructs a map of services indexed by their Kubernetes namespace and name
+// from the annotations that are set on the service
+func serviceMap(services []api.CatalogService) map[types.NamespacedName]api.CatalogService {
+	smap := make(map[types.NamespacedName]api.CatalogService)
+	for _, service := range services {
+		smap[serviceToNamespacedName(&service)] = service
+	}
+	return smap
+}
+
+// serviceToNamespacedName returns the Kubernetes namespace and name of a Consul catalog service
+// based on the Metadata annotations written on the service
+func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
+	var (
+		metaKeyKubeNS          = "k8s-namespace"
+		metaKeyKubeServiceName = "k8s-service-name"
+	)
+	return types.NamespacedName{
+		Namespace: s.ServiceMeta[metaKeyKubeNS],
+		Name:      s.ServiceMeta[metaKeyKubeServiceName],
+	}
+}
