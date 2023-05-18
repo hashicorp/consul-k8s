@@ -141,7 +141,7 @@ MAIN_LOOP:
 	}
 
 	// TODO: validate tls options
-	return nil, nil
+	return nil, err
 }
 
 // validateListeners validates the given listeners both internally and with respect to each
