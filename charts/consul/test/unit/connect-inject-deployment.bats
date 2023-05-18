@@ -2436,3 +2436,6 @@ reservedNameTest() {
     jq -r '. | select( .name == "CONSUL_TLS_SERVER_NAME").value' | tee /dev/stderr)
   [ "${actual}" = "server.dc1.consul" ]
 }
+
+#--------------------------------------------------------------------
+# Gateway API Configuration

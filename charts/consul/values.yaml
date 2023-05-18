@@ -1940,7 +1940,7 @@ connectInject:
 
   # Configuration settings for the Consul API Gateway integration.
   apiGateway:
-    # Configuration settings for the optional GatewayClass installed by Consul on Kubernetes.
+    # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
     managedGatewayClass:
       # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
       # labels for gateway pod assignment, formatted as a multi-line string.
@@ -1984,18 +1984,10 @@ connectInject:
         service: null
 
       # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
-      #
-      # Example:
-      #
-      # ```yaml
-      # deployment:
-      #   defaultInstances: 3
-      #   maxInstances: 8
-      #   minInstances: 1
-      # ```
-      #
-      # @type: map
-      deployment: null
+      deployment: 
+        replicas: 1
+        maxInstances: 1
+        minInstances: 1
 
     # Configuration for the ServiceAccount created for the api-gateway component
     serviceAccount:
@@ -2951,7 +2943,7 @@ terminatingGateways:
   gateways:
   - name: terminating-gateway
 
-# [DEPRECATED] Use connectInject.apiGateway instead.
+# [DEPRECATED] Use connectInject.apiGateway instead. This stanza will be removed with the release of Consul 1.17
 # Configuration settings for the Consul API Gateway integration
 apiGateway:
   # When true the helm chart will install the Consul API Gateway controller

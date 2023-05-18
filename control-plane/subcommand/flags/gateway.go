@@ -8,12 +8,13 @@ import (
 
 const (
 	GatewayDeploymentReplicasEnvVar = "GATEWAY_DEPLOYMENT_REPLICAS"
-	GatewayNodeSelectorEnvVar       = "GATEWAY_NODE_SELECTOR"
-	GatewayTolerationsEnvVar        = "GATEWAY_TOLERATIONS"
-	GatewayServiceTypeEnvVar        = "GATEWAY_SERVICE_TYPE"
-	GatewayCopyAnnotationsEnvVar    = "GATEWAY_COPY_ANNOTATIONS"
-	GatewayMaxInstancesEnvVar       = "GATEWAY_MAX_INSTANCES"
-	GatewayMinInstancesEnvVar       = "GATEWAY_MIN_INSTANCES"
+	GatewayMaxInstancesEnvVar       = "GATEWAY_DEPLOYMENT_MAX_INSTANCES"
+	GatewayMinInstancesEnvVar       = "GATEWAY_DEPLOYMENT_MIN_INSTANCES"
+
+	GatewayNodeSelectorEnvVar    = "GATEWAY_NODE_SELECTOR"
+	GatewayTolerationsEnvVar     = "GATEWAY_TOLERATIONS"
+	GatewayServiceTypeEnvVar     = "GATEWAY_SERVICE_TYPE"
+	GatewayCopyAnnotationsEnvVar = "GATEWAY_COPY_ANNOTATIONS"
 )
 
 // GatewayFlags contains flags related to the Gateway API.
@@ -39,20 +40,20 @@ func (f *GatewayFlags) Flags() *flag.FlagSet {
 	fs := flag.NewFlagSet("gateway", flag.ContinueOnError)
 
 	deploymentReplicas, _ := strconv.Atoi(os.Getenv(GatewayDeploymentReplicasEnvVar))
+	deploymentMaxInstances, _ := strconv.Atoi(os.Getenv(GatewayMaxInstancesEnvVar))
+	deploymentMinInstances, _ := strconv.Atoi(os.Getenv(GatewayMinInstancesEnvVar))
 	// nodeSelector := os.Getenv(GatewayNodeSelectorEnvVar)
 	// tolerations := os.Getenv(GatewayTolerationsEnvVar)
 	serviceType := os.Getenv(GatewayServiceTypeEnvVar)
 	// copyAnnotations := os.Getenv(GatewayCopyAnnotationsEnvVar)
-	deploymentMaxInstances, _ := strconv.Atoi(os.Getenv(GatewayMaxInstancesEnvVar))
-	deploymentMinInstances, _ := strconv.Atoi(os.Getenv(GatewayMinInstancesEnvVar))
 
 	fs.IntVar(&f.DeploymentReplicas, "deployment-replicas", deploymentReplicas, "")
+	fs.IntVar(&f.DeploymentMaxInstances, "max-instances", deploymentMaxInstances, "")
+	fs.IntVar(&f.DeploymentMinInstances, "min-instances", deploymentMinInstances, "")
 	// fs.Var((*FlagMapValue)(&f.NodeSelector), "node-selector", "")
 	// fs.Var((*FlagMapValue)(&f.Tolerations), "tolerations", "")
 	fs.StringVar(&f.ServiceType, "service-type", serviceType, "")
 	// fs.Var((*flags.FlagMapValue)(&f.CopyAnnotations), "copy-annotations", "")
-	fs.IntVar(&f.DeploymentMaxInstances, "max-instances", deploymentMaxInstances, "")
-	fs.IntVar(&f.DeploymentMinInstances, "min-instances", deploymentMinInstances, "")
 
 	return fs
 }
