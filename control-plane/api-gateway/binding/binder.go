@@ -94,13 +94,13 @@ type BinderConfig struct {
 // Binder is used for generating a Snapshot of all operations that should occur both
 // in Kubernetes and Consul as a result of binding routes to a Gateway.
 type Binder struct {
-	statusSetter *Setter
+	statusSetter *setter
 	config       BinderConfig
 }
 
 // NewBinder creates a Binder object with the given configuration.
 func NewBinder(config BinderConfig) *Binder {
-	return &Binder{config: config, statusSetter: NewSetter(config.ControllerName)}
+	return &Binder{config: config, statusSetter: newSetter(config.ControllerName)}
 }
 
 // gatewayRef returns a Consul-based reference for the given Kubernetes gateway to

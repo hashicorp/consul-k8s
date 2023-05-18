@@ -6,15 +6,18 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-type Setter struct {
+// setter wraps the status setting logic for routes.
+type setter struct {
 	controllerName string
 }
 
-func NewSetter(controllerName string) *Setter {
-	return &Setter{controllerName: controllerName}
+// newSetter constructs a status setter with the given controller name
+func newSetter(controllerName string) *setter {
+	return &setter{controllerName: controllerName}
 }
 
-func (s *Setter) SetHTTPRouteCondition(route *gwv1beta1.HTTPRoute, parent *gwv1beta1.ParentReference, condition metav1.Condition) bool {
+// setHTTPRouteCondition sets an HTTPRoute condition on its status with the given parent
+func (s *setter) setHTTPRouteCondition(route *gwv1beta1.HTTPRoute, parent *gwv1beta1.ParentReference, condition metav1.Condition) bool {
 	condition.LastTransitionTime = metav1.Now()
 	condition.ObservedGeneration = route.Generation
 
@@ -27,7 +30,8 @@ func (s *Setter) SetHTTPRouteCondition(route *gwv1beta1.HTTPRoute, parent *gwv1b
 	return modified
 }
 
-func (s *Setter) RemoveHTTPRouteReferences(route *gwv1beta1.HTTPRoute, refs []gwv1beta1.ParentReference) bool {
+// removeHTTPRouteReferences removes the given parent reference sections from an HTTPRoute's status
+func (s *setter) removeHTTPRouteReferences(route *gwv1beta1.HTTPRoute, refs []gwv1beta1.ParentReference) bool {
 	modified := false
 	for _, parent := range refs {
 		parents, removed := s.removeParentStatus(route.Status.Parents, parent)
@@ -39,7 +43,8 @@ func (s *Setter) RemoveHTTPRouteReferences(route *gwv1beta1.HTTPRoute, refs []gw
 	return modified
 }
 
-func (s *Setter) SetTCPRouteCondition(route *gwv1alpha2.TCPRoute, parent *gwv1beta1.ParentReference, condition metav1.Condition) bool {
+// setTCPRouteCondition sets a TCPRoute condition on its status with the given parent
+func (s *setter) setTCPRouteCondition(route *gwv1alpha2.TCPRoute, parent *gwv1beta1.ParentReference, condition metav1.Condition) bool {
 	condition.LastTransitionTime = metav1.Now()
 	condition.ObservedGeneration = route.Generation
 
@@ -52,7 +57,8 @@ func (s *Setter) SetTCPRouteCondition(route *gwv1alpha2.TCPRoute, parent *gwv1be
 	return modified
 }
 
-func (s *Setter) RemoveTCPRouteReferences(route *gwv1alpha2.TCPRoute, refs []gwv1beta1.ParentReference) bool {
+// removeTCPRouteReferences removes the given parent reference sections from a TCPRoute's status
+func (s *setter) removeTCPRouteReferences(route *gwv1alpha2.TCPRoute, refs []gwv1beta1.ParentReference) bool {
 	modified := false
 	for _, parent := range refs {
 		parents, removed := s.removeParentStatus(route.Status.Parents, parent)
@@ -64,7 +70,8 @@ func (s *Setter) RemoveTCPRouteReferences(route *gwv1alpha2.TCPRoute, refs []gwv
 	return modified
 }
 
-func (s *Setter) RemoveHTTPStatuses(route *gwv1beta1.HTTPRoute) bool {
+// removeHTTPStatuses removes all statuses set by the given controller from an HTTPRoute's status
+func (s *setter) removeHTTPStatuses(route *gwv1beta1.HTTPRoute) bool {
 	modified := false
 	filtered := []gwv1beta1.RouteParentStatus{}
 	for _, status := range route.Status.Parents {
@@ -81,7 +88,8 @@ func (s *Setter) RemoveHTTPStatuses(route *gwv1beta1.HTTPRoute) bool {
 	return modified
 }
 
-func (s *Setter) RemoveTCPStatuses(route *gwv1alpha2.TCPRoute) bool {
+// removeTCPStatuses removes all statuses set by the given controller from a TCPRoute's status
+func (s *setter) removeTCPStatuses(route *gwv1alpha2.TCPRoute) bool {
 	modified := false
 	filtered := []gwv1beta1.RouteParentStatus{}
 	for _, status := range route.Status.Parents {
@@ -98,7 +106,8 @@ func (s *Setter) RemoveTCPStatuses(route *gwv1alpha2.TCPRoute) bool {
 	return modified
 }
 
-func (s *Setter) getParentStatus(statuses []gwv1beta1.RouteParentStatus, parent *gwv1beta1.ParentReference) gwv1beta1.RouteParentStatus {
+// getParentStatus returns the section of a status referenced by the given parent reference
+func (s *setter) getParentStatus(statuses []gwv1beta1.RouteParentStatus, parent *gwv1beta1.ParentReference) gwv1beta1.RouteParentStatus {
 	var parentRef gwv1beta1.ParentReference
 	if parent != nil {
 		parentRef = *parent
@@ -115,7 +124,8 @@ func (s *Setter) getParentStatus(statuses []gwv1beta1.RouteParentStatus, parent 
 	}
 }
 
-func (s *Setter) removeParentStatus(statuses []gwv1beta1.RouteParentStatus, parent gwv1beta1.ParentReference) ([]gwv1beta1.RouteParentStatus, bool) {
+// removeParentStatus removes the section of a status referenced by the given parent reference
+func (s *setter) removeParentStatus(statuses []gwv1beta1.RouteParentStatus, parent gwv1beta1.ParentReference) ([]gwv1beta1.RouteParentStatus, bool) {
 	found := false
 	filtered := []gwv1beta1.RouteParentStatus{}
 	for _, status := range statuses {
@@ -128,6 +138,9 @@ func (s *Setter) removeParentStatus(statuses []gwv1beta1.RouteParentStatus, pare
 	return filtered, found
 }
 
+// setCondition overrides or appends a condition to the list of conditions, returning if a modification
+// to the condition set was made or not. Modifications only occur if a field other than the observation
+// timestamp is modified.
 func setCondition(conditions []metav1.Condition, condition metav1.Condition) ([]metav1.Condition, bool) {
 	for i, existing := range conditions {
 		if existing.Type == condition.Type {
@@ -143,7 +156,8 @@ func setCondition(conditions []metav1.Condition, condition metav1.Condition) ([]
 	return append(conditions, condition), true
 }
 
-func (s *Setter) setParentStatus(statuses []gwv1beta1.RouteParentStatus, parent gwv1beta1.RouteParentStatus) []gwv1beta1.RouteParentStatus {
+// setParentStatus updates or inserts the set of parent statuses with the newly modified parent
+func (s *setter) setParentStatus(statuses []gwv1beta1.RouteParentStatus, parent gwv1beta1.RouteParentStatus) []gwv1beta1.RouteParentStatus {
 	for i, status := range statuses {
 		if parentsEqual(status.ParentRef, parent.ParentRef) && status.ControllerName == parent.ControllerName {
 			statuses[i] = parent
@@ -153,6 +167,7 @@ func (s *Setter) setParentStatus(statuses []gwv1beta1.RouteParentStatus, parent 
 	return append(statuses, parent)
 }
 
+// parentsEqual checks for equality between two parent references
 func parentsEqual(one, two gwv1beta1.ParentReference) bool {
 	return bothNilOrEqual(one.Group, two.Group) &&
 		bothNilOrEqual(one.Kind, two.Kind) &&

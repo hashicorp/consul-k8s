@@ -9,7 +9,7 @@ import (
 )
 
 func TestSetter(t *testing.T) {
-	setter := NewSetter("test")
+	setter := newSetter("test")
 	parentRef := gwv1beta1.ParentReference{
 		Name: "test",
 	}
@@ -29,10 +29,10 @@ func TestSetter(t *testing.T) {
 			},
 		},
 	}
-	require.True(t, setter.SetHTTPRouteCondition(route, &parentRef, condition))
-	require.False(t, setter.SetHTTPRouteCondition(route, &parentRefDup, condition))
-	require.False(t, setter.SetHTTPRouteCondition(route, &parentRefDup, condition))
-	require.False(t, setter.SetHTTPRouteCondition(route, &parentRefDup, condition))
+	require.True(t, setter.setHTTPRouteCondition(route, &parentRef, condition))
+	require.False(t, setter.setHTTPRouteCondition(route, &parentRefDup, condition))
+	require.False(t, setter.setHTTPRouteCondition(route, &parentRefDup, condition))
+	require.False(t, setter.setHTTPRouteCondition(route, &parentRefDup, condition))
 
 	require.Len(t, route.Status.Parents, 1)
 	require.Len(t, route.Status.Parents[0].Conditions, 1)
