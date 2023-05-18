@@ -21,7 +21,6 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/binding"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/statuses"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul-k8s/control-plane/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -164,7 +163,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	services := r.cache.ListServices()
 
 	binder := binding.NewBinder(binding.BinderConfig{
-		Setter:                   statuses.NewSetter(GatewayClassControllerName),
 		Translator:               r.Translator,
 		ControllerName:           GatewayClassControllerName,
 		GatewayClass:             gwc,

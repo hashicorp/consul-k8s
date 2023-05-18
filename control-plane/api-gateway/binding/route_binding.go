@@ -370,11 +370,11 @@ func (b *Binder) newTCPRouteBinder(tracker referenceTracker, services map[types.
 		b.consulTCPRouteFor,
 		func(t *api.TCPRouteConfigEntry) []api.ResourceReference { return t.Parents },
 		func(t *api.TCPRouteConfigEntry, parents []api.ResourceReference) { t.Parents = parents },
-		b.config.Setter.RemoveTCPRouteReferences,
+		b.statusSetter.RemoveTCPRouteReferences,
 		func(t *gwv1alpha2.TCPRoute) []gwv1beta1.Hostname { return nil },
 		func(t *gwv1alpha2.TCPRoute) []gwv1beta1.ParentReference { return t.Spec.ParentRefs },
 		b.config.Translator.TCPRouteToTCPRoute,
-		b.config.Setter.SetTCPRouteCondition,
+		b.statusSetter.SetTCPRouteCondition,
 		func(t *gwv1alpha2.TCPRoute) []gwv1beta1.BackendRef {
 			refs := []gwv1beta1.BackendRef{}
 			for _, rule := range t.Spec.Rules {
@@ -382,7 +382,7 @@ func (b *Binder) newTCPRouteBinder(tracker referenceTracker, services map[types.
 			}
 			return refs
 		},
-		b.config.Setter.RemoveTCPStatuses,
+		b.statusSetter.RemoveTCPStatuses,
 	)
 }
 
@@ -398,11 +398,11 @@ func (b *Binder) newHTTPRouteBinder(tracker referenceTracker, services map[types
 		b.consulHTTPRouteFor,
 		func(t *api.HTTPRouteConfigEntry) []api.ResourceReference { return t.Parents },
 		func(t *api.HTTPRouteConfigEntry, parents []api.ResourceReference) { t.Parents = parents },
-		b.config.Setter.RemoveHTTPRouteReferences,
+		b.statusSetter.RemoveHTTPRouteReferences,
 		func(t *gwv1beta1.HTTPRoute) []gwv1beta1.Hostname { return t.Spec.Hostnames },
 		func(t *gwv1beta1.HTTPRoute) []gwv1beta1.ParentReference { return t.Spec.ParentRefs },
 		b.config.Translator.HTTPRouteToHTTPRoute,
-		b.config.Setter.SetHTTPRouteCondition,
+		b.statusSetter.SetHTTPRouteCondition,
 		func(t *gwv1beta1.HTTPRoute) []gwv1beta1.BackendRef {
 			refs := []gwv1beta1.BackendRef{}
 			for _, rule := range t.Spec.Rules {
@@ -412,7 +412,7 @@ func (b *Binder) newHTTPRouteBinder(tracker referenceTracker, services map[types
 			}
 			return refs
 		},
-		b.config.Setter.RemoveHTTPStatuses,
+		b.statusSetter.RemoveHTTPStatuses,
 	)
 }
 

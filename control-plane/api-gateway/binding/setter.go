@@ -1,4 +1,4 @@
-package statuses
+package binding
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -159,17 +159,4 @@ func parentsEqual(one, two gwv1beta1.ParentReference) bool {
 		bothNilOrEqual(one.SectionName, two.SectionName) &&
 		bothNilOrEqual(one.Port, two.Port) &&
 		one.Name == two.Name
-}
-
-func bothNilOrEqual[T comparable](one, two *T) bool {
-	if one == nil && two == nil {
-		return true
-	}
-	if one == nil {
-		return false
-	}
-	if two == nil {
-		return false
-	}
-	return *one == *two
 }

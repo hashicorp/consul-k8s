@@ -1,4 +1,4 @@
-package statuses
+package binding
 
 import (
 	"testing"

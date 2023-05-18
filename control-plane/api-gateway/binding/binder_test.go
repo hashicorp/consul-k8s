@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/statuses"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -938,7 +937,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			tt.config.Setter = statuses.NewSetter(controllerName)
+			tt.config.ControllerName = controllerName
 
 			binder := NewBinder(tt.config)
 			actual := binder.Snapshot()
@@ -2468,7 +2467,6 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			config := BinderConfig{
 				ControllerName: controllerName,
-				Setter:         statuses.NewSetter(controllerName),
 				GatewayClass:   gatewayClass,
 				Gateway:        gateway,
 				Namespaces:     namespaces,
