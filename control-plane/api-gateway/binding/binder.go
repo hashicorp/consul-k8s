@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/statuses"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul/api"
@@ -144,13 +145,14 @@ func (b *Binder) Snapshot() Snapshot {
 
 	httpRouteBinder := b.newHTTPRouteBinder(tracker, serviceMap)
 	tcpRouteBinder := b.newTCPRouteBinder(tracker, serviceMap)
+	boundCounts := make(map[gwv1beta1.SectionName]int)
 
 	for _, r := range b.config.HTTPRoutes {
-		snapshot = httpRouteBinder.bind(pointerTo(r), seenRoutes, snapshot)
+		snapshot = httpRouteBinder.bind(pointerTo(r), boundCounts, seenRoutes, snapshot)
 	}
 
 	for _, r := range b.config.TCPRoutes {
-		snapshot = tcpRouteBinder.bind(pointerTo(r), seenRoutes, snapshot)
+		snapshot = tcpRouteBinder.bind(pointerTo(r), boundCounts, seenRoutes, snapshot)
 	}
 
 	for _, route := range b.config.ConsulHTTPRoutes {
@@ -188,7 +190,28 @@ func (b *Binder) Snapshot() Snapshot {
 	if !isGatewayDeleted {
 		entry := b.config.Translator.GatewayToAPIGateway(b.config.Gateway, seenCerts)
 		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &entry)
-		// TODO: update gateway status
+
+		var status gwv1beta1.GatewayStatus
+		// TODO: conditions and addresses
+		status.Conditions = []metav1.Condition{}
+		status.Addresses = []gwv1beta1.GatewayAddress{}
+		for _, listener := range b.config.Gateway.Spec.Listeners {
+			status.Listeners = append(status.Listeners, gwv1beta1.ListenerStatus{
+				Name:           listener.Name,
+				SupportedKinds: supportedKindsForProtocol[listener.Protocol],
+				AttachedRoutes: int32(boundCounts[listener.Name]),
+				// TODO: conditions
+				Conditions: []metav1.Condition{},
+			})
+		}
+
+		if !cmp.Equal(status, b.config.Gateway.Status, cmp.FilterPath(func(p cmp.Path) bool {
+			path := p.String()
+			return path == "Listeners.Conditions.LastTransitionTime" || path == "Conditions.LastTransitionTime"
+		}, cmp.Ignore())) {
+			b.config.Gateway.Status = status
+			snapshot.Kubernetes.StatusUpdates = append(snapshot.Kubernetes.StatusUpdates, &b.config.Gateway)
+		}
 	}
 
 	return snapshot

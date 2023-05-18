@@ -159,7 +159,32 @@ func TestBinder_Lifecycle(t *testing.T) {
 				}},
 			},
 			expected: Snapshot{
-				Kubernetes: KubernetesSnapshot{},
+				Kubernetes: KubernetesSnapshot{
+					StatusUpdates: []client.Object{
+						&gwv1beta1.Gateway{
+							ObjectMeta: metav1.ObjectMeta{
+								Finalizers: []string{gatewayFinalizer},
+							},
+							Spec: gwv1beta1.GatewaySpec{
+								GatewayClassName: gatewayClassName,
+								Listeners: []gwv1beta1.Listener{{
+									TLS: &gwv1beta1.GatewayTLSConfig{
+										CertificateRefs: []gwv1beta1.SecretObjectReference{{
+											Name: "secret-one",
+										}},
+									},
+								}},
+							},
+							Status: gwv1beta1.GatewayStatus{
+								Addresses:  []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{},
+								Listeners: []gwv1beta1.ListenerStatus{{
+									Conditions: []metav1.Condition{},
+								}},
+							},
+						},
+					},
+				},
 				Consul: ConsulSnapshot{
 					Updates: []api.ConfigEntry{
 						&api.InlineCertificateConfigEntry{
@@ -232,6 +257,21 @@ func TestBinder_Lifecycle(t *testing.T) {
 							},
 						},
 					},
+					StatusUpdates: []client.Object{
+						&gwv1beta1.Gateway{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:       "gateway",
+								Finalizers: []string{gatewayFinalizer},
+							},
+							Spec: gwv1beta1.GatewaySpec{
+								GatewayClassName: gatewayClassName,
+							},
+							Status: gwv1beta1.GatewayStatus{
+								Addresses:  []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{},
+							},
+						},
+					},
 				},
 				Consul: ConsulSnapshot{
 					Updates: []api.ConfigEntry{
@@ -291,6 +331,21 @@ func TestBinder_Lifecycle(t *testing.T) {
 										Name: "gateway",
 									}},
 								},
+							},
+						},
+					},
+					StatusUpdates: []client.Object{
+						&gwv1beta1.Gateway{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:       "gateway",
+								Finalizers: []string{gatewayFinalizer},
+							},
+							Spec: gwv1beta1.GatewaySpec{
+								GatewayClassName: gatewayClassName,
+							},
+							Status: gwv1beta1.GatewayStatus{
+								Addresses:  []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{},
 							},
 						},
 					},
@@ -354,6 +409,21 @@ func TestBinder_Lifecycle(t *testing.T) {
 							},
 						},
 					},
+					StatusUpdates: []client.Object{
+						&gwv1beta1.Gateway{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:       "gateway",
+								Finalizers: []string{gatewayFinalizer},
+							},
+							Spec: gwv1beta1.GatewaySpec{
+								GatewayClassName: gatewayClassName,
+							},
+							Status: gwv1beta1.GatewayStatus{
+								Addresses:  []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{},
+							},
+						},
+					},
 				},
 				Consul: ConsulSnapshot{
 					Updates: []api.ConfigEntry{
@@ -413,6 +483,21 @@ func TestBinder_Lifecycle(t *testing.T) {
 										Name: "gateway",
 									}},
 								},
+							},
+						},
+					},
+					StatusUpdates: []client.Object{
+						&gwv1beta1.Gateway{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:       "gateway",
+								Finalizers: []string{gatewayFinalizer},
+							},
+							Spec: gwv1beta1.GatewaySpec{
+								GatewayClassName: gatewayClassName,
+							},
+							Status: gwv1beta1.GatewayStatus{
+								Addresses:  []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{},
 							},
 						},
 					},

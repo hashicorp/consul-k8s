@@ -201,7 +201,7 @@ func (r *routeBinder[T, U]) validateRefs(namespace string, refs []gwv1beta1.Back
 	return result
 }
 
-func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) (updatedSnapshot Snapshot) {
+func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]int, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) (updatedSnapshot Snapshot) {
 	routeRef := r.translationReferenceFunc(route)
 	existing := r.lookupFunc(routeRef)
 	seenRoutes[routeRef] = struct{}{}
@@ -235,7 +235,6 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 		if removeFinalizer(route) {
 			kubernetesNeedsUpdate = true
 		}
-		// TODO: drop the number of bound routes from the gateway if necessary
 		return
 	}
 
@@ -324,6 +323,8 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 			result = append(result, bindResult{
 				section: listener.Name,
 			})
+
+			boundCount[listener.Name] = boundCount[listener.Name] + 1
 		}
 
 		results = append(results, parentBindResult{
@@ -331,7 +332,6 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 			results: result,
 		})
 	}
-	// TODO: increment the number of bound routes if necessary
 
 	updated := false
 	for _, result := range results {
