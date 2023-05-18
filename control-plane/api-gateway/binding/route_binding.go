@@ -1,9 +1,6 @@
 package binding
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -34,27 +31,70 @@ func (b *Binder) consulTCPRouteFor(ref api.ResourceReference) *api.TCPRouteConfi
 	return nil
 }
 
-// routeBinder encapsulates the binding logic for
+// routeBinder encapsulates the binding logic for binding a route to the given Gateway.
+// The logic for route binding is almost identical between different route types, but
+// due to the strong typing in the Spec and Go's inability to deal with fields via generics
+// we have to pull in a bunch of accessors (which ideally should be in the upstream spec)
+// for each route type.
+//
+// From the generic signature -- T: the type of Kubernetes route, U: the type of Consul config entry
+//
+// TODO: consider moving the function closures to something like an interface that we can
+// implement the accessors on for each route type.
 type routeBinder[T client.Object, U api.ConfigEntry] struct {
-	isGatewayDeleted           bool
-	gateway                    *gwv1beta1.Gateway
-	gatewayRef                 api.ResourceReference
-	tracker                    referenceTracker
-	namespaces                 map[string]corev1.Namespace
-	services                   map[types.NamespacedName]api.CatalogService
-	translationReferenceFunc   func(route T) api.ResourceReference
-	lookupFunc                 func(api.ResourceReference) U
-	getParentsFunc             func(U) []api.ResourceReference
-	setParentsFunc             func(U, []api.ResourceReference)
-	removeStatusRefsFunc       func(T, []gwv1beta1.ParentReference) bool
-	getHostnamesFunc           func(T) []gwv1beta1.Hostname
-	getParentRefsFunc          func(T) []gwv1beta1.ParentReference
-	translationFunc            func(T, map[types.NamespacedName]api.ResourceReference) U
-	setRouteConditionFunc      func(T, *gwv1beta1.ParentReference, metav1.Condition) bool
-	getBackendRefsFunc         func(T) []gwv1beta1.BackendRef
+	// isGatewayDeleted is used to determine whether we should just ignore
+	// attempting to bind the route (since we no longer know whether we
+	// should manage the route we only want to remove any state we've
+	// set on it).
+	isGatewayDeleted bool
+	// gateway is the gateway that we want to use for binding
+	gateway *gwv1beta1.Gateway
+	// gatewayRef is a Consul reference used to prune no-longer bound
+	// parents from a Consul resource we've created.
+	gatewayRef api.ResourceReference
+	// tracker is the referenceTracker used to determine when we want to cleanup
+	// routes based on a deleted gateway.
+	tracker referenceTracker
+	// namespaces is the set of namespaces in Consul that use for determining
+	// whether a route in a given namespace can bind to a gateway with AllowedRoutes set
+	namespaces map[string]corev1.Namespace
+	// services is a catalog of all connect-injected services to check a route against
+	// for resolving its backend refs
+	services map[types.NamespacedName]api.CatalogService
+
+	// translationReferenceFunc is a function used to translate a Kubernetes object into
+	// a Consul object reference
+	translationReferenceFunc func(route T) api.ResourceReference
+	// lookupFunc is a function used for finding an existing Consul object based on
+	// its object reference
+	lookupFunc func(api.ResourceReference) U
+	// getParentsFunc is a function used for getting the parent references of a Consul route object
+	getParentsFunc func(U) []api.ResourceReference
+	// setParentsFunc is a function used for setting the parent references of a route object
+	setParentsFunc func(U, []api.ResourceReference)
+	// removeStatusRefsFunc is a function used for removing the statuses for the given parent
+	// references from a route
+	removeStatusRefsFunc func(T, []gwv1beta1.ParentReference) bool
+	// getHostnamesFunc is a function used for getting the hostnames associated with a route
+	getHostnamesFunc func(T) []gwv1beta1.Hostname
+	// getParentRefsFunc is used for getting the parent references of a Kubernetes route object
+	getParentRefsFunc func(T) []gwv1beta1.ParentReference
+	// translationFunc is used for translating a Kubernetes route into the corresponding Consul config entry
+	translationFunc func(T, map[types.NamespacedName]api.ResourceReference) U
+	// setRouteConditionFunc is used for adding or overwriting a condition on a route at the given
+	// parent
+	setRouteConditionFunc func(T, *gwv1beta1.ParentReference, metav1.Condition) bool
+	// getBackendRefsFunc returns a list of all backend references that we need to validate against the
+	// list of known connect-injected services
+	getBackendRefsFunc func(T) []gwv1beta1.BackendRef
+	// removeControllerStatusFunc is used to remove all of the statuses set by our controller when GC'ing
+	// a route
 	removeControllerStatusFunc func(T) bool
 }
 
+// newRouteBinder creates a new route binder for the given Kubernetes and Consul route types
+// generally this is lightly wrapped by other constructors that pass in the various closures
+// needed for accessing fields on the objects
 func newRouteBinder[T client.Object, U api.ConfigEntry](
 	isGatewayDeleted bool,
 	gateway *gwv1beta1.Gateway,
@@ -93,115 +133,6 @@ func newRouteBinder[T client.Object, U api.ConfigEntry](
 		getBackendRefsFunc:         getBackendRefsFunc,
 		removeControllerStatusFunc: removeControllerStatusFunc,
 	}
-}
-
-var (
-	errInvalidKind     = errors.New("invalid backend kind")
-	errBackendNotFound = errors.New("backend not found")
-	errRefNotPermitted = errors.New("reference not permitted due to lack of ReferenceGrant")
-)
-
-type routeValidations struct {
-	namespace string
-	backend   gwv1beta1.BackendRef
-	err       error
-}
-
-func (v routeValidations) Type() string {
-	return (&metav1.GroupKind{
-		Group: valueOr(v.backend.Group, ""),
-		Kind:  valueOr(v.backend.Kind, "Service"),
-	}).String()
-}
-
-func (v routeValidations) String() string {
-	return (types.NamespacedName{Namespace: v.namespace, Name: string(v.backend.Name)}).String()
-}
-
-type routeValidationResult []routeValidations
-
-func (e routeValidationResult) Condition() metav1.Condition {
-	// we only use the first error due to the way the spec is structured
-	// where you can only have a single condition
-	for _, v := range e {
-		err := v.err
-		if err != nil {
-			switch err {
-			case errInvalidKind:
-				return metav1.Condition{
-					Type:    "ResolvedRefs",
-					Status:  metav1.ConditionFalse,
-					Reason:  "InvalidKind",
-					Message: fmt.Sprintf("%s [%s]: %s", v.String(), v.Type(), err.Error()),
-				}
-			case errBackendNotFound:
-				return metav1.Condition{
-					Type:    "ResolvedRefs",
-					Status:  metav1.ConditionFalse,
-					Reason:  "BackendNotFound",
-					Message: fmt.Sprintf("%s: %s", v.String(), err.Error()),
-				}
-			case errRefNotPermitted:
-				return metav1.Condition{
-					Type:    "ResolvedRefs",
-					Status:  metav1.ConditionFalse,
-					Reason:  "RefNotPermitted",
-					Message: fmt.Sprintf("%s: %s", v.String(), err.Error()),
-				}
-			default:
-				// this should never happen
-				return metav1.Condition{
-					Type:    "ResolvedRefs",
-					Status:  metav1.ConditionFalse,
-					Reason:  "UnhandledValidationError",
-					Message: err.Error(),
-				}
-			}
-		}
-	}
-	return metav1.Condition{
-		Type:    "ResolvedRefs",
-		Status:  metav1.ConditionTrue,
-		Reason:  "ResolvedRefs",
-		Message: "resolved backend references",
-	}
-}
-
-func (r *routeBinder[T, U]) validateRefs(namespace string, refs []gwv1beta1.BackendRef) routeValidationResult {
-	var result routeValidationResult
-	for _, ref := range refs {
-		nsn := types.NamespacedName{
-			Name:      string(ref.BackendObjectReference.Name),
-			Namespace: valueOr(ref.BackendObjectReference.Namespace, namespace),
-		}
-
-		// TODO: check reference grants
-
-		if !nilOrEqual(ref.BackendObjectReference.Group, "") ||
-			!nilOrEqual(ref.BackendObjectReference.Kind, "Service") {
-			result = append(result, routeValidations{
-				namespace: nsn.Namespace,
-				backend:   ref,
-				err:       errInvalidKind,
-			})
-			continue
-		}
-
-		if _, found := r.services[nsn]; !found {
-			result = append(result, routeValidations{
-				namespace: nsn.Namespace,
-				backend:   ref,
-				err:       errBackendNotFound,
-			})
-			continue
-		}
-
-		result = append(result, routeValidations{
-			namespace: nsn.Namespace,
-			backend:   ref,
-		})
-	}
-	return result
 }
 
 func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]int, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) (updatedSnapshot Snapshot) {

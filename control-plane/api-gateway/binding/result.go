@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -19,7 +20,89 @@ var (
 	errRouteNotAllowedByListeners_Namespace = errors.New("listener does not allow binding routes from the given namespace")
 	errRouteNotAllowedByListeners_Protocol  = errors.New("listener does not support route protocol")
 	errRouteNoMatchingListenerHostname      = errors.New("listener cannot bind route with a non-aligned hostname")
+	errRouteInvalidKind                     = errors.New("invalid backend kind")
+	errRouteBackendNotFound                 = errors.New("backend not found")
+	errRouteRefNotPermitted                 = errors.New("reference not permitted due to lack of ReferenceGrant")
 )
+
+// routeValidationResult holds the result of validating a route globally, in other
+// words, for a particular backend reference without consideration to its particular
+// gateway. Unfortunately, due to the fact that the spec requires a route status be
+// associated with a parent reference, what it means is that anything that is global
+// in nature, like this status will need to be duplicated for every parent reference
+// on a given route status
+type routeValidationResult struct {
+	namespace string
+	backend   gwv1beta1.BackendRef
+	err       error
+}
+
+// Type is used for error printing a backend reference type that we don't support on
+// a validation error
+func (v routeValidationResult) Type() string {
+	return (&metav1.GroupKind{
+		Group: valueOr(v.backend.Group, ""),
+		Kind:  valueOr(v.backend.Kind, "Service"),
+	}).String()
+}
+
+// String is the namespace/name of the reference that has an error
+func (v routeValidationResult) String() string {
+	return (types.NamespacedName{Namespace: v.namespace, Name: string(v.backend.Name)}).String()
+}
+
+// routeValidationResults contains a list of validation results for the backend references
+// on a route
+type routeValidationResults []routeValidationResult
+
+// Condition returns the ResolvedRefs condition that gets duplicated across every relevant
+// parent on a route's status
+func (e routeValidationResults) Condition() metav1.Condition {
+	// we only use the first error due to the way the spec is structured
+	// where you can only have a single condition
+	for _, v := range e {
+		err := v.err
+		if err != nil {
+			switch err {
+			case errRouteInvalidKind:
+				return metav1.Condition{
+					Type:    "ResolvedRefs",
+					Status:  metav1.ConditionFalse,
+					Reason:  "InvalidKind",
+					Message: fmt.Sprintf("%s [%s]: %s", v.String(), v.Type(), err.Error()),
+				}
+			case errRouteBackendNotFound:
+				return metav1.Condition{
+					Type:    "ResolvedRefs",
+					Status:  metav1.ConditionFalse,
+					Reason:  "BackendNotFound",
+					Message: fmt.Sprintf("%s: %s", v.String(), err.Error()),
+				}
+			case errRouteRefNotPermitted:
+				return metav1.Condition{
+					Type:    "ResolvedRefs",
+					Status:  metav1.ConditionFalse,
+					Reason:  "RefNotPermitted",
+					Message: fmt.Sprintf("%s: %s", v.String(), err.Error()),
+				}
+			default:
+				// this should never happen
+				return metav1.Condition{
+					Type:    "ResolvedRefs",
+					Status:  metav1.ConditionFalse,
+					Reason:  "UnhandledValidationError",
+					Message: err.Error(),
+				}
+			}
+		}
+	}
+	return metav1.Condition{
+		Type:    "ResolvedRefs",
+		Status:  metav1.ConditionTrue,
+		Reason:  "ResolvedRefs",
+		Message: "resolved backend references",
+	}
+}
 
 // bindResult holds the result of attempting to bind a route to a particular gateway listener
 // an error value here means that the route did not bind successfully, no error means that

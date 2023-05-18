@@ -91,28 +91,35 @@ type BinderConfig struct {
 	ControlledGateways map[types.NamespacedName]gwv1beta1.Gateway
 }
 
-// TODO: DRY up a bunch of these implementations, the boilerplate is almost
-// identical for each route type
-
+// Binder is used for generating a Snapshot of all operations that should occur both
+// in Kubernetes and Consul as a result of binding routes to a Gateway.
 type Binder struct {
 	statusSetter *Setter
 	config       BinderConfig
 }
 
+// NewBinder creates a Binder object with the given configuration.
 func NewBinder(config BinderConfig) *Binder {
 	return &Binder{config: config, statusSetter: NewSetter(config.ControllerName)}
 }
 
+// gatewayRef returns a Consul-based reference for the given Kubernetes gateway to
+// be used for marking a deletion that is needed in Consul.
 func (b *Binder) gatewayRef() api.ResourceReference {
 	return b.config.Translator.ReferenceForGateway(&b.config.Gateway)
 }
 
+// isGatewayDeleted returns whether we should treat the given gateway as a deleted object.
+// This is true if the gateway has a deleted timestamp, if its GatewayClass does not match
+// our controller name, or if the GatewayClass it references doesn't exist.
 func (b *Binder) isGatewayDeleted() bool {
 	gatewayClassMismatch := b.config.GatewayClass == nil || b.config.ControllerName != string(b.config.GatewayClass.Spec.ControllerName)
 	isGatewayDeleted := isDeleted(&b.config.Gateway) || gatewayClassMismatch
 	return isGatewayDeleted
 }
 
+// Snapshot generates a snapshot of operations that need to occur in Kubernetes and Consul
+// in order for a Gateway to be reconciled.
 func (b *Binder) Snapshot() Snapshot {
 	// at this point we assume all tcp routes and http routes
 	// actually reference this gateway
@@ -133,7 +140,13 @@ func (b *Binder) Snapshot() Snapshot {
 
 	httpRouteBinder := b.newHTTPRouteBinder(tracker, serviceMap)
 	tcpRouteBinder := b.newTCPRouteBinder(tracker, serviceMap)
+
+	// used for tracking how many routes have successfully bound to which listeners
+	// on a gateway for reporting the number of bound routes in a gateway listener's
+	// status
 	boundCounts := make(map[gwv1beta1.SectionName]int)
+
+	// attempt to bind all routes
 
 	for _, r := range b.config.HTTPRoutes {
 		snapshot = httpRouteBinder.bind(pointerTo(r), boundCounts, seenRoutes, snapshot)
@@ -143,13 +156,17 @@ func (b *Binder) Snapshot() Snapshot {
 		snapshot = tcpRouteBinder.bind(pointerTo(r), boundCounts, seenRoutes, snapshot)
 	}
 
-	for _, route := range b.config.ConsulHTTPRoutes {
-		snapshot = b.cleanHTTPRoute(pointerTo(route), seenRoutes, snapshot)
+	// now cleanup any routes that we haven't already processed
+
+	for _, r := range b.config.ConsulHTTPRoutes {
+		snapshot = b.cleanHTTPRoute(pointerTo(r), seenRoutes, snapshot)
 	}
 
-	for _, route := range b.config.ConsulTCPRoutes {
-		snapshot = b.cleanTCPRoute(pointerTo(route), seenRoutes, snapshot)
+	for _, r := range b.config.ConsulTCPRoutes {
+		snapshot = b.cleanTCPRoute(pointerTo(r), seenRoutes, snapshot)
 	}
+
+	// process certificates
 
 	seenCerts := make(map[types.NamespacedName]api.ResourceReference)
 	for _, secret := range b.config.Secrets {
@@ -157,16 +174,21 @@ func (b *Binder) Snapshot() Snapshot {
 			// we bypass the secret creation since we want to be able to GC if necessary
 			continue
 		}
+
 		certificate := b.config.Translator.SecretToInlineCertificate(secret)
-		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &certificate)
 		certificateRef := translation.EntryToReference(&certificate)
+
+		// mark the certificate as processed
 		seenCerts[objectToMeta(&secret)] = certificateRef
+		// add the certificate to the set of upsert operations needed in Consul
+		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &certificate)
 	}
 
 	// clean up any inline certs that are now stale and can be GC'd
 	for _, cert := range b.config.ConsulInlineCertificates {
 		certRef := translation.EntryToNamespacedName(&cert)
 		if _, ok := seenCerts[certRef]; !ok {
+			// check to see if nothing is now referencing the certificate
 			if tracker.canGCSecret(certRef) {
 				ref := translation.EntryToReference(&cert)
 				// we can GC this now since it's not referenced by any Gateway
@@ -175,10 +197,13 @@ func (b *Binder) Snapshot() Snapshot {
 		}
 	}
 
+	// we only want to upsert the gateway into Consul or update its status
+	// if the gateway hasn't been marked for deletion
 	if !isGatewayDeleted {
 		entry := b.config.Translator.GatewayToAPIGateway(b.config.Gateway, seenCerts)
 		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &entry)
 
+		// calculate the status for the gateway
 		var status gwv1beta1.GatewayStatus
 		gatewayValidation := validateGateway(b.config.Gateway)
 		listenerValidation := validateListeners(b.config.Gateway.Namespace, b.config.Gateway.Spec.Listeners, b.config.Secrets)
@@ -194,6 +219,8 @@ func (b *Binder) Snapshot() Snapshot {
 		status.Conditions = gatewayValidation.Conditions(b.config.Gateway.Generation, listenerValidation.Invalid())
 		status.Addresses = []gwv1beta1.GatewayAddress{}
 
+		// only mark the gateway as needing a status update if there's a diff with its old
+		// status, this keeps the controller from infinitely reconciling
 		if !cmp.Equal(status, b.config.Gateway.Status, cmp.FilterPath(func(p cmp.Path) bool {
 			path := p.String()
 			return path == "Listeners.Conditions.LastTransitionTime" || path == "Conditions.LastTransitionTime"
@@ -202,6 +229,7 @@ func (b *Binder) Snapshot() Snapshot {
 			snapshot.Kubernetes.StatusUpdates = append(snapshot.Kubernetes.StatusUpdates, &b.config.Gateway)
 		}
 	} else {
+		// if the gateway has been deleted, unset whatever we've set on it
 		snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, b.gatewayRef())
 		if removeFinalizer(&b.config.Gateway) {
 			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, &b.config.Gateway)

@@ -7,12 +7,23 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
+// referenceTracker acts as a reference counting object for:
+//  1. the number of controlled gateways that are referenced by an HTTPRoute
+//  2. the number of controlled gateways that are referenced by a TCPRoute
+//  3. the number of gateways that reference a certificate Secret
+//
+// These are used for determining when dissasociating from a gateway
+// should cause us to cleanup a route or certificate both in Consul and
+// whatever state we have set on the object in Kubernetes.
 type referenceTracker struct {
 	httpRouteReferencesGateways      map[types.NamespacedName]int
 	tcpRouteReferencesGateways       map[types.NamespacedName]int
 	certificatesReferencedByGateways map[types.NamespacedName]int
 }
 
+// isLastReference checks if the given gateway is the last controlled gateway
+// that a route references. If it is and the gateway has been deleted, we
+// should clean up all state created for the route.
 func (r referenceTracker) isLastReference(object client.Object) bool {
 	key := types.NamespacedName{
 		Namespace: object.GetNamespace(),
@@ -29,10 +40,15 @@ func (r referenceTracker) isLastReference(object client.Object) bool {
 	}
 }
 
+// canGCSecret checks if we can garbage collect a secret that has
+// not been upserted.
 func (r referenceTracker) canGCSecret(key types.NamespacedName) bool {
+	// should this be 1 or 0?
 	return r.certificatesReferencedByGateways[key] == 1
 }
 
+// references initializes a referenceTracker based on the HTTPRoutes, TCPRoutes,
+// and ControlledGateways associated with this Binder.
 func (b *Binder) references() referenceTracker {
 	tracker := referenceTracker{
 		httpRouteReferencesGateways:      make(map[types.NamespacedName]int),

@@ -6,9 +6,47 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
+
+func (r *routeBinder[T, U]) validateRefs(namespace string, refs []gwv1beta1.BackendRef) routeValidationResults {
+	var result routeValidationResults
+	for _, ref := range refs {
+		nsn := types.NamespacedName{
+			Name:      string(ref.BackendObjectReference.Name),
+			Namespace: valueOr(ref.BackendObjectReference.Namespace, namespace),
+		}
+
+		// TODO: check reference grants
+
+		if !nilOrEqual(ref.BackendObjectReference.Group, "") ||
+			!nilOrEqual(ref.BackendObjectReference.Kind, "Service") {
+			result = append(result, routeValidationResult{
+				namespace: nsn.Namespace,
+				backend:   ref,
+				err:       errRouteInvalidKind,
+			})
+			continue
+		}
+
+		if _, found := r.services[nsn]; !found {
+			result = append(result, routeValidationResult{
+				namespace: nsn.Namespace,
+				backend:   ref,
+				err:       errRouteBackendNotFound,
+			})
+			continue
+		}
+
+		result = append(result, routeValidationResult{
+			namespace: nsn.Namespace,
+			backend:   ref,
+		})
+	}
+	return result
+}
 
 func validateGateway(gateway gwv1beta1.Gateway) gatewayValidationResult {
 	var result gatewayValidationResult
