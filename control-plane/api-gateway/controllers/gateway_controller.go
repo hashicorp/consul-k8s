@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
@@ -193,7 +194,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, update := range updates.Kubernetes.Updates {
 		log.Info("update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
-		if err := r.Client.Update(ctx, update); err != nil {
+		if err := r.updateAndResetStatus(ctx, update); err != nil {
+			log.Error(err, "error updating object")
 			return ctrl.Result{}, err
 		}
 	}
@@ -201,6 +203,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	for _, update := range updates.Kubernetes.StatusUpdates {
 		log.Info("update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.Client.Status().Update(ctx, update); err != nil {
+			log.Error(err, "error updating status")
 			return ctrl.Result{}, err
 		}
 	}
@@ -217,6 +220,17 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	*/
 
 	return ctrl.Result{}, nil
+}
+
+func (r *GatewayController) updateAndResetStatus(ctx context.Context, o client.Object) error {
+	// we create a copy so that we can re-update its status if need be
+	status := reflect.ValueOf(o.DeepCopyObject()).Elem().FieldByName("Status")
+	if err := r.Client.Update(ctx, o); err != nil {
+		return err
+	}
+	// reset the status in case it needs to be updated below
+	reflect.ValueOf(o).Elem().FieldByName("Status").Set(status)
+	return nil
 }
 
 func derefAll[T any](vs []*T) []T {

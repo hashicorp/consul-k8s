@@ -244,7 +244,9 @@ func (r *routeBinder[T, U]) bind(route T, seenRoutes map[api.ResourceReference]s
 		if r.tracker.isLastReference(route) {
 			// if it is, then mark everything for deletion
 			consulNeedsDelete = true
-			r.removeControllerStatusFunc(route)
+			if r.removeControllerStatusFunc(route) {
+				kubernetesNeedsStatusUpdate = true
+			}
 			if removeFinalizer(route) {
 				kubernetesNeedsUpdate = true
 			}
