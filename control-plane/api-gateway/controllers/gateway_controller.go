@@ -81,23 +81,10 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		gwc = nil
 	}
 
-	var gwcc *v1alpha1.GatewayClassConfig
-	if gwc != nil {
-		var err error
-		var annotated bool
-		gwcc, annotated, err = serializeGatewayClassConfig(ctx, r.Client, &gw, gwc)
-		if err != nil {
-			log.Error(err, "error annotating the gateway with its config")
-			return ctrl.Result{}, err
-		}
-		if annotated {
-			// update the gateway and wait until the next pass to re-reconcile
-			if err := r.Client.Update(ctx, &gw); err != nil {
-				log.Error(err, "unable to update gateway")
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{}, nil
-		}
+	gwcc, err := getConfigForGatewayClass(ctx, r.Client, gwc)
+	if err != nil {
+		log.Error(err, "error fetching the gateway class config")
+		return ctrl.Result{}, err
 	}
 
 	// fetch all namespaces
@@ -187,6 +174,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	binder := binding.NewBinder(binding.BinderConfig{
 		Translator:               r.Translator,
 		ControllerName:           GatewayClassControllerName,
+		GatewayClassConfig:       gwcc,
 		GatewayClass:             gwc,
 		Gateway:                  gw,
 		HTTPRoutes:               httpRouteList.Items,
@@ -202,9 +190,9 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	updates := binder.Snapshot()
 
-	// do something with deployments, gwcc and such here, might need a flag on
-	// the snapshot to signal that a deployment is needed
-	_ = gwcc
+	// do something with deployments, gwcc and such here, if the following exists on
+	// the snapshot it means we should attempt to enforce the deployment
+	_ = updates.GatewayClassConfig
 
 	for _, deletion := range updates.Consul.Deletions {
 		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
@@ -570,4 +558,31 @@ func (r *GatewayController) getAllRefsForGateway(ctx context.Context, gw *gwv1be
 	}
 
 	return objs, nil
+}
+
+// getConfigForGatewayClass returns the relevant GatewayClassConfig for the GatewayClass
+func getConfigForGatewayClass(ctx context.Context, client client.Client, gwc *gwv1beta1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
+	if gwc == nil {
+		// if we don't have a gateway class we can't fetch the corresponding config
+		return nil, nil
+	}
+
+	config := &v1alpha1.GatewayClassConfig{}
+	if ref := gwc.Spec.ParametersRef; ref != nil {
+		if string(ref.Group) != v1alpha1.GroupVersion.Group ||
+			ref.Kind != v1alpha1.GatewayClassConfigKind ||
+			gwc.Spec.ControllerName != GatewayClassControllerName {
+			// we don't have supported params, so return nil
+			return nil, nil
+		}
+
+		err := client.Get(ctx, types.NamespacedName{Name: ref.Name}, config)
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil, nil
+			}
+			return nil, err
+		}
+	}
+	return config, nil
 }

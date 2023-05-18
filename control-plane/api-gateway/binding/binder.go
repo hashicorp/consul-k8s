@@ -3,6 +3,7 @@ package binding
 import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,6 +52,10 @@ type BinderConfig struct {
 	// gateways we control, also leveraged for setting route statuses.
 	ControllerName string
 
+	// GatewayClassConfig is the configuration corresponding to the given
+	// GatewayClass -- if it is nil we should treat the gateway as deleted
+	// since the gateway is now pointing to an invalid gateway class
+	GatewayClassConfig *v1alpha1.GatewayClassConfig
 	// GatewayClass is the GatewayClass corresponding to the Gateway we want to
 	// bind routes to. It is passed as a pointer because it could be nil. If no
 	// GatewayClass corresponds to a Gateway, we ought to clean up any sort of
@@ -114,7 +119,7 @@ func (b *Binder) gatewayRef() api.ResourceReference {
 // our controller name, or if the GatewayClass it references doesn't exist.
 func (b *Binder) isGatewayDeleted() bool {
 	gatewayClassMismatch := b.config.GatewayClass == nil || b.config.ControllerName != string(b.config.GatewayClass.Spec.ControllerName)
-	isGatewayDeleted := isDeleted(&b.config.Gateway) || gatewayClassMismatch
+	isGatewayDeleted := isDeleted(&b.config.Gateway) || gatewayClassMismatch || b.config.GatewayClassConfig == nil
 	return isGatewayDeleted
 }
 
@@ -127,12 +132,17 @@ func (b *Binder) Snapshot() Snapshot {
 	serviceMap := serviceMap(b.config.ConnectInjectedServices)
 	seenRoutes := map[api.ResourceReference]struct{}{}
 	snapshot := Snapshot{}
+	gwcc := b.config.GatewayClassConfig
 
 	isGatewayDeleted := b.isGatewayDeleted()
 	if !isGatewayDeleted {
+		var updated bool
+		gwcc, updated = serializeGatewayClassConfig(&b.config.Gateway, gwcc)
+
 		// we don't have a deletion but if we add a finalizer for the gateway, then just add it and return
 		// otherwise try and resolve as much as possible
-		if ensureFinalizer(&b.config.Gateway) {
+		if ensureFinalizer(&b.config.Gateway) || updated {
+			// if we've added the finalizer or serialized the class config, then update
 			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, &b.config.Gateway)
 			return snapshot
 		}
@@ -200,6 +210,8 @@ func (b *Binder) Snapshot() Snapshot {
 	// we only want to upsert the gateway into Consul or update its status
 	// if the gateway hasn't been marked for deletion
 	if !isGatewayDeleted {
+		snapshot.GatewayClassConfig = gwcc
+
 		entry := b.config.Translator.GatewayToAPIGateway(b.config.Gateway, seenCerts)
 		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &entry)
 

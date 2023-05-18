@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -938,12 +939,14 @@ func TestBinder_Lifecycle(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			tt.config.ControllerName = controllerName
+			tt.config.GatewayClassConfig = &v1alpha1.GatewayClassConfig{}
+			serializeGatewayClassConfig(&tt.config.Gateway, tt.config.GatewayClassConfig)
 
 			binder := NewBinder(tt.config)
 			actual := binder.Snapshot()
 
 			diff := cmp.Diff(tt.expected, actual, cmp.FilterPath(func(p cmp.Path) bool {
-				return strings.HasSuffix(p.String(), "LastTransitionTime")
+				return p.String() == "GatewayClassConfig" || strings.HasSuffix(p.String(), "LastTransitionTime") || strings.HasSuffix(p.String(), "Annotations")
 			}, cmp.Ignore()))
 			if diff != "" {
 				t.Error("undexpected diff", diff)
@@ -2466,10 +2469,11 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			config := BinderConfig{
-				ControllerName: controllerName,
-				GatewayClass:   gatewayClass,
-				Gateway:        gateway,
-				Namespaces:     namespaces,
+				ControllerName:     controllerName,
+				GatewayClassConfig: &v1alpha1.GatewayClassConfig{},
+				GatewayClass:       gatewayClass,
+				Gateway:            gateway,
+				Namespaces:         namespaces,
 				ControlledGateways: map[types.NamespacedName]gwv1beta1.Gateway{
 					{Name: "gateway"}: gateway,
 				},
@@ -2479,6 +2483,7 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					},
 				}},
 			}
+			serializeGatewayClassConfig(&config.Gateway, config.GatewayClassConfig)
 
 			if tt.httpRoute != nil {
 				config.HTTPRoutes = append(config.HTTPRoutes, *tt.httpRoute)

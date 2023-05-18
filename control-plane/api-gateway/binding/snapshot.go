@@ -1,6 +1,7 @@
 package binding
 
 import (
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -35,4 +36,8 @@ type Snapshot struct {
 	Kubernetes KubernetesSnapshot
 	// Consul holds the snapshot of required Consul operations
 	Consul ConsulSnapshot
+	// GatewayClassConfig is the configuration to use for determining
+	// a Gateway deployment, if it is not set, a deployment should be
+	// deleted instead of updated
+	GatewayClassConfig *v1alpha1.GatewayClassConfig
 }
