@@ -15,6 +15,7 @@ import (
 	"sync"
 	"syscall"
 
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -479,10 +480,23 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	helmConfig := apigateway.HelmConfig{
+		Image:    c.flagConsulDataplaneImage,
+		Replicas: int32(c.gateway.DeploymentReplicas),
+		LogLevel: c.flagLogLevel,
+		// Node selector
+		// Tolerations
+		ServiceType: c.gateway.ServiceType,
+		// Copy annotations
+		MaxInstances: int32(c.gateway.DeploymentMaxInstances),
+		MinInstances: int32(c.gateway.DeploymentMinInstances),
+		// Manage system acls
+	}
+
 	if err := (&controllers.GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controllers").WithName("Gateway"),
-		HelmConfig: c.gateway.HelmConfig(),
+		HelmConfig: helmConfig,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return 1

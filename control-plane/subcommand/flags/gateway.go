@@ -4,9 +4,6 @@ import (
 	"flag"
 	"os"
 	"strconv"
-
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
-	"github.com/hashicorp/consul/command/flags"
 )
 
 const (
@@ -42,24 +39,20 @@ func (f *GatewayFlags) Flags() *flag.FlagSet {
 	fs := flag.NewFlagSet("gateway", flag.ContinueOnError)
 
 	deploymentReplicas, _ := strconv.Atoi(os.Getenv(GatewayDeploymentReplicasEnvVar))
-	nodeSelector := os.Getenv(GatewayNodeSelectorEnvVar)
-	tolerations := os.Getenv(GatewayTolerationsEnvVar)
+	// nodeSelector := os.Getenv(GatewayNodeSelectorEnvVar)
+	// tolerations := os.Getenv(GatewayTolerationsEnvVar)
 	serviceType := os.Getenv(GatewayServiceTypeEnvVar)
-	copyAnnotations := os.Getenv(GatewayCopyAnnotationsEnvVar)
-	deploymentMaxInstances := os.Getenv(GatewayMaxInstancesEnvVar)
-	deploymentMinInstances := os.Getenv(GatewayMinInstancesEnvVar)
+	// copyAnnotations := os.Getenv(GatewayCopyAnnotationsEnvVar)
+	deploymentMaxInstances, _ := strconv.Atoi(os.Getenv(GatewayMaxInstancesEnvVar))
+	deploymentMinInstances, _ := strconv.Atoi(os.Getenv(GatewayMinInstancesEnvVar))
 
 	fs.IntVar(&f.DeploymentReplicas, "deployment-replicas", deploymentReplicas, "")
-	fs.Var((*FlagMapValue)(&f.NodeSelector), "node-selector", "")
-	fs.Var((*FlagMapValue)(&f.Tolerations), "tolerations", "")
-	fs.StringVar(&f.ServiceType, "service-type", "", "")
-	fs.Var((*flags.FlagMapValue)(&f.CopyAnnotations), "copy-annotations", "")
-	fs.IntVar(&f.DeploymentMaxInstances, "max-instances", -1, "")
-	fs.IntVar(&f.DeploymentMinInstances, "min-instances", -1, "")
+	// fs.Var((*FlagMapValue)(&f.NodeSelector), "node-selector", "")
+	// fs.Var((*FlagMapValue)(&f.Tolerations), "tolerations", "")
+	fs.StringVar(&f.ServiceType, "service-type", serviceType, "")
+	// fs.Var((*flags.FlagMapValue)(&f.CopyAnnotations), "copy-annotations", "")
+	fs.IntVar(&f.DeploymentMaxInstances, "max-instances", deploymentMaxInstances, "")
+	fs.IntVar(&f.DeploymentMinInstances, "min-instances", deploymentMinInstances, "")
 
 	return fs
-}
-
-func (f *GatewayFlags) HelmConfig() apigateway.HelmConfig {
-	return apigateway.HelmConfig{}
 }
