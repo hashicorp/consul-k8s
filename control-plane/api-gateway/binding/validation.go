@@ -5,6 +5,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -262,4 +263,20 @@ func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRout
 	}
 
 	return false
+}
+
+// toNamespaceSet constructs a list of labels used to match a Namespace
+func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
+	// If namespace label is not set, implicitly insert it to support older Kubernetes versions
+	if labels[namespaceNameLabel] == name {
+		// Already set, avoid copies
+		return klabels.Set(labels)
+	}
+	// First we need a copy to not modify the underlying object
+	ret := make(map[string]string, len(labels)+1)
+	for k, v := range labels {
+		ret[k] = v
+	}
+	ret[namespaceNameLabel] = name
+	return klabels.Set(ret)
 }

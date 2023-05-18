@@ -5,12 +5,27 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
+// pointerTo is a convenience method for taking a pointer
+// of an object without having to declare an intermediate variable.
+// It's also useful for making sure we don't accidentally take
+// the pointer of a range variable directly.
+func pointerTo[T any](v T) *T {
+	return &v
+}
+
+// isNil checks if the argument is nil. It's mainly used to
+// check if a generic conforming to a nullable interface is
+// actually nil
+func isNil(arg interface{}) bool {
+	return arg == nil || reflect.ValueOf(arg).IsNil()
+}
+
+// bothNilOrEqual is used to determine if two pointers to comparable
+// object are either nil or both point to the same value
 func bothNilOrEqual[T comparable](one, two *T) bool {
 	if one == nil && two == nil {
 		return true
@@ -24,21 +39,8 @@ func bothNilOrEqual[T comparable](one, two *T) bool {
 	return *one == *two
 }
 
-func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
-	// If namespace label is not set, implicitly insert it to support older Kubernetes versions
-	if labels[namespaceNameLabel] == name {
-		// Already set, avoid copies
-		return klabels.Set(labels)
-	}
-	// First we need a copy to not modify the underlying object
-	ret := make(map[string]string, len(labels)+1)
-	for k, v := range labels {
-		ret[k] = v
-	}
-	ret[namespaceNameLabel] = name
-	return klabels.Set(ret)
-}
-
+// valueOr checks if a string-like pointer is nil, and if it is,
+// returns the given value instead
 func valueOr[T ~string](v *T, fallback string) string {
 	if v == nil {
 		return fallback
@@ -46,24 +48,13 @@ func valueOr[T ~string](v *T, fallback string) string {
 	return string(*v)
 }
 
+// nilOrEqual checks if a string-like pointer is nil or if it is
+// equal to the value provided
 func nilOrEqual[T ~string](v *T, check string) bool {
 	return v == nil || string(*v) == check
 }
 
-func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv1beta1.ParentReference) []gwv1beta1.ParentReference {
-	references := []gwv1beta1.ParentReference{}
-	for _, ref := range refs {
-		if nilOrEqual(ref.Group, betaGroup) &&
-			nilOrEqual(ref.Kind, kindGateway) &&
-			gateway.Namespace == valueOr(ref.Namespace, namespace) &&
-			gateway.Name == string(ref.Name) {
-			references = append(references, ref)
-		}
-	}
-
-	return references
-}
-
+// objectToMeta returns the NamespacedName for the given object
 func objectToMeta[T metav1.Object](object T) types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: object.GetNamespace(),
@@ -71,10 +62,13 @@ func objectToMeta[T metav1.Object](object T) types.NamespacedName {
 	}
 }
 
+// isDeleted checks if the deletion timestamp is set for an object
 func isDeleted(object client.Object) bool {
 	return !object.GetDeletionTimestamp().IsZero()
 }
 
+// ensureFinalizer ensures that our finalizer is set on an object
+// returning whether or not it modified the object
 func ensureFinalizer(object client.Object) bool {
 	if !object.GetDeletionTimestamp().IsZero() {
 		return false
@@ -91,6 +85,8 @@ func ensureFinalizer(object client.Object) bool {
 	return true
 }
 
+// removeFinalizer ensures that our finalizer is absent from an object
+// returning whether or not it modified the object
 func removeFinalizer(object client.Object) bool {
 	found := false
 	filtered := []string{}
@@ -104,28 +100,6 @@ func removeFinalizer(object client.Object) bool {
 
 	object.SetFinalizers(filtered)
 	return found
-}
-
-func pointerTo[T any](v T) *T {
-	return &v
-}
-
-func isNil(arg interface{}) bool {
-	return arg == nil || reflect.ValueOf(arg).IsNil()
-}
-
-func listenersFor(gateway *gwv1beta1.Gateway, name *gwv1beta1.SectionName) []gwv1beta1.Listener {
-	listeners := []gwv1beta1.Listener{}
-	for _, listener := range gateway.Spec.Listeners {
-		if name == nil {
-			listeners = append(listeners, listener)
-			continue
-		}
-		if listener.Name == *name {
-			listeners = append(listeners, listener)
-		}
-	}
-	return listeners
 }
 
 func serviceMap(services []api.CatalogService) map[types.NamespacedName]api.CatalogService {

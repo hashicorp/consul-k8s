@@ -444,3 +444,35 @@ func parentsForRoute(ref api.ResourceReference, existing []api.ResourceReference
 	}
 	return parents
 }
+
+// filterParentRefs returns the subset of parent references on a route that point to the given gateway
+func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv1beta1.ParentReference) []gwv1beta1.ParentReference {
+	references := []gwv1beta1.ParentReference{}
+	for _, ref := range refs {
+		if nilOrEqual(ref.Group, betaGroup) &&
+			nilOrEqual(ref.Kind, kindGateway) &&
+			gateway.Namespace == valueOr(ref.Namespace, namespace) &&
+			gateway.Name == string(ref.Name) {
+			references = append(references, ref)
+		}
+	}
+
+	return references
+}
+
+// listenersFor returns the listeners corresponding the given section name. If the section
+// name is actually specified, the returned set should just have one listener, if it is
+// unspecified, the all gatweway listeners should be returned.
+func listenersFor(gateway *gwv1beta1.Gateway, name *gwv1beta1.SectionName) []gwv1beta1.Listener {
+	listeners := []gwv1beta1.Listener{}
+	for _, listener := range gateway.Spec.Listeners {
+		if name == nil {
+			listeners = append(listeners, listener)
+			continue
+		}
+		if listener.Name == *name {
+			listeners = append(listeners, listener)
+		}
+	}
+	return listeners
+}
