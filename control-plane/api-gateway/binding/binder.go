@@ -126,15 +126,8 @@ func (b *Binder) Snapshot() Snapshot {
 	seenRoutes := map[api.ResourceReference]struct{}{}
 	snapshot := Snapshot{}
 
-	gatewayRef := b.gatewayRef()
 	isGatewayDeleted := b.isGatewayDeleted()
-
-	if isGatewayDeleted {
-		snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, gatewayRef)
-		if removeFinalizer(&b.config.Gateway) {
-			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, &b.config.Gateway)
-		}
-	} else {
+	if !isGatewayDeleted {
 		// we don't have a deletion but if we add a finalizer for the gateway, then just add it and return
 		// otherwise try and resolve as much as possible
 		if ensureFinalizer(&b.config.Gateway) {
@@ -192,18 +185,19 @@ func (b *Binder) Snapshot() Snapshot {
 		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &entry)
 
 		var status gwv1beta1.GatewayStatus
-		// TODO: conditions and addresses
-		status.Conditions = []metav1.Condition{}
-		status.Addresses = []gwv1beta1.GatewayAddress{}
-		for _, listener := range b.config.Gateway.Spec.Listeners {
+		gatewayValidation := validateGateway(b.config.Gateway)
+		listenerValidation := validateListeners(b.config.Gateway.Namespace, b.config.Gateway.Spec.Listeners, b.config.Secrets)
+		for i, listener := range b.config.Gateway.Spec.Listeners {
 			status.Listeners = append(status.Listeners, gwv1beta1.ListenerStatus{
 				Name:           listener.Name,
 				SupportedKinds: supportedKindsForProtocol[listener.Protocol],
 				AttachedRoutes: int32(boundCounts[listener.Name]),
-				// TODO: conditions
-				Conditions: []metav1.Condition{},
+				Conditions:     listenerValidation.Conditions(b.config.Gateway.Generation, i),
 			})
 		}
+		// TODO: addresses
+		status.Conditions = gatewayValidation.Conditions(b.config.Gateway.Generation, listenerValidation.Invalid())
+		status.Addresses = []gwv1beta1.GatewayAddress{}
 
 		if !cmp.Equal(status, b.config.Gateway.Status, cmp.FilterPath(func(p cmp.Path) bool {
 			path := p.String()
@@ -212,9 +206,360 @@ func (b *Binder) Snapshot() Snapshot {
 			b.config.Gateway.Status = status
 			snapshot.Kubernetes.StatusUpdates = append(snapshot.Kubernetes.StatusUpdates, &b.config.Gateway)
 		}
+	} else {
+		snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, b.gatewayRef())
+		if removeFinalizer(&b.config.Gateway) {
+			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, &b.config.Gateway)
+		}
 	}
 
 	return snapshot
+}
+
+var (
+	errGatewayUnsupportedAddress = errors.New("gateway does not support specifying addresses")
+	errGatewayListenersNotValid  = errors.New("one or more listeners are invalid")
+)
+
+type gatewayValidationResult struct {
+	acceptedErr error
+	// TODO: programmed
+}
+
+func (l gatewayValidationResult) acceptedCondition(generation int64, listenersInvalid bool) metav1.Condition {
+	now := metav1.Now()
+
+	if l.acceptedErr == nil {
+		if listenersInvalid {
+			return metav1.Condition{
+				Type: "Accepted",
+				// should one invalid listener cause the entire gateway to become invalid?
+				Status:             metav1.ConditionFalse,
+				Reason:             "ListenersNotValid",
+				ObservedGeneration: generation,
+				Message:            errGatewayListenersNotValid.Error(),
+				LastTransitionTime: now,
+			}
+		}
+
+		return metav1.Condition{
+			Type:               "Accepted",
+			Status:             metav1.ConditionTrue,
+			Reason:             "Accepted",
+			ObservedGeneration: generation,
+			Message:            "gateway accepted",
+			LastTransitionTime: now,
+		}
+	}
+
+	if l.acceptedErr == errGatewayUnsupportedAddress {
+		return metav1.Condition{
+			Type:               "Accepted",
+			Status:             metav1.ConditionFalse,
+			Reason:             "UnsupportedAddress",
+			ObservedGeneration: generation,
+			Message:            l.acceptedErr.Error(),
+			LastTransitionTime: now,
+		}
+	}
+
+	// fallback to Invalid reason
+	return metav1.Condition{
+		Type:               "Accepted",
+		Status:             metav1.ConditionFalse,
+		Reason:             "Invalid",
+		ObservedGeneration: generation,
+		Message:            l.acceptedErr.Error(),
+		LastTransitionTime: now,
+	}
+}
+
+func (l gatewayValidationResult) Conditions(generation int64, listenersInvalid bool) []metav1.Condition {
+	return []metav1.Condition{
+		l.acceptedCondition(generation, listenersInvalid),
+	}
+}
+
+func validateGateway(gateway gwv1beta1.Gateway) gatewayValidationResult {
+	var result gatewayValidationResult
+
+	if len(gateway.Spec.Addresses) > 0 {
+		result.acceptedErr = errGatewayUnsupportedAddress
+	}
+
+	return result
+}
+
+var (
+	errListenerUnsupportedProtocol               = errors.New("listener protocol is unsupported")
+	errListenerPortUnavailable                   = errors.New("listener port is unavailable")
+	errListenerHostnameConflict                  = errors.New("listener hostname conflicts with another listener")
+	errListenerProtocolConflict                  = errors.New("listener protocol conflicts with another listener")
+	errListenerInvalidCertificateRefNotFound     = errors.New("certificate not found")
+	errListenerInvalidCertificateRefNotSupported = errors.New("certificate type is not supported")
+
+	// custom stuff
+	errListenerNoTLSPassthrough = errors.New("TLS passthrough is not supported")
+)
+
+type listenerValidationResult struct {
+	acceptedErr   error
+	conflictedErr error
+	refErr        error
+	// TODO: programmed
+}
+
+func (l listenerValidationResult) acceptedCondition(generation int64) metav1.Condition {
+	now := metav1.Now()
+	switch l.acceptedErr {
+	case errListenerPortUnavailable:
+		return metav1.Condition{
+			Type:               "Accepted",
+			Status:             metav1.ConditionFalse,
+			Reason:             "PortUnavailable",
+			ObservedGeneration: generation,
+			Message:            l.acceptedErr.Error(),
+			LastTransitionTime: now,
+		}
+	case errListenerUnsupportedProtocol:
+		return metav1.Condition{
+			Type:               "Accepted",
+			Status:             metav1.ConditionFalse,
+			Reason:             "UnsupportedProtocol",
+			ObservedGeneration: generation,
+			Message:            l.acceptedErr.Error(),
+			LastTransitionTime: now,
+		}
+	case nil:
+		return metav1.Condition{
+			Type:               "Accepted",
+			Status:             metav1.ConditionTrue,
+			Reason:             "Accepted",
+			ObservedGeneration: generation,
+			Message:            "listener accepted",
+			LastTransitionTime: now,
+		}
+	default:
+		// falback to invalid
+		return metav1.Condition{
+			Type:               "Accepted",
+			Status:             metav1.ConditionFalse,
+			Reason:             "Invalid",
+			ObservedGeneration: generation,
+			Message:            l.acceptedErr.Error(),
+			LastTransitionTime: now,
+		}
+	}
+}
+
+func (l listenerValidationResult) conflictedCondition(generation int64) metav1.Condition {
+	now := metav1.Now()
+
+	switch l.conflictedErr {
+	case errListenerProtocolConflict:
+		return metav1.Condition{
+			Type:               "Conflicted",
+			Status:             metav1.ConditionTrue,
+			Reason:             "ProtocolConflict",
+			ObservedGeneration: generation,
+			Message:            l.conflictedErr.Error(),
+			LastTransitionTime: now,
+		}
+	case errListenerHostnameConflict:
+		return metav1.Condition{
+			Type:               "Conflicted",
+			Status:             metav1.ConditionTrue,
+			Reason:             "HostnameConflict",
+			ObservedGeneration: generation,
+			Message:            l.conflictedErr.Error(),
+			LastTransitionTime: now,
+		}
+	default:
+		return metav1.Condition{
+			Type:               "Conflicted",
+			Status:             metav1.ConditionFalse,
+			Reason:             "NoConflicts",
+			ObservedGeneration: generation,
+			Message:            "listener has no conflicts",
+			LastTransitionTime: now,
+		}
+	}
+}
+
+func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1.Condition {
+	now := metav1.Now()
+
+	switch l.refErr {
+	case errListenerInvalidCertificateRefNotFound:
+		return metav1.Condition{
+			Type:               "ResolvedRefs",
+			Status:             metav1.ConditionFalse,
+			Reason:             "InvalidCertificateRef",
+			ObservedGeneration: generation,
+			Message:            l.refErr.Error(),
+			LastTransitionTime: now,
+		}
+	case errListenerInvalidCertificateRefNotSupported:
+		return metav1.Condition{
+			Type:               "ResolvedRefs",
+			Status:             metav1.ConditionFalse,
+			Reason:             "InvalidCertificateRef",
+			ObservedGeneration: generation,
+			Message:            l.refErr.Error(),
+			LastTransitionTime: now,
+		}
+	default:
+		return metav1.Condition{
+			Type:               "ResolvedRefs",
+			Status:             metav1.ConditionTrue,
+			Reason:             "ResolvedRefs",
+			ObservedGeneration: generation,
+			Message:            "resolved certificate references",
+			LastTransitionTime: now,
+		}
+	}
+}
+
+func (l listenerValidationResult) Conditions(generation int64) []metav1.Condition {
+	return []metav1.Condition{
+		l.acceptedCondition(generation),
+		l.conflictedCondition(generation),
+		l.resolvedRefsCondition(generation),
+	}
+}
+
+type listenerValidationResults []listenerValidationResult
+
+func (l listenerValidationResults) Invalid() bool {
+	for _, r := range l {
+		if r.acceptedErr != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (l listenerValidationResults) Conditions(generation int64, index int) []metav1.Condition {
+	result := l[index]
+	return result.Conditions(generation)
+}
+
+type mergedListener struct {
+	index    int
+	listener gwv1beta1.Listener
+}
+
+type mergedListeners []mergedListener
+
+func (m mergedListeners) validateProtocol() error {
+	var protocol *gwv1beta1.ProtocolType
+	for _, l := range m {
+		if protocol == nil {
+			protocol = pointerTo(l.listener.Protocol)
+		}
+		if *protocol != l.listener.Protocol {
+			return errListenerProtocolConflict
+		}
+	}
+	return nil
+}
+
+func bothNilOrEqual[T comparable](one, two *T) bool {
+	if one == nil && two == nil {
+		return true
+	}
+	if one == nil {
+		return false
+	}
+	if two == nil {
+		return false
+	}
+	return *one == *two
+}
+
+func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener) error {
+	for _, l := range m {
+		if l.index == index {
+			continue
+		}
+		if bothNilOrEqual(listener.Hostname, l.listener.Hostname) {
+			return errListenerHostnameConflict
+		}
+	}
+	return nil
+}
+
+func validateTLS(namespace string, tls *gwv1beta1.GatewayTLSConfig, certificates []corev1.Secret) (error, error) {
+	if tls == nil {
+		return nil, nil
+	}
+
+	// TODO: Resource Grants
+
+	var err error
+MAIN_LOOP:
+	for _, ref := range tls.CertificateRefs {
+		// break on the first error
+		if !nilOrEqual(ref.Group, "") || !nilOrEqual(ref.Kind, "Secret") {
+			err = errListenerInvalidCertificateRefNotSupported
+			break MAIN_LOOP
+		}
+		ns := valueOr(ref.Namespace, namespace)
+
+		for _, secret := range certificates {
+			if secret.Namespace == ns && secret.Name == string(ref.Name) {
+				continue MAIN_LOOP
+			}
+		}
+
+		// not found, set error
+		err = errListenerInvalidCertificateRefNotFound
+		break MAIN_LOOP
+	}
+
+	if tls.Mode != nil && *tls.Mode == gwv1beta1.TLSModePassthrough {
+		return errListenerNoTLSPassthrough, err
+	}
+
+	// TODO: validate tls options
+	return nil, nil
+}
+
+func validateListeners(namespace string, listeners []gwv1beta1.Listener, secrets []corev1.Secret) listenerValidationResults {
+	var results listenerValidationResults
+	merged := make(map[gwv1beta1.PortNumber]mergedListeners)
+	for i, listener := range listeners {
+		merged[listener.Port] = append(merged[listener.Port], mergedListener{
+			index:    i,
+			listener: listener,
+		})
+	}
+
+	for i, listener := range listeners {
+		var result listenerValidationResult
+
+		err, refErr := validateTLS(namespace, listener.TLS, secrets)
+		result.refErr = refErr
+		if err != nil {
+			result.acceptedErr = err
+		} else {
+			_, supported := supportedKindsForProtocol[listener.Protocol]
+			if !supported {
+				result.acceptedErr = errListenerUnsupportedProtocol
+			} else if listener.Port == 20000 { //admin port
+				result.acceptedErr = errListenerPortUnavailable
+			}
+		}
+
+		if err := merged[listener.Port].validateProtocol(); err != nil {
+			result.conflictedErr = err
+		} else {
+			result.conflictedErr = merged[listener.Port].validateHostname(i, listener)
+		}
+
+		results = append(results, result)
+	}
+	return results
 }
 
 func listenersFor(gateway *gwv1beta1.Gateway, name *gwv1beta1.SectionName) []gwv1beta1.Listener {

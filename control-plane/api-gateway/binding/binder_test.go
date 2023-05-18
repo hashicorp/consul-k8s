@@ -1,12 +1,12 @@
 package binding
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/statuses"
 	"github.com/hashicorp/consul/api"
-	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -176,10 +176,30 @@ func TestBinder_Lifecycle(t *testing.T) {
 								}},
 							},
 							Status: gwv1beta1.GatewayStatus{
-								Addresses:  []gwv1beta1.GatewayAddress{},
-								Conditions: []metav1.Condition{},
+								Addresses: []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{{
+									Type:    "Accepted",
+									Status:  metav1.ConditionFalse,
+									Reason:  "ListenersNotValid",
+									Message: "one or more listeners are invalid",
+								}},
 								Listeners: []gwv1beta1.ListenerStatus{{
-									Conditions: []metav1.Condition{},
+									Conditions: []metav1.Condition{{
+										Type:    "Accepted",
+										Status:  metav1.ConditionFalse,
+										Reason:  "UnsupportedProtocol",
+										Message: "listener protocol is unsupported",
+									}, {
+										Type:    "Conflicted",
+										Status:  metav1.ConditionFalse,
+										Reason:  "NoConflicts",
+										Message: "listener has no conflicts",
+									}, {
+										Type:    "ResolvedRefs",
+										Status:  metav1.ConditionTrue,
+										Reason:  "ResolvedRefs",
+										Message: "resolved certificate references",
+									}},
 								}},
 							},
 						},
@@ -267,8 +287,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 								GatewayClassName: gatewayClassName,
 							},
 							Status: gwv1beta1.GatewayStatus{
-								Addresses:  []gwv1beta1.GatewayAddress{},
-								Conditions: []metav1.Condition{},
+								Addresses: []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{{
+									Type:    "Accepted",
+									Status:  metav1.ConditionTrue,
+									Reason:  "Accepted",
+									Message: "gateway accepted",
+								}},
 							},
 						},
 					},
@@ -344,8 +369,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 								GatewayClassName: gatewayClassName,
 							},
 							Status: gwv1beta1.GatewayStatus{
-								Addresses:  []gwv1beta1.GatewayAddress{},
-								Conditions: []metav1.Condition{},
+								Addresses: []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{{
+									Type:    "Accepted",
+									Status:  metav1.ConditionTrue,
+									Reason:  "Accepted",
+									Message: "gateway accepted",
+								}},
 							},
 						},
 					},
@@ -419,8 +449,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 								GatewayClassName: gatewayClassName,
 							},
 							Status: gwv1beta1.GatewayStatus{
-								Addresses:  []gwv1beta1.GatewayAddress{},
-								Conditions: []metav1.Condition{},
+								Addresses: []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{{
+									Type:    "Accepted",
+									Status:  metav1.ConditionTrue,
+									Reason:  "Accepted",
+									Message: "gateway accepted",
+								}},
 							},
 						},
 					},
@@ -496,8 +531,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 								GatewayClassName: gatewayClassName,
 							},
 							Status: gwv1beta1.GatewayStatus{
-								Addresses:  []gwv1beta1.GatewayAddress{},
-								Conditions: []metav1.Condition{},
+								Addresses: []gwv1beta1.GatewayAddress{},
+								Conditions: []metav1.Condition{{
+									Type:    "Accepted",
+									Status:  metav1.ConditionTrue,
+									Reason:  "Accepted",
+									Message: "gateway accepted",
+								}},
 							},
 						},
 					},
@@ -800,25 +840,6 @@ func TestBinder_Lifecycle(t *testing.T) {
 						},
 					},
 					Updates: []client.Object{
-						&gwv1beta1.Gateway{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:              "gateway",
-								DeletionTimestamp: deletionTimestamp,
-								Finalizers:        []string{},
-							},
-							Spec: gwv1beta1.GatewaySpec{
-								GatewayClassName: gatewayClassName,
-								Listeners: []gwv1beta1.Listener{{
-									TLS: &gwv1beta1.GatewayTLSConfig{
-										CertificateRefs: []gwv1beta1.SecretObjectReference{{
-											Name: "secret-one",
-										}, {
-											Name: "secret-two",
-										}},
-									},
-								}},
-							},
-						},
 						&gwv1beta1.HTTPRoute{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:       "http-route-one",
@@ -843,6 +864,25 @@ func TestBinder_Lifecycle(t *testing.T) {
 										Name: "gateway",
 									}},
 								},
+							},
+						},
+						&gwv1beta1.Gateway{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:              "gateway",
+								DeletionTimestamp: deletionTimestamp,
+								Finalizers:        []string{},
+							},
+							Spec: gwv1beta1.GatewaySpec{
+								GatewayClassName: gatewayClassName,
+								Listeners: []gwv1beta1.Listener{{
+									TLS: &gwv1beta1.GatewayTLSConfig{
+										CertificateRefs: []gwv1beta1.SecretObjectReference{{
+											Name: "secret-one",
+										}, {
+											Name: "secret-two",
+										}},
+									},
+								}},
 							},
 						},
 					},
@@ -881,9 +921,6 @@ func TestBinder_Lifecycle(t *testing.T) {
 						},
 					},
 					Deletions: []api.ResourceReference{{
-						Kind: api.APIGateway,
-						Name: "gateway",
-					}, {
 						Kind: api.HTTPRoute,
 						Name: "http-route-one",
 					}, {
@@ -892,6 +929,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 					}, {
 						Kind: api.InlineCertificate,
 						Name: "secret-two",
+					}, {
+						Kind: api.APIGateway,
+						Name: "gateway",
 					}},
 				},
 			},
@@ -902,7 +942,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 
 			binder := NewBinder(tt.config)
 			actual := binder.Snapshot()
-			require.Equal(t, tt.expected, actual)
+
+			diff := cmp.Diff(tt.expected, actual, cmp.FilterPath(func(p cmp.Path) bool {
+				return strings.HasSuffix(p.String(), "LastTransitionTime")
+			}, cmp.Ignore()))
+			if diff != "" {
+				t.Error("undexpected diff", diff)
+			}
 		})
 	}
 }
