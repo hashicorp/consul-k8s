@@ -13,7 +13,8 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-// validateRefs
+// validateRefs validates backend references for a route, determining whether or
+// not they were found in the list of known connect-injected services
 func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[types.NamespacedName]api.CatalogService) routeValidationResults {
 	var result routeValidationResults
 	for _, ref := range refs {
@@ -51,6 +52,8 @@ func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[ty
 	return result
 }
 
+// validateGateway validates that a gateway is semantically valid given
+// the set of features that we support
 func validateGateway(gateway gwv1beta1.Gateway) gatewayValidationResult {
 	var result gatewayValidationResult
 
@@ -61,13 +64,21 @@ func validateGateway(gateway gwv1beta1.Gateway) gatewayValidationResult {
 	return result
 }
 
+// mergedListener associates a listener with its indexed position
+// in the gateway spec, it's used to re-associate a status with
+// a listener after we merge compatible listeners together and then
+// validate their conflicts
 type mergedListener struct {
 	index    int
 	listener gwv1beta1.Listener
 }
 
+// mergedListeners is a set of a listeners that are considered "merged"
+// due to referencing the same listener port
 type mergedListeners []mergedListener
 
+// validateProtocol validates that the protocols used across all merged
+// listeners are compatible
 func (m mergedListeners) validateProtocol() error {
 	var protocol *gwv1beta1.ProtocolType
 	for _, l := range m {
@@ -81,6 +92,8 @@ func (m mergedListeners) validateProtocol() error {
 	return nil
 }
 
+// validateHostname validates that the merged listeners don't use the same
+// hostnames as per the spec
 func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener) error {
 	for _, l := range m {
 		if l.index == index {
@@ -93,6 +106,8 @@ func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener
 	return nil
 }
 
+// validateTLS validates that the TLS configuration for a given listener is valid and that
+// the certificates that it references exist
 func validateTLS(namespace string, tls *gwv1beta1.GatewayTLSConfig, certificates []corev1.Secret) (error, error) {
 	if tls == nil {
 		return nil, nil
@@ -129,6 +144,8 @@ MAIN_LOOP:
 	return nil, nil
 }
 
+// validateListeners validates the given listeners both internally and with respect to each
+// other for purposes of setting "Conflicted" status conditions
 func validateListeners(namespace string, listeners []gwv1beta1.Listener, secrets []corev1.Secret) listenerValidationResults {
 	var results listenerValidationResults
 	merged := make(map[gwv1beta1.PortNumber]mergedListeners)
@@ -199,6 +216,8 @@ func routeAllowedForListenerNamespaces(gatewayNamespace string, allowedRoutes *g
 	}
 }
 
+// routeAllowedForListenerHostname checks that a hostname specified on a route and the hostname specified
+// on the gateway listener are compatible
 func routeAllowedForListenerHostname(hostname *gwv1beta1.Hostname, hostnames []gwv1beta1.Hostname) bool {
 	if hostname == nil || len(hostnames) == 0 {
 		return true
@@ -212,6 +231,8 @@ func routeAllowedForListenerHostname(hostname *gwv1beta1.Hostname, hostnames []g
 	return false
 }
 
+// hostnameMatch checks that an individual hostname matches another hostname for
+// compatibility
 func hostnamesMatch(a gwv1alpha2.Hostname, b gwv1beta1.Hostname) bool {
 	if a == "" || a == "*" || b == "" || b == "*" {
 		// any wildcard always matches
@@ -235,6 +256,7 @@ func hostnamesMatch(a gwv1alpha2.Hostname, b gwv1beta1.Hostname) bool {
 	return string(a) == string(b)
 }
 
+// routeKindIsAllowedForListener checks that the given route kind is present in the allowed set
 func routeKindIsAllowedForListener(kinds []gwv1beta1.RouteGroupKind, gk schema.GroupKind) bool {
 	if kinds == nil {
 		return true
@@ -249,6 +271,8 @@ func routeKindIsAllowedForListener(kinds []gwv1beta1.RouteGroupKind, gk schema.G
 	return false
 }
 
+// routeKindIsAllowedForListenerExplicit checks that a route is allowed by the kinds specified explicitly
+// on the listener
 func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRoutes, gk schema.GroupKind) bool {
 	if allowedRoutes == nil {
 		return true
