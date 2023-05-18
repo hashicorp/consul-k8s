@@ -12,20 +12,20 @@ import (
 )
 
 const (
-	// gatewayFinalizer is the finalizer we add to any gateway object
+	// gatewayFinalizer is the finalizer we add to any gateway object.
 	gatewayFinalizer = "gateway-finalizer.consul.hashicorp.com"
 
-	// namespaceNameLabel represents that label added automatically to namespaces in newer Kubernetes clusters
+	// namespaceNameLabel represents that label added automatically to namespaces in newer Kubernetes clusters.
 	namespaceNameLabel = "kubernetes.io/metadata.name"
 )
 
 var (
-	// constants extracted for ease of use
+	// constants extracted for ease of use.
 	kindGateway = "Gateway"
 	kindSecret  = "Secret"
 	betaGroup   = gwv1beta1.GroupVersion.Group
 
-	// the list of kinds we can support by listener protocol
+	// the list of kinds we can support by listener protocol.
 	supportedKindsForProtocol = map[gwv1beta1.ProtocolType][]gwv1beta1.RouteGroupKind{
 		gwv1beta1.HTTPProtocolType: {{
 			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
@@ -252,7 +252,7 @@ func (b *Binder) Snapshot() Snapshot {
 }
 
 // serviceMap constructs a map of services indexed by their Kubernetes namespace and name
-// from the annotations that are set on the service
+// from the annotations that are set on the service.
 func serviceMap(services []api.CatalogService) map[types.NamespacedName]api.CatalogService {
 	smap := make(map[types.NamespacedName]api.CatalogService)
 	for _, service := range services {
@@ -262,7 +262,7 @@ func serviceMap(services []api.CatalogService) map[types.NamespacedName]api.Cata
 }
 
 // serviceToNamespacedName returns the Kubernetes namespace and name of a Consul catalog service
-// based on the Metadata annotations written on the service
+// based on the Metadata annotations written on the service.
 func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
 	var (
 		metaKeyKubeNS          = "k8s-namespace"

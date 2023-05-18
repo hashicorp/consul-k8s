@@ -94,7 +94,7 @@ type routeBinder[T client.Object, U api.ConfigEntry] struct {
 
 // newRouteBinder creates a new route binder for the given Kubernetes and Consul route types
 // generally this is lightly wrapped by other constructors that pass in the various closures
-// needed for accessing fields on the objects
+// needed for accessing fields on the objects.
 func newRouteBinder[T client.Object, U api.ConfigEntry](
 	isGatewayDeleted bool,
 	gateway *gwv1beta1.Gateway,
@@ -135,7 +135,7 @@ func newRouteBinder[T client.Object, U api.ConfigEntry](
 	}
 }
 
-// bind contains the main logic for binding a route to a given gateway
+// bind contains the main logic for binding a route to a given gateway.
 func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]int, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) (updatedSnapshot Snapshot) {
 	routeRef := r.translationReferenceFunc(route)
 	existing := r.lookupFunc(routeRef)
@@ -304,7 +304,7 @@ func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]i
 	return
 }
 
-// newTCPRouteBinder wraps newRouteBinder with the proper closures needed for accessing TCPRoutes and their config entries
+// newTCPRouteBinder wraps newRouteBinder with the proper closures needed for accessing TCPRoutes and their config entries.
 func (b *Binder) newTCPRouteBinder(tracker referenceTracker, services map[types.NamespacedName]api.CatalogService) *routeBinder[*gwv1alpha2.TCPRoute, *api.TCPRouteConfigEntry] {
 	return newRouteBinder(
 		b.isGatewayDeleted(),
@@ -333,7 +333,7 @@ func (b *Binder) newTCPRouteBinder(tracker referenceTracker, services map[types.
 	)
 }
 
-// newHTTPRouteBinder wraps newRouteBinder with the proper closures needed for accessing HTTPRoutes and their config entries
+// newHTTPRouteBinder wraps newRouteBinder with the proper closures needed for accessing HTTPRoutes and their config entries.
 func (b *Binder) newHTTPRouteBinder(tracker referenceTracker, services map[types.NamespacedName]api.CatalogService) *routeBinder[*gwv1beta1.HTTPRoute, *api.HTTPRouteConfigEntry] {
 	return newRouteBinder(
 		b.isGatewayDeleted(),
@@ -365,7 +365,7 @@ func (b *Binder) newHTTPRouteBinder(tracker referenceTracker, services map[types
 }
 
 // cleanRoute removes a gateway reference from the given route config entry
-// and marks adds it to the snapshot if its mutated the entry at all
+// and marks adds it to the snapshot if its mutated the entry at all.
 func cleanRoute[T api.ConfigEntry](
 	route T,
 	seenRoutes map[api.ResourceReference]struct{},
@@ -390,7 +390,7 @@ func cleanRoute[T api.ConfigEntry](
 	return snapshot
 }
 
-// cleanHTTPRoute wraps cleanRoute with the proper closures for HTTPRoute config entries
+// cleanHTTPRoute wraps cleanRoute with the proper closures for HTTPRoute config entries.
 func (b *Binder) cleanHTTPRoute(route *api.HTTPRouteConfigEntry, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) Snapshot {
 	return cleanRoute(route, seenRoutes, snapshot, b.gatewayRef(),
 		func(route *api.HTTPRouteConfigEntry) []api.ResourceReference { return route.Parents },
@@ -398,7 +398,7 @@ func (b *Binder) cleanHTTPRoute(route *api.HTTPRouteConfigEntry, seenRoutes map[
 	)
 }
 
-// cleanTCPRoute wraps cleanRoute with the proper closures for TCPRoute config entries
+// cleanTCPRoute wraps cleanRoute with the proper closures for TCPRoute config entries.
 func (b *Binder) cleanTCPRoute(route *api.TCPRouteConfigEntry, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) Snapshot {
 	return cleanRoute(route, seenRoutes, snapshot, b.gatewayRef(),
 		func(route *api.TCPRouteConfigEntry) []api.ResourceReference { return route.Parents },
@@ -445,7 +445,7 @@ func parentsForRoute(ref api.ResourceReference, existing []api.ResourceReference
 	return parents
 }
 
-// filterParentRefs returns the subset of parent references on a route that point to the given gateway
+// filterParentRefs returns the subset of parent references on a route that point to the given gateway.
 func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv1beta1.ParentReference) []gwv1beta1.ParentReference {
 	references := []gwv1beta1.ParentReference{}
 	for _, ref := range refs {

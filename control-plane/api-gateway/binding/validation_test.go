@@ -199,7 +199,6 @@ func TestMergedListeners_ValidateProtocol(t *testing.T) {
 	}
 }
 
-// // func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener) error {
 func TestMergedListeners_ValidateHostname(t *testing.T) {
 	t.Parallel()
 

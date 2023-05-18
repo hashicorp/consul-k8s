@@ -7,7 +7,7 @@ import (
 )
 
 // KubernetesSnapshot contains all the operations
-// required in Kubernetes to complete reconciliation
+// required in Kubernetes to complete reconciliation.
 type KubernetesSnapshot struct {
 	// Updates is the list of objects that need to have
 	// aspects of their metadata or spec updated in Kubernetes
@@ -19,7 +19,7 @@ type KubernetesSnapshot struct {
 }
 
 // ConsulSnapshot contains all the operations required
-// in Consul to complete reconciliation
+// in Consul to complete reconciliation.
 type ConsulSnapshot struct {
 	// Updates is the list of ConfigEntry objects that should
 	// either be updated or created in Consul
@@ -30,7 +30,7 @@ type ConsulSnapshot struct {
 }
 
 // Snapshot contains all Kubernetes and Consul operations
-// needed to complete reconciliation
+// needed to complete reconciliation.
 type Snapshot struct {
 	// Kubernetes holds the snapshot of required Kubernetes operations
 	Kubernetes KubernetesSnapshot

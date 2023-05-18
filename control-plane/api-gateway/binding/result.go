@@ -16,7 +16,7 @@ var (
 	// the general usage is that each error is specified as errRoute* where * corresponds
 	// to the RouteConditionReason given in the spec. If a reason is overloaded and can
 	// be used with two different types of things (i.e. something is not found or it's not supported)
-	// then we distinguish those two usages with errRoute*_Usage
+	// then we distinguish those two usages with errRoute*_Usage.
 	errRouteNotAllowedByListeners_Namespace = errors.New("listener does not allow binding routes from the given namespace")
 	errRouteNotAllowedByListeners_Protocol  = errors.New("listener does not support route protocol")
 	errRouteNoMatchingListenerHostname      = errors.New("listener cannot bind route with a non-aligned hostname")
@@ -30,7 +30,7 @@ var (
 // gateway. Unfortunately, due to the fact that the spec requires a route status be
 // associated with a parent reference, what it means is that anything that is global
 // in nature, like this status will need to be duplicated for every parent reference
-// on a given route status
+// on a given route status.
 type routeValidationResult struct {
 	namespace string
 	backend   gwv1beta1.BackendRef
@@ -38,7 +38,7 @@ type routeValidationResult struct {
 }
 
 // Type is used for error printing a backend reference type that we don't support on
-// a validation error
+// a validation error.
 func (v routeValidationResult) Type() string {
 	return (&metav1.GroupKind{
 		Group: valueOr(v.backend.Group, ""),
@@ -46,17 +46,17 @@ func (v routeValidationResult) Type() string {
 	}).String()
 }
 
-// String is the namespace/name of the reference that has an error
+// String is the namespace/name of the reference that has an error.
 func (v routeValidationResult) String() string {
 	return (types.NamespacedName{Namespace: v.namespace, Name: string(v.backend.Name)}).String()
 }
 
 // routeValidationResults contains a list of validation results for the backend references
-// on a route
+// on a route.
 type routeValidationResults []routeValidationResult
 
 // Condition returns the ResolvedRefs condition that gets duplicated across every relevant
-// parent on a route's status
+// parent on a route's status.
 func (e routeValidationResults) Condition() metav1.Condition {
 	// we only use the first error due to the way the spec is structured
 	// where you can only have a single condition
@@ -113,12 +113,12 @@ type bindResult struct {
 }
 
 // bindResults holds the results of attempting to bind a route to a gateway, having a separate
-// bindResult for each listener on the gateway
+// bindResult for each listener on the gateway.
 type bindResults []bindResult
 
 // Error constructs a human readable error for bindResults, containing any errors that a route
 // had in binding to a gateway, note that this is only used if a route failed to bind to every
-// listener it attempted to bind to
+// listener it attempted to bind to.
 func (b bindResults) Error() string {
 	messages := []string{}
 	for _, result := range b {
@@ -131,7 +131,7 @@ func (b bindResults) Error() string {
 	return strings.Join(messages, "; ")
 }
 
-// DidBind returns whether a route successfully bound to any listener on a gateway
+// DidBind returns whether a route successfully bound to any listener on a gateway.
 func (b bindResults) DidBind() bool {
 	for _, result := range b {
 		if result.err == nil {
@@ -142,7 +142,7 @@ func (b bindResults) DidBind() bool {
 }
 
 // Condition constructs an Accepted condition for a route that will be scoped
-// to the particular parent reference it's using to attempt binding
+// to the particular parent reference it's using to attempt binding.
 func (b bindResults) Condition() metav1.Condition {
 	// if we bound to any listeners, say we're accepted
 	if b.DidBind() {
@@ -175,14 +175,14 @@ func (b bindResults) Condition() metav1.Condition {
 	}
 }
 
-// parentBindResult associates a binding result with the given parent reference
+// parentBindResult associates a binding result with the given parent reference.
 type parentBindResult struct {
 	parent  gwv1beta1.ParentReference
 	results bindResults
 }
 
 // parentBindResults contains the list of all results that occurred when this route
-// attempted to bind to a gateway using its parent references
+// attempted to bind to a gateway using its parent references.
 type parentBindResults []parentBindResult
 
 var (
@@ -190,7 +190,7 @@ var (
 	// the general usage is that each error is specified as errListener* where * corresponds
 	// to the ListenerConditionReason given in the spec. If a reason is overloaded and can
 	// be used with two different types of things (i.e. something is not found or it's not supported)
-	// then we distinguish those two usages with errListener*_Usage
+	// then we distinguish those two usages with errListener*_Usage.
 	errListenerUnsupportedProtocol                = errors.New("listener protocol is unsupported")
 	errListenerPortUnavailable                    = errors.New("listener port is unavailable")
 	errListenerHostnameConflict                   = errors.New("listener hostname conflicts with another listener")
@@ -218,7 +218,7 @@ type listenerValidationResult struct {
 	// TODO: programmed
 }
 
-// acceptedCondition constructs the condition for the Accepted status type
+// acceptedCondition constructs the condition for the Accepted status type.
 func (l listenerValidationResult) acceptedCondition(generation int64) metav1.Condition {
 	now := metav1.Now()
 	switch l.acceptedErr {
@@ -262,7 +262,7 @@ func (l listenerValidationResult) acceptedCondition(generation int64) metav1.Con
 	}
 }
 
-// conflictedCondition constructs the condition for the Conflicted status type
+// conflictedCondition constructs the condition for the Conflicted status type.
 func (l listenerValidationResult) conflictedCondition(generation int64) metav1.Condition {
 	now := metav1.Now()
 
@@ -297,7 +297,7 @@ func (l listenerValidationResult) conflictedCondition(generation int64) metav1.C
 	}
 }
 
-// acceptedCondition constructs the condition for the ResolvedRefs status type
+// acceptedCondition constructs the condition for the ResolvedRefs status type.
 func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1.Condition {
 	now := metav1.Now()
 
@@ -343,12 +343,12 @@ func (l listenerValidationResult) Conditions(generation int64) []metav1.Conditio
 
 // listenerValidationResults holds all of the results for a gateway's listeners
 // the index of each result needs to correspond exactly to the index of the listener
-// on the gateway spec for which it is describing
+// on the gateway spec for which it is describing.
 type listenerValidationResults []listenerValidationResult
 
 // Invalid returns whether or not there is any listener that is not "Accepted"
 // this is used in constructing a gateway's status where the Accepted status
-// at the top-level can have a GatewayConditionReason of ListenersNotValid
+// at the top-level can have a GatewayConditionReason of ListenersNotValid.
 func (l listenerValidationResults) Invalid() bool {
 	for _, r := range l {
 		if r.acceptedErr != nil {
