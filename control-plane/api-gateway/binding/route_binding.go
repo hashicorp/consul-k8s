@@ -14,6 +14,7 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
+// consulHTTPRouteFor returns the Consul HTTPRouteConfigEntry for the given reference.
 func (b *Binder) consulHTTPRouteFor(ref api.ResourceReference) *api.HTTPRouteConfigEntry {
 	for _, route := range b.config.ConsulHTTPRoutes {
 		if route.Namespace == ref.Namespace && route.Partition == ref.Partition && route.Name == ref.Name {
@@ -23,6 +24,7 @@ func (b *Binder) consulHTTPRouteFor(ref api.ResourceReference) *api.HTTPRouteCon
 	return nil
 }
 
+// consulTCPRouteFor returns the Consul TCPRouteConfigEntry for the given reference.
 func (b *Binder) consulTCPRouteFor(ref api.ResourceReference) *api.TCPRouteConfigEntry {
 	for _, route := range b.config.ConsulTCPRoutes {
 		if route.Namespace == ref.Namespace && route.Partition == ref.Partition && route.Name == ref.Name {
@@ -32,6 +34,7 @@ func (b *Binder) consulTCPRouteFor(ref api.ResourceReference) *api.TCPRouteConfi
 	return nil
 }
 
+// routeBinder encapsulates the binding logic for
 type routeBinder[T client.Object, U api.ConfigEntry] struct {
 	isGatewayDeleted           bool
 	gateway                    *gwv1beta1.Gateway
@@ -293,7 +296,7 @@ func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]i
 			if !routeKindIsAllowedForListener(supportedKindsForProtocol[listener.Protocol], gk) {
 				result = append(result, bindResult{
 					section: listener.Name,
-					err:     errNotAllowedByListenerProtocol,
+					err:     errRouteNotAllowedByListeners_Protocol,
 				})
 				continue
 			}
@@ -301,7 +304,7 @@ func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]i
 			if !routeKindIsAllowedForListenerExplicit(listener.AllowedRoutes, gk) {
 				result = append(result, bindResult{
 					section: listener.Name,
-					err:     errNotAllowedByListenerProtocol,
+					err:     errRouteNotAllowedByListeners_Protocol,
 				})
 				continue
 			}
@@ -309,7 +312,7 @@ func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]i
 			if !routeAllowedForListenerNamespaces(r.gateway.Namespace, listener.AllowedRoutes, namespace) {
 				result = append(result, bindResult{
 					section: listener.Name,
-					err:     errNotAllowedByListenerNamespace,
+					err:     errRouteNotAllowedByListeners_Namespace,
 				})
 				continue
 			}
@@ -317,7 +320,7 @@ func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]i
 			if !routeAllowedForListenerHostname(listener.Hostname, r.getHostnamesFunc(route)) {
 				result = append(result, bindResult{
 					section: listener.Name,
-					err:     errNoMatchingListenerHostname,
+					err:     errRouteNoMatchingListenerHostname,
 				})
 				continue
 			}

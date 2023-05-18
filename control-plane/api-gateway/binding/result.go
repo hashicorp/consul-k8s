@@ -10,9 +10,20 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
+var (
+	// Each of the below are specified in the Gateway spec under RouteConditionReason
+	// the general usage is that each error is specified as errRoute* where * corresponds
+	// to the RouteConditionReason given in the spec. If a reason is overloaded and can
+	// be used with two different types of things (i.e. something is not found or it's not supported)
+	// then we distinguish those two usages with errRoute*_Usage
+	errRouteNotAllowedByListeners_Namespace = errors.New("listener does not allow binding routes from the given namespace")
+	errRouteNotAllowedByListeners_Protocol  = errors.New("listener does not support route protocol")
+	errRouteNoMatchingListenerHostname      = errors.New("listener cannot bind route with a non-aligned hostname")
+)
+
 // bindResult holds the result of attempting to bind a route to a particular gateway listener
 // an error value here means that the route did not bind successfully, no error means that
-// the route should be considered bound
+// the route should be considered bound.
 type bindResult struct {
 	section gwv1beta1.SectionName
 	err     error
@@ -67,7 +78,7 @@ func (b bindResults) Condition() metav1.Condition {
 	if len(b) == 1 {
 		for _, result := range b {
 			// if we have a hostname mismatch error, then use the more specific reason
-			if result.err == errNoMatchingListenerHostname {
+			if result.err == errRouteNoMatchingListenerHostname {
 				reason = "NoMatchingListenerHostname"
 			}
 		}

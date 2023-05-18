@@ -1,8 +1,6 @@
 package binding
 
 import (
-	"errors"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul/api"
@@ -13,21 +11,20 @@ import (
 )
 
 const (
+	// gatewayFinalizer is the finalizer we add to any gateway object
 	gatewayFinalizer = "gateway-finalizer.consul.hashicorp.com"
 
-	// NamespaceNameLabel represents that label added automatically to namespaces is newer Kubernetes clusters
-	NamespaceNameLabel = "kubernetes.io/metadata.name"
+	// namespaceNameLabel represents that label added automatically to namespaces in newer Kubernetes clusters
+	namespaceNameLabel = "kubernetes.io/metadata.name"
 )
 
 var (
-	errNotAllowedByListenerNamespace = errors.New("listener does not allow binding routes from the given namespace")
-	errNotAllowedByListenerProtocol  = errors.New("listener does not support route protocol")
-	errNoMatchingListenerHostname    = errors.New("listener cannot bind route with a non-aligned hostname")
+	// constants extracted for ease of use
+	kindGateway = "Gateway"
+	kindSecret  = "Secret"
+	betaGroup   = gwv1beta1.GroupVersion.Group
 
-	kindGateway               = "Gateway"
-	kindSecret                = "Secret"
-	betaGroup                 = gwv1beta1.GroupVersion.Group
-	betaVersion               = gwv1beta1.GroupVersion.Version
+	// the list of kinds we can support by listener protocol
 	supportedKindsForProtocol = map[gwv1beta1.ProtocolType][]gwv1beta1.RouteGroupKind{
 		gwv1beta1.HTTPProtocolType: {{
 			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
@@ -44,29 +41,53 @@ var (
 	}
 )
 
+// BinderConfig configures a binder instance with all of the information
+// that it needs to know to generate a snapshot of bound state.
 type BinderConfig struct {
-	Translator     translation.K8sToConsulTranslator
+	// Translator instance initialized with proper name/namespace translation
+	// configuration from helm.
+	Translator translation.K8sToConsulTranslator
+	// ControllerName is the name of the controller used in determining which
+	// gateways we control, also leveraged for setting route statuses.
 	ControllerName string
 
+	// GatewayClass is the GatewayClass corresponding to the Gateway we want to
+	// bind routes to. It is passed as a pointer because it could be nil. If no
+	// GatewayClass corresponds to a Gateway, we ought to clean up any sort of
+	// state that we may have set on the Gateway, its corresponding Routes or in
+	// Consul, because we should no longer be managing the Gateway (its association
+	// to our controller is through a parameter on the GatewayClass).
 	GatewayClass *gwv1beta1.GatewayClass
-	Gateway      gwv1beta1.Gateway
-	HTTPRoutes   []gwv1beta1.HTTPRoute
-	TCPRoutes    []gwv1alpha2.TCPRoute
-	Secrets      []corev1.Secret
+	// Gateway is the Gateway being reconciled that we want to bind routes to.
+	Gateway gwv1beta1.Gateway
+	// HTTPRoutes is a list of HTTPRoute objects that ought to be bound to the Gateway.
+	HTTPRoutes []gwv1beta1.HTTPRoute
+	// TCPRoutes is a list of TCPRoute objects that ought to be bound to the Gateway.
+	TCPRoutes []gwv1alpha2.TCPRoute
+	// Secrets is a list of Secret objects that a Gateway references.
+	Secrets []corev1.Secret
 
-	// All routes that are currently bound in Consul or correspond to the
-	// routes in the *Routes members above
+	// TODO: Do we need to pass in Routes that have references to a Gateway in their statuses
+	// for cleanup purposes or is the below enough for record keeping?
+
+	// ConsulHTTPRoutes are a list of HTTPRouteConfigEntry objects that currently reference the
+	// Gateway we've created in Consul.
 	ConsulHTTPRoutes []api.HTTPRouteConfigEntry
-	ConsulTCPRoutes  []api.TCPRouteConfigEntry
-	// All certificates that are currently bound in Consul or correspond
-	// to the Secrets member above
+	// ConsulTCPRoutes are a list of TCPRouteConfigEntry objects that currently reference the
+	// Gateway we've created in Consul.
+	ConsulTCPRoutes []api.TCPRouteConfigEntry
+	// ConsulInlineCertificates is a list of certificates that have been created in Consul.
 	ConsulInlineCertificates []api.InlineCertificateConfigEntry
-	// All the connect services that we're aware of
+	// ConnectInjectedServices is a list of all services that have been injected by our connect-injector
+	// and that we can, therefore reference on the mesh.
 	ConnectInjectedServices []api.CatalogService
 
-	// used for namespace label checking
+	// Namespaces is a map of all namespaces in Kubernetes indexed by their names for looking up labels
+	// for AllowedRoutes matching purposes.
 	Namespaces map[string]corev1.Namespace
-	// used for reference counting
+	// ControlledGateways is a map of all Gateway objects that we currently should be interested in. This
+	// is used to determine whether we should garbage collect Certificate or Route objects when they become
+	// disassociated with a particular Gateway.
 	ControlledGateways map[types.NamespacedName]gwv1beta1.Gateway
 }
 

@@ -8,7 +8,6 @@ import (
 	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -27,7 +26,7 @@ func bothNilOrEqual[T comparable](one, two *T) bool {
 
 func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
 	// If namespace label is not set, implicitly insert it to support older Kubernetes versions
-	if labels[NamespaceNameLabel] == name {
+	if labels[namespaceNameLabel] == name {
 		// Already set, avoid copies
 		return klabels.Set(labels)
 	}
@@ -36,7 +35,7 @@ func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
 	for k, v := range labels {
 		ret[k] = v
 	}
-	ret[NamespaceNameLabel] = name
+	ret[namespaceNameLabel] = name
 	return klabels.Set(ret)
 }
 
@@ -63,22 +62,6 @@ func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv
 	}
 
 	return references
-}
-
-func stringPointer[T ~string](v T) *string {
-	x := string(v)
-	return &x
-}
-
-func objectsToMeta[T metav1.Object](objects []T) []types.NamespacedName {
-	var meta []types.NamespacedName
-	for _, object := range objects {
-		meta = append(meta, types.NamespacedName{
-			Namespace: object.GetNamespace(),
-			Name:      object.GetName(),
-		})
-	}
-	return meta
 }
 
 func objectToMeta[T metav1.Object](object T) types.NamespacedName {
@@ -129,13 +112,6 @@ func pointerTo[T any](v T) *T {
 
 func isNil(arg interface{}) bool {
 	return arg == nil || reflect.ValueOf(arg).IsNil()
-}
-
-func routeMatchesListener(listenerName gwv1beta1.SectionName, routeSectionName *gwv1alpha2.SectionName) (can bool, must bool) {
-	if routeSectionName == nil {
-		return true, false
-	}
-	return string(listenerName) == string(*routeSectionName), true
 }
 
 func listenersFor(gateway *gwv1beta1.Gateway, name *gwv1beta1.SectionName) []gwv1beta1.Listener {
