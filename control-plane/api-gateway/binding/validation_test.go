@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -505,58 +506,140 @@ func TestRouteAllowedForListenerNamespaces(t *testing.T) {
 	}
 }
 
-// // func routeAllowedForListenerHostname(hostname *gwv1beta1.Hostname, hostnames []gwv1beta1.Hostname) bool {
-// func TestRouteAllowedForListenerHostname(t *testing.T) {
-// 	t.Parallel()
+func TestRouteAllowedForListenerHostname(t *testing.T) {
+	t.Parallel()
 
-// 	for name, tt := range map[string]struct {
-// 	}{
-// 		"": {},
-// 	} {
-// 		t.Run("name", func(t *testing.T) {
+	for name, tt := range map[string]struct {
+		hostname  *gwv1beta1.Hostname
+		hostnames []gwv1beta1.Hostname
+		expected  bool
+	}{
+		"empty hostnames": {
+			hostname:  nil,
+			hostnames: []gwv1beta1.Hostname{"foo", "bar"},
+			expected:  true,
+		},
+		"empty hostname": {
+			hostname:  pointerTo[gwv1beta1.Hostname]("foo"),
+			hostnames: nil,
+			expected:  true,
+		},
+		"any hostname match": {
+			hostname:  pointerTo[gwv1beta1.Hostname]("foo"),
+			hostnames: []gwv1beta1.Hostname{"foo", "bar"},
+			expected:  true,
+		},
+		"no match": {
+			hostname:  pointerTo[gwv1beta1.Hostname]("foo"),
+			hostnames: []gwv1beta1.Hostname{"bar"},
+			expected:  false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expected, routeAllowedForListenerHostname(tt.hostname, tt.hostnames))
+		})
+	}
+}
 
-// 		})
-// 	}
-// }
+func TestHostnamesMatch(t *testing.T) {
+	t.Parallel()
 
-// // func hostnamesMatch(a gwv1alpha2.Hostname, b gwv1beta1.Hostname) bool {
-// func TestHostnamesMatch(t *testing.T) {
-// 	t.Parallel()
+	for name, tt := range map[string]struct {
+		one      gwv1beta1.Hostname
+		two      gwv1beta1.Hostname
+		expected bool
+	}{
+		"wildcard one": {
+			one:      "*",
+			two:      "foo",
+			expected: true,
+		},
+		"wildcard two": {
+			one:      "foo",
+			two:      "*",
+			expected: true,
+		},
+		"empty one": {
+			one:      "",
+			two:      "foo",
+			expected: true,
+		},
+		"empty two": {
+			one:      "foo",
+			two:      "",
+			expected: true,
+		},
+		"subdomain one": {
+			one:      "*.foo",
+			two:      "sub.foo",
+			expected: true,
+		},
+		"subdomain two": {
+			one:      "sub.foo",
+			two:      "*.foo",
+			expected: true,
+		},
+		"exact match": {
+			one:      "foo",
+			two:      "foo",
+			expected: true,
+		},
+		"no match": {
+			one:      "foo",
+			two:      "bar",
+			expected: false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expected, hostnamesMatch(tt.one, tt.two))
+		})
+	}
+}
 
-// 	for name, tt := range map[string]struct {
-// 	}{
-// 		"": {},
-// 	} {
-// 		t.Run("name", func(t *testing.T) {
+func TestRouteKindIsAllowedForListener(t *testing.T) {
+	t.Parallel()
 
-// 		})
-// 	}
-// }
-
-// // func routeKindIsAllowedForListener(kinds []gwv1beta1.RouteGroupKind, gk schema.GroupKind) bool {
-// func TestRouteKindIsAllowedForListener(t *testing.T) {
-// 	t.Parallel()
-
-// 	for name, tt := range map[string]struct {
-// 	}{
-// 		"": {},
-// 	} {
-// 		t.Run("name", func(t *testing.T) {
-
-// 		})
-// 	}
-// }
-
-// // func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRoutes, gk schema.GroupKind) bool {
-// func TestRouteKindIsAllowedForListenerExplicit(t *testing.T) {
-// 	t.Parallel()
-
-// 	for name, tt := range map[string]struct {
-// 	}{
-// 		"": {},
-// 	} {
-// 		t.Run("name", func(t *testing.T) {
-
-// 		})
-// 	}
-// }
+	for name, tt := range map[string]struct {
+		kinds    []gwv1beta1.RouteGroupKind
+		gk       schema.GroupKind
+		expected bool
+	}{
+		"empty kinds": {
+			kinds:    nil,
+			gk:       schema.GroupKind{Group: "a", Kind: "b"},
+			expected: true,
+		},
+		"group specified": {
+			kinds: []gwv1beta1.RouteGroupKind{
+				{Group: pointerTo[gwv1beta1.Group]("a"), Kind: "b"},
+			},
+			gk:       schema.GroupKind{Group: "a", Kind: "b"},
+			expected: true,
+		},
+		"group unspecified": {
+			kinds: []gwv1beta1.RouteGroupKind{
+				{Kind: "b"},
+			},
+			gk:       schema.GroupKind{Group: "a", Kind: "b"},
+			expected: true,
+		},
+		"kind mismatch": {
+			kinds: []gwv1beta1.RouteGroupKind{
+				{Kind: "b"},
+			},
+			gk:       schema.GroupKind{Group: "a", Kind: "c"},
+			expected: false,
+		},
+		"group mismatch": {
+			kinds: []gwv1beta1.RouteGroupKind{
+				{Group: pointerTo[gwv1beta1.Group]("a"), Kind: "b"},
+			},
+			gk:       schema.GroupKind{Group: "d", Kind: "b"},
+			expected: false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expected, routeKindIsAllowedForListener(tt.kinds, tt.gk))
+		})
+	}
+}

@@ -278,17 +278,7 @@ func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRout
 		return true
 	}
 
-	if len(allowedRoutes.Kinds) == 0 {
-		return true
-	}
-
-	for _, kind := range allowedRoutes.Kinds {
-		if string(kind.Kind) == gk.Kind && nilOrEqual(kind.Group, gk.Group) {
-			return true
-		}
-	}
-
-	return false
+	return routeKindIsAllowedForListener(allowedRoutes.Kinds, gk)
 }
 
 // toNamespaceSet constructs a list of labels used to match a Namespace
