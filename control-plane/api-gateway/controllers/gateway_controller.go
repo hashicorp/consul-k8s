@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -75,6 +76,26 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if !k8serrors.IsNotFound(err) {
 			log.Error(err, "unable to get GatewayClass")
 			return ctrl.Result{}, err
+		}
+		gwc = nil
+	}
+
+	var gwcc *v1alpha1.GatewayClassConfig
+	if gwc != nil {
+		var err error
+		var annotated bool
+		gwcc, annotated, err = serializeGatewayClassConfig(ctx, r.Client, &gw, gwc)
+		if err != nil {
+			log.Error(err, "error annotating the gateway with its config")
+			return ctrl.Result{}, err
+		}
+		if annotated {
+			// update the gateway and wait until the next pass to re-reconcile
+			if err := r.Client.Update(ctx, &gw); err != nil {
+				log.Error(err, "unable to update gateway")
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
 		}
 	}
 
@@ -179,6 +200,10 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	})
 
 	updates := binder.Snapshot()
+
+	// do something with deployments, gwcc and such here, might need a flag on
+	// the snapshot to signal that a deployment is needed
+	_ = gwcc
 
 	for _, deletion := range updates.Consul.Deletions {
 		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
