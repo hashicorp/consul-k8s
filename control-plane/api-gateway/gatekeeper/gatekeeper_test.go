@@ -800,6 +800,11 @@ func configureRole(name, namespace string, labels map[string]string, resourceVer
 			APIGroups: []string{"policy"},
 			Resources: []string{"podsecuritypolicies"},
 			Verbs:     []string{"use"},
+		}, {
+			APIGroups:     []string{"security.openshift.io"},
+			Resources:     []string{"securitycontextconstraints"},
+			ResourceNames: []string{"name-of-the-security-context-constraints"},
+			Verbs:         []string{"use"},
 		}},
 	}
 }

@@ -47,9 +47,9 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 						Name: "my-gw-class",
 					},
 					Spec: gwv1beta1.GatewayClassSpec{
-						ControllerName: "",
+						ControllerName: GatewayClassControllerName,
 						ParametersRef: &gwv1beta1.ParametersReference{
-							Group: Group,
+							Group: group,
 							Kind:  v1alpha1.GatewayClassConfigKind,
 							Name:  "the config",
 						},
@@ -103,7 +103,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 					Spec: gwv1beta1.GatewayClassSpec{
 						ControllerName: "",
 						ParametersRef: &gwv1beta1.ParametersReference{
-							Group: Group,
+							Group: group,
 							Kind:  v1alpha1.GatewayClassConfigKind,
 							Name:  "the config",
 						},

@@ -265,15 +265,6 @@ func derefAll[T any](vs []*T) []T {
 	return e
 }
 
-func configEntryTo[T api.ConfigEntry](entry api.ConfigEntry) T {
-	var e T
-	if entry == nil {
-		return e
-	}
-
-	return entry.(T)
-}
-
 func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 	es := []T{}
 	for _, e := range entries {
@@ -391,18 +382,6 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&source.Channel{Source: c.Subscribe(ctx, api.InlineCertificate, translator.BuildConsulInlineCertificateTranslator(ctx, r.transformSecret)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).Complete(r)
-}
-
-func (r *GatewayController) cleanupGatewayResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) (ctrl.Result, error) {
-	// TODO: Delete configuration in Consul servers.
-	// TODO: Call gatekeeper delete.
-
-	_, err := RemoveFinalizer(ctx, r.Client, gw, gatewayFinalizer)
-	if err != nil {
-		log.Error(err, "unable to remove finalizer")
-	}
-
-	return ctrl.Result{}, err
 }
 
 func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
