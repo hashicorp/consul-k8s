@@ -123,6 +123,7 @@ type Command struct {
 
 	flagSet *flag.FlagSet
 	consul  *flags.ConsulFlags
+	gateway *flags.GatewayFlags
 
 	clientset kubernetes.Interface
 
@@ -136,8 +137,8 @@ var (
 )
 
 func init() {
+	// Add groups to the runtime scheme.
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
@@ -229,8 +230,11 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
 
 	c.consul = &flags.ConsulFlags{}
+	c.gateway = &flags.GatewayFlags{}
 
 	flags.Merge(c.flagSet, c.consul.Flags())
+	flags.Merge(c.flagSet, c.gateway.Flags())
+
 	// flag.CommandLine is a package level variable representing the default flagSet. The init() function in
 	// "sigs.k8s.io/controller-runtime/pkg/client/config", which is imported by ctrl, registers the flag --kubeconfig to
 	// the default flagSet. That's why we need to merge it to have access with our flagSet.
@@ -476,8 +480,9 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if err := (&controllers.GatewayController{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Gateway"),
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controllers").WithName("Gateway"),
+		HelmConfig: c.gateway.HelmConfig(),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return 1

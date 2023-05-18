@@ -21,7 +21,7 @@ var (
 )
 
 func (g *Gatekeeper) upsertService(ctx context.Context) error {
-	if g.HelmConfig.ServiceType == nil {
+	if g.HelmConfig.ServiceType == "" {
 		return nil
 	}
 
