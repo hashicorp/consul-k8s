@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -16,8 +15,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul-k8s/control-plane/cache"
@@ -191,7 +193,6 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 }
 
 func (r *GatewayController) cleanupGatewayResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) (ctrl.Result, error) {
-
 	// TODO: Delete configuration in Consul servers.
 	// TODO: Call gatekeeper delete.
 
@@ -337,4 +338,45 @@ func derefStringOr[T ~string, U ~string](v *T, val U) string {
 		return string(val)
 	}
 	return string(*v)
+}
+
+func (r *GatewayController) getAllRefsForGateway(ctx context.Context, gw *gwv1beta1.Gateway) ([]metav1.Object, error) {
+	objs := make([]metav1.Object, 0)
+
+	// handle http routes
+	httpRouteList := &gwv1beta1.HTTPRouteList{}
+	err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, types.NamespacedName{Name: gw.Name, Namespace: gw.Namespace}.String()),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, route := range httpRouteList.Items {
+		objs = append(objs, &route)
+	}
+	// handle tcp routes
+	tcpRouteList := &v1alpha2.TCPRouteList{}
+	err = r.Client.List(ctx, tcpRouteList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(TCPRoute_GatewayIndex, types.NamespacedName{Name: gw.Name, Namespace: gw.Namespace}.String()),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, route := range tcpRouteList.Items {
+		objs = append(objs, &route)
+	}
+
+	// handle secrets
+	for _, listener := range gw.Spec.Listeners {
+		for _, secret := range listener.TLS.CertificateRefs {
+			secretObj := &corev1.Secret{}
+			err = r.Client.Get(ctx, indexedNamespacedNameWithDefault(secret.Name, secret.Namespace, gw.Namespace), secretObj)
+			if err != nil {
+				continue
+			}
+			objs = append(objs, secretObj)
+		}
+	}
+
+	return objs, nil
 }

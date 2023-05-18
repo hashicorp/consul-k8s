@@ -2,10 +2,14 @@ package controllers
 
 import (
 	"context"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 const (
@@ -53,6 +57,16 @@ var indexes = []index{
 		target:      &gwv1beta1.Gateway{},
 		indexerFunc: gatewayForSecret,
 	},
+	{
+		name:        HTTPRoute_GatewayIndex,
+		target:      &gwv1beta1.HTTPRoute{},
+		indexerFunc: gatewayForHTTPRoute,
+	},
+	{
+		name:        TCPRoute_GatewayIndex,
+		target:      &v1alpha2.TCPRoute{},
+		indexerFunc: gatewayForTCPRoute,
+	},
 }
 
 // gatewayClassConfigForGatewayClass creates an index of every GatewayClassConfig referenced by a GatewayClass.
@@ -88,4 +102,40 @@ func gatewayForSecret(o client.Object) []string {
 		}
 	}
 	return secretReferences
+}
+
+func gatewayForHTTPRoute(o client.Object) []string {
+	httpRoute := o.(*gwv1beta1.HTTPRoute)
+	refSet := make(map[types.NamespacedName]struct{}, len(httpRoute.Spec.ParentRefs))
+	for _, parent := range httpRoute.Spec.ParentRefs {
+		namespace := ""
+		if parent.Namespace != nil {
+			namespace = string(*parent.Namespace)
+		}
+		refSet[types.NamespacedName{Name: string(parent.Name), Namespace: namespace}] = struct{}{}
+	}
+
+	refs := make([]string, 0, len(refSet))
+	for namespaceName := range refSet {
+		refs = append(refs, namespaceName.String())
+	}
+	return refs
+}
+
+func gatewayForTCPRoute(o client.Object) []string {
+	httpRoute := o.(*v1alpha2.TCPRoute)
+	refSet := make(map[types.NamespacedName]struct{}, len(httpRoute.Spec.ParentRefs))
+	for _, parent := range httpRoute.Spec.ParentRefs {
+		namespace := ""
+		if parent.Namespace != nil {
+			namespace = string(*parent.Namespace)
+		}
+		refSet[types.NamespacedName{Name: string(parent.Name), Namespace: namespace}] = struct{}{}
+	}
+
+	refs := make([]string, 0, len(refSet))
+	for namespaceName := range refSet {
+		refs = append(refs, namespaceName.String())
+	}
+	return refs
 }
