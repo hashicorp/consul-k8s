@@ -127,21 +127,35 @@ spec:
                   name: {{ .Values.connectInject.aclInjectToken.secretName }}
                   key: {{ .Values.connectInject.aclInjectToken.secretKey }}
             {{- end }}
-            # API Gateway Configuration
-            - name: GATEWAY_DEPLOYMENT_REPLICAS
-              value: {{ default .Values.apiGateway.managedGatewayClass.deployment.defaultInstances .Values.connectInject.apiGateway.managedGatewayClass.deployment.replicas }}
-            - name: GATEWAY_DEPLOYMENT_MAX_INSTANCES
-              value: {{ default .Values.apiGateway.managedGatewayClass.deployment.maxInstances .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
-            - name: GATEWAY_DEPLOYMENT_MIN_INSTANCES
-              value: {{ default .Values.apiGateway.managedGatewayClass.deployment.maxInstances .Values.connectInject.apiGateway.deployment.minInstances }}
-            - name: GATEWAY_NODE_SELECTOR
-              value: {{ default .Values.apiGateway.managedGatewayClass.nodeSelector .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
-            - name: GATEWAY_TOLERATIONS
-              value: {{ default .Values.apiGateway.managedGatewayClass.tolerations .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
-            - name: GATEWAY_SERVICE_TYPE
-              value: {{ default .Values.apiGateway.managedGatewayClass.serviceType .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
-            - name: GATEWAY_COPY_ANNOTATIONS
-              value: {{ default .Values.apiGateway.managedGatewayClass.copyAnnotations .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations }}
+            # {{- if .Values.apiGateway.managedGatewayClass.deployment }}
+            # - name: GATEWAY_DEPLOYMENT_REPLICAS
+            #   value: {{ default .Values.apiGateway.managedGatewayClass.deployment.defaultInstances .Values.connectInject.apiGateway.managedGatewayClass.deployment.replicas }}
+            # - name: GATEWAY_DEPLOYMENT_MAX_INSTANCES
+            #   value: {{ default .Values.apiGateway.managedGatewayClass.deployment.maxInstances .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
+            # - name: GATEWAY_DEPLOYMENT_MIN_INSTANCES
+            #   value: {{ default .Values.apiGateway.managedGatewayClass.deployment.maxInstances .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
+            # {{- else }}
+            # - name: GATEWAY_DEPLOYMENT_REPLICAS
+            #   value: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.replicas }}
+            # - name: GATEWAY_DEPLOYMENT_MAX_INSTANCES
+            #   value: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
+            # - name: GATEWAY_DEPLOYMENT_MIN_INSTANCES
+            #   value: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
+            # {{- end }}
+            # {{- if (or .Values.apiGateway.managedGatewayClass.nodeSelector .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector) }}
+            # - name: GATEWAY_NODE_SELECTOR
+            #   value: {{ default .Values.apiGateway.managedGatewayClass.nodeSelector .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
+            # {{- end }}
+            # {{- if (or .Values.apiGateway.managedGatewayClass.tolerations .Values.connectInject.apiGateway.managedGatewayClass.tolerations)}}
+            # - name: GATEWAY_TOLERATIONS
+            #   value: {{ default .Values.apiGateway.managedGatewayClass.tolerations .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
+            # {{- end }}
+            # - name: GATEWAY_SERVICE_TYPE
+            #   value: {{ default .Values.apiGateway.managedGatewayClass.serviceType .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
+            # {{- if (or .Values.apiGateway.managedGatewayClass.copyAnnotations.service .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service) }}
+            # - name: GATEWAY_COPY_ANNOTATIONS
+            #   value: {{ default .Values.apiGateway.managedGatewayClass.copyAnnotations.service .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
+            # {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
