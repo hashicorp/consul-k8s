@@ -25,6 +25,7 @@ rules:
   - ingressgateways
   - terminatinggateways
   - gatewayclassconfigs
+  - samenessgroups
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers
@@ -50,6 +51,7 @@ rules:
   - serviceintentions/status
   - ingressgateways/status
   - terminatinggateways/status
+  - samenessgroups/status
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors/status
   - peeringdialers/status

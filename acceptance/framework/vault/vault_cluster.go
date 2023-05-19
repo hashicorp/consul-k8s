@@ -59,13 +59,20 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	if cfg.EnablePodSecurityPolicies {
 		values["global.psp.enable"] = "true"
 	}
+	if cfg.VaultServerVersion != "" {
+		values["server.image.tag"] = cfg.VaultServerVersion
+	}
+	vaultHelmChartVersion := defaultVaultHelmChartVersion
 
+	if cfg.VaultHelmChartVersion != "" {
+		vaultHelmChartVersion = cfg.VaultHelmChartVersion
+	}
 	helpers.MergeMaps(values, helmValues)
 	vaultHelmOpts := &helm.Options{
 		SetValues:      values,
 		KubectlOptions: kopts,
 		Logger:         logger,
-		Version:        defaultVaultHelmChartVersion,
+		Version:        vaultHelmChartVersion,
 	}
 
 	helm.AddRepo(t, vaultHelmOpts, "hashicorp", "https://helm.releases.hashicorp.com")

@@ -291,5 +291,26 @@ webhooks:
   admissionReviewVersions:
   - "v1beta1"
   - "v1"
+- admissionReviewVersions:
+    - v1beta1
+    - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-samenessgroup
+  failurePolicy: Fail
+  name: mutate-samenessgroup.consul.hashicorp.com
+  rules:
+    - apiGroups:
+        - consul.hashicorp.com
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - samenessgroups
+  sideEffects: None
 {{- end }}
 {{- end }}

@@ -6,6 +6,8 @@ package main
 import (
 	"context"
 
+	"github.com/hashicorp/consul-k8s/cli/cmd/config"
+	config_read "github.com/hashicorp/consul-k8s/cli/cmd/config/read"
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/list"
@@ -76,6 +78,16 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 		},
 		"proxy read": func() (cli.Command, error) {
 			return &read.ReadCommand{
+				BaseCommand: baseCommand,
+			}, nil
+		},
+		"config": func() (cli.Command, error) {
+			return &config.ConfigCommand{
+				BaseCommand: baseCommand,
+			}, nil
+		},
+		"config read": func() (cli.Command, error) {
+			return &config_read.ReadCommand{
 				BaseCommand: baseCommand,
 			}, nil
 		},

@@ -335,7 +335,7 @@ Consul server environment variables for consul-k8s commands.
 {{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
 - name: CONSUL_SKIP_SERVER_WATCH
-  value: "true" 
+  value: "true"
 {{- end }}
 {{- end -}}
 
@@ -366,7 +366,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 */}}
 {{- define "consul.validateCloudSecretKeys" -}}
-{{- if and .Values.global.cloud.enabled }} 
+{{- if and .Values.global.cloud.enabled }}
 {{- if or (and .Values.global.cloud.resourceId.secretName (not .Values.global.cloud.resourceId.secretKey)) (and .Values.global.cloud.resourceId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
 {{fail "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set."}}
 {{- end }}
@@ -385,5 +385,41 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 {{- if or (and .Values.global.cloud.scadaAddress.secretName (not .Values.global.cloud.scadaAddress.secretKey)) (and .Values.global.cloud.scadaAddress.secretKey (not .Values.global.cloud.scadaAddress.secretName)) }}
 {{fail "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set."}}
 {{- end }}
+{{- end }}
+{{- end -}}
+
+
+{{/*
+Fails if temeletryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
+- telemetryCollector.cloud.clientId.secretName
+- telemetryCollector.cloud.clientSecret.secretName
+- global.cloud.resourceId.secretName
+
+Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
+
+*/}}
+{{- define "consul.validateTelemetryCollectorCloud" -}}
+{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
+{{- end }}
+{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, global.cloud.resourceId.secretName,telemetryCollector.cloud.clientId.secretName must also be set."}}
+{{- end }}
+{{- end }}
+
+{{/**/}}
+
+{{- define "consul.validateTelemetryCollectorCloudSecretKeys" -}}
+{{- if or (and .Values.telemetryCollector.cloud.clientId.secretName (not .Values.telemetryCollector.cloud.clientId.secretKey)) (and .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.telemetryCollector.cloud.clientId.secretName)) }}
+{{fail "When either telemetryCollector.cloud.clientId.secretName or telemetryCollector.cloud.clientId.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName (not .Values.telemetryCollector.cloud.clientSecret.secretKey)) (and .Values.telemetryCollector.cloud.clientSecret.secretKey (not .Values.telemetryCollector.cloud.clientSecret.secretName)) }}
+{{fail "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set."}}
+{{- end }}
+{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
+{{fail "When telemetryCollector has clientId and clientSecret global.cloud.resourceId.secretName must be set"}}
+{{- end }}
+{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretKey)) }}
+{{fail "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set"}}
 {{- end }}
 {{- end -}}

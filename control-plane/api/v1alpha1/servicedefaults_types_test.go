@@ -70,6 +70,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
+					MutualTLSMode: MutualTLSModePermissive,
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
 							Name:              "upstream-default",
@@ -90,6 +91,10 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								},
 								MaxFailures:             uint32(20),
 								EnforcingConsecutive5xx: pointer.Uint32(100),
+								MaxEjectionPercent:      pointer.Uint32(10),
+								BaseEjectionTime: &metav1.Duration{
+									Duration: 10 * time.Second,
+								},
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -115,6 +120,10 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									},
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
+									MaxEjectionPercent:      pointer.Uint32(20),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 20 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -139,6 +148,10 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									},
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
+									MaxEjectionPercent:      pointer.Uint32(30),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 30 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -197,6 +210,7 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
+				MutualTLSMode: capi.MutualTLSModePermissive,
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
@@ -215,6 +229,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							Interval:                2 * time.Second,
 							MaxFailures:             uint32(20),
 							EnforcingConsecutive5xx: pointer.Uint32(100),
+							MaxEjectionPercent:      pointer.Uint32(10),
+							BaseEjectionTime:        pointer.Duration(10 * time.Second),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -238,6 +254,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
 								EnforcingConsecutive5xx: pointer.Uint32(60),
+								MaxEjectionPercent:      pointer.Uint32(20),
+								BaseEjectionTime:        pointer.Duration(20 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -260,6 +278,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
 								EnforcingConsecutive5xx: pointer.Uint32(60),
+								MaxEjectionPercent:      pointer.Uint32(30),
+								BaseEjectionTime:        pointer.Duration(30 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -367,6 +387,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
+					MutualTLSMode: MutualTLSModeStrict,
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
 							Name:              "upstream-default",
@@ -386,6 +407,10 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								},
 								MaxFailures:             uint32(20),
 								EnforcingConsecutive5xx: pointer.Uint32(100),
+								MaxEjectionPercent:      pointer.Uint32(10),
+								BaseEjectionTime: &metav1.Duration{
+									Duration: 10 * time.Second,
+								},
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -410,6 +435,10 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									},
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
+									MaxEjectionPercent:      pointer.Uint32(20),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 20 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -433,6 +462,10 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									},
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
+									MaxEjectionPercent:      pointer.Uint32(30),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 30 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -487,6 +520,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
+				MutualTLSMode: capi.MutualTLSModeStrict,
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
@@ -504,6 +538,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							Interval:                2 * time.Second,
 							MaxFailures:             uint32(20),
 							EnforcingConsecutive5xx: pointer.Uint32(100),
+							MaxEjectionPercent:      pointer.Uint32(10),
+							BaseEjectionTime:        pointer.Duration(10 * time.Second),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -526,6 +562,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
 								EnforcingConsecutive5xx: pointer.Uint32(60),
+								MaxEjectionPercent:      pointer.Uint32(20),
+								BaseEjectionTime:        pointer.Duration(20 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -547,6 +585,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
 								EnforcingConsecutive5xx: pointer.Uint32(60),
+								MaxEjectionPercent:      pointer.Uint32(30),
+								BaseEjectionTime:        pointer.Duration(30 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -680,6 +720,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
+					MutualTLSMode: MutualTLSModePermissive,
 					Expose: Expose{
 						Checks: false,
 						Paths: []ExposePath{
@@ -814,6 +855,17 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: "servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
+		},
+		"mutualTLSMode": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					MutualTLSMode: MutualTLSMode("asdf"),
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.mutualTLSMode: Invalid value: "asdf": Must be one of "", "strict", or "permissive".`,
 		},
 		"mode": {
 			input: &ServiceDefaults{
@@ -1296,7 +1348,7 @@ func TestServiceDefaults_ConsulName(t *testing.T) {
 }
 
 func TestServiceDefaults_KubernetesName(t *testing.T) {
-	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
+	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
 }
 
 func TestServiceDefaults_ConsulNamespace(t *testing.T) {

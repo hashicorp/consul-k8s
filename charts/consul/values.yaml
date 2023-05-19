@@ -550,6 +550,11 @@ global:
     # @type: boolean
     enableGatewayMetrics: true
 
+    # Configures the Helm chart’s components to forward envoy metrics for the Consul service mesh to the
+    # consul-telemetry-collector. This includes gateway metrics and sidecar metrics.
+    # @type: boolean
+    enableTelemetryCollector: true
+
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
@@ -950,14 +955,14 @@ server:
           topologyKey: kubernetes.io/hostname
 
   # Toleration settings for server pods. This
-  # should be a multi-line string matching the 
-  # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) 
+  # should be a multi-line string matching the
+  # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
   # array in a Pod spec.
   tolerations: ""
 
   # Pod topology spread constraints for server pods.
-  # This should be a multi-line YAML string matching the 
-  # [`topologySpreadConstraints`](https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/) 
+  # This should be a multi-line YAML string matching the
+  # [`topologySpreadConstraints`](https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/)
   # array in a Pod Spec.
   #
   # This requires K8S >= 1.18 (beta) or 1.19 (stable).
@@ -1076,7 +1081,7 @@ server:
   # @type: map
   extraEnvironmentVars: { }
 
-  # [Enterprise Only] Values for setting up and running 
+  # [Enterprise Only] Values for setting up and running
   # [snapshot agents](https://developer.hashicorp.com/consul/commands/snapshot/agent)
   # within the Consul clusters. They run as a sidecar with Consul servers.
   snapshotAgent:
@@ -1780,6 +1785,19 @@ syncCatalog:
   # Set this to false to skip syncing ClusterIP services.
   syncClusterIPServices: true
 
+  ingress:
+    # Syncs the hostname from a Kubernetes Ingress resource to service registrations
+    # when a rule matched a service. Currently only supports host based routing and
+    # not path based routing. The only supported path on an ingress rule is "/".
+    # Set this to false to skip syncing Ingress services.
+    #
+    # Currently, port 80 is synced if there is not TLS entry for the hostname. Syncs the port
+    # 443 if there is a TLS entry that matches the hostname.
+    enabled: false
+    # Requires syncIngress to be `true`. syncs the LoadBalancer IP from a Kubernetes Ingress
+    # resource instead of the hostname to service registrations when a rule matched a service.
+    loadBalancerIPs: false
+
   # Configures the type of syncing that happens for NodePort
   # services. The valid options are: ExternalOnly, InternalOnly, ExternalFirst.
   #
@@ -2034,7 +2052,7 @@ connectInject:
     logLevel: null
 
     # Set the namespace to install the CNI plugin into. Overrides global namespace settings for CNI resources.
-    # Ex: "kube-system" 
+    # Ex: "kube-system"
     # @type: string
     namespace: null
 
@@ -2217,7 +2235,7 @@ connectInject:
     # @type: string
     annotations: null
 
-  # The resource settings for connect inject pods. The defaults, are optimized for getting started worklows on developer deployments. The settings should be tweaked for production deployments. 
+  # The resource settings for connect inject pods. The defaults, are optimized for getting started worklows on developer deployments. The settings should be tweaked for production deployments.
   # @type: map
   resources:
     requests:
@@ -2415,8 +2433,8 @@ connectInject:
         cpu: null
 
   # The resource settings for the Connect injected init container. If null, the resources
-  # won't be set for the initContainer. The defaults are optimized for developer instances of 
-  # Kubernetes, however they should be tweaked with the recommended defaults as shown below to speed up service registration times. 
+  # won't be set for the initContainer. The defaults are optimized for developer instances of
+  # Kubernetes, however they should be tweaked with the recommended defaults as shown below to speed up service registration times.
   # @type: map
   initContainer:
     resources:
@@ -2605,7 +2623,7 @@ meshGateway:
   tolerations: null
 
   # Pod topology spread constraints for mesh gateway pods.
-  # This should be a multi-line YAML string matching the 
+  # This should be a multi-line YAML string matching the
   # [`topologySpreadConstraints`](https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/)
   # array in a Pod Spec.
   #
@@ -2752,7 +2770,7 @@ ingressGateways:
     tolerations: null
 
     # Pod topology spread constraints for ingress gateway pods.
-    # This should be a multi-line YAML string matching the 
+    # This should be a multi-line YAML string matching the
     # [`topologySpreadConstraints`](https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/)
     # array in a Pod Spec.
     #
@@ -2990,7 +3008,7 @@ apiGateway:
     # @type: string
     nodeSelector: null
 
-    # Toleration settings for gateway pods created with the managed gateway class. 
+    # Toleration settings for gateway pods created with the managed gateway class.
     # This should be a multi-line string matching the
     # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
     #
@@ -3154,3 +3172,86 @@ prometheus:
 # is only useful when running helm template.
 tests:
   enabled: true
+
+telemetryCollector:
+  # Enables the consul-telemetry-collector deployment
+  # @type: boolean
+  enabled: false
+
+  # The name of the Docker image (including any tag) for the containers running
+  # the consul-telemetry-collector
+  # @type: string
+  image: "hashicorp/consul-telemetry-collector:0.0.1"
+
+  # The resource settings for consul-telemetry-collector pods.
+  # @recurse: false
+  # @type: map
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "1000m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+
+  # This value sets the number of consul-telemetry-collector replicas to deploy.
+  replicas: 1
+
+  # This value defines additional configuration for the telemetry collector. It should be formatted as a multi-line
+  # json blob string
+  #
+  # ```yaml
+  # customExporterConfig: |
+  #   {"http_collector_endpoint": "other-otel-collector"}
+  # ```
+  #
+  # @type: string
+  customExporterConfig: null
+
+  service:
+    # This value defines additional annotations for the server service account. This should be formatted as a multi-line
+    # string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
+  serviceAccount:
+    # This value defines additional annotations for the telemetry-collector's service account. This should be formatted
+    # as a multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
+  cloud:
+    clientId:
+      secretName: null
+      secretKey: null
+    clientSecret:
+      secretName: null
+      secretKey: null
+
+  initContainer:
+    # The resource settings for consul-telemetry-collector initContainer.
+    # @recurse: false
+    # @type: map
+    resources: {}
+
+  # Optional YAML string to specify a nodeSelector config.
+  # @type: string
+  nodeSelector: null
+
+  # Optional priorityClassName.
+  # @type: string
+  priorityClassName: ""

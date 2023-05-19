@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix issue where the API Gateway controller is unable to start up successfully when Vault is configured as the secrets backend
+```
