@@ -191,7 +191,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	updates := binder.Snapshot()
 
 	// do something with deployments, gwcc and such here, if the following exists on
-	// the snapshot it means we should attempt to enforce the deployment
+	// the snapshot it means we should attempt to enforce the deployment, if it's nil
+	// then we should delete the deployment
 	_ = updates.GatewayClassConfig
 
 	for _, deletion := range updates.Consul.Deletions {
@@ -560,7 +561,7 @@ func (r *GatewayController) getAllRefsForGateway(ctx context.Context, gw *gwv1be
 	return objs, nil
 }
 
-// getConfigForGatewayClass returns the relevant GatewayClassConfig for the GatewayClass
+// getConfigForGatewayClass returns the relevant GatewayClassConfig for the GatewayClass.
 func getConfigForGatewayClass(ctx context.Context, client client.Client, gwc *gwv1beta1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
 	if gwc == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
