@@ -498,7 +498,9 @@ func (c *Command) Run(args []string) int {
 	go cache.Run(ctx)
 
 	// wait for the cache to fill
+	setupLog.Info("waiting for Consul cache sync")
 	cache.WaitSynced(ctx)
+	setupLog.Info("Consul cache synced")
 
 	configEntryReconciler := &controller.ConfigEntryController{
 		ConsulClientConfig:         c.consul.ConsulClientConfig(),

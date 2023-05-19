@@ -11,13 +11,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/cache"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 func TestGatewayReconciler(t *testing.T) {
@@ -78,8 +81,9 @@ func TestGatewayReconciler(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			s := runtime.NewScheme()
+			require.NoError(t, clientgoscheme.AddToScheme(s))
+			require.NoError(t, gwv1alpha2.Install(s))
 			require.NoError(t, gwv1beta1.Install(s))
-			require.NoError(t, v1alpha2.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
 			objs := tc.k8sObjects
@@ -90,6 +94,7 @@ func TestGatewayReconciler(t *testing.T) {
 			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...)).Build()
 
 			r := &GatewayController{
+				cache:  cache.New(cache.Config{Logger: logrtest.New(t), ConsulClientConfig: &consul.Config{}}),
 				Client: fakeClient,
 				Log:    logrtest.New(t),
 			}
@@ -161,7 +166,7 @@ func TestGatewayController_getAllRefsForGateway(t *testing.T) {
 	t.Parallel()
 	s := runtime.NewScheme()
 	require.NoError(t, gwv1beta1.Install(s))
-	require.NoError(t, v1alpha2.Install(s))
+	require.NoError(t, gwv1alpha2.Install(s))
 	require.NoError(t, corev1.AddToScheme(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 
@@ -272,12 +277,12 @@ func TestGatewayController_getAllRefsForGateway(t *testing.T) {
 		Status: gwv1beta1.HTTPRouteStatus{},
 	}
 
-	tcpRoute := &v1alpha2.TCPRoute{
+	tcpRoute := &gwv1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp route",
 		},
-		Spec: v1alpha2.TCPRouteSpec{
+		Spec: gwv1alpha2.TCPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 				ParentRefs: []gwv1beta1.ParentReference{
 					{

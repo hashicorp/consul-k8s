@@ -3,10 +3,9 @@ package controllers
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -15,6 +14,7 @@ import (
 const (
 	// Naming convention: TARGET_REFERENCE.
 	GatewayClass_GatewayClassConfigIndex = "__gatewayclass_referencing_gatewayclassconfig"
+	GatewayClass_ControllerNameIndex     = "__gatewayclass_controller_name"
 	Gateway_GatewayClassIndex            = "__gateway_referencing_gatewayclass"
 	HTTPRoute_GatewayIndex               = "__httproute_referencing_gateway"
 	HTTPRoute_ServiceIndex               = "__httproute_referencing_service"
@@ -48,6 +48,11 @@ var indexes = []index{
 		indexerFunc: gatewayClassConfigForGatewayClass,
 	},
 	{
+		name:        GatewayClass_ControllerNameIndex,
+		target:      &gwv1beta1.GatewayClass{},
+		indexerFunc: gatewayClassControllerName,
+	},
+	{
 		name:        Gateway_GatewayClassIndex,
 		target:      &gwv1beta1.Gateway{},
 		indexerFunc: gatewayClassForGateway,
@@ -60,12 +65,22 @@ var indexes = []index{
 	{
 		name:        HTTPRoute_GatewayIndex,
 		target:      &gwv1beta1.HTTPRoute{},
-		indexerFunc: gatewayForHTTPRoute,
+		indexerFunc: gatewaysForHTTPRoute,
+	},
+	{
+		name:        HTTPRoute_ServiceIndex,
+		target:      &gwv1beta1.HTTPRoute{},
+		indexerFunc: servicesForHTTPRoute,
 	},
 	{
 		name:        TCPRoute_GatewayIndex,
-		target:      &v1alpha2.TCPRoute{},
-		indexerFunc: gatewayForTCPRoute,
+		target:      &gwv1alpha2.TCPRoute{},
+		indexerFunc: gatewaysForTCPRoute,
+	},
+	{
+		name:        TCPRoute_ServiceIndex,
+		target:      &gwv1alpha2.TCPRoute{},
+		indexerFunc: servicesForTCPRoute,
 	},
 }
 
@@ -76,6 +91,16 @@ func gatewayClassConfigForGatewayClass(o client.Object) []string {
 	pr := gc.Spec.ParametersRef
 	if pr != nil && pr.Kind == v1alpha1.GatewayClassConfigKind {
 		return []string{pr.Name}
+	}
+
+	return []string{}
+}
+
+func gatewayClassControllerName(o client.Object) []string {
+	gc := o.(*gwv1beta1.GatewayClass)
+
+	if gc.Spec.ControllerName != "" {
+		return []string{string(gc.Spec.ControllerName)}
 	}
 
 	return []string{}
@@ -104,38 +129,63 @@ func gatewayForSecret(o client.Object) []string {
 	return secretReferences
 }
 
-func gatewayForHTTPRoute(o client.Object) []string {
-	httpRoute := o.(*gwv1beta1.HTTPRoute)
-	refSet := make(map[types.NamespacedName]struct{}, len(httpRoute.Spec.ParentRefs))
-	for _, parent := range httpRoute.Spec.ParentRefs {
-		namespace := ""
-		if parent.Namespace != nil {
-			namespace = string(*parent.Namespace)
-		}
-		refSet[types.NamespacedName{Name: string(parent.Name), Namespace: namespace}] = struct{}{}
-	}
+func gatewaysForHTTPRoute(o client.Object) []string {
+	route := o.(*gwv1beta1.HTTPRoute)
+	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs)
+}
 
-	refs := make([]string, 0, len(refSet))
-	for namespaceName := range refSet {
-		refs = append(refs, namespaceName.String())
+func gatewaysForTCPRoute(o client.Object) []string {
+	route := o.(*gwv1alpha2.TCPRoute)
+	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs)
+}
+
+func servicesForHTTPRoute(o client.Object) []string {
+	route := o.(*gwv1beta1.HTTPRoute)
+	refs := []string{}
+	for _, rule := range route.Spec.Rules {
+	BACKEND_LOOP:
+		for _, ref := range rule.BackendRefs {
+			if nilOrEqual(ref.Group, "") && nilOrEqual(ref.Kind, "Service") {
+				backendRef := indexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+				for _, member := range refs {
+					if member == backendRef {
+						continue BACKEND_LOOP
+					}
+				}
+				refs = append(refs, backendRef)
+			}
+		}
 	}
 	return refs
 }
 
-func gatewayForTCPRoute(o client.Object) []string {
-	httpRoute := o.(*v1alpha2.TCPRoute)
-	refSet := make(map[types.NamespacedName]struct{}, len(httpRoute.Spec.ParentRefs))
-	for _, parent := range httpRoute.Spec.ParentRefs {
-		namespace := ""
-		if parent.Namespace != nil {
-			namespace = string(*parent.Namespace)
+func servicesForTCPRoute(o client.Object) []string {
+	route := o.(*gwv1alpha2.TCPRoute)
+	refs := []string{}
+	for _, rule := range route.Spec.Rules {
+	BACKEND_LOOP:
+		for _, ref := range rule.BackendRefs {
+			if nilOrEqual(ref.Group, "") && nilOrEqual(ref.Kind, "Service") {
+				backendRef := indexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+				for _, member := range refs {
+					if member == backendRef {
+						continue BACKEND_LOOP
+					}
+				}
+				refs = append(refs, backendRef)
+			}
 		}
-		refSet[types.NamespacedName{Name: string(parent.Name), Namespace: namespace}] = struct{}{}
-	}
-
-	refs := make([]string, 0, len(refSet))
-	for namespaceName := range refSet {
-		refs = append(refs, namespaceName.String())
 	}
 	return refs
+}
+
+func gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference) []string {
+	var references []string
+	for _, parent := range refs {
+		if nilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) && nilOrEqual(parent.Kind, "Gateway") {
+			// If an explicit Gateway namespace is not provided, use the Route namespace to lookup the provided Gateway Namespace.
+			references = append(references, indexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace).String())
+		}
+	}
+	return references
 }

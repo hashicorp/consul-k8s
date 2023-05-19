@@ -63,6 +63,38 @@ func (oldCache resourceCache) diff(newCache resourceCache) []api.ConfigEntry {
 			diffs = append(diffs, entry)
 		}
 	}
+
+	return diffs
+}
+
+type serviceCache map[api.ResourceReference]*api.CatalogService
+
+func (oldCache serviceCache) diff(newCache serviceCache) []*api.CatalogService {
+	diffs := make([]*api.CatalogService, 0)
+
+	for ref, entry := range newCache {
+		oldRef, ok := oldCache[ref]
+		// ref from the new cache doesn't exist in the old one
+		// this means a resource was added
+		if !ok {
+			diffs = append(diffs, entry)
+			continue
+		}
+
+		// the entry in the old cache has an older modify index than the ref
+		// from the new cache
+		if oldRef.ModifyIndex < entry.ModifyIndex {
+			diffs = append(diffs, entry)
+		}
+	}
+
+	// get all deleted entries, these are entries present in the old cache
+	// that are not present in the new
+	for ref, entry := range oldCache {
+		if _, ok := newCache[ref]; !ok {
+			diffs = append(diffs, entry)
+		}
+	}
 	return diffs
 }
 
@@ -105,6 +137,24 @@ func (s *Subscription) Events() chan event.GenericEvent {
 	return s.events
 }
 
+type ServiceTranslatorFn func(*api.CatalogService) []types.NamespacedName
+
+// ServiceSubscription represents a watcher for events on a specific kind.
+type ServiceSubscription struct {
+	translator ServiceTranslatorFn
+	ctx        context.Context
+	cancelCtx  context.CancelFunc
+	events     chan event.GenericEvent
+}
+
+func (s *ServiceSubscription) Cancel() {
+	s.cancelCtx()
+}
+
+func (s *ServiceSubscription) Events() chan event.GenericEvent {
+	return s.events
+}
+
 // Cache subscribes to and caches Consul objects, it also responsible for mainting subscriptions to
 // resources that it caches.
 type Cache struct {
@@ -112,11 +162,13 @@ type Cache struct {
 	serverMgr consul.ServerConnectionManager
 	logger    logr.Logger
 
-	cache      map[string]resourceCache
-	cacheMutex *sync.Mutex
+	cache        map[string]resourceCache
+	serviceCache serviceCache
+	cacheMutex   *sync.Mutex
 
-	subscribers     map[string][]*Subscription
-	subscriberMutex *sync.Mutex
+	subscribers        map[string][]*Subscription
+	serviceSubscribers []*ServiceSubscription
+	subscriberMutex    *sync.Mutex
 
 	partition         string
 	namespacesEnabled bool
@@ -134,17 +186,21 @@ func New(config Config) *Cache {
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
-		config:            config.ConsulClientConfig,
-		serverMgr:         config.ConsulServerConnMgr,
-		namespacesEnabled: config.NamespacesEnabled,
-		partition:         config.Partition,
-		cache:             cache,
-		cacheMutex:        &sync.Mutex{},
-		subscribers:       make(map[string][]*Subscription),
-		subscriberMutex:   &sync.Mutex{},
-		kinds:             Kinds,
-		synced:            make(chan struct{}, len(Kinds)),
-		logger:            config.Logger,
+		config:             config.ConsulClientConfig,
+		serverMgr:          config.ConsulServerConnMgr,
+		namespacesEnabled:  config.NamespacesEnabled,
+		partition:          config.Partition,
+		cache:              cache,
+		serviceCache:       make(serviceCache),
+		cacheMutex:         &sync.Mutex{},
+		subscribers:        make(map[string][]*Subscription),
+		serviceSubscribers: make([]*ServiceSubscription, 0),
+		subscriberMutex:    &sync.Mutex{},
+		kinds:              Kinds,
+		// we make a buffered channel that is the length of the kinds which
+		// are subscribed to + 1 for services
+		synced: make(chan struct{}, len(Kinds)+1),
+		logger: config.Logger,
 	}
 }
 
@@ -156,6 +212,12 @@ func (c *Cache) WaitSynced(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		}
+	}
+	// one more for service subscribers
+	select {
+	case <-c.synced:
+	case <-ctx.Done():
+		return
 	}
 }
 
@@ -186,6 +248,25 @@ func (c *Cache) Subscribe(ctx context.Context, kind string, translator translati
 	subscribers = append(subscribers, sub)
 
 	c.subscribers[kind] = subscribers
+
+	return sub
+}
+
+// SubscribeServices handles adding a new subscription for resources of a given kind.
+func (c *Cache) SubscribeServices(ctx context.Context, translator ServiceTranslatorFn) *ServiceSubscription {
+	c.subscriberMutex.Lock()
+	defer c.subscriberMutex.Unlock()
+
+	ctx, cancel := context.WithCancel(ctx)
+	events := make(chan event.GenericEvent)
+	sub := &ServiceSubscription{
+		translator: translator,
+		ctx:        ctx,
+		cancelCtx:  cancel,
+		events:     events,
+	}
+
+	c.serviceSubscribers = append(c.serviceSubscribers, sub)
 	return sub
 }
 
@@ -203,6 +284,12 @@ func (c *Cache) Run(ctx context.Context) {
 		}()
 	}
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.subscribeToConsulServices(ctx)
+	}()
+
 	wg.Wait()
 }
 
@@ -219,13 +306,19 @@ func (c *Cache) subscribeToConsul(ctx context.Context, kind string) {
 	}
 
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 		if err != nil {
 			c.logger.Error(err, "error initializing consul client")
 			continue
 		}
 
-		entries, meta, err := client.ConfigEntries().List(kind, opts)
+		entries, meta, err := client.ConfigEntries().List(kind, opts.WithContext(ctx))
 		if err != nil {
 			c.logger.Error(err, fmt.Sprintf("error fetching config entries for kind: %s", kind))
 			continue
@@ -234,6 +327,60 @@ func (c *Cache) subscribeToConsul(ctx context.Context, kind string) {
 		opts.WaitIndex = meta.LastIndex
 
 		c.updateAndNotify(ctx, once, kind, entries)
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			continue
+		}
+	}
+}
+
+func (c *Cache) subscribeToConsulServices(ctx context.Context) {
+	once := &sync.Once{}
+
+	opts := &api.QueryOptions{Connect: true}
+	if c.namespacesEnabled {
+		opts.Namespace = namespaceWildcard
+	}
+
+	if c.partition != "" {
+		opts.Partition = c.partition
+	}
+
+MAIN_LOOP:
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
+		if err != nil {
+			c.logger.Error(err, "error initializing consul client")
+			continue
+		}
+
+		services, meta, err := client.Catalog().Services(opts.WithContext(ctx))
+		if err != nil {
+			c.logger.Error(err, "error fetching services")
+			continue
+		}
+
+		flattened := []*api.CatalogService{}
+		for service := range services {
+			serviceList, _, err := client.Catalog().Service(service, "", opts.WithContext(ctx))
+			if err != nil {
+				c.logger.Error(err, fmt.Sprintf("error fetching service: %s", service))
+				continue MAIN_LOOP
+			}
+			flattened = append(flattened, serviceList...)
+		}
+
+		opts.WaitIndex = meta.LastIndex
+		c.updateAndNotifyServices(ctx, once, flattened)
 
 		select {
 		case <-ctx.Done():
@@ -265,6 +412,66 @@ func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind strin
 
 	// now notify all subscribers
 	c.notifySubscribers(ctx, kind, diffs)
+}
+
+func (c *Cache) updateAndNotifyServices(ctx context.Context, once *sync.Once, services []*api.CatalogService) {
+	c.cacheMutex.Lock()
+	defer c.cacheMutex.Unlock()
+
+	cache := make(serviceCache)
+
+	for _, service := range services {
+		cache[api.ResourceReference{Name: service.ServiceName, Namespace: service.Namespace, Partition: service.Partition}] = service
+	}
+
+	diffs := c.serviceCache.diff(cache)
+
+	c.serviceCache = cache
+
+	// we run this the first time the cache is filled to notify the waiter
+	once.Do(func() {
+		c.synced <- struct{}{}
+	})
+
+	// now notify all subscribers
+	c.notifyServiceSubscribers(ctx, diffs)
+}
+
+// notifyServiceSubscribers notifies each subscriber for a given kind on changes to a config entry of that kind. It also
+// handles removing any subscribers that have marked themselves as done.
+func (c *Cache) notifyServiceSubscribers(ctx context.Context, services []*api.CatalogService) {
+	c.subscriberMutex.Lock()
+	defer c.subscriberMutex.Unlock()
+
+	for _, service := range services {
+		// this will hold the new list of current subscribers after we finish notifying
+		subscribers := make([]*ServiceSubscription, 0, len(c.serviceSubscribers))
+		for _, subscriber := range c.serviceSubscribers {
+			addSubscriber := false
+
+			for _, namespaceName := range subscriber.translator(service) {
+				event := event.GenericEvent{
+					Object: newConfigEntryObject(namespaceName),
+				}
+
+				select {
+				case <-ctx.Done():
+					return
+				case <-subscriber.ctx.Done():
+					// don't add this subscriber to current list because it is done
+					addSubscriber = false
+				case subscriber.events <- event:
+					// keep this one since we can send events to it
+					addSubscriber = true
+				}
+			}
+
+			if addSubscriber {
+				subscribers = append(subscribers, subscriber)
+			}
+		}
+		c.serviceSubscribers = subscribers
+	}
 }
 
 // notifySubscribers notifies each subscriber for a given kind on changes to a config entry of that kind. It also
@@ -353,4 +560,34 @@ func (c *Cache) Get(ref api.ResourceReference) api.ConfigEntry {
 	}
 
 	return entry
+}
+
+// List returns a list of config entries from the cache that corresponds to the given kind.
+func (c *Cache) List(kind string) []api.ConfigEntry {
+	c.cacheMutex.Lock()
+	defer c.cacheMutex.Unlock()
+
+	entryMap, ok := c.cache[kind]
+	if !ok {
+		return nil
+	}
+	entries := make([]api.ConfigEntry, len(entryMap))
+	for _, entry := range entryMap {
+		entries = append(entries, entry)
+	}
+
+	return entries
+}
+
+// ListServices returns a list of services from the cache that corresponds to the given kind.
+func (c *Cache) ListServices() []api.CatalogService {
+	c.cacheMutex.Lock()
+	defer c.cacheMutex.Unlock()
+
+	entries := make([]api.CatalogService, len(c.serviceCache))
+	for _, service := range c.serviceCache {
+		entries = append(entries, *service)
+	}
+
+	return entries
 }
