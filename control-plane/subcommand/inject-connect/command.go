@@ -15,20 +15,6 @@ import (
 	"sync"
 	"syscall"
 
-<<<<<<< HEAD
-=======
-	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
-	"github.com/hashicorp/consul-k8s/control-plane/controllers"
-	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
->>>>>>> @{-1}
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
@@ -45,14 +31,14 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
+	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
-	"github.com/hashicorp/consul-k8s/control-plane/controller"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers"
 	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -473,22 +459,21 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// API Gateway Controllers
-	if err := controllers.RegisterFieldIndexes(ctx, mgr); err != nil {
+	if err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to register field indexes")
 		return 1
 	}
 
-<<<<<<< HEAD
-	if err = (&controllers.GatewayClassConfigController{
+	if err = (&gatewaycontrollers.GatewayClassConfigController{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controller").WithName("gateways"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", controllers.GatewayClassConfigController{})
+		setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollers.GatewayClassConfigController{})
 		return 1
 	}
 
-	if err := (&controllers.GatewayClassController{
-		ControllerName: controllers.GatewayClassControllerName,
+	if err := (&gatewaycontrollers.GatewayClassController{
+		ControllerName: gatewaycontrollers.GatewayClassControllerName,
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("GatewayClass"),
 	}).SetupWithManager(ctx, mgr); err != nil {
@@ -496,7 +481,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	cache, err := controllers.SetupGatewayControllerWithManager(ctx, mgr, controllers.GatewayControllerConfig{
+	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: apigateway.HelmConfig{
 			// TODO pass in the Helm Config here.
 		},
@@ -517,10 +502,7 @@ func (c *Command) Run(args []string) int {
 	cache.WaitSynced(ctx)
 	setupLog.Info("Consul cache synced")
 
-	configEntryReconciler := &controller.ConfigEntryController{
-=======
 	configEntryReconciler := &controllers.ConfigEntryController{
->>>>>>> @{-1}
 		ConsulClientConfig:         c.consul.ConsulClientConfig(),
 		ConsulServerConnMgr:        watcher,
 		DatacenterName:             c.consul.Datacenter,
