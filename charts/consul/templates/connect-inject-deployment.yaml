@@ -284,7 +284,7 @@ spec:
                 -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
                 {{- end }}
                 {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
-                -enable-auto-encrypt 
+                -enable-auto-encrypt \
                 {{- end }}
           startupProbe:
             httpGet:

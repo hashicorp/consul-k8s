@@ -2961,11 +2961,7 @@ terminatingGateways:
   gateways:
   - name: terminating-gateway
 
-<<<<<<< HEAD
 # [DEPRECATED] Use connectInject.apiGateway instead. This stanza will be removed with the release of Consul 1.17
-=======
-# [DEPRECATED] Use connectInject.apiGateway instead.
->>>>>>> api-gateways
 # Configuration settings for the Consul API Gateway integration
 apiGateway:
   # When true the helm chart will install the Consul API Gateway controller
