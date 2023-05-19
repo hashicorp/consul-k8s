@@ -2439,3 +2439,138 @@ reservedNameTest() {
 
 #--------------------------------------------------------------------
 # Gateway API Configuration
+
+@test "connectInject/Deployment: API Gateway env defaults" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_DEPLOYMENT_REPLICAS").value' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_DEPLOYMENT_MAX_INSTANCES").value' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_DEPLOYMENT_MIN_INSTANCES").value' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_SERVICE_TYPE").value' | tee /dev/stderr)
+  [ "${actual}" = "LoadBalancer" ]
+}
+
+# This can be removed when the old API Gateway stanza is removed. (t-eckert 2023-05-19)
+@test "connectInject/Deployment: API Gateway env overrides" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'apiGateway.image=apigateway' \
+      --set 'apiGateway.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_SERVICE_TYPE").value' | tee /dev/stderr)
+  [ "${actual}" = "LoadBalancer" ]
+}
+
+# This can be removed when the old API Gateway stanza is removed. (t-eckert 2023-05-19)
+@test "connectInject/Deployment: API Gateway env overrides with deployment config" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'apiGateway.image=apigateway' \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.managedGatewayClass.deployment.defaultInstances=3' \
+      --set 'apiGateway.managedGatewayClass.deployment.maxInstances=5' \
+      --set 'apiGateway.managedGatewayClass.deployment.minInstances=1' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_DEPLOYMENT_REPLICAS").value' | tee /dev/stderr)
+  [ "${actual}" = "3" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_DEPLOYMENT_MAX_INSTANCES").value' | tee /dev/stderr)
+  [ "${actual}" = "5" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_DEPLOYMENT_MIN_INSTANCES").value' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_SERVICE_TYPE").value' | tee /dev/stderr)
+  [ "${actual}" = "LoadBalancer" ]
+}
+
+# This can be removed when the old API Gateway stanza is removed. (t-eckert 2023-05-19)
+@test "connectInject/Deployment: API Gateway env overrides with nodeSelector" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'apiGateway.image=apigateway' \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.managedGatewayClass.nodeSelector=testing' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_SERVICE_TYPE").value' | tee /dev/stderr)
+  [ "${actual}" = "LoadBalancer" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_NODE_SELECTOR").value' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}
+
+# This can be removed when the old API Gateway stanza is removed. (t-eckert 2023-05-19)
+@test "connectInject/Deployment: API Gateway env overrides with tolerations" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'apiGateway.image=apigateway' \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.managedGatewayClass.tolerations=testing' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_SERVICE_TYPE").value' | tee /dev/stderr)
+  [ "${actual}" = "LoadBalancer" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_TOLERATIONS").value' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}
+
+# This can be removed when the old API Gateway stanza is removed. (t-eckert 2023-05-19)
+@test "connectInject/Deployment: API Gateway env overrides with copyAnnotations" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'apiGateway.image=apigateway' \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.managedGatewayClass.copyAnnotations.service=testing' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_SERVICE_TYPE").value' | tee /dev/stderr)
+  [ "${actual}" = "LoadBalancer" ]
+
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "GATEWAY_COPY_ANNOTATIONS").value' | tee /dev/stderr)
+  [ "${actual}" = "testing" ]
+}
