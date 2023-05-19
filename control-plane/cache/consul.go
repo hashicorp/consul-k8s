@@ -63,6 +63,7 @@ func (oldCache resourceCache) diff(newCache resourceCache) []api.ConfigEntry {
 			diffs = append(diffs, entry)
 		}
 	}
+
 	return diffs
 }
 
@@ -196,8 +197,10 @@ func New(config Config) *Cache {
 		serviceSubscribers: make([]*ServiceSubscription, 0),
 		subscriberMutex:    &sync.Mutex{},
 		kinds:              Kinds,
-		synced:             make(chan struct{}, len(Kinds)),
-		logger:             config.Logger,
+		// we make a buffered channel that is the length of the kinds which
+		// are subscribed to + 1 for services
+		synced: make(chan struct{}, len(Kinds)+1),
+		logger: config.Logger,
 	}
 }
 
@@ -245,6 +248,7 @@ func (c *Cache) Subscribe(ctx context.Context, kind string, translator translati
 	subscribers = append(subscribers, sub)
 
 	c.subscribers[kind] = subscribers
+
 	return sub
 }
 
@@ -252,11 +256,6 @@ func (c *Cache) Subscribe(ctx context.Context, kind string, translator translati
 func (c *Cache) SubscribeServices(ctx context.Context, translator ServiceTranslatorFn) *ServiceSubscription {
 	c.subscriberMutex.Lock()
 	defer c.subscriberMutex.Unlock()
-
-	// check that we only have a single subscription for now
-	if len(c.serviceSubscribers) == 1 {
-		return &ServiceSubscription{}
-	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	events := make(chan event.GenericEvent)
@@ -307,13 +306,19 @@ func (c *Cache) subscribeToConsul(ctx context.Context, kind string) {
 	}
 
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 		if err != nil {
 			c.logger.Error(err, "error initializing consul client")
 			continue
 		}
 
-		entries, meta, err := client.ConfigEntries().List(kind, opts)
+		entries, meta, err := client.ConfigEntries().List(kind, opts.WithContext(ctx))
 		if err != nil {
 			c.logger.Error(err, fmt.Sprintf("error fetching config entries for kind: %s", kind))
 			continue
@@ -346,6 +351,12 @@ func (c *Cache) subscribeToConsulServices(ctx context.Context) {
 
 MAIN_LOOP:
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 		if err != nil {
 			c.logger.Error(err, "error initializing consul client")

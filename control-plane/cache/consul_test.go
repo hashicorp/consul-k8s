@@ -1285,7 +1285,6 @@ func TestCache_Subscribe(t *testing.T) {
 				if expectedSubscriberCount != actualSubscriberCount {
 					t.Errorf("Expected there to be %d subscribers, there were %d", expectedSubscriberCount, actualSubscriberCount)
 				}
-
 			}
 		})
 	}
@@ -1322,6 +1321,8 @@ func TestCache_Write(t *testing.T) {
 				switch r.URL.Path {
 				case "/v1/config":
 					tt.responseFn(w)
+				case "/v1/catalog/services":
+					fmt.Fprintln(w, `{}`)
 				default:
 					w.WriteHeader(500)
 					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
@@ -1605,6 +1606,8 @@ func Test_Run(t *testing.T) {
 				return
 			}
 			fmt.Fprintln(w, string(val))
+		case "/v1/catalog/services":
+			fmt.Fprintln(w, `{}`)
 		default:
 			w.WriteHeader(500)
 			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
@@ -1711,6 +1714,8 @@ func Test_Run(t *testing.T) {
 			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
 		}
 	})
+
+	c.SubscribeServices(ctx, func(cs *api.CatalogService) []types.NamespacedName { return nil }).Cancel()
 
 	// mark this subscription as ended
 	canceledSub.Cancel()
