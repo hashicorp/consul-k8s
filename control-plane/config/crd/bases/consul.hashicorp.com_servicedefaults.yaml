@@ -246,12 +246,13 @@ spec:
                           the load balancing pool.
                         properties:
                           baseEjectionTime:
-                            description: The base time that a host is ejected for. The
-                              real time is equal to the base time multiplied by the number
-                              of times the host has been ejected and is capped by
-                              max_ejection_time (Default 300s). Defaults to 30s.
+                            description: The base time that a host is ejected for.
+                              The real time is equal to the base time multiplied by
+                              the number of times the host has been ejected and is
+                              capped by max_ejection_time (Default 300s). Defaults
+                              to 30000ms or 30s.
                             type: string
-                          enforcing_consecutive_5xx:
+                          enforcingConsecutive5xx:
                             description: EnforcingConsecutive5xx is the % chance that
                               a host will be actually ejected when an outlier status
                               is detected through consecutive 5xx. This setting can
@@ -265,7 +266,8 @@ spec:
                           maxEjectionPercent:
                             description: The maximum % of an upstream cluster that
                               can be ejected due to outlier detection. Defaults to
-                              10% but will eject at least one host regardless of the value.
+                              10% but will eject at least one host regardless of the
+                              value.
                             format: int32
                             type: integer
                           maxFailures:
@@ -357,12 +359,13 @@ spec:
                             from the load balancing pool.
                           properties:
                             baseEjectionTime:
-                              description: The base time that a host is ejected for. The
-                                real time is equal to the base time multiplied by the number
-                                of times the host has been ejected and is capped by
-                                max_ejection_time (Default 300s). Defaults to 30s.
+                              description: The base time that a host is ejected for.
+                                The real time is equal to the base time multiplied
+                                by the number of times the host has been ejected and
+                                is capped by max_ejection_time (Default 300s). Defaults
+                                to 30000ms or 30s.
                               type: string
-                            enforcing_consecutive_5xx:
+                            enforcingConsecutive5xx:
                               description: EnforcingConsecutive5xx is the % chance
                                 that a host will be actually ejected when an outlier
                                 status is detected through consecutive 5xx. This setting
@@ -376,8 +379,9 @@ spec:
                               type: string
                             maxEjectionPercent:
                               description: The maximum % of an upstream cluster that
-                                can be ejected due to outlier detection. Defaults to
-                                10% but will eject at least one host regardless of the value.
+                                can be ejected due to outlier detection. Defaults
+                                to 10% but will eject at least one host regardless
+                                of the value.
                               format: int32
                               type: integer
                             maxFailures:
