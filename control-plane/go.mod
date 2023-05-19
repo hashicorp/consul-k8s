@@ -13,7 +13,7 @@ require (
 	github.com/hashicorp/consul/api v1.10.1-0.20230512003852-bd0eb07ed3ca
 	github.com/hashicorp/consul/sdk v0.13.1
 	github.com/hashicorp/go-bexpr v0.1.11
-	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
+	github.com/hashicorp/go-discover v0.0.0-20230413202825-5eb21fa0d19e
 	github.com/hashicorp/go-hclog v1.2.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-netaddrs v0.1.0
@@ -100,8 +100,8 @@ require (
 	github.com/joyent/triton-go v1.7.1-0.20200416154420-6801d15b779f // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/linode/linodego v0.7.1 // indirect
-	github.com/mattn/go-colorable v0.1.12 // indirect
-	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.0.0 // indirect
@@ -126,7 +126,8 @@ require (
 	github.com/softlayer/softlayer-go v0.0.0-20180806151055-260589d94c7d // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
-	github.com/tencentcloud/tencentcloud-sdk-go v3.0.83+incompatible // indirect
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.658 // indirect
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/cvm v1.0.658 // indirect
 	github.com/vmware/govmomi v0.18.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
