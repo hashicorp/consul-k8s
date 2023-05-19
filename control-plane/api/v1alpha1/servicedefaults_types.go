@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	capi "github.com/hashicorp/consul/api"
 	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	capi "github.com/hashicorp/consul/api"
 )
 
 const (
@@ -73,6 +73,17 @@ type ServiceDefaultsSpec struct {
 	// Note: This cannot be set using the CRD and should be set using annotations on the
 	// services that are part of the mesh.
 	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
+	// MutualTLSMode controls whether mutual TLS is required for all incoming
+	// connections when transparent proxy is enabled. This can be set to
+	// "permissive" or "strict". "strict" is the default which requires mutual
+	// TLS for incoming connections. In the insecure "permissive" mode,
+	// connections to the sidecar proxy public listener port require mutual
+	// TLS, but connections to the service port do not require mutual TLS and
+	// are proxied to the application unmodified. Note: Intentions are not
+	// enforced for non-mTLS connections. To keep your services secure, we
+	// recommend using "strict" mode whenever possible and enabling
+	// "permissive" mode only when necessary.
+	MutualTLSMode MutualTLSMode `json:"mutualTLSMode,omitempty"`
 	// MeshGateway controls the default mesh gateway configuration for this service.
 	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
@@ -184,6 +195,13 @@ type PassiveHealthCheck struct {
 	// when an outlier status is detected through consecutive 5xx.
 	// This setting can be used to disable ejection or to ramp it up slowly.
 	EnforcingConsecutive5xx *uint32 `json:"enforcing_consecutive_5xx,omitempty"`
+	// The maximum % of an upstream cluster that can be ejected due to outlier detection.
+	// Defaults to 10% but will eject at least one host regardless of the value.
+	MaxEjectionPercent *uint32 `json:"maxEjectionPercent,omitempty"`
+	// The base time that a host is ejected for. The real time is equal to the base time
+	// multiplied by the number of times the host has been ejected and is capped by
+	// max_ejection_time (Default 300s). Defaults to 30000ms or 30s.
+	BaseEjectionTime *metav1.Duration `json:"baseEjectionTime,omitempty"`
 }
 
 type ServiceDefaultsDestination struct {
@@ -279,6 +297,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		Expose:                    in.Spec.Expose.toConsul(),
 		ExternalSNI:               in.Spec.ExternalSNI,
 		TransparentProxy:          in.Spec.TransparentProxy.toConsul(),
+		MutualTLSMode:             in.Spec.MutualTLSMode.toConsul(),
 		UpstreamConfig:            in.Spec.UpstreamConfig.toConsul(),
 		Destination:               in.Spec.Destination.toConsul(),
 		Meta:                      meta(datacenter),
@@ -305,6 +324,9 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 	}
 	if err := in.Spec.TransparentProxy.validate(path.Child("transparentProxy")); err != nil {
 		allErrs = append(allErrs, err)
+	}
+	if err := in.Spec.MutualTLSMode.validate(); err != nil {
+		allErrs = append(allErrs, field.Invalid(path.Child("mutualTLSMode"), in.Spec.MutualTLSMode, err.Error()))
 	}
 	if err := in.Spec.Mode.validate(path.Child("mode")); err != nil {
 		allErrs = append(allErrs, err)
@@ -448,6 +470,8 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 		Interval:                in.Interval.Duration,
 		MaxFailures:             in.MaxFailures,
 		EnforcingConsecutive5xx: in.EnforcingConsecutive5xx,
+		MaxEjectionPercent:      in.MaxEjectionPercent,
+		BaseEjectionTime:        &in.BaseEjectionTime.Duration,
 	}
 }
 

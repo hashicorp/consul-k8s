@@ -1,0 +1,3 @@
+```release-note:feature
+crd: Add `mutualTLSMode` to the ProxyDefaults and ServiceDefaults CRDs and `allowEnablingPermissiveMutualTLS` to the Mesh CRD to support configuring permissive mutual TLS.
+```

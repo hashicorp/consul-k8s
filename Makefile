@@ -1,4 +1,5 @@
 VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
+CONSUL_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
 
 # ===========> Helm Targets
 
@@ -159,6 +160,10 @@ ci.aws-acceptance-test-cleanup: ## Deletes AWS resources left behind after faile
 
 version:
 	@echo $(VERSION)
+
+consul-version:
+	@echo $(CONSUL_VERSION)
+
 
 # ===========> Release Targets
 

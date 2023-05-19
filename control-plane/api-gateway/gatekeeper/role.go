@@ -16,8 +16,6 @@ func (g *Gatekeeper) upsertRole(ctx context.Context) error {
 		return nil
 	}
 
-	// TODO check and do upsert
-
 	role := &rbac.Role{}
 	exists := false
 
@@ -71,12 +69,20 @@ func (g *Gatekeeper) role() *rbac.Role {
 			Namespace: g.Gateway.Namespace,
 			Labels:    apigateway.LabelsForGateway(&g.Gateway),
 		},
-		Rules: []rbac.PolicyRule{{
-			APIGroups: []string{"policy"},
-			Resources: []string{"podsecuritypolicies"},
-			// TODO figure out how to bring this in. Maybe GWCCFG
-			// ResourceNames: []string{c.Spec.ConsulSpec.AuthSpec.PodSecurityPolicy},
-			Verbs: []string{"use"},
-		}},
+		Rules: []rbac.PolicyRule{
+			{
+				APIGroups: []string{"policy"},
+				Resources: []string{"podsecuritypolicies"},
+				// TODO figure out how to bring this in. Maybe GWCCFG
+				// ResourceNames: []string{c.Spec.ConsulSpec.AuthSpec.PodSecurityPolicy},
+				Verbs: []string{"use"},
+			},
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{"name-of-the-security-context-constraints"},
+				Verbs:         []string{"use"},
+			},
+		},
 	}
 }

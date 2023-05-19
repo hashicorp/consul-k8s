@@ -19,6 +19,7 @@ import (
 )
 
 const ExportedServicesKubeKind = "exportedservices"
+const WildcardSpecifier = "*"
 
 func init() {
 	SchemeBuilder.Register(&ExportedServices{}, &ExportedServicesList{})
@@ -71,8 +72,10 @@ type ExportedService struct {
 type ServiceConsumer struct {
 	// Partition is the admin partition to export the service to.
 	Partition string `json:"partition,omitempty"`
-	// [Experimental] Peer is the name of the peer to export the service to.
+	// Peer is the name of the peer to export the service to.
 	Peer string `json:"peer,omitempty"`
+	// SamenessGroup is the name of the sameness group to export the service to.
+	SamenessGroup string `json:"samenessGroup,omitempty"`
 }
 
 func (in *ExportedServices) GetObjectMeta() metav1.ObjectMeta {
@@ -169,8 +172,9 @@ func (in *ExportedService) toConsul() capi.ExportedService {
 	var consumers []capi.ServiceConsumer
 	for _, consumer := range in.Consumers {
 		consumers = append(consumers, capi.ServiceConsumer{
-			Partition: consumer.Partition,
-			Peer:      consumer.Peer,
+			Partition:     consumer.Partition,
+			Peer:          consumer.Peer,
+			SamenessGroup: consumer.SamenessGroup,
 		})
 	}
 	return capi.ExportedService{
@@ -230,14 +234,34 @@ func (in *ExportedService) validate(path *field.Path, consulMeta common.ConsulMe
 }
 
 func (in *ServiceConsumer) validate(path *field.Path, consulMeta common.ConsulMeta) *field.Error {
-	if in.Partition != "" && in.Peer != "" {
-		return field.Invalid(path, *in, "both partition and peer cannot be specified.")
+	count := 0
+
+	if in.Partition != "" {
+		count++
 	}
-	if in.Partition == "" && in.Peer == "" {
-		return field.Invalid(path, *in, "either partition or peer must be specified.")
+	if in.Peer != "" {
+		count++
+	}
+	if in.SamenessGroup != "" {
+		count++
+	}
+	if count > 1 {
+		return field.Invalid(path, *in, "service consumer must define at most one of Peer, Partition, or SamenessGroup")
+	}
+	if count == 0 {
+		return field.Invalid(path, *in, "service consumer must define at least one of Peer, Partition, or SamenessGroup")
 	}
 	if !consulMeta.PartitionsEnabled && in.Partition != "" {
-		return field.Invalid(path.Child("partitions"), in.Partition, "Consul Admin Partitions need to be enabled to specify partition.")
+		return field.Invalid(path.Child("partition"), in.Partition, "Consul Admin Partitions need to be enabled to specify partition.")
+	}
+	if in.Partition == WildcardSpecifier {
+		return field.Invalid(path.Child("partition"), "", "exporting to all partitions (wildcard) is not supported")
+	}
+	if in.Peer == WildcardSpecifier {
+		return field.Invalid(path.Child("peer"), "", "exporting to all peers (wildcard) is not supported")
+	}
+	if in.SamenessGroup == WildcardSpecifier {
+		return field.Invalid(path.Child("samenessgroup"), "", "exporting to all sameness groups (wildcard) is not supported")
 	}
 	return nil
 }
