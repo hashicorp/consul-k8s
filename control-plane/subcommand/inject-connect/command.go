@@ -16,7 +16,7 @@ import (
 	"syscall"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
-	apigatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
+	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
@@ -458,21 +458,21 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// API Gateway Controllers
-	if err := apigatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
+	if err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to register field indexes")
 		return 1
 	}
 
-	if err = (&apigatewaycontrollers.GatewayClassConfigController{
+	if err = (&gatewaycontrollers.GatewayClassConfigController{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controller").WithName("gateways"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apigatewaycontrollers.GatewayClassConfigController{})
+		setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollers.GatewayClassConfigController{})
 		return 1
 	}
 
-	if err := (&apigatewaycontrollers.GatewayClassController{
-		ControllerName: apigatewaycontrollers.GatewayClassControllerName,
+	if err := (&gatewaycontrollers.GatewayClassController{
+		ControllerName: gatewaycontrollers.GatewayClassControllerName,
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("GatewayClass"),
 	}).SetupWithManager(ctx, mgr); err != nil {
@@ -480,7 +480,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	cache, err := apigatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, apigatewaycontrollers.GatewayControllerConfig{
+	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: apigateway.HelmConfig{
 			// TODO pass in the Helm Config here.
 		},

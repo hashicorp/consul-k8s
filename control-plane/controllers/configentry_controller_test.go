@@ -2109,7 +2109,7 @@ func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
 			testClient.TestServer.WaitForLeader(t)
 			consulClient := testClient.APIClient
 
-			ctrl := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+			ctrl := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.NewTestLogger(t))
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),
