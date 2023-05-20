@@ -15,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	apigatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
@@ -40,19 +42,6 @@ import (
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
-	apigatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
-	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
-	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 )
 
 const WebhookCAFilename = "ca.crt"
@@ -469,7 +458,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// API Gateway Controllers
-	if err := controllers.RegisterFieldIndexes(ctx, mgr); err != nil {
+	if err := apigatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to register field indexes")
 		return 1
 	}
@@ -478,7 +467,7 @@ func (c *Command) Run(args []string) int {
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controller").WithName("gateways"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", controllers.GatewayClassConfigController{})
+		setupLog.Error(err, "unable to create controller", "controller", apigatewaycontrollers.GatewayClassConfigController{})
 		return 1
 	}
 
