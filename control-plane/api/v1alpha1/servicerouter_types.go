@@ -145,9 +145,6 @@ type ServiceRouteDestination struct {
 	IdleTimeout metav1.Duration `json:"idleTimeout,omitempty"`
 	// RequestTimeout is the total amount of time permitted for the entire
 	// downstream request (and retries) to be processed.
-	IdleTimeout metav1.Duration `json:"idleTimeout,omitempty"`
-	// IdleTimeout is total amount of time permitted
-	// for the request stream to be idle.
 	RequestTimeout metav1.Duration `json:"requestTimeout,omitempty"`
 	// NumRetries is the number of times to retry the request when a retryable result occurs
 	NumRetries uint32 `json:"numRetries,omitempty"`

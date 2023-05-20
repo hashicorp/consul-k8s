@@ -77,10 +77,6 @@ spec:
                             the service from instead of the current namespace. If
                             empty the current namespace is assumed.
                           type: string
-                        idleTimeout:
-                          description: IdleTimeout is the total amount of time permitted 
-                            for the request stream to be idle.
-                          type: string
                         numRetries:
                           description: NumRetries is the number of times to retry
                             the request when a retryable result occurs
