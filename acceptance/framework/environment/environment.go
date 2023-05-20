@@ -9,9 +9,15 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 const (
@@ -31,6 +37,7 @@ type TestEnvironment interface {
 type TestContext interface {
 	KubectlOptions(t *testing.T) *k8s.KubectlOptions
 	KubernetesClient(t *testing.T) kubernetes.Interface
+	ControllerRuntimeClient(t *testing.T) client.Client
 }
 
 type KubernetesEnvironment struct {
@@ -85,7 +92,9 @@ type kubernetesContext struct {
 	kubeContextName  string
 	namespace        string
 
-	client  kubernetes.Interface
+	client        kubernetes.Interface
+	runtimeClient client.Client
+
 	options *k8s.KubectlOptions
 }
 
@@ -162,6 +171,31 @@ func (k kubernetesContext) KubernetesClient(t *testing.T) kubernetes.Interface {
 	k.client = KubernetesClientFromOptions(t, k.KubectlOptions(t))
 
 	return k.client
+}
+
+func (k kubernetesContext) ControllerRuntimeClient(t *testing.T) client.Client {
+	if k.runtimeClient != nil {
+		return k.runtimeClient
+	}
+
+	options := k.KubectlOptions(t)
+	configPath, err := options.GetConfigPath(t)
+	require.NoError(t, err)
+	config, err := k8s.LoadApiClientConfigE(configPath, options.ContextName)
+	require.NoError(t, err)
+
+	s := runtime.NewScheme()
+	require.NoError(t, clientgoscheme.AddToScheme(s))
+	require.NoError(t, gwv1alpha2.Install(s))
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client, err := client.New(config, client.Options{Scheme: s})
+	require.NoError(t, err)
+
+	k.runtimeClient = client
+
+	return k.runtimeClient
 }
 
 func NewContext(namespace, pathToKubeConfig, kubeContextName string) *kubernetesContext {
