@@ -2,6 +2,8 @@ package gatekeeper
 
 import (
 	"context"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/types"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	appsv1 "k8s.io/api/apps/v1"
@@ -14,12 +16,12 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
+func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
 	// Get Deployment if it exists.
 	existingDeployment := &appsv1.Deployment{}
 	exists := false
 
-	err := g.Client.Get(ctx, g.namespacedName(), existingDeployment)
+	err := g.Client.Get(ctx, g.namespacedName(gateway), existingDeployment)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	} else if k8serrors.IsNotFound(err) {
@@ -28,7 +30,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
 		exists = true
 	}
 
-	deployment := g.deployment()
+	deployment := g.deployment(gateway, gcc, config)
 
 	if exists {
 		g.Log.Info("Existing Gateway Deployment found.")
@@ -38,7 +40,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
 	}
 
 	mutated := deployment.DeepCopy()
-	mutator := newDeploymentMutator(deployment, mutated, g.Gateway, g.Client.Scheme())
+	mutator := newDeploymentMutator(deployment, mutated, gateway, g.Client.Scheme())
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -57,8 +59,8 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context) error {
 	return nil
 }
 
-func (g *Gatekeeper) deleteDeployment(ctx context.Context) error {
-	err := g.Client.Delete(ctx, g.deployment())
+func (g *Gatekeeper) deleteDeployment(ctx context.Context, nsname types.NamespacedName) error {
+	err := g.Client.Delete(ctx, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}})
 	if k8serrors.IsNotFound(err) {
 		return nil
 	}
@@ -66,22 +68,22 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context) error {
 	return err
 }
 
-func (g *Gatekeeper) deployment() *appsv1.Deployment {
+func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        g.Gateway.Name,
-			Namespace:   g.Gateway.Namespace,
-			Labels:      apigateway.LabelsForGateway(&g.Gateway),
-			Annotations: g.HelmConfig.CopyAnnotations,
+			Name:        gateway.Name,
+			Namespace:   gateway.Namespace,
+			Labels:      apigateway.LabelsForGateway(&gateway),
+			Annotations: config.CopyAnnotations,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &g.HelmConfig.Replicas,
+			Replicas: &config.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: apigateway.LabelsForGateway(&g.Gateway),
+				MatchLabels: apigateway.LabelsForGateway(&gateway),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: apigateway.LabelsForGateway(&g.Gateway),
+					Labels: apigateway.LabelsForGateway(&gateway),
 					Annotations: map[string]string{
 						"consul.hashicorp.com/connect-inject": "false",
 					},
@@ -89,7 +91,7 @@ func (g *Gatekeeper) deployment() *appsv1.Deployment {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Image: g.HelmConfig.Image,
+							Image: config.Image,
 						},
 					},
 					Affinity: &corev1.Affinity{
@@ -99,7 +101,7 @@ func (g *Gatekeeper) deployment() *appsv1.Deployment {
 									Weight: 1,
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: apigateway.LabelsForGateway(&g.Gateway),
+											MatchLabels: apigateway.LabelsForGateway(&gateway),
 										},
 										TopologyKey: "kubernetes.io/hostname",
 									},
@@ -107,8 +109,8 @@ func (g *Gatekeeper) deployment() *appsv1.Deployment {
 							},
 						},
 					},
-					NodeSelector:       g.GatewayClassConfig.Spec.NodeSelector, // TODO should I grab this from here or Helm?
-					Tolerations:        g.GatewayClassConfig.Spec.Tolerations,
+					NodeSelector:       gcc.Spec.NodeSelector,
+					Tolerations:        gcc.Spec.Tolerations,
 					ServiceAccountName: g.serviceAccountName(),
 				},
 			},

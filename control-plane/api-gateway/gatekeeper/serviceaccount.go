@@ -3,6 +3,10 @@ package gatekeeper
 import (
 	"context"
 	"errors"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/types"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	corev1 "k8s.io/api/core/v1"
@@ -11,9 +15,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
+func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
 	// We don't create the ServiceAccount if we are not using ManagedGatewayClass.
-	if !g.HelmConfig.ManageSystemACLs {
+	if !config.ManageSystemACLs {
 		return nil
 	}
 
@@ -21,7 +25,7 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
 	exists := false
 
 	// Get ServiceAccount if it exists.
-	err := g.Client.Get(ctx, g.namespacedName(), serviceAccount)
+	err := g.Client.Get(ctx, g.namespacedName(gateway), serviceAccount)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	} else if k8serrors.IsNotFound(err) {
@@ -33,7 +37,7 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
 	if exists {
 		// Ensure we own the ServiceAccount.
 		for _, ref := range serviceAccount.GetOwnerReferences() {
-			if ref.UID == g.Gateway.GetUID() && ref.Name == g.Gateway.GetName() {
+			if ref.UID == gateway.GetUID() && ref.Name == gateway.GetName() {
 				// We found ourselves!
 				return nil
 			}
@@ -42,8 +46,8 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
 	}
 
 	// Create the ServiceAccount.
-	serviceAccount = g.serviceAccount()
-	if err := ctrl.SetControllerReference(&g.Gateway, serviceAccount, g.Client.Scheme()); err != nil {
+	serviceAccount = g.serviceAccount(gateway)
+	if err := ctrl.SetControllerReference(&gateway, serviceAccount, g.Client.Scheme()); err != nil {
 		return err
 	}
 	if err := g.Client.Create(ctx, serviceAccount); err != nil {
@@ -53,8 +57,8 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context) error {
 	return nil
 }
 
-func (g *Gatekeeper) deleteServiceAccount(ctx context.Context) error {
-	if err := g.Client.Delete(ctx, g.serviceAccount()); err != nil {
+func (g *Gatekeeper) deleteServiceAccount(ctx context.Context, nsname types.NamespacedName) error {
+	if err := g.Client.Delete(ctx, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
@@ -64,12 +68,12 @@ func (g *Gatekeeper) deleteServiceAccount(ctx context.Context) error {
 	return nil
 }
 
-func (g *Gatekeeper) serviceAccount() *corev1.ServiceAccount {
+func (g *Gatekeeper) serviceAccount(gateway gwv1beta1.Gateway) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      g.Gateway.Name,
-			Namespace: g.Gateway.Namespace,
-			Labels:    apigateway.LabelsForGateway(&g.Gateway),
+			Name:      gateway.Name,
+			Namespace: gateway.Namespace,
+			Labels:    apigateway.LabelsForGateway(&gateway),
 		},
 	}
 }

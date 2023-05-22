@@ -16,40 +16,33 @@ import (
 type Gatekeeper struct {
 	Log    logr.Logger
 	Client client.Client
-
-	Gateway            gwv1beta1.Gateway
-	GatewayClassConfig v1alpha1.GatewayClassConfig
-	HelmConfig         apigateway.HelmConfig
 }
 
 // New creates a new Gatekeeper from the Config.
-func New(log logr.Logger, client client.Client, gateway gwv1beta1.Gateway, gatewayClassConfig v1alpha1.GatewayClassConfig, helmConfig apigateway.HelmConfig) *Gatekeeper {
+func New(log logr.Logger, client client.Client) *Gatekeeper {
 	return &Gatekeeper{
-		Log:                log,
-		Client:             client,
-		Gateway:            gateway,
-		GatewayClassConfig: gatewayClassConfig,
-		HelmConfig:         helmConfig,
+		Log:    log,
+		Client: client,
 	}
 }
 
 // Upsert creates or updates the resources for handling routing of network traffic.
-func (g *Gatekeeper) Upsert(ctx context.Context) error {
-	g.Log.Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", g.Gateway.Namespace, g.Gateway.Name))
+func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
+	g.Log.Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", gateway.Namespace, gateway.Name))
 
-	if err := g.upsertRole(ctx); err != nil {
+	if err := g.upsertRole(ctx, gateway, config); err != nil {
 		return err
 	}
 
-	if err := g.upsertServiceAccount(ctx); err != nil {
+	if err := g.upsertServiceAccount(ctx, gateway, gcc, config); err != nil {
 		return err
 	}
 
-	if err := g.upsertService(ctx); err != nil {
+	if err := g.upsertService(ctx, gateway, gcc, config); err != nil {
 		return err
 	}
 
-	if err := g.upsertDeployment(ctx); err != nil {
+	if err := g.upsertDeployment(ctx, gateway, gcc, config); err != nil {
 		return err
 	}
 
@@ -57,20 +50,20 @@ func (g *Gatekeeper) Upsert(ctx context.Context) error {
 }
 
 // Delete removes the resources for handling routing of network traffic.
-func (g *Gatekeeper) Delete(ctx context.Context) error {
-	if err := g.deleteRole(ctx); err != nil {
+func (g *Gatekeeper) Delete(ctx context.Context, nsname types.NamespacedName) error {
+	if err := g.deleteRole(ctx, nsname); err != nil {
 		return err
 	}
 
-	if err := g.deleteServiceAccount(ctx); err != nil {
+	if err := g.deleteServiceAccount(ctx, nsname); err != nil {
 		return err
 	}
 
-	if err := g.deleteService(ctx); err != nil {
+	if err := g.deleteService(ctx, nsname); err != nil {
 		return err
 	}
 
-	if err := g.deleteDeployment(ctx); err != nil {
+	if err := g.deleteDeployment(ctx, nsname); err != nil {
 		return err
 	}
 
@@ -80,10 +73,10 @@ func (g *Gatekeeper) Delete(ctx context.Context) error {
 // resourceMutator is passed to create or update functions to mutate Kubernetes resources.
 type resourceMutator = func() error
 
-func (g Gatekeeper) namespacedName() types.NamespacedName {
+func (g Gatekeeper) namespacedName(gateway gwv1beta1.Gateway) types.NamespacedName {
 	return types.NamespacedName{
-		Namespace: g.Gateway.Namespace,
-		Name:      g.Gateway.Name,
+		Namespace: gateway.Namespace,
+		Name:      gateway.Name,
 	}
 }
 
