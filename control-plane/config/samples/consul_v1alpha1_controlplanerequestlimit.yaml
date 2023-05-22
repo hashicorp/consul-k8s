@@ -1,0 +1,6 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ControlPlaneRequestLimit
+metadata:
+  name: controlplanerequestlimit-sample
+spec:
+  # TODO(user): Add fields here
