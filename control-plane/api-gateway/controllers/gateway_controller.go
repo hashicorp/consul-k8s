@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/go-logr/logr"
@@ -57,17 +58,17 @@ type GatewayController struct {
 }
 
 func buildOpts(ref api.ConfigEntry) cmp.Option {
-	switch ref.(type) {
+	switch v := ref.(type) {
 	case *api.APIGatewayConfigEntry:
-		return cmpopts.IgnoreFields(api.APIGatewayConfigEntry{}, "Status", "ModifiedIndex", "CreateIndex")
+		return cmpopts.IgnoreFields(api.APIGatewayConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
 	case *api.HTTPRouteConfigEntry:
-		return cmpopts.IgnoreFields(api.HTTPRouteConfigEntry{}, "Status", "ModifiedIndex", "CreateIndex")
+		return cmpopts.IgnoreFields(api.HTTPRouteConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
 	case *api.TCPRouteConfigEntry:
-		return cmpopts.IgnoreFields(api.TCPRouteConfigEntry{}, "Status", "ModifiedIndex", "CreateIndex")
+		return cmpopts.IgnoreFields(api.TCPRouteConfigEntry{}, "Status", "ModifiyIndex", "CreateIndex")
 	case *api.InlineCertificateConfigEntry:
-		return cmpopts.IgnoreFields(api.InlineCertificateConfigEntry{}, "Status", "ModifiedIndex", "CreateIndex")
+		return cmpopts.IgnoreFields(api.InlineCertificateConfigEntry{}, "Status", "ModifiyIndex", "CreateIndex")
 	default:
-		panic("type is not known")
+		panic(fmt.Sprintf("type is not known: %+v", v))
 	}
 }
 
@@ -90,7 +91,7 @@ func buildOpts(ref api.ConfigEntry) cmp.Option {
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gateway", req.NamespacedName)
-	log.Info("Reconciling the Gateway: ", req.Name)
+	log.Info("Reconciling the Gateway: ", "gatewayName", req.Name)
 
 	// If gateway does not exist, log an error.
 	var gw gwv1beta1.Gateway
@@ -235,10 +236,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, update := range updates.Consul.Updates {
 		log.Info("updating in Consul", "kind", update.GetKind(), "namespace", update.GetNamespace(), "name", update.GetName())
+		if update.GetKind() == api.HTTPRoute {
+			panic("ROUTE")
+		}
 		ref := translation.EntryToReference(update)
 		old := r.cache.Get(ref)
-		diff := cmp.Diff(old, update, buildOpts(old))
-		if diff == "" {
+		if cmp.Equal(old, update, buildOpts(update)) {
 			continue
 		}
 

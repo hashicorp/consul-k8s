@@ -23,7 +23,7 @@ const (
 	apiTimeout        = 5 * time.Minute
 )
 
-var ErrStaleEntry = errors.New("entry is stale")
+var ErrDidNotSet = errors.New("entry failed to be set")
 
 var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate}
 
@@ -532,13 +532,13 @@ func (c *Cache) Write(entry api.ConfigEntry) error {
 		options.Partition = c.partition
 	}
 
-	updated, _, err := client.ConfigEntries().CAS(entry, entry.GetModifyIndex(), options)
+	updated, _, err := client.ConfigEntries().Set(entry, options)
 	if err != nil {
 		return err
 	}
 
 	if !updated {
-		return ErrStaleEntry
+		return ErrDidNotSet
 	}
 
 	return nil
