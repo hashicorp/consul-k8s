@@ -236,9 +236,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, update := range updates.Consul.Updates {
 		log.Info("updating in Consul", "kind", update.GetKind(), "namespace", update.GetNamespace(), "name", update.GetName())
-		if update.GetKind() == api.HTTPRoute {
-			panic("ROUTE")
-		}
 		ref := translation.EntryToReference(update)
 		old := r.cache.Get(ref)
 		if cmp.Equal(old, update, buildOpts(update)) {
