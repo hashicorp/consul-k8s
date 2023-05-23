@@ -118,8 +118,7 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Replicas:    3,
-				ServiceType: "NodePort",
+				Replicas: 3,
 			},
 			initialResources: resources{},
 			finalResources: resources{
@@ -165,7 +164,6 @@ func TestUpsert(t *testing.T) {
 			},
 			helmConfig: apigateway.HelmConfig{
 				Replicas:         3,
-				ServiceType:      "NodePort",
 				ManageSystemACLs: true,
 			},
 			initialResources: resources{},
@@ -216,7 +214,6 @@ func TestUpsert(t *testing.T) {
 			},
 			helmConfig: apigateway.HelmConfig{
 				Replicas:         3,
-				ServiceType:      "NodePort",
 				ManageSystemACLs: true,
 			},
 			initialResources: resources{
@@ -288,7 +285,6 @@ func TestUpsert(t *testing.T) {
 			},
 			helmConfig: apigateway.HelmConfig{
 				Replicas:         3,
-				ServiceType:      "NodePort",
 				ManageSystemACLs: true,
 			},
 			initialResources: resources{
@@ -456,8 +452,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Replicas:    3,
-				ServiceType: "NodePort",
+				Replicas: 3,
 			},
 			initialResources: resources{
 
@@ -509,7 +504,6 @@ func TestDelete(t *testing.T) {
 			},
 			helmConfig: apigateway.HelmConfig{
 				Replicas:         3,
-				ServiceType:      "NodePort",
 				ManageSystemACLs: true,
 			},
 			initialResources: resources{

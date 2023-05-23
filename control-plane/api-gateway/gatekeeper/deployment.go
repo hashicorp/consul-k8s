@@ -69,10 +69,10 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context) error {
 func (g *Gatekeeper) deployment() *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        g.Gateway.Name,
-			Namespace:   g.Gateway.Namespace,
-			Labels:      apigateway.LabelsForGateway(&g.Gateway),
-			Annotations: g.HelmConfig.CopyAnnotations,
+			Name:      g.Gateway.Name,
+			Namespace: g.Gateway.Namespace,
+			Labels:    apigateway.LabelsForGateway(&g.Gateway),
+			// Annotations: g.GatewayClassConfig.Spec.CopyAnnotations,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &g.HelmConfig.Replicas,

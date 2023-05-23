@@ -132,54 +132,26 @@ spec:
             {{- if .Values.apiGateway.managedGatewayClass.deployment }}
             {{- if .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
             - name: GATEWAY_DEPLOYMENT_REPLICAS
-              value: {{ .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+              value: {{ quote .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
             {{- end }}
             {{- if .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
             - name: GATEWAY_DEPLOYMENT_MAX_INSTANCES
-              value: {{ .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
+              value: {{ quote .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
             {{- end }}
             {{- if .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
             - name: GATEWAY_DEPLOYMENT_MIN_INSTANCES
-              value: {{ .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
+              value: {{ quote .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
             {{- end }}
-            {{- end }}
-            {{- if .Values.apiGateway.managedGatewayClass.nodeSelector }}
-            - name: GATEWAY_NODE_SELECTOR
-              value: {{ .Values.apiGateway.managedGatewayClass.nodeSelector }}
-            {{- end }}
-            {{- if .Values.apiGateway.managedGatewayClass.tolerations }}
-            - name: GATEWAY_TOLERATIONS
-              value: {{ .Values.apiGateway.managedGatewayClass.tolerations }}
-            {{- end }}
-            - name: GATEWAY_SERVICE_TYPE
-              value: {{ .Values.apiGateway.managedGatewayClass.serviceType }}
-            {{- if .Values.apiGateway.managedGatewayClass.copyAnnotations.service }}
-            - name: GATEWAY_COPY_ANNOTATIONS
-              value: {{ .Values.apiGateway.managedGatewayClass.copyAnnotations.service }}
             {{- end }}
 
             {{- else }} # Values from the new stanza to replace the old stanza.
 
             - name: GATEWAY_DEPLOYMENT_REPLICAS
-              value: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.replicas }}
+              value: {{ quote .Values.connectInject.apiGateway.managedGatewayClass.deployment.replicas }}
             - name: GATEWAY_DEPLOYMENT_MAX_INSTANCES
-              value: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
+              value: {{ quote .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
             - name: GATEWAY_DEPLOYMENT_MIN_INSTANCES
-              value: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
-            {{- if .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
-            - name: GATEWAY_NODE_SELECTOR
-              value: {{ .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
-            {{- end }}
-            {{- if .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
-            - name: GATEWAY_TOLERATIONS
-              value: {{ default .Values.apiGateway.managedGatewayClass.tolerations .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
-            {{- end }}
-            - name: GATEWAY_SERVICE_TYPE
-              value: {{ default .Values.apiGateway.managedGatewayClass.serviceType .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
-            {{- if .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
-            - name: GATEWAY_COPY_ANNOTATIONS
-              value: {{ .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
-            {{- end }}
+              value: {{ quote .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
 
             {{- end }}
           command:

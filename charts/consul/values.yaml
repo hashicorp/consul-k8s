@@ -1983,9 +1983,6 @@ connectInject:
       # This value defines the type of Service created for gateways (e.g. LoadBalancer, ClusterIP)
       serviceType: LoadBalancer
 
-      # This value toggles if the gateway ports should be mapped to host ports
-      useHostPorts: false
-
       # Configuration settings for annotations to be copied from the Gateway to other child resources.
       copyAnnotations:
         # This value defines a list of annotations to be copied from the Gateway to the Service created, formatted as a multi-line string.

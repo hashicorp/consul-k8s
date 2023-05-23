@@ -102,8 +102,6 @@ type Command struct {
 	flagDefaultEnableTransparentProxy          bool
 	flagTransparentProxyDefaultOverwriteProbes bool
 
-	// TODO Pass Helm config for API Gateway into this subcommand.
-
 	// CNI flag.
 	flagEnableCNI bool
 
@@ -122,10 +120,13 @@ type Command struct {
 	flagEnableConsulDNS bool
 	flagResourcePrefix  string
 
+	// API Gateway flags.
+
 	flagEnableOpenShift bool
 
 	flagSet *flag.FlagSet
 	consul  *flags.ConsulFlags
+	gateway *flags.GatewayFlags
 
 	clientset kubernetes.Interface
 
@@ -209,8 +210,6 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
-	// TODO Add the requisite flag logic here.
-
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
@@ -234,8 +233,10 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
 
 	c.consul = &flags.ConsulFlags{}
+	c.gateway = &flags.GatewayFlags{}
 
 	flags.Merge(c.flagSet, c.consul.Flags())
+	flags.Merge(c.flagSet, c.gateway.Flags())
 	// flag.CommandLine is a package level variable representing the default flagSet. The init() function in
 	// "sigs.k8s.io/controller-runtime/pkg/client/config", which is imported by ctrl, registers the flag --kubeconfig to
 	// the default flagSet. That's why we need to merge it to have access with our flagSet.
@@ -481,9 +482,11 @@ func (c *Command) Run(args []string) int {
 	}
 
 	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
-		HelmConfig: apigateway.HelmConfig{
-			// TODO pass in the Helm Config here.
-		},
+		HelmConfig: *apigateway.
+			HelmConfigFromGatewayFlags(*c.gateway).
+			WithImage(c.flagConsulDataplaneImage).
+			WithLogLevel(c.flagLogLevel).
+			WithManageSystemACLs(c.flagACLAuthMethod != ""),
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,
 		NamespacesEnabled:   c.flagEnableNamespaces,

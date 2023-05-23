@@ -25,15 +25,6 @@ type GatewayFlags struct {
 	DeploymentMaxInstances int
 	// DeploymentMinInstances is the minimum number of instances for the Gateway Deployment.
 	DeploymentMinInstances int
-
-	// NodeSelector is the node selector for the Gateway Deployment.
-	NodeSelector map[string]string
-	// Tolerations is the tolerations for the Gateway Deployment.
-	Tolerations map[string]string
-	// ServiceType is the service type for the Gateway Service.
-	ServiceType string
-	// CopyAnnotations is the annotations to copy from the Gateway Service to the Gateway Deployment.
-	CopyAnnotations map[string]string
 }
 
 func (f *GatewayFlags) Flags() *flag.FlagSet {
@@ -42,18 +33,10 @@ func (f *GatewayFlags) Flags() *flag.FlagSet {
 	deploymentReplicas, _ := strconv.Atoi(os.Getenv(GatewayDeploymentReplicasEnvVar))
 	deploymentMaxInstances, _ := strconv.Atoi(os.Getenv(GatewayMaxInstancesEnvVar))
 	deploymentMinInstances, _ := strconv.Atoi(os.Getenv(GatewayMinInstancesEnvVar))
-	// nodeSelector := os.Getenv(GatewayNodeSelectorEnvVar)
-	// tolerations := os.Getenv(GatewayTolerationsEnvVar)
-	serviceType := os.Getenv(GatewayServiceTypeEnvVar)
-	// copyAnnotations := os.Getenv(GatewayCopyAnnotationsEnvVar)
 
-	fs.IntVar(&f.DeploymentReplicas, "deployment-replicas", deploymentReplicas, "")
-	fs.IntVar(&f.DeploymentMaxInstances, "max-instances", deploymentMaxInstances, "")
-	fs.IntVar(&f.DeploymentMinInstances, "min-instances", deploymentMinInstances, "")
-	// fs.Var((*FlagMapValue)(&f.NodeSelector), "node-selector", "")
-	// fs.Var((*FlagMapValue)(&f.Tolerations), "tolerations", "")
-	fs.StringVar(&f.ServiceType, "service-type", serviceType, "")
-	// fs.Var((*flags.FlagMapValue)(&f.CopyAnnotations), "copy-annotations", "")
+	fs.IntVar(&f.DeploymentReplicas, "gateway-deployment-replicas", deploymentReplicas, "The number of replicas for the API Gateway Deployment.")
+	fs.IntVar(&f.DeploymentMaxInstances, "gateway-max-instances", deploymentMaxInstances, "The maximum number of replicas for the API Gateway Deployment.")
+	fs.IntVar(&f.DeploymentMinInstances, "gateway-min-instances", deploymentMinInstances, "The minimum number of replicas for the API Gateway Deployment.")
 
 	return fs
 }

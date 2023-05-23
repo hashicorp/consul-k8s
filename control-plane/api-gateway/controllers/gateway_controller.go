@@ -277,9 +277,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	translator := translation.NewConsulToNamespaceNameTranslator(c)
 
 	r := &GatewayController{
-		Client: mgr.GetClient(),
-		cache:  c,
-		Log:    mgr.GetLogger(),
+		Client:     mgr.GetClient(),
+		HelmConfig: config.HelmConfig,
+		cache:      c,
+		Log:        mgr.GetLogger(),
 	}
 
 	return c, ctrl.NewControllerManagedBy(mgr).
