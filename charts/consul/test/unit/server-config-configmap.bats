@@ -965,3 +965,95 @@ load _helpers
 
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# server.limits.requestLimits
+
+@test "server/ConfigMap: server.limits.requestLimits.mode is disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.mode | tee /dev/stderr)
+
+  [ "${actual}" = "disabled" ]
+}
+
+@test "server/ConfigMap: server.limits.requestLimits.mode accepts disabled, permissive, and enforce" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.mode=disabled' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.mode | tee /dev/stderr)
+
+  [ "${actual}" = "disabled" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.mode=permissive' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.mode | tee /dev/stderr)
+
+  [ "${actual}" = "permissive" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.mode=enforce' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.mode | tee /dev/stderr)
+
+  [ "${actual}" = "enforce" ]
+}
+
+@test "server/ConfigMap: server.limits.requestLimits.mode errors with value other than disabled, permissive, and enforce" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.mode=notvalid' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "server.limits.requestLimits.mode must be one of the following values: disabled, permissive, and enforce" ]]
+}
+
+@test "server/ConfigMap: server.limits.request_limits.read_rate is -1 by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.read_rate | tee /dev/stderr)
+
+  [ "${actual}" = "-1" ]
+}
+
+@test "server/ConfigMap: server.limits.request_limits.read_rate is set properly when specified " {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.readRate=100' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.read_rate | tee /dev/stderr)
+
+  [ "${actual}" = "100" ]
+}
+
+@test "server/ConfigMap: server.limits.request_limits.write_rate is -1 by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.write_rate | tee /dev/stderr)
+
+  [ "${actual}" = "-1" ]
+}
+
+@test "server/ConfigMap: server.limits.request_limits.write_rate is set properly when specified " {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.writeRate=100' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.write_rate | tee /dev/stderr)
+
+  [ "${actual}" = "100" ]
+}
