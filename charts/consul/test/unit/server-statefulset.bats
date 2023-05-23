@@ -686,7 +686,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 251dd23c6cc44bf8362acddc24c78440b6a65c4618785d027fae526958af5dde ]
+  [ "${actual}" = 3714bf1fbca840dcd10b5aeb40c6ef35e349bd534727abe80b831c77f88da7da ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {

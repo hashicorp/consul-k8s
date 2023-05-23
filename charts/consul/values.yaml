@@ -1135,8 +1135,10 @@ server:
   # as servers, and other settings to limit exposure too many requests, requests
   # waiting for too long, and other runtime considerations.
   limits:
-    # Settings for enabling or disabling request limiting across all requests
-    # on each Consul server.
+    # This object specifies configurations that limit the rate of RPC and gRPC 
+    # requests on the Consul server. Limiting the rate of gRPC and RPC requests
+    # also limits HTTP requests to the Consul server. 
+    # https://developer.hashicorp.com/consul/docs/agent/config/config-files#request_limits
     requestLimits:   
       # Setting for disabling or enabling rate limiting.  If not disabled, it
       # enforces the action that will occur when RequestLimitsReadRate
