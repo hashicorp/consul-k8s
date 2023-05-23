@@ -16,7 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -33,95 +32,15 @@ const (
 	TestAnnotationConfigKey    = "api-gateway.consul.hashicorp.com/config"
 	TestGatewayClassName       = "test-gateway-class"
 	TestServiceType            = corev1.ServiceType("NodePort")
+	TestGatewayName            = "test-gateway"
+	TestNamespace              = "test-namespace"
 )
 
-func TestGatewayReconciler(t *testing.T) {
-	t.Parallel()
-
-	namespace := "test-namespace"
-	name := "test-gateway"
-
-	req := ctrl.Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: namespace,
-			Name:      name,
-		},
-	}
-
-	basicGatewayClass, basicGatewayClassConfig := getBasicGatewayClassAndConfig()
-
-	cases := map[string]struct {
-		gateway            *gwv1beta1.Gateway
-		k8sObjects         []runtime.Object
-		expectedResult     ctrl.Result
-		expectedError      error
-		expectedFinalizers []string
-		expectedIsDeleted  bool
-		expectedConditions []metav1.Condition
-	}{
-		"successful reconcile with no change simple gateway": {
-			gateway: &gwv1beta1.Gateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:  namespace,
-					Name:       name,
-					Finalizers: []string{gatewayFinalizer},
-					Annotations: map[string]string{
-						TestAnnotationConfigKey: `{"serviceType":"service"}`,
-					},
-				},
-				Spec: gwv1beta1.GatewaySpec{
-					GatewayClassName: TestGatewayClassName,
-				},
-			},
-			k8sObjects: []runtime.Object{
-				&basicGatewayClass,
-				&basicGatewayClassConfig,
-			},
-			expectedResult:     ctrl.Result{},
-			expectedError:      nil,
-			expectedFinalizers: []string{gatewayFinalizer},
-			expectedIsDeleted:  false,
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			s := runtime.NewScheme()
-			require.NoError(t, clientgoscheme.AddToScheme(s))
-			require.NoError(t, gwv1alpha2.Install(s))
-			require.NoError(t, gwv1beta1.Install(s))
-			require.NoError(t, v1alpha1.AddToScheme(s))
-
-			objs := tc.k8sObjects
-			if tc.gateway != nil {
-				objs = append(objs, tc.gateway)
-			}
-
-			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...)).Build()
-
-			r := &GatewayController{
-				cache:  cache.New(cache.Config{Logger: logrtest.New(t), ConsulClientConfig: &consul.Config{}}),
-				Client: fakeClient,
-				Log:    logrtest.New(t),
-			}
-			result, err := r.Reconcile(context.Background(), req)
-
-			require.Equal(t, tc.expectedResult, result)
-			require.Equal(t, tc.expectedError, err)
-
-			// TODO: Add back with real implementation of reconcile
-			//// Check the GatewayClass after reconciliation.
-			//g := &gwv1beta1.Gateway{}
-			//err = r.Client.Get(context.Background(), req.NamespacedName, g)
-			//
-			//require.NoError(t, client.IgnoreNotFound(err))
-			//require.Equal(t, tc.expectedFinalizers, g.ObjectMeta.Finalizers)
-			//require.Equal(t, len(tc.expectedConditions), len(g.Status.Conditions), "expected %+v, got %+v", tc.expectedConditions, g.Status.Conditions)
-			//for i, expectedCondition := range tc.expectedConditions {
-			//	require.True(t, equalConditions(expectedCondition, g.Status.Conditions[i]), "expected %+v, got %+v", expectedCondition, g.Status.Conditions[i])
-			//}
-		})
-	}
+type resources struct {
+	deployments     []*appsv1.Deployment
+	roles           []*rbac.Role
+	services        []*corev1.Service
+	serviceAccounts []*corev1.ServiceAccount
 }
 
 func TestGatewayReconcileUpdates(t *testing.T) {
@@ -192,22 +111,27 @@ func TestGatewayReconcileUpdates(t *testing.T) {
 			_, err := r.Reconcile(context.Background(), req)
 
 			require.Equal(t, tc.expectedError, err)
+			deployment := appsv1.Deployment{}
+			r.Client.Get(context.TODO(), types.NamespacedName{
+				Namespace: TestNamespace,
+				Name:      TestGatewayName,
+			}, &deployment)
+			require.NotEmpty(t, deployment)
+			require.Equal(t, TestGatewayName, deployment.ObjectMeta.Name)
 		})
 	}
 }
 
-func TestGatewayReconcileDeletes(t *testing.T) {
+func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 	t.Parallel()
-
-	namespace := "test-namespace"
-	name := "test-gateway"
 
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
-			Namespace: namespace,
-			Name:      name,
+			Namespace: TestNamespace,
+			Name:      TestGatewayName,
 		},
 	}
+	deletionTimestamp := metav1.Now()
 
 	basicGatewayClass, basicGatewayClassConfig := getBasicGatewayClassAndConfig()
 	serviceType := corev1.ServiceType("NodePort")
@@ -216,11 +140,36 @@ func TestGatewayReconcileDeletes(t *testing.T) {
 		k8sObjects    []runtime.Object
 		expectedError error
 	}{
+		"successful delete with deletion timestamp": {
+			gateway: &gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         TestNamespace,
+					Name:              TestGatewayName,
+					Finalizers:        []string{gatewayFinalizer},
+					DeletionTimestamp: &deletionTimestamp,
+					Annotations: map[string]string{
+						TestAnnotationConfigKey: `{"serviceType":"serviceType"}`,
+					},
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					GatewayClassName: TestGatewayClassName,
+				},
+			},
+			k8sObjects: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: TestNamespace,
+						Name:      TestGatewayName,
+					},
+				},
+			},
+			expectedError: nil,
+		},
 		"successful delete for nonexistent gateway class": {
 			gateway: &gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:  namespace,
-					Name:       name,
+					Namespace:  TestNamespace,
+					Name:       TestGatewayName,
 					Finalizers: []string{gatewayFinalizer},
 					Annotations: map[string]string{
 						TestAnnotationConfigKey: `{"serviceType":"serviceType"}`,
@@ -230,14 +179,21 @@ func TestGatewayReconcileDeletes(t *testing.T) {
 					GatewayClassName: TestGatewayClassName,
 				},
 			},
-			k8sObjects:    []runtime.Object{},
+			k8sObjects: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: TestNamespace,
+						Name:      TestGatewayName,
+					},
+				},
+			},
 			expectedError: nil,
 		},
 		"successful change of gatewayclass on gateway": {
 			gateway: &gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:  namespace,
-					Name:       name,
+					Namespace:  TestNamespace,
+					Name:       TestGatewayName,
 					Finalizers: []string{gatewayFinalizer},
 					Annotations: map[string]string{
 						TestAnnotationConfigKey: `{"serviceType":"serviceType"}`,
@@ -276,6 +232,12 @@ func TestGatewayReconcileDeletes(t *testing.T) {
 				},
 				&basicGatewayClass,
 				&basicGatewayClassConfig,
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: TestNamespace,
+						Name:      TestGatewayName,
+					},
+				},
 			},
 			expectedError: nil,
 		},
@@ -308,11 +270,19 @@ func TestGatewayReconcileDeletes(t *testing.T) {
 
 			require.Equal(t, tc.expectedError, err)
 
+			// Check the k8s objects are removed
+			deployment := appsv1.Deployment{}
+			r.Client.Get(context.TODO(), types.NamespacedName{
+				Namespace: TestNamespace,
+				Name:      TestGatewayName,
+			}, &deployment)
+			require.Empty(t, deployment)
+
 			// Check the finalizer is removed
 			gw := gwv1beta1.Gateway{}
 			err = r.Client.Get(context.TODO(), types.NamespacedName{
-				Namespace: gw.Namespace,
-				Name:      gw.Name,
+				Namespace: TestNamespace,
+				Name:      TestGatewayName,
 			}, &gw)
 			require.NoError(t, err)
 			require.Empty(t, gw.Finalizers)
@@ -323,11 +293,10 @@ func TestGatewayReconcileDeletes(t *testing.T) {
 func TestObjectsToRequests(t *testing.T) {
 	t.Parallel()
 
-	namespace := "test-namespace"
 	name := "test-gatewayclass"
 
 	namespacedName := types.NamespacedName{
-		Namespace: namespace,
+		Namespace: TestNamespace,
 		Name:      name,
 	}
 
@@ -339,7 +308,7 @@ func TestObjectsToRequests(t *testing.T) {
 			objects: []metav1.Object{
 				&gwv1beta1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: namespace,
+						Namespace: TestNamespace,
 						Name:      name,
 					},
 					Spec: gwv1beta1.GatewaySpec{

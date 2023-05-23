@@ -79,7 +79,11 @@ func buildOpts(ref api.ConfigEntry) cmp.Option {
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gateway", req.NamespacedName)
+<<<<<<< HEAD
 	log.Info("Reconciling the Gateway: ", "gatewayName", req.Name)
+=======
+	log.Info("Reconciling the Gateway: ")
+>>>>>>> 1cc80777 (still has some print statements, seeing issues with updates)
 
 	// If gateway does not exist, log an error.
 	var gw gwv1beta1.Gateway
@@ -212,18 +216,22 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	updates := binder.Snapshot()
 
-	// do something with deployments, gwcc and such here, if the following exists on
-	// the snapshot it means we should attempt to enforce the deployment, if it's nil
-	// then we should delete the deployment
-	if updates.GatewayClassConfig == nil {
-		err := r.deleteGatewayK8SResources(ctx, log, &gw)
+	fmt.Println("--------------------------------------\n", updates)
+
+	if updates.UpsertGatewayDeployment {
+		log.Info("updating gatekeeper")
+		err := r.updateGatekeeperResources(ctx, log, &gw, gwcc)
+		if err != nil {
+			log.Error(err, "unable to update gateway resources")
+			return ctrl.Result{}, err
+		}
+	} else {
+		log.Info("deleting gatekeeper")
+		err := r.deleteGatekeeperResources(ctx, log, &gw)
 		if err != nil {
 			log.Error(err, "unable to delete gateway resources")
 			return ctrl.Result{}, err
 		}
-		//TODO: should we return early here?
-	} else {
-		r.updateGatewayK8SResources(ctx, log, &gw, *updates.GatewayClassConfig)
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
@@ -250,7 +258,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	}
 
-	// currently this runs even after we delete
 	for _, update := range updates.Kubernetes.Updates {
 		log.Info("update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.updateAndResetStatus(ctx, update); err != nil {
@@ -308,36 +315,27 @@ func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 	return es
 }
 
-func (r *GatewayController) deleteGatewayK8SResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) error {
-	// delete k8s resources related to gateway
+func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) error {
 	gk := gatekeeper.New(log, r.Client)
 	err := gk.Delete(ctx, types.NamespacedName{
 		Namespace: gw.Namespace,
 		Name:      gw.Name,
 	})
 	if err != nil {
-		log.Error(err, "unable to delete gateway")
 		return err
 	}
-	// TODO: should we still removefinalizer here?
-	_, err = RemoveFinalizer(ctx, r.Client, gw, gatewayFinalizer)
-	if err != nil {
-		log.Error(err, "unable to remove finalizer")
-	}
 
-	return err
+	return nil
 }
 
-func (r *GatewayController) updateGatewayK8SResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc v1alpha1.GatewayClassConfig) error {
-	// delete k8s resources related to gateway
+func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
 	gk := gatekeeper.New(log, r.Client)
-	err := gk.Upsert(ctx, *gw, gwcc, r.HelmConfig)
+	err := gk.Upsert(ctx, *gw, *gwcc, r.HelmConfig)
 	if err != nil {
-		log.Error(err, "unable to update gateway")
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // SetupWithGatewayControllerManager registers the controller with the given manager.
