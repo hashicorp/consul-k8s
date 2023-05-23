@@ -34,6 +34,10 @@ func GetHumanVersion() string {
 	}
 	version = fmt.Sprintf("v%s", version)
 
+	if IsFIPS() {
+		version = fmt.Sprintf("%s+fips", version)
+	}
+
 	release := VersionPrerelease
 	if GitDescribe == "" && release == "" {
 		release = "dev"
