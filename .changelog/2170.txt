@@ -1,0 +1,2 @@
+```release-note:feature
+Add support for configuring global level server rate limiting.
