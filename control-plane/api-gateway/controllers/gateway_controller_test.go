@@ -28,17 +28,9 @@ const (
 	TestGatewayClassConfigName = "test-gateway-class-config"
 	TestAnnotationConfigKey    = "api-gateway.consul.hashicorp.com/config"
 	TestGatewayClassName       = "test-gateway-class"
-	TestServiceType            = corev1.ServiceType("NodePort")
 	TestGatewayName            = "test-gateway"
 	TestNamespace              = "test-namespace"
 )
-
-type resources struct {
-	deployments     []*appsv1.Deployment
-	roles           []*rbac.Role
-	services        []*corev1.Service
-	serviceAccounts []*corev1.ServiceAccount
-}
 
 func TestGatewayReconcileUpdates(t *testing.T) {
 	t.Parallel()

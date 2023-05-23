@@ -3,7 +3,6 @@ package gatekeeper
 import (
 	"context"
 	"errors"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -15,7 +14,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
+func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, config apigateway.HelmConfig) error {
 	// We don't create the ServiceAccount if we are not using ManagedGatewayClass.
 	if !config.ManageSystemACLs {
 		return nil

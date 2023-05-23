@@ -91,7 +91,8 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Image: config.Image,
+							Image: "hashicorp/consul-dataplane:1.1.0",
+							Name:  "hi",
 						},
 					},
 					Affinity: &corev1.Affinity{

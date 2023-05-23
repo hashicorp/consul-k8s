@@ -34,7 +34,7 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 		return err
 	}
 
-	if err := g.upsertServiceAccount(ctx, gateway, gcc, config); err != nil {
+	if err := g.upsertServiceAccount(ctx, gateway, config); err != nil {
 		return err
 	}
 
