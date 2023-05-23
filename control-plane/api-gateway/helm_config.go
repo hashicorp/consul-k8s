@@ -1,7 +1,5 @@
 package apigateway
 
-import "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-
 // HelmConfig is the configuration of gateways that comes in from the user's Helm values.
 type HelmConfig struct {
 	// Image is the Consul Dataplane image to use in gateway deployments.
@@ -18,27 +16,4 @@ type HelmConfig struct {
 
 	// ManageSystemACLs toggles the behavior of Consul on Kubernetes creating ACLs and RBAC resources for Gateway deployments.
 	ManageSystemACLs bool
-}
-
-func HelmConfigFromGatewayFlags(flags flags.GatewayFlags) *HelmConfig {
-	return &HelmConfig{
-		Replicas:     int32(flags.DeploymentReplicas),
-		MaxInstances: int32(flags.DeploymentMaxInstances),
-		MinInstances: int32(flags.DeploymentMinInstances),
-	}
-}
-
-func (h *HelmConfig) WithImage(image string) *HelmConfig {
-	h.Image = image
-	return h
-}
-
-func (h *HelmConfig) WithLogLevel(logLevel string) *HelmConfig {
-	h.LogLevel = logLevel
-	return h
-}
-
-func (h *HelmConfig) WithManageSystemACLs(manageSystemACLs bool) *HelmConfig {
-	h.ManageSystemACLs = manageSystemACLs
-	return h
 }

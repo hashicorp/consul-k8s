@@ -482,11 +482,14 @@ func (c *Command) Run(args []string) int {
 	}
 
 	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
-		HelmConfig: *apigateway.
-			HelmConfigFromGatewayFlags(*c.gateway).
-			WithImage(c.flagConsulDataplaneImage).
-			WithLogLevel(c.flagLogLevel).
-			WithManageSystemACLs(c.flagACLAuthMethod != ""),
+		HelmConfig: apigateway.HelmConfig{
+			Image:            c.flagConsulDataplaneImage,
+			LogLevel:         c.flagLogLevel,
+			Replicas:         int32(c.gateway.DeploymentReplicas),
+			MaxInstances:     int32(c.gateway.DeploymentMaxInstances),
+			MinInstances:     int32(c.gateway.DeploymentMinInstances),
+			ManageSystemACLs: c.flagACLAuthMethod != "",
+		},
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,
 		NamespacesEnabled:   c.flagEnableNamespaces,
