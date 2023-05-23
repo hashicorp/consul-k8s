@@ -124,7 +124,6 @@ type Command struct {
 
 	flagSet *flag.FlagSet
 	consul  *flags.ConsulFlags
-	gateway *flags.GatewayFlags
 
 	clientset kubernetes.Interface
 
@@ -231,10 +230,8 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
 
 	c.consul = &flags.ConsulFlags{}
-	c.gateway = &flags.GatewayFlags{}
 
 	flags.Merge(c.flagSet, c.consul.Flags())
-	flags.Merge(c.flagSet, c.gateway.Flags())
 	// flag.CommandLine is a package level variable representing the default flagSet. The init() function in
 	// "sigs.k8s.io/controller-runtime/pkg/client/config", which is imported by ctrl, registers the flag --kubeconfig to
 	// the default flagSet. That's why we need to merge it to have access with our flagSet.
@@ -483,9 +480,6 @@ func (c *Command) Run(args []string) int {
 		HelmConfig: apigateway.HelmConfig{
 			Image:            c.flagConsulDataplaneImage,
 			LogLevel:         c.flagLogLevel,
-			Replicas:         int32(c.gateway.DeploymentReplicas),
-			MaxInstances:     int32(c.gateway.DeploymentMaxInstances),
-			MinInstances:     int32(c.gateway.DeploymentMinInstances),
 			ManageSystemACLs: c.flagACLAuthMethod != "",
 		},
 		ConsulClientConfig:  consulConfig,

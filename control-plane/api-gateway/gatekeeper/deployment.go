@@ -78,7 +78,7 @@ func (g *Gatekeeper) deployment() *appsv1.Deployment {
 			// Annotations: g.GatewayClassConfig.Spec.CopyAnnotations,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &g.HelmConfig.Replicas,
+			Replicas: g.GatewayClassConfig.Spec.DeploymentSpec.DefaultInstances,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: apigateway.LabelsForGateway(&g.Gateway),
 			},
