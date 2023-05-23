@@ -6,7 +6,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
+    controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
   name: gatewayclassconfigs.consul.hashicorp.com
 spec:
@@ -47,6 +47,33 @@ spec:
                     items:
                       type: string
                     type: array
+                type: object
+              deployment:
+                description: Configuration information about how many instances to
+                  deploy
+                properties:
+                  defaultInstances:
+                    default: 1
+                    description: Number of gateway instances that should be deployed
+                      by default
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                  maxInstances:
+                    default: 8
+                    description: Max allowed number of gateway instances
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                  minInstances:
+                    default: 1
+                    description: Minimum allowed number of gateway instances
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
                 type: object
               nodeSelector:
                 additionalProperties:
@@ -107,9 +134,3 @@ spec:
         type: object
     served: true
     storage: true
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
