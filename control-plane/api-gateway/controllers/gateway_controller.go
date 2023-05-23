@@ -5,6 +5,8 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,6 +55,37 @@ type GatewayController struct {
 	cache      *cache.Cache
 	client.Client
 }
+
+func buildOpts(ref api.ConfigEntry) cmp.Option {
+	switch ref.(type) {
+	case *api.APIGatewayConfigEntry:
+		return cmpopts.IgnoreFields(api.APIGatewayConfigEntry{}, "Status", "ModifiedIndex", "CreateIndex")
+	case *api.HTTPRouteConfigEntry:
+		return cmpopts.IgnoreFields(api.HTTPRouteConfigEntry{}, "Status", "ModifiedIndex", "CreateIndex")
+	case *api.TCPRouteConfigEntry:
+		return cmpopts.IgnoreFields(api.TCPRouteConfigEntry{}, "Status", "ModifiedIndex", "CreateIndex")
+	case *api.InlineCertificateConfigEntry:
+		return cmpopts.IgnoreFields(api.InlineCertificateConfigEntry{}, "Status", "ModifiedIndex", "CreateIndex")
+	default:
+		panic("type is not known")
+	}
+}
+
+// func buildOpts[T any](_ T) cmp.Option {
+// empty := *(new(T))
+// fmt.Println()
+// fmt.Println()
+// fmt.Println()
+// fmt.Println()
+// fmt.Println()
+// fmt.Println(empty)
+// fmt.Println()
+// fmt.Println()
+// fmt.Println()
+// fmt.Println()
+// fmt.Println()
+// return cmpopts.IgnoreFields(empty, "Status", "ModifiedIndex", "CreateIndex")
+// }
 
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -197,12 +230,23 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, deletion := range updates.Consul.Deletions {
 		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
-		// TODO: the actual delete
+		r.cache.Delete(deletion)
 	}
 
 	for _, update := range updates.Consul.Updates {
 		log.Info("updating in Consul", "kind", update.GetKind(), "namespace", update.GetNamespace(), "name", update.GetName())
-		// TODO: the actual update
+		ref := translation.EntryToReference(update)
+		old := r.cache.Get(ref)
+		diff := cmp.Diff(old, update, buildOpts(old))
+		if diff == "" {
+			continue
+		}
+
+		err := r.cache.Write(update)
+		if err != nil {
+			log.Error(err, "error updating config entry in consul")
+		}
+
 	}
 
 	for _, update := range updates.Kubernetes.Updates {

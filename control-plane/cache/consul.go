@@ -544,6 +544,32 @@ func (c *Cache) Write(entry api.ConfigEntry) error {
 	return nil
 }
 
+// Delete handles deleting the config entry from consul, if the current reference of the config entry is stale then
+// it returns an error
+func (c *Cache) Delete(ref api.ResourceReference) error {
+	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
+	if err != nil {
+		return err
+	}
+
+	options := &api.WriteOptions{}
+
+	if c.namespacesEnabled {
+		options.Namespace = namespaceWildcard
+	}
+
+	if c.partition != "" {
+		options.Partition = c.partition
+	}
+
+	_, err = client.ConfigEntries().Delete(ref.Kind, ref.Name, options)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Get returns a config entry from the cache that corresponds to the given resource reference.
 func (c *Cache) Get(ref api.ResourceReference) api.ConfigEntry {
 	c.cacheMutex.Lock()
