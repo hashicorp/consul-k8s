@@ -1960,6 +1960,9 @@ connectInject:
   apiGateway:
     # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
     managedGatewayClass:
+      # When true a GatewayClass is configured to automatically work with Consul as installed by helm.
+      enabled: true
+
       # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
       # labels for gateway pod assignment, formatted as a multi-line string.
       #

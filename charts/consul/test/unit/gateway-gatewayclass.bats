@@ -11,11 +11,19 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/GatewayClass: disable with connectInject.enabled" {
+@test "apiGateway/GatewayClass: disabled with connectInject.enabled" {
   cd `chart_dir`
   assert_empty helm template \
       -s templates/gateway-gatewayclass.yaml  \
       --set 'connectInject.enabled=false' \
+      .
+}
+
+@test "apiGateway/GatewayClass: disabled with connectInject.apiGateway.managedGatewayClass.enabled" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/gateway-gatewayclass.yaml  \
+      --set 'connectInject.apiGateway.managedGatewayClass.enabled=false' \
       .
 }
 

@@ -120,8 +120,6 @@ type Command struct {
 	flagEnableConsulDNS bool
 	flagResourcePrefix  string
 
-	// API Gateway flags.
-
 	flagEnableOpenShift bool
 
 	flagSet *flag.FlagSet
