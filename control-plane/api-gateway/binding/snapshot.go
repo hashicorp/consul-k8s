@@ -43,6 +43,7 @@ type Snapshot struct {
 	// a Gateway deployment, if it is not set, a deployment should be
 	// deleted instead of updated
 	GatewayClassConfig *v1alpha1.GatewayClassConfig
-	// TODO: melisa describe this
+	// UpsertGatewayDeployment determines whether the gateway deployment
+	// objects should be updated, i.e. deployments, roles, services
 	UpsertGatewayDeployment bool
 }
