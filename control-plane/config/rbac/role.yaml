@@ -1,11 +1,7 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
@@ -26,6 +22,26 @@ rules:
   - secrets/status
   verbs:
   - get
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - controlplanerequestlimits
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - controlplanerequestlimits/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - consul.hashicorp.com
   resources:

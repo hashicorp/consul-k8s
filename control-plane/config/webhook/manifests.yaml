@@ -1,13 +1,30 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1alpha1-exportedservices
+  failurePolicy: Fail
+  name: mutate-exportedservices.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - exportedservices
+  sideEffects: None
 - admissionReviewVersions:
   - v1beta1
   - v1

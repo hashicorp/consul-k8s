@@ -3,4 +3,45 @@ kind: ControlPlaneRequestLimit
 metadata:
   name: controlplanerequestlimit-sample
 spec:
-  # TODO(user): Add fields here
+  mode: "permissive"
+  readRate:  100.0
+  writeRate: 100.0
+  acl:
+    readRate:  100.0
+    writeRate: 100.0
+  catalog:
+    readRate:  100.0
+    writeRate: 100.0
+  configEntry: 
+    readRate:  100.0
+    writeRate: 100.0
+  connectCA: 
+    readRate:  100.0
+    writeRate: 100.0
+  coordinate: 
+    readRate:  100.0
+    writeRate: 100.0
+  discoveryChain: 
+    readRate:  100.0
+    writeRate: 100.0
+  health: 
+    readRate:  100.0
+    writeRate: 100.0
+  intention: 
+    readRate:  100.0
+    writeRate: 100.0
+  kv: 
+    readRate:  100.0
+    writeRate: 100.0
+  tenancy: 
+    readRate:  100.0
+    writeRate: 100.0
+  preparedQuery: 
+    readRate:  100.0
+    writeRate: 100.0
+  session: 
+    readRate:  100.0
+    writeRate: 100.0
+  txn: 
+    readRate:  100.0
+    writeRate: 100.0
