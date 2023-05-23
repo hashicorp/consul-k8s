@@ -48,6 +48,33 @@ spec:
                       type: string
                     type: array
                 type: object
+              deployment:
+                description: Deployment defines the deployment configuration for the
+                  gateway.
+                properties:
+                  defaultInstances:
+                    default: 1
+                    description: Number of gateway instances that should be deployed
+                      by default
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                  maxInstances:
+                    default: 8
+                    description: Max allowed number of gateway instances
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                  minInstances:
+                    default: 1
+                    description: Minimum allowed number of gateway instances
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                type: object
               nodeSelector:
                 additionalProperties:
                   type: string
