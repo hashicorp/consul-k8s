@@ -18,6 +18,12 @@ var (
 		"consul.hashicorp.com_peeringacceptors.yaml": {},
 		"consul.hashicorp.com_peeringdialers.yaml":   {},
 	}
+	// HACK IT (again)! These CRDs need to go in the Helm chart's crds directory which means they
+	// cannot have any templating in them. They need to be in the CRD directory because we install
+	// resources that reference them in the main installation sequence.
+	toCRDDir = map[string]struct{}{
+		"consul.hashicorp.com_gatewayclassconfigs.yaml": {},
+	}
 )
 
 func main() {
@@ -57,29 +63,36 @@ func realMain(helmPath string) error {
 		if _, ok := requiresPeering[info.Name()]; ok {
 			// Add {{- if and .Values.connectInject.enabled .Values.global.peering.enabled  }} {{- end }} wrapper.
 			contents = fmt.Sprintf("{{- if and .Values.connectInject.enabled .Values.global.peering.enabled }}\n%s{{- end }}\n", contents)
+		} else if _, ok := toCRDDir[info.Name()]; ok {
+			// No-op (we don't want templating).
 		} else {
 			// Add {{- if .Values.connectInject.enabled }} {{- end }} wrapper.
 			contents = fmt.Sprintf("{{- if .Values.connectInject.enabled }}\n%s{{- end }}\n", contents)
 		}
 
-		// Add labels, this is hacky because we're relying on the line number
-		// but it means we don't need to regex or yaml parse.
-		splitOnNewlines := strings.Split(contents, "\n")
-		labelLines := []string{
-			`  labels:`,
-			`    app: {{ template "consul.name" . }}`,
-			`    chart: {{ template "consul.chart" . }}`,
-			`    heritage: {{ .Release.Service }}`,
-			`    release: {{ .Release.Name }}`,
-			`    component: crd`,
+		if _, ok := toCRDDir[info.Name()]; !ok {
+			// Add labels, this is hacky because we're relying on the line number
+			// but it means we don't need to regex or yaml parse.
+			splitOnNewlines := strings.Split(contents, "\n")
+			labelLines := []string{
+				`  labels:`,
+				`    app: {{ template "consul.name" . }}`,
+				`    chart: {{ template "consul.chart" . }}`,
+				`    heritage: {{ .Release.Service }}`,
+				`    release: {{ .Release.Name }}`,
+				`    component: crd`,
+			}
+			withLabels := append(splitOnNewlines[0:9], append(labelLines, splitOnNewlines[9:]...)...)
+			contents = strings.Join(withLabels, "\n")
 		}
-		withLabels := append(splitOnNewlines[0:9], append(labelLines, splitOnNewlines[9:]...)...)
-		contents = strings.Join(withLabels, "\n")
 
 		// Construct the destination filename.
 		filenameSplit := strings.Split(info.Name(), "_")
 		crdName := filenameSplit[1]
 		destinationPath := filepath.Join(helmPath, "templates", fmt.Sprintf("crd-%s", crdName))
+		if _, ok := toCRDDir[info.Name()]; ok {
+			destinationPath = filepath.Join(helmPath, "crds", formatCRDName(info.Name()))
+		}
 
 		// Write it.
 		printf("writing to %s", destinationPath)
@@ -89,4 +102,10 @@ func realMain(helmPath string) error {
 
 func printf(format string, args ...interface{}) {
 	fmt.Println(fmt.Sprintf(format, args...))
+}
+
+func formatCRDName(name string) string {
+	name = strings.TrimSuffix(name, ".yaml")
+	segments := strings.Split(name, "_")
+	return fmt.Sprintf("%s.%s.yaml", segments[1], segments[0])
 }
