@@ -28,9 +28,9 @@ import (
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/binding"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 )

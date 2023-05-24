@@ -28,8 +28,8 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
