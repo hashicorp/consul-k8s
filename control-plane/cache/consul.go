@@ -23,7 +23,10 @@ const (
 	apiTimeout        = 5 * time.Minute
 )
 
-var ErrDidNotSet = errors.New("entry failed to be set")
+var (
+	ErrDidNotSet    = errors.New("entry failed to be set")
+	ErrDidNotDelete = errors.New("entry failed to be deleted")
+)
 
 var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate}
 
@@ -564,7 +567,7 @@ func (c *Cache) Delete(ref api.ResourceReference) error {
 
 	_, err = client.ConfigEntries().Delete(ref.Kind, ref.Name, options)
 	if err != nil {
-		return err
+		return errors.Join(ErrDidNotDelete, err)
 	}
 
 	return nil
