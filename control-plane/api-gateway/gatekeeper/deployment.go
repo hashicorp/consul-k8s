@@ -75,7 +75,6 @@ func (g *Gatekeeper) deployment() *appsv1.Deployment {
 			Name:      g.Gateway.Name,
 			Namespace: g.Gateway.Namespace,
 			Labels:    apigateway.LabelsForGateway(&g.Gateway),
-			// Annotations: g.GatewayClassConfig.Spec.CopyAnnotations,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: g.GatewayClassConfig.Spec.DeploymentSpec.DefaultInstances,
@@ -93,6 +92,7 @@ func (g *Gatekeeper) deployment() *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Image: g.HelmConfig.Image,
+							Name:  "consul-dataplane",
 						},
 					},
 					Affinity: &corev1.Affinity{
@@ -110,7 +110,7 @@ func (g *Gatekeeper) deployment() *appsv1.Deployment {
 							},
 						},
 					},
-					NodeSelector:       g.GatewayClassConfig.Spec.NodeSelector, // TODO should I grab this from here or Helm?
+					NodeSelector:       g.GatewayClassConfig.Spec.NodeSelector,
 					Tolerations:        g.GatewayClassConfig.Spec.Tolerations,
 					ServiceAccountName: g.serviceAccountName(),
 				},
