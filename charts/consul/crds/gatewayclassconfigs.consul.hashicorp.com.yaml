@@ -1,4 +1,6 @@
-{{- if .Values.connectInject.enabled }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -7,12 +9,6 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
   name: gatewayclassconfigs.consul.hashicorp.com
-  labels:
-    app: {{ template "consul.name" . }}
-    chart: {{ template "consul.chart" . }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
-    component: crd
 spec:
   group: consul.hashicorp.com
   names:
@@ -53,8 +49,8 @@ spec:
                     type: array
                 type: object
               deployment:
-                description: Configuration information about how many instances to
-                  deploy
+                description: Deployment defines the deployment configuration for the
+                  gateway.
                 properties:
                   defaultInstances:
                     default: 1
@@ -142,4 +138,3 @@ spec:
         type: object
     served: true
     storage: true
-{{- end }}

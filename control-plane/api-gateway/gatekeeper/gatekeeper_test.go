@@ -25,6 +25,7 @@ import (
 )
 
 var (
+	image               = "hashicorp/consul-dataplane"
 	createdAtLabelKey   = "gateway.consul.hashicorp.com/created"
 	createdAtLabelValue = "101010"
 	name                = "test"
@@ -84,11 +85,13 @@ func TestUpsert(t *testing.T) {
 					Name: "consul-gatewayclassconfig",
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo(int32(3)),
+						MaxInstances:     ptrTo(int32(3)),
+						MinInstances:     ptrTo(int32(1)),
+					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
-					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo[int32](3),
-					},
 				},
 			},
 			helmConfig:       apigateway.HelmConfig{},
@@ -117,16 +120,16 @@ func TestUpsert(t *testing.T) {
 					Name: "consul-gatewayclassconfig",
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo(int32(3)),
+						MaxInstances:     ptrTo(int32(3)),
+						MinInstances:     ptrTo(int32(1)),
+					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
-					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo[int32](3),
-					},
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				ServiceType: ptrTo("NodePort"),
-			},
+			helmConfig:       apigateway.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -165,11 +168,13 @@ func TestUpsert(t *testing.T) {
 					Name: "consul-gatewayclassconfig",
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo(int32(3)),
+						MaxInstances:     ptrTo(int32(3)),
+						MinInstances:     ptrTo(int32(1)),
+					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
-					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo[int32](3),
-					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
@@ -217,11 +222,13 @@ func TestUpsert(t *testing.T) {
 					Name: "consul-gatewayclassconfig",
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo(int32(3)),
+						MaxInstances:     ptrTo(int32(3)),
+						MinInstances:     ptrTo(int32(1)),
+					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
-					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo[int32](3),
-					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
@@ -290,11 +297,13 @@ func TestUpsert(t *testing.T) {
 					Name: "consul-gatewayclassconfig",
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo(int32(3)),
+						MaxInstances:     ptrTo(int32(3)),
+						MinInstances:     ptrTo(int32(1)),
+					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
-					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo[int32](3),
-					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
@@ -361,11 +370,13 @@ func TestUpsert(t *testing.T) {
 					Name: "consul-gatewayclassconfig",
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo(int32(5)),
+						MaxInstances:     ptrTo(int32(7)),
+						MinInstances:     ptrTo(int32(1)),
+					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
-					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo[int32](3),
-					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{},
@@ -427,11 +438,13 @@ func TestDelete(t *testing.T) {
 					Name: "consul-gatewayclassconfig",
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo(int32(3)),
+						MaxInstances:     ptrTo(int32(3)),
+						MinInstances:     ptrTo(int32(1)),
+					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
-					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo[int32](3),
-					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{},
@@ -462,18 +475,17 @@ func TestDelete(t *testing.T) {
 					Name: "consul-gatewayclassconfig",
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo(int32(3)),
+						MaxInstances:     ptrTo(int32(3)),
+						MinInstances:     ptrTo(int32(1)),
+					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
-					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo[int32](3),
-					},
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				ServiceType: ptrTo("NodePort"),
-			},
+			helmConfig: apigateway.HelmConfig{},
 			initialResources: resources{
-
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
@@ -516,11 +528,13 @@ func TestDelete(t *testing.T) {
 					Name: "consul-gatewayclassconfig",
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo(int32(3)),
+						MaxInstances:     ptrTo(int32(3)),
+						MinInstances:     ptrTo(int32(1)),
+					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
-					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo[int32](3),
-					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{

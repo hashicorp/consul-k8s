@@ -84,8 +84,6 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, nsname types.Namespac
 	return err
 }
 
-// consulDataplaneContainer
-
 func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
 	initContainer, err := initContainer(config, gateway.Name, gateway.Namespace)
 	if err != nil {
@@ -184,6 +182,14 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 				return false
 			}
 		}
+	}
+
+	if b.Spec.Replicas == nil && a.Spec.Replicas == nil {
+		return true
+	} else if b.Spec.Replicas == nil {
+		return false
+	} else if a.Spec.Replicas == nil {
+		return false
 	}
 
 	return *b.Spec.Replicas == *a.Spec.Replicas

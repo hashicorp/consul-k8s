@@ -1984,3 +1984,61 @@ func setupInlineCertificate() *api.InlineCertificateConfigEntry {
 		},
 	}
 }
+
+func TestCache_Delete(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name        string
+		responseFn  func(w http.ResponseWriter)
+		expectedErr error
+	}{
+		{
+			name: "delete is successful",
+			responseFn: func(w http.ResponseWriter) {
+				w.WriteHeader(200)
+				fmt.Fprintln(w, `{deleted: true}`)
+			},
+			expectedErr: nil,
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			ref := api.ResourceReference{
+				Name: "my-route",
+				Kind: api.HTTPRoute,
+			}
+			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case fmt.Sprintf("/v1/config/%s/%s", ref.Kind, ref.Name):
+					tt.responseFn(w)
+				default:
+					w.WriteHeader(500)
+					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
+				}
+			}))
+			defer consulServer.Close()
+
+			serverURL, err := url.Parse(consulServer.URL)
+			require.NoError(t, err)
+
+			port, err := strconv.Atoi(serverURL.Port())
+			require.NoError(t, err)
+
+			c := New(Config{
+				ConsulClientConfig: &consul.Config{
+					APIClientConfig: &api.Config{},
+					HTTPPort:        port,
+					GRPCPort:        port,
+					APITimeout:      0,
+				},
+				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+				NamespacesEnabled:   false,
+				Partition:           "",
+				Logger:              logrtest.NewTestLogger(t),
+			})
+
+			err = c.Delete(context.Background(), ref)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}

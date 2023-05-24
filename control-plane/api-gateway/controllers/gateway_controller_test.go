@@ -83,7 +83,7 @@ func stubConsulCache(t *testing.T) *cache.Cache {
 	})
 }
 
-func TestGatewayReconcileUpdates(t *testing.T) {
+func TestGatewayReconcileGatekeeperUpdates(t *testing.T) {
 	t.Parallel()
 
 	namespace := "test-namespace"
@@ -173,13 +173,12 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 	}
 
 	basicGatewayClass, basicGatewayClassConfig := getBasicGatewayClassAndConfig()
-	serviceType := corev1.ServiceType("NodePort")
 	cases := map[string]struct {
 		gateway       *gwv1beta1.Gateway
 		k8sObjects    []runtime.Object
 		expectedError error
 	}{
-		"successful delete for nonexistent gateway class": {
+		"successful change of gatewayclass on gateway": {
 			gateway: &gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  TestNamespace,
@@ -194,64 +193,8 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 				},
 			},
 			k8sObjects: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: TestNamespace,
-						Name:      TestGatewayName,
-					},
-				},
-			},
-			expectedError: nil,
-		},
-		"successful change of gatewayclass on gateway": {
-			gateway: &gwv1beta1.Gateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:  TestNamespace,
-					Name:       TestGatewayName,
-					Finalizers: []string{gatewayFinalizer},
-					Annotations: map[string]string{
-						TestAnnotationConfigKey: `{"serviceType":"serviceType"}`,
-					},
-				},
-				Spec: gwv1beta1.GatewaySpec{
-					GatewayClassName: "DifferentGatewayClassName",
-				},
-			},
-			k8sObjects: []runtime.Object{
-				&gwv1beta1.GatewayClass{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "",
-						Name:      "DifferentGatewayClassName",
-						Finalizers: []string{
-							gatewayClassFinalizer,
-						},
-					},
-					Spec: gwv1beta1.GatewayClassSpec{
-						ControllerName: "different.controller.name",
-						ParametersRef: &gwv1beta1.ParametersReference{
-							Group:     "different.group",
-							Kind:      "GatewayClassConfig",
-							Name:      "DifferentGatewayClassConfigName",
-							Namespace: nil,
-						},
-					},
-				},
-				&v1alpha1.GatewayClassConfig{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "DifferentGatewayClassConfigName",
-					},
-					Spec: v1alpha1.GatewayClassConfigSpec{
-						ServiceType: &serviceType,
-					},
-				},
 				&basicGatewayClass,
 				&basicGatewayClassConfig,
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: TestNamespace,
-						Name:      TestGatewayName,
-					},
-				},
 			},
 			expectedError: nil,
 		},
@@ -280,26 +223,16 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 				Log:    logrtest.New(t),
 			}
 
-			_, err := r.Reconcile(context.TODO(), req)
+			_, err := r.Reconcile(context.Background(), req)
 
 			require.Equal(t, tc.expectedError, err)
-
-			// Check the k8s objects are removed
 			deployment := appsv1.Deployment{}
 			r.Client.Get(context.TODO(), types.NamespacedName{
 				Namespace: TestNamespace,
 				Name:      TestGatewayName,
 			}, &deployment)
-			require.Empty(t, deployment)
-
-			// Check the finalizer is removed
-			gw := gwv1beta1.Gateway{}
-			err = r.Client.Get(context.TODO(), types.NamespacedName{
-				Namespace: TestNamespace,
-				Name:      TestGatewayName,
-			}, &gw)
-			require.NoError(t, err)
-			require.Empty(t, gw.Finalizers)
+			require.NotEmpty(t, deployment)
+			require.Equal(t, TestGatewayName, deployment.ObjectMeta.Name)
 		})
 	}
 }

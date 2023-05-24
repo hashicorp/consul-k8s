@@ -36,6 +36,7 @@ type GatewayClassConfig struct {
 
 // GatewayClassConfigSpec specifies the desired state of the Config CRD.
 type GatewayClassConfigSpec struct {
+
 	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
 	ServiceType *corev1.ServiceType `json:"serviceType,omitempty"`
 
@@ -48,7 +49,7 @@ type GatewayClassConfigSpec struct {
 	// More Info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Configuration information about how many instances to deploy
+	// Deployment defines the deployment configuration for the gateway.
 	DeploymentSpec DeploymentSpec `json:"deployment,omitempty"`
 
 	// Annotation Information to copy to services or deployments

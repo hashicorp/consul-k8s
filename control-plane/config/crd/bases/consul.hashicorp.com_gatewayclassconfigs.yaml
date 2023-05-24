@@ -49,8 +49,8 @@ spec:
                     type: array
                 type: object
               deployment:
-                description: Configuration information about how many instances to
-                  deploy
+                description: Deployment defines the deployment configuration for the
+                  gateway.
                 properties:
                   defaultInstances:
                     default: 1
