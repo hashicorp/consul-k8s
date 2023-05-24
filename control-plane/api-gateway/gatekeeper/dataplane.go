@@ -41,8 +41,7 @@ func consulDataplaneContainer(config apigateway.HelmConfig, name, namespace stri
 		return corev1.Container{}, err
 	}
 
-	var probe *corev1.Probe
-	probe = &corev1.Probe{
+	probe := &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Port: intstr.FromInt(constants.ProxyDefaultHealthPort),

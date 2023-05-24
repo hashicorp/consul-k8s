@@ -592,7 +592,7 @@ func (c *Cache) Get(ref api.ResourceReference) api.ConfigEntry {
 }
 
 // Delete handles deleting the config entry from consul, if the current reference of the config entry is stale then
-// it returns an error
+// it returns an error.
 func (c *Cache) Delete(ctx context.Context, ref api.ResourceReference) error {
 	c.cacheMutex.Lock()
 	defer c.cacheMutex.Unlock()
@@ -704,7 +704,7 @@ func (c *Cache) LinkPolicy(ctx context.Context, name, namespace string) error {
 	return nil
 }
 
-// Register returns registers a service in Consul
+// Register registers a service in Consul.
 func (c *Cache) Register(ctx context.Context, registration api.CatalogRegistration) error {
 	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 	if err != nil {
@@ -721,7 +721,7 @@ func (c *Cache) Register(ctx context.Context, registration api.CatalogRegistrati
 	return err
 }
 
-// Deregister returns deregisters a service in Consul
+// Deregister deregisters a service in Consul.
 func (c *Cache) Deregister(ctx context.Context, deregistration api.CatalogDeregistration) error {
 	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 	if err != nil {
@@ -736,37 +736,6 @@ func (c *Cache) Deregister(ctx context.Context, deregistration api.CatalogDeregi
 
 	_, err = client.Catalog().Deregister(&deregistration, options.WithContext(ctx))
 	return err
-}
-
-func createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *api.Client) error {
-	// Attempt to create the ACL policy.
-	_, _, err := consulClient.ACL().PolicyCreate(&policy, &api.WriteOptions{})
-
-	if isPolicyExistsErr(err, policy.Name) {
-		existingPolicies, _, err := consulClient.ACL().PolicyList(&api.QueryOptions{})
-		if err != nil {
-			return err
-		}
-
-		for _, existingPolicy := range existingPolicies {
-			if existingPolicy.Name == policy.Name && existingPolicy.Description == policy.Description {
-				policy.ID = existingPolicy.ID
-			}
-		}
-
-		_, _, err = consulClient.ACL().PolicyUpdate(&policy, &api.WriteOptions{})
-		return err
-	}
-
-	return err
-}
-
-// isPolicyExistsErr returns true if err is due to trying to call the
-// policy create API when the policy already exists.
-func isPolicyExistsErr(err error, policyName string) bool {
-	return err != nil &&
-		strings.Contains(err.Error(), "Unexpected response code: 500") &&
-		strings.Contains(err.Error(), fmt.Sprintf("Invalid Policy: A Policy with Name %q already exists", policyName))
 }
 
 func ignoreACLsDisabled(err error) error {

@@ -5,14 +5,11 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 
 	"github.com/go-logr/logr"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -61,21 +58,6 @@ type GatewayController struct {
 	Translator translation.K8sToConsulTranslator
 	cache      *cache.Cache
 	client.Client
-}
-
-func buildOpts(ref api.ConfigEntry) cmp.Option {
-	switch v := ref.(type) {
-	case *api.APIGatewayConfigEntry:
-		return cmpopts.IgnoreFields(api.APIGatewayConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
-	case *api.HTTPRouteConfigEntry:
-		return cmpopts.IgnoreFields(api.HTTPRouteConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
-	case *api.TCPRouteConfigEntry:
-		return cmpopts.IgnoreFields(api.TCPRouteConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
-	case *api.InlineCertificateConfigEntry:
-		return cmpopts.IgnoreFields(api.InlineCertificateConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
-	default:
-		panic(fmt.Sprintf("type is not known: %+v", v))
-	}
 }
 
 // Reconcile handles the reconciliation loop for Gateway objects.

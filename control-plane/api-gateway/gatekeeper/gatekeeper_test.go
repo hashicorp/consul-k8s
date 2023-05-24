@@ -25,7 +25,6 @@ import (
 )
 
 var (
-	image               = "hashicorp/consul-dataplane"
 	createdAtLabelKey   = "gateway.consul.hashicorp.com/created"
 	createdAtLabelValue = "101010"
 	name                = "test"

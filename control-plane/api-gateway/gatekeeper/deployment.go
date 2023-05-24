@@ -39,7 +39,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	}
 
 	var currentReplicas *int32
-	if existingDeployment != nil {
+	if exists {
 		currentReplicas = existingDeployment.Spec.Replicas
 	}
 

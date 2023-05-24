@@ -5,7 +5,6 @@ package binding
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -77,19 +76,6 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 	}
 
 	return fmt.Sprintf("Pod \"%s/%s\" is not ready", podNamespace, podName)
-}
-
-func isPodUnschedulable(pod corev1.Pod) bool {
-	if corev1.PodRunning == pod.Status.Phase {
-		return false
-	}
-
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse && strings.Contains(condition.Reason, "Unschedulable") {
-			return true
-		}
-	}
-	return false
 }
 
 func isPodReady(pod corev1.Pod) bool {
