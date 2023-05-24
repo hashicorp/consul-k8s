@@ -79,15 +79,7 @@ func buildOpts(ref api.ConfigEntry) cmp.Option {
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gateway", req.NamespacedName)
-<<<<<<< HEAD
-<<<<<<< HEAD
-	log.Info("Reconciling the Gateway: ", "gatewayName", req.Name)
-=======
-	log.Info("Reconciling the Gateway: ")
->>>>>>> 1cc80777 (still has some print statements, seeing issues with updates)
-=======
 	log.Info("Reconciling Gateway")
->>>>>>> 6f4db1f5 (cleanup)
 
 	// If gateway does not exist, log an error.
 	var gw gwv1beta1.Gateway
