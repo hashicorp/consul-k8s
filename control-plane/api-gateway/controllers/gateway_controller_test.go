@@ -5,8 +5,14 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	appsv1 "k8s.io/api/apps/v1"
 	rbac "k8s.io/api/rbac/v1"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
@@ -25,6 +31,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul/api"
 )
 
 const (
@@ -79,6 +86,23 @@ func TestGatewayReconcileGatekeeperUpdates(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/v1/config/api-gateway/test-gateway":
+					fmt.Fprintln(w, `{}`)
+				default:
+					w.WriteHeader(500)
+					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
+				}
+			}))
+			defer consulServer.Close()
+
+			serverURL, err := url.Parse(consulServer.URL)
+			require.NoError(t, err)
+
+			port, err := strconv.Atoi(serverURL.Port())
+			require.NoError(t, err)
+
 			s := runtime.NewScheme()
 			require.NoError(t, gwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
@@ -95,12 +119,22 @@ func TestGatewayReconcileGatekeeperUpdates(t *testing.T) {
 			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...)).Build()
 
 			r := &GatewayController{
-				cache:  cache.New(cache.Config{Logger: logrtest.New(t), ConsulClientConfig: &consul.Config{}}),
+				cache: cache.New(cache.Config{
+					Logger: logrtest.New(t),
+					ConsulClientConfig: &consul.Config{
+						APIClientConfig: &api.Config{},
+						HTTPPort:        port,
+						GRPCPort:        port,
+						APITimeout:      0,
+					},
+					ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+					NamespacesEnabled:   false,
+					Partition:           ""}),
 				Client: fakeClient,
 				Log:    logrtest.New(t),
 			}
 
-			_, err := r.Reconcile(context.Background(), req)
+			_, err = r.Reconcile(context.Background(), req)
 
 			require.Equal(t, tc.expectedError, err)
 			deployment := appsv1.Deployment{}
@@ -239,6 +273,24 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+
+			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/v1/config/api-gateway/test-gateway":
+					fmt.Fprintln(w, `{}`)
+				default:
+					w.WriteHeader(500)
+					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
+				}
+			}))
+			defer consulServer.Close()
+
+			serverURL, err := url.Parse(consulServer.URL)
+			require.NoError(t, err)
+
+			port, err := strconv.Atoi(serverURL.Port())
+			require.NoError(t, err)
+
 			s := runtime.NewScheme()
 			require.NoError(t, gwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
@@ -255,12 +307,22 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...)).Build()
 
 			r := &GatewayController{
-				cache:  cache.New(cache.Config{Logger: logrtest.New(t), ConsulClientConfig: &consul.Config{}}),
+				cache: cache.New(cache.Config{
+					Logger: logrtest.New(t),
+					ConsulClientConfig: &consul.Config{
+						APIClientConfig: &api.Config{},
+						HTTPPort:        port,
+						GRPCPort:        port,
+						APITimeout:      0,
+					},
+					ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+					NamespacesEnabled:   false,
+					Partition:           ""}),
 				Client: fakeClient,
 				Log:    logrtest.New(t),
 			}
 
-			_, err := r.Reconcile(context.TODO(), req)
+			_, err = r.Reconcile(context.TODO(), req)
 
 			require.Equal(t, tc.expectedError, err)
 
