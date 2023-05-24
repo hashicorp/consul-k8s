@@ -153,6 +153,14 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 		}
 	}
 
+	if b.Spec.Replicas == nil && a.Spec.Replicas == nil {
+		return true
+	} else if b.Spec.Replicas == nil {
+		return false
+	} else if a.Spec.Replicas == nil {
+		return false
+	}
+
 	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
