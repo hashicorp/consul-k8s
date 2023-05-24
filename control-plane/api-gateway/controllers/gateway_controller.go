@@ -80,10 +80,14 @@ func buildOpts(ref api.ConfigEntry) cmp.Option {
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gateway", req.NamespacedName)
 <<<<<<< HEAD
+<<<<<<< HEAD
 	log.Info("Reconciling the Gateway: ", "gatewayName", req.Name)
 =======
 	log.Info("Reconciling the Gateway: ")
 >>>>>>> 1cc80777 (still has some print statements, seeing issues with updates)
+=======
+	log.Info("Reconciling Gateway")
+>>>>>>> 6f4db1f5 (cleanup)
 
 	// If gateway does not exist, log an error.
 	var gw gwv1beta1.Gateway
@@ -216,17 +220,13 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	updates := binder.Snapshot()
 
-	fmt.Println("--------------------------------------\n", updates)
-
 	if updates.UpsertGatewayDeployment {
-		log.Info("updating gatekeeper")
 		err := r.updateGatekeeperResources(ctx, log, &gw, gwcc)
 		if err != nil {
 			log.Error(err, "unable to update gateway resources")
 			return ctrl.Result{}, err
 		}
 	} else {
-		log.Info("deleting gatekeeper")
 		err := r.deleteGatekeeperResources(ctx, log, &gw)
 		if err != nil {
 			log.Error(err, "unable to delete gateway resources")

@@ -35,7 +35,7 @@ const (
 	TestNamespace              = "test-namespace"
 )
 
-func TestGatewayReconcileUpdates(t *testing.T) {
+func TestGatewayReconcileGatekeeperUpdates(t *testing.T) {
 	t.Parallel()
 
 	namespace := "test-namespace"
@@ -128,9 +128,10 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 	basicGatewayClass, basicGatewayClassConfig := getBasicGatewayClassAndConfig()
 	serviceType := corev1.ServiceType("NodePort")
 	cases := map[string]struct {
-		gateway       *gwv1beta1.Gateway
-		k8sObjects    []runtime.Object
-		expectedError error
+		gateway        *gwv1beta1.Gateway
+		k8sObjects     []runtime.Object
+		expectedError  error
+		expectDeletion bool
 	}{
 		"successful delete with deletion timestamp": {
 			gateway: &gwv1beta1.Gateway{
@@ -155,7 +156,8 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 					},
 				},
 			},
-			expectedError: nil,
+			expectedError:  nil,
+			expectDeletion: true,
 		},
 		"successful delete for nonexistent gateway class": {
 			gateway: &gwv1beta1.Gateway{
@@ -276,8 +278,12 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 				Namespace: TestNamespace,
 				Name:      TestGatewayName,
 			}, &gw)
-			require.NoError(t, err)
-			require.Empty(t, gw.Finalizers)
+			if tc.expectDeletion {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Empty(t, gw.Finalizers)
+			}
 		})
 	}
 }
