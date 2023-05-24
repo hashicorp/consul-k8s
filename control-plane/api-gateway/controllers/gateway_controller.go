@@ -5,9 +5,12 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -57,10 +60,25 @@ type GatewayController struct {
 	client.Client
 }
 
+func buildOpts(ref api.ConfigEntry) cmp.Option {
+	switch v := ref.(type) {
+	case *api.APIGatewayConfigEntry:
+		return cmpopts.IgnoreFields(api.APIGatewayConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
+	case *api.HTTPRouteConfigEntry:
+		return cmpopts.IgnoreFields(api.HTTPRouteConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
+	case *api.TCPRouteConfigEntry:
+		return cmpopts.IgnoreFields(api.TCPRouteConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
+	case *api.InlineCertificateConfigEntry:
+		return cmpopts.IgnoreFields(api.InlineCertificateConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
+	default:
+		panic(fmt.Sprintf("type is not known: %+v", v))
+	}
+}
+
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gateway", req.NamespacedName)
-	log.Info("Reconciling the Gateway: ", req.Name)
+	log.Info("Reconciling the Gateway: ", "gatewayName", req.Name)
 
 	// If gateway does not exist, log an error.
 	var gw gwv1beta1.Gateway
@@ -200,12 +218,26 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, deletion := range updates.Consul.Deletions {
 		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
-		// TODO: the actual delete
+		err = r.cache.Delete(deletion)
+		if err != nil {
+			log.Error(err, "failed to delete entry from consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
+		}
+
 	}
 
 	for _, update := range updates.Consul.Updates {
 		log.Info("updating in Consul", "kind", update.GetKind(), "namespace", update.GetNamespace(), "name", update.GetName())
-		// TODO: the actual update
+		ref := translation.EntryToReference(update)
+		old := r.cache.Get(ref)
+		if cmp.Equal(old, update, buildOpts(update)) {
+			continue
+		}
+
+		err := r.cache.Write(update)
+		if err != nil {
+			log.Error(err, "error updating config entry in consul")
+		}
+
 	}
 
 	for _, update := range updates.Kubernetes.Updates {
@@ -362,12 +394,12 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		).
 		Watches(
 			// Subscribe to changes from Consul for HTTPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulHTTPRouteTranslator(ctx)).Events()},
+			&source.Channel{Source: c.Subscribe(ctx, api.HTTPRoute, translator.BuildConsulHTTPRouteTranslator(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
 			// Subscribe to changes from Consul for TCPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulTCPRouteTranslator(ctx)).Events()},
+			&source.Channel{Source: c.Subscribe(ctx, api.TCPRoute, translator.BuildConsulTCPRouteTranslator(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(

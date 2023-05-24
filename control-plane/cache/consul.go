@@ -26,7 +26,10 @@ const (
 	apiTimeout        = 5 * time.Minute
 )
 
-var ErrStaleEntry = errors.New("entry is stale")
+var (
+	ErrDidNotSet    = errors.New("entry failed to be set")
+	ErrDidNotDelete = errors.New("entry failed to be deleted")
+)
 
 var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate}
 
@@ -535,13 +538,39 @@ func (c *Cache) Write(entry api.ConfigEntry) error {
 		options.Partition = c.partition
 	}
 
-	updated, _, err := client.ConfigEntries().CAS(entry, entry.GetModifyIndex(), options)
+	updated, _, err := client.ConfigEntries().Set(entry, options)
 	if err != nil {
 		return err
 	}
 
 	if !updated {
-		return ErrStaleEntry
+		return ErrDidNotSet
+	}
+
+	return nil
+}
+
+// Delete handles deleting the config entry from consul, if the current reference of the config entry is stale then
+// it returns an error.
+func (c *Cache) Delete(ref api.ResourceReference) error {
+	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
+	if err != nil {
+		return err
+	}
+
+	options := &api.WriteOptions{}
+
+	if c.namespacesEnabled {
+		options.Namespace = namespaceWildcard
+	}
+
+	if c.partition != "" {
+		options.Partition = c.partition
+	}
+
+	_, err = client.ConfigEntries().Delete(ref.Kind, ref.Name, options)
+	if err != nil {
+		return errors.Join(ErrDidNotDelete, err)
 	}
 
 	return nil
@@ -574,7 +603,7 @@ func (c *Cache) List(kind string) []api.ConfigEntry {
 	if !ok {
 		return nil
 	}
-	entries := make([]api.ConfigEntry, len(entryMap))
+	entries := make([]api.ConfigEntry, 0, len(entryMap))
 	for _, entry := range entryMap {
 		entries = append(entries, entry)
 	}
@@ -587,7 +616,7 @@ func (c *Cache) ListServices() []api.CatalogService {
 	c.cacheMutex.Lock()
 	defer c.cacheMutex.Unlock()
 
-	entries := make([]api.CatalogService, len(c.serviceCache))
+	entries := make([]api.CatalogService, 0, len(c.serviceCache))
 	for _, service := range c.serviceCache {
 		entries = append(entries, *service)
 	}
