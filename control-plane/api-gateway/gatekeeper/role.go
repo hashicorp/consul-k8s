@@ -6,6 +6,8 @@ package gatekeeper
 import (
 	"context"
 	"errors"
+	"k8s.io/apimachinery/pkg/types"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	rbac "k8s.io/api/rbac/v1"
@@ -14,8 +16,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (g *Gatekeeper) upsertRole(ctx context.Context) error {
-	if !g.HelmConfig.ManageSystemACLs {
+func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, config apigateway.HelmConfig) error {
+	if !config.ManageSystemACLs {
 		return nil
 	}
 
@@ -23,7 +25,7 @@ func (g *Gatekeeper) upsertRole(ctx context.Context) error {
 	exists := false
 
 	// Get ServiceAccount
-	err := g.Client.Get(ctx, g.namespacedName(), role)
+	err := g.Client.Get(ctx, g.namespacedName(gateway), role)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	} else if k8serrors.IsNotFound(err) {
@@ -35,7 +37,7 @@ func (g *Gatekeeper) upsertRole(ctx context.Context) error {
 	if exists {
 		// Ensure we own the Role.
 		for _, ref := range role.GetOwnerReferences() {
-			if ref.UID == g.Gateway.GetUID() && ref.Name == g.Gateway.GetName() {
+			if ref.UID == gateway.GetUID() && ref.Name == gateway.GetName() {
 				// We found ourselves!
 				return nil
 			}
@@ -43,8 +45,8 @@ func (g *Gatekeeper) upsertRole(ctx context.Context) error {
 		return errors.New("Role not owned by controller")
 	}
 
-	role = g.role()
-	if err := ctrl.SetControllerReference(&g.Gateway, role, g.Client.Scheme()); err != nil {
+	role = g.role(gateway)
+	if err := ctrl.SetControllerReference(&gateway, role, g.Client.Scheme()); err != nil {
 		return err
 	}
 	if err := g.Client.Create(ctx, role); err != nil {
@@ -54,8 +56,8 @@ func (g *Gatekeeper) upsertRole(ctx context.Context) error {
 	return nil
 }
 
-func (g *Gatekeeper) deleteRole(ctx context.Context) error {
-	if err := g.Client.Delete(ctx, g.role()); err != nil {
+func (g *Gatekeeper) deleteRole(ctx context.Context, nsname types.NamespacedName) error {
+	if err := g.Client.Delete(ctx, &rbac.Role{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
@@ -65,12 +67,12 @@ func (g *Gatekeeper) deleteRole(ctx context.Context) error {
 	return nil
 }
 
-func (g *Gatekeeper) role() *rbac.Role {
+func (g *Gatekeeper) role(gateway gwv1beta1.Gateway) *rbac.Role {
 	return &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      g.Gateway.Name,
-			Namespace: g.Gateway.Namespace,
-			Labels:    apigateway.LabelsForGateway(&g.Gateway),
+			Name:      gateway.Name,
+			Namespace: gateway.Namespace,
+			Labels:    apigateway.LabelsForGateway(&gateway),
 		},
 		Rules: []rbac.PolicyRule{
 			{

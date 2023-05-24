@@ -28,6 +28,7 @@ import (
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/binding"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/gatekeeper"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/cache"
@@ -78,7 +79,7 @@ func buildOpts(ref api.ConfigEntry) cmp.Option {
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gateway", req.NamespacedName)
-	log.Info("Reconciling the Gateway: ", "gatewayName", req.Name)
+	log.Info("Reconciling Gateway")
 
 	// If gateway does not exist, log an error.
 	var gw gwv1beta1.Gateway
@@ -211,10 +212,19 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	updates := binder.Snapshot()
 
-	// do something with deployments, gwcc and such here, if the following exists on
-	// the snapshot it means we should attempt to enforce the deployment, if it's nil
-	// then we should delete the deployment
-	_ = updates.GatewayClassConfig
+	if updates.UpsertGatewayDeployment {
+		err := r.updateGatekeeperResources(ctx, log, &gw, gwcc)
+		if err != nil {
+			log.Error(err, "unable to update gateway resources")
+			return ctrl.Result{}, err
+		}
+	} else {
+		err := r.deleteGatekeeperResources(ctx, log, &gw)
+		if err != nil {
+			log.Error(err, "unable to delete gateway resources")
+			return ctrl.Result{}, err
+		}
+	}
 
 	for _, deletion := range updates.Consul.Deletions {
 		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
@@ -295,6 +305,29 @@ func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 		es = append(es, e.(T))
 	}
 	return es
+}
+
+func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) error {
+	gk := gatekeeper.New(log, r.Client)
+	err := gk.Delete(ctx, types.NamespacedName{
+		Namespace: gw.Namespace,
+		Name:      gw.Name,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
+	gk := gatekeeper.New(log, r.Client)
+	err := gk.Upsert(ctx, *gw, *gwcc, r.HelmConfig)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SetupWithGatewayControllerManager registers the controller with the given manager.

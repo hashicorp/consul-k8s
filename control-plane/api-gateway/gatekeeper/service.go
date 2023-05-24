@@ -5,6 +5,8 @@ package gatekeeper
 
 import (
 	"context"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/types"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	corev1 "k8s.io/api/core/v1"
@@ -23,15 +25,15 @@ var (
 	}
 )
 
-func (g *Gatekeeper) upsertService(ctx context.Context) error {
-	if g.GatewayClassConfig.Spec.ServiceType == nil {
+func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
+	if gcc.Spec.ServiceType == nil {
 		return nil
 	}
 
-	service := g.service()
+	service := g.service(gateway, gcc)
 
 	mutated := service.DeepCopy()
-	mutator := newServiceMutator(service, mutated, g.Gateway, g.Client.Scheme())
+	mutator := newServiceMutator(service, mutated, gateway, g.Client.Scheme())
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -50,8 +52,8 @@ func (g *Gatekeeper) upsertService(ctx context.Context) error {
 	return nil
 }
 
-func (g *Gatekeeper) deleteService(ctx context.Context) error {
-	if err := g.Client.Delete(ctx, g.service()); err != nil {
+func (g *Gatekeeper) deleteService(ctx context.Context, nsname types.NamespacedName) error {
+	if err := g.Client.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
@@ -61,9 +63,9 @@ func (g *Gatekeeper) deleteService(ctx context.Context) error {
 	return nil
 }
 
-func (g *Gatekeeper) service() *corev1.Service {
+func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) *corev1.Service {
 	ports := []corev1.ServicePort{}
-	for _, listener := range g.Gateway.Spec.Listeners {
+	for _, listener := range gateway.Spec.Listeners {
 		ports = append(ports, corev1.ServicePort{
 			Name:     string(listener.Name),
 			Protocol: corev1.Protocol(listener.Protocol),
@@ -72,27 +74,27 @@ func (g *Gatekeeper) service() *corev1.Service {
 	}
 
 	// Copy annotations from the Gateway, filtered by those allowed by the GatewayClassConfig.
-	allowedAnnotations := g.GatewayClassConfig.Spec.CopyAnnotations.Service
+	allowedAnnotations := gcc.Spec.CopyAnnotations.Service
 	if allowedAnnotations == nil {
 		allowedAnnotations = defaultServiceAnnotations
 	}
 	annotations := make(map[string]string)
 	for _, allowedAnnotation := range allowedAnnotations {
-		if value, found := g.Gateway.Annotations[allowedAnnotation]; found {
+		if value, found := gateway.Annotations[allowedAnnotation]; found {
 			annotations[allowedAnnotation] = value
 		}
 	}
 
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        g.Gateway.Name,
-			Namespace:   g.Gateway.Namespace,
-			Labels:      apigateway.LabelsForGateway(&g.Gateway),
+			Name:        gateway.Name,
+			Namespace:   gateway.Namespace,
+			Labels:      apigateway.LabelsForGateway(&gateway),
 			Annotations: annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: apigateway.LabelsForGateway(&g.Gateway),
-			Type:     *g.GatewayClassConfig.Spec.ServiceType,
+			Selector: apigateway.LabelsForGateway(&gateway),
+			Type:     *gcc.Spec.ServiceType,
 			Ports:    ports,
 		},
 	}

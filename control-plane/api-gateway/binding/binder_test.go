@@ -949,7 +949,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 			actual := binder.Snapshot()
 
 			diff := cmp.Diff(tt.expected, actual, cmp.FilterPath(func(p cmp.Path) bool {
-				return p.String() == "GatewayClassConfig" || strings.HasSuffix(p.String(), "LastTransitionTime") || strings.HasSuffix(p.String(), "Annotations")
+				return p.String() == "GatewayClassConfig" || strings.HasSuffix(p.String(), "LastTransitionTime") || strings.HasSuffix(p.String(), "Annotations") || strings.HasSuffix(p.String(), "UpsertGatewayDeployment")
 			}, cmp.Ignore()))
 			if diff != "" {
 				t.Error("undexpected diff", diff)

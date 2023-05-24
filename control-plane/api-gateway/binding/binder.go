@@ -214,6 +214,7 @@ func (b *Binder) Snapshot() Snapshot {
 	// if the gateway hasn't been marked for deletion
 	if !isGatewayDeleted {
 		snapshot.GatewayClassConfig = gwcc
+		snapshot.UpsertGatewayDeployment = true
 
 		entry := b.config.Translator.GatewayToAPIGateway(b.config.Gateway, seenCerts)
 		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &entry)
