@@ -905,6 +905,6 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 	}
 }
 
-func ptrTo[T bool | string | int32](t T) *T {
+func ptrTo[T any](t T) *T {
 	return &t
 }
