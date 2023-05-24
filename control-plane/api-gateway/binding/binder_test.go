@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -984,6 +985,123 @@ func TestBinder_Lifecycle(t *testing.T) {
 			if diff != "" {
 				t.Error("undexpected diff", diff)
 			}
+		})
+	}
+}
+
+func TestBinder_Registrations(t *testing.T) {
+	t.Parallel()
+
+	className := "gateway-class"
+	gatewayClassName := gwv1beta1.ObjectName(className)
+	controllerName := "test-controller"
+	deletionTimestamp := pointerTo(metav1.Now())
+	gatewayClass := &gwv1beta1.GatewayClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className,
+		},
+		Spec: gwv1beta1.GatewayClassSpec{
+			ControllerName: gwv1beta1.GatewayController(controllerName),
+		},
+	}
+	gatewayName := "gateway"
+
+	for name, tt := range map[string]struct {
+		config                  BinderConfig
+		expectedRegistrations   []string
+		expectedDeregistrations []api.CatalogDeregistration
+	}{
+		"deleting gateway with consul services": {
+			config: BinderConfig{
+				ControllerName: controllerName,
+				GatewayClass:   gatewayClass,
+				Gateway: gwv1beta1.Gateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              gatewayName,
+						Finalizers:        []string{gatewayFinalizer},
+						DeletionTimestamp: deletionTimestamp,
+					},
+					Spec: gwv1beta1.GatewaySpec{
+						GatewayClassName: gatewayClassName,
+					},
+				},
+				GatewayServices: []api.CatalogService{
+					{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
+					{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
+					{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
+				},
+			},
+			expectedDeregistrations: []api.CatalogDeregistration{
+				{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
+				{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
+				{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
+			},
+		},
+		"gateway with consul services and mixed pods": {
+			config: BinderConfig{
+				ControllerName: controllerName,
+				GatewayClass:   gatewayClass,
+				Gateway: gwv1beta1.Gateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       gatewayName,
+						Finalizers: []string{gatewayFinalizer},
+					},
+					Spec: gwv1beta1.GatewaySpec{
+						GatewayClassName: gatewayClassName,
+					},
+				},
+				Pods: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "namespace1"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod3", Namespace: "namespace1"},
+						Status: corev1.PodStatus{
+							Phase: corev1.PodFailed,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod4", Namespace: "namespace1"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
+				},
+				GatewayServices: []api.CatalogService{
+					{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
+					{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
+					{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
+				},
+			},
+			expectedRegistrations: []string{"pod1", "pod3", "pod4"},
+			expectedDeregistrations: []api.CatalogDeregistration{
+				{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tt.config.ControllerName = controllerName
+			tt.config.GatewayClassConfig = &v1alpha1.GatewayClassConfig{}
+			serializeGatewayClassConfig(&tt.config.Gateway, tt.config.GatewayClassConfig)
+
+			binder := NewBinder(tt.config)
+			actual := binder.Snapshot()
+
+			require.Len(t, actual.Consul.Registrations, len(tt.expectedRegistrations))
+			for i := range actual.Consul.Registrations {
+				registration := actual.Consul.Registrations[i]
+				expected := tt.expectedRegistrations[i]
+
+				require.EqualValues(t, expected, registration.Service.ID)
+				require.EqualValues(t, gatewayName, registration.Service.Service)
+			}
+
+			require.EqualValues(t, tt.expectedDeregistrations, actual.Consul.Deregistrations)
 		})
 	}
 }

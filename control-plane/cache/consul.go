@@ -405,9 +405,7 @@ MAIN_LOOP:
 }
 
 func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind string, entries []api.ConfigEntry) {
-	fmt.Println("getting lock", kind)
 	c.cacheMutex.Lock()
-	fmt.Println("got lock", kind)
 
 	cache := make(resourceCache)
 
@@ -426,7 +424,6 @@ func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind strin
 	})
 
 	c.cacheMutex.Unlock()
-	fmt.Println("released lock", kind)
 
 	// now notify all subscribers
 	c.notifySubscribers(ctx, kind, diffs)
