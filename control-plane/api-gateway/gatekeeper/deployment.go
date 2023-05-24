@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"context"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -17,6 +18,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+)
+
+const (
+	defaultInstances int32 = 1
 )
 
 func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
@@ -33,7 +38,15 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 		exists = true
 	}
 
-	deployment := g.deployment(gateway, gcc, config)
+	var currentReplicas *int32
+	if existingDeployment != nil {
+		currentReplicas = existingDeployment.Spec.Replicas
+	}
+
+	deployment, err := g.deployment(gateway, gcc, config, currentReplicas)
+	if err != nil {
+		return err
+	}
 
 	if exists {
 		g.Log.Info("Existing Gateway Deployment found.")
@@ -43,7 +56,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	}
 
 	mutated := deployment.DeepCopy()
-	mutator := newDeploymentMutator(deployment, mutated, gateway, g.Client.Scheme())
+	mutator := newDeploymentMutator(deployment, mutated, gcc, gateway, g.Client.Scheme())
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -71,16 +84,27 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, nsname types.Namespac
 	return err
 }
 
-func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) *appsv1.Deployment {
+// consulDataplaneContainer
+
+func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
+	initContainer, err := initContainer(config, gateway.Name, gateway.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	container, err := consulDataplaneContainer(config, gateway.Name, gateway.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        gateway.Name,
-			Namespace:   gateway.Namespace,
-			Labels:      apigateway.LabelsForGateway(&gateway),
-			Annotations: config.CopyAnnotations,
+			Name:      gateway.Name,
+			Namespace: gateway.Namespace,
+			Labels:    apigateway.LabelsForGateway(&gateway),
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &config.Replicas,
+			Replicas: deploymentReplicas(gcc, currentReplicas),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: apigateway.LabelsForGateway(&gateway),
 			},
@@ -92,11 +116,19 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 					},
 				},
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+					Volumes: []corev1.Volume{
 						{
-							Image: "hashicorp/consul-dataplane:1.1.0",
-							Name:  "hi",
+							Name: volumeName,
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
+							},
 						},
+					},
+					InitContainers: []corev1.Container{
+						initContainer,
+					},
+					Containers: []corev1.Container{
+						container,
 					},
 					Affinity: &corev1.Affinity{
 						PodAntiAffinity: &corev1.PodAntiAffinity{
@@ -115,17 +147,17 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 					},
 					NodeSelector:       gcc.Spec.NodeSelector,
 					Tolerations:        gcc.Spec.Tolerations,
-					ServiceAccountName: g.serviceAccountName(),
+					ServiceAccountName: g.serviceAccountName(gateway, config),
 				},
 			},
 		},
-	}
+	}, nil
 }
 
-func mergeDeployments(a, b *appsv1.Deployment) *appsv1.Deployment {
+func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
 		b.Spec.Template = a.Spec.Template
-		b.Spec.Replicas = a.Spec.Replicas
+		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
 	}
 
 	return b
@@ -157,9 +189,40 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
-func newDeploymentMutator(deployment, mutated *appsv1.Deployment, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
+func newDeploymentMutator(deployment, mutated *appsv1.Deployment, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
 	return func() error {
-		mutated = mergeDeployments(deployment, mutated)
+		mutated = mergeDeployments(gcc, deployment, mutated)
 		return ctrl.SetControllerReference(&gateway, mutated, scheme)
 	}
+}
+
+func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32) *int32 {
+	instanceValue := defaultInstances
+
+	//if currentReplicas is not nil use current value when building deployment
+	if currentReplicas != nil {
+		instanceValue = *currentReplicas
+	} else if gcc.Spec.DeploymentSpec.DefaultInstances != nil {
+		// otherwise use the default value on the GatewayClassConfig if set
+		instanceValue = *gcc.Spec.DeploymentSpec.DefaultInstances
+	}
+
+	if gcc.Spec.DeploymentSpec.MaxInstances != nil {
+
+		//check if over maximum and lower to maximum
+		maxValue := *gcc.Spec.DeploymentSpec.MaxInstances
+		if instanceValue > maxValue {
+			instanceValue = maxValue
+		}
+	}
+
+	if gcc.Spec.DeploymentSpec.MinInstances != nil {
+		//check if less than minimum and raise to minimum
+		minValue := *gcc.Spec.DeploymentSpec.MinInstances
+		if instanceValue < minValue {
+			instanceValue = minValue
+		}
+
+	}
+	return &instanceValue
 }

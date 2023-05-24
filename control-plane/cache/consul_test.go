@@ -1435,7 +1435,7 @@ func TestCache_Write(t *testing.T) {
 				Status:    api.ConfigEntryStatus{},
 			}
 
-			err = c.Write(entry)
+			err = c.Write(context.Background(), entry)
 			require.Equal(t, err, tt.expectedErr)
 		})
 	}

@@ -57,11 +57,17 @@ func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[ty
 
 // validateGateway validates that a gateway is semantically valid given
 // the set of features that we support.
-func validateGateway(gateway gwv1beta1.Gateway) gatewayValidationResult {
+func validateGateway(gateway gwv1beta1.Gateway, pods []corev1.Pod, consulGateway *api.APIGatewayConfigEntry) gatewayValidationResult {
 	var result gatewayValidationResult
 
 	if len(gateway.Spec.Addresses) > 0 {
 		result.acceptedErr = errGatewayUnsupportedAddress
+	}
+
+	if len(pods) == 0 {
+		result.programmedErr = errGatewayPending_Pods
+	} else if consulGateway == nil {
+		result.programmedErr = errGatewayPending_Consul
 	}
 
 	return result

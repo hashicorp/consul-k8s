@@ -62,9 +62,14 @@ rules:
   - update
 {{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [ "" ]
-  resources: [ "serviceaccounts", "secrets" ]
+  resources: [ "secrets", "serviceaccounts" ]
   verbs:
   - get
+  - list
+  - watch
+  - delete
+  - create
+  - update
 {{- end }}
 - apiGroups: [ "" ]
   resources: [ "endpoints", "services", "namespaces", "nodes" ]
@@ -72,6 +77,7 @@ rules:
   - "get"
   - "list"
   - "watch"
+  - "delete"
 - apiGroups: [ "" ]
   resources:
   - pods

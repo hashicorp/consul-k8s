@@ -148,7 +148,7 @@ func TestValidateGateway(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tt.expected, validateGateway(tt.object).acceptedErr)
+			require.Equal(t, tt.expected, validateGateway(tt.object, nil, nil).acceptedErr)
 		})
 	}
 }

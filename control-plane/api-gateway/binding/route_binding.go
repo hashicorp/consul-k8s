@@ -419,7 +419,7 @@ func parentsForRoute(ref api.ResourceReference, existing []api.ResourceReference
 	parentSet := map[string]struct{}{}
 	for _, result := range results {
 		for _, r := range result.results {
-			if r.err != nil {
+			if r.err == nil {
 				parentSet[string(r.section)] = struct{}{}
 			}
 		}

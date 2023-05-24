@@ -5,9 +5,10 @@ package controllers
 
 import (
 	"context"
-	"fmt"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/gatekeeper"
 	"reflect"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/gatekeeper"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -112,6 +113,27 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// fetch related gateway pods
+	labels := apigateway.LabelsForGateway(&gw)
+	podList := &corev1.PodList{}
+	if err := r.Client.List(ctx, podList, client.MatchingLabels(labels)); err != nil {
+		log.Error(err, "unable to list Pods for Gateway")
+		return ctrl.Result{}, err
+	}
+
+	// fetch related gateway services
+	service := &corev1.Service{}
+	// we use the implicit association of a service name/namespace with a corresponding
+	// gateway
+	if err := r.Client.Get(ctx, req.NamespacedName, service); err != nil {
+		if !k8serrors.IsNotFound(err) {
+			log.Error(err, "unable to fetch service for Gateway")
+			return ctrl.Result{}, err
+		}
+		// if we got a 404, then nil out the service
+		service = nil
+	}
+
 	gwList := &gwv1beta1.GatewayList{}
 	if err := r.Client.List(ctx, gwList); err != nil {
 		log.Error(err, "unable to list Gateways")
@@ -171,6 +193,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	configEntry := r.cache.Get(r.Translator.ReferenceForGateway(&gw))
+
+	var consulGateway *api.APIGatewayConfigEntry
+	if configEntry != nil {
+		consulGateway = configEntry.(*api.APIGatewayConfigEntry)
+	}
 	httpRoutes := r.cache.List(api.HTTPRoute)
 	tcpRoutes := r.cache.List(api.TCPRoute)
 	inlineCertificates := r.cache.List(api.InlineCertificate)
@@ -182,20 +210,22 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		GatewayClassConfig:       gwcc,
 		GatewayClass:             gwc,
 		Gateway:                  gw,
+		Pods:                     podList.Items,
+		Service:                  service,
 		HTTPRoutes:               httpRouteList.Items,
 		TCPRoutes:                tcpRouteList.Items,
 		Secrets:                  filteredSecrets,
+		ConsulGateway:            consulGateway,
 		ConsulHTTPRoutes:         derefAll(configEntriesTo[*api.HTTPRouteConfigEntry](httpRoutes)),
 		ConsulTCPRoutes:          derefAll(configEntriesTo[*api.TCPRouteConfigEntry](tcpRoutes)),
 		ConsulInlineCertificates: derefAll(configEntriesTo[*api.InlineCertificateConfigEntry](inlineCertificates)),
 		ConnectInjectedServices:  services,
+		GatewayServices:          consulServicesForGateway(gw, services),
 		Namespaces:               namespaces,
 		ControlledGateways:       controlled,
 	})
 
 	updates := binder.Snapshot()
-
-	fmt.Println("--------------------------------------\n", updates)
 
 	if updates.UpsertGatewayDeployment {
 		log.Info("updating gatekeeper")
@@ -215,12 +245,34 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, deletion := range updates.Consul.Deletions {
 		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
-		// TODO: the actual delete
+		if err := r.cache.Delete(ctx, deletion); err != nil {
+			log.Error(err, "error deleting config entry")
+			return ctrl.Result{}, err
+		}
 	}
 
 	for _, update := range updates.Consul.Updates {
 		log.Info("updating in Consul", "kind", update.GetKind(), "namespace", update.GetNamespace(), "name", update.GetName())
-		// TODO: the actual update
+		if err := r.cache.Write(ctx, update); err != nil {
+			log.Error(err, "error updating config entry")
+			return ctrl.Result{}, err
+		}
+	}
+
+	for _, registration := range updates.Consul.Registrations {
+		log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
+		if err := r.cache.Register(ctx, registration); err != nil {
+			log.Error(err, "error registering service")
+			return ctrl.Result{}, err
+		}
+	}
+
+	for _, deregistration := range updates.Consul.Deregistrations {
+		log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
+		if err := r.cache.Deregister(ctx, deregistration); err != nil {
+			log.Error(err, "error deregistering service")
+			return ctrl.Result{}, err
+		}
 	}
 
 	for _, update := range updates.Kubernetes.Updates {
@@ -239,15 +291,19 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	// link up policy - TODO: this is really a nasty hack to inject a known policy with
+	// mesh == read on the provisioned gateway token if needed, figure out some other
+	// way of handling it.
+	if updates.UpsertGatewayDeployment {
+		reference := r.Translator.ReferenceForGateway(&gw)
+		if err := r.cache.LinkPolicy(ctx, reference.Name, reference.Namespace); err != nil {
+			log.Error(err, "error linking token policy")
+			return ctrl.Result{}, err
+		}
+	}
+
 	/* TODO:
-	1.Pull in the deployments that have been created through Gatekeeper previously to check their statuses.
-		Leverage health-checking.
-			OG impl: Any state change for the deployment/pods we subscribe to and set statuses on the gateway.
-			Do a health check on the service.
-	2.ReferenceGrants
-	  Error out if someone uses an unsupported feature:
-			- TLS mode type pass through
-	3. Run Gatekeeper Upsert with the GW, GWCC, HelmConfig.
+	1.ReferenceGrants
 	*/
 
 	return ctrl.Result{}, nil
@@ -318,9 +374,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	translator := translation.NewConsulToNamespaceNameTranslator(c)
 
 	r := &GatewayController{
-		Client: mgr.GetClient(),
-		cache:  c,
-		Log:    mgr.GetLogger(),
+		Client:     mgr.GetClient(),
+		cache:      c,
+		Log:        mgr.GetLogger(),
+		HelmConfig: config.HelmConfig,
 	}
 
 	return c, ctrl.NewControllerManagedBy(mgr).
@@ -399,12 +456,12 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		).
 		Watches(
 			// Subscribe to changes from Consul for HTTPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulHTTPRouteTranslator(ctx)).Events()},
+			&source.Channel{Source: c.Subscribe(ctx, api.HTTPRoute, translator.BuildConsulHTTPRouteTranslator(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
 			// Subscribe to changes from Consul for TCPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, translator.BuildConsulTCPRouteTranslator(ctx)).Events()},
+			&source.Channel{Source: c.Subscribe(ctx, api.TCPRoute, translator.BuildConsulTCPRouteTranslator(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
@@ -415,13 +472,9 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 }
 
 func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
-	var (
-		metaKeyKubeNS          = "k8s-namespace"
-		metaKeyKubeServiceName = "k8s-service-name"
-	)
 	return types.NamespacedName{
-		Namespace: s.ServiceMeta[metaKeyKubeNS],
-		Name:      s.ServiceMeta[metaKeyKubeServiceName],
+		Namespace: s.ServiceMeta[constants.MetaKeyKubeNS],
+		Name:      s.ServiceMeta[constants.MetaKeyKubeServiceName],
 	}
 }
 
@@ -627,4 +680,15 @@ func getConfigForGatewayClass(ctx context.Context, client client.Client, gwc *gw
 		}
 	}
 	return config, nil
+}
+
+func consulServicesForGateway(gateway gwv1beta1.Gateway, services []api.CatalogService) []api.CatalogService {
+	filtered := []api.CatalogService{}
+	for _, service := range services {
+		kubeService := serviceToNamespacedName(&service)
+		if gateway.Name == kubeService.Name && gateway.Namespace == kubeService.Namespace {
+			filtered = append(filtered, service)
+		}
+	}
+	return filtered
 }

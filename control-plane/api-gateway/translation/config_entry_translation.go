@@ -34,6 +34,10 @@ const (
 	AnnotationInlineCertificate = "consul.hashicorp.com/inline-certificate"
 )
 
+func translateListenerProtocol[T ~string](protocol T) string {
+	return strings.ToLower(string(protocol))
+}
+
 // K8sToConsulTranslator handles translating K8s resources into Consul config entries.
 type K8sToConsulTranslator struct {
 	EnableConsulNamespaces bool
@@ -79,7 +83,7 @@ func (t K8sToConsulTranslator) GatewayToAPIGateway(k8sGW gwv1beta1.Gateway, cert
 			Name:     string(listener.Name),
 			Hostname: hostname,
 			Port:     int(listener.Port),
-			Protocol: string(listener.Protocol),
+			Protocol: translateListenerProtocol(listener.Protocol),
 			TLS: capi.APIGatewayTLSConfiguration{
 				Certificates: certificates,
 			},

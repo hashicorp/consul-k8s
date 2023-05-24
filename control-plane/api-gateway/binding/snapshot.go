@@ -30,6 +30,12 @@ type ConsulSnapshot struct {
 	// Deletions is a list of references that ought to be
 	// deleted in Consul
 	Deletions []api.ResourceReference
+	// Registrations is a list of Consul services to make sure
+	// are registered in Consul
+	Registrations []api.CatalogRegistration
+	// Deregistrations is a list of Consul services to make sure
+	// are no longer registered in Consul
+	Deregistrations []api.CatalogDeregistration
 }
 
 // Snapshot contains all Kubernetes and Consul operations

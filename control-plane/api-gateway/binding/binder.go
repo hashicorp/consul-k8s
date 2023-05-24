@@ -74,10 +74,16 @@ type BinderConfig struct {
 	TCPRoutes []gwv1alpha2.TCPRoute
 	// Secrets is a list of Secret objects that a Gateway references.
 	Secrets []corev1.Secret
+	// Pods are any pods that are part of the Gateway deployment
+	Pods []corev1.Pod
+	// Service is the service associated with a Gateway deployment
+	Service *corev1.Service
 
 	// TODO: Do we need to pass in Routes that have references to a Gateway in their statuses
 	// for cleanup purposes or is the below enough for record keeping?
 
+	// ConsulGateway is the config entry we've created in Consul.
+	ConsulGateway *api.APIGatewayConfigEntry
 	// ConsulHTTPRoutes are a list of HTTPRouteConfigEntry objects that currently reference the
 	// Gateway we've created in Consul.
 	ConsulHTTPRoutes []api.HTTPRouteConfigEntry
@@ -89,6 +95,8 @@ type BinderConfig struct {
 	// ConnectInjectedServices is a list of all services that have been injected by our connect-injector
 	// and that we can, therefore reference on the mesh.
 	ConnectInjectedServices []api.CatalogService
+	// GatewayServices are the consul services for a given gateway
+	GatewayServices []api.CatalogService
 
 	// Namespaces is a map of all namespaces in Kubernetes indexed by their names for looking up labels
 	// for AllowedRoutes matching purposes.
@@ -219,9 +227,37 @@ func (b *Binder) Snapshot() Snapshot {
 		entry := b.config.Translator.GatewayToAPIGateway(b.config.Gateway, seenCerts)
 		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &entry)
 
+		registrationPods := []corev1.Pod{}
+		// filter out any pod that is being deleted
+		for _, pod := range b.config.Pods {
+			if !isDeleted(&pod) {
+				registrationPods = append(registrationPods, pod)
+			}
+		}
+		registrations := registrationsForPods(entry.Namespace, b.config.Gateway, registrationPods)
+		snapshot.Consul.Registrations = registrations
+
+		// deregister any not explicitly registered service
+		for _, service := range b.config.GatewayServices {
+			found := false
+			for _, registration := range registrations {
+				if service.ServiceID == registration.Service.ID {
+					found = true
+				}
+			}
+			if !found {
+				// we didn't register the service instance, so drop it
+				snapshot.Consul.Deregistrations = append(snapshot.Consul.Deregistrations, api.CatalogDeregistration{
+					Node:      service.Node,
+					ServiceID: service.ServiceID,
+					Namespace: service.Namespace,
+				})
+			}
+		}
+
 		// calculate the status for the gateway
 		var status gwv1beta1.GatewayStatus
-		gatewayValidation := validateGateway(b.config.Gateway)
+		gatewayValidation := validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
 		listenerValidation := validateListeners(b.config.Gateway.Namespace, b.config.Gateway.Spec.Listeners, b.config.Secrets)
 		for i, listener := range b.config.Gateway.Spec.Listeners {
 			status.Listeners = append(status.Listeners, gwv1beta1.ListenerStatus{
@@ -231,9 +267,8 @@ func (b *Binder) Snapshot() Snapshot {
 				Conditions:     listenerValidation.Conditions(b.config.Gateway.Generation, i),
 			})
 		}
-		// TODO: addresses
 		status.Conditions = gatewayValidation.Conditions(b.config.Gateway.Generation, listenerValidation.Invalid())
-		status.Addresses = []gwv1beta1.GatewayAddress{}
+		status.Addresses = addressesForGateway(b.config.Service, registrationPods)
 
 		// only mark the gateway as needing a status update if there's a diff with its old
 		// status, this keeps the controller from infinitely reconciling
@@ -246,7 +281,16 @@ func (b *Binder) Snapshot() Snapshot {
 		}
 	} else {
 		// if the gateway has been deleted, unset whatever we've set on it
-		snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, b.gatewayRef())
+		ref := b.gatewayRef()
+		snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, ref)
+		for _, service := range b.config.GatewayServices {
+			// deregister all gateways
+			snapshot.Consul.Deregistrations = append(snapshot.Consul.Deregistrations, api.CatalogDeregistration{
+				Node:      service.Node,
+				ServiceID: service.ServiceID,
+				Namespace: service.Namespace,
+			})
+		}
 		if removeFinalizer(&b.config.Gateway) {
 			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, &b.config.Gateway)
 		}
@@ -276,4 +320,100 @@ func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
 		Namespace: s.ServiceMeta[metaKeyKubeNS],
 		Name:      s.ServiceMeta[metaKeyKubeServiceName],
 	}
+}
+
+func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1beta1.GatewayAddress {
+	if service == nil {
+		return addressesFromPods(pods)
+	}
+
+	switch service.Spec.Type {
+	case corev1.ServiceTypeLoadBalancer:
+		return addressesFromLoadBalancer(service)
+	case corev1.ServiceTypeClusterIP:
+		return addressesFromClusterIP(service)
+	case corev1.ServiceTypeNodePort:
+		/* For serviceType: NodePort, there isn't a consistent way to guarantee access to the
+		 * service from outside the k8s cluster. For now, we're putting the IP address of the
+		 * nodes that the gateway pods are running on.
+		 * The practitioner will have to understand that they may need to port forward into the
+		 * cluster (in the case of Kind) or open firewall rules (in the case of GKE) in order to
+		 * access the gateway from outside the cluster.
+		 */
+		return addressesFromPodHosts(pods)
+	}
+
+	return []gwv1beta1.GatewayAddress{}
+}
+
+func addressesFromLoadBalancer(service *corev1.Service) []gwv1beta1.GatewayAddress {
+	addresses := []gwv1beta1.GatewayAddress{}
+
+	for _, ingress := range service.Status.LoadBalancer.Ingress {
+		if ingress.IP != "" {
+			addresses = append(addresses, gwv1beta1.GatewayAddress{
+				Type:  pointerTo(gwv1beta1.IPAddressType),
+				Value: ingress.IP,
+			})
+		}
+		if ingress.Hostname != "" {
+			addresses = append(addresses, gwv1beta1.GatewayAddress{
+				Type:  pointerTo(gwv1beta1.HostnameAddressType),
+				Value: ingress.Hostname,
+			})
+		}
+	}
+
+	return addresses
+}
+
+func addressesFromClusterIP(service *corev1.Service) []gwv1beta1.GatewayAddress {
+	addresses := []gwv1beta1.GatewayAddress{}
+
+	if service.Spec.ClusterIP != "" {
+		addresses = append(addresses, gwv1beta1.GatewayAddress{
+			Type:  pointerTo(gwv1beta1.IPAddressType),
+			Value: service.Spec.ClusterIP,
+		})
+	}
+
+	return addresses
+}
+
+func addressesFromPods(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
+	addresses := []gwv1beta1.GatewayAddress{}
+	seenIPs := make(map[string]struct{})
+
+	for _, pod := range pods {
+		if pod.Status.PodIP != "" {
+			if _, found := seenIPs[pod.Status.PodIP]; !found {
+				addresses = append(addresses, gwv1beta1.GatewayAddress{
+					Type:  pointerTo(gwv1beta1.IPAddressType),
+					Value: pod.Status.PodIP,
+				})
+				seenIPs[pod.Status.PodIP] = struct{}{}
+			}
+		}
+	}
+
+	return addresses
+}
+
+func addressesFromPodHosts(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
+	addresses := []gwv1beta1.GatewayAddress{}
+	seenIPs := make(map[string]struct{})
+
+	for _, pod := range pods {
+		if pod.Status.HostIP != "" {
+			if _, found := seenIPs[pod.Status.HostIP]; !found {
+				addresses = append(addresses, gwv1beta1.GatewayAddress{
+					Type:  pointerTo(gwv1beta1.IPAddressType),
+					Value: pod.Status.HostIP,
+				})
+				seenIPs[pod.Status.HostIP] = struct{}{}
+			}
+		}
+	}
+
+	return addresses
 }

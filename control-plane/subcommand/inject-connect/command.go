@@ -483,7 +483,26 @@ func (c *Command) Run(args []string) int {
 
 	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: apigateway.HelmConfig{
-			// TODO pass in the Helm Config here.
+			ConsulConfig: apigateway.ConsulConfig{
+				Address:    c.consul.Addresses,
+				GRPCPort:   consulConfig.GRPCPort,
+				HTTPPort:   consulConfig.HTTPPort,
+				APITimeout: consulConfig.APITimeout,
+			},
+			ImageDataplane:             c.flagConsulDataplaneImage,
+			ImageConsulK8S:             c.flagConsulK8sImage,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			NamespaceMirroringPrefix:   c.flagK8SNSMirroringPrefix,
+			EnableNamespaces:           c.flagEnableNamespaces,
+			EnableOpenShift:            c.flagEnableOpenShift,
+			EnableNamespaceMirroring:   c.flagEnableK8SNSMirroring,
+			AuthMethod:                 c.flagACLAuthMethod,
+			LogLevel:                   c.flagLogLevel,
+			LogJSON:                    c.flagLogJSON,
+			TLSEnabled:                 c.consul.UseTLS,
+			ConsulTLSServerName:        c.consul.TLSServerName,
+			ConsulPartition:            c.consul.Partition,
+			ConsulCACert:               string(caCertPem),
 		},
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,

@@ -83,9 +83,9 @@ func (g Gatekeeper) namespacedName(gateway gwv1beta1.Gateway) types.NamespacedNa
 	}
 }
 
-func (g Gatekeeper) serviceAccountName() string {
-	authspecaccount := "" // TODO do I need to add this to GatewayClassConfig?
-	fmt.Println(authspecaccount)
-
-	return ""
+func (g Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config apigateway.HelmConfig) string {
+	if config.AuthMethod == "" {
+		return ""
+	}
+	return gateway.Name
 }
