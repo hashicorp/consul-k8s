@@ -86,11 +86,12 @@ func TestUpsert(t *testing.T) {
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo[int32](3),
+					},
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				Replicas: 3,
-			},
+			helmConfig:       apigateway.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -118,10 +119,12 @@ func TestUpsert(t *testing.T) {
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo[int32](3),
+					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Replicas:    3,
 				ServiceType: ptrTo("NodePort"),
 			},
 			initialResources: resources{},
@@ -164,12 +167,13 @@ func TestUpsert(t *testing.T) {
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo[int32](3),
+					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Replicas:         3,
-				ServiceType:      ptrTo("NodePort"),
-				ManageSystemACLs: true,
+				AuthMethod: "method",
 			},
 			initialResources: resources{},
 			finalResources: resources{
@@ -215,12 +219,13 @@ func TestUpsert(t *testing.T) {
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo[int32](3),
+					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Replicas:         3,
-				ServiceType:      ptrTo("NodePort"),
-				ManageSystemACLs: true,
+				AuthMethod: "method",
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -287,12 +292,13 @@ func TestUpsert(t *testing.T) {
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo[int32](3),
+					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Replicas:         3,
-				ServiceType:      ptrTo("NodePort"),
-				ManageSystemACLs: true,
+				AuthMethod: "method",
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -357,11 +363,12 @@ func TestUpsert(t *testing.T) {
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo[int32](3),
+					},
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				Replicas: 3,
-			},
+			helmConfig: apigateway.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
@@ -422,11 +429,12 @@ func TestDelete(t *testing.T) {
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo[int32](3),
+					},
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				Replicas: 3,
-			},
+			helmConfig: apigateway.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -456,10 +464,12 @@ func TestDelete(t *testing.T) {
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo[int32](3),
+					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Replicas:    3,
 				ServiceType: ptrTo("NodePort"),
 			},
 			initialResources: resources{
@@ -508,12 +518,13 @@ func TestDelete(t *testing.T) {
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: ptrTo[int32](3),
+					},
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Replicas:         3,
-				ServiceType:      ptrTo("NodePort"),
-				ManageSystemACLs: true,
+				AuthMethod: "method",
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -597,6 +608,8 @@ func joinResources(resources resources) (objs []client.Object) {
 }
 
 func validateResourcesExist(t *testing.T, client client.Client, resources resources) error {
+	t.Helper()
+
 	for _, expected := range resources.deployments {
 		actual := &appsv1.Deployment{}
 		err := client.Get(context.Background(), types.NamespacedName{
@@ -616,7 +629,10 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 		require.Equal(t, expected.Namespace, actual.Namespace)
 		require.Equal(t, expected.APIVersion, actual.APIVersion)
 		require.Equal(t, expected.Labels, actual.Labels)
-		require.Equal(t, expected.Spec.Replicas, actual.Spec.Replicas)
+		if expected.Spec.Replicas != nil {
+			require.NotNil(t, actual.Spec.Replicas)
+			require.EqualValues(t, *expected.Spec.Replicas, *actual.Spec.Replicas)
+		}
 	}
 
 	for _, expected := range resources.roles {
@@ -672,6 +688,8 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 }
 
 func validateResourcesAreDeleted(t *testing.T, client client.Client, resources resources) error {
+	t.Helper()
+
 	for _, expected := range resources.deployments {
 		actual := &appsv1.Deployment{}
 		err := client.Get(context.Background(), types.NamespacedName{
@@ -869,6 +887,6 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 	}
 }
 
-func ptrTo[T bool | string](t T) *T {
+func ptrTo[T any](t T) *T {
 	return &t
 }

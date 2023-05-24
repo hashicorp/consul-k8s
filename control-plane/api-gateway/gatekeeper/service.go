@@ -5,8 +5,8 @@ package gatekeeper
 
 import (
 	"context"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
@@ -27,8 +27,8 @@ var (
 )
 
 func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
-	if config.ServiceType == nil {
-		return nil
+	if gcc.Spec.ServiceType == nil {
+		return g.deleteService(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
 	service := g.service(gateway, gcc)
@@ -54,7 +54,7 @@ func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gatewa
 }
 
 func (g *Gatekeeper) deleteService(ctx context.Context, nsname types.NamespacedName) error {
-	if err := g.Client.Delete(ctx, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
+	if err := g.Client.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}

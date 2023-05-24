@@ -5,7 +5,6 @@ package cache
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -27,8 +26,6 @@ const (
 	namespaceWildcard = "*"
 	apiTimeout        = 5 * time.Minute
 )
-
-var ErrStaleEntry = errors.New("entry is stale")
 
 var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate}
 
@@ -574,13 +571,9 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 		options.Partition = c.partition
 	}
 
-	updated, _, err := client.ConfigEntries().Set(entry, options.WithContext(ctx))
+	_, _, err = client.ConfigEntries().Set(entry, options.WithContext(ctx))
 	if err != nil {
 		return err
-	}
-
-	if !updated {
-		return ErrStaleEntry
 	}
 
 	return nil

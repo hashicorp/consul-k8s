@@ -1308,14 +1308,6 @@ func TestCache_Write(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		{
-			name: "stale entry",
-			responseFn: func(w http.ResponseWriter) {
-				w.WriteHeader(200)
-				fmt.Fprintln(w, `{updated: false}`)
-			},
-			expectedErr: ErrStaleEntry,
-		},
 	}
 
 	for _, tt := range testCases {
