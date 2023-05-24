@@ -1311,7 +1311,7 @@ func TestCache_Write(t *testing.T) {
 				w.WriteHeader(200)
 				fmt.Fprintln(w, `{updated: false}`)
 			},
-			expectedErr: ErrStaleEntry,
+			expectedErr: ErrDidNotSet,
 		},
 	}
 
