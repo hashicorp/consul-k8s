@@ -1960,9 +1960,6 @@ connectInject:
   apiGateway:
     # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
     managedGatewayClass:
-      # When true a GatewayClass is configured to automatically work with Consul as installed by helm.
-      enabled: true
-
       # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
       # labels for gateway pod assignment, formatted as a multi-line string.
       #
@@ -2003,7 +2000,7 @@ connectInject:
 
       # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
       deployment: 
-        replicas: 1
+        defaultInstances: 1
         maxInstances: 1
         minInstances: 1
 

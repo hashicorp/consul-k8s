@@ -19,18 +19,9 @@ load _helpers
       .
 }
 
-@test "apiGateway/GatewayClassConfig: disabled with connectInject.apiGateway.managedGatewayClass.enabled" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/gateway-gatewayclassconfig.yaml  \
-      --set 'connectInject.apiGateway.managedGatewayClass.enabled=false' \
-      .
-}
-
-
 #--------------------------------------------------------------------
-# Fallback configuration
-# To be removed in 1.17 (t-eckert 2023-05-23)
+# fallback configuration
+# to be removed in 1.17 (t-eckert 2023-05-23)
 
 @test "apiGateway/GatewayClassConfig: fallback configuration is used when apiGateway.enabled is true" {
   cd `chart_dir`
@@ -63,9 +54,29 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# Configuration
+# configuration
 
-@test "apiGateway/GatewayClassConfig: configuration of managedGatewayClass" {
+@test "apiGateway/GatewayClassConfig: default configuration" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s templates/gateway-gatewayclassconfig.yaml  \
+      . | tee /dev/stderr |
+      yq '.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" |
+    jq -r '.deployment.defaultInstances')
+  [ "${actual}" = 1 ]
+
+  local actual=$(echo "$spec" |
+    jq -r '.deployment.maxInstances')
+  [ "${actual}" = 1 ]
+
+  local actual=$(echo "$spec" |
+    jq -r '.deployment.minInstances')
+  [ "${actual}" = 1 ]
+}
+
+@test "apigateway/gatewayclassconfig: custom configuration" {
   cd `chart_dir`
   local spec=$(helm template \
       -s templates/gateway-gatewayclassconfig.yaml  \
@@ -75,6 +86,18 @@ load _helpers
       --set 'connectInject.apiGateway.managedGatewayClass.serviceType=LoadBalancer' \
       . | tee /dev/stderr |
       yq '.spec' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" |
+    jq -r '.deployment.defaultInstances')
+  [ "${actual}" = "1" ]
+
+  local actual=$(echo "$spec" |
+    jq -r '.deployment.maxInstances')
+  [ "${actual}" = "1" ]
+
+  local actual=$(echo "$spec" |
+    jq -r '.deployment.minInstances')
+  [ "${actual}" = "1" ]
 
   local actual=$(echo "$spec" |
     jq -r '.nodeSelector.foo')
