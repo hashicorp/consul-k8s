@@ -86,6 +86,10 @@ spec:
                   pod to fit on a node. Selector which must match a node''s labels
                   for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
                 type: object
+              podSecurityPolicy:
+                description: The name of an existing Kubernetes PodSecurityPolicy
+                  to bind to the managed ServiceAccount if ACLs are managed.
+                type: string
               serviceType:
                 description: Service Type string describes ingress methods for a service
                 enum:

@@ -53,6 +53,9 @@ type GatewayClassConfigSpec struct {
 
 	// Annotation Information to copy to services or deployments
 	CopyAnnotations CopyAnnotationsSpec `json:"copyAnnotations,omitempty"`
+
+	// The name of an existing Kubernetes PodSecurityPolicy to bind to the managed ServiceAccount if ACLs are managed.
+	PodSecurityPolicy string `json:"podSecurityPolicy,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true

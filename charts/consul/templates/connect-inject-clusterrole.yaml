@@ -60,9 +60,16 @@ rules:
   - get
   - patch
   - update
-{{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [ "" ]
-  resources: [ "secrets", "serviceaccounts" ]
+  resources: [ "secrets", "serviceaccounts", "endpoints", "services", "namespaces", "nodes" ]
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+- apiGroups: [ "rbac.authorization.k8s.io" ]
+  resources: [ "roles" ]
   verbs:
   - get
   - list
@@ -70,14 +77,6 @@ rules:
   - delete
   - create
   - update
-{{- end }}
-- apiGroups: [ "" ]
-  resources: [ "endpoints", "services", "namespaces", "nodes" ]
-  verbs:
-  - "get"
-  - "list"
-  - "watch"
-  - "delete"
 - apiGroups: [ "" ]
   resources:
   - pods
@@ -117,14 +116,10 @@ rules:
   - "update"
   - "delete"
 {{- end }}
-{{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: [ "policy" ]
   resources: [ "podsecuritypolicies" ]
-  resourceNames:
-  - {{ template "consul.fullname" . }}-connect-injector
   verbs:
   - use
-{{- end }}
 - apiGroups:
   - gateway.networking.k8s.io
   resources:

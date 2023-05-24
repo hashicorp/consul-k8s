@@ -430,9 +430,7 @@ func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind strin
 }
 
 func (c *Cache) updateAndNotifyServices(ctx context.Context, once *sync.Once, services []*api.CatalogService) {
-	fmt.Println("getting lock", "services")
 	c.cacheMutex.Lock()
-	fmt.Println("got lock", "services")
 
 	cache := make(serviceCache)
 
@@ -451,7 +449,6 @@ func (c *Cache) updateAndNotifyServices(ctx context.Context, once *sync.Once, se
 	})
 
 	c.cacheMutex.Unlock()
-	fmt.Println("releasing lock", "services")
 
 	// now notify all subscribers
 	c.notifyServiceSubscribers(ctx, diffs)
@@ -684,7 +681,7 @@ func (c *Cache) LinkPolicy(ctx context.Context, name, namespace string) error {
 
 	tokens, _, err := client.ACL().TokenList(options.WithContext(ctx))
 	if err != nil {
-		return err
+		return ignoreACLsDisabled(err)
 	}
 
 	for _, token := range tokens {
@@ -692,12 +689,14 @@ func (c *Cache) LinkPolicy(ctx context.Context, name, namespace string) error {
 			if identity.ServiceName == name {
 				token, _, err := client.ACL().TokenRead(token.AccessorID, options.WithContext(ctx))
 				if err != nil {
-					return err
+					return ignoreACLsDisabled(err)
 				}
 				token.Policies = links
 
 				_, _, err = client.ACL().TokenUpdate(token, &api.WriteOptions{})
-				return err
+				if err != nil {
+					return ignoreACLsDisabled(err)
+				}
 			}
 		}
 	}
@@ -768,4 +767,11 @@ func isPolicyExistsErr(err error, policyName string) bool {
 	return err != nil &&
 		strings.Contains(err.Error(), "Unexpected response code: 500") &&
 		strings.Contains(err.Error(), fmt.Sprintf("Invalid Policy: A Policy with Name %q already exists", policyName))
+}
+
+func ignoreACLsDisabled(err error) error {
+	if err.Error() == "Unexpected response code: 401 (ACL support disabled)" {
+		return nil
+	}
+	return err
 }
