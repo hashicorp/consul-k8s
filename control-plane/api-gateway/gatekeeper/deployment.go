@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package gatekeeper
 
 import (
@@ -69,13 +72,12 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context) error {
 func (g *Gatekeeper) deployment() *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        g.Gateway.Name,
-			Namespace:   g.Gateway.Namespace,
-			Labels:      apigateway.LabelsForGateway(&g.Gateway),
-			Annotations: g.HelmConfig.CopyAnnotations,
+			Name:      g.Gateway.Name,
+			Namespace: g.Gateway.Namespace,
+			Labels:    apigateway.LabelsForGateway(&g.Gateway),
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &g.HelmConfig.Replicas,
+			Replicas: g.GatewayClassConfig.Spec.DeploymentSpec.DefaultInstances,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: apigateway.LabelsForGateway(&g.Gateway),
 			},
@@ -90,6 +92,7 @@ func (g *Gatekeeper) deployment() *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Image: g.HelmConfig.Image,
+							Name:  "consul-dataplane",
 						},
 					},
 					Affinity: &corev1.Affinity{
@@ -107,7 +110,7 @@ func (g *Gatekeeper) deployment() *appsv1.Deployment {
 							},
 						},
 					},
-					NodeSelector:       g.GatewayClassConfig.Spec.NodeSelector, // TODO should I grab this from here or Helm?
+					NodeSelector:       g.GatewayClassConfig.Spec.NodeSelector,
 					Tolerations:        g.GatewayClassConfig.Spec.Tolerations,
 					ServiceAccountName: g.serviceAccountName(),
 				},

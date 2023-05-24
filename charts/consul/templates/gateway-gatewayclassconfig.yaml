@@ -1,0 +1,74 @@
+{{- if .Values.connectInject.enabled }}
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: GatewayClassConfig 
+metadata:
+  name: consul-api-gateway
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: api-gateway
+spec:
+  {{- if .Values.apiGateway.enabled }} # Overide values from the old stanza. To be removed in 1.17 (t-eckert 2023-05-19)
+
+  {{- if .Values.apiGateway.managedGatewayClass.deployment }}
+  deployment:
+    {{- if .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+    defaultInstances: {{ .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+    {{- end}}
+    {{- if .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
+    maxInstances: {{ .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
+    {{- end}}
+    {{- if .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
+    minInstances: {{ .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
+    {{- end}}
+  {{- end}}
+  {{- if .Values.apiGateway.managedGatewayClass.nodeSelector }}
+  nodeSelector:
+    {{ tpl .Values.apiGateway.managedGatewayClass.nodeSelector . | indent 4 | trim }}
+  {{- end }}
+  {{- if .Values.apiGateway.managedGatewayClass.tolerations }}
+  tolerations:
+    {{ tpl .Values.apiGateway.managedGatewayClass.tolerations . | indent 4 | trim }}
+  {{- end }}
+  {{- if .Values.apiGateway.managedGatewayClass.copyAnnotations.service }}
+  copyAnnotations:
+    service: 
+      {{ tpl .Values.apiGateway.managedGatewayClass.copyAnnotations.service.annotations . | nindent 6 | trim }}
+  {{- end }}
+  serviceType: {{ .Values.apiGateway.managedGatewayClass.serviceType }}
+
+  {{- else }}
+
+  {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment }}
+  deployment:
+    {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+    defaultInstances: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+    {{- end}}
+    {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
+    maxInstances: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
+    {{- end}}
+    {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
+    minInstances: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
+    {{- end}}
+  {{- end}}
+  {{- if .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
+  nodeSelector:
+    {{ tpl .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector . | indent 4 | trim }}
+  {{- end }}
+  {{- if .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
+  tolerations:
+    {{ tpl .Values.connectInject.apiGateway.managedGatewayClass.tolerations . | indent 4 | trim }}
+  {{- end }}
+  {{- if .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
+  copyAnnotations:
+    service: 
+      {{ tpl .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations . | nindent 6 | trim }}
+  {{- end }}
+  serviceType: {{ .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
+
+  {{- end }}
+
+{{- end }}

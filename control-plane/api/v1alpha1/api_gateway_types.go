@@ -36,6 +36,9 @@ type GatewayClassConfig struct {
 
 // GatewayClassConfigSpec specifies the desired state of the Config CRD.
 type GatewayClassConfigSpec struct {
+	// Deployment defines the deployment configuration for the gateway.
+	DeploymentSpec DeploymentSpec `json:"deployment,omitempty"`
+
 	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
 	ServiceType *corev1.ServiceType `json:"serviceType,omitempty"`
 
@@ -50,6 +53,26 @@ type GatewayClassConfigSpec struct {
 
 	// Annotation Information to copy to services or deployments
 	CopyAnnotations CopyAnnotationsSpec `json:"copyAnnotations,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+type DeploymentSpec struct {
+	// +kubebuilder:default:=1
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=1
+	// Number of gateway instances that should be deployed by default
+	DefaultInstances *int32 `json:"defaultInstances,omitempty"`
+	// +kubebuilder:default:=8
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=1
+	// Max allowed number of gateway instances
+	MaxInstances *int32 `json:"maxInstances,omitempty"`
+	// +kubebuilder:default:=1
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=1
+	// Minimum allowed number of gateway instances
+	MinInstances *int32 `json:"minInstances,omitempty"`
 }
 
 //+kubebuilder:object:generate=true

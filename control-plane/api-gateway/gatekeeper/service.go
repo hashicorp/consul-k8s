@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package gatekeeper
 
 import (
@@ -21,7 +24,7 @@ var (
 )
 
 func (g *Gatekeeper) upsertService(ctx context.Context) error {
-	if g.HelmConfig.ServiceType == nil {
+	if g.GatewayClassConfig.Spec.ServiceType == nil {
 		return nil
 	}
 

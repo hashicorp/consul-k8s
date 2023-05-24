@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package controllers
 
 import (
@@ -277,9 +280,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	translator := translation.NewConsulToNamespaceNameTranslator(c)
 
 	r := &GatewayController{
-		Client: mgr.GetClient(),
-		cache:  c,
-		Log:    mgr.GetLogger(),
+		Client:     mgr.GetClient(),
+		HelmConfig: config.HelmConfig,
+		cache:      c,
+		Log:        mgr.GetLogger(),
 	}
 
 	return c, ctrl.NewControllerManagedBy(mgr).
