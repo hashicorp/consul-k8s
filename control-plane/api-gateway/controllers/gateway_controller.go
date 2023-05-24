@@ -64,29 +64,13 @@ func buildOpts(ref api.ConfigEntry) cmp.Option {
 	case *api.HTTPRouteConfigEntry:
 		return cmpopts.IgnoreFields(api.HTTPRouteConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
 	case *api.TCPRouteConfigEntry:
-		return cmpopts.IgnoreFields(api.TCPRouteConfigEntry{}, "Status", "ModifiyIndex", "CreateIndex")
+		return cmpopts.IgnoreFields(api.TCPRouteConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
 	case *api.InlineCertificateConfigEntry:
-		return cmpopts.IgnoreFields(api.InlineCertificateConfigEntry{}, "Status", "ModifiyIndex", "CreateIndex")
+		return cmpopts.IgnoreFields(api.InlineCertificateConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
 	default:
 		panic(fmt.Sprintf("type is not known: %+v", v))
 	}
 }
-
-// func buildOpts[T any](_ T) cmp.Option {
-// empty := *(new(T))
-// fmt.Println()
-// fmt.Println()
-// fmt.Println()
-// fmt.Println()
-// fmt.Println()
-// fmt.Println(empty)
-// fmt.Println()
-// fmt.Println()
-// fmt.Println()
-// fmt.Println()
-// fmt.Println()
-// return cmpopts.IgnoreFields(empty, "Status", "ModifiedIndex", "CreateIndex")
-// }
 
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -231,7 +215,11 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, deletion := range updates.Consul.Deletions {
 		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
-		r.cache.Delete(deletion)
+		err = r.cache.Delete(deletion)
+		if err != nil {
+			log.Error(err, "failed to delete entry from consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
+		}
+
 	}
 
 	for _, update := range updates.Consul.Updates {

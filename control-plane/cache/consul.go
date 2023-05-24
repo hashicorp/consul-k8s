@@ -545,7 +545,7 @@ func (c *Cache) Write(entry api.ConfigEntry) error {
 }
 
 // Delete handles deleting the config entry from consul, if the current reference of the config entry is stale then
-// it returns an error
+// it returns an error.
 func (c *Cache) Delete(ref api.ResourceReference) error {
 	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 	if err != nil {
