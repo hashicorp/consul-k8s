@@ -6,7 +6,6 @@ package gatekeeper
 import (
 	"context"
 	"errors"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -60,7 +59,7 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1
 }
 
 func (g *Gatekeeper) deleteServiceAccount(ctx context.Context, nsname types.NamespacedName) error {
-	if err := g.Client.Delete(ctx, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
+	if err := g.Client.Delete(ctx, &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
