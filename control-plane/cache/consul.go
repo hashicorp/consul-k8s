@@ -597,7 +597,7 @@ func (c *Cache) List(kind string) []api.ConfigEntry {
 	if !ok {
 		return nil
 	}
-	entries := make([]api.ConfigEntry, len(entryMap))
+	entries := make([]api.ConfigEntry, 0, len(entryMap))
 	for _, entry := range entryMap {
 		entries = append(entries, entry)
 	}
@@ -610,7 +610,7 @@ func (c *Cache) ListServices() []api.CatalogService {
 	c.cacheMutex.Lock()
 	defer c.cacheMutex.Unlock()
 
-	entries := make([]api.CatalogService, len(c.serviceCache))
+	entries := make([]api.CatalogService, 0, len(c.serviceCache))
 	for _, service := range c.serviceCache {
 		entries = append(entries, *service)
 	}
