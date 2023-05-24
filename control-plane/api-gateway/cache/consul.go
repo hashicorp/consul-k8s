@@ -667,7 +667,7 @@ func (c *Cache) LinkPolicy(ctx context.Context, name, namespace string) error {
 
 	policies, _, err := client.ACL().PolicyList(options.WithContext(ctx))
 	if err != nil {
-		return err
+		return ignoreACLsDisabled(err)
 	}
 
 	links := []*api.ACLLink{}

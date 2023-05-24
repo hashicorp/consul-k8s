@@ -23,7 +23,7 @@ import (
 )
 
 func TestGatewayClassConfigSetup(t *testing.T) {
-	require.Error(t, (&GatewayClassConfigController{}).SetupWithManager(nil))
+	require.Error(t, (&GatewayClassConfigController{}).SetupWithManager(context.Background(), nil))
 }
 
 func TestGatewayClassConfigReconcile(t *testing.T) {

@@ -9,8 +9,12 @@ import (
 
 	"github.com/go-logr/logr"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -100,8 +104,27 @@ func gatewayClassConfigInUse(ctx context.Context, k8sClient client.Client, gcc *
 	return false, nil
 }
 
-func (r *GatewayClassConfigController) SetupWithManager(mgr ctrl.Manager) error {
+func (r *GatewayClassConfigController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.GatewayClassConfig{}).
+		// Watch for changes to GatewayClass objects associated with this config for purposes of finalizer removal.
+		Watches(source.NewKindWithCache(&gwv1beta1.GatewayClass{}, mgr.GetCache()), r.transformGatewayClassToGatewayClassConfig(ctx)).
 		Complete(r)
+}
+
+func (r *GatewayClassConfigController) transformGatewayClassToGatewayClassConfig(ctx context.Context) handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+		gc := o.(*gwv1beta1.GatewayClass)
+
+		pr := gc.Spec.ParametersRef
+		if pr != nil && pr.Kind == v1alpha1.GatewayClassConfigKind {
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Name: pr.Name,
+				},
+			}}
+		}
+
+		return nil
+	})
 }

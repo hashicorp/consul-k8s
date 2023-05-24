@@ -77,6 +77,10 @@ func TestAPIGateway(t *testing.T) {
 				// Ignore errors here because if the test ran as expected
 				// the custom resources will have been deleted.
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
+				// manually remove the helm configured gateway class and gateway class config
+				// since otherwise the early termination can result in a dangling gatewayclassconfig
+				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "gatewayclass", "consul-api-gateway")
+				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "gatewayclassconfig", "consul-api-gateway")
 			})
 
 			logger.Log(t, "creating target server")
