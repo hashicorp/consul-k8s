@@ -396,13 +396,17 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		pod.Annotations[constants.KeyTransparentProxyStatus] = constants.Enabled
 	}
 
-	// If tproxy with DNS redirection is enabled, we want to configure dns on the pod.
-	if tproxyEnabled && w.EnableConsulDNS {
+	// If DNS redirection is enabled, we want to configure dns on the pod.
+	dnsEnabled, err := consulDNSEnabled(*ns, pod, w.EnableConsulDNS, w.EnableTransparentProxy)
+	if err != nil {
+		w.Log.Error(err, "error determining if dns redirection is enabled", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error determining if dns redirection is enabled: %s", err))
+	}
+	if dnsEnabled {
 		if err = w.configureDNS(&pod, req.Namespace); err != nil {
 			w.Log.Error(err, "error configuring DNS on the pod", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring DNS on the pod: %s", err))
 		}
-
 	}
 
 	// Add annotations for metrics.

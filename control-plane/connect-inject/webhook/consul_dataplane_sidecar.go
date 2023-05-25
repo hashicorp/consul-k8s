@@ -314,7 +314,11 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 
 	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
 	// for Consul DNS in the pod.
-	if w.EnableConsulDNS {
+	dnsEnabled, err := consulDNSEnabled(namespace, pod, w.EnableConsulDNS, w.EnableTransparentProxy)
+	if err != nil {
+		return nil, err
+	}
+	if dnsEnabled {
 		args = append(args, "-consul-dns-bind-port="+strconv.Itoa(consulDataplaneDNSBindPort))
 	}
 
