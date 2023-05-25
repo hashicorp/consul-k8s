@@ -10,10 +10,12 @@ import (
 
 const (
 	GatewayClassConfigKind = "GatewayClassConfig"
+	MeshServiceKind        = "MeshService"
 )
 
 func init() {
 	SchemeBuilder.Register(&GatewayClassConfig{}, &GatewayClassConfigList{})
+	SchemeBuilder.Register(&MeshService{}, &MeshServiceList{})
 }
 
 // +genclient
@@ -96,4 +98,38 @@ type GatewayClassConfigList struct {
 
 	// Items is the list of Configs.
 	Items []GatewayClassConfig `json:"items"`
+}
+
+// +genclient
+// +kubebuilder:object:root=true
+
+// MeshService holds a reference to an externally managed Consul Service Mesh service.
+type MeshService struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the desired state of MeshService.
+	Spec MeshServiceSpec `json:"spec,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// MeshServiceSpec specifies the 'spec' of the MeshService CRD.
+type MeshServiceSpec struct {
+	// Name holds the service name for a Consul service.
+	Name string `json:"name,omitempty"`
+	// Peer optionally specifies the name of the peer exporting the Consul service.
+	// If not specified, the Consul service is assumed to be in the local datacenter.
+	Peer *string `json:"peer,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// MeshServiceList is a list of MeshService resources.
+type MeshServiceList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []MeshService `json:"items"`
 }

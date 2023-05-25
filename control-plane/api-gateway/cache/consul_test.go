@@ -1603,6 +1603,8 @@ func Test_Run(t *testing.T) {
 			fmt.Fprintln(w, string(val))
 		case "/v1/catalog/services":
 			fmt.Fprintln(w, `{}`)
+		case "/v1/peerings":
+			fmt.Fprintln(w, `[]`)
 		default:
 			w.WriteHeader(500)
 			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
@@ -1711,6 +1713,7 @@ func Test_Run(t *testing.T) {
 	})
 
 	c.SubscribeServices(ctx, func(cs *api.CatalogService) []types.NamespacedName { return nil }).Cancel()
+	c.SubscribePeerings(ctx, func(cs *api.Peering) []types.NamespacedName { return nil }).Cancel()
 
 	// mark this subscription as ended
 	canceledSub.Cancel()

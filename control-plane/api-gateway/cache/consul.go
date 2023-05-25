@@ -100,6 +100,37 @@ func (oldCache serviceCache) diff(newCache serviceCache) []*api.CatalogService {
 	return diffs
 }
 
+type peeringCache map[api.ResourceReference]*api.Peering
+
+func (oldCache peeringCache) diff(newCache peeringCache) []*api.Peering {
+	diffs := make([]*api.Peering, 0)
+
+	for ref, entry := range newCache {
+		oldRef, ok := oldCache[ref]
+		// ref from the new cache doesn't exist in the old one
+		// this means a resource was added
+		if !ok {
+			diffs = append(diffs, entry)
+			continue
+		}
+
+		// the entry in the old cache has an older modify index than the ref
+		// from the new cache
+		if oldRef.ModifyIndex < entry.ModifyIndex {
+			diffs = append(diffs, entry)
+		}
+	}
+
+	// get all deleted entries, these are entries present in the old cache
+	// that are not present in the new
+	for ref, entry := range oldCache {
+		if _, ok := newCache[ref]; !ok {
+			diffs = append(diffs, entry)
+		}
+	}
+	return diffs
+}
+
 // configEntryObject is used for generic k8s events so we maintain the consul name/namespace.
 type configEntryObject struct {
 	client.Object // embed so we fufill the object interface
@@ -157,6 +188,24 @@ func (s *ServiceSubscription) Events() chan event.GenericEvent {
 	return s.events
 }
 
+type PeeringTranslatorFn func(*api.Peering) []types.NamespacedName
+
+// PeeringsSubscription represents a watcher for events on a specific kind.
+type PeeringsSubscription struct {
+	translator PeeringTranslatorFn
+	ctx        context.Context
+	cancelCtx  context.CancelFunc
+	events     chan event.GenericEvent
+}
+
+func (s *PeeringsSubscription) Cancel() {
+	s.cancelCtx()
+}
+
+func (s *PeeringsSubscription) Events() chan event.GenericEvent {
+	return s.events
+}
+
 // Cache subscribes to and caches Consul objects, it also responsible for mainting subscriptions to
 // resources that it caches.
 type Cache struct {
@@ -166,11 +215,13 @@ type Cache struct {
 
 	cache        map[string]resourceCache
 	serviceCache serviceCache
+	peeringCache peeringCache
 	cacheMutex   *sync.Mutex
 
-	subscribers        map[string][]*Subscription
-	serviceSubscribers []*ServiceSubscription
-	subscriberMutex    *sync.Mutex
+	subscribers         map[string][]*Subscription
+	serviceSubscribers  []*ServiceSubscription
+	peeringsSubscribers []*PeeringsSubscription
+	subscriberMutex     *sync.Mutex
 
 	partition         string
 	namespacesEnabled bool
@@ -188,20 +239,22 @@ func New(config Config) *Cache {
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
-		config:             config.ConsulClientConfig,
-		serverMgr:          config.ConsulServerConnMgr,
-		namespacesEnabled:  config.NamespacesEnabled,
-		partition:          config.Partition,
-		cache:              cache,
-		serviceCache:       make(serviceCache),
-		cacheMutex:         &sync.Mutex{},
-		subscribers:        make(map[string][]*Subscription),
-		serviceSubscribers: make([]*ServiceSubscription, 0),
-		subscriberMutex:    &sync.Mutex{},
-		kinds:              Kinds,
+		config:              config.ConsulClientConfig,
+		serverMgr:           config.ConsulServerConnMgr,
+		namespacesEnabled:   config.NamespacesEnabled,
+		partition:           config.Partition,
+		cache:               cache,
+		serviceCache:        make(serviceCache),
+		peeringCache:        make(peeringCache),
+		cacheMutex:          &sync.Mutex{},
+		subscribers:         make(map[string][]*Subscription),
+		serviceSubscribers:  make([]*ServiceSubscription, 0),
+		peeringsSubscribers: make([]*PeeringsSubscription, 0),
+		subscriberMutex:     &sync.Mutex{},
+		kinds:               Kinds,
 		// we make a buffered channel that is the length of the kinds which
-		// are subscribed to + 1 for services
-		synced: make(chan struct{}, len(Kinds)+1),
+		// are subscribed to + 2 for services + peerings
+		synced: make(chan struct{}, len(Kinds)+2),
 		logger: config.Logger,
 	}
 }
@@ -216,6 +269,12 @@ func (c *Cache) WaitSynced(ctx context.Context) {
 		}
 	}
 	// one more for service subscribers
+	select {
+	case <-c.synced:
+	case <-ctx.Done():
+		return
+	}
+	// and one more for peerings subscribers
 	select {
 	case <-c.synced:
 	case <-ctx.Done():
@@ -272,6 +331,24 @@ func (c *Cache) SubscribeServices(ctx context.Context, translator ServiceTransla
 	return sub
 }
 
+// SubscribeServices handles adding a new subscription for resources of a given kind.
+func (c *Cache) SubscribePeerings(ctx context.Context, translator PeeringTranslatorFn) *PeeringsSubscription {
+	c.subscriberMutex.Lock()
+	defer c.subscriberMutex.Unlock()
+
+	ctx, cancel := context.WithCancel(ctx)
+	events := make(chan event.GenericEvent)
+	sub := &PeeringsSubscription{
+		translator: translator,
+		ctx:        ctx,
+		cancelCtx:  cancel,
+		events:     events,
+	}
+
+	c.peeringsSubscribers = append(c.peeringsSubscribers, sub)
+	return sub
+}
+
 // Run starts the cache watch cycle, on the first call it will fill the cache with existing resources.
 func (c *Cache) Run(ctx context.Context) {
 	wg := &sync.WaitGroup{}
@@ -290,6 +367,12 @@ func (c *Cache) Run(ctx context.Context) {
 	go func() {
 		defer wg.Done()
 		c.subscribeToConsulServices(ctx)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.subscribeToConsulPeerings(ctx)
 	}()
 
 	wg.Wait()
@@ -404,6 +487,49 @@ MAIN_LOOP:
 	}
 }
 
+func (c *Cache) subscribeToConsulPeerings(ctx context.Context) {
+	once := &sync.Once{}
+
+	opts := &api.QueryOptions{Connect: true}
+	if c.namespacesEnabled {
+		opts.Namespace = namespaceWildcard
+	}
+
+	if c.partition != "" {
+		opts.Partition = c.partition
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
+		if err != nil {
+			c.logger.Error(err, "error initializing consul client")
+			continue
+		}
+
+		peerings, meta, err := client.Peerings().List(ctx, opts.WithContext(ctx))
+		if err != nil {
+			c.logger.Error(err, "error fetching services")
+			continue
+		}
+
+		opts.WaitIndex = meta.LastIndex
+		c.updateAndNotifyPeerings(ctx, once, peerings)
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			continue
+		}
+	}
+}
+
 func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind string, entries []api.ConfigEntry) {
 	c.cacheMutex.Lock()
 
@@ -454,6 +580,31 @@ func (c *Cache) updateAndNotifyServices(ctx context.Context, once *sync.Once, se
 	c.notifyServiceSubscribers(ctx, diffs)
 }
 
+func (c *Cache) updateAndNotifyPeerings(ctx context.Context, once *sync.Once, peerings []*api.Peering) {
+	c.cacheMutex.Lock()
+
+	cache := make(peeringCache)
+
+	for _, peering := range peerings {
+		cache[api.ResourceReference{Name: peering.Name, Namespace: peering.ID, Partition: peering.Partition}] = peering
+	}
+
+	diffs := c.peeringCache.diff(cache)
+
+	c.peeringCache = cache
+
+	// we run this the first time the cache is filled to notify the waiter
+	once.Do(func() {
+		c.logger.Info("sync mark for peerings")
+		c.synced <- struct{}{}
+	})
+
+	c.cacheMutex.Unlock()
+
+	// now notify all peering subscribers
+	c.notifyPeeringSubscribers(ctx, diffs)
+}
+
 // notifyServiceSubscribers notifies each subscriber for a given kind on changes to a config entry of that kind. It also
 // handles removing any subscribers that have marked themselves as done.
 func (c *Cache) notifyServiceSubscribers(ctx context.Context, services []*api.CatalogService) {
@@ -488,6 +639,43 @@ func (c *Cache) notifyServiceSubscribers(ctx context.Context, services []*api.Ca
 			}
 		}
 		c.serviceSubscribers = subscribers
+	}
+}
+
+// notifyPeeringSubscribers notifies each subscriber for a given kind on changes to a config entry of that kind. It also
+// handles removing any subscribers that have marked themselves as done.
+func (c *Cache) notifyPeeringSubscribers(ctx context.Context, peerings []*api.Peering) {
+	c.subscriberMutex.Lock()
+	defer c.subscriberMutex.Unlock()
+
+	for _, peering := range peerings {
+		// this will hold the new list of current subscribers after we finish notifying
+		subscribers := make([]*PeeringsSubscription, 0, len(c.peeringsSubscribers))
+		for _, subscriber := range c.peeringsSubscribers {
+			addSubscriber := false
+
+			for _, namespaceName := range subscriber.translator(peering) {
+				event := event.GenericEvent{
+					Object: newConfigEntryObject(namespaceName),
+				}
+
+				select {
+				case <-ctx.Done():
+					return
+				case <-subscriber.ctx.Done():
+					// don't add this subscriber to current list because it is done
+					addSubscriber = false
+				case subscriber.events <- event:
+					// keep this one since we can send events to it
+					addSubscriber = true
+				}
+			}
+
+			if addSubscriber {
+				subscribers = append(subscribers, subscriber)
+			}
+		}
+		c.peeringsSubscribers = subscribers
 	}
 }
 

@@ -149,6 +149,13 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	// fetch all MeshServices
+	meshServiceList := &v1alpha1.MeshServiceList{}
+	if err := r.Client.List(ctx, meshServiceList); err != nil {
+		log.Error(err, "unable to list MeshServices")
+		return ctrl.Result{}, err
+	}
+
 	// fetch all secrets referenced by this gateway
 	secretList := &corev1.SecretList{}
 	if err := r.Client.List(ctx, secretList); err != nil {
@@ -214,6 +221,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Service:                  service,
 		HTTPRoutes:               httpRouteList.Items,
 		TCPRoutes:                tcpRouteList.Items,
+		MeshServices:             meshServiceList.Items,
 		Secrets:                  filteredSecrets,
 		ConsulGateway:            consulGateway,
 		ConsulHTTPRoutes:         derefAll(configEntriesTo[*api.HTTPRouteConfigEntry](httpRoutes)),
@@ -361,8 +369,6 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 
 // SetupWithGatewayControllerManager registers the controller with the given manager.
 func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, error) {
-	logger := mgr.GetLogger()
-
 	c := cache.New(cache.Config{
 		ConsulClientConfig:  config.ConsulClientConfig,
 		ConsulServerConnMgr: config.ConsulServerConnMgr,
@@ -406,47 +412,17 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant(ctx)),
 		).
 		Watches(
+			source.NewKindWithCache(&v1alpha1.MeshService{}, mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformMeshService(ctx)),
+		).
+		Watches(
 			// Subscribe to changes from Consul Connect Services
-			&source.Channel{Source: c.SubscribeServices(ctx, func(service *api.CatalogService) []types.NamespacedName {
-				nsn := serviceToNamespacedName(service)
-
-				if nsn.Namespace != "" && nsn.Name != "" {
-					key := nsn.String()
-
-					requestSet := make(map[types.NamespacedName]struct{})
-					tcpRouteList := &gwv1alpha2.TCPRouteList{}
-					if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
-						FieldSelector: fields.OneTermEqualSelector(TCPRoute_ServiceIndex, key),
-					}); err != nil {
-						logger.Error(err, "unable to list TCPRoutes")
-					}
-					for _, route := range tcpRouteList.Items {
-						for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
-							requestSet[ref] = struct{}{}
-						}
-					}
-
-					httpRouteList := &gwv1alpha2.HTTPRouteList{}
-					if err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
-						FieldSelector: fields.OneTermEqualSelector(HTTPRoute_ServiceIndex, key),
-					}); err != nil {
-						logger.Error(err, "unable to list HTTPRoutes")
-					}
-					for _, route := range httpRouteList.Items {
-						for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
-							requestSet[ref] = struct{}{}
-						}
-					}
-
-					requests := []types.NamespacedName{}
-					for request := range requestSet {
-						requests = append(requests, request)
-					}
-					return requests
-				}
-
-				return nil
-			}).Events()},
+			&source.Channel{Source: c.SubscribeServices(ctx, r.transformConsulService(ctx)).Events()},
+			&handler.EnqueueRequestForObject{},
+		).
+		Watches(
+			// Subscribe to changes from Consul Peering Services
+			&source.Channel{Source: c.SubscribePeerings(ctx, r.transformConsulPeering(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
@@ -539,6 +515,115 @@ func (r *GatewayController) transformReferenceGrant(ctx context.Context) func(o 
 			return nil
 		}
 		return objectsToRequests(pointersOf(gatewayList.Items))
+	}
+}
+
+// transformConsulService will return a list of gateways that are referenced
+// by a TCPRoute or HTTPRoute that references the Consul service.
+func (r *GatewayController) transformConsulService(ctx context.Context) func(service *api.CatalogService) []types.NamespacedName {
+	return func(service *api.CatalogService) []types.NamespacedName {
+		nsn := serviceToNamespacedName(service)
+
+		if nsn.Namespace != "" && nsn.Name != "" {
+			key := nsn.String()
+
+			requestSet := make(map[types.NamespacedName]struct{})
+			tcpRouteList := &gwv1alpha2.TCPRouteList{}
+			if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
+				FieldSelector: fields.OneTermEqualSelector(TCPRoute_ServiceIndex, key),
+			}); err != nil {
+				r.Log.Error(err, "unable to list TCPRoutes")
+			}
+			for _, route := range tcpRouteList.Items {
+				for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+					requestSet[ref] = struct{}{}
+				}
+			}
+
+			httpRouteList := &gwv1alpha2.HTTPRouteList{}
+			if err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
+				FieldSelector: fields.OneTermEqualSelector(HTTPRoute_ServiceIndex, key),
+			}); err != nil {
+				r.Log.Error(err, "unable to list HTTPRoutes")
+			}
+			for _, route := range httpRouteList.Items {
+				for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+					requestSet[ref] = struct{}{}
+				}
+			}
+
+			requests := []types.NamespacedName{}
+			for request := range requestSet {
+				requests = append(requests, request)
+			}
+			return requests
+		}
+
+		return nil
+	}
+}
+
+// transformConsulPeering will return a list of gateways that are referenced
+// by a TCPRoute or HTTPRoute that references the Consul peering.
+func (r *GatewayController) transformConsulPeering(ctx context.Context) func(service *api.Peering) []types.NamespacedName {
+	return func(peering *api.Peering) []types.NamespacedName {
+		meshServiceList := &v1alpha1.MeshServiceList{}
+
+		if err := r.Client.List(ctx, meshServiceList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(MeshService_PeerIndex, peering.Name),
+		}); err != nil {
+			r.Log.Error(err, "unable to list TCPRoutes")
+		}
+
+		flattened := []types.NamespacedName{}
+		for _, meshService := range meshServiceList.Items {
+			for _, request := range r.transformMeshService(ctx)(&meshService) {
+				flattened = append(flattened, request.NamespacedName)
+			}
+		}
+
+		return flattened
+	}
+}
+
+// transformMeshService will return a list of gateways that are referenced
+// by a TCPRoute or HTTPRoute that references the mesh service.
+func (r *GatewayController) transformMeshService(ctx context.Context) func(o client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		service := o.(*v1alpha1.MeshService)
+		key := client.ObjectKeyFromObject(service).String()
+
+		requestSet := make(map[types.NamespacedName]struct{})
+
+		tcpRouteList := &gwv1alpha2.TCPRouteList{}
+		if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(TCPRoute_MeshServiceIndex, key),
+		}); err != nil {
+			r.Log.Error(err, "unable to list TCPRoutes")
+		}
+		for _, route := range tcpRouteList.Items {
+			for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+				requestSet[ref] = struct{}{}
+			}
+		}
+
+		httpRouteList := &gwv1beta1.HTTPRouteList{}
+		if err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(HTTPRoute_MeshServiceIndex, key),
+		}); err != nil {
+			r.Log.Error(err, "unable to list HTTPRoutes")
+		}
+		for _, route := range httpRouteList.Items {
+			for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+				requestSet[ref] = struct{}{}
+			}
+		}
+
+		requests := []reconcile.Request{}
+		for request := range requestSet {
+			requests = append(requests, reconcile.Request{NamespacedName: request})
+		}
+		return requests
 	}
 }
 

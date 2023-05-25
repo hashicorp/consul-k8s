@@ -5,6 +5,7 @@ package binding
 
 import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,6 +65,9 @@ type routeBinder[T client.Object, U api.ConfigEntry] struct {
 	// services is a catalog of all connect-injected services to check a route against
 	// for resolving its backend refs
 	services map[types.NamespacedName]api.CatalogService
+	// meshServices is a catalog of all mesh service objects to check a route against
+	// for resolving its backend refs
+	meshServices map[types.NamespacedName]v1alpha1.MeshService
 
 	// translationReferenceFunc is a function used to translate a Kubernetes object into
 	// a Consul object reference
@@ -83,7 +87,7 @@ type routeBinder[T client.Object, U api.ConfigEntry] struct {
 	// getParentRefsFunc is used for getting the parent references of a Kubernetes route object
 	getParentRefsFunc func(T) []gwv1beta1.ParentReference
 	// translationFunc is used for translating a Kubernetes route into the corresponding Consul config entry
-	translationFunc func(T, map[types.NamespacedName]api.ResourceReference) U
+	translationFunc func(T, map[types.NamespacedName]api.ResourceReference, map[types.NamespacedName]api.CatalogService, map[types.NamespacedName]v1alpha1.MeshService) U
 	// setRouteConditionFunc is used for adding or overwriting a condition on a route at the given
 	// parent
 	setRouteConditionFunc func(T, *gwv1beta1.ParentReference, metav1.Condition) bool
@@ -104,6 +108,7 @@ func newRouteBinder[T client.Object, U api.ConfigEntry](
 	gatewayRef api.ResourceReference,
 	namespaces map[string]corev1.Namespace,
 	services map[types.NamespacedName]api.CatalogService,
+	meshServices map[types.NamespacedName]v1alpha1.MeshService,
 	tracker referenceTracker,
 	translationReferenceFunc func(route T) api.ResourceReference,
 	lookupFunc func(api.ResourceReference) U,
@@ -112,7 +117,7 @@ func newRouteBinder[T client.Object, U api.ConfigEntry](
 	removeStatusRefsFunc func(T, []gwv1beta1.ParentReference) bool,
 	getHostnamesFunc func(T) []gwv1beta1.Hostname,
 	getParentRefsFunc func(T) []gwv1beta1.ParentReference,
-	translationFunc func(T, map[types.NamespacedName]api.ResourceReference) U,
+	translationFunc func(T, map[types.NamespacedName]api.ResourceReference, map[types.NamespacedName]api.CatalogService, map[types.NamespacedName]v1alpha1.MeshService) U,
 	setRouteConditionFunc func(T, *gwv1beta1.ParentReference, metav1.Condition) bool,
 	getBackendRefsFunc func(T) []gwv1beta1.BackendRef,
 	removeControllerStatusFunc func(T) bool,
@@ -123,6 +128,7 @@ func newRouteBinder[T client.Object, U api.ConfigEntry](
 		gatewayRef:                 gatewayRef,
 		namespaces:                 namespaces,
 		services:                   services,
+		meshServices:               meshServices,
 		tracker:                    tracker,
 		translationReferenceFunc:   translationReferenceFunc,
 		lookupFunc:                 lookupFunc,
@@ -223,7 +229,7 @@ func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]i
 
 	// TODO: scrub route refs from statuses that no longer exist
 
-	validation := validateRefs(route.GetNamespace(), r.getBackendRefsFunc(route), r.services)
+	validation := validateRefs(route.GetNamespace(), r.getBackendRefsFunc(route), r.services, r.meshServices)
 	// the spec is dumb and makes you set a parent for any status, even when the
 	// status is not with respect to a parent, as is the case of resolved refs
 	// so we need to set the status on all parents
@@ -295,7 +301,7 @@ func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]i
 		kubernetesNeedsStatusUpdate = true
 	}
 
-	entry := r.translationFunc(route, nil)
+	entry := r.translationFunc(route, nil, r.services, r.meshServices)
 	// make all parent refs explicit based on what actually bound
 	if isNil(existing) {
 		r.setParentsFunc(entry, parentsForRoute(r.gatewayRef, nil, results))
@@ -308,13 +314,14 @@ func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]i
 }
 
 // newTCPRouteBinder wraps newRouteBinder with the proper closures needed for accessing TCPRoutes and their config entries.
-func (b *Binder) newTCPRouteBinder(tracker referenceTracker, services map[types.NamespacedName]api.CatalogService) *routeBinder[*gwv1alpha2.TCPRoute, *api.TCPRouteConfigEntry] {
+func (b *Binder) newTCPRouteBinder(tracker referenceTracker, services map[types.NamespacedName]api.CatalogService, meshServices map[types.NamespacedName]v1alpha1.MeshService) *routeBinder[*gwv1alpha2.TCPRoute, *api.TCPRouteConfigEntry] {
 	return newRouteBinder(
 		b.isGatewayDeleted(),
 		&b.config.Gateway,
 		b.gatewayRef(),
 		b.config.Namespaces,
 		services,
+		meshServices,
 		tracker,
 		b.config.Translator.ReferenceForTCPRoute,
 		b.consulTCPRouteFor,
@@ -337,13 +344,14 @@ func (b *Binder) newTCPRouteBinder(tracker referenceTracker, services map[types.
 }
 
 // newHTTPRouteBinder wraps newRouteBinder with the proper closures needed for accessing HTTPRoutes and their config entries.
-func (b *Binder) newHTTPRouteBinder(tracker referenceTracker, services map[types.NamespacedName]api.CatalogService) *routeBinder[*gwv1beta1.HTTPRoute, *api.HTTPRouteConfigEntry] {
+func (b *Binder) newHTTPRouteBinder(tracker referenceTracker, services map[types.NamespacedName]api.CatalogService, meshServices map[types.NamespacedName]v1alpha1.MeshService) *routeBinder[*gwv1beta1.HTTPRoute, *api.HTTPRouteConfigEntry] {
 	return newRouteBinder(
 		b.isGatewayDeleted(),
 		&b.config.Gateway,
 		b.gatewayRef(),
 		b.config.Namespaces,
 		services,
+		meshServices,
 		tracker,
 		b.config.Translator.ReferenceForHTTPRoute,
 		b.consulHTTPRouteFor,

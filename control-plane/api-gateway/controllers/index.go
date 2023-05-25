@@ -21,8 +21,11 @@ const (
 	Gateway_GatewayClassIndex            = "__gateway_referencing_gatewayclass"
 	HTTPRoute_GatewayIndex               = "__httproute_referencing_gateway"
 	HTTPRoute_ServiceIndex               = "__httproute_referencing_service"
+	HTTPRoute_MeshServiceIndex           = "__httproute_referencing_mesh_service"
 	TCPRoute_GatewayIndex                = "__tcproute_referencing_gateway"
 	TCPRoute_ServiceIndex                = "__tcproute_referencing_service"
+	TCPRoute_MeshServiceIndex            = "__tcproute_referencing_mesh_service"
+	MeshService_PeerIndex                = "__meshservice_referencing_peer"
 	Secret_GatewayIndex                  = "__secret_referencing_gateway"
 )
 
@@ -76,6 +79,11 @@ var indexes = []index{
 		indexerFunc: servicesForHTTPRoute,
 	},
 	{
+		name:        HTTPRoute_MeshServiceIndex,
+		target:      &gwv1beta1.HTTPRoute{},
+		indexerFunc: meshServicesForHTTPRoute,
+	},
+	{
 		name:        TCPRoute_GatewayIndex,
 		target:      &gwv1alpha2.TCPRoute{},
 		indexerFunc: gatewaysForTCPRoute,
@@ -84,6 +92,16 @@ var indexes = []index{
 		name:        TCPRoute_ServiceIndex,
 		target:      &gwv1alpha2.TCPRoute{},
 		indexerFunc: servicesForTCPRoute,
+	},
+	{
+		name:        TCPRoute_MeshServiceIndex,
+		target:      &gwv1alpha2.TCPRoute{},
+		indexerFunc: meshServicesForTCPRoute,
+	},
+	{
+		name:        MeshService_PeerIndex,
+		target:      &v1alpha1.MeshService{},
+		indexerFunc: peersForMeshService,
 	},
 }
 
@@ -113,6 +131,14 @@ func gatewayClassControllerName(o client.Object) []string {
 func gatewayClassForGateway(o client.Object) []string {
 	g := o.(*gwv1beta1.Gateway)
 	return []string{string(g.Spec.GatewayClassName)}
+}
+
+func peersForMeshService(o client.Object) []string {
+	m := o.(*v1alpha1.MeshService)
+	if m.Spec.Peer != nil {
+		return []string{string(*m.Spec.Peer)}
+	}
+	return nil
 }
 
 func gatewayForSecret(o client.Object) []string {
@@ -162,6 +188,27 @@ func servicesForHTTPRoute(o client.Object) []string {
 	return refs
 }
 
+func meshServicesForHTTPRoute(o client.Object) []string {
+	route := o.(*gwv1beta1.HTTPRoute)
+	refs := []string{}
+	for _, rule := range route.Spec.Rules {
+	BACKEND_LOOP:
+		for _, ref := range rule.BackendRefs {
+			if ref.Group != nil && string(*ref.Group) == v1alpha1.ConsulHashicorpGroup &&
+				ref.Kind != nil && string(*ref.Kind) == v1alpha1.MeshServiceKind {
+				backendRef := indexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+				for _, member := range refs {
+					if member == backendRef {
+						continue BACKEND_LOOP
+					}
+				}
+				refs = append(refs, backendRef)
+			}
+		}
+	}
+	return refs
+}
+
 func servicesForTCPRoute(o client.Object) []string {
 	route := o.(*gwv1alpha2.TCPRoute)
 	refs := []string{}
@@ -169,6 +216,27 @@ func servicesForTCPRoute(o client.Object) []string {
 	BACKEND_LOOP:
 		for _, ref := range rule.BackendRefs {
 			if nilOrEqual(ref.Group, "") && nilOrEqual(ref.Kind, "Service") {
+				backendRef := indexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+				for _, member := range refs {
+					if member == backendRef {
+						continue BACKEND_LOOP
+					}
+				}
+				refs = append(refs, backendRef)
+			}
+		}
+	}
+	return refs
+}
+
+func meshServicesForTCPRoute(o client.Object) []string {
+	route := o.(*gwv1alpha2.TCPRoute)
+	refs := []string{}
+	for _, rule := range route.Spec.Rules {
+	BACKEND_LOOP:
+		for _, ref := range rule.BackendRefs {
+			if ref.Group != nil && string(*ref.Group) == v1alpha1.ConsulHashicorpGroup &&
+				ref.Kind != nil && string(*ref.Kind) == v1alpha1.MeshServiceKind {
 				backendRef := indexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
 				for _, member := range refs {
 					if member == backendRef {

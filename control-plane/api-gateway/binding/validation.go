@@ -6,6 +6,7 @@ package binding
 import (
 	"strings"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +19,7 @@ import (
 
 // validateRefs validates backend references for a route, determining whether or
 // not they were found in the list of known connect-injected services.
-func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[types.NamespacedName]api.CatalogService) routeValidationResults {
+func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[types.NamespacedName]api.CatalogService, meshServices map[types.NamespacedName]v1alpha1.MeshService) routeValidationResults {
 	var result routeValidationResults
 	for _, ref := range refs {
 		nsn := types.NamespacedName{
@@ -28,8 +29,12 @@ func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[ty
 
 		// TODO: check reference grants
 
-		if !nilOrEqual(ref.BackendObjectReference.Group, "") ||
-			!nilOrEqual(ref.BackendObjectReference.Kind, "Service") {
+		backendRef := ref.BackendObjectReference
+
+		isServiceRef := nilOrEqual(backendRef.Group, "") && nilOrEqual(backendRef.Kind, "Service")
+		isMeshServiceRef := derefEqual(backendRef.Group, v1alpha1.ConsulHashicorpGroup) && derefEqual(backendRef.Kind, v1alpha1.MeshServiceKind)
+
+		if !isServiceRef && !isMeshServiceRef {
 			result = append(result, routeValidationResult{
 				namespace: nsn.Namespace,
 				backend:   ref,
@@ -38,13 +43,26 @@ func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[ty
 			continue
 		}
 
-		if _, found := services[nsn]; !found {
-			result = append(result, routeValidationResult{
-				namespace: nsn.Namespace,
-				backend:   ref,
-				err:       errRouteBackendNotFound,
-			})
-			continue
+		if isServiceRef {
+			if _, found := services[nsn]; !found {
+				result = append(result, routeValidationResult{
+					namespace: nsn.Namespace,
+					backend:   ref,
+					err:       errRouteBackendNotFound,
+				})
+				continue
+			}
+		}
+
+		if isMeshServiceRef {
+			if _, found := meshServices[nsn]; !found {
+				result = append(result, routeValidationResult{
+					namespace: nsn.Namespace,
+					backend:   ref,
+					err:       errRouteBackendNotFound,
+				})
+				continue
+			}
 		}
 
 		result = append(result, routeValidationResult{
@@ -304,4 +322,11 @@ func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
 	}
 	ret[namespaceNameLabel] = name
 	return klabels.Set(ret)
+}
+
+func derefEqual[T ~string](v *T, check string) bool {
+	if v == nil {
+		return false
+	}
+	return string(*v) == check
 }

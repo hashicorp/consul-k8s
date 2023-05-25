@@ -12,6 +12,7 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
@@ -125,7 +126,7 @@ func (t K8sToConsulTranslator) ReferenceForGateway(k8sGW *gwv1beta1.Gateway) api
 }
 
 // HTTPRouteToHTTPRoute translates a k8s HTTPRoute into a Consul HTTPRoute Config Entry.
-func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute *gwv1beta1.HTTPRoute, parentRefs map[types.NamespacedName]api.ResourceReference) *capi.HTTPRouteConfigEntry {
+func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute *gwv1beta1.HTTPRoute, parentRefs map[types.NamespacedName]api.ResourceReference, k8sServices map[types.NamespacedName]api.CatalogService, meshServices map[types.NamespacedName]v1alpha1.MeshService) *capi.HTTPRouteConfigEntry {
 	routeName := k8sHTTPRoute.Name
 	if routeNameFromAnnotation, ok := k8sHTTPRoute.Annotations[AnnotationHTTPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
@@ -156,7 +157,7 @@ func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute *gwv1beta1.HTTP
 	consulHTTPRoute.Parents = translateRouteParentRefs(k8sHTTPRoute.Spec.CommonRouteSpec.ParentRefs, parentRefs)
 
 	// translate rules
-	consulHTTPRoute.Rules = t.translateHTTPRouteRules(k8sHTTPRoute.Spec.Rules)
+	consulHTTPRoute.Rules = t.translateHTTPRouteRules(k8sHTTPRoute.Namespace, k8sHTTPRoute.Spec.Rules, k8sServices, meshServices)
 
 	return consulHTTPRoute
 }
@@ -208,7 +209,7 @@ func isRefAPIGateway(ref gwv1beta1.ParentReference) bool {
 }
 
 // translate the rules portion of a HTTPRoute.
-func (t K8sToConsulTranslator) translateHTTPRouteRules(k8sRules []gwv1beta1.HTTPRouteRule) []capi.HTTPRouteRule {
+func (t K8sToConsulTranslator) translateHTTPRouteRules(namespace string, k8sRules []gwv1beta1.HTTPRouteRule, k8sServices map[types.NamespacedName]api.CatalogService, meshServices map[types.NamespacedName]v1alpha1.MeshService) []capi.HTTPRouteRule {
 	rules := make([]capi.HTTPRouteRule, 0, len(k8sRules))
 	for _, k8sRule := range k8sRules {
 		rule := capi.HTTPRouteRule{}
@@ -219,7 +220,7 @@ func (t K8sToConsulTranslator) translateHTTPRouteRules(k8sRules []gwv1beta1.HTTP
 		rule.Filters = translateHTTPFilters(k8sRule.Filters)
 
 		// translate services
-		rule.Services = t.translateHTTPServices(k8sRule.BackendRefs)
+		rule.Services = t.translateHTTPServices(namespace, k8sRule.BackendRefs, k8sServices, meshServices)
 
 		rules = append(rules, rule)
 	}
@@ -330,28 +331,51 @@ func translateHTTPFilters(k8sFilters []gwv1beta1.HTTPRouteFilter) capi.HTTPFilte
 }
 
 // translate the backendrefs into services.
-func (t K8sToConsulTranslator) translateHTTPServices(k8sBackendRefs []gwv1beta1.HTTPBackendRef) []capi.HTTPService {
+func (t K8sToConsulTranslator) translateHTTPServices(namespace string, k8sBackendRefs []gwv1beta1.HTTPBackendRef, k8sServices map[types.NamespacedName]api.CatalogService, meshServices map[types.NamespacedName]v1alpha1.MeshService) []capi.HTTPService {
 	services := make([]capi.HTTPService, 0, len(k8sBackendRefs))
 
 	for _, k8sRef := range k8sBackendRefs {
-		service := capi.HTTPService{
-			Name:    string(k8sRef.Name),
-			Filters: translateHTTPFilters(k8sRef.Filters),
+		backendRef := k8sRef.BackendObjectReference
+
+		nsn := types.NamespacedName{
+			Name:      string(backendRef.Name),
+			Namespace: valueOr(backendRef.Namespace, namespace),
 		}
-		if k8sRef.Weight != nil {
-			service.Weight = int(*k8sRef.Weight)
+
+		isServiceRef := nilOrEqual(backendRef.Group, "") && nilOrEqual(backendRef.Kind, "Service")
+		isMeshServiceRef := derefEqual(backendRef.Group, v1alpha1.ConsulHashicorpGroup) && derefEqual(backendRef.Kind, v1alpha1.MeshServiceKind)
+
+		k8sService, k8sServiceFound := k8sServices[nsn]
+		meshService, meshServiceFound := meshServices[nsn]
+
+		if isServiceRef && k8sServiceFound {
+			service := capi.HTTPService{
+				Name:      k8sService.ServiceName,
+				Namespace: t.getConsulNamespace(k8sService.Namespace),
+				Filters:   translateHTTPFilters(k8sRef.Filters),
+			}
+			if k8sRef.Weight != nil {
+				service.Weight = int(*k8sRef.Weight)
+			}
+			services = append(services, service)
+		} else if isMeshServiceRef && meshServiceFound {
+			service := capi.HTTPService{
+				Name:      meshService.Spec.Name,
+				Namespace: t.getConsulNamespace(meshService.Namespace),
+				Filters:   translateHTTPFilters(k8sRef.Filters),
+			}
+			if k8sRef.Weight != nil {
+				service.Weight = int(*k8sRef.Weight)
+			}
+			services = append(services, service)
 		}
-		if k8sRef.Namespace != nil {
-			service.Namespace = t.getConsulNamespace(string(*k8sRef.Namespace))
-		}
-		services = append(services, service)
 	}
 
 	return services
 }
 
 // TCPRouteToTCPRoute translates a Kuberenetes TCPRoute into a Consul TCPRoute Config Entry.
-func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute *gwv1alpha2.TCPRoute, parentRefs map[types.NamespacedName]api.ResourceReference) *capi.TCPRouteConfigEntry {
+func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute *gwv1alpha2.TCPRoute, parentRefs map[types.NamespacedName]api.ResourceReference, k8sServices map[types.NamespacedName]api.CatalogService, meshServices map[types.NamespacedName]v1alpha1.MeshService) *capi.TCPRouteConfigEntry {
 	routeName := k8sRoute.Name
 	if routeNameFromAnnotation, ok := k8sRoute.Annotations[AnnotationTCPRoute]; ok && routeNameFromAnnotation != "" && !strings.Contains(routeNameFromAnnotation, ",") {
 		routeName = routeNameFromAnnotation
@@ -378,16 +402,32 @@ func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute *gwv1alpha2.TCPRoute,
 	consulRoute.Services = make([]capi.TCPService, 0)
 	for _, rule := range k8sRoute.Spec.Rules {
 		for _, k8sref := range rule.BackendRefs {
-			k8srefNS := ""
-			if k8sref.Namespace != nil {
-				k8srefNS = string(*k8sref.Namespace)
+			backendRef := k8sref.BackendObjectReference
+
+			nsn := types.NamespacedName{
+				Name:      string(backendRef.Name),
+				Namespace: valueOr(backendRef.Namespace, k8sRoute.Namespace),
 			}
-			tcpService := capi.TCPService{
-				Name:      string(k8sref.Name),
-				Partition: t.ConsulPartition,
-				Namespace: t.getConsulNamespace(k8srefNS),
+
+			isServiceRef := nilOrEqual(backendRef.Group, "") && nilOrEqual(backendRef.Kind, "Service")
+			isMeshServiceRef := derefEqual(backendRef.Group, v1alpha1.ConsulHashicorpGroup) && derefEqual(backendRef.Kind, v1alpha1.MeshServiceKind)
+
+			k8sService, k8sServiceFound := k8sServices[nsn]
+			meshService, meshServiceFound := meshServices[nsn]
+
+			if isServiceRef && k8sServiceFound {
+				service := capi.TCPService{
+					Name:      k8sService.ServiceName,
+					Namespace: t.getConsulNamespace(k8sService.Namespace),
+				}
+				consulRoute.Services = append(consulRoute.Services, service)
+			} else if isMeshServiceRef && meshServiceFound {
+				service := capi.TCPService{
+					Name:      meshService.Spec.Name,
+					Namespace: t.getConsulNamespace(meshService.Namespace),
+				}
+				consulRoute.Services = append(consulRoute.Services, service)
 			}
-			consulRoute.Services = append(consulRoute.Services, tcpService)
 		}
 	}
 
@@ -455,4 +495,22 @@ func EntryToReference(entry capi.ConfigEntry) capi.ResourceReference {
 
 func ptrTo[T any](v T) *T {
 	return &v
+}
+
+func derefEqual[T ~string](v *T, check string) bool {
+	if v == nil {
+		return false
+	}
+	return string(*v) == check
+}
+
+func nilOrEqual[T ~string](v *T, check string) bool {
+	return v == nil || string(*v) == check
+}
+
+func valueOr[T ~string](v *T, fallback string) string {
+	if v == nil {
+		return fallback
+	}
+	return string(*v)
 }

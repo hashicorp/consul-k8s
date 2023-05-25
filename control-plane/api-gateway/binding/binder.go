@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -76,6 +77,8 @@ type BinderConfig struct {
 	Secrets []corev1.Secret
 	// Pods are any pods that are part of the Gateway deployment
 	Pods []corev1.Pod
+	// MeshServices are all the MeshService objects that can be used for service lookup
+	MeshServices []v1alpha1.MeshService
 	// Service is the service associated with a Gateway deployment
 	Service *corev1.Service
 
@@ -140,6 +143,7 @@ func (b *Binder) Snapshot() Snapshot {
 	// at this point we assume all tcp routes and http routes
 	// actually reference this gateway
 	tracker := b.references()
+	meshServiceMap := meshServiceMap(b.config.MeshServices)
 	serviceMap := serviceMap(b.config.ConnectInjectedServices)
 	seenRoutes := map[api.ResourceReference]struct{}{}
 	snapshot := Snapshot{}
@@ -159,8 +163,8 @@ func (b *Binder) Snapshot() Snapshot {
 		}
 	}
 
-	httpRouteBinder := b.newHTTPRouteBinder(tracker, serviceMap)
-	tcpRouteBinder := b.newTCPRouteBinder(tracker, serviceMap)
+	httpRouteBinder := b.newHTTPRouteBinder(tracker, serviceMap, meshServiceMap)
+	tcpRouteBinder := b.newTCPRouteBinder(tracker, serviceMap, meshServiceMap)
 
 	// used for tracking how many routes have successfully bound to which listeners
 	// on a gateway for reporting the number of bound routes in a gateway listener's
@@ -234,6 +238,7 @@ func (b *Binder) Snapshot() Snapshot {
 				registrationPods = append(registrationPods, pod)
 			}
 		}
+
 		registrations := registrationsForPods(entry.Namespace, b.config.Gateway, registrationPods)
 		snapshot.Consul.Registrations = registrations
 
@@ -305,6 +310,15 @@ func serviceMap(services []api.CatalogService) map[types.NamespacedName]api.Cata
 	smap := make(map[types.NamespacedName]api.CatalogService)
 	for _, service := range services {
 		smap[serviceToNamespacedName(&service)] = service
+	}
+	return smap
+}
+
+// meshServiceMap constructs a map of services indexed by their Kubernetes namespace and name.
+func meshServiceMap(services []v1alpha1.MeshService) map[types.NamespacedName]v1alpha1.MeshService {
+	smap := make(map[types.NamespacedName]v1alpha1.MeshService)
+	for _, service := range services {
+		smap[client.ObjectKeyFromObject(&service)] = service
 	}
 	return smap
 }
