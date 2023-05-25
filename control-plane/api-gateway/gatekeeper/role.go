@@ -81,7 +81,7 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 		})
 	}
 
-	if config.OpenShiftEnabled {
+	if config.EnableOpenShift {
 		role.Rules = append(role.Rules, rbac.PolicyRule{
 			APIGroups: []string{"security.openshift.io"},
 			Resources: []string{"securitycontextconstraints"},

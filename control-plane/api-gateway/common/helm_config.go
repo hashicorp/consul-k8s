@@ -19,7 +19,6 @@ type HelmConfig struct {
 	ConsulDestinationNamespace string
 	NamespaceMirroringPrefix   string
 	EnableNamespaces           bool
-	EnableOpenShift            bool
 	EnableNamespaceMirroring   bool
 	AuthMethod                 string
 	// LogLevel is the logging level of the deployed Consul Dataplanes.
@@ -32,9 +31,9 @@ type HelmConfig struct {
 	ConsulCACert        string
 	ConsulConfig        ConsulConfig
 
-	// OpenShiftEnabled indicates whether we're deploying into an OpenShift environment
+	// EnableOpenShift indicates whether we're deploying into an OpenShift environment
 	// and should create SecurityContextConstraints.
-	OpenShiftEnabled bool
+	EnableOpenShift bool
 
 	// ReleaseName indicates the name of the release for the Helm installation. This value is used
 	// as a prefix for some resources - SecurityContextConstraints, for example - so it must be known.
