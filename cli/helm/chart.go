@@ -101,8 +101,8 @@ func readChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile
 	}
 
 	for _, f := range dirs {
-		if f.IsDir() {
-			// We only need to include files in the templates directory.
+		if f.IsDir() || f.Name() == "kustomization.yaml" {
+			// We only need to include files in the crds directory.
 			continue
 		}
 
