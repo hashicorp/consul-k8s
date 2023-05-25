@@ -136,13 +136,10 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 
-			// Multi port apps don't work with transparent proxy.
-			if cfg.EnableTransparentProxy {
-				t.Skipf("skipping this test because transparent proxy is enabled")
-			}
-
 			helmValues := map[string]string{
 				"connectInject.enabled": "true",
+				// Enable DNS so we can test that DNS redirection _isn't_ set in the pod.
+				"dns.enabled": "true",
 
 				"global.tls.enabled":           strconv.FormatBool(secure),
 				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
