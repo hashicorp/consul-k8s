@@ -350,7 +350,7 @@ func (t K8sToConsulTranslator) translateHTTPServices(namespace string, k8sBacken
 
 		if isServiceRef && k8sServiceFound {
 			service := capi.HTTPService{
-				Name:      k8sService.ServiceName,
+				Name:      strings.TrimSuffix(k8sService.ServiceName, "-sidecar-proxy"),
 				Namespace: t.getConsulNamespace(k8sService.Namespace),
 				Filters:   translateHTTPFilters(k8sRef.Filters),
 			}
@@ -417,7 +417,7 @@ func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute *gwv1alpha2.TCPRoute,
 
 			if isServiceRef && k8sServiceFound {
 				service := capi.TCPService{
-					Name:      k8sService.ServiceName,
+					Name:      strings.TrimSuffix(k8sService.ServiceName, "-sidecar-proxy"),
 					Namespace: t.getConsulNamespace(k8sService.Namespace),
 				}
 				consulRoute.Services = append(consulRoute.Services, service)

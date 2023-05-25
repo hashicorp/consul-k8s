@@ -25,6 +25,7 @@ rules:
   - ingressgateways
   - terminatinggateways
   - gatewayclassconfigs
+  - meshservices
   - samenessgroups
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors

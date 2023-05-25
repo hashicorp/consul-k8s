@@ -44,7 +44,9 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-const WebhookCAFilename = "ca.crt"
+const (
+	WebhookCAFilename = "ca.crt"
+)
 
 type Command struct {
 	UI cli.Ui
