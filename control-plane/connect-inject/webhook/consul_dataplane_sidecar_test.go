@@ -379,7 +379,12 @@ func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
 					pod.Annotations[constants.KeyTransparentProxy] = strconv.FormatBool(*tproxyCase.PodTProxy)
 				}
 
-				ns := testNS
+				ns := corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   k8sNamespace,
+						Labels: map[string]string{},
+					},
+				}
 				if dnsCase.NamespaceDNS != nil {
 					ns.Labels[constants.KeyConsulDNS] = strconv.FormatBool(*dnsCase.NamespaceDNS)
 				}
