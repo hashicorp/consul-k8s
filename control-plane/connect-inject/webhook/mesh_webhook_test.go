@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -56,7 +56,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"kube-system namespace",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -76,7 +80,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"already injected",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -100,7 +108,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"empty pod basic",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -142,7 +154,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with upstreams specified",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -201,7 +217,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"empty pod with injection disabled",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -227,7 +247,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"empty pod with injection truthy",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -282,7 +306,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with empty volume mount annotation",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -336,7 +364,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with volume mount annotation",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -410,7 +442,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with sidecar volume mount annotation",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -470,7 +506,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with sidecar invalid volume mount annotation",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -501,7 +541,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with service annotation",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -556,7 +600,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with existing label",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -606,7 +654,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"tproxy with overwriteProbes is enabled",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                    logrtest.NewTestLogger(t),
+=======
+				Log:                    logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSet(),
 				EnableTransparentProxy: true,
@@ -696,7 +748,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> 736f3358 (Fix test loggr)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
