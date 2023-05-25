@@ -1,4 +1,4 @@
-{{- if (and .Values.connectInject.enabled .Values.connectInject.apiGateway.managedGatewayClass.enabled) }}
+{{- if .Values.connectInject.enabled }}
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: GatewayClass
 metadata:
