@@ -811,7 +811,11 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"multiport pod kube 1.24 with AuthMethod, serviceaccount does not have secret ref",
 			MeshWebhook{
+<<<<<<< HEAD
 				Log:                   logrtest.NewTestLogger(t),
+=======
+				Log:                   logrtest.New(t),
+>>>>>>> ba8accaf (Fix ProbeHandler)
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
