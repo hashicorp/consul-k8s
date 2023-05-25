@@ -162,6 +162,16 @@ rules:
   - get
   - patch
   - update
+{{- if .Values.global.openshift.enabled }}
+- apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  resourceNames:
+  - {{ .Release.Name }}-api-gateway
+  verbs:
+  - use
+{{- end }}
 - apiGroups:
     - apps
   resources:
