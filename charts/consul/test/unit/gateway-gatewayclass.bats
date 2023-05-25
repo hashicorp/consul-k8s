@@ -6,6 +6,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/gateway-gatewayclass.yaml  \
+      --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
