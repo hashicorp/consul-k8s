@@ -1131,6 +1131,43 @@ server:
     # @type: string
     caCert: null
 
+  # Settings for potentially limiting timeouts, rate limiting on clients as well
+  # as servers, and other settings to limit exposure too many requests, requests
+  # waiting for too long, and other runtime considerations.
+  limits:
+    # This object specifies configurations that limit the rate of RPC and gRPC 
+    # requests on the Consul server. Limiting the rate of gRPC and RPC requests
+    # also limits HTTP requests to the Consul server. 
+    # https://developer.hashicorp.com/consul/docs/agent/config/config-files#request_limits
+    requestLimits:   
+      # Setting for disabling or enabling rate limiting.  If not disabled, it
+      # enforces the action that will occur when RequestLimitsReadRate
+      # or RequestLimitsWriteRate is exceeded.  The default value of "disabled" will
+      # prevent any rate limiting from occuring.  A value of "enforce" will block
+      # the request from processings by returning an error.  A value of
+      # "permissive" will not block the request and will allow the request to 
+      # continue processing.
+      # @type: string
+      mode: "disabled"
+      
+      # Setting that controls how frequently RPC, gRPC, and HTTP
+      # queries are allowed to happen. In any large enough time interval, rate
+      # limiter limits the rate to RequestLimitsReadRate tokens per second.
+      #
+      # See https://en.wikipedia.org/wiki/Token_bucket for more about token
+      # buckets.
+      # @type: integer
+      readRate: -1
+      
+      # Setting that controls how frequently RPC, gRPC, and HTTP
+      # writes are allowed to happen. In any large enough time interval, rate
+      # limiter limits the rate to RequestLimitsWriteRate tokens per second.
+      #
+      # See https://en.wikipedia.org/wiki/Token_bucket for more about token
+      # buckets.
+      # @type: integer
+      writeRate: -1
+
 # Configuration for Consul servers when the servers are running outside of Kubernetes.
 # When running external servers, configuring these values is recommended
 # if setting `global.tls.enableAutoEncrypt` to true
