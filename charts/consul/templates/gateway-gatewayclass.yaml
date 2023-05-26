@@ -1,0 +1,18 @@
+{{- if .Values.connectInject.enabled }}
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: GatewayClass
+metadata:
+  name: consul-api-gateway
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: api-gateway-controller
+spec:
+  controllerName: consul.hashicorp.com/consul-api-gateway-controller
+  parametersRef:
+    group: consul.hashicorp.com
+    kind: GatewayClassConfig
+    name: consul-api-gateway
+{{- end }}

@@ -15,7 +15,8 @@ import "embed"
 //
 // The embed directive does not include files with underscores unless explicitly listed, which is why _helpers.tpl is
 // explicitly embedded.
-//go:embed consul/Chart.yaml consul/values.yaml consul/templates consul/templates/_helpers.tpl
+//
+//go:embed consul/Chart.yaml consul/values.yaml consul/crds consul/templates consul/templates/_helpers.tpl
 var ConsulHelmChart embed.FS
 
 //go:embed demo/Chart.yaml demo/values.yaml demo/templates

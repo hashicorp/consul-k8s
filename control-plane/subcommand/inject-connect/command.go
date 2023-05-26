@@ -15,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
@@ -38,9 +40,13 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-const WebhookCAFilename = "ca.crt"
+const (
+	WebhookCAFilename = "ca.crt"
+)
 
 type Command struct {
 	UI cli.Ui
@@ -136,6 +142,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
+	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -447,14 +455,69 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	consulMeta := apicommon.ConsulMeta{
-		PartitionsEnabled:    c.flagEnablePartitions,
-		Partition:            c.consul.Partition,
-		NamespacesEnabled:    c.flagEnableNamespaces,
-		DestinationNamespace: c.flagConsulDestinationNamespace,
-		Mirroring:            c.flagEnableK8SNSMirroring,
-		Prefix:               c.flagK8SNSMirroringPrefix,
+	// API Gateway Controllers
+	if err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to register field indexes")
+		return 1
 	}
+
+	if err = (&gatewaycontrollers.GatewayClassConfigController{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controller").WithName("gateways"),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollers.GatewayClassConfigController{})
+		return 1
+	}
+
+	if err := (&gatewaycontrollers.GatewayClassController{
+		ControllerName: gatewaycontrollers.GatewayClassControllerName,
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("controllers").WithName("GatewayClass"),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GatewayClass")
+		return 1
+	}
+
+	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
+		HelmConfig: apigateway.HelmConfig{
+			ConsulConfig: apigateway.ConsulConfig{
+				Address:    c.consul.Addresses,
+				GRPCPort:   consulConfig.GRPCPort,
+				HTTPPort:   consulConfig.HTTPPort,
+				APITimeout: consulConfig.APITimeout,
+			},
+			ImageDataplane:             c.flagConsulDataplaneImage,
+			ImageConsulK8S:             c.flagConsulK8sImage,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			NamespaceMirroringPrefix:   c.flagK8SNSMirroringPrefix,
+			EnableNamespaces:           c.flagEnableNamespaces,
+			PeeringEnabled:             c.flagEnablePeering,
+			EnableOpenShift:            c.flagEnableOpenShift,
+			EnableNamespaceMirroring:   c.flagEnableK8SNSMirroring,
+			AuthMethod:                 c.flagACLAuthMethod,
+			LogLevel:                   c.flagLogLevel,
+			LogJSON:                    c.flagLogJSON,
+			TLSEnabled:                 c.consul.UseTLS,
+			ConsulTLSServerName:        c.consul.TLSServerName,
+			ConsulPartition:            c.consul.Partition,
+			ConsulCACert:               string(caCertPem),
+		},
+		ConsulClientConfig:  consulConfig,
+		ConsulServerConnMgr: watcher,
+		NamespacesEnabled:   c.flagEnableNamespaces,
+		Partition:           c.consul.Partition,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
+		return 1
+	}
+
+	go cache.Run(ctx)
+
+	// wait for the cache to fill
+	setupLog.Info("waiting for Consul cache sync")
+	cache.WaitSynced(ctx)
+	setupLog.Info("Consul cache synced")
 
 	configEntryReconciler := &controllers.ConfigEntryController{
 		ConsulClientConfig:         c.consul.ConsulClientConfig(),
@@ -652,6 +715,15 @@ func (c *Command) Run(args []string) int {
 			LogLevel:                     c.flagLogLevel,
 			LogJSON:                      c.flagLogJSON,
 		}})
+
+	consulMeta := apicommon.ConsulMeta{
+		PartitionsEnabled:    c.flagEnablePartitions,
+		Partition:            c.consul.Partition,
+		NamespacesEnabled:    c.flagEnableNamespaces,
+		DestinationNamespace: c.flagConsulDestinationNamespace,
+		Mirroring:            c.flagEnableK8SNSMirroring,
+		Prefix:               c.flagK8SNSMirroringPrefix,
+	}
 
 	// Note: The path here should be identical to the one on the kubebuilder
 	// annotation in each webhook file.

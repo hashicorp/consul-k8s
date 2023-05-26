@@ -316,7 +316,7 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 		}
 		for _, gateway := range gatewayList.Services {
 			switch gateway.Kind {
-			case api.ServiceKindMeshGateway, api.ServiceKindIngressGateway, api.ServiceKindTerminatingGateway:
+			case api.ServiceKindAPIGateway, api.ServiceKindMeshGateway, api.ServiceKindIngressGateway, api.ServiceKindTerminatingGateway:
 				proxyID = gateway.ID
 			}
 		}

@@ -241,7 +241,7 @@ func TestUpdateHealthCheckOnConsulClient(t *testing.T) {
 
 			ctrl := Controller{
 				ConsulClientConfig: testClient.Cfg,
-				Log:                logrtest.TestLogger{T: t},
+				Log:                logrtest.NewTestLogger(t),
 			}
 
 			err := ctrl.updateHealthCheckOnConsulClient(testClient.Cfg.APIClientConfig, pod, endpoints, c.updateToStatus)
