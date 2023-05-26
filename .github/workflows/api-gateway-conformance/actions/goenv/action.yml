@@ -1,0 +1,54 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+name: "Setup Go Environment"
+description: "Setup a go environment with caching"
+inputs:
+  go-version:
+    description: "Go version to install"
+    required: true
+  gotestsum-version:
+    description: "gotestsum version to install"
+    required: false
+    default: 1.7.0
+outputs:
+  go-build-cache:
+    description: "go build cache path"
+    value: ${{ steps.go-cache-paths.outputs.go-build-cache }}
+  go-mod-cache:
+    description: "go mod cache path"
+    value: ${{ steps.go-cache-paths.outputs.go-mod-cache }}
+runs:
+  using: composite
+  steps:
+  - name: Setup Go
+    uses: actions/setup-go@v2
+    with:
+      go-version: ${{ inputs.go-version }}
+
+  - name: Setup gotestsum
+    shell: bash
+    run: |
+      url=https://github.com/gotestyourself/gotestsum/releases/download
+      curl -sSL "${url}/v${{ inputs.gotestsum-version }}/gotestsum_${{ inputs.gotestsum-version }}_linux_amd64.tar.gz" | \
+            tar -xz --overwrite -C /usr/local/bin gotestsum
+      gotestsum --version
+
+  - id: go-cache-paths
+    name: Setup Go Cache paths
+    shell: bash
+    run: |
+      echo "::set-output name=go-build-cache::$(go env GOCACHE)"
+      echo "::set-output name=go-mod-cache::$(go env GOMODCACHE)"
+
+  - name: Go Build Cache
+    uses: actions/cache@v2
+    with:
+      path: ${{ steps.go-cache-paths.outputs.go-build-cache }}
+      key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
+  - name: Go Mod Cache
+    uses: actions/cache@v2
+    with:
+      path: ${{ steps.go-cache-paths.outputs.go-mod-cache }}
+      key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}

@@ -1,0 +1,14 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+global:
+  tls:
+    enabled: true
+server:
+  replicas: 1
+connectInject:
+  enabled: true
+  default: true
+controller:
+  enabled: true
+logLevel: info

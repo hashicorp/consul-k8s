@@ -1,0 +1,39 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+name: "Setup Kind"
+description: "Setup a Kind cluster with MetalLB for ingress"
+inputs:
+  cluster-name:
+    description: "The name to assign to the Kind cluster"
+    required: false
+    default: "consul-api-gateway-test"
+  load-docker-image:
+    description: "A Docker image to load into Kind cluster, if any"
+    required: false
+    default: ""
+  metallb-config-path:
+    description: "The path to a config file for MetalLB"
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Create Kind cluster
+      uses: helm/kind-action@9e8295d178de23cbfbd8fa16cf844eec1d773a07
+      with:
+        cluster_name: ${{ inputs.cluster-name }}
+        kubectl_version: "v1.22.0"
+        node_image: "kindest/node:v1.24.6@sha256:97e8d00bc37a7598a0b32d1fabd155a96355c49fa0d4d4790aab0f161bf31be1"
+
+    - name: Install MetalLB
+      shell: bash
+      run: |
+        kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.12.1/manifests/namespace.yaml
+        kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.12.1/manifests/metallb.yaml
+        kubectl apply -f ${{ inputs.metallb-config-path }}
+        kubectl wait --for=condition=Ready --timeout=60s --namespace=metallb-system pods --all
+
+    - name: Load Docker image
+      if: inputs.load-docker-image != ''
+      shell: bash
+      run: kind load docker-image ${{ inputs.load-docker-image }} --name ${{ inputs.cluster-name }}

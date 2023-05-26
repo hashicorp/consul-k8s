@@ -1,0 +1,138 @@
+name: Conformance (Build)
+
+on:
+  pull_request:
+    types: ["opened", "reopened", "synchronize", "labeled"]
+
+  push:
+    branches: ["conformance/*"]
+
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Start tmate session if any step fails'
+        required: false
+        type: boolean
+        default: false  # GitHub parses this value to string, see https://github.com/actions/runner/issues/1483
+      debug_timeout_minutes:
+        description: 'How many minutes should the tmate session close itself after?'
+        required: false
+        type: string  # No support for numeric value
+        default: '10'
+
+env:
+  GO_VERSION: "1.19"
+
+jobs:
+  run-on-kind:
+    # Run on PR only if there is a `pr/api-gateway-conformance` label
+    if: "github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'pr/api-gateway-conformance')"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+#          - name: "consul@v1.12 + consul-k8s@v0.49.1"
+#            consul-image: "hashicorp/consul:1.12"
+#            envoy-image: "envoyproxy/envoy:v1.22-latest"
+#            consul-k8s-version: "consul-k8s-control-plane-dev"
+#            envoy-field: "global.imageEnvoy"
+#          - name: "consul@v1.13 + consul-k8s@v0.49.1"
+#            consul-image: "hashicorp/consul:1.13"
+#            envoy-image: "envoyproxy/envoy:v1.22-latest"
+#            consul-k8s-version: "consul-k8s-control-plane-dev"
+#            envoy-field: "global.imageEnvoy"
+#          - name: "consul@v1.14 + consul-k8s@v1.0.1"
+#            api-gateway-image: "consul-api-gateway:local-build"
+#            consul-image: "hashicorp/consul:1.14"
+#            envoy-image: "envoyproxy/envoy:v1.24-latest"
+#            consul-k8s-version: "consul-k8s-control-plane-dev"
+#            envoy-field: "apiGateway.imageEnvoy"
+          - name: "consul@v1.15 + consul-k8s@v1.0.1"
+            consul-image: "hashicorp/consul:1.15"
+            envoy-image: "envoyproxy/envoy:v1.24-latest"
+            consul-k8s-version: "consul-k8s-control-plane-dev"
+            envoy-field: "apiGateway.imageEnvoy"
+      fail-fast: false
+    name: "${{ matrix.config.name }}"
+
+    steps:
+      # Clone repos side-by-side:
+      # GITHUB_WORKSPACE/
+      #     consul-k8s/
+      #     gateway-api/
+      - name: Checkout consul-k8s
+        uses: actions/checkout@v2
+        with:
+          path: "consul-k8s"
+
+
+#      #Previously we were running these tests against multiple released versions of consul-k8s, but
+#      # now that we're integrated, do we still want to do this?
+#      - name: Clone consul-k8s
+#        uses: actions/checkout@v2
+#        with:
+#          repository: "hashicorp/consul-k8s"
+#          ref: ${{ matrix.config.consul-k8s-version }}
+#          path: "consul-k8s"
+
+      - name: Clone gateway-api
+        uses: actions/checkout@v2
+        with:
+          repository: "hashicorp/gateway-api"
+          ref: "conformance/v0.5.1-skipped-tests"
+          path: "gateway-api"
+
+      - name: Setup Goenv
+        uses: ./consul-k8s/.github/workflows/api-gateway-conformance/actions/goenv
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+#      - name: Build binary
+#        env:
+#          CGO_ENABLED: "0"
+#          GOARCH: "amd64"
+#          GOOS: "linux"
+#        working-directory: "consul-k8s"
+#        run: make control-plane-dev
+
+      - name: Build docker image
+        env:
+          CGO_ENABLED: "0"
+          GOARCH: "amd64"
+          GOOS: "linux"
+        working-directory: "consul-k8s"
+        run: make control-plane-dev-docker
+
+
+      - name: Setup Kind cluster
+        uses: ./consul-k8s/.github/workflows/api-gateway-conformance/actions/setup-kind
+        with:
+          load-docker-image: ${{ matrix.config.consul-k8s-version}}
+          metallb-config-path: "consul-k8s/.github/workflows/api-gateway-conformance/metallb-config.yaml"
+
+      #TODO I'm not sure if we still need this since I think Thomas wrapped the crd installs into the helm install
+      - name: Install Consul CRDs
+        working-directory: "consul-k8s"
+        run: kubectl apply --kustomize="./charts/consul/crds"
+
+      - name: Install Consul
+        working-directory: "consul-k8s/.github/workflows/api-gateway-conformance"
+        run: |
+          helm install --values ./consul-config.yaml consul $GITHUB_WORKSPACE/consul-k8s/charts/consul --set global.imageK8S=${{ matrix.config.consul-k8s-version }} --set global.image=${{ matrix.config.consul-image }} --set ${{ matrix.config.envoy-field }}=${{ matrix.config.envoy-image }} --create-namespace --namespace=consul
+          kubectl wait --for=condition=Ready --timeout=60s --namespace=consul pods --all
+
+      - name: Patch testing resources
+        working-directory: "consul-k8s/.github/workflows/api-gateway-conformance"
+        run: |
+          cp kustomization.yaml proxydefaults.yaml $GITHUB_WORKSPACE/gateway-api/conformance/
+          cd $GITHUB_WORKSPACE/gateway-api/conformance/
+          kubectl kustomize ./ --output ./base/manifests.yaml
+
+      - name: Run tests
+        working-directory: "gateway-api/conformance"
+        run: go test -v -timeout 10m ./ --gateway-class=consul-api-gateway
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: failure() && github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true'
+        timeout-minutes: ${{ fromJSON(github.event.inputs.debug_timeout_minutes) }}
