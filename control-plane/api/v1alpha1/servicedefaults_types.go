@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -172,14 +171,14 @@ type PassiveHealthCheck struct {
 	// EnforcingConsecutive5xx is the % chance that a host will be actually ejected
 	// when an outlier status is detected through consecutive 5xx.
 	// This setting can be used to disable ejection or to ramp it up slowly.
-	EnforcingConsecutive5xx *uint32 `json:"enforcing_consecutive_5xx,omitempty"`
+	EnforcingConsecutive5xx *uint32 `json:"enforcingConsecutive5xx,omitempty"`
 	// The maximum % of an upstream cluster that can be ejected due to outlier detection.
 	// Defaults to 10% but will eject at least one host regardless of the value.
-	MaxEjectionPercent *uint32 `json:",omitempty" alias:"max_ejection_percent"`
+	MaxEjectionPercent *uint32 `json:"maxEjectionPercent,omitempty"`
 	// The base time that a host is ejected for. The real time is equal to the base time
 	// multiplied by the number of times the host has been ejected and is capped by
 	// max_ejection_time (Default 300s). Defaults to 30000ms or 30s.
-	BaseEjectionTime *time.Duration `json:",omitempty" alias:"base_ejection_time"`
+	BaseEjectionTime *metav1.Duration `json:"baseEjectionTime,omitempty"`
 }
 
 type ServiceDefaultsDestination struct {
@@ -422,7 +421,7 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 		MaxFailures:             in.MaxFailures,
 		EnforcingConsecutive5xx: in.EnforcingConsecutive5xx,
 		MaxEjectionPercent:      in.MaxEjectionPercent,
-		BaseEjectionTime:        in.BaseEjectionTime,
+		BaseEjectionTime:        &in.BaseEjectionTime.Duration,
 	}
 }
 

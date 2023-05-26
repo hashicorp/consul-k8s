@@ -86,7 +86,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								MaxFailures:             uint32(20),
 								EnforcingConsecutive5xx: pointer.Uint32(100),
 								MaxEjectionPercent:      pointer.Uint32(10),
-								BaseEjectionTime:        pointer.Duration(10 * time.Second),
+								BaseEjectionTime: &metav1.Duration{
+									Duration: 10 * time.Second,
+								},
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -113,7 +115,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
 									MaxEjectionPercent:      pointer.Uint32(20),
-									BaseEjectionTime:        pointer.Duration(20 * time.Second),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 20 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -139,7 +143,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
 									MaxEjectionPercent:      pointer.Uint32(30),
-									BaseEjectionTime:        pointer.Duration(30 * time.Second),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 30 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -361,7 +367,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								MaxFailures:             uint32(20),
 								EnforcingConsecutive5xx: pointer.Uint32(100),
 								MaxEjectionPercent:      pointer.Uint32(10),
-								BaseEjectionTime:        pointer.Duration(10 * time.Second),
+								BaseEjectionTime: &metav1.Duration{
+									Duration: 10 * time.Second,
+								},
 							},
 							MeshGateway: MeshGateway{
 								Mode: "local",
@@ -387,7 +395,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
 									MaxEjectionPercent:      pointer.Uint32(20),
-									BaseEjectionTime:        pointer.Duration(20 * time.Second),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 20 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",
@@ -412,7 +422,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									MaxFailures:             uint32(10),
 									EnforcingConsecutive5xx: pointer.Uint32(60),
 									MaxEjectionPercent:      pointer.Uint32(30),
-									BaseEjectionTime:        pointer.Duration(30 * time.Second),
+									BaseEjectionTime: &metav1.Duration{
+										Duration: 30 * time.Second,
+									},
 								},
 								MeshGateway: MeshGateway{
 									Mode: "remote",

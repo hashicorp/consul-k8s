@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: fix issue with json tags of service defaults fields EnforcingConsecutive5xx, MaxEjectionPercent and BaseEjectionTime.
+```
