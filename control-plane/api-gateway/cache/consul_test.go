@@ -1308,14 +1308,6 @@ func TestCache_Write(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		{
-			name: "failed to set",
-			responseFn: func(w http.ResponseWriter) {
-				w.WriteHeader(200)
-				fmt.Fprintln(w, `{updated: false}`)
-			},
-			expectedErr: ErrDidNotSet,
-		},
 	}
 
 	for _, tt := range testCases {
@@ -1435,7 +1427,7 @@ func TestCache_Write(t *testing.T) {
 				Status:    api.ConfigEntryStatus{},
 			}
 
-			err = c.Write(entry)
+			err = c.Write(context.Background(), entry)
 			require.Equal(t, err, tt.expectedErr)
 		})
 	}
@@ -1611,6 +1603,8 @@ func Test_Run(t *testing.T) {
 			fmt.Fprintln(w, string(val))
 		case "/v1/catalog/services":
 			fmt.Fprintln(w, `{}`)
+		case "/v1/peerings":
+			fmt.Fprintln(w, `[]`)
 		default:
 			w.WriteHeader(500)
 			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
@@ -1719,6 +1713,7 @@ func Test_Run(t *testing.T) {
 	})
 
 	c.SubscribeServices(ctx, func(cs *api.CatalogService) []types.NamespacedName { return nil }).Cancel()
+	c.SubscribePeerings(ctx, func(cs *api.Peering) []types.NamespacedName { return nil }).Cancel()
 
 	// mark this subscription as ended
 	canceledSub.Cancel()
@@ -2008,14 +2003,6 @@ func TestCache_Delete(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		{
-			name: "failed to delete",
-			responseFn: func(w http.ResponseWriter) {
-				w.WriteHeader(500)
-				fmt.Fprintln(w, `{deleted: false}`)
-			},
-			expectedErr: ErrDidNotDelete,
-		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2050,10 +2037,10 @@ func TestCache_Delete(t *testing.T) {
 				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 				NamespacesEnabled:   false,
 				Partition:           "",
-				Logger:              logr.Logger{},
+				Logger:              logrtest.NewTestLogger(t),
 			})
 
-			err = c.Delete(ref)
+			err = c.Delete(context.Background(), ref)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

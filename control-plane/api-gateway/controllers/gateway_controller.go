@@ -5,12 +5,11 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+
 	"github.com/go-logr/logr"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,10 +27,10 @@ import (
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/binding"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/gatekeeper"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 )
@@ -59,21 +58,6 @@ type GatewayController struct {
 	Translator translation.K8sToConsulTranslator
 	cache      *cache.Cache
 	client.Client
-}
-
-func buildOpts(ref api.ConfigEntry) cmp.Option {
-	switch v := ref.(type) {
-	case *api.APIGatewayConfigEntry:
-		return cmpopts.IgnoreFields(api.APIGatewayConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
-	case *api.HTTPRouteConfigEntry:
-		return cmpopts.IgnoreFields(api.HTTPRouteConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
-	case *api.TCPRouteConfigEntry:
-		return cmpopts.IgnoreFields(api.TCPRouteConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
-	case *api.InlineCertificateConfigEntry:
-		return cmpopts.IgnoreFields(api.InlineCertificateConfigEntry{}, "Status", "ModifyIndex", "CreateIndex")
-	default:
-		panic(fmt.Sprintf("type is not known: %+v", v))
-	}
 }
 
 // Reconcile handles the reconciliation loop for Gateway objects.
@@ -129,6 +113,27 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// fetch related gateway pods
+	labels := apigateway.LabelsForGateway(&gw)
+	podList := &corev1.PodList{}
+	if err := r.Client.List(ctx, podList, client.MatchingLabels(labels)); err != nil {
+		log.Error(err, "unable to list Pods for Gateway")
+		return ctrl.Result{}, err
+	}
+
+	// fetch related gateway services
+	service := &corev1.Service{}
+	// we use the implicit association of a service name/namespace with a corresponding
+	// gateway
+	if err := r.Client.Get(ctx, req.NamespacedName, service); err != nil {
+		if !k8serrors.IsNotFound(err) {
+			log.Error(err, "unable to fetch service for Gateway")
+			return ctrl.Result{}, err
+		}
+		// if we got a 404, then nil out the service
+		service = nil
+	}
+
 	gwList := &gwv1beta1.GatewayList{}
 	if err := r.Client.List(ctx, gwList); err != nil {
 		log.Error(err, "unable to list Gateways")
@@ -142,6 +147,13 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				controlled[types.NamespacedName{Namespace: gw.Namespace, Name: gw.Name}] = gw
 			}
 		}
+	}
+
+	// fetch all MeshServices
+	meshServiceList := &v1alpha1.MeshServiceList{}
+	if err := r.Client.List(ctx, meshServiceList); err != nil {
+		log.Error(err, "unable to list MeshServices")
+		return ctrl.Result{}, err
 	}
 
 	// fetch all secrets referenced by this gateway
@@ -188,6 +200,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	configEntry := r.cache.Get(r.Translator.ReferenceForGateway(&gw))
+
+	var consulGateway *api.APIGatewayConfigEntry
+	if configEntry != nil {
+		consulGateway = configEntry.(*api.APIGatewayConfigEntry)
+	}
 	httpRoutes := r.cache.List(api.HTTPRoute)
 	tcpRoutes := r.cache.List(api.TCPRoute)
 	inlineCertificates := r.cache.List(api.InlineCertificate)
@@ -199,13 +217,18 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		GatewayClassConfig:       gwcc,
 		GatewayClass:             gwc,
 		Gateway:                  gw,
+		Pods:                     podList.Items,
+		Service:                  service,
 		HTTPRoutes:               httpRouteList.Items,
 		TCPRoutes:                tcpRouteList.Items,
+		MeshServices:             meshServiceList.Items,
 		Secrets:                  filteredSecrets,
+		ConsulGateway:            consulGateway,
 		ConsulHTTPRoutes:         derefAll(configEntriesTo[*api.HTTPRouteConfigEntry](httpRoutes)),
 		ConsulTCPRoutes:          derefAll(configEntriesTo[*api.TCPRouteConfigEntry](tcpRoutes)),
 		ConsulInlineCertificates: derefAll(configEntriesTo[*api.InlineCertificateConfigEntry](inlineCertificates)),
 		ConnectInjectedServices:  services,
+		GatewayServices:          consulServicesForGateway(gw, services),
 		Namespaces:               namespaces,
 		ControlledGateways:       controlled,
 	})
@@ -213,12 +236,14 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	updates := binder.Snapshot()
 
 	if updates.UpsertGatewayDeployment {
+		log.Info("updating gatekeeper")
 		err := r.updateGatekeeperResources(ctx, log, &gw, gwcc)
 		if err != nil {
 			log.Error(err, "unable to update gateway resources")
 			return ctrl.Result{}, err
 		}
 	} else {
+		log.Info("deleting gatekeeper")
 		err := r.deleteGatekeeperResources(ctx, log, &gw)
 		if err != nil {
 			log.Error(err, "unable to delete gateway resources")
@@ -228,26 +253,34 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, deletion := range updates.Consul.Deletions {
 		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
-		err = r.cache.Delete(deletion)
-		if err != nil {
-			log.Error(err, "failed to delete entry from consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
+		if err := r.cache.Delete(ctx, deletion); err != nil {
+			log.Error(err, "error deleting config entry")
+			return ctrl.Result{}, err
 		}
-
 	}
 
 	for _, update := range updates.Consul.Updates {
 		log.Info("updating in Consul", "kind", update.GetKind(), "namespace", update.GetNamespace(), "name", update.GetName())
-		ref := translation.EntryToReference(update)
-		old := r.cache.Get(ref)
-		if cmp.Equal(old, update, buildOpts(update)) {
-			continue
+		if err := r.cache.Write(ctx, update); err != nil {
+			log.Error(err, "error updating config entry")
+			return ctrl.Result{}, err
 		}
+	}
 
-		err := r.cache.Write(update)
-		if err != nil {
-			log.Error(err, "error updating config entry in consul")
+	for _, registration := range updates.Consul.Registrations {
+		log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
+		if err := r.cache.Register(ctx, registration); err != nil {
+			log.Error(err, "error registering service")
+			return ctrl.Result{}, err
 		}
+	}
 
+	for _, deregistration := range updates.Consul.Deregistrations {
+		log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
+		if err := r.cache.Deregister(ctx, deregistration); err != nil {
+			log.Error(err, "error deregistering service")
+			return ctrl.Result{}, err
+		}
 	}
 
 	for _, update := range updates.Kubernetes.Updates {
@@ -266,15 +299,19 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	// link up policy - TODO: this is really a nasty hack to inject a known policy with
+	// mesh == read on the provisioned gateway token if needed, figure out some other
+	// way of handling it.
+	if updates.UpsertGatewayDeployment {
+		reference := r.Translator.ReferenceForGateway(&gw)
+		if err := r.cache.LinkPolicy(ctx, reference.Name, reference.Namespace); err != nil {
+			log.Error(err, "error linking token policy")
+			return ctrl.Result{}, err
+		}
+	}
+
 	/* TODO:
-	1.Pull in the deployments that have been created through Gatekeeper previously to check their statuses.
-		Leverage health-checking.
-			OG impl: Any state change for the deployment/pods we subscribe to and set statuses on the gateway.
-			Do a health check on the service.
-	2.ReferenceGrants
-	  Error out if someone uses an unsupported feature:
-			- TLS mode type pass through
-	3. Run Gatekeeper Upsert with the GW, GWCC, HelmConfig.
+	1.ReferenceGrants
 	*/
 
 	return ctrl.Result{}, nil
@@ -332,8 +369,6 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 
 // SetupWithGatewayControllerManager registers the controller with the given manager.
 func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, error) {
-	logger := mgr.GetLogger()
-
 	c := cache.New(cache.Config{
 		ConsulClientConfig:  config.ConsulClientConfig,
 		ConsulServerConnMgr: config.ConsulServerConnMgr,
@@ -346,9 +381,9 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
+		Log:        mgr.GetLogger(),
 		HelmConfig: config.HelmConfig,
 		cache:      c,
-		Log:        mgr.GetLogger(),
 	}
 
 	return c, ctrl.NewControllerManagedBy(mgr).
@@ -377,47 +412,17 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant(ctx)),
 		).
 		Watches(
+			source.NewKindWithCache(&v1alpha1.MeshService{}, mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformMeshService(ctx)),
+		).
+		Watches(
 			// Subscribe to changes from Consul Connect Services
-			&source.Channel{Source: c.SubscribeServices(ctx, func(service *api.CatalogService) []types.NamespacedName {
-				nsn := serviceToNamespacedName(service)
-
-				if nsn.Namespace != "" && nsn.Name != "" {
-					key := nsn.String()
-
-					requestSet := make(map[types.NamespacedName]struct{})
-					tcpRouteList := &gwv1alpha2.TCPRouteList{}
-					if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
-						FieldSelector: fields.OneTermEqualSelector(TCPRoute_ServiceIndex, key),
-					}); err != nil {
-						logger.Error(err, "unable to list TCPRoutes")
-					}
-					for _, route := range tcpRouteList.Items {
-						for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
-							requestSet[ref] = struct{}{}
-						}
-					}
-
-					httpRouteList := &gwv1alpha2.HTTPRouteList{}
-					if err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
-						FieldSelector: fields.OneTermEqualSelector(HTTPRoute_ServiceIndex, key),
-					}); err != nil {
-						logger.Error(err, "unable to list HTTPRoutes")
-					}
-					for _, route := range httpRouteList.Items {
-						for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
-							requestSet[ref] = struct{}{}
-						}
-					}
-
-					requests := []types.NamespacedName{}
-					for request := range requestSet {
-						requests = append(requests, request)
-					}
-					return requests
-				}
-
-				return nil
-			}).Events()},
+			&source.Channel{Source: c.SubscribeServices(ctx, r.transformConsulService(ctx)).Events()},
+			&handler.EnqueueRequestForObject{},
+		).
+		Watches(
+			// Subscribe to changes from Consul Peering Services
+			&source.Channel{Source: c.SubscribePeerings(ctx, r.transformConsulPeering(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
@@ -443,13 +448,9 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 }
 
 func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
-	var (
-		metaKeyKubeNS          = "k8s-namespace"
-		metaKeyKubeServiceName = "k8s-service-name"
-	)
 	return types.NamespacedName{
-		Namespace: s.ServiceMeta[metaKeyKubeNS],
-		Name:      s.ServiceMeta[metaKeyKubeServiceName],
+		Namespace: s.ServiceMeta[constants.MetaKeyKubeNS],
+		Name:      s.ServiceMeta[constants.MetaKeyKubeServiceName],
 	}
 }
 
@@ -514,6 +515,115 @@ func (r *GatewayController) transformReferenceGrant(ctx context.Context) func(o 
 			return nil
 		}
 		return objectsToRequests(pointersOf(gatewayList.Items))
+	}
+}
+
+// transformConsulService will return a list of gateways that are referenced
+// by a TCPRoute or HTTPRoute that references the Consul service.
+func (r *GatewayController) transformConsulService(ctx context.Context) func(service *api.CatalogService) []types.NamespacedName {
+	return func(service *api.CatalogService) []types.NamespacedName {
+		nsn := serviceToNamespacedName(service)
+
+		if nsn.Namespace != "" && nsn.Name != "" {
+			key := nsn.String()
+
+			requestSet := make(map[types.NamespacedName]struct{})
+			tcpRouteList := &gwv1alpha2.TCPRouteList{}
+			if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
+				FieldSelector: fields.OneTermEqualSelector(TCPRoute_ServiceIndex, key),
+			}); err != nil {
+				r.Log.Error(err, "unable to list TCPRoutes")
+			}
+			for _, route := range tcpRouteList.Items {
+				for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+					requestSet[ref] = struct{}{}
+				}
+			}
+
+			httpRouteList := &gwv1alpha2.HTTPRouteList{}
+			if err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
+				FieldSelector: fields.OneTermEqualSelector(HTTPRoute_ServiceIndex, key),
+			}); err != nil {
+				r.Log.Error(err, "unable to list HTTPRoutes")
+			}
+			for _, route := range httpRouteList.Items {
+				for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+					requestSet[ref] = struct{}{}
+				}
+			}
+
+			requests := []types.NamespacedName{}
+			for request := range requestSet {
+				requests = append(requests, request)
+			}
+			return requests
+		}
+
+		return nil
+	}
+}
+
+// transformConsulPeering will return a list of gateways that are referenced
+// by a TCPRoute or HTTPRoute that references the Consul peering.
+func (r *GatewayController) transformConsulPeering(ctx context.Context) func(service *api.Peering) []types.NamespacedName {
+	return func(peering *api.Peering) []types.NamespacedName {
+		meshServiceList := &v1alpha1.MeshServiceList{}
+
+		if err := r.Client.List(ctx, meshServiceList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(MeshService_PeerIndex, peering.Name),
+		}); err != nil {
+			r.Log.Error(err, "unable to list TCPRoutes")
+		}
+
+		flattened := []types.NamespacedName{}
+		for _, meshService := range meshServiceList.Items {
+			for _, request := range r.transformMeshService(ctx)(&meshService) {
+				flattened = append(flattened, request.NamespacedName)
+			}
+		}
+
+		return flattened
+	}
+}
+
+// transformMeshService will return a list of gateways that are referenced
+// by a TCPRoute or HTTPRoute that references the mesh service.
+func (r *GatewayController) transformMeshService(ctx context.Context) func(o client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		service := o.(*v1alpha1.MeshService)
+		key := client.ObjectKeyFromObject(service).String()
+
+		requestSet := make(map[types.NamespacedName]struct{})
+
+		tcpRouteList := &gwv1alpha2.TCPRouteList{}
+		if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(TCPRoute_MeshServiceIndex, key),
+		}); err != nil {
+			r.Log.Error(err, "unable to list TCPRoutes")
+		}
+		for _, route := range tcpRouteList.Items {
+			for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+				requestSet[ref] = struct{}{}
+			}
+		}
+
+		httpRouteList := &gwv1beta1.HTTPRouteList{}
+		if err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(HTTPRoute_MeshServiceIndex, key),
+		}); err != nil {
+			r.Log.Error(err, "unable to list HTTPRoutes")
+		}
+		for _, route := range httpRouteList.Items {
+			for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+				requestSet[ref] = struct{}{}
+			}
+		}
+
+		requests := []reconcile.Request{}
+		for request := range requestSet {
+			requests = append(requests, reconcile.Request{NamespacedName: request})
+		}
+		return requests
 	}
 }
 
@@ -655,4 +765,15 @@ func getConfigForGatewayClass(ctx context.Context, client client.Client, gwc *gw
 		}
 	}
 	return config, nil
+}
+
+func consulServicesForGateway(gateway gwv1beta1.Gateway, services []api.CatalogService) []api.CatalogService {
+	filtered := []api.CatalogService{}
+	for _, service := range services {
+		kubeService := serviceToNamespacedName(&service)
+		if gateway.Name == kubeService.Name && gateway.Namespace == kubeService.Namespace {
+			filtered = append(filtered, service)
+		}
+	}
+	return filtered
 }

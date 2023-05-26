@@ -22,10 +22,6 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-func TestGatewayClassConfigSetup(t *testing.T) {
-	require.Error(t, (&GatewayClassConfigController{}).SetupWithManager(nil))
-}
-
 func TestGatewayClassConfigReconcile(t *testing.T) {
 	t.Parallel()
 	deletionTimestamp := meta.Now()

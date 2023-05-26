@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"context"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -27,7 +28,7 @@ var (
 
 func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
 	if gcc.Spec.ServiceType == nil {
-		return nil
+		return g.deleteService(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
 	service := g.service(gateway, gcc)

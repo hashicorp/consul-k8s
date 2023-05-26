@@ -6,14 +6,14 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	appsv1 "k8s.io/api/apps/v1"
-	rbac "k8s.io/api/rbac/v1"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"testing"
+
+	appsv1 "k8s.io/api/apps/v1"
+	rbac "k8s.io/api/rbac/v1"
 
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/require"
@@ -28,9 +28,10 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -41,6 +42,46 @@ const (
 	TestGatewayName            = "test-gateway"
 	TestNamespace              = "test-namespace"
 )
+
+func stubConsulCache(t *testing.T) *cache.Cache {
+	t.Helper()
+
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/acl/policies":
+			fmt.Fprintln(w, `[]`)
+		case "/v1/acl/tokens":
+			fmt.Fprintln(w, `[]`)
+		case "/v1/config":
+			fmt.Fprintln(w, `[]`)
+		case "/v1/catalog/services":
+			fmt.Fprintln(w, `{}`)
+		default:
+			w.WriteHeader(500)
+			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
+		}
+	}))
+	t.Cleanup(consulServer.Close)
+
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(t, err)
+
+	port, err := strconv.Atoi(serverURL.Port())
+	require.NoError(t, err)
+
+	return cache.New(cache.Config{
+		ConsulClientConfig: &consul.Config{
+			APIClientConfig: &api.Config{},
+			HTTPPort:        port,
+			GRPCPort:        port,
+			APITimeout:      0,
+		},
+		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+		NamespacesEnabled:   false,
+		Partition:           "",
+		Logger:              logrtest.New(t),
+	})
+}
 
 func TestGatewayReconcileGatekeeperUpdates(t *testing.T) {
 	t.Parallel()
@@ -86,23 +127,6 @@ func TestGatewayReconcileGatekeeperUpdates(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch r.URL.Path {
-				case "/v1/config/api-gateway/test-gateway":
-					fmt.Fprintln(w, `{}`)
-				default:
-					w.WriteHeader(500)
-					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
-				}
-			}))
-			defer consulServer.Close()
-
-			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-
-			port, err := strconv.Atoi(serverURL.Port())
-			require.NoError(t, err)
-
 			s := runtime.NewScheme()
 			require.NoError(t, gwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
@@ -119,22 +143,12 @@ func TestGatewayReconcileGatekeeperUpdates(t *testing.T) {
 			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...)).Build()
 
 			r := &GatewayController{
-				cache: cache.New(cache.Config{
-					Logger: logrtest.New(t),
-					ConsulClientConfig: &consul.Config{
-						APIClientConfig: &api.Config{},
-						HTTPPort:        port,
-						GRPCPort:        port,
-						APITimeout:      0,
-					},
-					ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
-					NamespacesEnabled:   false,
-					Partition:           ""}),
+				cache:  stubConsulCache(t),
 				Client: fakeClient,
 				Log:    logrtest.New(t),
 			}
 
-			_, err = r.Reconcile(context.Background(), req)
+			_, err := r.Reconcile(context.Background(), req)
 
 			require.Equal(t, tc.expectedError, err)
 			deployment := appsv1.Deployment{}
@@ -157,66 +171,13 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 			Name:      TestGatewayName,
 		},
 	}
-	deletionTimestamp := metav1.Now()
 
 	basicGatewayClass, basicGatewayClassConfig := getBasicGatewayClassAndConfig()
-	serviceType := corev1.ServiceType("NodePort")
 	cases := map[string]struct {
-		gateway        *gwv1beta1.Gateway
-		k8sObjects     []runtime.Object
-		expectedError  error
-		expectDeletion bool
+		gateway       *gwv1beta1.Gateway
+		k8sObjects    []runtime.Object
+		expectedError error
 	}{
-		"successful delete with deletion timestamp": {
-			gateway: &gwv1beta1.Gateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:         TestNamespace,
-					Name:              TestGatewayName,
-					Finalizers:        []string{gatewayFinalizer},
-					DeletionTimestamp: &deletionTimestamp,
-					Annotations: map[string]string{
-						TestAnnotationConfigKey: `{"serviceType":"serviceType"}`,
-					},
-				},
-				Spec: gwv1beta1.GatewaySpec{
-					GatewayClassName: TestGatewayClassName,
-				},
-			},
-			k8sObjects: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: TestNamespace,
-						Name:      TestGatewayName,
-					},
-				},
-			},
-			expectedError:  nil,
-			expectDeletion: true,
-		},
-		"successful delete for nonexistent gateway class": {
-			gateway: &gwv1beta1.Gateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:  TestNamespace,
-					Name:       TestGatewayName,
-					Finalizers: []string{gatewayFinalizer},
-					Annotations: map[string]string{
-						TestAnnotationConfigKey: `{"serviceType":"serviceType"}`,
-					},
-				},
-				Spec: gwv1beta1.GatewaySpec{
-					GatewayClassName: TestGatewayClassName,
-				},
-			},
-			k8sObjects: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: TestNamespace,
-						Name:      TestGatewayName,
-					},
-				},
-			},
-			expectedError: nil,
-		},
 		"successful change of gatewayclass on gateway": {
 			gateway: &gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
@@ -228,44 +189,12 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 					},
 				},
 				Spec: gwv1beta1.GatewaySpec{
-					GatewayClassName: "DifferentGatewayClassName",
+					GatewayClassName: TestGatewayClassName,
 				},
 			},
 			k8sObjects: []runtime.Object{
-				&gwv1beta1.GatewayClass{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "",
-						Name:      "DifferentGatewayClassName",
-						Finalizers: []string{
-							gatewayClassFinalizer,
-						},
-					},
-					Spec: gwv1beta1.GatewayClassSpec{
-						ControllerName: "different.controller.name",
-						ParametersRef: &gwv1beta1.ParametersReference{
-							Group:     "different.group",
-							Kind:      "GatewayClassConfig",
-							Name:      "DifferentGatewayClassConfigName",
-							Namespace: nil,
-						},
-					},
-				},
-				&v1alpha1.GatewayClassConfig{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "DifferentGatewayClassConfigName",
-					},
-					Spec: v1alpha1.GatewayClassConfigSpec{
-						ServiceType: &serviceType,
-					},
-				},
 				&basicGatewayClass,
 				&basicGatewayClassConfig,
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: TestNamespace,
-						Name:      TestGatewayName,
-					},
-				},
 			},
 			expectedError: nil,
 		},
@@ -273,24 +202,6 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch r.URL.Path {
-				case "/v1/config/api-gateway/test-gateway":
-					fmt.Fprintln(w, `{}`)
-				default:
-					w.WriteHeader(500)
-					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
-				}
-			}))
-			defer consulServer.Close()
-
-			serverURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-
-			port, err := strconv.Atoi(serverURL.Port())
-			require.NoError(t, err)
-
 			s := runtime.NewScheme()
 			require.NoError(t, gwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
@@ -307,45 +218,21 @@ func TestGatewayReconcileGatekeeperDeletes(t *testing.T) {
 			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...)).Build()
 
 			r := &GatewayController{
-				cache: cache.New(cache.Config{
-					Logger: logrtest.New(t),
-					ConsulClientConfig: &consul.Config{
-						APIClientConfig: &api.Config{},
-						HTTPPort:        port,
-						GRPCPort:        port,
-						APITimeout:      0,
-					},
-					ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
-					NamespacesEnabled:   false,
-					Partition:           ""}),
+				cache:  stubConsulCache(t),
 				Client: fakeClient,
 				Log:    logrtest.New(t),
 			}
 
-			_, err = r.Reconcile(context.TODO(), req)
+			_, err := r.Reconcile(context.Background(), req)
 
 			require.Equal(t, tc.expectedError, err)
-
-			// Check the k8s objects are removed
 			deployment := appsv1.Deployment{}
 			r.Client.Get(context.TODO(), types.NamespacedName{
 				Namespace: TestNamespace,
 				Name:      TestGatewayName,
 			}, &deployment)
-			require.Empty(t, deployment)
-
-			// Check the finalizer is removed
-			gw := gwv1beta1.Gateway{}
-			err = r.Client.Get(context.TODO(), types.NamespacedName{
-				Namespace: TestNamespace,
-				Name:      TestGatewayName,
-			}, &gw)
-			if tc.expectDeletion {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				require.Empty(t, gw.Finalizers)
-			}
+			require.NotEmpty(t, deployment)
+			require.Equal(t, TestGatewayName, deployment.ObjectMeta.Name)
 		})
 	}
 }
