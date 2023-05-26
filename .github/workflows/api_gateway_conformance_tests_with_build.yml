@@ -48,10 +48,8 @@ jobs:
 #            consul-k8s-version: "consul-k8s-control-plane-dev"
 #            envoy-field: "apiGateway.imageEnvoy"
           - name: "consul@v1.15 + consul-k8s@v1.0.1"
-            consul-image: "hashicorp/consul:1.15"
-            envoy-image: "envoyproxy/envoy:v1.24-latest"
+            consul-image: "hashicorppreview/consul:1.16-dev "
             consul-k8s-image: "consul-k8s-control-plane-dev:local-build"
-            envoy-field: "apiGateway.imageEnvoy"
       fail-fast: false
     name: "${{ matrix.config.name }}"
 
@@ -64,16 +62,6 @@ jobs:
         uses: actions/checkout@v2
         with:
           path: "consul-k8s"
-
-
-#      #Previously we were running these tests against multiple released versions of consul-k8s, but
-#      # now that we're integrated, do we still want to do this?
-#      - name: Clone consul-k8s
-#        uses: actions/checkout@v2
-#        with:
-#          repository: "hashicorp/consul-k8s"
-#          ref: ${{ matrix.config.consul-k8s-version }}
-#          path: "consul-k8s"
 
       - name: Clone gateway-api
         uses: actions/checkout@v2
@@ -110,7 +98,7 @@ jobs:
           load-docker-image: ${{ matrix.config.consul-k8s-image }}
           metallb-config-path: "consul-k8s/.github/workflows/api-gateway-conformance/metallb-config.yaml"
 
-      #TODO I'm not sure if we still need this since I think Thomas wrapped the crd installs into the helm install
+      #TODO I'm not sure if we still need this since
       - name: Install Consul CRDs
         working-directory: "consul-k8s"
         run: kubectl apply --kustomize="./charts/consul/crds"
@@ -118,7 +106,7 @@ jobs:
       - name: Install Consul
         working-directory: "consul-k8s/.github/workflows/api-gateway-conformance"
         run: |
-          helm install --values ./consul-config.yaml consul $GITHUB_WORKSPACE/consul-k8s/charts/consul --set global.imageK8S=${{ matrix.config.consul-k8s-image }} --set global.image=${{ matrix.config.consul-image }} --set ${{ matrix.config.envoy-field }}=${{ matrix.config.envoy-image }} --create-namespace --namespace=consul
+          helm install --values ./consul-config.yaml consul $GITHUB_WORKSPACE/consul-k8s/charts/consul --set global.imageK8S=${{ matrix.config.consul-k8s-image }} --set global.image=${{ matrix.config.consul-image }} --create-namespace --namespace=consul
           kubectl wait --for=condition=Ready --timeout=60s --namespace=consul pods --all
 
       - name: Patch testing resources
