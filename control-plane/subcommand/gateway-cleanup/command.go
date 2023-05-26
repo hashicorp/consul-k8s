@@ -101,7 +101,8 @@ func (c *Command) Run(args []string) int {
 
 	// do the cleanup
 
-	// find the class config
+	// find the class config and mark it for deletion first so that we
+	// can do an early return if the gateway class isn't found
 	config := &v1alpha1.GatewayClassConfig{}
 	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassConfigName}, config)
 	if err != nil {
@@ -112,6 +113,9 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(err.Error())
 		return 1
 	}
+
+	// ignore any returned errors
+	_ = c.k8sClient.Delete(context.Background(), config)
 
 	// find the gateway class
 	gatewayClass := &gwv1beta1.GatewayClass{}
@@ -126,7 +130,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// ignore any returned errors
-	_ = c.k8sClient.Delete(context.Background(), config)
 	_ = c.k8sClient.Delete(context.Background(), gatewayClass)
 
 	// make sure they're gone
