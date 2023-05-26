@@ -24,7 +24,7 @@ func init() {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// ControlPlaneRequestLimit is the Schema for the controlplanerequestlimits API
+// ControlPlaneRequestLimit is the Schema for the controlplanerequestlimits API.
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 type ControlPlaneRequestLimit struct {
@@ -37,7 +37,7 @@ type ControlPlaneRequestLimit struct {
 
 // +kubebuilder:object:root=true
 
-// ControlPlaneRequestLimitList contains a list of ControlPlaneRequestLimit
+// ControlPlaneRequestLimitList contains a list of ControlPlaneRequestLimit.
 type ControlPlaneRequestLimitList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -74,12 +74,12 @@ func (c *ReadWriteRatesConfig) validate(path *field.Path) field.ErrorList {
 	return errs
 }
 
-// ControlPlaneRequestLimitSpec defines the desired state of ControlPlaneRequestLimit
+// ControlPlaneRequestLimitSpec defines the desired state of ControlPlaneRequestLimit.
 type ControlPlaneRequestLimitSpec struct {
 	Mode           string                `json:"mode,omitempty"`
 	ReadRate       float64               `json:"readRate,omitempty"`
 	WriteRate      float64               `json:"writeRate,omitempty"`
-	ACL            *ReadWriteRatesConfig `json:"acl",omitempty"`
+	ACL            *ReadWriteRatesConfig `json:"acl,omitempty"`
 	Catalog        *ReadWriteRatesConfig `json:"catalog,omitempty"`
 	ConfigEntry    *ReadWriteRatesConfig `json:"configEntry,omitempty"`
 	ConnectCA      *ReadWriteRatesConfig `json:"connectCA,omitempty"`
@@ -234,7 +234,7 @@ func (c *ControlPlaneRequestLimit) Validate(consulMeta common.ConsulMeta) error 
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 
-	if c.Spec.Mode != "permissive" || c.Spec.Mode != "enforcing" || c.Spec.Mode != "disabled" {
+	if c.Spec.Mode != "permissive" && c.Spec.Mode != "enforcing" && c.Spec.Mode != "disabled" {
 		errs = append(errs, field.Invalid(path.Child("mode"), c.Spec.Mode, "mode must be one of: permissive, enforcing, disabled"))
 	}
 	if c.Spec.ReadRate >= 0 {
