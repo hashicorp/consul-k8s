@@ -12,7 +12,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// ControlPlaneRequestLimitController reconciles a ControlPlaneRequestLimit object
+// ControlPlaneRequestLimitController reconciles a ControlPlaneRequestLimit object.
 type ControlPlaneRequestLimitController struct {
 	client.Client
 	Log                   logr.Logger
