@@ -24,6 +24,7 @@
     1. [Writing Acceptance tests](#writing-acceptance-tests)
 1. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
 1. [Helm Reference Docs](#helm-reference-docs)
+1. [Managing External CRD Dependencies](#managing-external-crd-dependencies)
 1. [Adding a Changelog Entry](#adding-a-changelog-entry)
 
 ## Contributing 101
@@ -1213,6 +1214,26 @@ So that the documentation can look like:
 ```markdown
 - `ports` ((#v-ingressgateways-defaults-service-ports)) (`array<map>: [{port: 8080, port: 8443}]`) - Port docs
 ```
+
+## Managing External CRD Dependencies
+
+Some of the features of Consul on Kubernetes make use of CustomResourceDefinitions (CRDs) that we don't directly
+manage. One such example is the Gateway API CRDs which we use to configure API Gateways, but are managed by SIG
+Networking.
+
+To pull external CRDs into our Helm chart and make sure they get installed, we generate their configuration using
+[Kustomize](https://kustomize.io/) which can pull in Kubernetes config from external sources. We split these 
+generated CRDs into individual files and store them in the 
+[Helm `/crds` directory](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/).
+
+If you need to update the external CRDs we depend on, or add to them, you can do this by editing the 
+[crds/kustomization.yaml](/charts/consul/crds/kustomization.yaml) file. Once modified, running
+
+```bash
+make generate-external-crds
+```
+
+will update the CRDs in the `/crds` directory.
 
 ## Adding a Changelog Entry
 

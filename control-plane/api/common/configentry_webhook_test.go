@@ -115,7 +115,7 @@ func TestValidateConfigEntry(t *testing.T) {
 					},
 				},
 			},
-				logrtest.TestLogger{T: t},
+				logrtest.NewTestLogger(t),
 				lister,
 				c.newResource,
 				ConsulMeta{

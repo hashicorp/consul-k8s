@@ -105,7 +105,7 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 
 			controller := &controllers.ExportedServicesController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.NewTestLogger(t),
 				Scheme: s,
 				ConfigEntryController: &controllers.ConfigEntryController{
 					ConsulClientConfig:         testClient.Cfg,
@@ -220,7 +220,7 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 
 			controller := &controllers.ExportedServicesController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.NewTestLogger(t),
 				Scheme: s,
 				ConfigEntryController: &controllers.ConfigEntryController{
 					ConsulClientConfig:         testClient.Cfg,
@@ -358,7 +358,7 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 
 			controller := &controllers.ExportedServicesController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.NewTestLogger(t),
 				Scheme: s,
 				ConfigEntryController: &controllers.ConfigEntryController{
 					ConsulClientConfig:         testClient.Cfg,

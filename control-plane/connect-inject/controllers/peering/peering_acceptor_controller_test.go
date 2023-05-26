@@ -520,7 +520,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 				Client:                   fakeClient,
 				ExposeServersServiceName: "test-expose-servers",
 				ReleaseNamespace:         "default",
-				Log:                      logrtest.TestLogger{T: t},
+				Log:                      logrtest.NewTestLogger(t),
 				ConsulClientConfig:       testClient.Cfg,
 				ConsulServerConnMgr:      testClient.Watcher,
 				Scheme:                   s,
@@ -638,7 +638,7 @@ func TestReconcile_DeletePeeringAcceptor(t *testing.T) {
 	// Create the peering acceptor controller.
 	controller := &AcceptorController{
 		Client:              fakeClient,
-		Log:                 logrtest.TestLogger{T: t},
+		Log:                 logrtest.NewTestLogger(t),
 		ConsulClientConfig:  testClient.Cfg,
 		ConsulServerConnMgr: testClient.Watcher,
 		Scheme:              s,
@@ -782,7 +782,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 			// Create the peering acceptor controller
 			controller := &AcceptorController{
 				Client:              fakeClient,
-				Log:                 logrtest.TestLogger{T: t},
+				Log:                 logrtest.NewTestLogger(t),
 				ConsulClientConfig:  testClient.Cfg,
 				ConsulServerConnMgr: testClient.Watcher,
 				Scheme:              s,
@@ -1086,7 +1086,7 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 			// Create the peering acceptor controller.
 			pac := &AcceptorController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.NewTestLogger(t),
 				Scheme: s,
 			}
 
@@ -1198,7 +1198,7 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			// Create the peering acceptor controller.
 			controller := &AcceptorController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.NewTestLogger(t),
 				Scheme: s,
 			}
 
@@ -1481,7 +1481,7 @@ func TestAcceptor_RequestsForPeeringTokens(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.acceptors).Build()
 			controller := AcceptorController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.NewTestLogger(t),
 			}
 			result := controller.requestsForPeeringTokens(tt.secret)
 
