@@ -426,9 +426,6 @@ func (c *Cache) subscribeToConsulServices(ctx context.Context) {
 	once := &sync.Once{}
 
 	opts := &api.QueryOptions{Connect: true}
-	if c.namespacesEnabled {
-		opts.Namespace = namespaceWildcard
-	}
 
 	if c.partition != "" {
 		opts.Partition = c.partition
@@ -437,9 +434,6 @@ func (c *Cache) subscribeToConsulServices(ctx context.Context) {
 	// we need a second set of opts to make sure we don't
 	// block on the secondary list operations
 	serviceListOpts := &api.QueryOptions{Connect: true}
-	if c.namespacesEnabled {
-		serviceListOpts.Namespace = namespaceWildcard
-	}
 
 	if c.partition != "" {
 		serviceListOpts.Partition = c.partition
