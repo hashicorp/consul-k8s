@@ -1,3 +1,0 @@
-```release-note:improvement
-api-gateway: Add GatewayClassConfig CRD to allow for configuration of GatewayClass.
-```
