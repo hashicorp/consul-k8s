@@ -1,5 +1,5 @@
 VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
-CONSUL_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
+CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
 
 # ===========> Helm Targets
 
@@ -162,8 +162,7 @@ version:
 	@echo $(VERSION)
 
 consul-version:
-	@echo $(CONSUL_VERSION)
-
+	@echo $(CONSUL_IMAGE_VERSION)
 
 # ===========> Release Targets
 
@@ -174,7 +173,13 @@ endif
 ifndef RELEASE_DATE
 	$(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(LAST_RELEASE_GIT_TAG) $(PRERELEASE_VERSION)
+ifndef LAST_RELEASE_GIT_TAG 
+	$(error LAST_RELEASE_GIT_TAG is required)
+endif
+ifndef CONSUL_VERSION
+	$(error CONSUL_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(LAST_RELEASE_GIT_TAG) $(CONSUL_VERSION) $(PRERELEASE_VERSION)
 
 prepare-dev:
 ifndef RELEASE_VERSION
@@ -186,7 +191,10 @@ endif
 ifndef NEXT_RELEASE_VERSION
 	$(error NEXT_RELEASE_VERSION is required)
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(NEXT_RELEASE_VERSION)
+ifndef NEXT_CONSUL_VERSION
+	$(error NEXT_CONSUL_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" "" $(NEXT_RELEASE_VERSION) $(NEXT_CONSUL_VERSION)
 
 # ===========> Makefile config
 
