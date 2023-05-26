@@ -313,4 +313,25 @@ webhooks:
         - samenessgroups
   sideEffects: None
 {{- end }}
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-jwtprovider
+  failurePolicy: Fail
+  name: mutate-jwtprovider.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - jwtproviders
+  sideEffects: None
 {{- end }}
