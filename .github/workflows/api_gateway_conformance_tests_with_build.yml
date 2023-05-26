@@ -50,7 +50,7 @@ jobs:
           - name: "consul@v1.15 + consul-k8s@v1.0.1"
             consul-image: "hashicorp/consul:1.15"
             envoy-image: "envoyproxy/envoy:v1.24-latest"
-            consul-k8s-version: "consul-k8s-control-plane-dev"
+            consul-k8s-image: "consul-k8s-control-plane-dev:local-build"
             envoy-field: "apiGateway.imageEnvoy"
       fail-fast: false
     name: "${{ matrix.config.name }}"
@@ -101,13 +101,13 @@ jobs:
           GOARCH: "amd64"
           GOOS: "linux"
         working-directory: "consul-k8s"
-        run: make control-plane-dev-docker
+        run: make DEV_IMAGE=${{ matrix.config.consul-k8s-image }}control-plane-dev-docker
 
 
       - name: Setup Kind cluster
         uses: ./consul-k8s/.github/workflows/api-gateway-conformance/actions/setup-kind
         with:
-          load-docker-image: ${{ matrix.config.consul-k8s-version}}
+          load-docker-image: ${{ matrix.config.consul-k8s-image }}
           metallb-config-path: "consul-k8s/.github/workflows/api-gateway-conformance/metallb-config.yaml"
 
       #TODO I'm not sure if we still need this since I think Thomas wrapped the crd installs into the helm install
@@ -118,7 +118,7 @@ jobs:
       - name: Install Consul
         working-directory: "consul-k8s/.github/workflows/api-gateway-conformance"
         run: |
-          helm install --values ./consul-config.yaml consul $GITHUB_WORKSPACE/consul-k8s/charts/consul --set global.imageK8S=${{ matrix.config.consul-k8s-version }} --set global.image=${{ matrix.config.consul-image }} --set ${{ matrix.config.envoy-field }}=${{ matrix.config.envoy-image }} --create-namespace --namespace=consul
+          helm install --values ./consul-config.yaml consul $GITHUB_WORKSPACE/consul-k8s/charts/consul --set global.imageK8S=${{ matrix.config.consul-k8s-image }} --set global.image=${{ matrix.config.consul-image }} --set ${{ matrix.config.envoy-field }}=${{ matrix.config.envoy-image }} --create-namespace --namespace=consul
           kubectl wait --for=condition=Ready --timeout=60s --namespace=consul pods --all
 
       - name: Patch testing resources
