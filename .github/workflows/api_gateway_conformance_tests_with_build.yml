@@ -101,7 +101,7 @@ jobs:
           GOARCH: "amd64"
           GOOS: "linux"
         working-directory: "consul-k8s"
-        run: make DEV_IMAGE=${{ matrix.config.consul-k8s-image }}control-plane-dev-docker
+        run: make DEV_IMAGE=${{ matrix.config.consul-k8s-image }} control-plane-dev-docker
 
 
       - name: Setup Kind cluster
