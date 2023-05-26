@@ -12,6 +12,7 @@ import (
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdFetchServerRegion "github.com/hashicorp/consul-k8s/control-plane/subcommand/fetch-server-region"
+	cmdGatewayCleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
@@ -47,6 +48,10 @@ func init() {
 
 		"consul-logout": func() (cli.Command, error) {
 			return &cmdConsulLogout.Command{UI: ui}, nil
+		},
+
+		"gateway-cleanup": func() (cli.Command, error) {
+			return &cmdGatewayCleanup.Command{UI: ui}, nil
 		},
 
 		"server-acl-init": func() (cli.Command, error) {

@@ -55,7 +55,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		// If using the proxy health check for a service, configure an HTTP handler
 		// that queries the '/ready' endpoint of the proxy.
 		probe = &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(constants.ProxyDefaultHealthPort + mpi.serviceIndex),
 					Path: "/ready",
@@ -65,7 +65,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		}
 	} else {
 		probe = &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
 					Port: intstr.FromInt(constants.ProxyDefaultInboundPort + mpi.serviceIndex),
 				},

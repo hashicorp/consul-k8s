@@ -138,7 +138,7 @@ func TestValidatePeeringAcceptor(t *testing.T) {
 
 			validator := &PeeringAcceptorWebhook{
 				Client:  client,
-				Logger:  logrtest.TestLogger{T: t},
+				Logger:  logrtest.NewTestLogger(t),
 				decoder: decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{
