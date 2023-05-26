@@ -25,7 +25,6 @@ import (
 )
 
 var (
-	image               = "hashicorp/consul-dataplane"
 	createdAtLabelKey   = "gateway.consul.hashicorp.com/created"
 	createdAtLabelValue = "101010"
 	name                = "test"
@@ -94,9 +93,7 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				Image: image,
-			},
+			helmConfig:       apigateway.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -131,9 +128,7 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				Image: image,
-			},
+			helmConfig:       apigateway.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -182,8 +177,7 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Image:            image,
-				ManageSystemACLs: true,
+				AuthMethod: "method",
 			},
 			initialResources: resources{},
 			finalResources: resources{
@@ -237,8 +231,7 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Image:            image,
-				ManageSystemACLs: true,
+				AuthMethod: "method",
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -313,8 +306,7 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Image:            image,
-				ManageSystemACLs: true,
+				AuthMethod: "method",
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -386,9 +378,7 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				Image: image,
-			},
+			helmConfig: apigateway.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
@@ -456,9 +446,7 @@ func TestDelete(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				Image: image,
-			},
+			helmConfig: apigateway.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -495,9 +483,7 @@ func TestDelete(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
-				Image: image,
-			},
+			helmConfig: apigateway.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -551,8 +537,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			helmConfig: apigateway.HelmConfig{
-				Image:            image,
-				ManageSystemACLs: true,
+				AuthMethod: "method",
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -636,6 +621,8 @@ func joinResources(resources resources) (objs []client.Object) {
 }
 
 func validateResourcesExist(t *testing.T, client client.Client, resources resources) error {
+	t.Helper()
+
 	for _, expected := range resources.deployments {
 		actual := &appsv1.Deployment{}
 		err := client.Get(context.Background(), types.NamespacedName{
@@ -655,7 +642,10 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 		require.Equal(t, expected.Namespace, actual.Namespace)
 		require.Equal(t, expected.APIVersion, actual.APIVersion)
 		require.Equal(t, expected.Labels, actual.Labels)
-		require.Equal(t, *expected.Spec.Replicas, *actual.Spec.Replicas)
+		if expected.Spec.Replicas != nil {
+			require.NotNil(t, actual.Spec.Replicas)
+			require.EqualValues(t, *expected.Spec.Replicas, *actual.Spec.Replicas)
+		}
 	}
 
 	for _, expected := range resources.roles {
@@ -711,6 +701,8 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 }
 
 func validateResourcesAreDeleted(t *testing.T, client client.Client, resources resources) error {
+	t.Helper()
+
 	for _, expected := range resources.deployments {
 		actual := &appsv1.Deployment{}
 		err := client.Get(context.Background(), types.NamespacedName{
@@ -841,16 +833,7 @@ func configureRole(name, namespace string, labels map[string]string, resourceVer
 				},
 			},
 		},
-		Rules: []rbac.PolicyRule{{
-			APIGroups: []string{"policy"},
-			Resources: []string{"podsecuritypolicies"},
-			Verbs:     []string{"use"},
-		}, {
-			APIGroups:     []string{"security.openshift.io"},
-			Resources:     []string{"securitycontextconstraints"},
-			ResourceNames: []string{"name-of-the-security-context-constraints"},
-			Verbs:         []string{"use"},
-		}},
+		Rules: []rbac.PolicyRule{},
 	}
 }
 

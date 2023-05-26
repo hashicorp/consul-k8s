@@ -13,6 +13,7 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 )
@@ -253,6 +254,8 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 	type args struct {
 		k8sHTTPRoute gwv1beta1.HTTPRoute
 		parentRefs   map[types.NamespacedName]api.ResourceReference
+		services     map[types.NamespacedName]api.CatalogService
+		meshServices map[types.NamespacedName]v1alpha1.MeshService
 	}
 	tests := map[string]struct {
 		args args
@@ -382,6 +385,9 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 				parentRefs: map[types.NamespacedName]api.ResourceReference{
 					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
 				},
+				services: map[types.NamespacedName]api.CatalogService{
+					{Name: "service one", Namespace: "some ns"}: {ServiceName: "service one", Namespace: "other"},
+				},
 			},
 			want: capi.HTTPRouteConfigEntry{
 				Kind: capi.HTTPRoute,
@@ -456,7 +462,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 										Path: "path",
 									},
 								},
-								Namespace: "some ns",
+								Namespace: "other",
 							},
 						},
 					},
@@ -599,6 +605,9 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 				},
 				parentRefs: map[types.NamespacedName]api.ResourceReference{
 					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
+				},
+				services: map[types.NamespacedName]api.CatalogService{
+					{Name: "service one", Namespace: "some ns"}: {ServiceName: "service one", Namespace: "some ns"},
 				},
 			},
 			want: capi.HTTPRouteConfigEntry{
@@ -818,6 +827,9 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 				},
 				parentRefs: map[types.NamespacedName]api.ResourceReference{
 					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
+				},
+				services: map[types.NamespacedName]api.CatalogService{
+					{Name: "service one", Namespace: "some ns"}: {ServiceName: "service one", Namespace: "some ns"},
 				},
 			},
 			want: capi.HTTPRouteConfigEntry{
@@ -1042,6 +1054,9 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 				parentRefs: map[types.NamespacedName]api.ResourceReference{
 					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
 				},
+				services: map[types.NamespacedName]api.CatalogService{
+					{Name: "service one", Namespace: "some ns"}: {ServiceName: "service one", Namespace: "some ns"},
+				},
 			},
 			want: capi.HTTPRouteConfigEntry{
 				Kind: capi.HTTPRoute,
@@ -1212,6 +1227,25 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 								},
 								BackendRefs: []gwv1beta1.HTTPBackendRef{
 									{
+										// this ref should get dropped
+										BackendRef: gwv1beta1.BackendRef{
+											BackendObjectReference: gwv1beta1.BackendObjectReference{
+												Name:      "service two",
+												Namespace: ptrTo(gwv1beta1.Namespace("some ns")),
+											},
+										},
+									},
+									{
+										BackendRef: gwv1beta1.BackendRef{
+											BackendObjectReference: gwv1beta1.BackendObjectReference{
+												Name:      "some-service-part-three",
+												Namespace: ptrTo(gwv1beta1.Namespace("svc-ns")),
+												Group:     ptrTo(gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup)),
+												Kind:      ptrTo(gwv1beta1.Kind(v1alpha1.MeshServiceKind)),
+											},
+										},
+									},
+									{
 										BackendRef: gwv1beta1.BackendRef{
 											BackendObjectReference: gwv1beta1.BackendObjectReference{
 												Name:      "service one",
@@ -1256,6 +1290,12 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 				},
 				parentRefs: map[types.NamespacedName]api.ResourceReference{
 					{Name: "api-gw", Namespace: "k8s-gw-ns"}: {Name: "api-gw", Partition: "part-1", Namespace: "ns"},
+				},
+				services: map[types.NamespacedName]api.CatalogService{
+					{Name: "service one", Namespace: "some ns"}: {ServiceName: "service one", Namespace: "some ns"},
+				},
+				meshServices: map[types.NamespacedName]v1alpha1.MeshService{
+					{Name: "some-service-part-three", Namespace: "svc-ns"}: {Spec: v1alpha1.MeshServiceSpec{Name: "some-service-part-three"}},
 				},
 			},
 			want: capi.HTTPRouteConfigEntry{
@@ -1311,6 +1351,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 							},
 						},
 						Services: []capi.HTTPService{
+							{Name: "some-service-part-three", Filters: capi.HTTPFilters{Headers: []capi.HTTPHeaderFilter{{Add: make(map[string]string), Remove: make([]string, 0), Set: make(map[string]string)}}}},
 							{
 								Name:   "service one",
 								Weight: 45,
@@ -1356,7 +1397,7 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 				EnableConsulNamespaces: true,
 				EnableK8sMirroring:     true,
 			}
-			got := tr.HTTPRouteToHTTPRoute(&tc.args.k8sHTTPRoute, tc.args.parentRefs)
+			got := tr.HTTPRouteToHTTPRoute(&tc.args.k8sHTTPRoute, tc.args.parentRefs, tc.args.services, tc.args.meshServices)
 			if diff := cmp.Diff(&tc.want, got); diff != "" {
 				t.Errorf("Translator.HTTPRouteToHTTPRoute() mismatch (-want +got):\n%s", diff)
 			}
@@ -1367,8 +1408,10 @@ func TestTranslator_HTTPRouteToHTTPRoute(t *testing.T) {
 func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		k8sRoute   gwv1alpha2.TCPRoute
-		parentRefs map[types.NamespacedName]api.ResourceReference
+		k8sRoute     gwv1alpha2.TCPRoute
+		parentRefs   map[types.NamespacedName]api.ResourceReference
+		services     map[types.NamespacedName]api.CatalogService
+		meshServices map[types.NamespacedName]v1alpha1.MeshService
 	}
 	tests := map[string]struct {
 		args args
@@ -1427,6 +1470,13 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 						Namespace: "another-ns",
 						Partition: "",
 					},
+				},
+				services: map[types.NamespacedName]api.CatalogService{
+					{Name: "some-service", Namespace: "svc-ns"}:          {ServiceName: "some-service", Namespace: "svc-ns"},
+					{Name: "some-service-part-two", Namespace: "svc-ns"}: {ServiceName: "some-service-part-two", Namespace: "svc-ns"},
+				},
+				meshServices: map[types.NamespacedName]v1alpha1.MeshService{
+					{Name: "some-service-part-three", Namespace: "svc-ns"}: {Spec: v1alpha1.MeshServiceSpec{Name: "some-service-part-three"}},
 				},
 			},
 			want: capi.TCPRouteConfigEntry{
@@ -1507,6 +1557,19 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 									},
 								},
 							},
+							{
+								BackendRefs: []gwv1beta1.BackendRef{
+									{
+										BackendObjectReference: gwv1beta1.BackendObjectReference{
+											Name:      "some-service-part-three",
+											Namespace: ptrTo(gwv1beta1.Namespace("svc-ns")),
+											Group:     ptrTo(gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup)),
+											Kind:      ptrTo(gwv1beta1.Kind(v1alpha1.MeshServiceKind)),
+										},
+										Weight: new(int32),
+									},
+								},
+							},
 						},
 					},
 				},
@@ -1519,6 +1582,12 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 						Namespace: "another-ns",
 						Partition: "",
 					},
+				},
+				services: map[types.NamespacedName]api.CatalogService{
+					{Name: "some-service", Namespace: "svc-ns"}: {ServiceName: "some-service", Namespace: "other"},
+				},
+				meshServices: map[types.NamespacedName]v1alpha1.MeshService{
+					{Name: "some-service-part-three", Namespace: "svc-ns"}: {Spec: v1alpha1.MeshServiceSpec{Name: "some-service-part-three"}},
 				},
 			},
 			want: capi.TCPRouteConfigEntry{
@@ -1538,13 +1607,9 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 					{
 						Name:      "some-service",
 						Partition: "",
-						Namespace: "svc-ns",
+						Namespace: "other",
 					},
-					{
-						Name:      "some-service-part-two",
-						Partition: "",
-						Namespace: "svc-ns",
-					},
+					{Name: "some-service-part-three"},
 				},
 				Meta: map[string]string{
 					metaKeyManagedBy:       metaValueManagedBy,
@@ -1562,8 +1627,8 @@ func TestTranslator_TCPRouteToTCPRoute(t *testing.T) {
 				EnableK8sMirroring:     true,
 			}
 
-			got := tr.TCPRouteToTCPRoute(&tt.args.k8sRoute, tt.args.parentRefs)
-			if diff := cmp.Diff(got, &tt.want); diff != "" {
+			got := tr.TCPRouteToTCPRoute(&tt.args.k8sRoute, tt.args.parentRefs, tt.args.services, tt.args.meshServices)
+			if diff := cmp.Diff(&tt.want, got); diff != "" {
 				t.Errorf("Translator.TCPRouteToTCPRoute() mismatch (-want +got):\n%s", diff)
 			}
 		})

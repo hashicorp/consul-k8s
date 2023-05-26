@@ -373,14 +373,42 @@ var (
 	// to the GatewayConditionReason given in the spec.
 	errGatewayUnsupportedAddress = errors.New("gateway does not support specifying addresses")
 	errGatewayListenersNotValid  = errors.New("one or more listeners are invalid")
+	errGatewayPending_Pods       = errors.New("gateway pods are still being scheduled")
+	errGatewayPending_Consul     = errors.New("gateway configuration is not yet synced to Consul")
 )
 
 // gatewayValidationResult contains the result of internally validating a gateway.
 // An error set on any of its members corresponds to an error condition on the corresponding
 // status type.
 type gatewayValidationResult struct {
-	acceptedErr error
-	// TODO: programmed
+	acceptedErr   error
+	programmedErr error
+}
+
+// programmedCondition returns a condition for the Programmed status type.
+func (l gatewayValidationResult) programmedCondition(generation int64) metav1.Condition {
+	now := metav1.Now()
+
+	switch l.programmedErr {
+	case errGatewayPending_Pods, errGatewayPending_Consul:
+		return metav1.Condition{
+			Type:               "Programmed",
+			Status:             metav1.ConditionFalse,
+			Reason:             "Pending",
+			ObservedGeneration: generation,
+			Message:            l.programmedErr.Error(),
+			LastTransitionTime: now,
+		}
+	default:
+		return metav1.Condition{
+			Type:               "Programmed",
+			Status:             metav1.ConditionTrue,
+			Reason:             "Programmed",
+			ObservedGeneration: generation,
+			Message:            "gateway programmed",
+			LastTransitionTime: now,
+		}
+	}
 }
 
 // acceptedCondition returns a condition for the Accepted status type. It takes a boolean argument
@@ -438,5 +466,6 @@ func (l gatewayValidationResult) acceptedCondition(generation int64, listenersIn
 func (l gatewayValidationResult) Conditions(generation int64, listenersInvalid bool) []metav1.Condition {
 	return []metav1.Condition{
 		l.acceptedCondition(generation, listenersInvalid),
+		l.programmedCondition(generation),
 	}
 }

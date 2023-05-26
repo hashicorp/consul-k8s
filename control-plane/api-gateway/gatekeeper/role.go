@@ -6,19 +6,21 @@ package gatekeeper
 import (
 	"context"
 	"errors"
+
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, config apigateway.HelmConfig) error {
-	if !config.ManageSystemACLs {
-		return nil
+func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
+	if config.AuthMethod == "" {
+		return g.deleteRole(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
 	role := &rbac.Role{}
@@ -45,7 +47,7 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 		return errors.New("Role not owned by controller")
 	}
 
-	role = g.role(gateway)
+	role = g.role(gateway, gcc)
 	if err := ctrl.SetControllerReference(&gateway, role, g.Client.Scheme()); err != nil {
 		return err
 	}
@@ -67,27 +69,22 @@ func (g *Gatekeeper) deleteRole(ctx context.Context, nsname types.NamespacedName
 	return nil
 }
 
-func (g *Gatekeeper) role(gateway gwv1beta1.Gateway) *rbac.Role {
-	return &rbac.Role{
+func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) *rbac.Role {
+	role := &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      gateway.Name,
 			Namespace: gateway.Namespace,
 			Labels:    apigateway.LabelsForGateway(&gateway),
 		},
-		Rules: []rbac.PolicyRule{
-			{
-				APIGroups: []string{"policy"},
-				Resources: []string{"podsecuritypolicies"},
-				// TODO figure out how to bring this in. Maybe GWCCFG
-				// ResourceNames: []string{c.Spec.ConsulSpec.AuthSpec.PodSecurityPolicy},
-				Verbs: []string{"use"},
-			},
-			{
-				APIGroups:     []string{"security.openshift.io"},
-				Resources:     []string{"securitycontextconstraints"},
-				ResourceNames: []string{"name-of-the-security-context-constraints"},
-				Verbs:         []string{"use"},
-			},
-		},
+		Rules: []rbac.PolicyRule{},
 	}
+	if gcc.Spec.PodSecurityPolicy != "" {
+		role.Rules = append(role.Rules, rbac.PolicyRule{
+			APIGroups:     []string{"policy"},
+			Resources:     []string{"podsecuritypolicies"},
+			ResourceNames: []string{gcc.Spec.PodSecurityPolicy},
+			Verbs:         []string{"use"},
+		})
+	}
+	return role
 }

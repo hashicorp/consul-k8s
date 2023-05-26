@@ -3,13 +3,32 @@
 
 package apigateway
 
+import "time"
+
 // HelmConfig is the configuration of gateways that comes in from the user's Helm values.
 type HelmConfig struct {
-	// Image is the Consul Dataplane image to use in gateway deployments.
-	Image string
+	// ImageDataplane is the Consul Dataplane image to use in gateway deployments.
+	ImageDataplane             string
+	ImageConsulK8S             string
+	ConsulDestinationNamespace string
+	NamespaceMirroringPrefix   string
+	EnableNamespaces           bool
+	EnableOpenShift            bool
+	EnableNamespaceMirroring   bool
+	AuthMethod                 string
 	// LogLevel is the logging level of the deployed Consul Dataplanes.
-	LogLevel string
+	LogLevel            string
+	ConsulPartition     string
+	LogJSON             bool
+	TLSEnabled          bool
+	ConsulTLSServerName string
+	ConsulCACert        string
+	ConsulConfig        ConsulConfig
+}
 
-	// ManageSystemACLs toggles the behavior of Consul on Kubernetes creating ACLs and RBAC resources for Gateway deployments.
-	ManageSystemACLs bool
+type ConsulConfig struct {
+	Address    string
+	GRPCPort   int
+	HTTPPort   int
+	APITimeout time.Duration
 }

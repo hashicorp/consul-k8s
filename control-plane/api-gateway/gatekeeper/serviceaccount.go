@@ -6,6 +6,7 @@ package gatekeeper
 import (
 	"context"
 	"errors"
+
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -17,9 +18,8 @@ import (
 )
 
 func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, config apigateway.HelmConfig) error {
-	// We don't create the ServiceAccount if we are not using ManagedGatewayClass.
-	if !config.ManageSystemACLs {
-		return nil
+	if config.AuthMethod == "" {
+		return g.deleteServiceAccount(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
 	serviceAccount := &corev1.ServiceAccount{}

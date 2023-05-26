@@ -6,6 +6,7 @@ package binding
 import (
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +23,7 @@ func TestValidateRefs(t *testing.T) {
 		namespace      string
 		refs           []gwv1beta1.BackendObjectReference
 		services       map[types.NamespacedName]api.CatalogService
+		meshServices   map[types.NamespacedName]v1alpha1.MeshService
 		expectedErrors []error
 	}{
 		"all pass no namespaces": {
@@ -32,6 +34,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "2", Namespace: "test"}: {},
 				{Name: "3", Namespace: "test"}: {},
 			},
+			meshServices:   map[types.NamespacedName]v1alpha1.MeshService{},
 			expectedErrors: []error{nil, nil},
 		},
 		"all pass namespaces": {
@@ -45,6 +48,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "2", Namespace: "other"}: {},
 				{Name: "3", Namespace: "other"}: {},
 			},
+			meshServices:   map[types.NamespacedName]v1alpha1.MeshService{},
 			expectedErrors: []error{nil, nil},
 		},
 		"all pass mixed": {
@@ -58,6 +62,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "2", Namespace: "test"}:  {},
 				{Name: "3", Namespace: "other"}: {},
 			},
+			meshServices:   map[types.NamespacedName]v1alpha1.MeshService{},
 			expectedErrors: []error{nil, nil},
 		},
 		"all fail mixed": {
@@ -71,6 +76,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "2", Namespace: "test"}:  {},
 				{Name: "3", Namespace: "other"}: {},
 			},
+			meshServices:   map[types.NamespacedName]v1alpha1.MeshService{},
 			expectedErrors: []error{errRouteBackendNotFound, errRouteBackendNotFound},
 		},
 		"all fail no namespaces": {
@@ -84,6 +90,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "2", Namespace: "other"}: {},
 				{Name: "3", Namespace: "other"}: {},
 			},
+			meshServices:   map[types.NamespacedName]v1alpha1.MeshService{},
 			expectedErrors: []error{errRouteBackendNotFound, errRouteBackendNotFound},
 		},
 		"all fail namespaces": {
@@ -97,6 +104,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "2", Namespace: "test"}: {},
 				{Name: "3", Namespace: "test"}: {},
 			},
+			meshServices:   map[types.NamespacedName]v1alpha1.MeshService{},
 			expectedErrors: []error{errRouteBackendNotFound, errRouteBackendNotFound},
 		},
 		"type failures": {
@@ -110,7 +118,24 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "2", Namespace: "test"}: {},
 				{Name: "3", Namespace: "test"}: {},
 			},
+			meshServices:   map[types.NamespacedName]v1alpha1.MeshService{},
 			expectedErrors: []error{errRouteInvalidKind, nil},
+		},
+		"mesh services": {
+			namespace: "test",
+			refs: []gwv1beta1.BackendObjectReference{
+				{
+					Name:  "1",
+					Group: pointerTo(gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup)),
+					Kind:  pointerTo(gwv1beta1.Kind(v1alpha1.MeshServiceKind)),
+				},
+			},
+			meshServices: map[types.NamespacedName]v1alpha1.MeshService{
+				{Name: "1", Namespace: "test"}: {},
+				{Name: "2", Namespace: "test"}: {},
+				{Name: "3", Namespace: "test"}: {},
+			},
+			expectedErrors: []error{nil},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -119,7 +144,7 @@ func TestValidateRefs(t *testing.T) {
 				refs[i] = gwv1beta1.BackendRef{BackendObjectReference: ref}
 			}
 
-			actual := validateRefs(tt.namespace, refs, tt.services)
+			actual := validateRefs(tt.namespace, refs, tt.services, tt.meshServices)
 			require.Equal(t, len(actual), len(tt.refs))
 			require.Equal(t, len(actual), len(tt.expectedErrors))
 			for i, err := range tt.expectedErrors {
@@ -148,7 +173,7 @@ func TestValidateGateway(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tt.expected, validateGateway(tt.object).acceptedErr)
+			require.Equal(t, tt.expected, validateGateway(tt.object, nil, nil).acceptedErr)
 		})
 	}
 }

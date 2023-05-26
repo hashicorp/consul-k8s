@@ -44,7 +44,9 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-const WebhookCAFilename = "ca.crt"
+const (
+	WebhookCAFilename = "ca.crt"
+)
 
 type Command struct {
 	UI cli.Ui
@@ -462,7 +464,7 @@ func (c *Command) Run(args []string) int {
 	if err = (&gatewaycontrollers.GatewayClassConfigController{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controller").WithName("gateways"),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollers.GatewayClassConfigController{})
 		return 1
 	}
@@ -478,9 +480,26 @@ func (c *Command) Run(args []string) int {
 
 	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: apigateway.HelmConfig{
-			Image:            c.flagConsulDataplaneImage,
-			LogLevel:         c.flagLogLevel,
-			ManageSystemACLs: c.flagACLAuthMethod != "",
+			ConsulConfig: apigateway.ConsulConfig{
+				Address:    c.consul.Addresses,
+				GRPCPort:   consulConfig.GRPCPort,
+				HTTPPort:   consulConfig.HTTPPort,
+				APITimeout: consulConfig.APITimeout,
+			},
+			ImageDataplane:             c.flagConsulDataplaneImage,
+			ImageConsulK8S:             c.flagConsulK8sImage,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			NamespaceMirroringPrefix:   c.flagK8SNSMirroringPrefix,
+			EnableNamespaces:           c.flagEnableNamespaces,
+			EnableOpenShift:            c.flagEnableOpenShift,
+			EnableNamespaceMirroring:   c.flagEnableK8SNSMirroring,
+			AuthMethod:                 c.flagACLAuthMethod,
+			LogLevel:                   c.flagLogLevel,
+			LogJSON:                    c.flagLogJSON,
+			TLSEnabled:                 c.consul.UseTLS,
+			ConsulTLSServerName:        c.consul.TLSServerName,
+			ConsulPartition:            c.consul.Partition,
+			ConsulCACert:               string(caCertPem),
 		},
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,

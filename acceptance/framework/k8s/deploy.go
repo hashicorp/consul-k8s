@@ -153,6 +153,15 @@ func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOption
 	}, "", curlArgs...)
 }
 
+// CheckStaticServerHTTPConnectionFailing is just like CheckStaticServerConnectionFailing
+// except with HTTP-based intentions.
+func CheckStaticServerHTTPConnectionFailing(t *testing.T, options *k8s.KubectlOptions, sourceApp string, curlArgs ...string) {
+	t.Helper()
+	CheckStaticServerConnection(t, options, sourceApp, false, []string{
+		"curl: (22) The requested URL returned error: 403",
+	}, "", curlArgs...)
+}
+
 // labelMapToString takes a label map[string]string
 // and returns the string-ified version of, e.g app=foo,env=dev.
 func labelMapToString(labelMap map[string]string) string {

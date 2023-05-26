@@ -30,6 +30,12 @@ type ConsulSnapshot struct {
 	// Deletions is a list of references that ought to be
 	// deleted in Consul
 	Deletions []api.ResourceReference
+	// Registrations is a list of Consul services to make sure
+	// are registered in Consul
+	Registrations []api.CatalogRegistration
+	// Deregistrations is a list of Consul services to make sure
+	// are no longer registered in Consul
+	Deregistrations []api.CatalogDeregistration
 }
 
 // Snapshot contains all Kubernetes and Consul operations
@@ -43,6 +49,7 @@ type Snapshot struct {
 	// a Gateway deployment, if it is not set, a deployment should be
 	// deleted instead of updated
 	GatewayClassConfig *v1alpha1.GatewayClassConfig
+
 	// UpsertGatewayDeployment determines whether the gateway deployment
 	// objects should be updated, i.e. deployments, roles, services
 	UpsertGatewayDeployment bool
