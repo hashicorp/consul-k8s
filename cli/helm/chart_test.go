@@ -42,6 +42,7 @@ func TestReadChartFiles(t *testing.T) {
 		"values.yaml":            "# Copyright (c) HashiCorp, Inc.\n# SPDX-License-Identifier: MPL-2.0\n\n# This is a mock Helm values.yaml file used for testing.\nkey: value",
 		"templates/_helpers.tpl": "helpers",
 		"templates/foo.yaml":     "# Copyright (c) HashiCorp, Inc.\n# SPDX-License-Identifier: MPL-2.0\n\nfoo: bar\n",
+		"crds/foo.yaml":          "# Copyright (c) HashiCorp, Inc.\n# SPDX-License-Identifier: MPL-2.0\n\nfoo: bar\n",
 	}
 
 	files, err := readChartFiles(testChartFiles, directory)
