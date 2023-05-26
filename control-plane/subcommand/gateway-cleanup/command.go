@@ -181,13 +181,10 @@ Usage: consul-k8s-control-plane gateay-cleanup [options]
 
 `
 
-// exponentialBackoffWithMaxInterval creates an exponential backoff but limits the
-// maximum backoff to 10 seconds so that we don't find ourselves in a situation
-// where we are waiting for minutes before retries. Also, try for a maximum of 1 minute.
 func exponentialBackoffWithMaxIntervalAndTime() *backoff.ExponentialBackOff {
 	backoff := backoff.NewExponentialBackOff()
-	backoff.MaxElapsedTime = 1 * time.Minute
-	backoff.MaxInterval = 10 * time.Second
+	backoff.MaxElapsedTime = 10 * time.Second
+	backoff.MaxInterval = 1 * time.Second
 	backoff.Reset()
 	return backoff
 }

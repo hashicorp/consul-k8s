@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -33,8 +34,20 @@ func TestRun(t *testing.T) {
 			gatewayClassConfig: &v1alpha1.GatewayClassConfig{},
 		},
 		"neither exist": {},
+		"finalizers on gatewayclass blocking deletion": {
+			gatewayClassConfig: &v1alpha1.GatewayClassConfig{},
+			gatewayClass:       &gwv1beta1.GatewayClass{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"finalizer"}}},
+		},
+		"finalizers on gatewayclassconfig blocking deletion": {
+			gatewayClassConfig: &v1alpha1.GatewayClassConfig{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"finalizer"}}},
+			gatewayClass:       &gwv1beta1.GatewayClass{},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
+			tt := tt
+
+			t.Parallel()
+
 			s := runtime.NewScheme()
 			require.NoError(t, gwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
