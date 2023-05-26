@@ -33,7 +33,7 @@ type Config struct {
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
 	NamespacesEnabled   bool
-	Partition           string
+	PeeringEnabled      bool
 	Logger              logr.Logger
 }
 
@@ -223,8 +223,8 @@ type Cache struct {
 	peeringsSubscribers []*PeeringsSubscription
 	subscriberMutex     *sync.Mutex
 
-	partition         string
 	namespacesEnabled bool
+	peeringsEnabled   bool
 
 	synced chan struct{}
 
@@ -242,7 +242,7 @@ func New(config Config) *Cache {
 		config:              config.ConsulClientConfig,
 		serverMgr:           config.ConsulServerConnMgr,
 		namespacesEnabled:   config.NamespacesEnabled,
-		partition:           config.Partition,
+		peeringsEnabled:     config.PeeringEnabled,
 		cache:               cache,
 		serviceCache:        make(serviceCache),
 		peeringCache:        make(peeringCache),
@@ -274,11 +274,13 @@ func (c *Cache) WaitSynced(ctx context.Context) {
 	case <-ctx.Done():
 		return
 	}
-	// and one more for peerings subscribers
-	select {
-	case <-c.synced:
-	case <-ctx.Done():
-		return
+	if c.peeringsEnabled {
+		// and one more for peerings subscribers
+		select {
+		case <-c.synced:
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -369,11 +371,13 @@ func (c *Cache) Run(ctx context.Context) {
 		c.subscribeToConsulServices(ctx)
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.subscribeToConsulPeerings(ctx)
-	}()
+	if c.peeringsEnabled {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.subscribeToConsulPeerings(ctx)
+		}()
+	}
 
 	wg.Wait()
 }
@@ -384,10 +388,6 @@ func (c *Cache) subscribeToConsul(ctx context.Context, kind string) {
 	opts := &api.QueryOptions{}
 	if c.namespacesEnabled {
 		opts.Namespace = namespaceWildcard
-	}
-
-	if c.partition != "" {
-		opts.Partition = c.partition
 	}
 
 	for {
@@ -427,17 +427,9 @@ func (c *Cache) subscribeToConsulServices(ctx context.Context) {
 
 	opts := &api.QueryOptions{Connect: true}
 
-	if c.partition != "" {
-		opts.Partition = c.partition
-	}
-
 	// we need a second set of opts to make sure we don't
 	// block on the secondary list operations
 	serviceListOpts := &api.QueryOptions{Connect: true}
-
-	if c.partition != "" {
-		serviceListOpts.Partition = c.partition
-	}
 
 MAIN_LOOP:
 	for {
@@ -487,10 +479,6 @@ func (c *Cache) subscribeToConsulPeerings(ctx context.Context) {
 	opts := &api.QueryOptions{Connect: true}
 	if c.namespacesEnabled {
 		opts.Namespace = namespaceWildcard
-	}
-
-	if c.partition != "" {
-		opts.Partition = c.partition
 	}
 
 	for {
@@ -722,9 +710,6 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	}
 
 	ref := translation.EntryToReference(entry)
-	if c.partition != "" {
-		ref.Partition = c.partition
-	}
 
 	old, ok := entryMap[ref]
 	if ok {
@@ -742,10 +727,6 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	}
 
 	options := &api.WriteOptions{}
-
-	if c.partition != "" {
-		options.Partition = c.partition
-	}
 
 	_, _, err = client.ConfigEntries().Set(entry, options.WithContext(ctx))
 	if err != nil {
@@ -795,10 +776,6 @@ func (c *Cache) Delete(ctx context.Context, ref api.ResourceReference) error {
 	}
 
 	options := &api.WriteOptions{}
-
-	if c.partition != "" {
-		options.Partition = c.partition
-	}
 
 	_, err = client.ConfigEntries().Delete(ref.Kind, ref.Name, options.WithContext(ctx))
 	return err
@@ -895,10 +872,6 @@ func (c *Cache) Register(ctx context.Context, registration api.CatalogRegistrati
 
 	options := &api.WriteOptions{}
 
-	if c.partition != "" {
-		options.Partition = c.partition
-	}
-
 	_, err = client.Catalog().Register(&registration, options.WithContext(ctx))
 	return err
 }
@@ -911,10 +884,6 @@ func (c *Cache) Deregister(ctx context.Context, deregistration api.CatalogDeregi
 	}
 
 	options := &api.WriteOptions{}
-
-	if c.partition != "" {
-		options.Partition = c.partition
-	}
 
 	_, err = client.Catalog().Deregister(&deregistration, options.WithContext(ctx))
 	return err

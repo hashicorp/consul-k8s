@@ -21,6 +21,7 @@ type HelmConfig struct {
 	ConsulPartition     string
 	LogJSON             bool
 	TLSEnabled          bool
+	PeeringEnabled      bool
 	ConsulTLSServerName string
 	ConsulCACert        string
 	ConsulConfig        ConsulConfig

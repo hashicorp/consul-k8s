@@ -491,6 +491,7 @@ func (c *Command) Run(args []string) int {
 			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 			NamespaceMirroringPrefix:   c.flagK8SNSMirroringPrefix,
 			EnableNamespaces:           c.flagEnableNamespaces,
+			PeeringEnabled:             c.flagEnablePeering,
 			EnableOpenShift:            c.flagEnableOpenShift,
 			EnableNamespaceMirroring:   c.flagEnableK8SNSMirroring,
 			AuthMethod:                 c.flagACLAuthMethod,

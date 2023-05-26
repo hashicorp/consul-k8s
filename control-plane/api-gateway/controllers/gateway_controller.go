@@ -373,7 +373,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		ConsulClientConfig:  config.ConsulClientConfig,
 		ConsulServerConnMgr: config.ConsulServerConnMgr,
 		NamespacesEnabled:   config.NamespacesEnabled,
-		Partition:           config.Partition,
+		PeeringEnabled:      config.HelmConfig.PeeringEnabled,
 		Logger:              mgr.GetLogger(),
 	})
 

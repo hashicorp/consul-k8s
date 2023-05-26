@@ -78,7 +78,6 @@ func stubConsulCache(t *testing.T) *cache.Cache {
 		},
 		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 		NamespacesEnabled:   false,
-		Partition:           "",
 		Logger:              logrtest.New(t),
 	})
 }
