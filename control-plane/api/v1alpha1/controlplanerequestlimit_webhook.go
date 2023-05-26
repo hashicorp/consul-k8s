@@ -5,11 +5,15 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // +kubebuilder:object:generate=false
@@ -31,10 +35,46 @@ type ControlPlaneRequestLimitWebhook struct {
 // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-exportedservices,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=exportedservices,versions=v1alpha1,name=mutate-exportedservices.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
 func (v *ControlPlaneRequestLimitWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
-	// TODO: no idea what I'm supposed to be doing here. The docs say copy and existing webhook?
-	// They're all different.
+	var limit ControlPlaneRequestLimit
+	var limitList ControlPlaneRequestLimitList
+	err := v.decoder.Decode(req, &limit)
+	if err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
 
-	return nil
+	if req.Operation == admissionv1.Create {
+		v.Logger.Info("validate create", "name", limit.KubernetesName())
+
+		if limit.KubernetesName() != common.ControlPlaneRequestLimit {
+			return admission.Errored(http.StatusBadRequest,
+				fmt.Errorf(`%s resource name must be "%s"`,
+					limit.KubeKind(), common.ControlPlaneRequestLimit))
+		}
+
+		if err := v.Client.List(ctx, &limitList); err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+
+		if len(limitList.Items) > 0 {
+			return admission.Errored(http.StatusBadRequest,
+				fmt.Errorf("%s resource already defined - only one control plane request limit entry is supported",
+					limit.KubeKind()))
+		}
+	}
+
+	return common.ValidateConfigEntry(ctx, req, v.Logger, v, &limit, v.ConsulMeta)
+}
+
+func (v *ControlPlaneRequestLimitWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {
+	var limitList ControlPlaneRequestLimitList
+	if err := v.Client.List(ctx, &limitList); err != nil {
+		return nil, err
+	}
+	var entries []common.ConfigEntryResource
+	for _, item := range limitList.Items {
+		entries = append(entries, common.ConfigEntryResource(&item))
+	}
+	return entries, nil
 }
 
 func (v *ControlPlaneRequestLimitWebhook) InjectDecoder(d *admission.Decoder) error {

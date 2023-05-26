@@ -5,7 +5,10 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	consul "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
@@ -54,6 +57,21 @@ func (c *ReadWriteRatesConfig) toConsul() *consul.ReadWriteRatesConfig {
 		ReadRate:  c.ReadRate,
 		WriteRate: c.WriteRate,
 	}
+}
+
+func (c *ReadWriteRatesConfig) validate(path *field.Path) field.ErrorList {
+	if c == nil {
+		return nil
+	}
+
+	var errs field.ErrorList
+	if c.ReadRate >= 0 {
+		errs = append(errs, field.Invalid(path.Child("readRate"), c.ReadRate, "must be >= 0"))
+	}
+	if c.WriteRate > 0 {
+		errs = append(errs, field.Invalid(path.Child("writeRate"), c.WriteRate, "must be > 0"))
+	}
+	return errs
 }
 
 // ControlPlaneRequestLimitSpec defines the desired state of ControlPlaneRequestLimit
@@ -213,12 +231,41 @@ func (c *ControlPlaneRequestLimit) MatchesConsul(candidate consul.ConfigEntry) b
 
 // Validate returns an error if the resource is invalid.
 func (c *ControlPlaneRequestLimit) Validate(consulMeta common.ConsulMeta) error {
-	// TODO: implement.
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+
+	if c.Spec.Mode != "permissive" || c.Spec.Mode != "enforcing" || c.Spec.Mode != "disabled" {
+		errs = append(errs, field.Invalid(path.Child("mode"), c.Spec.Mode, "mode must be one of: permissive, enforcing, disabled"))
+	}
+	if c.Spec.ReadRate >= 0 {
+		errs = append(errs, field.Invalid(path.Child("readRate"), c.Spec.ReadRate, "must be >= 0"))
+	}
+	if c.Spec.WriteRate > 0 {
+		errs = append(errs, field.Invalid(path.Child("writeRate"), c.Spec.WriteRate, "must be > 0"))
+	}
+
+	errs = append(errs, c.Spec.ACL.validate(path.Child("acl"))...)
+	errs = append(errs, c.Spec.ConfigEntry.validate(path.Child("configEntry"))...)
+	errs = append(errs, c.Spec.ConnectCA.validate(path.Child("connectCA"))...)
+	errs = append(errs, c.Spec.Coordinate.validate(path.Child("coordinate"))...)
+	errs = append(errs, c.Spec.DiscoveryChain.validate(path.Child("discoveryChain"))...)
+	errs = append(errs, c.Spec.Health.validate(path.Child("health"))...)
+	errs = append(errs, c.Spec.Intention.validate(path.Child("intention"))...)
+	errs = append(errs, c.Spec.KV.validate(path.Child("kv"))...)
+	errs = append(errs, c.Spec.Tenancy.validate(path.Child("tenancy"))...)
+	errs = append(errs, c.Spec.PreparedQuery.validate(path.Child("preparedQuery"))...)
+	errs = append(errs, c.Spec.Session.validate(path.Child("session"))...)
+	errs = append(errs, c.Spec.Txn.validate(path.Child("txn"))...)
+
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: ConsulHashicorpGroup, Kind: ControlPlaneRequestLimitKubeKind},
+			c.KubernetesName(), errs)
+	}
+
 	return nil
 }
 
-// DefaultNamespaceFields sets Consul namespace fields on the config entry
-// spec to their default values if namespaces are enabled.
-func (c *ControlPlaneRequestLimit) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
-	// TODO: implement.
+// DefaultNamespaceFields has no behaviour here as control-plane-request-limit have no namespace specific fields.
+func (s *ControlPlaneRequestLimit) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
