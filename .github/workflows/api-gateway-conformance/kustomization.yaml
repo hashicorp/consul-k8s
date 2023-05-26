@@ -1,0 +1,32 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# This file contains the additional resources and the patches for existing resources necessary
+# to run the conformance tests from https://github.com/kubernetes-sigs/gateway-api against
+# Consul API Gateway.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ./base/manifests.yaml
+  - ./proxydefaults.yaml
+
+patches:
+  # Add connect-inject annotation to each Deployment. This is required due to
+  # containerPort not being defined on Deployments upstream. Though containerPort
+  # is optional, Consul relies on it as a default value in the absence of a
+  # connect-service-port annotation.
+  - patch: |-
+      - op: add
+        path: "/spec/template/metadata/annotations"
+        value: {'consul.hashicorp.com/connect-service-port': '3000'}
+    target:
+      kind: Deployment
+  # We don't have enough resources in the GitHub-hosted Actions runner to support 2 replicas
+  - patch: |-
+      - op: replace
+        path: "/spec/replicas"
+        value: 1
+    target:
+      kind: Deployment

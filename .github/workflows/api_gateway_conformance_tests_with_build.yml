@@ -47,7 +47,7 @@ jobs:
 #            envoy-image: "envoyproxy/envoy:v1.24-latest"
 #            consul-k8s-version: "consul-k8s-control-plane-dev"
 #            envoy-field: "apiGateway.imageEnvoy"
-          - name: "consul@v1.15 + consul-k8s@v1.0.1"
+          - name: "consul@v1.16-dev"
             consul-image: "hashicorppreview/consul:1.16-dev "
             consul-k8s-image: "consul-k8s-control-plane-dev:local-build"
       fail-fast: false
