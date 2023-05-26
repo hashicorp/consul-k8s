@@ -41,6 +41,78 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 			},
 			Matches: true,
 		},
+		"namespaces and partitions equate `default` and empty strings": {
+			Ours: ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "svc-name",
+						Namespace: "ns1",
+					},
+					Sources: []*SourceIntention{
+						{
+							Name:      "svc1",
+							Namespace: "",
+							Partition: "default",
+							Action:    "allow",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceIntentionsConfigEntry{
+				Kind:      capi.ServiceIntentions,
+				Name:      "svc-name",
+				Namespace: "ns1",
+				Sources: []*capi.SourceIntention{
+					{
+						Name:       "svc1",
+						Namespace:  "default",
+						Partition:  "",
+						Action:     "allow",
+						Precedence: 0,
+					},
+				},
+			},
+			Matches: true,
+		},
+		"source namespaces and partitions are compared": {
+			Ours: ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "svc-name",
+						Namespace: "test",
+					},
+					Sources: []*SourceIntention{
+						{
+							Name:      "svc1",
+							Namespace: "test",
+							Partition: "test",
+							Action:    "allow",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceIntentionsConfigEntry{
+				Kind:      capi.ServiceIntentions,
+				Name:      "svc-name",
+				Namespace: "test",
+				Sources: []*capi.SourceIntention{
+					{
+						Name:       "svc1",
+						Namespace:  "not-test",
+						Partition:  "not-test",
+						Action:     "allow",
+						Precedence: 0,
+					},
+				},
+			},
+			Matches: false,
+		},
 		"all fields set matches": {
 			Ours: ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{

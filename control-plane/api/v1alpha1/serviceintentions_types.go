@@ -234,10 +234,26 @@ func (in *ServiceIntentions) ConsulGlobalResource() bool {
 	return false
 }
 
+func normalizeEmptyToDefault(value string) string {
+	if value == "" {
+		return "default"
+	}
+	return value
+}
+
 func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	configEntry, ok := candidate.(*capi.ServiceIntentionsConfigEntry)
 	if !ok {
 		return false
+	}
+
+	specialEquality := cmp.Options{
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Sources.Namespace"
+		}, cmp.Transformer("NormalizeNamespace", normalizeEmptyToDefault)),
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Sources.Partition"
+		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
 	}
 
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
@@ -245,7 +261,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 		in.ToConsul(""),
 		configEntry,
 		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
-		cmpopts.IgnoreFields(capi.SourceIntention{}, "Partition", "Namespace", "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
+		cmpopts.IgnoreFields(capi.SourceIntention{}, "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
 		cmpopts.IgnoreUnexported(),
 		cmpopts.EquateEmpty(),
 		// Consul will sort the sources by precedence when returning the resource
@@ -255,6 +271,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 			// piggyback on strings.Compare that returns -1 if a < b.
 			return strings.Compare(sourceIntentionSortKey(a), sourceIntentionSortKey(b)) == -1
 		}),
+		specialEquality,
 	)
 }
 
