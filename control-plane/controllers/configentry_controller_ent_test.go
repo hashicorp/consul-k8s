@@ -108,7 +108,7 @@ func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 				req.True(written)
 			}
 
-			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.NewTestLogger(t))
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),
@@ -235,7 +235,7 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 				c.updateF(c.configEntryResource)
 				err = fakeClient.Update(ctx, c.configEntryResource)
 				req.NoError(err)
-				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.NewTestLogger(t))
 				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
@@ -331,7 +331,7 @@ func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
 				}
-				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.NewTestLogger(t))
 				resp, err := r.Reconcile(context.Background(), ctrl.Request{
 					NamespacedName: namespacedName,
 				})

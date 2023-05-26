@@ -814,7 +814,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"dns redirection enabled",
 			MeshWebhook{
-				Log:                    logrtest.TestLogger{T: t},
+				Log:                    logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSet(),
 				EnableTransparentProxy: true,
@@ -888,7 +888,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"dns redirection only enabled if tproxy enabled",
 			MeshWebhook{
-				Log:                    logrtest.TestLogger{T: t},
+				Log:                    logrtest.NewTestLogger(t),
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSet(),
 				EnableTransparentProxy: true,
