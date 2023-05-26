@@ -617,7 +617,6 @@ function update_version_helm {
 	local vfile="$1/values.yaml"
 	local cfile="$1/Chart.yaml"
 	local version="$2"
-	local consul_version="$5"
 	local prerelease="$3"
 	local full_version="$2"
 	local full_consul_version="$5"
