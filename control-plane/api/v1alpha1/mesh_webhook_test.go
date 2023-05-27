@@ -97,11 +97,7 @@ func TestValidateMesh(t *testing.T) {
 
 			validator := &MeshWebhook{
 				Client:  client,
-<<<<<<< HEAD
-				Logger:  logrtest.NewTestLogger(t),
-=======
 				Logger:  logrtest.New(t),
->>>>>>> fa02b5ce (Fix up a few more breaking change issues)
 				decoder: decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{
