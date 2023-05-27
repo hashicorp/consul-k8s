@@ -229,7 +229,6 @@ func TestBasicCloud(t *testing.T) {
 
 	logger.Log(t, "creating static-server deployment")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
-	time.Sleep(1 * time.Hour)
-
+	// time.Sleep(1 * time.Hour)
 	// TODO: add in test assertions here
 }
