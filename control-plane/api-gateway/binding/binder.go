@@ -5,6 +5,7 @@ package binding
 
 import (
 	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -145,7 +146,7 @@ func (b *Binder) Snapshot() Snapshot {
 	tracker := b.references()
 	meshServiceMap := meshServiceMap(b.config.MeshServices)
 	serviceMap := serviceMap(b.config.ConnectInjectedServices)
-	seenRoutes := map[api.ResourceReference]struct{}{}
+	seenRoutes := cache.NewReferenceSet()
 	snapshot := Snapshot{}
 	gwcc := b.config.GatewayClassConfig
 
@@ -200,13 +201,17 @@ func (b *Binder) Snapshot() Snapshot {
 			continue
 		}
 
-		certificate := b.config.Translator.SecretToInlineCertificate(secret)
-		certificateRef := translation.EntryToReference(&certificate)
+		certificate, err := b.config.Translator.SecretToInlineCertificate(secret)
+		if err != nil {
+			// just drop anything that doesn't pass validation
+			continue
+		}
+		certificateRef := translation.EntryToReference(certificate)
 
 		// mark the certificate as processed
 		seenCerts[objectToMeta(&secret)] = certificateRef
 		// add the certificate to the set of upsert operations needed in Consul
-		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &certificate)
+		snapshot.Consul.Updates = append(snapshot.Consul.Updates, certificate)
 	}
 
 	// clean up any inline certs that are now stale and can be GC'd

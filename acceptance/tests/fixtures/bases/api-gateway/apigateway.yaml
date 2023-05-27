@@ -14,3 +14,9 @@ spec:
   - protocol: TCP
     port: 8081
     name: tcp
+  - protocol: HTTPS
+    port: 8082
+    name: https
+    tls:
+      certificateRefs:
+        - name: "certificate"

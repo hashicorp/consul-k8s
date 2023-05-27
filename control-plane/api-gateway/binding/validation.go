@@ -6,6 +6,7 @@ package binding
 import (
 	"strings"
 
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -154,6 +155,10 @@ MAIN_LOOP:
 
 		for _, secret := range certificates {
 			if secret.Namespace == ns && secret.Name == string(ref.Name) {
+				if validationErr := validateCertificateData(secret); validationErr != nil {
+					err = validationErr
+					break MAIN_LOOP
+				}
 				continue MAIN_LOOP
 			}
 		}
@@ -169,6 +174,11 @@ MAIN_LOOP:
 
 	// TODO: validate tls options
 	return nil, err
+}
+
+func validateCertificateData(secret corev1.Secret) error {
+	_, _, err := apigateway.ParseCertificateData(secret)
+	return err
 }
 
 // validateListeners validates the given listeners both internally and with respect to each

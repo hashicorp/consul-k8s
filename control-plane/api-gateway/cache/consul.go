@@ -5,16 +5,15 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
@@ -35,38 +34,6 @@ type Config struct {
 	NamespacesEnabled   bool
 	PeeringEnabled      bool
 	Logger              logr.Logger
-}
-
-type resourceCache map[api.ResourceReference]api.ConfigEntry
-
-func (oldCache resourceCache) diff(newCache resourceCache) []api.ConfigEntry {
-	diffs := make([]api.ConfigEntry, 0)
-
-	for ref, entry := range newCache {
-		oldRef, ok := oldCache[ref]
-		// ref from the new cache doesn't exist in the old one
-		// this means a resource was added
-		if !ok {
-			diffs = append(diffs, entry)
-			continue
-		}
-
-		// the entry in the old cache has an older modify index than the ref
-		// from the new cache
-		if oldRef.GetModifyIndex() < entry.GetModifyIndex() {
-			diffs = append(diffs, entry)
-		}
-	}
-
-	// get all deleted entries, these are entries present in the old cache
-	// that are not present in the new
-	for ref, entry := range oldCache {
-		if _, ok := newCache[ref]; !ok {
-			diffs = append(diffs, entry)
-		}
-	}
-
-	return diffs
 }
 
 type serviceCache map[api.ResourceReference]*api.CatalogService
@@ -131,45 +98,6 @@ func (oldCache peeringCache) diff(newCache peeringCache) []*api.Peering {
 	return diffs
 }
 
-// configEntryObject is used for generic k8s events so we maintain the consul name/namespace.
-type configEntryObject struct {
-	client.Object // embed so we fufill the object interface
-
-	Namespace string
-	Name      string
-}
-
-func (c *configEntryObject) GetNamespace() string {
-	return c.Namespace
-}
-
-func (c *configEntryObject) GetName() string {
-	return c.Name
-}
-
-func newConfigEntryObject(namespacedName types.NamespacedName) *configEntryObject {
-	return &configEntryObject{
-		Namespace: namespacedName.Namespace,
-		Name:      namespacedName.Name,
-	}
-}
-
-// Subscription represents a watcher for events on a specific kind.
-type Subscription struct {
-	translator translation.TranslatorFn
-	ctx        context.Context
-	cancelCtx  context.CancelFunc
-	events     chan event.GenericEvent
-}
-
-func (s *Subscription) Cancel() {
-	s.cancelCtx()
-}
-
-func (s *Subscription) Events() chan event.GenericEvent {
-	return s.events
-}
-
 type ServiceTranslatorFn func(*api.CatalogService) []types.NamespacedName
 
 // ServiceSubscription represents a watcher for events on a specific kind.
@@ -213,7 +141,7 @@ type Cache struct {
 	serverMgr consul.ServerConnectionManager
 	logger    logr.Logger
 
-	cache        map[string]resourceCache
+	cache        map[string]*ReferenceMap
 	serviceCache serviceCache
 	peeringCache peeringCache
 	cacheMutex   *sync.Mutex
@@ -232,9 +160,9 @@ type Cache struct {
 }
 
 func New(config Config) *Cache {
-	cache := make(map[string]resourceCache, len(Kinds))
+	cache := make(map[string]*ReferenceMap, len(Kinds))
 	for _, kind := range Kinds {
-		cache[kind] = make(resourceCache)
+		cache[kind] = NewReferenceMap()
 	}
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
@@ -515,13 +443,13 @@ func (c *Cache) subscribeToConsulPeerings(ctx context.Context) {
 func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind string, entries []api.ConfigEntry) {
 	c.cacheMutex.Lock()
 
-	cache := make(resourceCache)
+	cache := NewReferenceMap()
 
 	for _, entry := range entries {
-		cache[translation.EntryToReference(entry)] = entry
+		cache.Set(translation.EntryToReference(entry), entry)
 	}
 
-	diffs := c.cache[kind].diff(cache)
+	diffs := c.cache[kind].Diff(cache)
 
 	c.cache[kind] = cache
 
@@ -711,14 +639,9 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 
 	ref := translation.EntryToReference(entry)
 
-	old, ok := entryMap[ref]
-	if ok {
-		if cmp.Equal(old, entry, cmp.FilterPath(func(p cmp.Path) bool {
-			path := p.String()
-			return strings.HasSuffix(path, "Status") || strings.HasSuffix(path, "ModifyIndex") || strings.HasSuffix(path, "CreateIndex")
-		}, cmp.Ignore())) {
-			return nil
-		}
+	old := entryMap.Get(ref)
+	if old != nil && entriesEqual(old, entry) {
+		return nil
 	}
 
 	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
@@ -727,6 +650,9 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	}
 
 	options := &api.WriteOptions{}
+
+	data, _ := json.MarshalIndent(entry, "", "  ")
+	c.logger.Info("writing config entry", "entry", string(data))
 
 	_, _, err = client.ConfigEntries().Set(entry, options.WithContext(ctx))
 	if err != nil {
@@ -746,12 +672,7 @@ func (c *Cache) Get(ref api.ResourceReference) api.ConfigEntry {
 		return nil
 	}
 
-	entry, ok := entryMap[ref]
-	if !ok {
-		return nil
-	}
-
-	return entry
+	return entryMap.Get(ref)
 }
 
 // Delete handles deleting the config entry from consul, if the current reference of the config entry is stale then
@@ -764,8 +685,8 @@ func (c *Cache) Delete(ctx context.Context, ref api.ResourceReference) error {
 	if !ok {
 		return nil
 	}
-	_, ok = entryMap[ref]
-	if !ok {
+
+	if entryMap.Get(ref) == nil {
 		c.logger.Info("cached object not found, not deleting")
 		return nil
 	}
@@ -786,16 +707,12 @@ func (c *Cache) List(kind string) []api.ConfigEntry {
 	c.cacheMutex.Lock()
 	defer c.cacheMutex.Unlock()
 
-	entryMap, ok := c.cache[kind]
+	refMap, ok := c.cache[kind]
 	if !ok {
 		return nil
 	}
-	entries := make([]api.ConfigEntry, 0, len(entryMap))
-	for _, entry := range entryMap {
-		entries = append(entries, entry)
-	}
 
-	return entries
+	return refMap.Entries()
 }
 
 // ListServices returns a list of services from the cache that corresponds to the given kind.

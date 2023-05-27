@@ -200,6 +200,7 @@ var (
 	errListenerProtocolConflict                   = errors.New("listener protocol conflicts with another listener")
 	errListenerInvalidCertificateRef_NotFound     = errors.New("certificate not found")
 	errListenerInvalidCertificateRef_NotSupported = errors.New("certificate type is not supported")
+	errListenerInvalidCertificateRef_InvalidData  = errors.New("certificate is invalid or does not contain a supported server name")
 
 	// Below is where any custom generic listener validation errors should go.
 	// We map anything under here to a custom ListenerConditionReason of Invalid on
@@ -305,16 +306,7 @@ func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1
 	now := metav1.Now()
 
 	switch l.refErr {
-	case errListenerInvalidCertificateRef_NotFound:
-		return metav1.Condition{
-			Type:               "ResolvedRefs",
-			Status:             metav1.ConditionFalse,
-			Reason:             "InvalidCertificateRef",
-			ObservedGeneration: generation,
-			Message:            l.refErr.Error(),
-			LastTransitionTime: now,
-		}
-	case errListenerInvalidCertificateRef_NotSupported:
+	case errListenerInvalidCertificateRef_NotFound, errListenerInvalidCertificateRef_NotSupported, errListenerInvalidCertificateRef_InvalidData:
 		return metav1.Condition{
 			Type:               "ResolvedRefs",
 			Status:             metav1.ConditionFalse,

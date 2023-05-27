@@ -12,6 +12,7 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
@@ -122,6 +123,7 @@ func (t K8sToConsulTranslator) ReferenceForGateway(k8sGW *gwv1beta1.Gateway) api
 		Kind:      api.APIGateway,
 		Name:      gwName,
 		Namespace: t.getConsulNamespace(k8sGW.GetObjectMeta().GetNamespace()),
+		Partition: t.ConsulPartition,
 	}
 }
 
@@ -142,7 +144,6 @@ func (t K8sToConsulTranslator) HTTPRouteToHTTPRoute(k8sHTTPRoute *gwv1beta1.HTTP
 			metaKeyKubeName:        k8sHTTPRoute.GetObjectMeta().GetName(),
 		},
 		Partition: t.ConsulPartition,
-
 		Namespace: t.getConsulNamespace(k8sHTTPRoute.GetObjectMeta().GetNamespace()),
 	}
 
@@ -171,6 +172,7 @@ func (t K8sToConsulTranslator) ReferenceForHTTPRoute(k8sHTTPRoute *gwv1beta1.HTT
 		Kind:      api.HTTPRoute,
 		Name:      routeName,
 		Namespace: t.getConsulNamespace(k8sHTTPRoute.GetObjectMeta().GetNamespace()),
+		Partition: t.ConsulPartition,
 	}
 }
 
@@ -391,7 +393,6 @@ func (t K8sToConsulTranslator) TCPRouteToTCPRoute(k8sRoute *gwv1alpha2.TCPRoute,
 			metaKeyKubeName:        k8sRoute.GetObjectMeta().GetName(),
 		},
 		Partition: t.ConsulPartition,
-
 		Namespace: t.getConsulNamespace(k8sRoute.GetObjectMeta().GetNamespace()),
 	}
 
@@ -443,25 +444,30 @@ func (t K8sToConsulTranslator) ReferenceForTCPRoute(k8sTCPRoute *gwv1alpha2.TCPR
 		Kind:      api.TCPRoute,
 		Name:      routeName,
 		Namespace: t.getConsulNamespace(k8sTCPRoute.GetObjectMeta().GetNamespace()),
+		Partition: t.ConsulPartition,
 	}
 }
 
 // SecretToInlineCertificate translates a Kuberenetes Secret into a Consul Inline Certificate Config Entry.
-func (t K8sToConsulTranslator) SecretToInlineCertificate(k8sSecret corev1.Secret) capi.InlineCertificateConfigEntry {
+func (t K8sToConsulTranslator) SecretToInlineCertificate(k8sSecret corev1.Secret) (*capi.InlineCertificateConfigEntry, error) {
+	certificate, privateKey, err := apigateway.ParseCertificateData(k8sSecret)
+	if err != nil {
+		return nil, err
+	}
 	namespace := t.getConsulNamespace(k8sSecret.GetObjectMeta().GetNamespace())
-	return capi.InlineCertificateConfigEntry{
+	return &capi.InlineCertificateConfigEntry{
 		Kind:        capi.InlineCertificate,
 		Namespace:   namespace,
 		Name:        k8sSecret.Name,
-		Certificate: k8sSecret.StringData[corev1.TLSCertKey],
-		PrivateKey:  k8sSecret.StringData[corev1.TLSPrivateKeyKey],
+		Certificate: strings.TrimSpace(certificate),
+		PrivateKey:  strings.TrimSpace(privateKey),
 		Meta: map[string]string{
 			metaKeyManagedBy:       metaValueManagedBy,
 			metaKeyKubeNS:          namespace,
 			metaKeyKubeServiceName: string(k8sSecret.Name),
 			metaKeyKubeName:        string(k8sSecret.Name),
 		},
-	}
+	}, nil
 }
 
 func (t K8sToConsulTranslator) ReferenceForSecret(k8sSecret corev1.Secret) api.ResourceReference {
@@ -469,6 +475,7 @@ func (t K8sToConsulTranslator) ReferenceForSecret(k8sSecret corev1.Secret) api.R
 		Kind:      api.InlineCertificate,
 		Name:      k8sSecret.Name,
 		Namespace: t.getConsulNamespace(k8sSecret.GetObjectMeta().GetNamespace()),
+		Partition: t.ConsulPartition,
 	}
 }
 

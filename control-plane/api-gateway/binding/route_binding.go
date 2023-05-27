@@ -4,6 +4,7 @@
 package binding
 
 import (
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -145,13 +146,13 @@ func newRouteBinder[T client.Object, U api.ConfigEntry](
 }
 
 // bind contains the main logic for binding a route to a given gateway.
-func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]int, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) (updatedSnapshot Snapshot) {
+func (r *routeBinder[T, U]) bind(route T, boundCount map[gwv1beta1.SectionName]int, seenRoutes *cache.ReferenceSet, snapshot Snapshot) (updatedSnapshot Snapshot) {
 	routeRef := r.translationReferenceFunc(route)
 	existing := r.lookupFunc(routeRef)
 	gatewayRefs := filterParentRefs(objectToMeta(r.gateway), route.GetNamespace(), r.getParentRefsFunc(route))
 
 	// mark this route as having been processed
-	seenRoutes[routeRef] = struct{}{}
+	seenRoutes.Mark(routeRef)
 
 	// flags to mark that some operation needs to occur
 	consulNeedsDelete := false
@@ -379,14 +380,14 @@ func (b *Binder) newHTTPRouteBinder(tracker referenceTracker, services map[types
 // and marks adds it to the snapshot if its mutated the entry at all.
 func cleanRoute[T api.ConfigEntry](
 	route T,
-	seenRoutes map[api.ResourceReference]struct{},
+	seenRoutes *cache.ReferenceSet,
 	snapshot Snapshot,
 	gatewayRef api.ResourceReference,
 	getParentsFunc func(T) []api.ResourceReference,
 	setParentsFunc func(T, []api.ResourceReference),
 ) Snapshot {
 	routeRef := translation.EntryToReference(route)
-	if _, ok := seenRoutes[routeRef]; !ok {
+	if !seenRoutes.Contains(routeRef) {
 		existingParents := getParentsFunc(route)
 		parents := parentsForRoute(gatewayRef, existingParents, nil)
 		if len(parents) == 0 {
@@ -402,7 +403,7 @@ func cleanRoute[T api.ConfigEntry](
 }
 
 // cleanHTTPRoute wraps cleanRoute with the proper closures for HTTPRoute config entries.
-func (b *Binder) cleanHTTPRoute(route *api.HTTPRouteConfigEntry, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) Snapshot {
+func (b *Binder) cleanHTTPRoute(route *api.HTTPRouteConfigEntry, seenRoutes *cache.ReferenceSet, snapshot Snapshot) Snapshot {
 	return cleanRoute(route, seenRoutes, snapshot, b.gatewayRef(),
 		func(route *api.HTTPRouteConfigEntry) []api.ResourceReference { return route.Parents },
 		func(route *api.HTTPRouteConfigEntry, parents []api.ResourceReference) { route.Parents = parents },
@@ -410,7 +411,7 @@ func (b *Binder) cleanHTTPRoute(route *api.HTTPRouteConfigEntry, seenRoutes map[
 }
 
 // cleanTCPRoute wraps cleanRoute with the proper closures for TCPRoute config entries.
-func (b *Binder) cleanTCPRoute(route *api.TCPRouteConfigEntry, seenRoutes map[api.ResourceReference]struct{}, snapshot Snapshot) Snapshot {
+func (b *Binder) cleanTCPRoute(route *api.TCPRouteConfigEntry, seenRoutes *cache.ReferenceSet, snapshot Snapshot) Snapshot {
 	return cleanRoute(route, seenRoutes, snapshot, b.gatewayRef(),
 		func(route *api.TCPRouteConfigEntry) []api.ResourceReference { return route.Parents },
 		func(route *api.TCPRouteConfigEntry, parents []api.ResourceReference) { route.Parents = parents },
