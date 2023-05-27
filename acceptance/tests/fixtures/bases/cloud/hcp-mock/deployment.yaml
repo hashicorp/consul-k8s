@@ -4,26 +4,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: static-server
+  name: fake-server
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: static-server
+      app: fake-server
   template:
     metadata:
-      name: static-server
+      name: fake-server
       labels:
-        app: static-server
+        app: fake-server
     spec:
       containers:
-        - name: static-server
-          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
-          args:
-            - -text="hello world"
-            - -listen=:8080
+        - name: fake-server
+          # TODO: move this to a hashicorp mirror
+          image: docker.io/chaapppie/fakeserver:latest
           ports:
+            - containerPort: 443
+              name: https
             - containerPort: 8080
               name: http
-      serviceAccountName: static-server
+      serviceAccountName: fake-server
       terminationGracePeriodSeconds: 0 # so deletion is quick
