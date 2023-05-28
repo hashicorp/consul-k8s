@@ -502,10 +502,12 @@ func (c *Command) Run(args []string) int {
 			ConsulPartition:            c.consul.Partition,
 			ConsulCACert:               string(caCertPem),
 		},
-		ConsulClientConfig:  consulConfig,
-		ConsulServerConnMgr: watcher,
-		NamespacesEnabled:   c.flagEnableNamespaces,
-		Partition:           c.consul.Partition,
+		AllowK8sNamespacesSet: allowK8sNamespaces,
+		DenyK8sNamespacesSet:  denyK8sNamespaces,
+		ConsulClientConfig:    consulConfig,
+		ConsulServerConnMgr:   watcher,
+		NamespacesEnabled:     c.flagEnableNamespaces,
+		Partition:             c.consul.Partition,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")

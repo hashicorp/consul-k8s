@@ -4,6 +4,8 @@
 package binding
 
 import (
+	"fmt"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/go-cmp/cmp"
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
@@ -159,6 +161,7 @@ func (b *Binder) Snapshot() Snapshot {
 
 	if !isGatewayDeleted {
 		var updated bool
+
 		gatewayClassConfig, updated = serializeGatewayClassConfig(&b.config.Gateway, gatewayClassConfig)
 
 		// we don't have a deletion but if we add a finalizer for the gateway, then just add it and return
@@ -169,6 +172,7 @@ func (b *Binder) Snapshot() Snapshot {
 			return snapshot
 		}
 
+		fmt.Println("VALIDATING")
 		// calculate the status for the gateway
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
 		listenerValidation = validateListeners(b.config.Gateway.Namespace, b.config.Gateway.Spec.Listeners, b.config.Resources)
@@ -181,16 +185,17 @@ func (b *Binder) Snapshot() Snapshot {
 
 	// attempt to bind all routes
 
+	fmt.Println("BINDING HTTPROUTES")
 	for _, r := range b.config.HTTPRoutes {
 		snapshot = b.bindRoute(pointerTo(r), boundCounts, snapshot)
 	}
-
+	fmt.Println("BINDING TCPROUTES")
 	for _, r := range b.config.TCPRoutes {
 		snapshot = b.bindRoute(pointerTo(r), boundCounts, snapshot)
 	}
 
 	// process secrets
-
+	fmt.Println("PROCESSING SECRETS")
 	gatewaySecrets := secretsForGateway(b.config.Gateway)
 	certs := mapset.NewSet()
 	for secret := range gatewaySecrets.Iter() {
@@ -203,7 +208,9 @@ func (b *Binder) Snapshot() Snapshot {
 
 	// now cleanup any routes or certificates that we haven't already processed
 
+	fmt.Println("CHECKING GC")
 	snapshot.Consul.Deletions = b.config.Resources.ResourcesToGC(b.key)
+	fmt.Println("CHECKING UPDATES")
 	snapshot.Consul.Updates = b.config.Resources.Mutations()
 
 	// finally, handle the gateway itself
@@ -211,6 +218,8 @@ func (b *Binder) Snapshot() Snapshot {
 	// we only want to upsert the gateway into Consul or update its status
 	// if the gateway hasn't been marked for deletion
 	if !isGatewayDeleted {
+		fmt.Println("GATEWAY NOT DELETED!!!")
+
 		snapshot.GatewayClassConfig = gatewayClassConfig
 		snapshot.UpsertGatewayDeployment = true
 

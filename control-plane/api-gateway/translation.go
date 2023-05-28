@@ -1,6 +1,7 @@
 package apigateway
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -72,6 +73,12 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *R
 	}
 }
 
+var listenerProtocolMap = map[string]string{
+	"https": "http",
+	"http":  "http",
+	"tcp":   "tcp",
+}
+
 func (t ResourceTranslator) toAPIGatewayListener(namespace string, listener gwv1beta1.Listener, resources *ResourceMap) api.APIGatewayListener {
 	var certificates []api.ResourceReference
 
@@ -93,7 +100,7 @@ func (t ResourceTranslator) toAPIGatewayListener(namespace string, listener gwv1
 		Name:     string(listener.Name),
 		Hostname: DerefStringOr(listener.Hostname, ""),
 		Port:     int(listener.Port),
-		Protocol: string(listener.Protocol),
+		Protocol: listenerProtocolMap[strings.ToLower(string(listener.Protocol))],
 		TLS: api.APIGatewayTLSConfiguration{
 			Certificates: certificates,
 		},
@@ -107,7 +114,7 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 
 	hostnames := StringLikeSlice(route.Spec.Hostnames)
 	rules := ConvertSliceFuncIf(route.Spec.Rules, func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
-		return t.translateHTTPRouteRule(namespace, rule, resources)
+		return t.translateHTTPRouteRule(route.Namespace, rule, resources)
 	})
 
 	return &api.HTTPRouteConfigEntry{
@@ -129,6 +136,7 @@ func (t ResourceTranslator) translateHTTPRouteRule(namespace string, rule gwv1be
 		return t.translateHTTPBackendRef(namespace, ref, resources)
 	})
 
+	fmt.Println("TRANSLATED SERVICES", services)
 	if len(services) == 0 {
 		return api.HTTPRouteRule{}, false
 	}
@@ -148,8 +156,10 @@ func (t ResourceTranslator) translateHTTPBackendRef(namespace string, ref gwv1be
 		Name:      string(ref.Name),
 		Namespace: DerefStringOr(ref.Namespace, namespace),
 	}
+	fmt.Println("CHECKING BACKEND REF", id)
 
 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
+
 	if isServiceRef && resources.HasService(id) {
 		filters := t.translateHTTPFilters(ref.Filters)
 		service := resources.Service(id)
@@ -271,7 +281,7 @@ func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *Res
 	backendRefs := ConvertSliceFunc(route.Spec.Rules, func(rule gwv1alpha2.TCPRouteRule) []gwv1beta1.BackendRef { return rule.BackendRefs })
 	flattenedRefs := Flatten(backendRefs)
 	services := ConvertSliceFuncIf(flattenedRefs, func(ref gwv1beta1.BackendRef) (api.TCPService, bool) {
-		return t.translateTCPRouteRule(namespace, ref, resources)
+		return t.translateTCPRouteRule(route.Namespace, ref, resources)
 	})
 
 	return &api.TCPRouteConfigEntry{

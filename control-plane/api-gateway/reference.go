@@ -122,18 +122,6 @@ func (r *ReferenceSet) Mark(ref api.ResourceReference) {
 	r.data[NormalizeMeta(ref)] = struct{}{}
 }
 
-// Iter iterates across the reference set
-func (r *ReferenceSet) Iter() <-chan api.ResourceReference {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	c := make(chan api.ResourceReference, len(r.data))
-	for ref := range r.data {
-		c <- ref
-	}
-	return c
-}
-
 // Contains checks for the inclusion of a reference in the set.
 func (r *ReferenceSet) Contains(ref api.ResourceReference) bool {
 	r.mutex.RLock()

@@ -1,6 +1,9 @@
 package apigateway
 
 import (
+	"encoding/json"
+	"fmt"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -10,8 +13,6 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
-
-type GCResources []api.ResourceReference
 
 type certificate struct {
 	secret   corev1.Secret
@@ -94,6 +95,7 @@ func (s *ResourceMap) Service(id types.NamespacedName) api.ResourceReference {
 }
 
 func (s *ResourceMap) HasService(id types.NamespacedName) bool {
+	fmt.Println("SERVICE CHECK", id)
 	_, ok := s.services[id]
 	return ok
 }
@@ -176,30 +178,38 @@ func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceRefe
 
 	var toGC []api.ResourceReference
 
-	for id := range resources.consulObjects.Iter() {
+	fmt.Println("ITERATING")
+	for id := range resources.consulObjects.data {
 		// if any of these objects exist in the below maps
 		// it means we haven't "popped" it to be created
 		switch id.Kind {
 		case api.HTTPRoute:
+			fmt.Println("HTTPROUTE START")
 			if route, ok := s.consulHTTPRoutes[id]; ok && route.gateways.Cardinality() <= 1 {
 				// we only have a single reference, which will be this gateway, so drop
 				// the route altogether
 				toGC = append(toGC, id)
 			}
+			fmt.Println("HTTPROUTE DONE")
 		case api.TCPRoute:
+			fmt.Println("TCPROUTE START")
 			if route, ok := s.consulTCPRoutes[id]; ok && route.gateways.Cardinality() <= 1 {
 				// we only have a single reference, which will be this gateway, so drop
 				// the route altogether
 				toGC = append(toGC, id)
 			}
+			fmt.Println("TCPROUTE DONE")
 		case api.InlineCertificate:
+			fmt.Println("CERT START")
 			if route, ok := s.certificateGateways[id]; ok && route.gateways.Cardinality() <= 1 {
 				// we only have a single reference, which will be this gateway, so drop
 				// the route altogether
 				toGC = append(toGC, id)
 			}
+			fmt.Println("CERT DONE")
 		}
 	}
+	fmt.Println("ITERATION DONE")
 
 	return toGC
 }
@@ -313,7 +323,11 @@ func (s *ResourceMap) gatewaysForRoute(namespace string, refs []gwv1beta1.Parent
 func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, mutateFn func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
 	consulKey := s.toConsulReference(api.HTTPRoute, key)
 
-	route := s.httpRouteGateways[consulKey]
+	route, ok := s.httpRouteGateways[consulKey]
+	if !ok {
+		return
+	}
+
 	translated := s.translator.ToHTTPRoute(route.route, s)
 
 	consulRoute, ok := s.consulHTTPRoutes[consulKey]
@@ -353,7 +367,12 @@ func (s *ResourceMap) CanGCHTTPRouteOnUnbind(id api.ResourceReference) bool {
 func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, mutateFn func(*api.TCPRouteConfigEntry, api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
 	consulKey := s.toConsulReference(api.TCPRoute, key)
 
-	route := s.tcpRouteGateways[consulKey]
+	route, ok := s.tcpRouteGateways[consulKey]
+	if !ok {
+
+		return
+	}
+
 	translated := s.translator.ToTCPRoute(route.route, s)
 
 	consulRoute, ok := s.consulTCPRoutes[consulKey]
@@ -396,7 +415,11 @@ func (s *ResourceMap) CanGCTCPRouteOnUnbind(id api.ResourceReference) bool {
 func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error {
 	consulKey := s.toConsulReference(api.InlineCertificate, key)
 
-	certificate := s.certificateGateways[consulKey]
+	certificate, ok := s.certificateGateways[consulKey]
+	if !ok {
+		return nil
+	}
+
 	consulCertificate, err := s.translator.ToInlineCertificate(certificate.secret)
 	if err != nil {
 		return err
@@ -448,4 +471,46 @@ func (s *ResourceMap) toConsulReference(kind string, key types.NamespacedName) a
 		Namespace: s.translator.Namespace(key.Namespace),
 		Partition: s.translator.ConsulPartition,
 	}
+}
+
+func (s *ResourceMap) DumpAll() {
+	fmt.Println("====CERTS====")
+	for ref := range s.certificateGateways {
+		marshalDump(ref)
+	}
+	fmt.Println("====CONSUL CERTS====")
+	for ref := range s.consulInlineCertificates {
+		marshalDump(ref)
+	}
+	fmt.Println("====HTTPROUTES====")
+	for ref := range s.httpRouteGateways {
+		marshalDump(ref)
+	}
+	fmt.Println("====CONSUL HTTPROUTES====")
+	for ref := range s.consulHTTPRoutes {
+		marshalDump(ref)
+	}
+	fmt.Println("====TCPROUTES====")
+	for ref := range s.tcpRouteGateways {
+		marshalDump(ref)
+	}
+	fmt.Println("====CONSUL TCPROUTES====")
+	for ref := range s.consulTCPRoutes {
+		marshalDump(ref)
+	}
+	fmt.Println("====SERVICES====")
+	for k, v := range s.services {
+		marshalDump(k)
+		marshalDump(v)
+	}
+	fmt.Println("====MESH SERVICES====")
+	for k, v := range s.meshServices {
+		marshalDump(k)
+		marshalDump(v)
+	}
+}
+
+func marshalDump(v interface{}) {
+	data, _ := json.MarshalIndent(v, "", "  ")
+	fmt.Println(string(data))
 }

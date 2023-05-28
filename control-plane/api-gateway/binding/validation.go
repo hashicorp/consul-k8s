@@ -23,14 +23,14 @@ import (
 func validateRefs(namespace string, refs []gwv1beta1.BackendRef, resources *apigateway.ResourceMap) routeValidationResults {
 	var result routeValidationResults
 	for _, ref := range refs {
-		nsn := types.NamespacedName{
-			Name:      string(ref.BackendObjectReference.Name),
-			Namespace: valueOr(ref.BackendObjectReference.Namespace, namespace),
-		}
+		backendRef := ref.BackendObjectReference
 
 		// TODO: check reference grants
 
-		backendRef := ref.BackendObjectReference
+		nsn := types.NamespacedName{
+			Name:      string(backendRef.Name),
+			Namespace: valueOr(backendRef.Namespace, namespace),
+		}
 
 		isServiceRef := nilOrEqual(backendRef.Group, "") && nilOrEqual(backendRef.Kind, "Service")
 		isMeshServiceRef := derefEqual(backendRef.Group, v1alpha1.ConsulHashicorpGroup) && derefEqual(backendRef.Kind, v1alpha1.MeshServiceKind)
@@ -44,26 +44,22 @@ func validateRefs(namespace string, refs []gwv1beta1.BackendRef, resources *apig
 			continue
 		}
 
-		if isServiceRef {
-			if resources.HasService(nsn) {
-				result = append(result, routeValidationResult{
-					namespace: nsn.Namespace,
-					backend:   ref,
-					err:       errRouteBackendNotFound,
-				})
-				continue
-			}
+		if isServiceRef && !resources.HasService(nsn) {
+			result = append(result, routeValidationResult{
+				namespace: nsn.Namespace,
+				backend:   ref,
+				err:       errRouteBackendNotFound,
+			})
+			continue
 		}
 
-		if isMeshServiceRef {
-			if resources.HasMeshService(nsn) {
-				result = append(result, routeValidationResult{
-					namespace: nsn.Namespace,
-					backend:   ref,
-					err:       errRouteBackendNotFound,
-				})
-				continue
-			}
+		if isMeshServiceRef && !resources.HasMeshService(nsn) {
+			result = append(result, routeValidationResult{
+				namespace: nsn.Namespace,
+				backend:   ref,
+				err:       errRouteBackendNotFound,
+			})
+			continue
 		}
 
 		result = append(result, routeValidationResult{

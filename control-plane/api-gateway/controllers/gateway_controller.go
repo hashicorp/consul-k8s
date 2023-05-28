@@ -5,6 +5,8 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -83,6 +85,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	marshalDump("GATEWAY", &gateway)
 
 	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
@@ -90,6 +93,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to get GatewayClass")
 		return ctrl.Result{}, err
 	}
+	marshalDump("GATEWAYCLASS", gatewayClass)
 
 	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
@@ -97,6 +101,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "error fetching the gateway class config")
 		return ctrl.Result{}, err
 	}
+	marshalDump("GATEWAYCLASSCONFIG", gatewayClassConfig)
 
 	// get all namespaces
 	namespaces, err := r.getNamespaces(ctx)
@@ -104,12 +109,14 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to list Namespaces")
 		return ctrl.Result{}, err
 	}
+	marshalDump("NAMESPACES", &namespaces)
 
 	// get related gateway service
 	service, err := r.getDeployedGatewayService(ctx, req.NamespacedName)
 	if err != nil {
 		log.Error(err, "unable to fetch service for Gateway")
 	}
+	marshalDump("SERVICE", service)
 
 	// get related gateway pods
 	pods, err := r.getDeployedGatewayPods(ctx, gateway)
@@ -117,45 +124,59 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to list Pods for Gateway")
 		return ctrl.Result{}, err
 	}
-
-	// get all http routes referencing this gateway
-	httpRoutes, err := r.getRelatedHTTPRoutes(ctx, req.NamespacedName)
-	if err != nil {
-		log.Error(err, "unable to list HTTPRoutes")
-		return ctrl.Result{}, err
-	}
-
-	// get all tcp routes referencing this gateway
-	tcpRoutes, err := r.getRelatedTCPRoutes(ctx, req.NamespacedName)
-	if err != nil {
-		log.Error(err, "unable to list TCPRoutes")
-		return ctrl.Result{}, err
-	}
+	marshalDump("PODS", &pods)
 
 	// construct our resource map
-	resources := apigateway.NewResourceMap(apigateway.ResourceTranslator{})
+	resources := apigateway.NewResourceMap(r.Translator)
 
-	if err := r.fetchServicesForRoutes(ctx, resources, tcpRoutes, httpRoutes); err != nil {
-		log.Error(err, "unable to fetch services for routes")
-		return ctrl.Result{}, err
-	}
-
+	fmt.Println("FETCHING CONTROLLED GATEWAYS!!!!!")
 	if err := r.fetchControlledGateways(ctx, resources); err != nil {
 		log.Error(err, "unable to fetch controlled gateways")
 		return ctrl.Result{}, err
 	}
 
+	fmt.Println("FETCHING CERTIFICATES!!!!!")
 	if err := r.fetchCertificatesForGateway(ctx, resources, gateway); err != nil {
 		log.Error(err, "unable to fetch certificates for gateway")
 		return ctrl.Result{}, err
 	}
 
+	// get all http routes referencing this gateway
+	httpRoutes, err := r.getRelatedHTTPRoutes(ctx, req.NamespacedName, resources)
+	if err != nil {
+		log.Error(err, "unable to list HTTPRoutes")
+		return ctrl.Result{}, err
+	}
+	marshalDump("HTTPROUTES", &httpRoutes)
+
+	// get all tcp routes referencing this gateway
+	tcpRoutes, err := r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
+	if err != nil {
+		log.Error(err, "unable to list TCPRoutes")
+		return ctrl.Result{}, err
+	}
+	marshalDump("TCPROUTES", &tcpRoutes)
+
+	fmt.Println("FETCHING SERVICE RESOURCES!!!!!")
+	if err := r.fetchServicesForRoutes(ctx, resources, tcpRoutes, httpRoutes); err != nil {
+		log.Error(err, "unable to fetch services for routes")
+		return ctrl.Result{}, err
+	}
+
+	resources.DumpAll()
+
+	fmt.Println("GENERATING SNAPSHOT!!!!!")
 	// fetch all consul objects from cache
 	consulServices := r.getConsulServices(consulKey)
+	marshalDump("CONSUL SERVICES", &consulServices)
 	consulGateway := r.getConsulGateway(consulKey)
+	marshalDump("CONSUL GATEWAY", consulGateway)
 	consulHTTPRoutes := r.getConsulHTTPRoutes(consulKey, resources)
+	marshalDump("CONSUL HTTPROUTES", &consulHTTPRoutes)
 	consulTCPRoutes := r.getConsulTCPRoutes(consulKey, resources)
+	marshalDump("CONSUL TCPROUTES", &consulTCPRoutes)
 	consulInlineCertificates := r.getConsulInlineCertificates()
+	marshalDump("CONSUL CERTIFICATES", &consulInlineCertificates)
 
 	binder := binding.NewBinder(binding.BinderConfig{
 		Translator:               r.Translator,
@@ -176,7 +197,9 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		ConsulGatewayServices:    consulServices,
 	})
 
+	fmt.Println("GENERATING SNAPSHOT!!!!!")
 	updates := binder.Snapshot()
+	marshalDump("UPDATES!!!!!", &updates)
 
 	if updates.UpsertGatewayDeployment {
 		log.Info("updating gatekeeper")
@@ -333,8 +356,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			MirroringPrefix:        config.HelmConfig.NamespaceMirroringPrefix,
 			ConsulPartition:        config.HelmConfig.ConsulPartition,
 		},
-		cache:        c,
-		gatewayCache: gwc,
+		denyK8sNamespacesSet:  config.DenyK8sNamespacesSet,
+		allowK8sNamespacesSet: config.AllowK8sNamespacesSet,
+		cache:                 c,
+		gatewayCache:          gwc,
 	}
 
 	return c, ctrl.NewControllerManagedBy(mgr).
@@ -367,8 +392,8 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformMeshService(ctx)),
 		).
 		Watches(
-			source.NewKindWithCache(&corev1.Service{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformService(ctx)),
+			source.NewKindWithCache(&corev1.Endpoints{}, mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints(ctx)),
 		).
 		Watches(
 			// Subscribe to changes from Consul for APIGateways
@@ -556,12 +581,11 @@ func gatewayReferencesCertificate(certificateKey api.ResourceReference, gateway 
 	return false
 }
 
-// transformService will return a list of gateways that are referenced
+// transformEndpoints will return a list of gateways that are referenced
 // by a TCPRoute or HTTPRoute that references the service.
-func (r *GatewayController) transformService(ctx context.Context) func(o client.Object) []reconcile.Request {
+func (r *GatewayController) transformEndpoints(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
-		service := o.(*corev1.Service)
-		key := client.ObjectKeyFromObject(service).String()
+		key := client.ObjectKeyFromObject(o).String()
 
 		return r.gatewaysForRoutesReferencing(ctx, TCPRoute_ServiceIndex, HTTPRoute_ServiceIndex, key)
 	}
@@ -714,7 +738,7 @@ func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway 
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName) ([]gwv1beta1.HTTPRoute, error) {
+func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *apigateway.ResourceMap) ([]gwv1beta1.HTTPRoute, error) {
 	var list gwv1beta1.HTTPRouteList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
@@ -723,16 +747,24 @@ func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway ty
 		return nil, err
 	}
 
+	for _, route := range list.Items {
+		resources.ReferenceCountHTTPRoute(route)
+	}
+
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName) ([]gwv1alpha2.TCPRoute, error) {
+func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName, resources *apigateway.ResourceMap) ([]gwv1alpha2.TCPRoute, error) {
 	var list gwv1alpha2.TCPRouteList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(TCPRoute_GatewayIndex, gateway.String()),
 	}); err != nil {
 		return nil, err
+	}
+
+	for _, route := range list.Items {
+		resources.ReferenceCountTCPRoute(route)
 	}
 
 	return list.Items, nil
@@ -761,11 +793,12 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 }
 
 func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1beta1.Gateway) (*gwv1beta1.GatewayClass, error) {
-	gatewayClass := &gwv1beta1.GatewayClass{}
-	if err := c.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, gatewayClass); err != nil {
+	var gatewayClass gwv1beta1.GatewayClass
+	if err := c.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
+		fmt.Println(err)
 		return nil, client.IgnoreNotFound(err)
 	}
-	return gatewayClass, nil
+	return &gatewayClass, nil
 }
 
 // resource map construction routines
@@ -838,9 +871,9 @@ func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resource
 			for _, backend := range rule.BackendRefs {
 				if apigateway.DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&
 					apigateway.DerefEqual(backend.Kind, v1alpha1.MeshServiceKind) {
-					meshServiceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(route.Namespace, backend.Namespace, backend.Name))
-				} else if nilOrEqual(backend.Group, "") && nilOrEqual(backend.Kind, "Service") {
-					serviceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(route.Namespace, backend.Namespace, backend.Name))
+					meshServiceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
+				} else if apigateway.NilOrEqual(backend.Group, "") && apigateway.NilOrEqual(backend.Kind, "Service") {
+					serviceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
 				}
 			}
 		}
@@ -851,9 +884,9 @@ func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resource
 			for _, backend := range rule.BackendRefs {
 				if apigateway.DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&
 					apigateway.DerefEqual(backend.Kind, v1alpha1.MeshServiceKind) {
-					meshServiceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(route.Namespace, backend.Namespace, backend.Name))
+					meshServiceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
 				} else if apigateway.NilOrEqual(backend.Group, "") && apigateway.NilOrEqual(backend.Kind, "Service") {
-					serviceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(route.Namespace, backend.Namespace, backend.Name))
+					serviceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
 				}
 			}
 		}
@@ -1017,4 +1050,13 @@ func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
 	}
 
 	return false
+}
+
+func marshalDump[T any](message string, item *T) {
+	if item == nil {
+		fmt.Println(message, "is nil")
+		return
+	}
+	data, _ := json.MarshalIndent(item, "", "  ")
+	fmt.Println(message, string(data))
 }
