@@ -175,7 +175,7 @@ func (b *Binder) Snapshot() Snapshot {
 		fmt.Println("VALIDATING")
 		// calculate the status for the gateway
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
-		listenerValidation = validateListeners(b.config.Gateway.Namespace, b.config.Gateway.Spec.Listeners, b.config.Resources)
+		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources)
 	}
 
 	// used for tracking how many routes have successfully bound to which listeners

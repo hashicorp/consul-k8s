@@ -69,7 +69,7 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 
 	// TODO: scrub route refs from statuses that no longer exist
 
-	validation := validateRefs(route.GetNamespace(), getRouteBackends(route), r.config.Resources)
+	validation := validateRefs(route, getRouteBackends(route), r.config.Resources)
 	// the spec is dumb and makes you set a parent for any status, even when the
 	// status is not with respect to a parent, as is the case of resolved refs
 	// so we need to set the status on all parents
@@ -88,6 +88,14 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 		var result bindResults
 
 		for _, listener := range listenersFor(&r.config.Gateway, ref.SectionName) {
+			if !canReferenceGateway(route, ref, r.config.Resources) {
+				result = append(result, bindResult{
+					section: listener.Name,
+					err:     errRefNotPermitted,
+				})
+				continue
+			}
+
 			if !routeKindIsAllowedForListener(supportedKindsForProtocol[listener.Protocol], groupKind) {
 				result = append(result, bindResult{
 					section: listener.Name,
@@ -382,4 +390,24 @@ func getRouteBackends(object client.Object) []gwv1beta1.BackendRef {
 		}))
 	}
 	return nil
+}
+
+func canReferenceGateway(object client.Object, ref gwv1beta1.ParentReference, resources *apigateway.ResourceMap) bool {
+	switch v := object.(type) {
+	case *gwv1beta1.HTTPRoute:
+		return resources.HTTPRouteCanReferenceGateway(*v, ref)
+	case *gwv1alpha2.TCPRoute:
+		return resources.TCPRouteCanReferenceGateway(*v, ref)
+	}
+	return false
+}
+
+func canReferenceBackend(object client.Object, ref gwv1beta1.BackendRef, resources *apigateway.ResourceMap) bool {
+	switch v := object.(type) {
+	case *gwv1beta1.HTTPRoute:
+		return resources.HTTPRouteCanReferenceBackend(*v, ref)
+	case *gwv1alpha2.TCPRoute:
+		return resources.TCPRouteCanReferenceBackend(*v, ref)
+	}
+	return false
 }

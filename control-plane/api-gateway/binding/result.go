@@ -16,6 +16,11 @@ import (
 )
 
 var (
+	// this is used pretty much every reference grants need to be checked
+	errRefNotPermitted = errors.New("reference not permitted due to lack of ReferenceGrant")
+)
+
+var (
 	// Each of the below are specified in the Gateway spec under RouteConditionReason
 	// the general usage is that each error is specified as errRoute* where * corresponds
 	// to the RouteConditionReason given in the spec. If a reason is overloaded and can
@@ -26,7 +31,6 @@ var (
 	errRouteNoMatchingListenerHostname      = errors.New("listener cannot bind route with a non-aligned hostname")
 	errRouteInvalidKind                     = errors.New("invalid backend kind")
 	errRouteBackendNotFound                 = errors.New("backend not found")
-	errRouteRefNotPermitted                 = errors.New("reference not permitted due to lack of ReferenceGrant")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
@@ -82,7 +86,7 @@ func (e routeValidationResults) Condition() metav1.Condition {
 					Reason:  "BackendNotFound",
 					Message: fmt.Sprintf("%s: %s", v.String(), err.Error()),
 				}
-			case errRouteRefNotPermitted:
+			case errRefNotPermitted:
 				return metav1.Condition{
 					Type:    "ResolvedRefs",
 					Status:  metav1.ConditionFalse,
@@ -167,6 +171,10 @@ func (b bindResults) Condition() metav1.Condition {
 			// if we have a hostname mismatch error, then use the more specific reason
 			if result.err == errRouteNoMatchingListenerHostname {
 				reason = "NoMatchingListenerHostname"
+			}
+			// or if we have a ref not permitted, then use that
+			if result.err == errRefNotPermitted {
+				reason = "RefNotPermitted"
 			}
 		}
 	}
@@ -324,6 +332,15 @@ func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1
 			Type:               "ResolvedRefs",
 			Status:             metav1.ConditionFalse,
 			Reason:             "InvalidCertificateRef",
+			ObservedGeneration: generation,
+			Message:            l.refErr.Error(),
+			LastTransitionTime: now,
+		}
+	case errRefNotPermitted:
+		return metav1.Condition{
+			Type:               "ResolvedRefs",
+			Status:             metav1.ConditionFalse,
+			Reason:             "RefNotPermitted",
 			ObservedGeneration: generation,
 			Message:            l.refErr.Error(),
 			LastTransitionTime: now,

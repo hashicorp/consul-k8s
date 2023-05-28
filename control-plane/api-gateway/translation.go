@@ -114,7 +114,7 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 
 	hostnames := StringLikeSlice(route.Spec.Hostnames)
 	rules := ConvertSliceFuncIf(route.Spec.Rules, func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
-		return t.translateHTTPRouteRule(route.Namespace, rule, resources)
+		return t.translateHTTPRouteRule(route, rule, resources)
 	})
 
 	return &api.HTTPRouteConfigEntry{
@@ -131,9 +131,9 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 	}
 }
 
-func (t ResourceTranslator) translateHTTPRouteRule(namespace string, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
+func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
 	services := ConvertSliceFuncIf(rule.BackendRefs, func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
-		return t.translateHTTPBackendRef(namespace, ref, resources)
+		return t.translateHTTPBackendRef(route, ref, resources)
 	})
 
 	fmt.Println("TRANSLATED SERVICES", services)
@@ -151,16 +151,16 @@ func (t ResourceTranslator) translateHTTPRouteRule(namespace string, rule gwv1be
 	}, true
 }
 
-func (t ResourceTranslator) translateHTTPBackendRef(namespace string, ref gwv1beta1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
+func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, ref gwv1beta1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
 	id := types.NamespacedName{
 		Name:      string(ref.Name),
-		Namespace: DerefStringOr(ref.Namespace, namespace),
+		Namespace: DerefStringOr(ref.Namespace, route.Namespace),
 	}
 	fmt.Println("CHECKING BACKEND REF", id)
 
 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
 
-	if isServiceRef && resources.HasService(id) {
+	if isServiceRef && resources.HasService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
 		filters := t.translateHTTPFilters(ref.Filters)
 		service := resources.Service(id)
 
@@ -174,7 +174,7 @@ func (t ResourceTranslator) translateHTTPBackendRef(namespace string, ref gwv1be
 	}
 
 	isMeshServiceRef := DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && DerefEqual(ref.Kind, v1alpha1.MeshServiceKind)
-	if isMeshServiceRef && resources.HasMeshService(id) {
+	if isMeshServiceRef && resources.HasMeshService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
 		filters := t.translateHTTPFilters(ref.Filters)
 		service := resources.MeshService(id)
 
@@ -281,7 +281,7 @@ func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *Res
 	backendRefs := ConvertSliceFunc(route.Spec.Rules, func(rule gwv1alpha2.TCPRouteRule) []gwv1beta1.BackendRef { return rule.BackendRefs })
 	flattenedRefs := Flatten(backendRefs)
 	services := ConvertSliceFuncIf(flattenedRefs, func(ref gwv1beta1.BackendRef) (api.TCPService, bool) {
-		return t.translateTCPRouteRule(route.Namespace, ref, resources)
+		return t.translateTCPRouteRule(route, ref, resources)
 	})
 
 	return &api.TCPRouteConfigEntry{
@@ -297,16 +297,16 @@ func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *Res
 	}
 }
 
-func (t ResourceTranslator) translateTCPRouteRule(namespace string, ref gwv1beta1.BackendRef, resources *ResourceMap) (api.TCPService, bool) {
+func (t ResourceTranslator) translateTCPRouteRule(route gwv1alpha2.TCPRoute, ref gwv1beta1.BackendRef, resources *ResourceMap) (api.TCPService, bool) {
 	// we ignore weight for now
 
 	id := types.NamespacedName{
 		Name:      string(ref.Name),
-		Namespace: DerefStringOr(ref.Namespace, namespace),
+		Namespace: DerefStringOr(ref.Namespace, route.Namespace),
 	}
 
 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
-	if isServiceRef && resources.HasService(id) {
+	if isServiceRef && resources.HasService(id) && resources.TCPRouteCanReferenceBackend(route, ref) {
 		service := resources.Service(id)
 
 		return api.TCPService{
@@ -316,7 +316,7 @@ func (t ResourceTranslator) translateTCPRouteRule(namespace string, ref gwv1beta
 	}
 
 	isMeshServiceRef := DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && DerefEqual(ref.Kind, v1alpha1.MeshServiceKind)
-	if isMeshServiceRef && resources.HasMeshService(id) {
+	if isMeshServiceRef && resources.HasMeshService(id) && resources.TCPRouteCanReferenceBackend(route, ref) {
 		service := resources.MeshService(id)
 
 		return api.TCPService{

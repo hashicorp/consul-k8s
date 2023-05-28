@@ -17,6 +17,7 @@ import (
 
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -28,10 +29,11 @@ const (
 var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate}
 
 type Config struct {
-	ConsulClientConfig  *consul.Config
-	ConsulServerConnMgr consul.ServerConnectionManager
-	NamespacesEnabled   bool
-	Logger              logr.Logger
+	ConsulClientConfig      *consul.Config
+	ConsulServerConnMgr     consul.ServerConnectionManager
+	NamespacesEnabled       bool
+	CrossNamespaceACLPolicy string
+	Logger                  logr.Logger
 }
 
 // Cache subscribes to and caches Consul objects, it also responsible for mainting subscriptions to
@@ -47,8 +49,8 @@ type Cache struct {
 	subscribers     map[string][]*Subscription
 	subscriberMutex *sync.Mutex
 
-	namespacesEnabled bool
-	peeringsEnabled   bool
+	namespacesEnabled       bool
+	crossNamespaceACLPolicy string
 
 	synced chan struct{}
 
@@ -63,16 +65,17 @@ func New(config Config) *Cache {
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
-		config:            config.ConsulClientConfig,
-		serverMgr:         config.ConsulServerConnMgr,
-		namespacesEnabled: config.NamespacesEnabled,
-		cache:             cache,
-		cacheMutex:        &sync.Mutex{},
-		subscribers:       make(map[string][]*Subscription),
-		subscriberMutex:   &sync.Mutex{},
-		kinds:             Kinds,
-		synced:            make(chan struct{}, len(Kinds)),
-		logger:            config.Logger,
+		config:                  config.ConsulClientConfig,
+		serverMgr:               config.ConsulServerConnMgr,
+		namespacesEnabled:       config.NamespacesEnabled,
+		cache:                   cache,
+		cacheMutex:              &sync.Mutex{},
+		subscribers:             make(map[string][]*Subscription),
+		subscriberMutex:         &sync.Mutex{},
+		kinds:                   Kinds,
+		synced:                  make(chan struct{}, len(Kinds)),
+		logger:                  config.Logger,
+		crossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
 	}
 }
 
@@ -258,6 +261,12 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 	if err != nil {
 		return err
+	}
+
+	if c.namespacesEnabled {
+		if _, err := namespaces.EnsureExists(client, entry.GetNamespace(), c.crossNamespaceACLPolicy); err != nil {
+			return err
+		}
 	}
 
 	options := &api.WriteOptions{}

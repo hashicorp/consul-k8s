@@ -14,6 +14,14 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
+type ReferenceValidator interface {
+	GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool
+	HTTPRouteCanReferenceGateway(httproute gwv1beta1.HTTPRoute, parentRef gwv1beta1.ParentReference) bool
+	HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool
+	TCPRouteCanReferenceGateway(tcpRoute gwv1alpha2.TCPRoute, parentRef gwv1beta1.ParentReference) bool
+	TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool
+}
+
 type certificate struct {
 	secret   corev1.Secret
 	gateways mapset.Set
@@ -48,7 +56,8 @@ type resourceSet struct {
 }
 
 type ResourceMap struct {
-	translator ResourceTranslator
+	translator         ResourceTranslator
+	referenceValidator ReferenceValidator
 
 	services     map[types.NamespacedName]api.ResourceReference
 	meshServices map[types.NamespacedName]api.ResourceReference
@@ -67,9 +76,10 @@ type ResourceMap struct {
 	consulMutations []api.ConfigEntry
 }
 
-func NewResourceMap(translator ResourceTranslator) *ResourceMap {
+func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator) *ResourceMap {
 	return &ResourceMap{
 		translator:               translator,
+		referenceValidator:       validator,
 		services:                 make(map[types.NamespacedName]api.ResourceReference),
 		meshServices:             make(map[types.NamespacedName]api.ResourceReference),
 		consulTCPRoutes:          make(map[api.ResourceReference]*consulTCPRoute),
@@ -174,7 +184,12 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 
 func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceReference {
 	consulKey := s.toConsulReference(api.APIGateway, key)
-	resources := s.gatewayResources[consulKey]
+
+	fmt.Println("GC resources for", consulKey)
+	resources, ok := s.gatewayResources[consulKey]
+	if !ok {
+		return nil
+	}
 
 	var toGC []api.ResourceReference
 
@@ -513,4 +528,24 @@ func (s *ResourceMap) DumpAll() {
 func marshalDump(v interface{}) {
 	data, _ := json.MarshalIndent(v, "", "  ")
 	fmt.Println(string(data))
+}
+
+func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, ref gwv1beta1.SecretObjectReference) bool {
+	return s.referenceValidator.GatewayCanReferenceSecret(gateway, ref)
+}
+
+func (s *ResourceMap) HTTPRouteCanReferenceBackend(route gwv1beta1.HTTPRoute, ref gwv1beta1.BackendRef) bool {
+	return s.referenceValidator.HTTPRouteCanReferenceBackend(route, ref)
+}
+
+func (s *ResourceMap) HTTPRouteCanReferenceGateway(route gwv1beta1.HTTPRoute, ref gwv1beta1.ParentReference) bool {
+	return s.referenceValidator.HTTPRouteCanReferenceGateway(route, ref)
+}
+
+func (s *ResourceMap) TCPRouteCanReferenceBackend(route gwv1alpha2.TCPRoute, ref gwv1beta1.BackendRef) bool {
+	return s.referenceValidator.TCPRouteCanReferenceBackend(route, ref)
+}
+
+func (s *ResourceMap) TCPRouteCanReferenceGateway(route gwv1alpha2.TCPRoute, ref gwv1beta1.ParentReference) bool {
+	return s.referenceValidator.TCPRouteCanReferenceGateway(route, ref)
 }

@@ -46,13 +46,14 @@ const (
 
 // GatewayControllerConfig holds the values necessary for configuring the GatewayController.
 type GatewayControllerConfig struct {
-	HelmConfig            apigateway.HelmConfig
-	ConsulClientConfig    *consul.Config
-	ConsulServerConnMgr   consul.ServerConnectionManager
-	NamespacesEnabled     bool
-	Partition             string
-	AllowK8sNamespacesSet mapset.Set
-	DenyK8sNamespacesSet  mapset.Set
+	HelmConfig              apigateway.HelmConfig
+	ConsulClientConfig      *consul.Config
+	ConsulServerConnMgr     consul.ServerConnectionManager
+	NamespacesEnabled       bool
+	CrossNamespaceACLPolicy string
+	Partition               string
+	AllowK8sNamespacesSet   mapset.Set
+	DenyK8sNamespacesSet    mapset.Set
 }
 
 // GatewayController reconciles a Gateway object.
@@ -111,6 +112,14 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	marshalDump("NAMESPACES", &namespaces)
 
+	// get all reference grants
+	grants, err := r.getReferenceGrants(ctx)
+	if err != nil {
+		log.Error(err, "unable to list ReferenceGrants")
+		return ctrl.Result{}, err
+	}
+	marshalDump("REFERENCE GRANTS", &grants)
+
 	// get related gateway service
 	service, err := r.getDeployedGatewayService(ctx, req.NamespacedName)
 	if err != nil {
@@ -127,7 +136,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	marshalDump("PODS", &pods)
 
 	// construct our resource map
-	resources := apigateway.NewResourceMap(r.Translator)
+	referenceValidator := binding.NewReferenceValidator(grants)
+	resources := apigateway.NewResourceMap(r.Translator, referenceValidator)
 
 	fmt.Println("FETCHING CONTROLLED GATEWAYS!!!!!")
 	if err := r.fetchControlledGateways(ctx, resources); err != nil {
@@ -337,10 +347,11 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 // SetupWithGatewayControllerManager registers the controller with the given manager.
 func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, error) {
 	cacheConfig := cache.Config{
-		ConsulClientConfig:  config.ConsulClientConfig,
-		ConsulServerConnMgr: config.ConsulServerConnMgr,
-		NamespacesEnabled:   config.NamespacesEnabled,
-		Logger:              mgr.GetLogger(),
+		ConsulClientConfig:      config.ConsulClientConfig,
+		ConsulServerConnMgr:     config.ConsulServerConnMgr,
+		NamespacesEnabled:       config.NamespacesEnabled,
+		CrossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
+		Logger:                  mgr.GetLogger(),
 	}
 	c := cache.New(cacheConfig)
 	gwc := cache.NewGatewayCache(ctx, cacheConfig)
@@ -713,6 +724,16 @@ func (c *GatewayController) getNamespaces(ctx context.Context) (map[string]corev
 	}
 
 	return namespaces, nil
+}
+
+func (c *GatewayController) getReferenceGrants(ctx context.Context) ([]gwv1beta1.ReferenceGrant, error) {
+	var list gwv1beta1.ReferenceGrantList
+
+	if err := c.Client.List(ctx, &list); err != nil {
+		return nil, err
+	}
+
+	return list.Items, nil
 }
 
 func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gateway types.NamespacedName) (*corev1.Service, error) {
