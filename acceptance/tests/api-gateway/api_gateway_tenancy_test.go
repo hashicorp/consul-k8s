@@ -4,6 +4,7 @@
 package apigateway
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -24,7 +25,24 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+)
+
+var (
+	gatewayGroup    = gwv1beta1.Group(gwv1beta1.GroupVersion.Group)
+	consulGroup     = gwv1beta1.Group(v1alpha1.GroupVersion.Group)
+	gatewayKind     = gwv1beta1.Kind("Gateway")
+	serviceKind     = gwv1beta1.Kind("Service")
+	secretKind      = gwv1beta1.Kind("Secret")
+	meshServiceKind = gwv1beta1.Kind("MeshService")
+	httpRouteKind   = gwv1beta1.Kind("HTTPRoute")
+	tcpRouteKind    = gwv1beta1.Kind("TCPRoute")
 )
 
 func TestAPIGateway_Tenancy(t *testing.T) {
@@ -32,22 +50,22 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 		secure             bool
 		namespaceMirroring bool
 	}{
-		// {
-		// 	secure:             false,
-		// 	namespaceMirroring: false,
-		// },
-		// {
-		// 	secure:             true,
-		// 	namespaceMirroring: false,
-		// },
+		{
+			secure:             false,
+			namespaceMirroring: false,
+		},
+		{
+			secure:             true,
+			namespaceMirroring: false,
+		},
 		{
 			secure:             false,
 			namespaceMirroring: true,
 		},
-		// {
-		// 	secure:             true,
-		// 	namespaceMirroring: true,
-		// },
+		{
+			secure:             true,
+			namespaceMirroring: true,
+		},
 	}
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t, namespaces: %t", c.secure, c.namespaceMirroring)
@@ -86,7 +104,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			applyFixture(t, cfg, certificateK8SOptions, "cases/api-gateways/certificate")
 
 			logger.Logf(t, "creating gateway in %s namespace", gatewayNamespace)
-			applyFixture(t, cfg, gatewayK8SOptions, "bases/api-gateway")
+			applyFixture(t, cfg, gatewayK8SOptions, "cases/api-gateways/gateway")
 
 			logger.Logf(t, "creating route resources in %s namespace", routeNamespace)
 			applyFixture(t, cfg, routeK8SOptions, "cases/api-gateways/httproute")
@@ -98,7 +116,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// patch the resources to reference each other
 			logger.Log(t, "patching gateway to certificate")
-			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateway", "gateway", "-p", fmt.Sprintf(`{"spec":{"gatewayClassName":"gateway-class","listeners":[{"protocol":"HTTP","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
+			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateway", "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to target server")
 			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
@@ -106,8 +124,76 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			logger.Log(t, "patching route to gateway")
 			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
 
+			// Grab a kubernetes client so that we can verify binding
+			// behavior prior to issuing requests through the gateway.
+			k8sClient := ctx.ControllerRuntimeClient(t)
+
+			retryCheck(t, 60, func(r *retry.R) {
+				var gateway gwv1beta1.Gateway
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
+				require.NoError(r, err)
+
+				// check our statuses
+				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
+				require.Len(r, gateway.Status.Listeners, 1)
+				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
+				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
+			})
+
 			// check that we have resolution errors because of missing reference grants
-			time.Sleep(10 * time.Minute)
+
+			// route failure
+			retryCheck(t, 2, func(r *retry.R) {
+				var httproute gwv1beta1.HTTPRoute
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
+				require.NoError(r, err)
+
+				require.Len(r, httproute.Status.Parents, 1)
+				require.EqualValues(r, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
+				require.EqualValues(r, "gateway", httproute.Status.Parents[0].ParentRef.Name)
+				require.NotNil(r, httproute.Status.Parents[0].ParentRef.Namespace)
+				require.EqualValues(r, gatewayNamespace, *httproute.Status.Parents[0].ParentRef.Namespace)
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("Accepted", "RefNotPermitted"))
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
+			})
+
+			// now create reference grants
+			createReferenceGrant(t, k8sClient, "gateway-certificate", gatewayNamespace, certificateNamespace)
+			createReferenceGrant(t, k8sClient, "route-gateway", routeNamespace, gatewayNamespace)
+			createReferenceGrant(t, k8sClient, "route-service", routeNamespace, serviceNamespace)
+
+			// gateway updated with references allowed
+			retryCheck(t, 2, func(r *retry.R) {
+				var gateway gwv1beta1.Gateway
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
+				require.NoError(r, err)
+
+				// check our statuses
+				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
+				require.Len(r, gateway.Status.Listeners, 1)
+				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
+				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+			})
+
+			// route updated with gateway and services allowed
+			retryCheck(t, 2, func(r *retry.R) {
+				var httproute gwv1beta1.HTTPRoute
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
+				require.NoError(r, err)
+
+				require.Len(r, httproute.Status.Parents, 1)
+				require.EqualValues(r, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
+				require.EqualValues(r, "gateway", httproute.Status.Parents[0].ParentRef.Name)
+				require.NotNil(r, httproute.Status.Parents[0].ParentRef.Namespace)
+				require.EqualValues(r, gatewayNamespace, *httproute.Status.Parents[0].ParentRef.Namespace)
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+			})
+
+			// c
+			// time.Sleep(10 * time.Minute)
 			// ensure that the consul resources are not created
 
 			// create the reference grants
@@ -213,4 +299,50 @@ func generateCertificate(t *testing.T, ca *certificateInfo, commonName string) *
 		PrivateKey:    privateKey,
 		PrivateKeyPEM: privateKeyBytes,
 	}
+}
+
+func retryCheck(t *testing.T, count int, fn func(r *retry.R)) {
+	t.Helper()
+
+	counter := &retry.Counter{Count: count, Wait: 2 * time.Second}
+	retry.RunWith(counter, t, fn)
+}
+
+func createReferenceGrant(t *testing.T, client client.Client, name, from, to string) {
+	t.Helper()
+
+	// we just create a reference grant for all combinations in the given namespaces
+
+	require.NoError(t, client.Create(context.Background(), &gwv1beta1.ReferenceGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: to,
+		},
+		Spec: gwv1beta1.ReferenceGrantSpec{
+			From: []gwv1beta1.ReferenceGrantFrom{{
+				Group:     gatewayGroup,
+				Kind:      gatewayKind,
+				Namespace: gwv1beta1.Namespace(from),
+			}, {
+				Group:     gatewayGroup,
+				Kind:      httpRouteKind,
+				Namespace: gwv1beta1.Namespace(from),
+			}, {
+				Group:     gatewayGroup,
+				Kind:      tcpRouteKind,
+				Namespace: gwv1beta1.Namespace(from),
+			}},
+			To: []gwv1beta1.ReferenceGrantTo{{
+				Group: gatewayGroup,
+				Kind:  gatewayKind,
+			}, {
+				Kind: serviceKind,
+			}, {
+				Group: consulGroup,
+				Kind:  meshServiceKind,
+			}, {
+				Kind: secretKind,
+			}},
+		},
+	}))
 }

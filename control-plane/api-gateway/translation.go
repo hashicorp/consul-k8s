@@ -89,9 +89,9 @@ func (t ResourceTranslator) toAPIGatewayListener(namespace string, listener gwv1
 				continue
 			}
 
-			ref := ResourceReferenceWithDefault(api.InlineCertificate, ref.Name, "", ref.Namespace, namespace, t.ConsulPartition)
+			ref := IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, namespace)
 			if resources.Certificate(ref) != nil {
-				certificates = append(certificates, ref)
+				certificates = append(certificates, t.NonNormalizedConfigEntryReference(api.InlineCertificate, ref))
 			}
 		}
 	}

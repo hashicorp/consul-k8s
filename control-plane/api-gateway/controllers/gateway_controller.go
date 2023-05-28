@@ -139,15 +139,15 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	referenceValidator := binding.NewReferenceValidator(grants)
 	resources := apigateway.NewResourceMap(r.Translator, referenceValidator)
 
-	fmt.Println("FETCHING CONTROLLED GATEWAYS!!!!!")
-	if err := r.fetchControlledGateways(ctx, resources); err != nil {
-		log.Error(err, "unable to fetch controlled gateways")
-		return ctrl.Result{}, err
-	}
-
 	fmt.Println("FETCHING CERTIFICATES!!!!!")
 	if err := r.fetchCertificatesForGateway(ctx, resources, gateway); err != nil {
 		log.Error(err, "unable to fetch certificates for gateway")
+		return ctrl.Result{}, err
+	}
+
+	fmt.Println("FETCHING CONTROLLED GATEWAYS!!!!!")
+	if err := r.fetchControlledGateways(ctx, resources); err != nil {
+		log.Error(err, "unable to fetch controlled gateways")
 		return ctrl.Result{}, err
 	}
 
@@ -287,10 +287,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	/* TODO:
-	1.ReferenceGrants
-	*/
-
 	return ctrl.Result{}, nil
 }
 
@@ -378,6 +374,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
+		Watches(
+			source.NewKindWithCache(&gwv1beta1.ReferenceGrant{}, mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant(ctx)),
+		).
 		Watches(
 			source.NewKindWithCache(&gwv1beta1.GatewayClass{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass(ctx)),
@@ -487,14 +487,14 @@ func (r *GatewayController) transformSecret(ctx context.Context) func(o client.O
 // class, then return a list of reconcile Requests for Gateways referring to it.
 func (r *GatewayController) transformReferenceGrant(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
-		// just reconcile all gateways within the namespace
-		grant := o.(*gwv1beta1.ReferenceGrant)
+		// just re-reconcile all gateways for now ideally this will filter down to gateways
+		// affected, but technically the blast radius is gateways in the namespace + referencing
+		// the namespace + the routes that bind to them.
 		gatewayList := &gwv1beta1.GatewayList{}
-		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
-			Namespace: grant.Namespace,
-		}); err != nil {
+		if err := r.Client.List(ctx, gatewayList); err != nil {
 			return nil
 		}
+
 		return objectsToRequests(pointersOf(gatewayList.Items))
 	}
 }
@@ -857,13 +857,14 @@ func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, res
 		if listener.TLS != nil {
 			for _, cert := range listener.TLS.CertificateRefs {
 				if nilOrEqual(cert.Group, "") && nilOrEqual(cert.Kind, "Secret") {
-					certificates.Add(apigateway.IndexedNamespacedNameWithDefault(gateway.Namespace, cert.Namespace, cert.Name))
+					certificates.Add(apigateway.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace))
 				}
 			}
 		}
 	}
 
 	for key := range certificates.Iter() {
+		fmt.Println("FETCHING CERTIFICATE", key.(types.NamespacedName))
 		if err := c.fetchSecret(ctx, resources, key.(types.NamespacedName)); err != nil {
 			return err
 		}
@@ -875,6 +876,7 @@ func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, res
 func (c *GatewayController) fetchSecret(ctx context.Context, resources *apigateway.ResourceMap, key types.NamespacedName) error {
 	var secret corev1.Secret
 	if err := c.Client.Get(ctx, key, &secret); err != nil {
+		fmt.Println("FETCHING CERTIFICATE ERR", err)
 		return client.IgnoreNotFound(err)
 	}
 

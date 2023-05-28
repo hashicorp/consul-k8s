@@ -4,25 +4,26 @@
 package binding
 
 import (
-	mapset "github.com/deckarep/golang-set"
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 type referenceValidator struct {
-	grants map[string]mapset.Set
+	grants map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant
 }
 
 func NewReferenceValidator(grants []gwv1beta1.ReferenceGrant) apigateway.ReferenceValidator {
-	byNamespace := make(map[string]mapset.Set)
+	byNamespace := make(map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant)
 	for _, grant := range grants {
 		grantsForNamespace, ok := byNamespace[grant.Namespace]
 		if !ok {
-			grantsForNamespace = mapset.NewSet()
+			grantsForNamespace = make(map[types.NamespacedName]gwv1beta1.ReferenceGrant)
 		}
-		grantsForNamespace.Add(grant)
+		grantsForNamespace[client.ObjectKeyFromObject(&grant)] = grant
 		byNamespace[grant.Namespace] = grantsForNamespace
 	}
 	return &referenceValidator{
@@ -134,13 +135,12 @@ func (rv *referenceValidator) referenceAllowed(fromGK metav1.GroupKind, fromName
 	}
 
 	// Fetch all ReferenceGrants in the referenced namespace
-	refGrants, ok := rv.grants[toNamespace]
+	grants, ok := rv.grants[toNamespace]
 	if !ok {
 		return false
 	}
 
-	for refGrant := range refGrants.Iter() {
-		grant := refGrant.(gwv1beta1.ReferenceGrant)
+	for _, grant := range grants {
 		// Check for a From that applies
 		fromMatch := false
 		for _, from := range grant.Spec.From {

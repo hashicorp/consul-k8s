@@ -62,10 +62,13 @@ type ResourceMap struct {
 	services     map[types.NamespacedName]api.ResourceReference
 	meshServices map[types.NamespacedName]api.ResourceReference
 
-	certificateGateways map[api.ResourceReference]*certificate
-	tcpRouteGateways    map[api.ResourceReference]*tcpRoute
-	httpRouteGateways   map[api.ResourceReference]*httpRoute
-	gatewayResources    map[api.ResourceReference]*resourceSet
+	// this acts a a secondary store of what has not yet
+	// been processed for the sake of garbage collection.
+	processedCertificates mapset.Set
+	certificateGateways   map[api.ResourceReference]*certificate
+	tcpRouteGateways      map[api.ResourceReference]*tcpRoute
+	httpRouteGateways     map[api.ResourceReference]*httpRoute
+	gatewayResources      map[api.ResourceReference]*resourceSet
 
 	// consul resources for a gateway
 	consulTCPRoutes          map[api.ResourceReference]*consulTCPRoute
@@ -80,6 +83,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator)
 	return &ResourceMap{
 		translator:               translator,
 		referenceValidator:       validator,
+		processedCertificates:    mapset.NewSet(),
 		services:                 make(map[types.NamespacedName]api.ResourceReference),
 		meshServices:             make(map[types.NamespacedName]api.ResourceReference),
 		consulTCPRoutes:          make(map[api.ResourceReference]*consulTCPRoute),
@@ -128,8 +132,9 @@ func (s *ResourceMap) HasMeshService(id types.NamespacedName) bool {
 	return ok
 }
 
-func (s *ResourceMap) Certificate(ref api.ResourceReference) *corev1.Secret {
-	if secret, ok := s.certificateGateways[NormalizeMeta(ref)]; ok {
+func (s *ResourceMap) Certificate(key types.NamespacedName) *corev1.Secret {
+	consulKey := s.toConsulReference(api.InlineCertificate, key)
+	if secret, ok := s.certificateGateways[consulKey]; ok {
 		return &secret.secret
 	}
 	return nil
@@ -138,8 +143,7 @@ func (s *ResourceMap) Certificate(ref api.ResourceReference) *corev1.Secret {
 func (s *ResourceMap) ReferenceCountCertificate(secret corev1.Secret) {
 	key := client.ObjectKeyFromObject(&secret)
 	consulKey := s.toConsulReference(api.InlineCertificate, key)
-
-	if _, ok := s.certificateGateways[consulKey]; ok {
+	if _, ok := s.certificateGateways[consulKey]; !ok {
 		s.certificateGateways[consulKey] = &certificate{
 			secret:   secret,
 			gateways: mapset.NewSet(),
@@ -215,7 +219,9 @@ func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceRefe
 			}
 			fmt.Println("TCPROUTE DONE")
 		case api.InlineCertificate:
-			fmt.Println("CERT START")
+			if s.processedCertificates.Contains(id) {
+				continue
+			}
 			if route, ok := s.certificateGateways[id]; ok && route.gateways.Cardinality() <= 1 {
 				// we only have a single reference, which will be this gateway, so drop
 				// the route altogether
@@ -441,7 +447,7 @@ func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error
 	}
 	// remove from the certificate map since we don't want to
 	// GC it in the end
-	delete(s.certificateGateways, consulKey)
+	s.processedCertificates.Add(consulKey)
 	s.consulMutations = append(s.consulMutations, consulCertificate)
 
 	return nil
