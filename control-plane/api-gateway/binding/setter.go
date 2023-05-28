@@ -5,7 +5,7 @@ package binding
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -19,26 +19,12 @@ func newSetter(controllerName string) *setter {
 	return &setter{controllerName: controllerName}
 }
 
-// setHTTPRouteCondition sets an HTTPRoute condition on its status with the given parent.
-func (s *setter) setHTTPRouteCondition(route *gwv1beta1.HTTPRoute, parent *gwv1beta1.ParentReference, condition metav1.Condition) bool {
-	condition.LastTransitionTime = metav1.Now()
-	condition.ObservedGeneration = route.Generation
-
-	status := s.getParentStatus(route.Status.Parents, parent)
-	conditions, modified := setCondition(status.Conditions, condition)
-	if modified {
-		status.Conditions = conditions
-		route.Status.Parents = s.setParentStatus(route.Status.Parents, status)
-	}
-	return modified
-}
-
-// removeHTTPRouteReferences removes the given parent reference sections from an HTTPRoute's status.
-func (s *setter) removeHTTPRouteReferences(route *gwv1beta1.HTTPRoute, refs []gwv1beta1.ParentReference) bool {
+// removeRouteReferences removes the given parent reference sections from a routes's status.
+func (s *setter) removeRouteReferences(route client.Object, refs []gwv1beta1.ParentReference) bool {
 	modified := false
 	for _, parent := range refs {
-		parents, removed := s.removeParentStatus(route.Status.Parents, parent)
-		route.Status.Parents = parents
+		parents, removed := s.removeParentStatus(getRouteParentsStatus(route), parent)
+		setRouteParentsStatus(route, parents)
 		if removed {
 			modified = true
 		}
@@ -46,38 +32,26 @@ func (s *setter) removeHTTPRouteReferences(route *gwv1beta1.HTTPRoute, refs []gw
 	return modified
 }
 
-// setTCPRouteCondition sets a TCPRoute condition on its status with the given parent.
-func (s *setter) setTCPRouteCondition(route *gwv1alpha2.TCPRoute, parent *gwv1beta1.ParentReference, condition metav1.Condition) bool {
+// setRouteCondition sets an route condition on its status with the given parent.
+func (s *setter) setRouteCondition(route client.Object, parent *gwv1beta1.ParentReference, condition metav1.Condition) bool {
 	condition.LastTransitionTime = metav1.Now()
-	condition.ObservedGeneration = route.Generation
+	condition.ObservedGeneration = route.GetGeneration()
 
-	status := s.getParentStatus(route.Status.Parents, parent)
+	parents := getRouteParentsStatus(route)
+	status := s.getParentStatus(parents, parent)
 	conditions, modified := setCondition(status.Conditions, condition)
 	if modified {
 		status.Conditions = conditions
-		route.Status.Parents = s.setParentStatus(route.Status.Parents, status)
+		setRouteParentsStatus(route, s.setParentStatus(parents, status))
 	}
 	return modified
 }
 
-// removeTCPRouteReferences removes the given parent reference sections from a TCPRoute's status.
-func (s *setter) removeTCPRouteReferences(route *gwv1alpha2.TCPRoute, refs []gwv1beta1.ParentReference) bool {
-	modified := false
-	for _, parent := range refs {
-		parents, removed := s.removeParentStatus(route.Status.Parents, parent)
-		route.Status.Parents = parents
-		if removed {
-			modified = true
-		}
-	}
-	return modified
-}
-
-// removeHTTPStatuses removes all statuses set by the given controller from an HTTPRoute's status.
-func (s *setter) removeHTTPStatuses(route *gwv1beta1.HTTPRoute) bool {
+// removeStatuses removes all statuses set by the given controller from an route's status.
+func (s *setter) removeStatuses(route client.Object) bool {
 	modified := false
 	filtered := []gwv1beta1.RouteParentStatus{}
-	for _, status := range route.Status.Parents {
+	for _, status := range getRouteParentsStatus(route) {
 		if string(status.ControllerName) == s.controllerName {
 			modified = true
 			continue
@@ -86,25 +60,7 @@ func (s *setter) removeHTTPStatuses(route *gwv1beta1.HTTPRoute) bool {
 	}
 
 	if modified {
-		route.Status.Parents = filtered
-	}
-	return modified
-}
-
-// removeTCPStatuses removes all statuses set by the given controller from a TCPRoute's status.
-func (s *setter) removeTCPStatuses(route *gwv1alpha2.TCPRoute) bool {
-	modified := false
-	filtered := []gwv1beta1.RouteParentStatus{}
-	for _, status := range route.Status.Parents {
-		if string(status.ControllerName) == s.controllerName {
-			modified = true
-			continue
-		}
-		filtered = append(filtered, status)
-	}
-
-	if modified {
-		route.Status.Parents = filtered
+		setRouteParentsStatus(route, filtered)
 	}
 	return modified
 }

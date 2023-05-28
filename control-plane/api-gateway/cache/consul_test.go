@@ -1749,9 +1749,6 @@ func Test_Run(t *testing.T) {
 		}
 	})
 
-	c.SubscribeServices(ctx, func(cs *api.CatalogService) []types.NamespacedName { return nil }).Cancel()
-	c.SubscribePeerings(ctx, func(cs *api.Peering) []types.NamespacedName { return nil }).Cancel()
-
 	// mark this subscription as ended
 	canceledSub.Cancel()
 

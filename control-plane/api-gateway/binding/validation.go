@@ -20,7 +20,7 @@ import (
 
 // validateRefs validates backend references for a route, determining whether or
 // not they were found in the list of known connect-injected services.
-func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[types.NamespacedName]api.CatalogService, meshServices map[types.NamespacedName]v1alpha1.MeshService) routeValidationResults {
+func validateRefs(namespace string, refs []gwv1beta1.BackendRef, resources *apigateway.ResourceMap) routeValidationResults {
 	var result routeValidationResults
 	for _, ref := range refs {
 		nsn := types.NamespacedName{
@@ -45,7 +45,7 @@ func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[ty
 		}
 
 		if isServiceRef {
-			if _, found := services[nsn]; !found {
+			if resources.HasService(nsn) {
 				result = append(result, routeValidationResult{
 					namespace: nsn.Namespace,
 					backend:   ref,
@@ -56,7 +56,7 @@ func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[ty
 		}
 
 		if isMeshServiceRef {
-			if _, found := meshServices[nsn]; !found {
+			if resources.HasMeshService(nsn) {
 				result = append(result, routeValidationResult{
 					namespace: nsn.Namespace,
 					backend:   ref,
@@ -136,7 +136,7 @@ func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener
 
 // validateTLS validates that the TLS configuration for a given listener is valid and that
 // the certificates that it references exist.
-func validateTLS(namespace string, tls *gwv1beta1.GatewayTLSConfig, certificates []corev1.Secret) (error, error) {
+func validateTLS(namespace string, tls *gwv1beta1.GatewayTLSConfig, resources *apigateway.ResourceMap) (error, error) {
 	if tls == nil {
 		return nil, nil
 	}
@@ -144,28 +144,23 @@ func validateTLS(namespace string, tls *gwv1beta1.GatewayTLSConfig, certificates
 	// TODO: Resource Grants
 
 	var err error
-MAIN_LOOP:
-	for _, ref := range tls.CertificateRefs {
+
+	for _, cert := range tls.CertificateRefs {
 		// break on the first error
-		if !nilOrEqual(ref.Group, "") || !nilOrEqual(ref.Kind, "Secret") {
+		if !nilOrEqual(cert.Group, "") || !nilOrEqual(cert.Kind, "Secret") {
 			err = errListenerInvalidCertificateRef_NotSupported
-			break MAIN_LOOP
-		}
-		ns := valueOr(ref.Namespace, namespace)
-
-		for _, secret := range certificates {
-			if secret.Namespace == ns && secret.Name == string(ref.Name) {
-				if validationErr := validateCertificateData(secret); validationErr != nil {
-					err = validationErr
-					break MAIN_LOOP
-				}
-				continue MAIN_LOOP
-			}
+			break
 		}
 
-		// not found, set error
-		err = errListenerInvalidCertificateRef_NotFound
-		break MAIN_LOOP
+		key := apigateway.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, namespace)
+		secret := resources.Secret(key)
+
+		if secret == nil {
+			err = errListenerInvalidCertificateRef_NotFound
+			break
+		}
+
+		err = validateCertificateData(*secret)
 	}
 
 	if tls.Mode != nil && *tls.Mode == gwv1beta1.TLSModePassthrough {
@@ -183,7 +178,7 @@ func validateCertificateData(secret corev1.Secret) error {
 
 // validateListeners validates the given listeners both internally and with respect to each
 // other for purposes of setting "Conflicted" status conditions.
-func validateListeners(namespace string, listeners []gwv1beta1.Listener, secrets []corev1.Secret) listenerValidationResults {
+func validateListeners(namespace string, listeners []gwv1beta1.Listener, resources *apigateway.ResourceMap) listenerValidationResults {
 	var results listenerValidationResults
 	merged := make(map[gwv1beta1.PortNumber]mergedListeners)
 	for i, listener := range listeners {
@@ -196,7 +191,7 @@ func validateListeners(namespace string, listeners []gwv1beta1.Listener, secrets
 	for i, listener := range listeners {
 		var result listenerValidationResult
 
-		err, refErr := validateTLS(namespace, listener.TLS, secrets)
+		err, refErr := validateTLS(namespace, listener.TLS, resources)
 		result.refErr = refErr
 		if err != nil {
 			result.acceptedErr = err

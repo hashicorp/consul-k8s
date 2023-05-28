@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package cache
+package apigateway
 
 import (
 	"strings"
@@ -11,7 +11,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func entriesEqual(a, b api.ConfigEntry) bool {
+func EntriesEqual(a, b api.ConfigEntry) bool {
 	switch aCast := a.(type) {
 	case *api.APIGatewayConfigEntry:
 		if bCast, ok := b.(*api.APIGatewayConfigEntry); ok {
@@ -46,10 +46,10 @@ func apiGatewaysEqual(a, b *api.APIGatewayConfigEntry) bool {
 	}
 
 	return (entryComparator{
-		namespaceA: normalizeEmptyMetadataString(a.Namespace),
-		partitionA: normalizeEmptyMetadataString(a.Partition),
-		namespaceB: normalizeEmptyMetadataString(b.Namespace),
-		partitionB: normalizeEmptyMetadataString(b.Partition),
+		namespaceA: NormalizeEmptyMetadataString(a.Namespace),
+		partitionA: NormalizeEmptyMetadataString(a.Partition),
+		namespaceB: NormalizeEmptyMetadataString(b.Namespace),
+		partitionB: NormalizeEmptyMetadataString(b.Partition),
 	}).apiGatewaysEqual(*a, *b)
 }
 
@@ -92,10 +92,10 @@ func httpRoutesEqual(a, b *api.HTTPRouteConfigEntry) bool {
 	}
 
 	return (entryComparator{
-		namespaceA: normalizeEmptyMetadataString(a.Namespace),
-		partitionA: normalizeEmptyMetadataString(a.Partition),
-		namespaceB: normalizeEmptyMetadataString(b.Namespace),
-		partitionB: normalizeEmptyMetadataString(b.Partition),
+		namespaceA: NormalizeEmptyMetadataString(a.Namespace),
+		partitionA: NormalizeEmptyMetadataString(a.Partition),
+		namespaceB: NormalizeEmptyMetadataString(b.Namespace),
+		partitionB: NormalizeEmptyMetadataString(b.Partition),
 	}).httpRoutesEqual(*a, *b)
 }
 
@@ -161,10 +161,10 @@ func tcpRoutesEqual(a, b *api.TCPRouteConfigEntry) bool {
 	}
 
 	return (entryComparator{
-		namespaceA: normalizeEmptyMetadataString(a.Namespace),
-		partitionA: normalizeEmptyMetadataString(a.Partition),
-		namespaceB: normalizeEmptyMetadataString(b.Namespace),
-		partitionB: normalizeEmptyMetadataString(b.Partition),
+		namespaceA: NormalizeEmptyMetadataString(a.Namespace),
+		partitionA: NormalizeEmptyMetadataString(a.Partition),
+		namespaceB: NormalizeEmptyMetadataString(b.Namespace),
+		partitionB: NormalizeEmptyMetadataString(b.Partition),
 	}).tcpRoutesEqual(*a, *b)
 }
 
@@ -190,10 +190,10 @@ func certificatesEqual(a, b *api.InlineCertificateConfigEntry) bool {
 	}
 
 	return (entryComparator{
-		namespaceA: normalizeEmptyMetadataString(a.Namespace),
-		partitionA: normalizeEmptyMetadataString(a.Partition),
-		namespaceB: normalizeEmptyMetadataString(b.Namespace),
-		partitionB: normalizeEmptyMetadataString(b.Partition),
+		namespaceA: NormalizeEmptyMetadataString(a.Namespace),
+		partitionA: NormalizeEmptyMetadataString(a.Partition),
+		namespaceB: NormalizeEmptyMetadataString(b.Namespace),
+		partitionB: NormalizeEmptyMetadataString(b.Partition),
 	}).certificatesEqual(*a, *b)
 }
 

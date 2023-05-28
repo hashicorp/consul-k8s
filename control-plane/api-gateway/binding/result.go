@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -187,6 +188,18 @@ type parentBindResult struct {
 // parentBindResults contains the list of all results that occurred when this route
 // attempted to bind to a gateway using its parent references.
 type parentBindResults []parentBindResult
+
+func (p parentBindResults) boundSections() mapset.Set {
+	set := mapset.NewSet()
+	for _, result := range p {
+		for _, r := range result.results {
+			if r.err == nil {
+				set.Add(string(r.section))
+			}
+		}
+	}
+	return set
+}
 
 var (
 	// Each of the below are specified in the Gateway spec under ListenerConditionReason

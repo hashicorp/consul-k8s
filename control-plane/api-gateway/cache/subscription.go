@@ -6,13 +6,16 @@ package cache
 import (
 	"context"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
+	"github.com/hashicorp/consul/api"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
+type TranslatorFn func(api.ConfigEntry) []types.NamespacedName
+
 // Subscription represents a watcher for events on a specific kind.
 type Subscription struct {
-	translator translation.TranslatorFn
+	translator TranslatorFn
 	ctx        context.Context
 	cancelCtx  context.CancelFunc
 	events     chan event.GenericEvent

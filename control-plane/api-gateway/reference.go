@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package cache
+package apigateway
 
 import (
 	"sync"
@@ -29,7 +29,7 @@ func (r *ReferenceMap) Set(ref api.ResourceReference, v api.ConfigEntry) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	r.data[normalizeMeta(ref)] = v
+	r.data[NormalizeMeta(ref)] = v
 }
 
 // Get returns an entry from the reference map.
@@ -37,7 +37,7 @@ func (r *ReferenceMap) Get(ref api.ResourceReference) api.ConfigEntry {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	v, ok := r.data[normalizeMeta(ref)]
+	v, ok := r.data[NormalizeMeta(ref)]
 	if !ok {
 		return nil
 	}
@@ -61,7 +61,7 @@ func (r *ReferenceMap) Delete(ref api.ResourceReference) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	delete(r.data, normalizeMeta(ref))
+	delete(r.data, NormalizeMeta(ref))
 }
 
 // Diff calculates the difference between the stored entries in two reference maps.
@@ -119,7 +119,19 @@ func (r *ReferenceSet) Mark(ref api.ResourceReference) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	r.data[normalizeMeta(ref)] = struct{}{}
+	r.data[NormalizeMeta(ref)] = struct{}{}
+}
+
+// Iter iterates across the reference set
+func (r *ReferenceSet) Iter() <-chan api.ResourceReference {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	c := make(chan api.ResourceReference, len(r.data))
+	for ref := range r.data {
+		c <- ref
+	}
+	return c
 }
 
 // Contains checks for the inclusion of a reference in the set.
@@ -127,7 +139,7 @@ func (r *ReferenceSet) Contains(ref api.ResourceReference) bool {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	_, ok := r.data[normalizeMeta(ref)]
+	_, ok := r.data[NormalizeMeta(ref)]
 	return ok
 }
 
@@ -136,16 +148,16 @@ func (r *ReferenceSet) Remove(ref api.ResourceReference) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	delete(r.data, normalizeMeta(ref))
+	delete(r.data, NormalizeMeta(ref))
 }
 
-func normalizeMeta(ref api.ResourceReference) api.ResourceReference {
-	ref.Namespace = normalizeEmptyMetadataString(ref.Namespace)
-	ref.Partition = normalizeEmptyMetadataString(ref.Partition)
+func NormalizeMeta(ref api.ResourceReference) api.ResourceReference {
+	ref.Namespace = NormalizeEmptyMetadataString(ref.Namespace)
+	ref.Partition = NormalizeEmptyMetadataString(ref.Partition)
 	return ref
 }
 
-func normalizeEmptyMetadataString(metaString string) string {
+func NormalizeEmptyMetadataString(metaString string) string {
 	if metaString == "" {
 		return "default"
 	}

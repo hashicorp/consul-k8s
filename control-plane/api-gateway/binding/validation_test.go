@@ -6,8 +6,8 @@ package binding
 import (
 	"testing"
 
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,14 +22,14 @@ func TestValidateRefs(t *testing.T) {
 	for name, tt := range map[string]struct {
 		namespace      string
 		refs           []gwv1beta1.BackendObjectReference
-		services       map[types.NamespacedName]api.CatalogService
+		services       map[types.NamespacedName]corev1.Service
 		meshServices   map[types.NamespacedName]v1alpha1.MeshService
 		expectedErrors []error
 	}{
 		"all pass no namespaces": {
 			namespace: "test",
 			refs:      []gwv1beta1.BackendObjectReference{{Name: "1"}, {Name: "2"}},
-			services: map[types.NamespacedName]api.CatalogService{
+			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "test"}: {},
 				{Name: "2", Namespace: "test"}: {},
 				{Name: "3", Namespace: "test"}: {},
@@ -43,7 +43,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "1", Namespace: pointerTo[gwv1beta1.Namespace]("other")},
 				{Name: "2", Namespace: pointerTo[gwv1beta1.Namespace]("other")},
 			},
-			services: map[types.NamespacedName]api.CatalogService{
+			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "other"}: {},
 				{Name: "2", Namespace: "other"}: {},
 				{Name: "3", Namespace: "other"}: {},
@@ -57,7 +57,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "1", Namespace: pointerTo[gwv1beta1.Namespace]("other")},
 				{Name: "2"},
 			},
-			services: map[types.NamespacedName]api.CatalogService{
+			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "other"}: {},
 				{Name: "2", Namespace: "test"}:  {},
 				{Name: "3", Namespace: "other"}: {},
@@ -71,7 +71,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "1"},
 				{Name: "2", Namespace: pointerTo[gwv1beta1.Namespace]("other")},
 			},
-			services: map[types.NamespacedName]api.CatalogService{
+			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "other"}: {},
 				{Name: "2", Namespace: "test"}:  {},
 				{Name: "3", Namespace: "other"}: {},
@@ -85,7 +85,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "1"},
 				{Name: "2"},
 			},
-			services: map[types.NamespacedName]api.CatalogService{
+			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "other"}: {},
 				{Name: "2", Namespace: "other"}: {},
 				{Name: "3", Namespace: "other"}: {},
@@ -99,7 +99,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "1", Namespace: pointerTo[gwv1beta1.Namespace]("other")},
 				{Name: "2", Namespace: pointerTo[gwv1beta1.Namespace]("other")},
 			},
-			services: map[types.NamespacedName]api.CatalogService{
+			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "test"}: {},
 				{Name: "2", Namespace: "test"}: {},
 				{Name: "3", Namespace: "test"}: {},
@@ -113,7 +113,7 @@ func TestValidateRefs(t *testing.T) {
 				{Name: "1", Group: pointerTo[gwv1beta1.Group]("test")},
 				{Name: "2"},
 			},
-			services: map[types.NamespacedName]api.CatalogService{
+			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "test"}: {},
 				{Name: "2", Namespace: "test"}: {},
 				{Name: "3", Namespace: "test"}: {},
@@ -144,7 +144,15 @@ func TestValidateRefs(t *testing.T) {
 				refs[i] = gwv1beta1.BackendRef{BackendObjectReference: ref}
 			}
 
-			actual := validateRefs(tt.namespace, refs, tt.services, tt.meshServices)
+			resources := apigateway.NewResourceMap()
+			for _, service := range tt.meshServices {
+				resources.AddMeshService(service)
+			}
+			for _, service := range tt.services {
+				resources.AddService(service)
+			}
+
+			actual := validateRefs(tt.namespace, refs, resources)
 			require.Equal(t, len(actual), len(tt.refs))
 			require.Equal(t, len(actual), len(tt.expectedErrors))
 			for i, err := range tt.expectedErrors {
