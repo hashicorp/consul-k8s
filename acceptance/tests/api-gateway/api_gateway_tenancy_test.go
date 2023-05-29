@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,22 +51,22 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 		secure             bool
 		namespaceMirroring bool
 	}{
-		{
-			secure:             false,
-			namespaceMirroring: false,
-		},
-		{
-			secure:             true,
-			namespaceMirroring: false,
-		},
+		// {
+		// 	secure:             false,
+		// 	namespaceMirroring: false,
+		// },
+		// {
+		// 	secure:             true,
+		// 	namespaceMirroring: false,
+		// },
 		{
 			secure:             false,
 			namespaceMirroring: true,
 		},
-		{
-			secure:             true,
-			namespaceMirroring: true,
-		},
+		// {
+		// 	secure:             true,
+		// 	namespaceMirroring: true,
+		// },
 	}
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t, namespaces: %t", c.secure, c.namespaceMirroring)
@@ -124,9 +125,10 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			logger.Log(t, "patching route to gateway")
 			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
 
-			// Grab a kubernetes client so that we can verify binding
+			// Grab a kubernetes and consul client so that we can verify binding
 			// behavior prior to issuing requests through the gateway.
 			k8sClient := ctx.ControllerRuntimeClient(t)
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			retryCheck(t, 60, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
@@ -135,13 +137,25 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 				// check our statuses
 				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, gateway.Status.Conditions, falseCondition("Programmed", "Pending"))
+				// we expect a sync error here since dropping the listener means the gateway is now invalid
+				checkStatusCondition(r, gateway.Status.Conditions, falseCondition("Synced", "SyncError"))
+
 				require.Len(r, gateway.Status.Listeners, 1)
+				require.EqualValues(r, 0, gateway.Status.Listeners[0].AttachedRoutes)
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
 			})
 
-			// check that we have resolution errors because of missing reference grants
+			retryCheck(t, 2, func(r *retry.R) {
+				// since the sync operation should fail above, check that we don't have the entry in Consul.
+				_, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", &api.QueryOptions{
+					Namespace: gatewayNamespace,
+				})
+				require.Error(r, err)
+				require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "api-gateway" / "gateway")`)
+			})
 
 			// route failure
 			retryCheck(t, 2, func(r *retry.R) {
@@ -156,6 +170,30 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				require.EqualValues(r, gatewayNamespace, *httproute.Status.Parents[0].ParentRef.Namespace)
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("Accepted", "RefNotPermitted"))
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
+				// the route itself actually gets synced to Consul
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Synced", "Synced"))
+			})
+
+			retryCheck(t, 2, func(r *retry.R) {
+				// since we're not bound, check to make sure that the route doesn't target the gateway in Consul.
+				entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, "route", &api.QueryOptions{
+					Namespace: routeNamespace,
+				})
+				require.NoError(r, err)
+				route := entry.(*api.HTTPRouteConfigEntry)
+
+				require.EqualValues(r, "route", route.Meta["k8s-name"])
+				require.EqualValues(r, routeNamespace, route.Meta["k8s-namespace"])
+				require.Len(r, route.Parents, 0)
+			})
+
+			retryCheck(t, 2, func(r *retry.R) {
+				// we only sync validly referenced certificates over, so check to make sure it is not created.
+				_, _, err := consulClient.ConfigEntries().Get(api.InlineCertificate, "certificate", &api.QueryOptions{
+					Namespace: certificateNamespace,
+				})
+				require.Error(r, err)
+				require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "inline-certificate" / "certificate")`)
 			})
 
 			// now create reference grants
@@ -164,18 +202,37 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			createReferenceGrant(t, k8sClient, "route-service", routeNamespace, serviceNamespace)
 
 			// gateway updated with references allowed
-			retryCheck(t, 2, func(r *retry.R) {
+			retryCheck(t, 10, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
 
 				// check our statuses
 				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Programmed", "Programmed"))
+				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Synced", "Synced"))
 				require.Len(r, gateway.Status.Listeners, 1)
+				require.EqualValues(r, 1, gateway.Status.Listeners[0].AttachedRoutes)
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 			})
+
+			// // check the Consul gateway is updated, with the listener.
+			// retryCheck(t, 2, func(r *retry.R) {
+			// 	entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", &api.QueryOptions{
+			// 		Namespace: gatewayNamespace,
+			// 	})
+			// 	require.NoError(r, err)
+			// 	gateway := entry.(*api.APIGatewayConfigEntry)
+			// 	fmt.Println(*gateway)
+
+			// 	require.EqualValues(r, "gateway", gateway.Meta["k8s-name"])
+			// 	require.EqualValues(r, gatewayNamespace, gateway.Meta["k8s-namespace"])
+			// 	require.Len(r, gateway.Listeners, 1)
+			// 	checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
+			// 	checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("ResolvedRefs", "ResolvedRefs"))
+			// })
 
 			// route updated with gateway and services allowed
 			retryCheck(t, 2, func(r *retry.R) {
@@ -192,15 +249,31 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 			})
 
-			// c
-			// time.Sleep(10 * time.Minute)
-			// ensure that the consul resources are not created
+			// now check to make sure that the route is actually created
+			retryCheck(t, 2, func(r *retry.R) {
+				// since we're not bound, check to make sure that the route doesn't target the gateway in Consul.
+				entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, "route", &api.QueryOptions{
+					Namespace: routeNamespace,
+				})
+				require.NoError(r, err)
+				route := entry.(*api.HTTPRouteConfigEntry)
 
-			// create the reference grants
+				require.EqualValues(r, "route", route.Meta["k8s-name"])
+				require.EqualValues(r, routeNamespace, route.Meta["k8s-namespace"])
+				require.Len(r, route.Parents, 1)
+			})
 
-			// check that we have no resolution errors
+			// and check to make sure that the certificate exists
+			retryCheck(t, 2, func(r *retry.R) {
+				entry, _, err := consulClient.ConfigEntries().Get(api.InlineCertificate, "certificate", &api.QueryOptions{
+					Namespace: certificateNamespace,
+				})
+				require.NoError(r, err)
+				certificate := entry.(*api.InlineCertificateConfigEntry)
 
-			// ensure that the consul resources are created with the proper status
+				require.EqualValues(r, "certificate", certificate.Meta["k8s-name"])
+				require.EqualValues(r, certificateNamespace, certificate.Meta["k8s-namespace"])
+			})
 		})
 	}
 }

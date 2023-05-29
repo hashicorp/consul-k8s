@@ -250,3 +250,11 @@ func trueConsulCondition(conditionType, reason string) api.Condition {
 		Status: "True",
 	}
 }
+
+func falseConsulCondition(conditionType, reason string) api.Condition {
+	return api.Condition{
+		Type:   conditionType,
+		Reason: reason,
+		Status: "False",
+	}
+}

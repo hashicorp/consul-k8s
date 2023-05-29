@@ -4,6 +4,8 @@
 package binding
 
 import (
+	"fmt"
+
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -141,6 +143,8 @@ func (rv *referenceValidator) referenceAllowed(fromGK metav1.GroupKind, fromName
 	}
 
 	for _, grant := range grants {
+		fmt.Println("GRANT", grant, fromGK, toGK, fromNamespace, toNamespace, toName)
+
 		// Check for a From that applies
 		fromMatch := false
 		for _, from := range grant.Spec.From {

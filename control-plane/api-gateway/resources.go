@@ -14,6 +14,50 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
+// ConsulUpdateOperation is an operation representing an
+// update in Consul.
+type ConsulUpdateOperation struct {
+	// Entry is the ConfigEntry to write to Consul.
+	Entry api.ConfigEntry
+	// OnUpdate is an optional callback to fire after running
+	// the Consul update operation. If specified, then no more
+	// error handling occurs after the function is called, otherwise
+	// normal error handling logic applies.
+	OnUpdate func(err error)
+}
+
+type gvkNamespacedName struct {
+	gvk string
+	nsn types.NamespacedName
+}
+
+// KubernetesUpdates holds all update operations (including status)
+// that need to be synced to Kubernetes. So long as you're
+// modifying the same pointer object passed in to its Add
+// function, this de-duplicates any calls to Add, in order
+// for us to Add any previously unseen entires, but ignore
+// them if they've already been added.
+type KubernetesUpdates struct {
+	operations map[gvkNamespacedName]client.Object
+}
+
+func NewKubernetesUpdates() *KubernetesUpdates {
+	return &KubernetesUpdates{
+		operations: make(map[gvkNamespacedName]client.Object),
+	}
+}
+
+func (k *KubernetesUpdates) Add(object client.Object) {
+	k.operations[gvkNamespacedName{
+		gvk: object.GetObjectKind().GroupVersionKind().String(),
+		nsn: client.ObjectKeyFromObject(object),
+	}] = object
+}
+
+func (k *KubernetesUpdates) Operations() []client.Object {
+	return ConvertMapValuesToSlice(k.operations)
+}
+
 type ReferenceValidator interface {
 	GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool
 	HTTPRouteCanReferenceGateway(httproute gwv1beta1.HTTPRoute, parentRef gwv1beta1.ParentReference) bool
@@ -76,7 +120,7 @@ type ResourceMap struct {
 	consulInlineCertificates map[api.ResourceReference]mapset.Set
 
 	// mutations
-	consulMutations []api.ConfigEntry
+	consulMutations []*ConsulUpdateOperation
 }
 
 func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator) *ResourceMap {
@@ -341,7 +385,7 @@ func (s *ResourceMap) gatewaysForRoute(namespace string, refs []gwv1beta1.Parent
 	return gateways
 }
 
-func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, mutateFn func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
+func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
 	consulKey := s.toConsulReference(api.HTTPRoute, key)
 
 	route, ok := s.httpRouteGateways[consulKey]
@@ -357,14 +401,20 @@ func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, muta
 		// GC it in the end
 		delete(s.consulHTTPRoutes, consulKey)
 		mutated := mutateFn(&consulRoute.route, *translated)
-		s.consulMutations = append(s.consulMutations, &mutated)
+		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+			Entry:    &mutated,
+			OnUpdate: onUpdate,
+		})
 		return
 	}
 	mutated := mutateFn(nil, *translated)
-	s.consulMutations = append(s.consulMutations, &mutated)
+	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+		Entry:    &mutated,
+		OnUpdate: onUpdate,
+	})
 }
 
-func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, mutateFn func(api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
+func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
 	consulKey := s.toConsulReference(api.HTTPRoute, key)
 
 	consulRoute, ok := s.consulHTTPRoutes[consulKey]
@@ -374,7 +424,10 @@ func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, mutateFn func(ap
 		delete(s.consulHTTPRoutes, consulKey)
 		mutated := mutateFn(consulRoute.route)
 		// add it to the mutation set
-		s.consulMutations = append(s.consulMutations, &mutated)
+		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+			Entry:    &mutated,
+			OnUpdate: onUpdate,
+		})
 	}
 }
 
@@ -385,7 +438,7 @@ func (s *ResourceMap) CanGCHTTPRouteOnUnbind(id api.ResourceReference) bool {
 	return true
 }
 
-func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, mutateFn func(*api.TCPRouteConfigEntry, api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
+func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(*api.TCPRouteConfigEntry, api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
 	consulKey := s.toConsulReference(api.TCPRoute, key)
 
 	route, ok := s.tcpRouteGateways[consulKey]
@@ -401,14 +454,20 @@ func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, mutat
 		// remove from the consulTCPRoutes map since we don't want to
 		// GC it in the end
 		mutated := mutateFn(&consulRoute.route, *translated)
-		s.consulMutations = append(s.consulMutations, &mutated)
+		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+			Entry:    &mutated,
+			OnUpdate: onUpdate,
+		})
 		return
 	}
 	mutated := mutateFn(nil, *translated)
-	s.consulMutations = append(s.consulMutations, &mutated)
+	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+		Entry:    &mutated,
+		OnUpdate: onUpdate,
+	})
 }
 
-func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, mutateFn func(api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
+func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
 	consulKey := s.toConsulReference(api.TCPRoute, key)
 
 	consulRoute, ok := s.consulTCPRoutes[consulKey]
@@ -418,12 +477,11 @@ func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, mutateFn func(api
 		delete(s.consulTCPRoutes, consulKey)
 		mutated := mutateFn(consulRoute.route)
 		// add it to the mutation set
-		s.consulMutations = append(s.consulMutations, &mutated)
+		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+			Entry:    &mutated,
+			OnUpdate: onUpdate,
+		})
 	}
-}
-
-func (s *ResourceMap) AddMutation(entry api.ConfigEntry) {
-	s.consulMutations = append(s.consulMutations, entry)
 }
 
 func (s *ResourceMap) CanGCTCPRouteOnUnbind(id api.ResourceReference) bool {
@@ -438,17 +496,26 @@ func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error
 
 	certificate, ok := s.certificateGateways[consulKey]
 	if !ok {
+		fmt.Println("CERT not found")
 		return nil
 	}
 
 	consulCertificate, err := s.translator.ToInlineCertificate(certificate.secret)
 	if err != nil {
+		fmt.Println("CERT err", err)
 		return err
 	}
-	// remove from the certificate map since we don't want to
-	// GC it in the end
+
+	fmt.Println("adding to mutations")
+	// add to the processed set so we don't GC it.
 	s.processedCertificates.Add(consulKey)
-	s.consulMutations = append(s.consulMutations, consulCertificate)
+	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+		Entry: consulCertificate,
+		// just swallow the error since we can't propagate status back on a certificate.
+		OnUpdate: func(error) {
+			fmt.Println("ERRR syncing!", err)
+		},
+	})
 
 	return nil
 }
@@ -463,7 +530,7 @@ func (s *ResourceMap) Secret(key types.NamespacedName) *corev1.Secret {
 	return &certificate.secret
 }
 
-func (s *ResourceMap) Mutations() []api.ConfigEntry {
+func (s *ResourceMap) Mutations() []*ConsulUpdateOperation {
 	return s.consulMutations
 }
 

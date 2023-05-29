@@ -7,6 +7,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -14,7 +15,7 @@ import (
 )
 
 // bindRoute contains the main logic for binding a route to a given gateway.
-func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.SectionName]int, snapshot Snapshot) (updatedSnapshot Snapshot) {
+func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.SectionName]int, snapshot *Snapshot) {
 	// use the non-normalized key since we can't write back enterprise metadata
 	// on non-enterprise installations
 	routeConsulKey := r.config.Translator.NonNormalizedConfigEntryReference(entryKind(route), client.ObjectKeyFromObject(route))
@@ -30,13 +31,11 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 	// append to the snapshot right before returning
 	defer func() {
 		if kubernetesNeedsUpdate {
-			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, route)
+			snapshot.Kubernetes.Updates.Add(route)
 		}
 		if kubernetesNeedsStatusUpdate {
-			snapshot.Kubernetes.StatusUpdates = append(snapshot.Kubernetes.StatusUpdates, route)
+			snapshot.Kubernetes.StatusUpdates.Add(route)
 		}
-
-		updatedSnapshot = snapshot
 	}()
 
 	if isDeleted(route) {
@@ -54,7 +53,7 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 
 		// remove the condition since we no longer know if we should
 		// control the route and drop any references for the Consul route
-		dropConsulRouteParent(route, r.nonNormalizedConsulKey, r.config.Resources)
+		r.dropConsulRouteParent(snapshot, route, r.nonNormalizedConsulKey, r.config.Resources)
 		// drop the status conditions
 		if r.statusSetter.removeRouteReferences(route, filteredParents) {
 			kubernetesNeedsStatusUpdate = true
@@ -152,7 +151,7 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 		kubernetesNeedsStatusUpdate = true
 	}
 
-	mutateRouteWithBindingResults(route, r.nonNormalizedConsulKey, r.config.Resources, results)
+	r.mutateRouteWithBindingResults(snapshot, route, r.nonNormalizedConsulKey, r.config.Resources, results)
 
 	return
 }
@@ -213,10 +212,10 @@ func consulParentMatches(namespace string, gatewayKey api.ResourceReference, par
 		parent.Partition == gatewayKey.Partition
 }
 
-func dropConsulRouteParent(object client.Object, gateway api.ResourceReference, resources *apigateway.ResourceMap) {
+func (r *Binder) dropConsulRouteParent(snapshot *Snapshot, object client.Object, gateway api.ResourceReference, resources *apigateway.ResourceMap) {
 	switch object.(type) {
 	case *gwv1beta1.HTTPRoute:
-		resources.MutateHTTPRoute(client.ObjectKeyFromObject(object), func(entry api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry {
+		resources.MutateHTTPRoute(client.ObjectKeyFromObject(object), r.handleRouteSyncStatus(snapshot, object), func(entry api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry {
 			entry.Parents = apigateway.Filter(entry.Parents, func(parent api.ResourceReference) bool {
 				return consulParentMatches(entry.Namespace, gateway, parent)
 			})
@@ -229,7 +228,7 @@ func dropConsulRouteParent(object client.Object, gateway api.ResourceReference, 
 			return entry
 		})
 	case *gwv1alpha2.TCPRoute:
-		resources.MutateTCPRoute(client.ObjectKeyFromObject(object), func(entry api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
+		resources.MutateTCPRoute(client.ObjectKeyFromObject(object), r.handleRouteSyncStatus(snapshot, object), func(entry api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
 			entry.Parents = apigateway.Filter(entry.Parents, func(parent api.ResourceReference) bool {
 				return consulParentMatches(entry.Namespace, gateway, parent)
 			})
@@ -244,7 +243,7 @@ func dropConsulRouteParent(object client.Object, gateway api.ResourceReference, 
 	}
 }
 
-func mutateRouteWithBindingResults(object client.Object, gatewayConsulKey api.ResourceReference, resources *apigateway.ResourceMap, results parentBindResults) {
+func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client.Object, gatewayConsulKey api.ResourceReference, resources *apigateway.ResourceMap, results parentBindResults) {
 	key := client.ObjectKeyFromObject(object)
 
 	parents := mapset.NewSet()
@@ -260,7 +259,7 @@ func mutateRouteWithBindingResults(object client.Object, gatewayConsulKey api.Re
 
 	switch object.(type) {
 	case *gwv1beta1.HTTPRoute:
-		resources.TranslateAndMutateHTTPRoute(key, func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry {
+		resources.TranslateAndMutateHTTPRoute(key, r.handleRouteSyncStatus(snapshot, object), func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry {
 			if old != nil {
 				for _, parent := range old.Parents {
 					// drop any references that already exist
@@ -279,7 +278,7 @@ func mutateRouteWithBindingResults(object client.Object, gatewayConsulKey api.Re
 			return new
 		})
 	case *gwv1alpha2.TCPRoute:
-		resources.TranslateAndMutateTCPRoute(key, func(old *api.TCPRouteConfigEntry, new api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
+		resources.TranslateAndMutateTCPRoute(key, r.handleRouteSyncStatus(snapshot, object), func(old *api.TCPRouteConfigEntry, new api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
 			if old != nil {
 				for _, parent := range old.Parents {
 					// drop any references that already exist
@@ -410,4 +409,58 @@ func canReferenceBackend(object client.Object, ref gwv1beta1.BackendRef, resourc
 		return resources.TCPRouteCanReferenceBackend(*v, ref)
 	}
 	return false
+}
+
+func (r *Binder) handleRouteSyncStatus(snapshot *Snapshot, object client.Object) func(error) {
+	return func(err error) {
+		condition := metav1.Condition{
+			Type:               "Synced",
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: object.GetGeneration(),
+			LastTransitionTime: metav1.Now(),
+			Reason:             "Synced",
+			Message:            "route synced to Consul",
+		}
+		if err != nil {
+			condition = metav1.Condition{
+				Type:               "Synced",
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: object.GetGeneration(),
+				LastTransitionTime: metav1.Now(),
+				Reason:             "SyncError",
+				Message:            err.Error(),
+			}
+		}
+		if r.statusSetter.setRouteConditionOnAllRefs(object, condition) {
+			snapshot.Kubernetes.StatusUpdates.Add(object)
+		}
+	}
+}
+
+func (r *Binder) handleGatewaySyncStatus(snapshot *Snapshot, gateway *gwv1beta1.Gateway) func(error) {
+	return func(err error) {
+		condition := metav1.Condition{
+			Type:               "Synced",
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: gateway.Generation,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "Synced",
+			Message:            "gateway synced to Consul",
+		}
+		if err != nil {
+			condition = metav1.Condition{
+				Type:               "Synced",
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: gateway.Generation,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "SyncError",
+				Message:            err.Error(),
+			}
+		}
+
+		if conditions, updated := setCondition(gateway.Status.Conditions, condition); updated {
+			gateway.Status.Conditions = conditions
+			snapshot.Kubernetes.StatusUpdates.Add(gateway)
+		}
+	}
 }

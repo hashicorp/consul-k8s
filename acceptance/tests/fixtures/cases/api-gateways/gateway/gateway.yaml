@@ -8,9 +8,13 @@ metadata:
 spec:
   gatewayClassName: consul-api-gateway
   listeners:
-  - protocol: HTTP
+  - protocol: HTTPS
     port: 8080
-    name: http
+    name: https
+    tls:
+      certificateRefs:
+      - name: "certificate"
+        namespace: "default"
     allowedRoutes:
       namespaces:
         from: "All"

@@ -6,7 +6,6 @@ package apigateway
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -16,19 +15,14 @@ import (
 )
 
 func ParseCertificateData(secret corev1.Secret) (cert string, privateKey string, err error) {
-	decodedPrivateKey, err := base64.StdEncoding.DecodeString(string(secret.Data[corev1.TLSPrivateKeyKey]))
-	if err != nil {
-		return "", "", err
-	}
+	decodedPrivateKey := secret.Data[corev1.TLSPrivateKeyKey]
+	decodedCertificate := secret.Data[corev1.TLSCertKey]
+
 	privateKeyBlock, _ := pem.Decode(decodedPrivateKey)
 	if privateKeyBlock == nil {
 		return "", "", errors.New("failed to parse private key PEM")
 	}
 
-	decodedCertificate, err := base64.StdEncoding.DecodeString(string(secret.Data[corev1.TLSCertKey]))
-	if err != nil {
-		return "", "", err
-	}
 	certificateBlock, _ := pem.Decode(decodedCertificate)
 	if certificateBlock == nil {
 		return "", "", errors.New("failed to parse certificate PEM")

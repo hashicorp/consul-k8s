@@ -238,8 +238,16 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	for _, update := range updates.Consul.Updates {
-		log.Info("updating in Consul", "kind", update.GetKind(), "namespace", update.GetNamespace(), "name", update.GetName())
-		if err := r.cache.Write(ctx, update); err != nil {
+		entry := update.Entry
+		log.Info("updating in Consul", "kind", entry.GetKind(), "namespace", entry.GetNamespace(), "name", entry.GetName())
+		err := r.cache.Write(ctx, entry)
+		if update.OnUpdate != nil {
+			// swallow any potential error with our handler if one is provided
+			update.OnUpdate(err)
+			continue
+		}
+
+		if err != nil {
 			log.Error(err, "error updating config entry")
 			return ctrl.Result{}, err
 		}
@@ -261,7 +269,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	for _, update := range updates.Kubernetes.Updates {
+	for _, update := range updates.Kubernetes.Updates.Operations() {
 		log.Info("update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.updateAndResetStatus(ctx, update); err != nil {
 			log.Error(err, "error updating object")
@@ -269,7 +277,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	for _, update := range updates.Kubernetes.StatusUpdates {
+	for _, update := range updates.Kubernetes.StatusUpdates.Operations() {
 		log.Info("update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.Client.Status().Update(ctx, update); err != nil {
 			log.Error(err, "error updating status")

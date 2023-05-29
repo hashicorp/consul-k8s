@@ -54,11 +54,9 @@ func (t ResourceTranslator) Namespace(namespace string) string {
 func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *ResourceMap) *api.APIGatewayConfigEntry {
 	namespace := t.Namespace(gateway.Namespace)
 
-	var listeners []api.APIGatewayListener
-
-	for _, listener := range gateway.Spec.Listeners {
-		listeners = append(listeners, t.toAPIGatewayListener(namespace, listener, resources))
-	}
+	listeners := ConvertSliceFuncIf(gateway.Spec.Listeners, func(listener gwv1beta1.Listener) (api.APIGatewayListener, bool) {
+		return t.toAPIGatewayListener(gateway, listener, resources)
+	})
 
 	return &api.APIGatewayConfigEntry{
 		Kind:      api.APIGateway,
@@ -79,11 +77,17 @@ var listenerProtocolMap = map[string]string{
 	"tcp":   "tcp",
 }
 
-func (t ResourceTranslator) toAPIGatewayListener(namespace string, listener gwv1beta1.Listener, resources *ResourceMap) api.APIGatewayListener {
+func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *ResourceMap) (api.APIGatewayListener, bool) {
+	namespace := gateway.Namespace
+
 	var certificates []api.ResourceReference
 
 	if listener.TLS != nil {
 		for _, ref := range listener.TLS.CertificateRefs {
+			if !resources.GatewayCanReferenceSecret(gateway, ref) {
+				return api.APIGatewayListener{}, false
+			}
+
 			if !NilOrEqual(ref.Group, "") || !NilOrEqual(ref.Kind, "Secret") {
 				// only translate the valid types we support
 				continue
@@ -104,7 +108,7 @@ func (t ResourceTranslator) toAPIGatewayListener(namespace string, listener gwv1
 		TLS: api.APIGatewayTLSConfiguration{
 			Certificates: certificates,
 		},
-	}
+	}, true
 }
 
 func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {

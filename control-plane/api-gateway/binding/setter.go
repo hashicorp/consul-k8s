@@ -4,6 +4,9 @@
 package binding
 
 import (
+	"fmt"
+
+	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -45,6 +48,29 @@ func (s *setter) setRouteCondition(route client.Object, parent *gwv1beta1.Parent
 		setRouteParentsStatus(route, s.setParentStatus(parents, status))
 	}
 	return modified
+}
+
+// setRouteConditionOnAllRefs sets an route condition and its status on all parents.
+func (s *setter) setRouteConditionOnAllRefs(route client.Object, condition metav1.Condition) bool {
+	condition.LastTransitionTime = metav1.Now()
+	condition.ObservedGeneration = route.GetGeneration()
+
+	parents := getRouteParentsStatus(route)
+	statuses := apigateway.Filter(getRouteParentsStatus(route), func(status gwv1beta1.RouteParentStatus) bool {
+		return string(status.ControllerName) != s.controllerName
+	})
+
+	fmt.Println("SETTING", condition, "ON", statuses, "FROM", getRouteParentsStatus(route))
+	updated := false
+	for _, status := range statuses {
+		conditions, modified := setCondition(status.Conditions, condition)
+		if modified {
+			updated = true
+			status.Conditions = conditions
+			setRouteParentsStatus(route, s.setParentStatus(parents, status))
+		}
+	}
+	return updated
 }
 
 // removeStatuses removes all statuses set by the given controller from an route's status.

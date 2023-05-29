@@ -75,6 +75,14 @@ func StringLikeSlice[T ~string](vs []T) []string {
 	return converted
 }
 
+func ConvertMapValuesToSlice[T comparable, U any](vs map[T]U) []U {
+	converted := []U{}
+	for _, v := range vs {
+		converted = append(converted, v)
+	}
+	return converted
+}
+
 func ConvertSliceFunc[T any, U any](vs []T, fn func(T) U) []U {
 	converted := []U{}
 	for _, v := range vs {

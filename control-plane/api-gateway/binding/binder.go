@@ -4,8 +4,6 @@
 package binding
 
 import (
-	"fmt"
-
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/go-cmp/cmp"
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
@@ -139,10 +137,10 @@ func (b *Binder) isGatewayDeleted() bool {
 
 // Snapshot generates a snapshot of operations that need to occur in Kubernetes and Consul
 // in order for a Gateway to be reconciled.
-func (b *Binder) Snapshot() Snapshot {
+func (b *Binder) Snapshot() *Snapshot {
 	// at this point we assume all tcp routes and http routes
 	// actually reference this gateway
-	snapshot := Snapshot{}
+	snapshot := NewSnapshot()
 
 	registrationPods := []corev1.Pod{}
 	// filter out any pod that is being deleted
@@ -168,11 +166,10 @@ func (b *Binder) Snapshot() Snapshot {
 		// otherwise try and resolve as much as possible
 		if ensureFinalizer(&b.config.Gateway) || updated {
 			// if we've added the finalizer or serialized the class config, then update
-			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, &b.config.Gateway)
+			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
 			return snapshot
 		}
 
-		fmt.Println("VALIDATING")
 		// calculate the status for the gateway
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
 		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources)
@@ -185,32 +182,28 @@ func (b *Binder) Snapshot() Snapshot {
 
 	// attempt to bind all routes
 
-	fmt.Println("BINDING HTTPROUTES")
 	for _, r := range b.config.HTTPRoutes {
-		snapshot = b.bindRoute(pointerTo(r), boundCounts, snapshot)
+		b.bindRoute(pointerTo(r), boundCounts, snapshot)
 	}
-	fmt.Println("BINDING TCPROUTES")
+
 	for _, r := range b.config.TCPRoutes {
-		snapshot = b.bindRoute(pointerTo(r), boundCounts, snapshot)
+		b.bindRoute(pointerTo(r), boundCounts, snapshot)
 	}
 
 	// process secrets
-	fmt.Println("PROCESSING SECRETS")
-	gatewaySecrets := secretsForGateway(b.config.Gateway)
+	gatewaySecrets := secretsForGateway(b.config.Gateway, b.config.Resources)
 	certs := mapset.NewSet()
 	for secret := range gatewaySecrets.Iter() {
 		// ignore the error if the certificate cannot be processed and just don't add it into the final
 		// sync set
-		if err := b.config.Resources.TranslateInlineCertificate(secret.(types.NamespacedName)); err != nil {
+		if err := b.config.Resources.TranslateInlineCertificate(secret.(types.NamespacedName)); err == nil {
 			certs.Add(secret)
 		}
 	}
 
 	// now cleanup any routes or certificates that we haven't already processed
 
-	fmt.Println("CHECKING GC")
 	snapshot.Consul.Deletions = b.config.Resources.ResourcesToGC(b.key)
-	fmt.Println("CHECKING UPDATES")
 	snapshot.Consul.Updates = b.config.Resources.Mutations()
 
 	// finally, handle the gateway itself
@@ -218,13 +211,14 @@ func (b *Binder) Snapshot() Snapshot {
 	// we only want to upsert the gateway into Consul or update its status
 	// if the gateway hasn't been marked for deletion
 	if !isGatewayDeleted {
-		fmt.Println("GATEWAY NOT DELETED!!!")
-
 		snapshot.GatewayClassConfig = gatewayClassConfig
 		snapshot.UpsertGatewayDeployment = true
 
 		entry := b.config.Translator.ToAPIGateway(b.config.Gateway, b.config.Resources)
-		snapshot.Consul.Updates = append(snapshot.Consul.Updates, entry)
+		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &apigateway.ConsulUpdateOperation{
+			Entry:    entry,
+			OnUpdate: b.handleGatewaySyncStatus(snapshot, &b.config.Gateway),
+		})
 
 		registrations := registrationsForPods(entry.Namespace, b.config.Gateway, registrationPods)
 		snapshot.Consul.Registrations = registrations
@@ -257,7 +251,13 @@ func (b *Binder) Snapshot() Snapshot {
 				Conditions:     listenerValidation.Conditions(b.config.Gateway.Generation, i),
 			})
 		}
-		status.Conditions = gatewayValidation.Conditions(b.config.Gateway.Generation, listenerValidation.Invalid())
+		status.Conditions = b.config.Gateway.Status.Conditions
+
+		// we do this loop to not accidentally override any additional statuses that
+		// have been set anywhere outside of validation.
+		for _, condition := range gatewayValidation.Conditions(b.config.Gateway.Generation, listenerValidation.Invalid()) {
+			status.Conditions, _ = setCondition(status.Conditions, condition)
+		}
 		status.Addresses = addressesForGateway(b.config.Service, registrationPods)
 
 		// only mark the gateway as needing a status update if there's a diff with its old
@@ -267,7 +267,7 @@ func (b *Binder) Snapshot() Snapshot {
 			return path == "Listeners.Conditions.LastTransitionTime" || path == "Conditions.LastTransitionTime"
 		}, cmp.Ignore())) {
 			b.config.Gateway.Status = status
-			snapshot.Kubernetes.StatusUpdates = append(snapshot.Kubernetes.StatusUpdates, &b.config.Gateway)
+			snapshot.Kubernetes.StatusUpdates.Add(&b.config.Gateway)
 		}
 	} else {
 		// if the gateway has been deleted, unset whatever we've set on it
@@ -281,14 +281,14 @@ func (b *Binder) Snapshot() Snapshot {
 			})
 		}
 		if removeFinalizer(&b.config.Gateway) {
-			snapshot.Kubernetes.Updates = append(snapshot.Kubernetes.Updates, &b.config.Gateway)
+			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
 		}
 	}
 
 	return snapshot
 }
 
-func secretsForGateway(gateway gwv1beta1.Gateway) mapset.Set {
+func secretsForGateway(gateway gwv1beta1.Gateway, resources *apigateway.ResourceMap) mapset.Set {
 	set := mapset.NewSet()
 
 	for _, listener := range gateway.Spec.Listeners {
@@ -297,9 +297,11 @@ func secretsForGateway(gateway gwv1beta1.Gateway) mapset.Set {
 		}
 
 		for _, cert := range listener.TLS.CertificateRefs {
-			if apigateway.NilOrEqual(cert.Group, "") && apigateway.NilOrEqual(cert.Kind, "Secret") {
-				key := apigateway.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace)
-				set.Add(key)
+			if resources.GatewayCanReferenceSecret(gateway, cert) {
+				if apigateway.NilOrEqual(cert.Group, "") && apigateway.NilOrEqual(cert.Kind, "Secret") {
+					key := apigateway.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace)
+					set.Add(key)
+				}
 			}
 		}
 	}
