@@ -68,6 +68,10 @@ spec:
                       description: Destination controls how to proxy the matching
                         request(s) to a service.
                       properties:
+                        idleTimeout:
+                          description: IdleTimeout is total amount of time permitted
+                            for the request stream to be idle.
+                          type: string
                         namespace:
                           description: Namespace is the Consul namespace to resolve
                             the service from instead of the current namespace. If
