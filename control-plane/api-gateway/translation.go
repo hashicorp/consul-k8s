@@ -1,7 +1,6 @@
 package apigateway
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -140,7 +139,6 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 		return t.translateHTTPBackendRef(route, ref, resources)
 	})
 
-	fmt.Println("TRANSLATED SERVICES", services)
 	if len(services) == 0 {
 		return api.HTTPRouteRule{}, false
 	}
@@ -160,7 +158,6 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 		Name:      string(ref.Name),
 		Namespace: DerefStringOr(ref.Namespace, route.Namespace),
 	}
-	fmt.Println("CHECKING BACKEND REF", id)
 
 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
 

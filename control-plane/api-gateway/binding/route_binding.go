@@ -166,8 +166,8 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv1beta1.ParentReference) []gwv1beta1.ParentReference {
 	references := []gwv1beta1.ParentReference{}
 	for _, ref := range refs {
-		if nilOrEqual(ref.Group, betaGroup) &&
-			nilOrEqual(ref.Kind, kindGateway) &&
+		if apigateway.NilOrEqual(ref.Group, betaGroup) &&
+			apigateway.NilOrEqual(ref.Kind, kindGateway) &&
 			gateway.Namespace == valueOr(ref.Namespace, namespace) &&
 			gateway.Name == string(ref.Name) {
 			references = append(references, ref)

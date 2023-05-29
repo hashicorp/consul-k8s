@@ -1,10 +1,8 @@
 package apigateway
 
 import (
-	"encoding/json"
-	"fmt"
-
 	mapset "github.com/deckarep/golang-set"
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -102,6 +100,7 @@ type resourceSet struct {
 type ResourceMap struct {
 	translator         ResourceTranslator
 	referenceValidator ReferenceValidator
+	logger             logr.Logger
 
 	services     map[types.NamespacedName]api.ResourceReference
 	meshServices map[types.NamespacedName]api.ResourceReference
@@ -123,10 +122,11 @@ type ResourceMap struct {
 	consulMutations []*ConsulUpdateOperation
 }
 
-func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator) *ResourceMap {
+func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator, logger logr.Logger) *ResourceMap {
 	return &ResourceMap{
 		translator:               translator,
 		referenceValidator:       validator,
+		logger:                   logger,
 		processedCertificates:    mapset.NewSet(),
 		services:                 make(map[types.NamespacedName]api.ResourceReference),
 		meshServices:             make(map[types.NamespacedName]api.ResourceReference),
@@ -153,7 +153,6 @@ func (s *ResourceMap) Service(id types.NamespacedName) api.ResourceReference {
 }
 
 func (s *ResourceMap) HasService(id types.NamespacedName) bool {
-	fmt.Println("SERVICE CHECK", id)
 	_, ok := s.services[id]
 	return ok
 }
@@ -233,7 +232,6 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceReference {
 	consulKey := s.toConsulReference(api.APIGateway, key)
 
-	fmt.Println("GC resources for", consulKey)
 	resources, ok := s.gatewayResources[consulKey]
 	if !ok {
 		return nil
@@ -241,27 +239,22 @@ func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceRefe
 
 	var toGC []api.ResourceReference
 
-	fmt.Println("ITERATING")
 	for id := range resources.consulObjects.data {
 		// if any of these objects exist in the below maps
 		// it means we haven't "popped" it to be created
 		switch id.Kind {
 		case api.HTTPRoute:
-			fmt.Println("HTTPROUTE START")
 			if route, ok := s.consulHTTPRoutes[id]; ok && route.gateways.Cardinality() <= 1 {
 				// we only have a single reference, which will be this gateway, so drop
 				// the route altogether
 				toGC = append(toGC, id)
 			}
-			fmt.Println("HTTPROUTE DONE")
 		case api.TCPRoute:
-			fmt.Println("TCPROUTE START")
 			if route, ok := s.consulTCPRoutes[id]; ok && route.gateways.Cardinality() <= 1 {
 				// we only have a single reference, which will be this gateway, so drop
 				// the route altogether
 				toGC = append(toGC, id)
 			}
-			fmt.Println("TCPROUTE DONE")
 		case api.InlineCertificate:
 			if s.processedCertificates.Contains(id) {
 				continue
@@ -271,10 +264,8 @@ func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceRefe
 				// the route altogether
 				toGC = append(toGC, id)
 			}
-			fmt.Println("CERT DONE")
 		}
 	}
-	fmt.Println("ITERATION DONE")
 
 	return toGC
 }
@@ -496,24 +487,21 @@ func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error
 
 	certificate, ok := s.certificateGateways[consulKey]
 	if !ok {
-		fmt.Println("CERT not found")
 		return nil
 	}
 
 	consulCertificate, err := s.translator.ToInlineCertificate(certificate.secret)
 	if err != nil {
-		fmt.Println("CERT err", err)
 		return err
 	}
 
-	fmt.Println("adding to mutations")
 	// add to the processed set so we don't GC it.
 	s.processedCertificates.Add(consulKey)
 	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
 		Entry: consulCertificate,
-		// just swallow the error since we can't propagate status back on a certificate.
+		// just swallow the error and log it since we can't propagate status back on a certificate.
 		OnUpdate: func(error) {
-			fmt.Println("ERRR syncing!", err)
+			s.logger.Error(err, "error syncing certificate to Consul")
 		},
 	})
 
@@ -559,48 +547,6 @@ func (s *ResourceMap) toConsulReference(kind string, key types.NamespacedName) a
 		Namespace: s.translator.Namespace(key.Namespace),
 		Partition: s.translator.ConsulPartition,
 	}
-}
-
-func (s *ResourceMap) DumpAll() {
-	fmt.Println("====CERTS====")
-	for ref := range s.certificateGateways {
-		marshalDump(ref)
-	}
-	fmt.Println("====CONSUL CERTS====")
-	for ref := range s.consulInlineCertificates {
-		marshalDump(ref)
-	}
-	fmt.Println("====HTTPROUTES====")
-	for ref := range s.httpRouteGateways {
-		marshalDump(ref)
-	}
-	fmt.Println("====CONSUL HTTPROUTES====")
-	for ref := range s.consulHTTPRoutes {
-		marshalDump(ref)
-	}
-	fmt.Println("====TCPROUTES====")
-	for ref := range s.tcpRouteGateways {
-		marshalDump(ref)
-	}
-	fmt.Println("====CONSUL TCPROUTES====")
-	for ref := range s.consulTCPRoutes {
-		marshalDump(ref)
-	}
-	fmt.Println("====SERVICES====")
-	for k, v := range s.services {
-		marshalDump(k)
-		marshalDump(v)
-	}
-	fmt.Println("====MESH SERVICES====")
-	for k, v := range s.meshServices {
-		marshalDump(k)
-		marshalDump(v)
-	}
-}
-
-func marshalDump(v interface{}) {
-	data, _ := json.MarshalIndent(v, "", "  ")
-	fmt.Println(string(data))
 }
 
 func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, ref gwv1beta1.SecretObjectReference) bool {

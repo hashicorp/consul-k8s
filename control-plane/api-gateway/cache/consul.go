@@ -5,7 +5,6 @@ package cache
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -270,9 +269,6 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	}
 
 	options := &api.WriteOptions{}
-
-	data, _ := json.MarshalIndent(entry, "", "  ")
-	c.logger.Info("writing config entry", "entry", string(data))
 
 	_, _, err = client.ConfigEntries().Set(entry, options.WithContext(ctx))
 	if err != nil {

@@ -50,12 +50,6 @@ func valueOr[T ~string](v *T, fallback string) string {
 	return string(*v)
 }
 
-// nilOrEqual checks if a string-like pointer is nil or if it is
-// equal to the value provided.
-func nilOrEqual[T ~string](v *T, check string) bool {
-	return v == nil || string(*v) == check
-}
-
 // objectToMeta returns the NamespacedName for the given object.
 func objectToMeta[T metav1.Object](object T) types.NamespacedName {
 	return types.NamespacedName{

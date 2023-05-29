@@ -5,8 +5,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -86,7 +84,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	marshalDump("GATEWAY", &gateway)
 
 	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
@@ -94,7 +91,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to get GatewayClass")
 		return ctrl.Result{}, err
 	}
-	marshalDump("GATEWAYCLASS", gatewayClass)
 
 	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
@@ -102,7 +98,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "error fetching the gateway class config")
 		return ctrl.Result{}, err
 	}
-	marshalDump("GATEWAYCLASSCONFIG", gatewayClassConfig)
 
 	// get all namespaces
 	namespaces, err := r.getNamespaces(ctx)
@@ -110,7 +105,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to list Namespaces")
 		return ctrl.Result{}, err
 	}
-	marshalDump("NAMESPACES", &namespaces)
 
 	// get all reference grants
 	grants, err := r.getReferenceGrants(ctx)
@@ -118,14 +112,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to list ReferenceGrants")
 		return ctrl.Result{}, err
 	}
-	marshalDump("REFERENCE GRANTS", &grants)
 
 	// get related gateway service
 	service, err := r.getDeployedGatewayService(ctx, req.NamespacedName)
 	if err != nil {
 		log.Error(err, "unable to fetch service for Gateway")
 	}
-	marshalDump("SERVICE", service)
 
 	// get related gateway pods
 	pods, err := r.getDeployedGatewayPods(ctx, gateway)
@@ -133,19 +125,16 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to list Pods for Gateway")
 		return ctrl.Result{}, err
 	}
-	marshalDump("PODS", &pods)
 
 	// construct our resource map
 	referenceValidator := binding.NewReferenceValidator(grants)
-	resources := apigateway.NewResourceMap(r.Translator, referenceValidator)
+	resources := apigateway.NewResourceMap(r.Translator, referenceValidator, log)
 
-	fmt.Println("FETCHING CERTIFICATES!!!!!")
 	if err := r.fetchCertificatesForGateway(ctx, resources, gateway); err != nil {
 		log.Error(err, "unable to fetch certificates for gateway")
 		return ctrl.Result{}, err
 	}
 
-	fmt.Println("FETCHING CONTROLLED GATEWAYS!!!!!")
 	if err := r.fetchControlledGateways(ctx, resources); err != nil {
 		log.Error(err, "unable to fetch controlled gateways")
 		return ctrl.Result{}, err
@@ -157,7 +146,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to list HTTPRoutes")
 		return ctrl.Result{}, err
 	}
-	marshalDump("HTTPROUTES", &httpRoutes)
 
 	// get all tcp routes referencing this gateway
 	tcpRoutes, err := r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
@@ -165,28 +153,18 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to list TCPRoutes")
 		return ctrl.Result{}, err
 	}
-	marshalDump("TCPROUTES", &tcpRoutes)
 
-	fmt.Println("FETCHING SERVICE RESOURCES!!!!!")
 	if err := r.fetchServicesForRoutes(ctx, resources, tcpRoutes, httpRoutes); err != nil {
 		log.Error(err, "unable to fetch services for routes")
 		return ctrl.Result{}, err
 	}
 
-	resources.DumpAll()
-
-	fmt.Println("GENERATING SNAPSHOT!!!!!")
 	// fetch all consul objects from cache
 	consulServices := r.getConsulServices(consulKey)
-	marshalDump("CONSUL SERVICES", &consulServices)
 	consulGateway := r.getConsulGateway(consulKey)
-	marshalDump("CONSUL GATEWAY", consulGateway)
 	consulHTTPRoutes := r.getConsulHTTPRoutes(consulKey, resources)
-	marshalDump("CONSUL HTTPROUTES", &consulHTTPRoutes)
 	consulTCPRoutes := r.getConsulTCPRoutes(consulKey, resources)
-	marshalDump("CONSUL TCPROUTES", &consulTCPRoutes)
 	consulInlineCertificates := r.getConsulInlineCertificates()
-	marshalDump("CONSUL CERTIFICATES", &consulInlineCertificates)
 
 	binder := binding.NewBinder(binding.BinderConfig{
 		Translator:               r.Translator,
@@ -207,12 +185,9 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		ConsulGatewayServices:    consulServices,
 	})
 
-	fmt.Println("GENERATING SNAPSHOT!!!!!")
 	updates := binder.Snapshot()
-	marshalDump("UPDATES!!!!!", &updates)
 
 	if updates.UpsertGatewayDeployment {
-		log.Info("updating gatekeeper")
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
 			log.Error(err, "unable to update gateway resources")
@@ -220,7 +195,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		r.gatewayCache.EnsureSubscribed(nonNormalizedConsulKey, req.NamespacedName)
 	} else {
-		log.Info("deleting gatekeeper")
 		err := r.deleteGatekeeperResources(ctx, log, &gateway)
 		if err != nil {
 			log.Error(err, "unable to delete gateway resources")
@@ -824,7 +798,6 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1beta1.Gateway) (*gwv1beta1.GatewayClass, error) {
 	var gatewayClass gwv1beta1.GatewayClass
 	if err := c.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
-		fmt.Println(err)
 		return nil, client.IgnoreNotFound(err)
 	}
 	return &gatewayClass, nil
@@ -872,7 +845,6 @@ func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, res
 	}
 
 	for key := range certificates.Iter() {
-		fmt.Println("FETCHING CERTIFICATE", key.(types.NamespacedName))
 		if err := c.fetchSecret(ctx, resources, key.(types.NamespacedName)); err != nil {
 			return err
 		}
@@ -884,7 +856,6 @@ func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, res
 func (c *GatewayController) fetchSecret(ctx context.Context, resources *apigateway.ResourceMap, key types.NamespacedName) error {
 	var secret corev1.Secret
 	if err := c.Client.Get(ctx, key, &secret); err != nil {
-		fmt.Println("FETCHING CERTIFICATE ERR", err)
 		return client.IgnoreNotFound(err)
 	}
 
@@ -1081,13 +1052,4 @@ func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
 	}
 
 	return false
-}
-
-func marshalDump[T any](message string, item *T) {
-	if item == nil {
-		fmt.Println(message, "is nil")
-		return
-	}
-	data, _ := json.MarshalIndent(item, "", "  ")
-	fmt.Println(message, string(data))
 }

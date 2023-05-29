@@ -4,8 +4,6 @@
 package binding
 
 import (
-	"fmt"
-
 	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,7 +58,6 @@ func (s *setter) setRouteConditionOnAllRefs(route client.Object, condition metav
 		return string(status.ControllerName) != s.controllerName
 	})
 
-	fmt.Println("SETTING", condition, "ON", statuses, "FROM", getRouteParentsStatus(route))
 	updated := false
 	for _, status := range statuses {
 		conditions, modified := setCondition(status.Conditions, condition)

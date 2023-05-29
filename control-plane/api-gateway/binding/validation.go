@@ -33,7 +33,7 @@ func validateRefs(route client.Object, refs []gwv1beta1.BackendRef, resources *a
 			Namespace: valueOr(backendRef.Namespace, namespace),
 		}
 
-		isServiceRef := nilOrEqual(backendRef.Group, "") && nilOrEqual(backendRef.Kind, "Service")
+		isServiceRef := apigateway.NilOrEqual(backendRef.Group, "") && apigateway.NilOrEqual(backendRef.Kind, "Service")
 		isMeshServiceRef := derefEqual(backendRef.Group, v1alpha1.ConsulHashicorpGroup) && derefEqual(backendRef.Kind, v1alpha1.MeshServiceKind)
 
 		if !isServiceRef && !isMeshServiceRef {
@@ -153,7 +153,7 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 
 	for _, cert := range tls.CertificateRefs {
 		// break on the first error
-		if !nilOrEqual(cert.Group, "") || !nilOrEqual(cert.Kind, "Secret") {
+		if !apigateway.NilOrEqual(cert.Group, "") || !apigateway.NilOrEqual(cert.Kind, "Secret") {
 			err = errListenerInvalidCertificateRef_NotSupported
 			break
 		}
@@ -306,7 +306,7 @@ func routeKindIsAllowedForListener(kinds []gwv1beta1.RouteGroupKind, gk schema.G
 	}
 
 	for _, kind := range kinds {
-		if string(kind.Kind) == gk.Kind && nilOrEqual(kind.Group, gk.Group) {
+		if string(kind.Kind) == gk.Kind && apigateway.NilOrEqual(kind.Group, gk.Group) {
 			return true
 		}
 	}
