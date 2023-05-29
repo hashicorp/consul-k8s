@@ -43,20 +43,20 @@ var (
 
 	apiHostSecretName = "apihost-sec-name"
 	apiHostSecretKey  = "apihost-sec-key"
-	// helloworldsvc.test.svc.cluster.local:9111
-	apiHostSecretKeyValue = "fake-server:8080" //TODO this will be the name of the test service
+	// helloworldsvc.test.svc.cluster.local:9111.
+	apiHostSecretKeyValue = "fake-server:8080" //TODO this will be the name of the test service.
 
 	authUrlSecretName     = "authurl-sec-name"
 	authUrlSecretKey      = "authurl-sec-key"
-	authUrlSecretKeyValue = "https://fake-server:443" //TODO this will be the name of the test service
+	authUrlSecretKeyValue = "https://fake-server:443" //TODO this will be the name of the test service.
 
 	scadaAddressSecretName     = "scadaaddress-sec-name"
 	scadaAddressSecretKey      = "scadaaddress-sec-key"
-	scadaAddressSecretKeyValue = "fake-server:8080" //TODO this will be the name of the test service
+	scadaAddressSecretKeyValue = "fake-server:8080" //TODO this will be the name of the test service.
 
 )
 
-// The fake-server has a requestToken endpoint to retrieve the token
+// The fake-server has a requestToken endpoint to retrieve the token.
 func requestToken(endpoint string) (string, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
