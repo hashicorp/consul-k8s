@@ -21,7 +21,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: JWTProvider is the Schema for the jwtproviders API
+        description: JWTProvider is the Schema for the jwtproviders API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
