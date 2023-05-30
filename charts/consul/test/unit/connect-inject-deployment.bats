@@ -211,6 +211,19 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: metrics.enableTelemetryCollector can be configured" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.metrics.enableTelemetryCollector=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-enable-telemetry-collector=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
 #--------------------------------------------------------------------
 # consul and consul-dataplane images
 
