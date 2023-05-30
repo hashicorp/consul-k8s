@@ -34,8 +34,9 @@ func init() {
 }
 
 const (
-	testGatewayClassName = "gateway-class"
-	testControllerName   = "test-controller"
+	testGatewayClassName                    = "gateway-class"
+	testControllerName                      = "test-controller"
+	routeListenerReferenceGrantErrorMessage = `http-listener-allowed-selector: reference not permitted due to lack of ReferenceGrant; http-listener-default-same: reference not permitted due to lack of ReferenceGrant; http-listener-explicit-all-allowed: reference not permitted due to lack of ReferenceGrant; http-listener-explicit-allowed-same: reference not permitted due to lack of ReferenceGrant; http-listener-hostname: reference not permitted due to lack of ReferenceGrant; http-listener-mismatched-kind-allowed: reference not permitted due to lack of ReferenceGrant; http-listener-tls: reference not permitted due to lack of ReferenceGrant; tcp-listener-allowed-selector: reference not permitted due to lack of ReferenceGrant; tcp-listener-default-same: reference not permitted due to lack of ReferenceGrant; tcp-listener-explicit-all-allowed: reference not permitted due to lack of ReferenceGrant; tcp-listener-explicit-allowed-same: reference not permitted due to lack of ReferenceGrant; tcp-listener-mismatched-kind-allowed: reference not permitted due to lack of ReferenceGrant; tcp-listener-tls: reference not permitted due to lack of ReferenceGrant`
 )
 
 var (
@@ -273,6 +274,10 @@ func TestBinder_Lifecycle(t *testing.T) {
 				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
 				HTTPRoutes: []gwv1beta1.HTTPRoute{
 					{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "HTTPRoute",
+							APIVersion: "gateway.networking.k8s.io/v1beta1",
+						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "route",
 						},
@@ -394,6 +399,10 @@ func TestBinder_Lifecycle(t *testing.T) {
 				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
 				TCPRoutes: []gwv1alpha2.TCPRoute{
 					{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "TCPRoute",
+							APIVersion: "gateway.networking.k8s.io/v1beta1",
+						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "route",
 						},
@@ -651,6 +660,10 @@ func TestBinder_Lifecycle(t *testing.T) {
 			},
 			expectedUpdates: []client.Object{
 				&gwv1beta1.HTTPRoute{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "HTTPRoute",
+						APIVersion: "gateway.networking.k8s.io/v1beta1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "http-route-one",
 						// removing a finalizer
@@ -666,6 +679,10 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Status: gwv1beta1.HTTPRouteStatus{RouteStatus: gwv1beta1.RouteStatus{Parents: []gwv1alpha2.RouteParentStatus{}}},
 				},
 				&gwv1alpha2.TCPRoute{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "TCPRoute",
+						APIVersion: "gateway.networking.k8s.io/v1beta1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "tcp-route-one",
 						Finalizers: []string{},
@@ -860,1581 +877,1439 @@ func TestBinder_Registrations(t *testing.T) {
 	}
 }
 
-// func TestBinder_BindingRulesKitchenSink(t *testing.T) {
-// 	t.Parallel()
+func TestBinder_BindingRulesKitchenSink(t *testing.T) {
+	t.Parallel()
 
-// 	className := "gateway-class"
-// 	gatewayClassName := gwv1beta1.ObjectName(className)
-// 	controllerName := "test-controller"
-// 	gatewayClass := &gwv1beta1.GatewayClass{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name: className,
-// 		},
-// 		Spec: gwv1beta1.GatewayClassSpec{
-// 			ControllerName: gwv1beta1.GatewayController(controllerName),
-// 		},
-// 	}
+	gateway := gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+		Listeners: []gwv1beta1.Listener{{
+			Name:     "http-listener-default-same",
+			Protocol: gwv1beta1.HTTPProtocolType,
+		}, {
+			Name:     "http-listener-hostname",
+			Protocol: gwv1beta1.HTTPProtocolType,
+			Hostname: common.PointerTo[gwv1beta1.Hostname]("host.name"),
+		}, {
+			Name:     "http-listener-mismatched-kind-allowed",
+			Protocol: gwv1beta1.HTTPProtocolType,
+			AllowedRoutes: &gwv1beta1.AllowedRoutes{
+				Kinds: []gwv1beta1.RouteGroupKind{{
+					Kind: "Foo",
+				}},
+			},
+		}, {
+			Name:     "http-listener-explicit-all-allowed",
+			Protocol: gwv1beta1.HTTPProtocolType,
+			AllowedRoutes: &gwv1beta1.AllowedRoutes{
+				Namespaces: &gwv1beta1.RouteNamespaces{
+					From: common.PointerTo(gwv1beta1.NamespacesFromAll),
+				},
+			},
+		}, {
+			Name:     "http-listener-explicit-allowed-same",
+			Protocol: gwv1beta1.HTTPProtocolType,
+			AllowedRoutes: &gwv1beta1.AllowedRoutes{
+				Namespaces: &gwv1beta1.RouteNamespaces{
+					From: common.PointerTo(gwv1beta1.NamespacesFromSame),
+				},
+			},
+		}, {
+			Name:     "http-listener-allowed-selector",
+			Protocol: gwv1beta1.HTTPProtocolType,
+			AllowedRoutes: &gwv1beta1.AllowedRoutes{
+				Namespaces: &gwv1beta1.RouteNamespaces{
+					From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "foo",
+						},
+					},
+				},
+			},
+		}, {
+			Name:     "http-listener-tls",
+			Protocol: gwv1beta1.HTTPSProtocolType,
+			TLS: &gwv1beta1.GatewayTLSConfig{
+				CertificateRefs: []gwv1beta1.SecretObjectReference{{
+					Name: "secret-one",
+				}},
+			},
+		}, {
+			Name:     "tcp-listener-default-same",
+			Protocol: gwv1beta1.TCPProtocolType,
+		}, {
+			Name:     "tcp-listener-mismatched-kind-allowed",
+			Protocol: gwv1beta1.TCPProtocolType,
+			AllowedRoutes: &gwv1beta1.AllowedRoutes{
+				Kinds: []gwv1beta1.RouteGroupKind{{
+					Kind: "Foo",
+				}},
+			},
+		}, {
+			Name:     "tcp-listener-explicit-all-allowed",
+			Protocol: gwv1beta1.TCPProtocolType,
+			AllowedRoutes: &gwv1beta1.AllowedRoutes{
+				Namespaces: &gwv1beta1.RouteNamespaces{
+					From: common.PointerTo(gwv1beta1.NamespacesFromAll),
+				},
+			},
+		}, {
+			Name:     "tcp-listener-explicit-allowed-same",
+			Protocol: gwv1beta1.TCPProtocolType,
+			AllowedRoutes: &gwv1beta1.AllowedRoutes{
+				Namespaces: &gwv1beta1.RouteNamespaces{
+					From: common.PointerTo(gwv1beta1.NamespacesFromSame),
+				},
+			},
+		}, {
+			Name:     "tcp-listener-allowed-selector",
+			Protocol: gwv1beta1.TCPProtocolType,
+			AllowedRoutes: &gwv1beta1.AllowedRoutes{
+				Namespaces: &gwv1beta1.RouteNamespaces{
+					From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "foo",
+						},
+					},
+				},
+			},
+		}, {
+			Name:     "tcp-listener-tls",
+			Protocol: gwv1beta1.TCPProtocolType,
+			TLS: &gwv1beta1.GatewayTLSConfig{
+				CertificateRefs: []gwv1beta1.SecretObjectReference{{
+					Name: "secret-one",
+				}},
+			},
+		}},
+	})
 
-// 	gateway := gwv1beta1.Gateway{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:       "gateway",
-// 			Finalizers: []string{common.GatewayFinalizer},
-// 		},
-// 		Spec: gwv1beta1.GatewaySpec{
-// 			GatewayClassName: gatewayClassName,
-// 			Listeners: []gwv1beta1.Listener{{
-// 				Name:     "http-listener-default-same",
-// 				Protocol: gwv1beta1.HTTPProtocolType,
-// 			}, {
-// 				Name:     "http-listener-hostname",
-// 				Protocol: gwv1beta1.HTTPProtocolType,
-// 				Hostname: common.PointerTo[gwv1beta1.Hostname]("host.name"),
-// 			}, {
-// 				Name:     "http-listener-mismatched-kind-allowed",
-// 				Protocol: gwv1beta1.HTTPProtocolType,
-// 				AllowedRoutes: &gwv1beta1.AllowedRoutes{
-// 					Kinds: []gwv1beta1.RouteGroupKind{{
-// 						Kind: "Foo",
-// 					}},
-// 				},
-// 			}, {
-// 				Name:     "http-listener-explicit-all-allowed",
-// 				Protocol: gwv1beta1.HTTPProtocolType,
-// 				AllowedRoutes: &gwv1beta1.AllowedRoutes{
-// 					Namespaces: &gwv1beta1.RouteNamespaces{
-// 						From: common.PointerTo(gwv1beta1.NamespacesFromAll),
-// 					},
-// 				},
-// 			}, {
-// 				Name:     "http-listener-explicit-allowed-same",
-// 				Protocol: gwv1beta1.HTTPProtocolType,
-// 				AllowedRoutes: &gwv1beta1.AllowedRoutes{
-// 					Namespaces: &gwv1beta1.RouteNamespaces{
-// 						From: common.PointerTo(gwv1beta1.NamespacesFromSame),
-// 					},
-// 				},
-// 			}, {
-// 				Name:     "http-listener-allowed-selector",
-// 				Protocol: gwv1beta1.HTTPProtocolType,
-// 				AllowedRoutes: &gwv1beta1.AllowedRoutes{
-// 					Namespaces: &gwv1beta1.RouteNamespaces{
-// 						From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
-// 						Selector: &metav1.LabelSelector{
-// 							MatchLabels: map[string]string{
-// 								"test": "foo",
-// 							},
-// 						},
-// 					},
-// 				},
-// 			}, {
-// 				Name:     "http-listener-tls",
-// 				Protocol: gwv1beta1.HTTPSProtocolType,
-// 				TLS: &gwv1beta1.GatewayTLSConfig{
-// 					CertificateRefs: []gwv1beta1.SecretObjectReference{{
-// 						Name: "secret-one",
-// 					}},
-// 				},
-// 			}, {
-// 				Name:     "tcp-listener-default-same",
-// 				Protocol: gwv1beta1.TCPProtocolType,
-// 			}, {
-// 				Name:     "tcp-listener-mismatched-kind-allowed",
-// 				Protocol: gwv1beta1.TCPProtocolType,
-// 				AllowedRoutes: &gwv1beta1.AllowedRoutes{
-// 					Kinds: []gwv1beta1.RouteGroupKind{{
-// 						Kind: "Foo",
-// 					}},
-// 				},
-// 			}, {
-// 				Name:     "tcp-listener-explicit-all-allowed",
-// 				Protocol: gwv1beta1.TCPProtocolType,
-// 				AllowedRoutes: &gwv1beta1.AllowedRoutes{
-// 					Namespaces: &gwv1beta1.RouteNamespaces{
-// 						From: common.PointerTo(gwv1beta1.NamespacesFromAll),
-// 					},
-// 				},
-// 			}, {
-// 				Name:     "tcp-listener-explicit-allowed-same",
-// 				Protocol: gwv1beta1.TCPProtocolType,
-// 				AllowedRoutes: &gwv1beta1.AllowedRoutes{
-// 					Namespaces: &gwv1beta1.RouteNamespaces{
-// 						From: common.PointerTo(gwv1beta1.NamespacesFromSame),
-// 					},
-// 				},
-// 			}, {
-// 				Name:     "tcp-listener-allowed-selector",
-// 				Protocol: gwv1beta1.TCPProtocolType,
-// 				AllowedRoutes: &gwv1beta1.AllowedRoutes{
-// 					Namespaces: &gwv1beta1.RouteNamespaces{
-// 						From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
-// 						Selector: &metav1.LabelSelector{
-// 							MatchLabels: map[string]string{
-// 								"test": "foo",
-// 							},
-// 						},
-// 					},
-// 				},
-// 			}, {
-// 				Name:     "tcp-listener-tls",
-// 				Protocol: gwv1beta1.TCPProtocolType,
-// 				TLS: &gwv1beta1.GatewayTLSConfig{
-// 					CertificateRefs: []gwv1beta1.SecretObjectReference{{
-// 						Name: "secret-one",
-// 					}},
-// 				},
-// 			}},
-// 		},
-// 	}
+	namespaces := map[string]corev1.Namespace{
+		"default": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "default",
+			},
+		},
+		"test": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+				Labels: map[string]string{
+					"test": "foo",
+				},
+			},
+		},
+	}
 
-// 	namespaces := map[string]corev1.Namespace{
-// 		"": {
-// 			ObjectMeta: metav1.ObjectMeta{
-// 				Name: "",
-// 			},
-// 		},
-// 		"test": {
-// 			ObjectMeta: metav1.ObjectMeta{
-// 				Name: "test",
-// 				Labels: map[string]string{
-// 					"test": "foo",
-// 				},
-// 			},
-// 		},
-// 	}
+	_, secretOne := generateTestCertificate(t, "", "secret-one")
 
-// 	defaultNamespacePointer := common.PointerTo[gwv1beta1.Namespace]("")
+	gateway.Namespace = "default"
+	defaultNamespacePointer := common.PointerTo[gwv1beta1.Namespace]("default")
 
-// 	httpTypeMeta := metav1.TypeMeta{}
-// 	httpTypeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("HTTPRoute"))
-// 	tcpTypeMeta := metav1.TypeMeta{}
-// 	tcpTypeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("TCPRoute"))
+	for name, tt := range map[string]struct {
+		httpRoute             *gwv1beta1.HTTPRoute
+		tcpRoute              *gwv1alpha2.TCPRoute
+		referenceGrants       []gwv1beta1.ReferenceGrant
+		expectedStatusUpdates []client.Object
+	}{
+		"untargeted http route same namespace": {
+			httpRoute: testHTTPRouteBackends("route", "default", nil, []gwv1beta1.ParentReference{
+				{Name: "gateway"},
+			}),
+			expectedStatusUpdates: []client.Object{
+				testHTTPRouteStatusBackends("route", "default", nil, []gwv1beta1.RouteParentStatus{
+					{ControllerName: testControllerName, ParentRef: gwv1beta1.ParentReference{Name: "gateway"}, Conditions: []metav1.Condition{
+						{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						},
+						{
+							Type:    "Accepted",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
+						},
+					}},
+				}),
+			},
+		},
+		"untargeted http route same namespace missing backend": {
+			httpRoute: testHTTPRouteBackends("route", "default", []gwv1beta1.BackendObjectReference{
+				{Name: gwv1beta1.ObjectName("backend")},
+			}, []gwv1beta1.ParentReference{
+				{Name: "gateway"},
+			}),
+			expectedStatusUpdates: []client.Object{
+				testHTTPRouteStatusBackends("route", "default", []gwv1beta1.BackendObjectReference{
+					{Name: gwv1beta1.ObjectName("backend")},
+				}, []gwv1beta1.RouteParentStatus{
+					{ControllerName: testControllerName, ParentRef: gwv1beta1.ParentReference{Name: "gateway"}, Conditions: []metav1.Condition{
+						{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionFalse,
+							Reason:  "BackendNotFound",
+							Message: "default/backend: backend not found",
+						},
+						{
+							Type:    "Accepted",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
+						},
+					}},
+				}),
+			},
+		},
+		"untargeted http route same namespace invalid backend type": {
+			httpRoute: testHTTPRouteBackends("route", "default", []gwv1beta1.BackendObjectReference{
+				{
+					Name:  gwv1beta1.ObjectName("backend"),
+					Group: common.PointerTo[gwv1beta1.Group]("invalid.foo.com"),
+				},
+			}, []gwv1beta1.ParentReference{
+				{Name: "gateway"},
+			}),
+			expectedStatusUpdates: []client.Object{
+				testHTTPRouteStatusBackends("route", "default", []gwv1beta1.BackendObjectReference{
+					{
+						Name:  gwv1beta1.ObjectName("backend"),
+						Group: common.PointerTo[gwv1beta1.Group]("invalid.foo.com"),
+					},
+				}, []gwv1beta1.RouteParentStatus{
+					{ControllerName: testControllerName, ParentRef: gwv1beta1.ParentReference{Name: "gateway"}, Conditions: []metav1.Condition{
+						{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionFalse,
+							Reason:  "InvalidKind",
+							Message: "default/backend [Service.invalid.foo.com]: invalid backend kind",
+						},
+						{
+							Type:    "Accepted",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
+						},
+					}},
+				}),
+			},
+		},
+		"untargeted http route different namespace": {
+			httpRoute: testHTTPRouteBackends("route", "other", nil, []gwv1beta1.ParentReference{
+				{
+					Name:      "gateway",
+					Namespace: defaultNamespacePointer,
+				},
+			}),
+			expectedStatusUpdates: []client.Object{
+				testHTTPRouteStatusBackends("route", "other", nil, []gwv1beta1.RouteParentStatus{
+					{ControllerName: testControllerName, ParentRef: gwv1beta1.ParentReference{
+						Name:      "gateway",
+						Namespace: defaultNamespacePointer,
+					}, Conditions: []metav1.Condition{
+						{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionFalse,
+							Reason:  "NotAllowedByListeners",
+							Message: routeListenerReferenceGrantErrorMessage,
+						},
+					}},
+				}),
+			},
+		},
+		"untargeted http route different namespace and reference grants": {
+			httpRoute: testHTTPRouteBackends("route", "other", nil, []gwv1beta1.ParentReference{
+				{
+					Name:      "gateway",
+					Namespace: defaultNamespacePointer,
+				},
+			}),
+			referenceGrants: []gwv1beta1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
+					From: []gwv1beta1.ReferenceGrantFrom{
+						{Group: gwv1beta1.GroupName, Kind: "HTTPRoute", Namespace: gwv1beta1.Namespace("other")},
+					},
+					To: []gwv1beta1.ReferenceGrantTo{
+						{Group: gwv1beta1.GroupName, Kind: "Gateway"},
+					},
+				}},
+			},
+			expectedStatusUpdates: []client.Object{
+				testHTTPRouteStatusBackends("route", "other", nil, []gwv1beta1.RouteParentStatus{
+					{ControllerName: testControllerName, ParentRef: gwv1beta1.ParentReference{
+						Name:      "gateway",
+						Namespace: defaultNamespacePointer,
+					}, Conditions: []metav1.Condition{
+						{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
+						},
+					}},
+				}),
+			},
+		},
+		"targeted http route same namespace": {
+			httpRoute: testHTTPRouteBackends("route", "default", nil, []gwv1beta1.ParentReference{
+				{
+					Name:        "gateway",
+					SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
+				}, {
+					Name:        "gateway",
+					SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
+				}, {
+					Name:        "gateway",
+					SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
+				}, {
+					Name:        "gateway",
+					SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+				}, {
+					Name:        "gateway",
+					SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
+				}, {
+					Name:        "gateway",
+					SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
+				}, {
+					Name:        "gateway",
+					SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
+				}, {
+					Name:        "gateway",
+					SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+				},
+			}),
+			expectedStatusUpdates: []client.Object{
+				testHTTPRouteStatusBackends("route", "default", nil, []gwv1beta1.RouteParentStatus{
+					{
+						ControllerName: testControllerName,
+						ParentRef: gwv1beta1.ParentReference{
+							Name:        "gateway",
+							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
+						},
+						Conditions: []metav1.Condition{{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
+						}},
+					}, {
+						ControllerName: testControllerName,
+						ParentRef: gwv1beta1.ParentReference{
+							Name:        "gateway",
+							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
+						},
+						Conditions: []metav1.Condition{{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
+						}},
+					}, {
+						ControllerName: testControllerName,
+						ParentRef: gwv1beta1.ParentReference{
+							Name:        "gateway",
+							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
+						},
+						Conditions: []metav1.Condition{{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionFalse,
+							Reason:  "NotAllowedByListeners",
+							Message: "http-listener-mismatched-kind-allowed: listener does not support route protocol",
+						}},
+					}, {
+						ControllerName: testControllerName,
+						ParentRef: gwv1beta1.ParentReference{
+							Name:        "gateway",
+							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+						},
+						Conditions: []metav1.Condition{{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
+						}},
+					}, {
+						ControllerName: testControllerName,
+						ParentRef: gwv1beta1.ParentReference{
+							Name:        "gateway",
+							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
+						},
+						Conditions: []metav1.Condition{{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
+						}},
+					}, {
+						ControllerName: testControllerName,
+						ParentRef: gwv1beta1.ParentReference{
+							Name:        "gateway",
+							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
+						},
+						Conditions: []metav1.Condition{{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionFalse,
+							Reason:  "NotAllowedByListeners",
+							Message: "http-listener-allowed-selector: listener does not allow binding routes from the given namespace",
+						}},
+					}, {
+						ControllerName: testControllerName,
+						ParentRef: gwv1beta1.ParentReference{
+							Name:        "gateway",
+							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
+						},
+						Conditions: []metav1.Condition{{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
+						}},
+					}, {
+						ControllerName: testControllerName,
+						ParentRef: gwv1beta1.ParentReference{
+							Name:        "gateway",
+							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+						},
+						Conditions: []metav1.Condition{{
+							Type:    "ResolvedRefs",
+							Status:  metav1.ConditionTrue,
+							Reason:  "ResolvedRefs",
+							Message: "resolved backend references",
+						}, {
+							Type:    "Accepted",
+							Status:  metav1.ConditionFalse,
+							Reason:  "NotAllowedByListeners",
+							Message: "tcp-listener-explicit-all-allowed: listener does not support route protocol",
+						}},
+					},
+				}),
+			},
+		},
+		// 			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
+		// 				TypeMeta: httpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1beta1.HTTPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 						}},
+		// 					},
+		// 				},
+		// 				Status: gwv1beta1.HTTPRouteStatus{
+		// 					RouteStatus: gwv1beta1.RouteStatus{
+		// 						Parents: []gwv1beta1.RouteParentStatus{
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 		"targeted http route different namespace": {
+		// 			httpRoute: &gwv1beta1.HTTPRoute{
+		// 				TypeMeta: httpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Namespace:  "test",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1beta1.HTTPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
+		// 				TypeMeta: httpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Namespace:  "test",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1beta1.HTTPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 						}},
+		// 					},
+		// 				},
+		// 				Status: gwv1beta1.HTTPRouteStatus{
+		// 					RouteStatus: gwv1beta1.RouteStatus{
+		// 						Parents: []gwv1beta1.RouteParentStatus{{
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "http-listener-default-same: listener does not allow binding routes from the given namespace",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "http-listener-hostname: listener does not allow binding routes from the given namespace",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "http-listener-mismatched-kind-allowed: listener does not support route protocol",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "http-listener-explicit-allowed-same: listener does not allow binding routes from the given namespace",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "http-listener-tls: listener does not allow binding routes from the given namespace",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "tcp-listener-explicit-all-allowed: listener does not support route protocol",
+		// 							}},
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 		"untargeted tcp route same namespace": {
+		// 			tcpRoute: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name: "gateway",
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name: "gateway",
+		// 						}},
+		// 					},
+		// 				},
+		// 				Status: gwv1alpha2.TCPRouteStatus{
+		// 					RouteStatus: gwv1beta1.RouteStatus{
+		// 						Parents: []gwv1beta1.RouteParentStatus{{
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name: "gateway",
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 		"untargeted tcp route same namespace missing backend": {
+		// 			tcpRoute: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name: "gateway",
+		// 						}},
+		// 					},
+		// 					Rules: []gwv1alpha2.TCPRouteRule{{
+		// 						BackendRefs: []gwv1beta1.BackendRef{{
+		// 							BackendObjectReference: gwv1beta1.BackendObjectReference{
+		// 								Name: gwv1beta1.ObjectName("backend"),
+		// 							},
+		// 						}},
+		// 					}},
+		// 				},
+		// 			},
+		// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name: "gateway",
+		// 						}},
+		// 					},
+		// 					Rules: []gwv1alpha2.TCPRouteRule{{
+		// 						BackendRefs: []gwv1beta1.BackendRef{{
+		// 							BackendObjectReference: gwv1beta1.BackendObjectReference{
+		// 								Name: gwv1beta1.ObjectName("backend"),
+		// 							},
+		// 						}},
+		// 					}},
+		// 				},
+		// 				Status: gwv1alpha2.TCPRouteStatus{
+		// 					RouteStatus: gwv1beta1.RouteStatus{
+		// 						Parents: []gwv1beta1.RouteParentStatus{{
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name: "gateway",
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "BackendNotFound",
+		// 								Message: "/backend: backend not found",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 		"untargeted tcp route same namespace invalid backend type": {
+		// 			tcpRoute: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name: "gateway",
+		// 						}},
+		// 					},
+		// 					Rules: []gwv1alpha2.TCPRouteRule{{
+		// 						BackendRefs: []gwv1beta1.BackendRef{{
+		// 							BackendObjectReference: gwv1beta1.BackendObjectReference{
+		// 								Name:  gwv1beta1.ObjectName("backend"),
+		// 								Group: common.PointerTo[gwv1beta1.Group]("invalid.foo.com"),
+		// 							},
+		// 						}},
+		// 					}},
+		// 				},
+		// 			},
+		// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name: "gateway",
+		// 						}},
+		// 					},
+		// 					Rules: []gwv1alpha2.TCPRouteRule{{
+		// 						BackendRefs: []gwv1beta1.BackendRef{{
+		// 							BackendObjectReference: gwv1beta1.BackendObjectReference{
+		// 								Name:  gwv1beta1.ObjectName("backend"),
+		// 								Group: common.PointerTo[gwv1beta1.Group]("invalid.foo.com"),
+		// 							},
+		// 						}},
+		// 					}},
+		// 				},
+		// 				Status: gwv1alpha2.TCPRouteStatus{
+		// 					RouteStatus: gwv1beta1.RouteStatus{
+		// 						Parents: []gwv1beta1.RouteParentStatus{{
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name: "gateway",
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "InvalidKind",
+		// 								Message: "/backend [Service.invalid.foo.com]: invalid backend kind",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 		"untargeted tcp route different namespace": {
+		// 			tcpRoute: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Namespace:  "test",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name:      "gateway",
+		// 							Namespace: defaultNamespacePointer,
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Namespace:  "test",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name:      "gateway",
+		// 							Namespace: defaultNamespacePointer,
+		// 						}},
+		// 					},
+		// 				},
+		// 				Status: gwv1alpha2.TCPRouteStatus{
+		// 					RouteStatus: gwv1beta1.RouteStatus{
+		// 						Parents: []gwv1beta1.RouteParentStatus{{
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:      "gateway",
+		// 								Namespace: defaultNamespacePointer,
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 		"targeted tcp route same namespace": {
+		// 			tcpRoute: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 						}},
+		// 					},
+		// 				},
+		// 				Status: gwv1alpha2.TCPRouteStatus{
+		// 					RouteStatus: gwv1beta1.RouteStatus{
+		// 						Parents: []gwv1beta1.RouteParentStatus{{
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "tcp-listener-mismatched-kind-allowed: listener does not support route protocol",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "tcp-listener-allowed-selector: listener does not allow binding routes from the given namespace",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "http-listener-explicit-all-allowed: listener does not support route protocol",
+		// 							}},
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 		"targeted tcp route different namespace": {
+		// 			tcpRoute: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Namespace:  "test",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
+		// 				TypeMeta: tcpTypeMeta,
+		// 				ObjectMeta: metav1.ObjectMeta{
+		// 					Name:       "route",
+		// 					Namespace:  "test",
+		// 					Finalizers: []string{common.GatewayFinalizer},
+		// 				},
+		// 				Spec: gwv1alpha2.TCPRouteSpec{
+		// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+		// 						ParentRefs: []gwv1beta1.ParentReference{{
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
+		// 						}, {
+		// 							Name:        "gateway",
+		// 							Namespace:   defaultNamespacePointer,
+		// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 						}},
+		// 					},
+		// 				},
+		// 				Status: gwv1alpha2.TCPRouteStatus{
+		// 					RouteStatus: gwv1beta1.RouteStatus{
+		// 						Parents: []gwv1beta1.RouteParentStatus{{
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "tcp-listener-default-same: listener does not allow binding routes from the given namespace",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "tcp-listener-mismatched-kind-allowed: listener does not support route protocol",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "tcp-listener-explicit-allowed-same: listener does not allow binding routes from the given namespace",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "Accepted",
+		// 								Message: "route accepted",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "tcp-listener-tls: listener does not allow binding routes from the given namespace",
+		// 							}},
+		// 						}, {
+		// 							ControllerName: gatewayClass.Spec.ControllerName,
+		// 							ParentRef: gwv1beta1.ParentReference{
+		// 								Name:        "gateway",
+		// 								Namespace:   defaultNamespacePointer,
+		// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
+		// 							},
+		// 							Conditions: []metav1.Condition{{
+		// 								Type:    "ResolvedRefs",
+		// 								Status:  metav1.ConditionTrue,
+		// 								Reason:  "ResolvedRefs",
+		// 								Message: "resolved backend references",
+		// 							}, {
+		// 								Type:    "Accepted",
+		// 								Status:  metav1.ConditionFalse,
+		// 								Reason:  "NotAllowedByListeners",
+		// 								Message: "http-listener-explicit-all-allowed: listener does not support route protocol",
+		// 							}},
+		// 						}},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			g := *addClassConfig(gateway)
 
-// 	for name, tt := range map[string]struct {
-// 		httpRoute                     *gwv1beta1.HTTPRoute
-// 		expectedHTTPRouteUpdate       *gwv1beta1.HTTPRoute
-// 		expectedHTTPRouteUpdateStatus *gwv1beta1.HTTPRoute
-// 		expectedHTTPConsulRouteUpdate *api.HTTPRouteConfigEntry
-// 		expectedHTTPConsulRouteDelete *api.ResourceReference
+			resources := resourceMapResources{
+				gateways: []gwv1beta1.Gateway{g},
+				secrets: []corev1.Secret{
+					secretOne,
+				},
+				grants: tt.referenceGrants,
+			}
 
-// 		tcpRoute                     *gwv1alpha2.TCPRoute
-// 		expectedTCPRouteUpdate       *gwv1alpha2.TCPRoute
-// 		expectedTCPRouteUpdateStatus *gwv1alpha2.TCPRoute
-// 		expectedTCPConsulRouteUpdate *api.TCPRouteConfigEntry
-// 		expectedTCPConsulRouteDelete *api.ResourceReference
-// 	}{
-// 		"untargeted http route same namespace": {
-// 			httpRoute: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 				},
-// 			},
-// 			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 				},
-// 				Status: gwv1beta1.HTTPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name: "gateway",
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"untargeted http route same namespace missing backend": {
-// 			httpRoute: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 					Rules: []gwv1beta1.HTTPRouteRule{{
-// 						BackendRefs: []gwv1beta1.HTTPBackendRef{{
-// 							BackendRef: gwv1beta1.BackendRef{
-// 								BackendObjectReference: gwv1beta1.BackendObjectReference{
-// 									Name: gwv1beta1.ObjectName("backend"),
-// 								},
-// 							},
-// 						}},
-// 					}},
-// 				},
-// 			},
-// 			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 					Rules: []gwv1beta1.HTTPRouteRule{{
-// 						BackendRefs: []gwv1beta1.HTTPBackendRef{{
-// 							BackendRef: gwv1beta1.BackendRef{
-// 								BackendObjectReference: gwv1beta1.BackendObjectReference{
-// 									Name: gwv1beta1.ObjectName("backend"),
-// 								},
-// 							},
-// 						}},
-// 					}},
-// 				},
-// 				Status: gwv1beta1.HTTPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name: "gateway",
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "BackendNotFound",
-// 								Message: "/backend: backend not found",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"untargeted http route same namespace invalid backend type": {
-// 			httpRoute: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 					Rules: []gwv1beta1.HTTPRouteRule{{
-// 						BackendRefs: []gwv1beta1.HTTPBackendRef{{
-// 							BackendRef: gwv1beta1.BackendRef{
-// 								BackendObjectReference: gwv1beta1.BackendObjectReference{
-// 									Name:  gwv1beta1.ObjectName("backend"),
-// 									Group: common.PointerTo[gwv1beta1.Group]("invalid.foo.com"),
-// 								},
-// 							},
-// 						}},
-// 					}},
-// 				},
-// 			},
-// 			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 					Rules: []gwv1beta1.HTTPRouteRule{{
-// 						BackendRefs: []gwv1beta1.HTTPBackendRef{{
-// 							BackendRef: gwv1beta1.BackendRef{
-// 								BackendObjectReference: gwv1beta1.BackendObjectReference{
-// 									Name:  gwv1beta1.ObjectName("backend"),
-// 									Group: common.PointerTo[gwv1beta1.Group]("invalid.foo.com"),
-// 								},
-// 							},
-// 						}},
-// 					}},
-// 				},
-// 				Status: gwv1beta1.HTTPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name: "gateway",
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "InvalidKind",
-// 								Message: "/backend [Service.invalid.foo.com]: invalid backend kind",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"untargeted http route different namespace": {
-// 			httpRoute: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Namespace:  "test",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:      "gateway",
-// 							Namespace: defaultNamespacePointer,
-// 						}},
-// 					},
-// 				},
-// 			},
-// 			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Namespace:  "test",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:      "gateway",
-// 							Namespace: defaultNamespacePointer,
-// 						}},
-// 					},
-// 				},
-// 				Status: gwv1beta1.HTTPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:      "gateway",
-// 								Namespace: defaultNamespacePointer,
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"targeted http route same namespace": {
-// 			httpRoute: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 						}},
-// 					},
-// 				},
-// 			},
-// 			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 						}},
-// 					},
-// 				},
-// 				Status: gwv1beta1.HTTPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "http-listener-mismatched-kind-allowed: listener does not support route protocol",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "http-listener-allowed-selector: listener does not allow binding routes from the given namespace",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "tcp-listener-explicit-all-allowed: listener does not support route protocol",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"targeted http route different namespace": {
-// 			httpRoute: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Namespace:  "test",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 						}},
-// 					},
-// 				},
-// 			},
-// 			expectedHTTPRouteUpdateStatus: &gwv1beta1.HTTPRoute{
-// 				TypeMeta: httpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Namespace:  "test",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1beta1.HTTPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 						}},
-// 					},
-// 				},
-// 				Status: gwv1beta1.HTTPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-default-same"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "http-listener-default-same: listener does not allow binding routes from the given namespace",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-hostname"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "http-listener-hostname: listener does not allow binding routes from the given namespace",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-mismatched-kind-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "http-listener-mismatched-kind-allowed: listener does not support route protocol",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-allowed-same"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "http-listener-explicit-allowed-same: listener does not allow binding routes from the given namespace",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-allowed-selector"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-tls"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "http-listener-tls: listener does not allow binding routes from the given namespace",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "tcp-listener-explicit-all-allowed: listener does not support route protocol",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"untargeted tcp route same namespace": {
-// 			tcpRoute: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 				},
-// 			},
-// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 				},
-// 				Status: gwv1alpha2.TCPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name: "gateway",
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"untargeted tcp route same namespace missing backend": {
-// 			tcpRoute: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 					Rules: []gwv1alpha2.TCPRouteRule{{
-// 						BackendRefs: []gwv1beta1.BackendRef{{
-// 							BackendObjectReference: gwv1beta1.BackendObjectReference{
-// 								Name: gwv1beta1.ObjectName("backend"),
-// 							},
-// 						}},
-// 					}},
-// 				},
-// 			},
-// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 					Rules: []gwv1alpha2.TCPRouteRule{{
-// 						BackendRefs: []gwv1beta1.BackendRef{{
-// 							BackendObjectReference: gwv1beta1.BackendObjectReference{
-// 								Name: gwv1beta1.ObjectName("backend"),
-// 							},
-// 						}},
-// 					}},
-// 				},
-// 				Status: gwv1alpha2.TCPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name: "gateway",
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "BackendNotFound",
-// 								Message: "/backend: backend not found",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"untargeted tcp route same namespace invalid backend type": {
-// 			tcpRoute: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 					Rules: []gwv1alpha2.TCPRouteRule{{
-// 						BackendRefs: []gwv1beta1.BackendRef{{
-// 							BackendObjectReference: gwv1beta1.BackendObjectReference{
-// 								Name:  gwv1beta1.ObjectName("backend"),
-// 								Group: common.PointerTo[gwv1beta1.Group]("invalid.foo.com"),
-// 							},
-// 						}},
-// 					}},
-// 				},
-// 			},
-// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name: "gateway",
-// 						}},
-// 					},
-// 					Rules: []gwv1alpha2.TCPRouteRule{{
-// 						BackendRefs: []gwv1beta1.BackendRef{{
-// 							BackendObjectReference: gwv1beta1.BackendObjectReference{
-// 								Name:  gwv1beta1.ObjectName("backend"),
-// 								Group: common.PointerTo[gwv1beta1.Group]("invalid.foo.com"),
-// 							},
-// 						}},
-// 					}},
-// 				},
-// 				Status: gwv1alpha2.TCPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name: "gateway",
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "InvalidKind",
-// 								Message: "/backend [Service.invalid.foo.com]: invalid backend kind",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"untargeted tcp route different namespace": {
-// 			tcpRoute: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Namespace:  "test",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:      "gateway",
-// 							Namespace: defaultNamespacePointer,
-// 						}},
-// 					},
-// 				},
-// 			},
-// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Namespace:  "test",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:      "gateway",
-// 							Namespace: defaultNamespacePointer,
-// 						}},
-// 					},
-// 				},
-// 				Status: gwv1alpha2.TCPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:      "gateway",
-// 								Namespace: defaultNamespacePointer,
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"targeted tcp route same namespace": {
-// 			tcpRoute: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 						}},
-// 					},
-// 				},
-// 			},
-// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
-// 						}, {
-// 							Name:        "gateway",
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 						}},
-// 					},
-// 				},
-// 				Status: gwv1alpha2.TCPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "tcp-listener-mismatched-kind-allowed: listener does not support route protocol",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "tcp-listener-allowed-selector: listener does not allow binding routes from the given namespace",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "http-listener-explicit-all-allowed: listener does not support route protocol",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 		"targeted tcp route different namespace": {
-// 			tcpRoute: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Namespace:  "test",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 						}},
-// 					},
-// 				},
-// 			},
-// 			expectedTCPRouteUpdateStatus: &gwv1alpha2.TCPRoute{
-// 				TypeMeta: tcpTypeMeta,
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:       "route",
-// 					Namespace:  "test",
-// 					Finalizers: []string{common.GatewayFinalizer},
-// 				},
-// 				Spec: gwv1alpha2.TCPRouteSpec{
-// 					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-// 						ParentRefs: []gwv1beta1.ParentReference{{
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
-// 						}, {
-// 							Name:        "gateway",
-// 							Namespace:   defaultNamespacePointer,
-// 							SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 						}},
-// 					},
-// 				},
-// 				Status: gwv1alpha2.TCPRouteStatus{
-// 					RouteStatus: gwv1beta1.RouteStatus{
-// 						Parents: []gwv1beta1.RouteParentStatus{{
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-default-same"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "tcp-listener-default-same: listener does not allow binding routes from the given namespace",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-mismatched-kind-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "tcp-listener-mismatched-kind-allowed: listener does not support route protocol",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-all-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-explicit-allowed-same"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "tcp-listener-explicit-allowed-same: listener does not allow binding routes from the given namespace",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-allowed-selector"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "Accepted",
-// 								Message: "route accepted",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("tcp-listener-tls"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "tcp-listener-tls: listener does not allow binding routes from the given namespace",
-// 							}},
-// 						}, {
-// 							ControllerName: gatewayClass.Spec.ControllerName,
-// 							ParentRef: gwv1beta1.ParentReference{
-// 								Name:        "gateway",
-// 								Namespace:   defaultNamespacePointer,
-// 								SectionName: common.PointerTo[gwv1beta1.SectionName]("http-listener-explicit-all-allowed"),
-// 							},
-// 							Conditions: []metav1.Condition{{
-// 								Type:    "ResolvedRefs",
-// 								Status:  metav1.ConditionTrue,
-// 								Reason:  "ResolvedRefs",
-// 								Message: "resolved backend references",
-// 							}, {
-// 								Type:    "Accepted",
-// 								Status:  metav1.ConditionFalse,
-// 								Reason:  "NotAllowedByListeners",
-// 								Message: "http-listener-explicit-all-allowed: listener does not support route protocol",
-// 							}},
-// 						}},
-// 					},
-// 				},
-// 			},
-// 		},
-// 	} {
-// 		t.Run(name, func(t *testing.T) {
-// 			config := BinderConfig{
-// 				ControllerName:     controllerName,
-// 				GatewayClassConfig: &v1alpha1.GatewayClassConfig{},
-// 				GatewayClass:       gatewayClass,
-// 				Gateway:            gateway,
-// 				Namespaces:         namespaces,
-// 				ControlledGateways: map[types.NamespacedName]gwv1beta1.Gateway{
-// 					{Name: "gateway"}: gateway,
-// 				},
-// 				Secrets: []corev1.Secret{{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "secret-one",
-// 					},
-// 				}},
-// 			}
-// 			serializeGatewayClassConfig(&config.Gateway, config.GatewayClassConfig)
+			if tt.httpRoute != nil {
+				resources.httpRoutes = append(resources.httpRoutes, *tt.httpRoute)
+			}
+			if tt.tcpRoute != nil {
+				resources.tcpRoutes = append(resources.tcpRoutes, *tt.tcpRoute)
+			}
 
-// 			if tt.httpRoute != nil {
-// 				config.HTTPRoutes = append(config.HTTPRoutes, *tt.httpRoute)
-// 			}
-// 			if tt.tcpRoute != nil {
-// 				config.TCPRoutes = append(config.TCPRoutes, *tt.tcpRoute)
-// 			}
+			config := controlledBinder(BinderConfig{
+				Gateway:            g,
+				GatewayClassConfig: &v1alpha1.GatewayClassConfig{},
+				Namespaces:         namespaces,
+				Resources:          newTestResourceMap(t, resources),
+				HTTPRoutes:         resources.httpRoutes,
+				TCPRoutes:          resources.tcpRoutes,
+			})
 
-// 			binder := NewBinder(config)
-// 			actual := binder.Snapshot()
+			binder := NewBinder(config)
+			actual := binder.Snapshot()
 
-// 			compareUpdates(t, tt.expectedHTTPRouteUpdate, actual.Kubernetes.Updates)
-// 			compareUpdates(t, tt.expectedTCPRouteUpdate, actual.Kubernetes.Updates)
-// 			compareUpdates(t, tt.expectedHTTPRouteUpdateStatus, actual.Kubernetes.StatusUpdates)
-// 			compareUpdates(t, tt.expectedTCPRouteUpdateStatus, actual.Kubernetes.StatusUpdates)
-// 		})
-// 	}
-// }
+			compareUpdates(t, tt.expectedStatusUpdates, actual.Kubernetes.StatusUpdates.Operations())
+		})
+	}
+}
 
-// func compareUpdates[T client.Object](t *testing.T, expected T, updates []client.Object) {
-// 	t.Helper()
+func compareUpdates(t *testing.T, expected []client.Object, actual []client.Object) {
+	t.Helper()
 
-// 	if isNil(expected) {
-// 		for _, update := range updates {
-// 			if u, ok := update.(T); ok {
-// 				t.Error("found unexpected update", u)
-// 			}
-// 		}
-// 	} else {
-// 		found := false
-// 		for _, update := range updates {
-// 			if u, ok := update.(T); ok {
-// 				diff := cmp.Diff(expected, u, cmp.FilterPath(func(p cmp.Path) bool {
-// 					return p.String() == "Status.RouteStatus.Parents.Conditions.LastTransitionTime"
-// 				}, cmp.Ignore()))
-// 				if diff != "" {
-// 					t.Error("diff between actual and expected", diff)
-// 				}
-// 				found = true
-// 			}
-// 		}
-// 		if !found {
-// 			t.Error("expected route update not found in", updates)
-// 		}
-// 	}
-// }
+	filtered := common.Filter(actual, func(o client.Object) bool {
+		if _, ok := o.(*gwv1beta1.HTTPRoute); ok {
+			return false
+		}
+		if _, ok := o.(*gwv1alpha2.TCPRoute); ok {
+			return false
+		}
+		return true
+	})
+
+	require.ElementsMatch(t, expected, filtered, "statuses don't match", cmp.Diff(expected, filtered))
+}
 
 func addClassConfig(g gwv1beta1.Gateway) *gwv1beta1.Gateway {
 	serializeGatewayClassConfig(&g, &v1alpha1.GatewayClassConfig{})
@@ -2492,7 +2367,11 @@ func testHTTPRoute(name string, parents []string, services []string) gwv1beta1.H
 		})
 	}
 
+	httpTypeMeta := metav1.TypeMeta{}
+	httpTypeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("HTTPRoute"))
+
 	return gwv1beta1.HTTPRoute{
+		TypeMeta:   httpTypeMeta,
 		ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{common.GatewayFinalizer}},
 		Spec: gwv1beta1.HTTPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
@@ -2501,6 +2380,53 @@ func testHTTPRoute(name string, parents []string, services []string) gwv1beta1.H
 			Rules: rules,
 		},
 	}
+}
+
+func testHTTPRouteNamespace(name, namespace string, parents []string, services []string) gwv1beta1.HTTPRoute {
+	route := testHTTPRoute(name, parents, services)
+	route.Namespace = namespace
+	return route
+}
+
+func testHTTPRouteBackends(name, namespace string, services []gwv1beta1.BackendObjectReference, parents []gwv1beta1.ParentReference) *gwv1beta1.HTTPRoute {
+	var rules []gwv1beta1.HTTPRouteRule
+	for _, service := range services {
+		rules = append(rules, gwv1beta1.HTTPRouteRule{
+			BackendRefs: []gwv1beta1.HTTPBackendRef{
+				{
+					BackendRef: gwv1beta1.BackendRef{
+						BackendObjectReference: service,
+					},
+				},
+			},
+		})
+	}
+
+	httpTypeMeta := metav1.TypeMeta{}
+	httpTypeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("HTTPRoute"))
+
+	return &gwv1beta1.HTTPRoute{
+		TypeMeta:   httpTypeMeta,
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Finalizers: []string{common.GatewayFinalizer}},
+		Spec: gwv1beta1.HTTPRouteSpec{
+			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+				ParentRefs: parents,
+			},
+			Rules: rules,
+		},
+	}
+}
+
+func testHTTPRouteStatusBackends(name, namespace string, services []gwv1beta1.BackendObjectReference, parentStatuses []gwv1beta1.RouteParentStatus) *gwv1beta1.HTTPRoute {
+	var parentRefs []gwv1beta1.ParentReference
+
+	for _, parent := range parentStatuses {
+		parentRefs = append(parentRefs, parent.ParentRef)
+	}
+
+	route := testHTTPRouteBackends(name, namespace, services, parentRefs)
+	route.Status.RouteStatus.Parents = parentStatuses
+	return route
 }
 
 func testHTTPRouteStatus(name string, services []string, parentStatuses []gwv1beta1.RouteParentStatus, extraParents ...string) gwv1beta1.HTTPRoute {
@@ -2513,6 +2439,12 @@ func testHTTPRouteStatus(name string, services []string, parentStatuses []gwv1be
 	route := testHTTPRoute(name, parentRefs, services)
 	route.Status.RouteStatus.Parents = parentStatuses
 
+	return route
+}
+
+func testHTTPRouteStatusNamespace(name, namespace string, services []string, parentStatuses []gwv1beta1.RouteParentStatus, extraParents ...string) gwv1beta1.HTTPRoute {
+	route := testHTTPRouteStatus(name, services, parentStatuses, extraParents...)
+	route.Namespace = namespace
 	return route
 }
 
@@ -2536,7 +2468,11 @@ func testTCPRoute(name string, parents []string, services []string) gwv1alpha2.T
 		})
 	}
 
+	tcpTypeMeta := metav1.TypeMeta{}
+	tcpTypeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("TCPRoute"))
+
 	return gwv1alpha2.TCPRoute{
+		TypeMeta:   tcpTypeMeta,
 		ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{common.GatewayFinalizer}},
 		Spec: gwv1alpha2.TCPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
@@ -2545,6 +2481,49 @@ func testTCPRoute(name string, parents []string, services []string) gwv1alpha2.T
 			Rules: rules,
 		},
 	}
+}
+
+func testTCPRouteBackends(name, namespace string, services []gwv1beta1.BackendObjectReference, parents []gwv1beta1.ParentReference) *gwv1alpha2.TCPRoute {
+	var rules []gwv1alpha2.TCPRouteRule
+	for _, service := range services {
+		rules = append(rules, gwv1alpha2.TCPRouteRule{
+			BackendRefs: []gwv1beta1.BackendRef{
+				{BackendObjectReference: service},
+			},
+		})
+	}
+
+	tcpTypeMeta := metav1.TypeMeta{}
+	tcpTypeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("TCPRoute"))
+
+	return &gwv1alpha2.TCPRoute{
+		TypeMeta:   tcpTypeMeta,
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Finalizers: []string{common.GatewayFinalizer}},
+		Spec: gwv1alpha2.TCPRouteSpec{
+			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+				ParentRefs: parents,
+			},
+			Rules: rules,
+		},
+	}
+}
+
+func testTCPRouteStatusBackends(name, namespace string, services []gwv1beta1.BackendObjectReference, parentStatuses []gwv1beta1.RouteParentStatus) *gwv1alpha2.TCPRoute {
+	var parentRefs []gwv1beta1.ParentReference
+
+	for _, parent := range parentStatuses {
+		parentRefs = append(parentRefs, parent.ParentRef)
+	}
+
+	route := testTCPRouteBackends(name, namespace, services, parentRefs)
+	route.Status.RouteStatus.Parents = parentStatuses
+	return route
+}
+
+func testTCPRouteNamespace(name, namespace string, parents []string, services []string) gwv1alpha2.TCPRoute {
+	route := testTCPRoute(name, parents, services)
+	route.Namespace = namespace
+	return route
 }
 
 func testTCPRouteStatus(name string, services []string, parentStatuses []gwv1beta1.RouteParentStatus, extraParents ...string) gwv1alpha2.TCPRoute {
@@ -2557,6 +2536,12 @@ func testTCPRouteStatus(name string, services []string, parentStatuses []gwv1bet
 	route := testTCPRoute(name, parentRefs, services)
 	route.Status.RouteStatus.Parents = parentStatuses
 
+	return route
+}
+
+func testTCPRouteStatusNamespace(name, namespace string, services []string, parentStatuses []gwv1beta1.RouteParentStatus, extraParents ...string) gwv1alpha2.TCPRoute {
+	route := testTCPRouteStatus(name, services, parentStatuses, extraParents...)
+	route.Namespace = namespace
 	return route
 }
 
