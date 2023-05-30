@@ -168,7 +168,7 @@ rules:
   resources:
   - securitycontextconstraints
   resourceNames:
-  - {{ .Release.Name }}-api-gateway
+  - {{ template "consul.fullname" . }}-api-gateway
   verbs:
   - use
 {{- end }}
