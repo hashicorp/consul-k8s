@@ -764,122 +764,101 @@ func TestBinder_Lifecycle(t *testing.T) {
 	}
 }
 
-// func TestBinder_Registrations(t *testing.T) {
-// 	t.Parallel()
+func TestBinder_Registrations(t *testing.T) {
+	t.Parallel()
 
-// 	className := "gateway-class"
-// 	gatewayClassName := gwv1beta1.ObjectName(className)
-// 	controllerName := "test-controller"
-// 	deletionTimestamp := common.PointerTo(metav1.Now())
-// 	gatewayClass := &gwv1beta1.GatewayClass{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name: className,
-// 		},
-// 		Spec: gwv1beta1.GatewayClassSpec{
-// 			ControllerName: gwv1beta1.GatewayController(controllerName),
-// 		},
-// 	}
-// 	gatewayName := "gateway"
+	setDeleted := func(gateway gwv1beta1.Gateway) gwv1beta1.Gateway {
+		gateway.DeletionTimestamp = deletionTimestamp
+		return gateway
+	}
 
-// 	for name, tt := range map[string]struct {
-// 		config                  BinderConfig
-// 		expectedRegistrations   []string
-// 		expectedDeregistrations []api.CatalogDeregistration
-// 	}{
-// 		"deleting gateway with consul services": {
-// 			config: BinderConfig{
-// 				ControllerName: controllerName,
-// 				GatewayClass:   gatewayClass,
-// 				Gateway: gwv1beta1.Gateway{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name:              gatewayName,
-// 						Finalizers:        []string{common.GatewayFinalizer},
-// 						DeletionTimestamp: deletionTimestamp,
-// 					},
-// 					Spec: gwv1beta1.GatewaySpec{
-// 						GatewayClassName: gatewayClassName,
-// 					},
-// 				},
-// 				GatewayServices: []api.CatalogService{
-// 					{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
-// 					{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
-// 					{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
-// 				},
-// 			},
-// 			expectedDeregistrations: []api.CatalogDeregistration{
-// 				{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
-// 				{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
-// 				{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
-// 			},
-// 		},
-// 		"gateway with consul services and mixed pods": {
-// 			config: BinderConfig{
-// 				ControllerName: controllerName,
-// 				GatewayClass:   gatewayClass,
-// 				Gateway: gwv1beta1.Gateway{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name:       gatewayName,
-// 						Finalizers: []string{common.GatewayFinalizer},
-// 					},
-// 					Spec: gwv1beta1.GatewaySpec{
-// 						GatewayClassName: gatewayClassName,
-// 					},
-// 				},
-// 				Pods: []corev1.Pod{
-// 					{
-// 						ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "namespace1"},
-// 						Status: corev1.PodStatus{
-// 							Phase:      corev1.PodRunning,
-// 							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
-// 						},
-// 					},
-// 					{
-// 						ObjectMeta: metav1.ObjectMeta{Name: "pod3", Namespace: "namespace1"},
-// 						Status: corev1.PodStatus{
-// 							Phase: corev1.PodFailed,
-// 						},
-// 					},
-// 					{
-// 						ObjectMeta: metav1.ObjectMeta{Name: "pod4", Namespace: "namespace1"},
-// 						Status: corev1.PodStatus{
-// 							Phase:      corev1.PodRunning,
-// 							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
-// 						},
-// 					},
-// 				},
-// 				GatewayServices: []api.CatalogService{
-// 					{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
-// 					{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
-// 					{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
-// 				},
-// 			},
-// 			expectedRegistrations: []string{"pod1", "pod3", "pod4"},
-// 			expectedDeregistrations: []api.CatalogDeregistration{
-// 				{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
-// 			},
-// 		},
-// 	} {
-// 		t.Run(name, func(t *testing.T) {
-// 			tt.config.ControllerName = controllerName
-// 			tt.config.GatewayClassConfig = &v1alpha1.GatewayClassConfig{}
-// 			serializeGatewayClassConfig(&tt.config.Gateway, tt.config.GatewayClassConfig)
+	for name, tt := range map[string]struct {
+		config                  BinderConfig
+		resources               resourceMapResources
+		expectedRegistrations   []string
+		expectedDeregistrations []api.CatalogDeregistration
+	}{
+		"deleting gateway with consul services": {
+			config: controlledBinder(BinderConfig{
+				Gateway: setDeleted(gatewayWithFinalizer(gwv1beta1.GatewaySpec{})),
+				ConsulGatewayServices: []api.CatalogService{
+					{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
+					{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
+					{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
+				},
+			}),
+			expectedDeregistrations: []api.CatalogDeregistration{
+				{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
+				{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
+				{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
+			},
+		},
+		"gateway with consul services and mixed pods": {
+			config: controlledBinder(BinderConfig{
+				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+				Pods: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "namespace1"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod3", Namespace: "namespace1"},
+						Status: corev1.PodStatus{
+							Phase: corev1.PodFailed,
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod4", Namespace: "namespace1"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
+				},
+				ConsulGatewayServices: []api.CatalogService{
+					{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
+					{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
+					{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
+				},
+			}),
+			expectedRegistrations: []string{"pod1", "pod3", "pod4"},
+			expectedDeregistrations: []api.CatalogDeregistration{
+				{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tt.resources.gateways = append(tt.resources.gateways, tt.config.Gateway)
+			tt.resources.httpRoutes = append(tt.resources.httpRoutes, tt.config.HTTPRoutes...)
+			tt.resources.tcpRoutes = append(tt.resources.tcpRoutes, tt.config.TCPRoutes...)
+			tt.resources.consulHTTPRoutes = append(tt.resources.consulHTTPRoutes, tt.config.ConsulHTTPRoutes...)
+			tt.resources.consulTCPRoutes = append(tt.resources.consulTCPRoutes, tt.config.ConsulTCPRoutes...)
 
-// 			binder := NewBinder(tt.config)
-// 			actual := binder.Snapshot()
+			tt.config.Resources = newTestResourceMap(t, tt.resources)
+			tt.config.ControllerName = testControllerName
+			tt.config.Logger = logrtest.NewTestLogger(t)
+			tt.config.GatewayClassConfig = &v1alpha1.GatewayClassConfig{}
+			serializeGatewayClassConfig(&tt.config.Gateway, tt.config.GatewayClassConfig)
 
-// 			require.Len(t, actual.Consul.Registrations, len(tt.expectedRegistrations))
-// 			for i := range actual.Consul.Registrations {
-// 				registration := actual.Consul.Registrations[i]
-// 				expected := tt.expectedRegistrations[i]
+			binder := NewBinder(tt.config)
+			actual := binder.Snapshot()
 
-// 				require.EqualValues(t, expected, registration.Service.ID)
-// 				require.EqualValues(t, gatewayName, registration.Service.Service)
-// 			}
+			require.Len(t, actual.Consul.Registrations, len(tt.expectedRegistrations))
+			for i := range actual.Consul.Registrations {
+				registration := actual.Consul.Registrations[i]
+				expected := tt.expectedRegistrations[i]
 
-// 			require.EqualValues(t, tt.expectedDeregistrations, actual.Consul.Deregistrations)
-// 		})
-// 	}
-// }
+				require.EqualValues(t, expected, registration.Service.ID)
+				require.EqualValues(t, "gateway", registration.Service.Service)
+			}
+
+			require.EqualValues(t, tt.expectedDeregistrations, actual.Consul.Deregistrations)
+		})
+	}
+}
 
 // func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 // 	t.Parallel()
