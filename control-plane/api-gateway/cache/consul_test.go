@@ -16,11 +16,12 @@ import (
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
@@ -29,24 +30,102 @@ import (
 func Test_resourceCache_diff(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		newCache *ReferenceMap
+		newCache *common.ReferenceMap
 	}
 	tests := []struct {
 		name     string
-		oldCache *ReferenceMap
+		oldCache *common.ReferenceMap
 		args     args
 		want     []api.ConfigEntry
 	}{
 		{
 			name: "no difference",
-			oldCache: &ReferenceMap{
-				data: map[api.ResourceReference]api.ConfigEntry{
-					{
-						Kind:      api.HTTPRoute,
-						Name:      "my route",
-						Namespace: "default",
-						Partition: "default",
-					}: &api.HTTPRouteConfigEntry{
+			oldCache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
+					Kind: api.HTTPRoute,
+					Name: "my route",
+					Parents: []api.ResourceReference{
+						{
+							Kind:        api.APIGateway,
+							Name:        "api-gw",
+							SectionName: "listener-1",
+							Namespace:   "ns",
+						},
+					},
+					Rules: []api.HTTPRouteRule{
+						{
+							Filters: api.HTTPFilters{
+								Headers: []api.HTTPHeaderFilter{
+									{
+										Add: map[string]string{
+											"add it on": "the value",
+										},
+										Remove: []string{"time to go"},
+										Set: map[string]string{
+											"Magic":       "v2",
+											"Another One": "dj khaled",
+										},
+									},
+								},
+								URLRewrite: &api.URLRewrite{Path: "v1"},
+							},
+							Matches: []api.HTTPMatch{
+								{
+									Headers: []api.HTTPHeaderMatch{
+										{
+											Match: api.HTTPHeaderMatchExact,
+											Name:  "my header match",
+											Value: "the value",
+										},
+									},
+									Method: api.HTTPMatchMethodGet,
+									Path: api.HTTPPathMatch{
+										Match: api.HTTPPathMatchPrefix,
+										Value: "/v1",
+									},
+									Query: []api.HTTPQueryMatch{
+										{
+											Match: api.HTTPQueryMatchExact,
+											Name:  "search",
+											Value: "term",
+										},
+									},
+								},
+							},
+							Services: []api.HTTPService{
+								{
+									Name:   "service one",
+									Weight: 45,
+									Filters: api.HTTPFilters{
+										Headers: []api.HTTPHeaderFilter{
+											{
+												Add: map[string]string{
+													"svc - add it on": "svc - the value",
+												},
+												Remove: []string{"svc - time to go"},
+												Set: map[string]string{
+													"svc - Magic":       "svc - v2",
+													"svc - Another One": "svc - dj khaled",
+												},
+											},
+										},
+										URLRewrite: &api.URLRewrite{
+											Path: "path",
+										},
+									},
+									Namespace: "some ns",
+								},
+							},
+						},
+					},
+					Hostnames: []string{"hostname.com"},
+					Meta:      map[string]string{},
+					Status:    api.ConfigEntryStatus{},
+				},
+			})[api.HTTPRoute],
+			args: args{
+				newCache: loadedReferenceMaps([]api.ConfigEntry{
+					&api.HTTPRouteConfigEntry{
 						Kind: api.HTTPRoute,
 						Name: "my route",
 						Parents: []api.ResourceReference{
@@ -127,112 +206,179 @@ func Test_resourceCache_diff(t *testing.T) {
 						Meta:      map[string]string{},
 						Status:    api.ConfigEntryStatus{},
 					},
-				},
-			},
-			args: args{
-				newCache: &ReferenceMap{
-					data: map[api.ResourceReference]api.ConfigEntry{
-						{
-							Kind:      api.HTTPRoute,
-							Name:      "my route",
-							Namespace: "default",
-							Partition: "default",
-						}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
-							Kind: api.HTTPRoute,
-							Name: "my route",
-							Parents: []api.ResourceReference{
-								{
-									Kind:        api.APIGateway,
-									Name:        "api-gw",
-									SectionName: "listener-1",
-									Namespace:   "ns",
-								},
-							},
-							Rules: []api.HTTPRouteRule{
-								{
-									Filters: api.HTTPFilters{
-										Headers: []api.HTTPHeaderFilter{
-											{
-												Add: map[string]string{
-													"add it on": "the value",
-												},
-												Remove: []string{"time to go"},
-												Set: map[string]string{
-													"Magic":       "v2",
-													"Another One": "dj khaled",
-												},
-											},
-										},
-										URLRewrite: &api.URLRewrite{Path: "v1"},
-									},
-									Matches: []api.HTTPMatch{
-										{
-											Headers: []api.HTTPHeaderMatch{
-												{
-													Match: api.HTTPHeaderMatchExact,
-													Name:  "my header match",
-													Value: "the value",
-												},
-											},
-											Method: api.HTTPMatchMethodGet,
-											Path: api.HTTPPathMatch{
-												Match: api.HTTPPathMatchPrefix,
-												Value: "/v1",
-											},
-											Query: []api.HTTPQueryMatch{
-												{
-													Match: api.HTTPQueryMatchExact,
-													Name:  "search",
-													Value: "term",
-												},
-											},
-										},
-									},
-									Services: []api.HTTPService{
-										{
-											Name:   "service one",
-											Weight: 45,
-											Filters: api.HTTPFilters{
-												Headers: []api.HTTPHeaderFilter{
-													{
-														Add: map[string]string{
-															"svc - add it on": "svc - the value",
-														},
-														Remove: []string{"svc - time to go"},
-														Set: map[string]string{
-															"svc - Magic":       "svc - v2",
-															"svc - Another One": "svc - dj khaled",
-														},
-													},
-												},
-												URLRewrite: &api.URLRewrite{
-													Path: "path",
-												},
-											},
-											Namespace: "some ns",
-										},
-									},
-								},
-							},
-							Hostnames: []string{"hostname.com"},
-							Meta:      map[string]string{},
-							Status:    api.ConfigEntryStatus{},
-						}),
-					},
-				},
+				})[api.HTTPRoute],
 			},
 			want: []api.ConfigEntry{},
 		},
 		{
 			name: "resource exists in old cache but not new one",
-			oldCache: &ReferenceMap{
-				data: map[api.ResourceReference]api.ConfigEntry{
-					{
-						Kind:      api.HTTPRoute,
-						Name:      "my route",
-						Namespace: "default",
-						Partition: "default",
-					}: &api.HTTPRouteConfigEntry{
+			oldCache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
+					Kind: api.HTTPRoute,
+					Name: "my route",
+					Parents: []api.ResourceReference{
+						{
+							Kind:        api.APIGateway,
+							Name:        "api-gw",
+							SectionName: "listener-1",
+							Namespace:   "ns",
+						},
+					},
+					Rules: []api.HTTPRouteRule{
+						{
+							Filters: api.HTTPFilters{
+								Headers: []api.HTTPHeaderFilter{
+									{
+										Add: map[string]string{
+											"add it on": "the value",
+										},
+										Remove: []string{"time to go"},
+										Set: map[string]string{
+											"Magic":       "v2",
+											"Another One": "dj khaled",
+										},
+									},
+								},
+								URLRewrite: &api.URLRewrite{Path: "v1"},
+							},
+							Matches: []api.HTTPMatch{
+								{
+									Headers: []api.HTTPHeaderMatch{
+										{
+											Match: api.HTTPHeaderMatchExact,
+											Name:  "my header match",
+											Value: "the value",
+										},
+									},
+									Method: api.HTTPMatchMethodGet,
+									Path: api.HTTPPathMatch{
+										Match: api.HTTPPathMatchPrefix,
+										Value: "/v1",
+									},
+									Query: []api.HTTPQueryMatch{
+										{
+											Match: api.HTTPQueryMatchExact,
+											Name:  "search",
+											Value: "term",
+										},
+									},
+								},
+							},
+							Services: []api.HTTPService{
+								{
+									Name:   "service one",
+									Weight: 45,
+									Filters: api.HTTPFilters{
+										Headers: []api.HTTPHeaderFilter{
+											{
+												Add: map[string]string{
+													"svc - add it on": "svc - the value",
+												},
+												Remove: []string{"svc - time to go"},
+												Set: map[string]string{
+													"svc - Magic":       "svc - v2",
+													"svc - Another One": "svc - dj khaled",
+												},
+											},
+										},
+										URLRewrite: &api.URLRewrite{
+											Path: "path",
+										},
+									},
+									Namespace: "some ns",
+								},
+							},
+						},
+					},
+					Hostnames: []string{"hostname.com"},
+					Meta:      map[string]string{},
+					Status:    api.ConfigEntryStatus{},
+				},
+				&api.HTTPRouteConfigEntry{
+					Kind: api.HTTPRoute,
+					Name: "my route 2",
+					Parents: []api.ResourceReference{
+						{
+							Kind:        api.APIGateway,
+							Name:        "api-gw",
+							SectionName: "listener-2",
+							Namespace:   "ns",
+						},
+					},
+					Rules: []api.HTTPRouteRule{
+						{
+							Filters: api.HTTPFilters{
+								Headers: []api.HTTPHeaderFilter{
+									{
+										Add: map[string]string{
+											"add it on": "the value",
+										},
+										Remove: []string{"time to go"},
+										Set: map[string]string{
+											"Magic":       "v2",
+											"Another One": "dj khaled",
+										},
+									},
+								},
+								URLRewrite: &api.URLRewrite{Path: "v1"},
+							},
+							Matches: []api.HTTPMatch{
+								{
+									Headers: []api.HTTPHeaderMatch{
+										{
+											Match: api.HTTPHeaderMatchExact,
+											Name:  "my header match",
+											Value: "the value",
+										},
+									},
+									Method: api.HTTPMatchMethodGet,
+									Path: api.HTTPPathMatch{
+										Match: api.HTTPPathMatchPrefix,
+										Value: "/v1",
+									},
+									Query: []api.HTTPQueryMatch{
+										{
+											Match: api.HTTPQueryMatchExact,
+											Name:  "search",
+											Value: "term",
+										},
+									},
+								},
+							},
+							Services: []api.HTTPService{
+								{
+									Name:   "service one",
+									Weight: 45,
+									Filters: api.HTTPFilters{
+										Headers: []api.HTTPHeaderFilter{
+											{
+												Add: map[string]string{
+													"svc - add it on": "svc - the value",
+												},
+												Remove: []string{"svc - time to go"},
+												Set: map[string]string{
+													"svc - Magic":       "svc - v2",
+													"svc - Another One": "svc - dj khaled",
+												},
+											},
+										},
+										URLRewrite: &api.URLRewrite{
+											Path: "path",
+										},
+									},
+									Namespace: "some ns",
+								},
+							},
+						},
+					},
+					Hostnames: []string{"hostname.com"},
+					Meta:      map[string]string{},
+					Status:    api.ConfigEntryStatus{},
+				},
+			})[api.HTTPRoute],
+			args: args{
+				newCache: loadedReferenceMaps([]api.ConfigEntry{
+					&api.HTTPRouteConfigEntry{
 						Kind: api.HTTPRoute,
 						Name: "my route",
 						Parents: []api.ResourceReference{
@@ -313,185 +459,7 @@ func Test_resourceCache_diff(t *testing.T) {
 						Meta:      map[string]string{},
 						Status:    api.ConfigEntryStatus{},
 					},
-					{
-						Kind:      api.HTTPRoute,
-						Name:      "my route 2",
-						Namespace: "default",
-						Partition: "default",
-					}: &api.HTTPRouteConfigEntry{
-						Kind: api.HTTPRoute,
-						Name: "my route 2",
-						Parents: []api.ResourceReference{
-							{
-								Kind:        api.APIGateway,
-								Name:        "api-gw",
-								SectionName: "listener-2",
-								Namespace:   "ns",
-							},
-						},
-						Rules: []api.HTTPRouteRule{
-							{
-								Filters: api.HTTPFilters{
-									Headers: []api.HTTPHeaderFilter{
-										{
-											Add: map[string]string{
-												"add it on": "the value",
-											},
-											Remove: []string{"time to go"},
-											Set: map[string]string{
-												"Magic":       "v2",
-												"Another One": "dj khaled",
-											},
-										},
-									},
-									URLRewrite: &api.URLRewrite{Path: "v1"},
-								},
-								Matches: []api.HTTPMatch{
-									{
-										Headers: []api.HTTPHeaderMatch{
-											{
-												Match: api.HTTPHeaderMatchExact,
-												Name:  "my header match",
-												Value: "the value",
-											},
-										},
-										Method: api.HTTPMatchMethodGet,
-										Path: api.HTTPPathMatch{
-											Match: api.HTTPPathMatchPrefix,
-											Value: "/v1",
-										},
-										Query: []api.HTTPQueryMatch{
-											{
-												Match: api.HTTPQueryMatchExact,
-												Name:  "search",
-												Value: "term",
-											},
-										},
-									},
-								},
-								Services: []api.HTTPService{
-									{
-										Name:   "service one",
-										Weight: 45,
-										Filters: api.HTTPFilters{
-											Headers: []api.HTTPHeaderFilter{
-												{
-													Add: map[string]string{
-														"svc - add it on": "svc - the value",
-													},
-													Remove: []string{"svc - time to go"},
-													Set: map[string]string{
-														"svc - Magic":       "svc - v2",
-														"svc - Another One": "svc - dj khaled",
-													},
-												},
-											},
-											URLRewrite: &api.URLRewrite{
-												Path: "path",
-											},
-										},
-										Namespace: "some ns",
-									},
-								},
-							},
-						},
-						Hostnames: []string{"hostname.com"},
-						Meta:      map[string]string{},
-						Status:    api.ConfigEntryStatus{},
-					},
-				},
-			},
-			args: args{
-				newCache: &ReferenceMap{
-					data: map[api.ResourceReference]api.ConfigEntry{
-						{
-							Kind:      api.HTTPRoute,
-							Name:      "my route",
-							Namespace: "default",
-							Partition: "default",
-						}: &api.HTTPRouteConfigEntry{
-							Kind: api.HTTPRoute,
-							Name: "my route",
-							Parents: []api.ResourceReference{
-								{
-									Kind:        api.APIGateway,
-									Name:        "api-gw",
-									SectionName: "listener-1",
-									Namespace:   "ns",
-								},
-							},
-							Rules: []api.HTTPRouteRule{
-								{
-									Filters: api.HTTPFilters{
-										Headers: []api.HTTPHeaderFilter{
-											{
-												Add: map[string]string{
-													"add it on": "the value",
-												},
-												Remove: []string{"time to go"},
-												Set: map[string]string{
-													"Magic":       "v2",
-													"Another One": "dj khaled",
-												},
-											},
-										},
-										URLRewrite: &api.URLRewrite{Path: "v1"},
-									},
-									Matches: []api.HTTPMatch{
-										{
-											Headers: []api.HTTPHeaderMatch{
-												{
-													Match: api.HTTPHeaderMatchExact,
-													Name:  "my header match",
-													Value: "the value",
-												},
-											},
-											Method: api.HTTPMatchMethodGet,
-											Path: api.HTTPPathMatch{
-												Match: api.HTTPPathMatchPrefix,
-												Value: "/v1",
-											},
-											Query: []api.HTTPQueryMatch{
-												{
-													Match: api.HTTPQueryMatchExact,
-													Name:  "search",
-													Value: "term",
-												},
-											},
-										},
-									},
-									Services: []api.HTTPService{
-										{
-											Name:   "service one",
-											Weight: 45,
-											Filters: api.HTTPFilters{
-												Headers: []api.HTTPHeaderFilter{
-													{
-														Add: map[string]string{
-															"svc - add it on": "svc - the value",
-														},
-														Remove: []string{"svc - time to go"},
-														Set: map[string]string{
-															"svc - Magic":       "svc - v2",
-															"svc - Another One": "svc - dj khaled",
-														},
-													},
-												},
-												URLRewrite: &api.URLRewrite{
-													Path: "path",
-												},
-											},
-											Namespace: "some ns",
-										},
-									},
-								},
-							},
-							Hostnames: []string{"hostname.com"},
-							Meta:      map[string]string{},
-							Status:    api.ConfigEntryStatus{},
-						},
-					},
-				},
+				})[api.HTTPRoute],
 			},
 			want: []api.ConfigEntry{
 				&api.HTTPRouteConfigEntry{
@@ -579,14 +547,92 @@ func Test_resourceCache_diff(t *testing.T) {
 		},
 		{
 			name: "resource exists in new cache but not old one",
-			oldCache: &ReferenceMap{
-				data: map[api.ResourceReference]api.ConfigEntry{
-					{
-						Kind:      api.HTTPRoute,
-						Name:      "my route",
-						Namespace: "default",
-						Partition: "default",
-					}: &api.HTTPRouteConfigEntry{
+			oldCache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
+					Kind: api.HTTPRoute,
+					Name: "my route",
+					Parents: []api.ResourceReference{
+						{
+							Kind:        api.APIGateway,
+							Name:        "api-gw",
+							SectionName: "listener-1",
+							Namespace:   "ns",
+						},
+					},
+					Rules: []api.HTTPRouteRule{
+						{
+							Filters: api.HTTPFilters{
+								Headers: []api.HTTPHeaderFilter{
+									{
+										Add: map[string]string{
+											"add it on": "the value",
+										},
+										Remove: []string{"time to go"},
+										Set: map[string]string{
+											"Magic":       "v2",
+											"Another One": "dj khaled",
+										},
+									},
+								},
+								URLRewrite: &api.URLRewrite{Path: "v1"},
+							},
+							Matches: []api.HTTPMatch{
+								{
+									Headers: []api.HTTPHeaderMatch{
+										{
+											Match: api.HTTPHeaderMatchExact,
+											Name:  "my header match",
+											Value: "the value",
+										},
+									},
+									Method: api.HTTPMatchMethodGet,
+									Path: api.HTTPPathMatch{
+										Match: api.HTTPPathMatchPrefix,
+										Value: "/v1",
+									},
+									Query: []api.HTTPQueryMatch{
+										{
+											Match: api.HTTPQueryMatchExact,
+											Name:  "search",
+											Value: "term",
+										},
+									},
+								},
+							},
+							Services: []api.HTTPService{
+								{
+									Name:   "service one",
+									Weight: 45,
+									Filters: api.HTTPFilters{
+										Headers: []api.HTTPHeaderFilter{
+											{
+												Add: map[string]string{
+													"svc - add it on": "svc - the value",
+												},
+												Remove: []string{"svc - time to go"},
+												Set: map[string]string{
+													"svc - Magic":       "svc - v2",
+													"svc - Another One": "svc - dj khaled",
+												},
+											},
+										},
+										URLRewrite: &api.URLRewrite{
+											Path: "path",
+										},
+									},
+									Namespace: "some ns",
+								},
+							},
+						},
+					},
+					Hostnames: []string{"hostname.com"},
+					Meta:      map[string]string{},
+					Status:    api.ConfigEntryStatus{},
+				},
+			})[api.HTTPRoute],
+			args: args{
+				newCache: loadedReferenceMaps([]api.ConfigEntry{
+					&api.HTTPRouteConfigEntry{
 						Kind: api.HTTPRoute,
 						Name: "my route",
 						Parents: []api.ResourceReference{
@@ -667,185 +713,88 @@ func Test_resourceCache_diff(t *testing.T) {
 						Meta:      map[string]string{},
 						Status:    api.ConfigEntryStatus{},
 					},
-				},
-			},
-			args: args{
-				newCache: &ReferenceMap{
-					data: map[api.ResourceReference]api.ConfigEntry{
-						{
-							Kind:      api.HTTPRoute,
-							Name:      "my route",
-							Namespace: "default",
-							Partition: "default",
-						}: &api.HTTPRouteConfigEntry{
-							Kind: api.HTTPRoute,
-							Name: "my route",
-							Parents: []api.ResourceReference{
-								{
-									Kind:        api.APIGateway,
-									Name:        "api-gw",
-									SectionName: "listener-1",
-									Namespace:   "ns",
-								},
+					&api.HTTPRouteConfigEntry{
+						Kind: api.HTTPRoute,
+						Name: "my route 2",
+						Parents: []api.ResourceReference{
+							{
+								Kind:        api.APIGateway,
+								Name:        "api-gw",
+								SectionName: "listener-2",
+								Namespace:   "ns",
 							},
-							Rules: []api.HTTPRouteRule{
-								{
-									Filters: api.HTTPFilters{
-										Headers: []api.HTTPHeaderFilter{
+						},
+						Rules: []api.HTTPRouteRule{
+							{
+								Filters: api.HTTPFilters{
+									Headers: []api.HTTPHeaderFilter{
+										{
+											Add: map[string]string{
+												"add it on": "the value",
+											},
+											Remove: []string{"time to go"},
+											Set: map[string]string{
+												"Magic":       "v2",
+												"Another One": "dj khaled",
+											},
+										},
+									},
+									URLRewrite: &api.URLRewrite{Path: "v1"},
+								},
+								Matches: []api.HTTPMatch{
+									{
+										Headers: []api.HTTPHeaderMatch{
 											{
-												Add: map[string]string{
-													"add it on": "the value",
-												},
-												Remove: []string{"time to go"},
-												Set: map[string]string{
-													"Magic":       "v2",
-													"Another One": "dj khaled",
-												},
+												Match: api.HTTPHeaderMatchExact,
+												Name:  "my header match",
+												Value: "the value",
 											},
 										},
-										URLRewrite: &api.URLRewrite{Path: "v1"},
-									},
-									Matches: []api.HTTPMatch{
-										{
-											Headers: []api.HTTPHeaderMatch{
-												{
-													Match: api.HTTPHeaderMatchExact,
-													Name:  "my header match",
-													Value: "the value",
-												},
-											},
-											Method: api.HTTPMatchMethodGet,
-											Path: api.HTTPPathMatch{
-												Match: api.HTTPPathMatchPrefix,
-												Value: "/v1",
-											},
-											Query: []api.HTTPQueryMatch{
-												{
-													Match: api.HTTPQueryMatchExact,
-													Name:  "search",
-													Value: "term",
-												},
+										Method: api.HTTPMatchMethodGet,
+										Path: api.HTTPPathMatch{
+											Match: api.HTTPPathMatchPrefix,
+											Value: "/v1",
+										},
+										Query: []api.HTTPQueryMatch{
+											{
+												Match: api.HTTPQueryMatchExact,
+												Name:  "search",
+												Value: "term",
 											},
 										},
 									},
-									Services: []api.HTTPService{
-										{
-											Name:   "service one",
-											Weight: 45,
-											Filters: api.HTTPFilters{
-												Headers: []api.HTTPHeaderFilter{
-													{
-														Add: map[string]string{
-															"svc - add it on": "svc - the value",
-														},
-														Remove: []string{"svc - time to go"},
-														Set: map[string]string{
-															"svc - Magic":       "svc - v2",
-															"svc - Another One": "svc - dj khaled",
-														},
+								},
+								Services: []api.HTTPService{
+									{
+										Name:   "service one",
+										Weight: 45,
+										Filters: api.HTTPFilters{
+											Headers: []api.HTTPHeaderFilter{
+												{
+													Add: map[string]string{
+														"svc - add it on": "svc - the value",
+													},
+													Remove: []string{"svc - time to go"},
+													Set: map[string]string{
+														"svc - Magic":       "svc - v2",
+														"svc - Another One": "svc - dj khaled",
 													},
 												},
-												URLRewrite: &api.URLRewrite{
-													Path: "path",
-												},
 											},
-											Namespace: "some ns",
+											URLRewrite: &api.URLRewrite{
+												Path: "path",
+											},
 										},
+										Namespace: "some ns",
 									},
 								},
 							},
-							Hostnames: []string{"hostname.com"},
-							Meta:      map[string]string{},
-							Status:    api.ConfigEntryStatus{},
 						},
-						{
-							Kind:      api.HTTPRoute,
-							Name:      "my route 2",
-							Namespace: "default",
-							Partition: "default",
-						}: &api.HTTPRouteConfigEntry{
-							Kind: api.HTTPRoute,
-							Name: "my route 2",
-							Parents: []api.ResourceReference{
-								{
-									Kind:        api.APIGateway,
-									Name:        "api-gw",
-									SectionName: "listener-2",
-									Namespace:   "ns",
-								},
-							},
-							Rules: []api.HTTPRouteRule{
-								{
-									Filters: api.HTTPFilters{
-										Headers: []api.HTTPHeaderFilter{
-											{
-												Add: map[string]string{
-													"add it on": "the value",
-												},
-												Remove: []string{"time to go"},
-												Set: map[string]string{
-													"Magic":       "v2",
-													"Another One": "dj khaled",
-												},
-											},
-										},
-										URLRewrite: &api.URLRewrite{Path: "v1"},
-									},
-									Matches: []api.HTTPMatch{
-										{
-											Headers: []api.HTTPHeaderMatch{
-												{
-													Match: api.HTTPHeaderMatchExact,
-													Name:  "my header match",
-													Value: "the value",
-												},
-											},
-											Method: api.HTTPMatchMethodGet,
-											Path: api.HTTPPathMatch{
-												Match: api.HTTPPathMatchPrefix,
-												Value: "/v1",
-											},
-											Query: []api.HTTPQueryMatch{
-												{
-													Match: api.HTTPQueryMatchExact,
-													Name:  "search",
-													Value: "term",
-												},
-											},
-										},
-									},
-									Services: []api.HTTPService{
-										{
-											Name:   "service one",
-											Weight: 45,
-											Filters: api.HTTPFilters{
-												Headers: []api.HTTPHeaderFilter{
-													{
-														Add: map[string]string{
-															"svc - add it on": "svc - the value",
-														},
-														Remove: []string{"svc - time to go"},
-														Set: map[string]string{
-															"svc - Magic":       "svc - v2",
-															"svc - Another One": "svc - dj khaled",
-														},
-													},
-												},
-												URLRewrite: &api.URLRewrite{
-													Path: "path",
-												},
-											},
-											Namespace: "some ns",
-										},
-									},
-								},
-							},
-							Hostnames: []string{"hostname.com"},
-							Meta:      map[string]string{},
-							Status:    api.ConfigEntryStatus{},
-						},
+						Hostnames: []string{"hostname.com"},
+						Meta:      map[string]string{},
+						Status:    api.ConfigEntryStatus{},
 					},
-				},
+				})[api.HTTPRoute],
 			},
 			want: []api.ConfigEntry{
 				&api.HTTPRouteConfigEntry{
@@ -933,17 +882,96 @@ func Test_resourceCache_diff(t *testing.T) {
 		},
 		{
 			name: "same ref new cache has a greater modify index",
-			oldCache: &ReferenceMap{
-				data: map[api.ResourceReference]api.ConfigEntry{
-					{
-						Kind:      api.HTTPRoute,
-						Name:      "my route",
-						Namespace: "default",
-						Partition: "default",
-					}: &api.HTTPRouteConfigEntry{
+			oldCache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
+					Kind:        api.HTTPRoute,
+					Name:        "my route",
+					ModifyIndex: 1,
+					Parents: []api.ResourceReference{
+						{
+							Kind:        api.APIGateway,
+							Name:        "api-gw",
+							SectionName: "listener-1",
+							Namespace:   "ns",
+						},
+					},
+					Rules: []api.HTTPRouteRule{
+						{
+							Filters: api.HTTPFilters{
+								Headers: []api.HTTPHeaderFilter{
+									{
+										Add: map[string]string{
+											"add it on": "the value",
+										},
+										Remove: []string{"time to go"},
+										Set: map[string]string{
+											"Magic":       "v2",
+											"Another One": "dj khaled",
+										},
+									},
+								},
+								URLRewrite: &api.URLRewrite{Path: "v1"},
+							},
+							Matches: []api.HTTPMatch{
+								{
+									Headers: []api.HTTPHeaderMatch{
+										{
+											Match: api.HTTPHeaderMatchExact,
+											Name:  "my header match",
+											Value: "the value",
+										},
+									},
+									Method: api.HTTPMatchMethodGet,
+									Path: api.HTTPPathMatch{
+										Match: api.HTTPPathMatchPrefix,
+										Value: "/v1",
+									},
+									Query: []api.HTTPQueryMatch{
+										{
+											Match: api.HTTPQueryMatchExact,
+											Name:  "search",
+											Value: "term",
+										},
+									},
+								},
+							},
+							Services: []api.HTTPService{
+								{
+									Name:   "service one",
+									Weight: 45,
+									Filters: api.HTTPFilters{
+										Headers: []api.HTTPHeaderFilter{
+											{
+												Add: map[string]string{
+													"svc - add it on": "svc - the value",
+												},
+												Remove: []string{"svc - time to go"},
+												Set: map[string]string{
+													"svc - Magic":       "svc - v2",
+													"svc - Another One": "svc - dj khaled",
+												},
+											},
+										},
+										URLRewrite: &api.URLRewrite{
+											Path: "path",
+										},
+									},
+									Namespace: "some ns",
+								},
+							},
+						},
+					},
+					Hostnames: []string{"hostname.com"},
+					Meta:      map[string]string{},
+					Status:    api.ConfigEntryStatus{},
+				},
+			})[api.HTTPRoute],
+			args: args{
+				newCache: loadedReferenceMaps([]api.ConfigEntry{
+					&api.HTTPRouteConfigEntry{
 						Kind:        api.HTTPRoute,
 						Name:        "my route",
-						ModifyIndex: 1,
+						ModifyIndex: 10,
 						Parents: []api.ResourceReference{
 							{
 								Kind:        api.APIGateway,
@@ -1022,100 +1050,7 @@ func Test_resourceCache_diff(t *testing.T) {
 						Meta:      map[string]string{},
 						Status:    api.ConfigEntryStatus{},
 					},
-				},
-			},
-			args: args{
-				newCache: &ReferenceMap{
-					data: map[api.ResourceReference]api.ConfigEntry{
-						{
-							Kind:      api.HTTPRoute,
-							Name:      "my route",
-							Namespace: "default",
-							Partition: "default",
-						}: &api.HTTPRouteConfigEntry{
-							Kind:        api.HTTPRoute,
-							Name:        "my route",
-							ModifyIndex: 10,
-							Parents: []api.ResourceReference{
-								{
-									Kind:        api.APIGateway,
-									Name:        "api-gw",
-									SectionName: "listener-1",
-									Namespace:   "ns",
-								},
-							},
-							Rules: []api.HTTPRouteRule{
-								{
-									Filters: api.HTTPFilters{
-										Headers: []api.HTTPHeaderFilter{
-											{
-												Add: map[string]string{
-													"add it on": "the value",
-												},
-												Remove: []string{"time to go"},
-												Set: map[string]string{
-													"Magic":       "v2",
-													"Another One": "dj khaled",
-												},
-											},
-										},
-										URLRewrite: &api.URLRewrite{Path: "v1"},
-									},
-									Matches: []api.HTTPMatch{
-										{
-											Headers: []api.HTTPHeaderMatch{
-												{
-													Match: api.HTTPHeaderMatchExact,
-													Name:  "my header match",
-													Value: "the value",
-												},
-											},
-											Method: api.HTTPMatchMethodGet,
-											Path: api.HTTPPathMatch{
-												Match: api.HTTPPathMatchPrefix,
-												Value: "/v1",
-											},
-											Query: []api.HTTPQueryMatch{
-												{
-													Match: api.HTTPQueryMatchExact,
-													Name:  "search",
-													Value: "term",
-												},
-											},
-										},
-									},
-									Services: []api.HTTPService{
-										{
-											Name:   "service one",
-											Weight: 45,
-											Filters: api.HTTPFilters{
-												Headers: []api.HTTPHeaderFilter{
-													{
-														Add: map[string]string{
-															"svc - add it on": "svc - the value",
-														},
-														Remove: []string{"svc - time to go"},
-														Set: map[string]string{
-															"svc - Magic":       "svc - v2",
-															"svc - Another One": "svc - dj khaled",
-														},
-													},
-												},
-												URLRewrite: &api.URLRewrite{
-													Path: "path",
-												},
-											},
-											Namespace: "some ns",
-										},
-									},
-								},
-							},
-							Hostnames: []string{"hostname.com"},
-							Meta:      map[string]string{},
-							Status:    api.ConfigEntryStatus{},
-						},
-					},
-				},
+				})[api.HTTPRoute],
 			},
 			want: []api.ConfigEntry{
 				&api.HTTPRouteConfigEntry{
@@ -1220,7 +1155,7 @@ func TestCache_Subscribe(t *testing.T) {
 	type args struct {
 		ctx        context.Context
 		kind       string
-		translator translation.TranslatorFn
+		translator TranslatorFn
 	}
 	tests := []struct {
 		name             string
@@ -1462,7 +1397,7 @@ func TestCache_Get(t *testing.T) {
 		name  string
 		args  args
 		want  api.ConfigEntry
-		cache map[string]*ReferenceMap
+		cache map[string]*common.ReferenceMap
 	}{
 		{
 			name: "entry exists",
@@ -1477,32 +1412,18 @@ func TestCache_Get(t *testing.T) {
 				Name: "api-gw",
 				Meta: map[string]string{},
 			},
-			cache: map[string]*ReferenceMap{
-				api.APIGateway: {
-					data: map[api.ResourceReference]api.ConfigEntry{
-						{
-							Kind:      api.APIGateway,
-							Name:      "api-gw",
-							Namespace: "default",
-							Partition: "default",
-						}: &api.APIGatewayConfigEntry{
-							Kind: api.APIGateway,
-							Name: "api-gw",
-							Meta: map[string]string{},
-						},
-						{
-							Kind:      api.APIGateway,
-							Name:      "api-gw-2",
-							Namespace: "default",
-							Partition: "default",
-						}: &api.APIGatewayConfigEntry{
-							Kind: api.APIGateway,
-							Name: "api-gw-2",
-							Meta: map[string]string{},
-						},
-					},
+			cache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.APIGatewayConfigEntry{
+					Kind: api.APIGateway,
+					Name: "api-gw",
+					Meta: map[string]string{},
 				},
-			},
+				&api.APIGatewayConfigEntry{
+					Kind: api.APIGateway,
+					Name: "api-gw-2",
+					Meta: map[string]string{},
+				},
+			}),
 		},
 		{
 			name: "entry does not exist",
@@ -1513,32 +1434,18 @@ func TestCache_Get(t *testing.T) {
 				},
 			},
 			want: nil,
-			cache: map[string]*ReferenceMap{
-				api.APIGateway: {
-					data: map[api.ResourceReference]api.ConfigEntry{
-						{
-							Kind:      api.APIGateway,
-							Name:      "api-gw",
-							Namespace: "default",
-							Partition: "default",
-						}: &api.APIGatewayConfigEntry{
-							Kind: api.APIGateway,
-							Name: "api-gw",
-							Meta: map[string]string{},
-						},
-						{
-							Kind:      api.APIGateway,
-							Name:      "api-gw-2",
-							Namespace: "default",
-							Partition: "default",
-						}: &api.APIGatewayConfigEntry{
-							Kind: api.APIGateway,
-							Name: "api-gw-2",
-							Meta: map[string]string{},
-						},
-					},
+			cache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.APIGatewayConfigEntry{
+					Kind: api.APIGateway,
+					Name: "api-gw",
+					Meta: map[string]string{},
 				},
-			},
+				&api.APIGatewayConfigEntry{
+					Kind: api.APIGateway,
+					Name: "api-gw-2",
+					Meta: map[string]string{},
+				},
+			}),
 		},
 		{
 			name: "kind key does not exist",
@@ -1549,22 +1456,13 @@ func TestCache_Get(t *testing.T) {
 				},
 			},
 			want: nil,
-			cache: map[string]*ReferenceMap{
-				api.HTTPRoute: {
-					data: map[api.ResourceReference]api.ConfigEntry{
-						{
-							Kind:      api.HTTPRoute,
-							Name:      "api-gw",
-							Namespace: "default",
-							Partition: "default",
-						}: &api.HTTPRouteConfigEntry{
-							Kind: api.HTTPRoute,
-							Name: "route",
-							Meta: map[string]string{},
-						},
-					},
+			cache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
+					Kind: api.HTTPRoute,
+					Name: "route",
+					Meta: map[string]string{},
 				},
-			},
+			}),
 		},
 	}
 	for _, tt := range tests {
@@ -1665,32 +1563,18 @@ func Test_Run(t *testing.T) {
 		NamespacesEnabled:   false,
 		Logger:              logrtest.NewTestLogger(t),
 	})
-	prevCache := make(map[string]*ReferenceMap)
+	prevCache := make(map[string]*common.ReferenceMap)
 	for kind, cache := range c.cache {
-		resCache := NewReferenceMap()
+		resCache := common.NewReferenceMap()
 		for _, entry := range cache.Entries() {
-			resCache.Set(translation.EntryToReference(entry), entry)
+			resCache.Set(common.EntryToReference(entry), entry)
 		}
 		prevCache[kind] = resCache
 	}
 
-	expectedCache := map[string]*ReferenceMap{
-		api.APIGateway: {
-			data: map[api.ResourceReference]api.ConfigEntry{{Kind: api.APIGateway, Name: gw.Name, Namespace: "default", Partition: "default"}: gw},
-		},
-		api.TCPRoute: {
-			data: map[api.ResourceReference]api.ConfigEntry{{Kind: api.TCPRoute, Name: tcpRoute.Name, Namespace: "default", Partition: "default"}: tcpRoute},
-		},
-		api.HTTPRoute: {
-			data: map[api.ResourceReference]api.ConfigEntry{
-				{Kind: api.HTTPRoute, Name: httpRouteOne.Name, Namespace: "default", Partition: "default"}: httpRouteOne,
-				{Kind: api.HTTPRoute, Name: httpRouteTwo.Name, Namespace: "default", Partition: "default"}: httpRouteTwo,
-			},
-		},
-		api.InlineCertificate: {
-			data: map[api.ResourceReference]api.ConfigEntry{{Kind: api.InlineCertificate, Name: inlineCert.Name, Namespace: "default", Partition: "default"}: inlineCert},
-		},
-	}
+	expectedCache := loadedReferenceMaps([]api.ConfigEntry{
+		gw, tcpRoute, httpRouteOne, httpRouteTwo, inlineCert,
+	})
 
 	ctx, cancelFn := context.WithCancel(context.Background())
 
@@ -1786,14 +1670,17 @@ func Test_Run(t *testing.T) {
 	// cancel the context so the Run function exits
 	cancelFn()
 
+	sorter := func(x, y api.ConfigEntry) bool {
+		return x.GetName() < y.GetName()
+	}
 	// Check cache
 	// expect the cache to have changed
 	for _, kind := range Kinds {
-		if diff := cmp.Diff(prevCache[kind].data, c.cache[kind].data); diff == "" {
+		if diff := cmp.Diff(prevCache[kind].Entries(), c.cache[kind].Entries(), cmpopts.SortSlices(sorter)); diff == "" {
 			t.Error("Expect cache to have changed but it did not")
 		}
 
-		if diff := cmp.Diff(expectedCache[kind].data, c.cache[kind].data); diff != "" {
+		if diff := cmp.Diff(expectedCache[kind].Entries(), c.cache[kind].Entries(), cmpopts.SortSlices(sorter)); diff != "" {
 			t.Errorf("Cache.cache mismatch (-want +got):\n%s", diff)
 		}
 	}
@@ -2077,4 +1964,18 @@ func TestCache_Delete(t *testing.T) {
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
+}
+
+func loadedReferenceMaps(entries []api.ConfigEntry) map[string]*common.ReferenceMap {
+	refs := make(map[string]*common.ReferenceMap)
+
+	for _, entry := range entries {
+		refMap, ok := refs[entry.GetKind()]
+		if !ok {
+			refMap = common.NewReferenceMap()
+		}
+		refMap.Set(common.EntryToReference(entry), entry)
+		refs[entry.GetKind()] = refMap
+	}
+	return refs
 }
