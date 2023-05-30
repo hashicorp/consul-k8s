@@ -23,19 +23,18 @@ type ControlPlaneRequestLimitController struct {
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=controlplanerequestlimits,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=controlplanerequestlimits/status,verbs=get;update;patch
 
-func (c *ControlPlaneRequestLimitController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return c.ConfigEntryController.ReconcileEntry(ctx, c, req, &consulv1alpha1.ControlPlaneRequestLimit{})
+func (r *ControlPlaneRequestLimitController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ExportedServices{})
 }
 
-func (c *ControlPlaneRequestLimitController) Logger(name types.NamespacedName) logr.Logger {
-	return c.Log.WithValues("request", name)
+func (r *ControlPlaneRequestLimitController) Logger(name types.NamespacedName) logr.Logger {
+	return r.Log.WithValues("request", name)
 }
 
-func (c *ControlPlaneRequestLimitController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	return c.Status().Update(ctx, obj, opts...)
+func (r *ControlPlaneRequestLimitController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	return r.Status().Update(ctx, obj, opts...)
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (c *ControlPlaneRequestLimitController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &consulv1alpha1.ControlPlaneRequestLimit{}, c)
+func (r *ControlPlaneRequestLimitController) SetupWithManager(mgr ctrl.Manager) error {
+	return setupWithManager(mgr, &consulv1alpha1.ExportedServices{}, r)
 }
