@@ -15,7 +15,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// JWTProviderController reconciles a JWTProvider object
+// JWTProviderController reconciles a JWTProvider object.
 type JWTProviderController struct {
 	client.Client
 	Log                   logr.Logger

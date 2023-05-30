@@ -32,7 +32,7 @@ func init() {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// JWTProvider is the Schema for the jwtproviders API
+// JWTProvider is the Schema for the jwtproviders API.
 type JWTProvider struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -42,7 +42,7 @@ type JWTProvider struct {
 
 //+kubebuilder:object:root=true
 
-// JWTProviderList contains a list of JWTProvider
+// JWTProviderList contains a list of JWTProvider.
 type JWTProviderList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -1,0 +1,3 @@
+```release-note:feature
+helm: Add `JWTProvider` CRD for configuring the `jwt-provider` config entry.
+```
