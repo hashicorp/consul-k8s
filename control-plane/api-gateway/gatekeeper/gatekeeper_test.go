@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	common "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -44,7 +44,7 @@ var (
 		{
 			Name:     "Listener 2",
 			Port:     8081,
-			Protocol: "UDP",
+			Protocol: "TCP",
 		},
 	}
 )
@@ -52,7 +52,7 @@ var (
 type testCase struct {
 	gateway            gwv1beta1.Gateway
 	gatewayClassConfig v1alpha1.GatewayClassConfig
-	helmConfig         apigateway.HelmConfig
+	helmConfig         common.HelmConfig
 
 	initialResources resources
 	finalResources   resources
@@ -93,7 +93,7 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig:       apigateway.HelmConfig{},
+			helmConfig:       common.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -128,7 +128,7 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig:       apigateway.HelmConfig{},
+			helmConfig:       common.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -144,7 +144,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -176,7 +176,7 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{},
@@ -196,7 +196,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -230,7 +230,7 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{
@@ -269,7 +269,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "2"),
@@ -305,7 +305,7 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{
@@ -324,7 +324,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -378,7 +378,7 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{},
+			helmConfig: common.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
@@ -446,7 +446,7 @@ func TestDelete(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{},
+			helmConfig: common.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -483,7 +483,7 @@ func TestDelete(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{},
+			helmConfig: common.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -498,7 +498,7 @@ func TestDelete(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -536,7 +536,7 @@ func TestDelete(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{
@@ -555,7 +555,7 @@ func TestDelete(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
