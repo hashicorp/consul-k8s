@@ -257,9 +257,7 @@ spec:
                 {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
                 -enable-auto-encrypt \
                 {{- end }}
-                {{- if .Values.global.enableTelemetryCollector }}
-                -enable-telemetry-collector \
-                {{- end }}
+                -enable-telemetry-collector={{ .Values.global.metrics.enableTelemetryCollector}}  \
           startupProbe:
             httpGet:
               path: /readyz/ready
