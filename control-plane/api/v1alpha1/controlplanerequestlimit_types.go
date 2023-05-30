@@ -221,12 +221,12 @@ func (c *ControlPlaneRequestLimit) ToConsul(datacenter string) consul.ConfigEntr
 // MatchesConsul returns true if the resource has the same fields as the Consul
 // config entry.
 func (c *ControlPlaneRequestLimit) MatchesConsul(candidate consul.ConfigEntry) bool {
-	configEntry, ok := candidate.(*consul.IngressGatewayConfigEntry)
+	configEntry, ok := candidate.(*consul.RateLimitIPConfigEntry)
 	if !ok {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(c.ToConsul(""), configEntry, cmpopts.IgnoreFields(consul.IngressGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(c.ToConsul(""), configEntry, cmpopts.IgnoreFields(consul.RateLimitIPConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 // Validate returns an error if the resource is invalid.
