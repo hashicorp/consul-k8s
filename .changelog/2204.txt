@@ -1,0 +1,3 @@
+```release-note:security
+Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:9.2`. 
+```
