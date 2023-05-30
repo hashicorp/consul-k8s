@@ -164,7 +164,7 @@ jobs:
         if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
         uses: addnab/docker-run-action@v3  # TSCCR: no entry for repository "addnab/docker-run-action"
         with:
-          image: registry.access.redhat.com/ubi8/ubi:latest
+          image: registry.access.redhat.com/ubi9/ubi:latest
           options: -v ${{ github.workspace }}:/work
           run: |
             dnf install -qy openssl
