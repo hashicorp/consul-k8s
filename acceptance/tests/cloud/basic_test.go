@@ -102,6 +102,10 @@ func TestBasicCloud(t *testing.T) {
 	k8sClient := environment.KubernetesClientFromOptions(t, kubectlOptions)
 
 	cfg := suite.Config()
+
+	if cfg.HCPResourceID != "" {
+		resourceSecretKeyValue = cfg.HCPResourceID
+	}
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, resourceSecretName, resourceSecretKey, resourceSecretKeyValue)
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, clientIDSecretName, clientIDSecretKey, clientIDSecretKeyValue)
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, clientSecretName, clientSecretKey, clientSecretKeyValue)
@@ -172,10 +176,9 @@ func TestBasicCloud(t *testing.T) {
 		"global.tls.enabled":                   "true",
 		"global.tls.enableAutoEncrypt":         "true",
 		// TODO: Take this out
-		"global.image": "consul:local",
 
 		"telemetryCollector.enabled":                   "true",
-		"telemetryCollector.image":                     "consul-telemetry-collector:latest",
+		"telemetryCollector.image":                     cfg.ConsulCollectorImage,
 		"telemetryCollector.cloud.clientId.secretName": clientIDSecretName,
 		"telemetryCollector.cloud.clientId.secretKey":  clientIDSecretKey,
 
@@ -212,6 +215,12 @@ func TestBasicCloud(t *testing.T) {
 		// DOHIJfie9d9BQD52nZh3SGHz0b3vfJ430XrQmaNZ26fuIEyIYrpvyAhBXckj2iTD
 		// 1TXpqr/1D7EUbddktyhXTK9e
 		// -----END CERTIFICATE-----`,
+	}
+	if cfg.ConsulImage != "" {
+		helmValues["global.image"] = cfg.ConsulImage
+	}
+	if cfg.ConsulCollectorImage != "" {
+		helmValues["telemetryCollector.image"] = cfg.ConsulCollectorImage
 	}
 
 	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
