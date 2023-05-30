@@ -41,19 +41,17 @@ var (
 	clientSecretKey      = "client-sec-key"
 	clientSecretKeyValue = "client-secret"
 
-	apiHostSecretName = "apihost-sec-name"
-	apiHostSecretKey  = "apihost-sec-key"
-	// helloworldsvc.test.svc.cluster.local:9111.
-	apiHostSecretKeyValue = "fake-server:8080" //TODO this will be the name of the test service.
+	apiHostSecretName     = "apihost-sec-name"
+	apiHostSecretKey      = "apihost-sec-key"
+	apiHostSecretKeyValue = "fake-server:443"
 
 	authUrlSecretName     = "authurl-sec-name"
 	authUrlSecretKey      = "authurl-sec-key"
-	authUrlSecretKeyValue = "https://fake-server:443" //TODO this will be the name of the test service.
+	authUrlSecretKeyValue = "https://fake-server:443"
 
 	scadaAddressSecretName     = "scadaaddress-sec-name"
 	scadaAddressSecretKey      = "scadaaddress-sec-key"
-	scadaAddressSecretKeyValue = "fake-server:8080" //TODO this will be the name of the test service.
-
+	scadaAddressSecretKeyValue = "fake-server:443"
 )
 
 // The fake-server has a requestToken endpoint to retrieve the token.
@@ -186,14 +184,14 @@ func TestBasicCloud(t *testing.T) {
 		// Either we set the global.trustedCAs (make sure it's idented exactly) or we
 		// set TLS to insecure
 
-		"telemetryCollector.extraEnvironmentVars.HCP_API_TLS":   "disabled",
-		"telemetryCollector.extraEnvironmentVars.HCP_AUTH_TLS":  "insecure",
-		"telemetryCollector.extraEnvironmentVars.HCP_SCADA_TLS": "disabled",
-		// "telemetryCollector.extraEnvironmentVars.OTLP_EXPORTER_TLS": "disabled",
+		"telemetryCollector.extraEnvironmentVars.HCP_API_TLS":       "insecure",
+		"telemetryCollector.extraEnvironmentVars.HCP_AUTH_TLS":      "insecure",
+		"telemetryCollector.extraEnvironmentVars.HCP_SCADA_TLS":     "insecure",
+		"telemetryCollector.extraEnvironmentVars.OTLP_EXPORTER_TLS": "insecure",
 
-		"server.extraEnvironmentVars.HCP_API_TLS":   "disabled",
+		"server.extraEnvironmentVars.HCP_API_TLS":   "insecure",
 		"server.extraEnvironmentVars.HCP_AUTH_TLS":  "insecure",
-		"server.extraEnvironmentVars.HCP_SCADA_TLS": "disabled",
+		"server.extraEnvironmentVars.HCP_SCADA_TLS": "insecure",
 
 		// This is pregenerated CA used for testing. It can be replaced at any time and isn't
 		// meant for anything other than testing
@@ -218,14 +216,6 @@ func TestBasicCloud(t *testing.T) {
 
 	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 	consulCluster.Create(t)
-
-	// TODO remove once this is made this part of the standard k8s run
-	logger.Log(t, "creating proxy defaults that sets envoy_telemetry_collector_bind_socket_dir")
-	kustomizeDir := "../fixtures/bases/cloud/proxydefaults"
-	k8s.KubectlApplyK(t, ctx.KubectlOptions(t), kustomizeDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), kustomizeDir)
-	})
 
 	logger.Log(t, "creating static-server deployment")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
