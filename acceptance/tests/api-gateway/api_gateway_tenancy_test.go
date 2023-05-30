@@ -51,22 +51,22 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 		secure             bool
 		namespaceMirroring bool
 	}{
-		// {
-		// 	secure:             false,
-		// 	namespaceMirroring: false,
-		// },
-		// {
-		// 	secure:             true,
-		// 	namespaceMirroring: false,
-		// },
+		{
+			secure:             false,
+			namespaceMirroring: false,
+		},
+		{
+			secure:             true,
+			namespaceMirroring: false,
+		},
 		{
 			secure:             false,
 			namespaceMirroring: true,
 		},
-		// {
-		// 	secure:             true,
-		// 	namespaceMirroring: true,
-		// },
+		{
+			secure:             true,
+			namespaceMirroring: true,
+		},
 	}
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t, namespaces: %t", c.secure, c.namespaceMirroring)
@@ -218,21 +218,21 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 			})
 
-			// // check the Consul gateway is updated, with the listener.
-			// retryCheck(t, 2, func(r *retry.R) {
-			// 	entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", &api.QueryOptions{
-			// 		Namespace: gatewayNamespace,
-			// 	})
-			// 	require.NoError(r, err)
-			// 	gateway := entry.(*api.APIGatewayConfigEntry)
-			// 	fmt.Println(*gateway)
+			// check the Consul gateway is updated, with the listener.
+			retryCheck(t, 2, func(r *retry.R) {
+				entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", &api.QueryOptions{
+					Namespace: gatewayNamespace,
+				})
+				require.NoError(r, err)
+				gateway := entry.(*api.APIGatewayConfigEntry)
+				fmt.Println(*gateway)
 
-			// 	require.EqualValues(r, "gateway", gateway.Meta["k8s-name"])
-			// 	require.EqualValues(r, gatewayNamespace, gateway.Meta["k8s-namespace"])
-			// 	require.Len(r, gateway.Listeners, 1)
-			// 	checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
-			// 	checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("ResolvedRefs", "ResolvedRefs"))
-			// })
+				require.EqualValues(r, "gateway", gateway.Meta["k8s-name"])
+				require.EqualValues(r, gatewayNamespace, gateway.Meta["k8s-namespace"])
+				require.Len(r, gateway.Listeners, 1)
+				checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
+				checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("ResolvedRefs", "ResolvedRefs"))
+			})
 
 			// route updated with gateway and services allowed
 			retryCheck(t, 2, func(r *retry.R) {
@@ -249,7 +249,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 			})
 
-			// now check to make sure that the route is actually created
+			// now check to make sure that the route is updated and valid
 			retryCheck(t, 2, func(r *retry.R) {
 				// since we're not bound, check to make sure that the route doesn't target the gateway in Consul.
 				entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, "route", &api.QueryOptions{
