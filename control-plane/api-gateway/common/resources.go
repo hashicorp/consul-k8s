@@ -503,7 +503,9 @@ func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error
 		Entry: consulCertificate,
 		// just swallow the error and log it since we can't propagate status back on a certificate.
 		OnUpdate: func(error) {
-			s.logger.Error(err, "error syncing certificate to Consul")
+			if err != nil {
+				s.logger.Error(err, "error syncing certificate to Consul")
+			}
 		},
 	})
 
