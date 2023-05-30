@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -603,7 +603,7 @@ func TestProcessUpstreams(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			ep := &Controller{
-				Log:                    logrtest.NewTestLogger(t),
+				Log:                    logrtest.New(t),
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSetWith(),
 				EnableConsulNamespaces: tt.consulNamespacesEnabled,
@@ -902,7 +902,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			// Create the endpoints controller
 			ep := &Controller{
 				Client:                fakeClient,
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				ConsulClientConfig:    testClient.Cfg,
 				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
@@ -2057,7 +2057,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                fakeClient,
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				ConsulClientConfig:    testClient.Cfg,
 				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
@@ -3377,7 +3377,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                fakeClient,
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				ConsulClientConfig:    testClient.Cfg,
 				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
@@ -3627,7 +3627,7 @@ func TestReconcileUpdateEndpoint_LegacyService(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                fakeClient,
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				ConsulClientConfig:    testClient.Cfg,
 				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
@@ -4001,7 +4001,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			// Create the endpoints controller
 			ep := &Controller{
 				Client:                fakeClient,
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				ConsulClientConfig:    testClient.Cfg,
 				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
@@ -4146,7 +4146,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                fakeClient,
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				ConsulClientConfig:    testClient.Cfg,
 				ConsulServerConnMgr:   testClient.Watcher,
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
@@ -4232,7 +4232,7 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	// Create the endpoints controller.
 	ep := &Controller{
 		Client:                fakeClient,
-		Log:                   logrtest.NewTestLogger(t),
+		Log:                   logrtest.New(t),
 		ConsulClientConfig:    testClient.Cfg,
 		ConsulServerConnMgr:   testClient.Watcher,
 		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
@@ -5711,7 +5711,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 				Client:                 fakeClient,
 				EnableTransparentProxy: c.tproxyGlobalEnabled,
 				TProxyOverwriteProbes:  c.overwriteProbes,
-				Log:                    logrtest.NewTestLogger(t),
+				Log:                    logrtest.New(t),
 			}
 
 			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, *endpoints, api.HealthPassing)

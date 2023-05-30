@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -321,7 +321,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			// Create the peering dialer controller
 			controller := &PeeringDialerController{
 				Client:              fakeClient,
-				Log:                 logrtest.NewTestLogger(t),
+				Log:                 logrtest.New(t),
 				ConsulClientConfig:  testClient.Cfg,
 				ConsulServerConnMgr: testClient.Watcher,
 				Scheme:              s,
@@ -531,7 +531,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			// Create the peering dialer controller
 			controller := &PeeringDialerController{
 				Client:              fakeClient,
-				Log:                 logrtest.NewTestLogger(t),
+				Log:                 logrtest.New(t),
 				ConsulClientConfig:  consulConfig,
 				ConsulServerConnMgr: watcher,
 				Scheme:              s,
@@ -755,7 +755,7 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 	// Create the peering dialer controller.
 	pdc := &PeeringDialerController{
 		Client:              fakeClient,
-		Log:                 logrtest.NewTestLogger(t),
+		Log:                 logrtest.New(t),
 		ConsulClientConfig:  testClient.Cfg,
 		ConsulServerConnMgr: testClient.Watcher,
 		Scheme:              s,
@@ -887,7 +887,7 @@ func TestDialerUpdateStatus(t *testing.T) {
 			// Create the peering dialer controller.
 			controller := &PeeringDialerController{
 				Client: fakeClient,
-				Log:    logrtest.NewTestLogger(t),
+				Log:    logrtest.New(t),
 				Scheme: s,
 			}
 
@@ -999,7 +999,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 			// Create the peering dialer controller.
 			controller := &PeeringDialerController{
 				Client: fakeClient,
-				Log:    logrtest.NewTestLogger(t),
+				Log:    logrtest.New(t),
 				Scheme: s,
 			}
 
@@ -1282,7 +1282,7 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.dialers).Build()
 			controller := PeeringDialerController{
 				Client: fakeClient,
-				Log:    logrtest.NewTestLogger(t),
+				Log:    logrtest.New(t),
 			}
 			result := controller.requestsForPeeringTokens(tt.secret)
 

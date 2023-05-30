@@ -44,9 +44,10 @@ const (
 	terminatingGateway = "terminating-gateway"
 	ingressGateway     = "ingress-gateway"
 
-	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
-	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
-	defaultNS                  = "default"
+	kubernetesSuccessReasonMsg           = "Kubernetes health checks passing"
+	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
+	envoyTelemetryCollectorBindSocketDir = "envoy_telemetry_collector_bind_socket_dir"
+	defaultNS                            = "default"
 
 	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
@@ -118,6 +119,10 @@ type Controller struct {
 	// EnableAutoEncrypt indicates whether we should use auto-encrypt when talking
 	// to Consul client agents.
 	EnableAutoEncrypt bool
+
+	// EnableTelemetryCollector controls whether the proxy service should be registered
+	// with config to enable telemetry forwarding.
+	EnableTelemetryCollector bool
 
 	MetricsConfig metrics.Config
 	Log           logr.Logger
@@ -482,6 +487,10 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
 	}
 
+	if r.EnableTelemetryCollector {
+		proxyConfig.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/connect-inject"
+	}
+
 	if consulServicePort > 0 {
 		proxyConfig.LocalServiceAddress = "127.0.0.1"
 		proxyConfig.LocalServicePort = consulServicePort
@@ -759,6 +768,10 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 				},
 			}
 		}
+	}
+
+	if r.EnableTelemetryCollector {
+		service.Proxy.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/service"
 	}
 
 	serviceRegistration := &api.CatalogRegistration{
