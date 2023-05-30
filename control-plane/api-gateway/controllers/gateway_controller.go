@@ -161,6 +161,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	consulInlineCertificates := r.getConsulInlineCertificates()
 
 	binder := binding.NewBinder(binding.BinderConfig{
+		Logger:                   log,
 		Translator:               r.Translator,
 		ControllerName:           GatewayClassControllerName,
 		Namespaces:               namespaces,

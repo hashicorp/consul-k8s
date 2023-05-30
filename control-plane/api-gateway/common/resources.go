@@ -179,7 +179,7 @@ func (s *ResourceMap) HasMeshService(id types.NamespacedName) bool {
 }
 
 func (s *ResourceMap) Certificate(key types.NamespacedName) *corev1.Secret {
-	consulKey := s.toConsulReference(api.InlineCertificate, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
 	if secret, ok := s.certificateGateways[consulKey]; ok {
 		return &secret.secret
 	}
@@ -188,7 +188,7 @@ func (s *ResourceMap) Certificate(key types.NamespacedName) *corev1.Secret {
 
 func (s *ResourceMap) ReferenceCountCertificate(secret corev1.Secret) {
 	key := client.ObjectKeyFromObject(&secret)
-	consulKey := s.toConsulReference(api.InlineCertificate, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
 	if _, ok := s.certificateGateways[consulKey]; !ok {
 		s.certificateGateways[consulKey] = &certificate{
 			secret:   secret,
@@ -199,7 +199,7 @@ func (s *ResourceMap) ReferenceCountCertificate(secret corev1.Secret) {
 
 func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 	key := client.ObjectKeyFromObject(&gateway)
-	consulKey := s.toConsulReference(api.APIGateway, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
 
 	set := &resourceSet{
 		httpRoutes:    mapset.NewSet(),
@@ -209,7 +209,7 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 	}
 
 	for _, listener := range gateway.Spec.Listeners {
-		if listener.TLS == nil || *listener.TLS.Mode != gwv1beta1.TLSModeTerminate {
+		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
 			continue
 		}
 		for _, cert := range listener.TLS.CertificateRefs {
@@ -218,12 +218,11 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 
 				set.certificates.Add(certificateKey)
 
-				certificate, ok := s.certificateGateways[s.toConsulReference(
-					api.InlineCertificate,
-					certificateKey,
-				)]
+				consulCertificateKey := s.toConsulReference(api.InlineCertificate, certificateKey)
+				certificate, ok := s.certificateGateways[NormalizeMeta(consulCertificateKey)]
 				if ok {
 					certificate.gateways.Add(key)
+					set.consulObjects.Mark(consulCertificateKey)
 				}
 			}
 		}
@@ -233,7 +232,7 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 }
 
 func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceReference {
-	consulKey := s.toConsulReference(api.APIGateway, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
 
 	resources, ok := s.gatewayResources[consulKey]
 	if !ok {
@@ -242,18 +241,18 @@ func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceRefe
 
 	var toGC []api.ResourceReference
 
-	for id := range resources.consulObjects.data {
+	for _, id := range resources.consulObjects.IDs() {
 		// if any of these objects exist in the below maps
 		// it means we haven't "popped" it to be created
 		switch id.Kind {
 		case api.HTTPRoute:
-			if route, ok := s.consulHTTPRoutes[id]; ok && route.gateways.Cardinality() <= 1 {
+			if route, ok := s.consulHTTPRoutes[NormalizeMeta(id)]; ok && route.gateways.Cardinality() <= 1 {
 				// we only have a single reference, which will be this gateway, so drop
 				// the route altogether
 				toGC = append(toGC, id)
 			}
 		case api.TCPRoute:
-			if route, ok := s.consulTCPRoutes[id]; ok && route.gateways.Cardinality() <= 1 {
+			if route, ok := s.consulTCPRoutes[NormalizeMeta(id)]; ok && route.gateways.Cardinality() <= 1 {
 				// we only have a single reference, which will be this gateway, so drop
 				// the route altogether
 				toGC = append(toGC, id)
@@ -262,7 +261,7 @@ func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceRefe
 			if s.processedCertificates.Contains(id) {
 				continue
 			}
-			if route, ok := s.certificateGateways[id]; ok && route.gateways.Cardinality() <= 1 {
+			if route, ok := s.certificateGateways[NormalizeMeta(id)]; ok && route.gateways.Cardinality() <= 1 {
 				// we only have a single reference, which will be this gateway, so drop
 				// the route altogether
 				toGC = append(toGC, id)
@@ -289,7 +288,7 @@ func (s *ResourceMap) ReferenceCountConsulHTTPRoute(route api.HTTPRouteConfigEnt
 		set.gateways.Add(gatewayKey)
 	}
 
-	s.consulHTTPRoutes[key] = set
+	s.consulHTTPRoutes[NormalizeMeta(key)] = set
 }
 
 func (s *ResourceMap) ReferenceCountConsulTCPRoute(route api.TCPRouteConfigEntry) {
@@ -308,7 +307,7 @@ func (s *ResourceMap) ReferenceCountConsulTCPRoute(route api.TCPRouteConfigEntry
 		set.gateways.Add(gatewayKey)
 	}
 
-	s.consulTCPRoutes[key] = set
+	s.consulTCPRoutes[NormalizeMeta(key)] = set
 }
 
 func (s *ResourceMap) consulGatewaysForRoute(namespace string, refs []api.ResourceReference) mapset.Set {
@@ -326,7 +325,7 @@ func (s *ResourceMap) consulGatewaysForRoute(namespace string, refs []api.Resour
 
 func (s *ResourceMap) ReferenceCountHTTPRoute(route gwv1beta1.HTTPRoute) {
 	key := client.ObjectKeyFromObject(&route)
-	consulKey := s.toConsulReference(api.HTTPRoute, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
 
 	set := &httpRoute{
 		route:    route,
@@ -345,7 +344,7 @@ func (s *ResourceMap) ReferenceCountHTTPRoute(route gwv1beta1.HTTPRoute) {
 
 func (s *ResourceMap) ReferenceCountTCPRoute(route gwv1alpha2.TCPRoute) {
 	key := client.ObjectKeyFromObject(&route)
-	consulKey := s.toConsulReference(api.TCPRoute, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.TCPRoute, key))
 
 	set := &tcpRoute{
 		route:    route,
@@ -368,7 +367,7 @@ func (s *ResourceMap) gatewaysForRoute(namespace string, refs []gwv1beta1.Parent
 	for _, parent := range refs {
 		if NilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) && NilOrEqual(parent.Kind, "Gateway") {
 			key := IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace)
-			consulKey := s.toConsulReference(api.APIGateway, key)
+			consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
 
 			if _, ok := s.gatewayResources[consulKey]; ok {
 				gateways.Add(consulKey)
@@ -380,7 +379,7 @@ func (s *ResourceMap) gatewaysForRoute(namespace string, refs []gwv1beta1.Parent
 }
 
 func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
-	consulKey := s.toConsulReference(api.HTTPRoute, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
 
 	route, ok := s.httpRouteGateways[consulKey]
 	if !ok {
@@ -409,7 +408,7 @@ func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUp
 }
 
 func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
-	consulKey := s.toConsulReference(api.HTTPRoute, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
 
 	consulRoute, ok := s.consulHTTPRoutes[consulKey]
 	if ok {
@@ -426,14 +425,14 @@ func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(er
 }
 
 func (s *ResourceMap) CanGCHTTPRouteOnUnbind(id api.ResourceReference) bool {
-	if set := s.httpRouteGateways[id]; set != nil {
+	if set := s.httpRouteGateways[NormalizeMeta(id)]; set != nil {
 		return set.gateways.Cardinality() <= 1
 	}
 	return true
 }
 
 func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(*api.TCPRouteConfigEntry, api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
-	consulKey := s.toConsulReference(api.TCPRoute, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.TCPRoute, key))
 
 	route, ok := s.tcpRouteGateways[consulKey]
 	if !ok {
@@ -462,7 +461,7 @@ func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, onUpd
 }
 
 func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
-	consulKey := s.toConsulReference(api.TCPRoute, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.TCPRoute, key))
 
 	consulRoute, ok := s.consulTCPRoutes[consulKey]
 	if ok {
@@ -479,14 +478,14 @@ func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(err
 }
 
 func (s *ResourceMap) CanGCTCPRouteOnUnbind(id api.ResourceReference) bool {
-	if set := s.tcpRouteGateways[id]; set != nil {
+	if set := s.tcpRouteGateways[NormalizeMeta(id)]; set != nil {
 		return set.gateways.Cardinality() <= 1
 	}
 	return true
 }
 
 func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error {
-	consulKey := s.toConsulReference(api.InlineCertificate, key)
+	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
 
 	certificate, ok := s.certificateGateways[consulKey]
 	if !ok {
@@ -526,12 +525,12 @@ func (s *ResourceMap) Mutations() []*ConsulUpdateOperation {
 }
 
 func (s *ResourceMap) objectReference(o api.ConfigEntry) api.ResourceReference {
-	return NormalizeMeta(api.ResourceReference{
+	return api.ResourceReference{
 		Kind:      o.GetKind(),
 		Name:      o.GetName(),
 		Namespace: o.GetNamespace(),
 		Partition: s.translator.ConsulPartition,
-	})
+	}
 }
 
 func (s *ResourceMap) sectionlessParentReference(kind, namespace string, parent api.ResourceReference) api.ResourceReference {

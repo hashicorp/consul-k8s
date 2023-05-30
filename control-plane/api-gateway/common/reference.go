@@ -14,6 +14,7 @@ import (
 // for namespaces and partitions stored as "default").
 type ReferenceMap struct {
 	data  map[api.ResourceReference]api.ConfigEntry
+	ids   map[api.ResourceReference]struct{}
 	mutex sync.RWMutex
 }
 
@@ -21,7 +22,19 @@ type ReferenceMap struct {
 func NewReferenceMap() *ReferenceMap {
 	return &ReferenceMap{
 		data: make(map[api.ResourceReference]api.ConfigEntry),
+		ids:  make(map[api.ResourceReference]struct{}),
 	}
+}
+
+func (r *ReferenceMap) IDs() []api.ResourceReference {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	var ids []api.ResourceReference
+	for id := range r.ids {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 // Set adds an entry to the reference map.
@@ -29,6 +42,7 @@ func (r *ReferenceMap) Set(ref api.ResourceReference, v api.ConfigEntry) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
+	r.ids[ref] = struct{}{}
 	r.data[NormalizeMeta(ref)] = v
 }
 
@@ -61,6 +75,7 @@ func (r *ReferenceMap) Delete(ref api.ResourceReference) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
+	delete(r.ids, ref)
 	delete(r.data, NormalizeMeta(ref))
 }
 
@@ -103,7 +118,9 @@ func (r *ReferenceMap) Diff(other *ReferenceMap) []api.ConfigEntry {
 
 // ReferenceSet is a set of stored references.
 type ReferenceSet struct {
-	data  map[api.ResourceReference]struct{}
+	data map[api.ResourceReference]struct{}
+	ids  map[api.ResourceReference]struct{}
+
 	mutex sync.RWMutex
 }
 
@@ -111,6 +128,7 @@ type ReferenceSet struct {
 func NewReferenceSet() *ReferenceSet {
 	return &ReferenceSet{
 		data: make(map[api.ResourceReference]struct{}),
+		ids:  make(map[api.ResourceReference]struct{}),
 	}
 }
 
@@ -119,6 +137,7 @@ func (r *ReferenceSet) Mark(ref api.ResourceReference) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
+	r.ids[ref] = struct{}{}
 	r.data[NormalizeMeta(ref)] = struct{}{}
 }
 
@@ -136,7 +155,19 @@ func (r *ReferenceSet) Remove(ref api.ResourceReference) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
+	delete(r.ids, ref)
 	delete(r.data, NormalizeMeta(ref))
+}
+
+func (r *ReferenceSet) IDs() []api.ResourceReference {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	var ids []api.ResourceReference
+	for id := range r.ids {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 func NormalizeMeta(ref api.ResourceReference) api.ResourceReference {

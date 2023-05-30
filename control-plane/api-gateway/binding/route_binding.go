@@ -49,11 +49,14 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 	if r.isGatewayDeleted() {
 		if canGCOnUnbind(routeConsulKey, r.config.Resources) && common.RemoveFinalizer(route) {
 			kubernetesNeedsUpdate = true
+		} else {
+			// Remove the condition since we no longer know if we should
+			// control the route and drop any references for the Consul route.
+			// This only gets run if we can't GC the route at the end of this
+			// loop.
+			r.dropConsulRouteParent(snapshot, route, r.nonNormalizedConsulKey, r.config.Resources)
 		}
 
-		// remove the condition since we no longer know if we should
-		// control the route and drop any references for the Consul route
-		r.dropConsulRouteParent(snapshot, route, r.nonNormalizedConsulKey, r.config.Resources)
 		// drop the status conditions
 		if r.statusSetter.removeRouteReferences(route, filteredParents) {
 			kubernetesNeedsStatusUpdate = true
@@ -153,12 +156,6 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 
 	r.mutateRouteWithBindingResults(snapshot, route, r.nonNormalizedConsulKey, r.config.Resources, results)
 }
-
-// parentsForRoute constructs a list of Consul route parent references based on what parents actually bound
-// on a given route. This is necessary due to the fact that some additional validation in Kubernetes might
-// require a route not to actually be accepted by a gateway, whereas we may have laxer logic inside of Consul
-// itself. In these cases we want to just drop the parent reference in the Consul config entry we are going
-// to write in order for it not to succeed in binding where Kubernetes failed to bind.
 
 // filterParentRefs returns the subset of parent references on a route that point to the given gateway.
 func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv1beta1.ParentReference) []gwv1beta1.ParentReference {
@@ -396,7 +393,7 @@ func (r *Binder) handleRouteSyncStatus(snapshot *Snapshot, object client.Object)
 			Type:               "Synced",
 			Status:             metav1.ConditionTrue,
 			ObservedGeneration: object.GetGeneration(),
-			LastTransitionTime: metav1.Now(),
+			LastTransitionTime: timeFunc(),
 			Reason:             "Synced",
 			Message:            "route synced to Consul",
 		}
@@ -405,7 +402,7 @@ func (r *Binder) handleRouteSyncStatus(snapshot *Snapshot, object client.Object)
 				Type:               "Synced",
 				Status:             metav1.ConditionFalse,
 				ObservedGeneration: object.GetGeneration(),
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: timeFunc(),
 				Reason:             "SyncError",
 				Message:            err.Error(),
 			}
@@ -422,7 +419,7 @@ func (r *Binder) handleGatewaySyncStatus(snapshot *Snapshot, gateway *gwv1beta1.
 			Type:               "Synced",
 			Status:             metav1.ConditionTrue,
 			ObservedGeneration: gateway.Generation,
-			LastTransitionTime: metav1.Now(),
+			LastTransitionTime: timeFunc(),
 			Reason:             "Synced",
 			Message:            "gateway synced to Consul",
 		}
@@ -431,7 +428,7 @@ func (r *Binder) handleGatewaySyncStatus(snapshot *Snapshot, gateway *gwv1beta1.
 				Type:               "Synced",
 				Status:             metav1.ConditionFalse,
 				ObservedGeneration: gateway.Generation,
-				LastTransitionTime: metav1.Now(),
+				LastTransitionTime: timeFunc(),
 				Reason:             "SyncError",
 				Message:            err.Error(),
 			}

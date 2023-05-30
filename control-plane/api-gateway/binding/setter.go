@@ -35,7 +35,7 @@ func (s *setter) removeRouteReferences(route client.Object, refs []gwv1beta1.Par
 
 // setRouteCondition sets an route condition on its status with the given parent.
 func (s *setter) setRouteCondition(route client.Object, parent *gwv1beta1.ParentReference, condition metav1.Condition) bool {
-	condition.LastTransitionTime = metav1.Now()
+	condition.LastTransitionTime = timeFunc()
 	condition.ObservedGeneration = route.GetGeneration()
 
 	parents := getRouteParentsStatus(route)
@@ -50,7 +50,7 @@ func (s *setter) setRouteCondition(route client.Object, parent *gwv1beta1.Parent
 
 // setRouteConditionOnAllRefs sets an route condition and its status on all parents.
 func (s *setter) setRouteConditionOnAllRefs(route client.Object, condition metav1.Condition) bool {
-	condition.LastTransitionTime = metav1.Now()
+	condition.LastTransitionTime = timeFunc()
 	condition.ObservedGeneration = route.GetGeneration()
 
 	parents := getRouteParentsStatus(route)

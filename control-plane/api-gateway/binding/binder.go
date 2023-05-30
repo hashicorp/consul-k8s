@@ -5,6 +5,7 @@ package binding
 
 import (
 	mapset "github.com/deckarep/golang-set"
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -18,6 +19,8 @@ import (
 // BinderConfig configures a binder instance with all of the information
 // that it needs to know to generate a snapshot of bound state.
 type BinderConfig struct {
+	// Logger for any internal logs
+	Logger logr.Logger
 	// Translator instance initialized with proper name/namespace translation
 	// configuration from helm.
 	Translator common.ResourceTranslator
@@ -161,10 +164,16 @@ func (b *Binder) Snapshot() *Snapshot {
 	// process secrets
 	gatewaySecrets := secretsForGateway(b.config.Gateway, b.config.Resources)
 	certs := mapset.NewSet()
-	for secret := range gatewaySecrets.Iter() {
-		// ignore the error if the certificate cannot be processed and just don't add it into the final
-		// sync set
-		if err := b.config.Resources.TranslateInlineCertificate(secret.(types.NamespacedName)); err == nil {
+	if !isGatewayDeleted {
+		// we only do this if the gateway isn't going to be deleted so that the
+		// resources can get GC'd
+		for secret := range gatewaySecrets.Iter() {
+			// ignore the error if the certificate cannot be processed and just don't add it into the final
+			// sync set
+			if err := b.config.Resources.TranslateInlineCertificate(secret.(types.NamespacedName)); err != nil {
+				b.config.Logger.Error(err, "error parsing referenced secret, ignoring")
+				continue
+			}
 			certs.Add(secret)
 		}
 	}

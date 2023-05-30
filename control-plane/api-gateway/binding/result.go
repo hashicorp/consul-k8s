@@ -17,6 +17,11 @@ import (
 )
 
 var (
+	// override function for tests
+	timeFunc = metav1.Now
+)
+
+var (
 	// This is used for any error related to a lack of proper reference grant creation.
 	errRefNotPermitted = errors.New("reference not permitted due to lack of ReferenceGrant")
 )
@@ -246,7 +251,7 @@ type listenerValidationResult struct {
 
 // acceptedCondition constructs the condition for the Accepted status type.
 func (l listenerValidationResult) acceptedCondition(generation int64) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 	switch l.acceptedErr {
 	case errListenerPortUnavailable:
 		return metav1.Condition{
@@ -290,7 +295,7 @@ func (l listenerValidationResult) acceptedCondition(generation int64) metav1.Con
 
 // conflictedCondition constructs the condition for the Conflicted status type.
 func (l listenerValidationResult) conflictedCondition(generation int64) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 
 	switch l.conflictedErr {
 	case errListenerProtocolConflict:
@@ -325,7 +330,7 @@ func (l listenerValidationResult) conflictedCondition(generation int64) metav1.C
 
 // acceptedCondition constructs the condition for the ResolvedRefs status type.
 func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 
 	switch l.refErr {
 	case errListenerInvalidCertificateRef_NotFound, errListenerInvalidCertificateRef_NotSupported, errListenerInvalidCertificateRef_InvalidData:
@@ -410,7 +415,7 @@ type gatewayValidationResult struct {
 
 // programmedCondition returns a condition for the Programmed status type.
 func (l gatewayValidationResult) programmedCondition(generation int64) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 
 	switch l.programmedErr {
 	case errGatewayPending_Pods, errGatewayPending_Consul:
@@ -438,7 +443,7 @@ func (l gatewayValidationResult) programmedCondition(generation int64) metav1.Co
 // for whether or not any of the gateway's listeners are invalid, if they are, it overrides whatever
 // Reason is set as an error on the result and instead uses the ListenersNotValid reason.
 func (l gatewayValidationResult) acceptedCondition(generation int64, listenersInvalid bool) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 
 	if l.acceptedErr == nil {
 		if listenersInvalid {
