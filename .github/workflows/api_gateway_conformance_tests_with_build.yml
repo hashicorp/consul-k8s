@@ -98,11 +98,6 @@ jobs:
           load-docker-image: ${{ matrix.config.consul-k8s-image }}
           metallb-config-path: "consul-k8s/.github/workflows/api-gateway-conformance/metallb-config.yaml"
 
-      #TODO I'm not sure if we still need this since
-      - name: Install Consul CRDs
-        working-directory: "consul-k8s"
-        run: kubectl apply --kustomize="./charts/consul/crds"
-
       - name: Install Consul
         working-directory: "consul-k8s/.github/workflows/api-gateway-conformance"
         run: |
