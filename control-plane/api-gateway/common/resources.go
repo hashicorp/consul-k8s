@@ -146,11 +146,13 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 }
 
 func (s *ResourceMap) AddService(id types.NamespacedName, name string) {
-	s.services[id] = NormalizeMeta(api.ResourceReference{
+	// this needs to be not-normalized since it gets written straight
+	// to Consul's configuration, including in non-enterprise builds.
+	s.services[id] = api.ResourceReference{
 		Name:      name,
 		Namespace: s.translator.Namespace(id.Namespace),
 		Partition: s.translator.ConsulPartition,
-	})
+	}
 }
 
 func (s *ResourceMap) Service(id types.NamespacedName) api.ResourceReference {
@@ -163,12 +165,14 @@ func (s *ResourceMap) HasService(id types.NamespacedName) bool {
 }
 
 func (s *ResourceMap) AddMeshService(service v1alpha1.MeshService) {
+	// this needs to be not-normalized since it gets written straight
+	// to Consul's configuration, including in non-enterprise builds.
 	key := client.ObjectKeyFromObject(&service)
-	s.meshServices[key] = NormalizeMeta(api.ResourceReference{
+	s.meshServices[key] = api.ResourceReference{
 		Name:      service.Spec.Name,
 		Namespace: s.translator.Namespace(service.Namespace),
 		Partition: s.translator.ConsulPartition,
-	})
+	}
 }
 
 func (s *ResourceMap) MeshService(id types.NamespacedName) api.ResourceReference {

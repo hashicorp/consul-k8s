@@ -1146,7 +1146,6 @@ func TestTranslator_ToTCPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		k8sRoute     gwv1alpha2.TCPRoute
-		parentRefs   map[types.NamespacedName]api.ResourceReference
 		services     []types.NamespacedName
 		meshServices []v1alpha1.MeshService
 	}

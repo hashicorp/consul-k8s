@@ -716,20 +716,6 @@ func TestBinder_Lifecycle(t *testing.T) {
 				}),
 			},
 			expectedConsulUpdates: []api.ConfigEntry{
-				&api.TCPRouteConfigEntry{
-					Kind: api.TCPRoute,
-					Name: "tcp-route-two",
-					Meta: map[string]string{
-						"k8s-name":      "tcp-route-two",
-						"k8s-namespace": "",
-					},
-					// dropped ref to gateway
-					Parents: []api.ResourceReference{{
-						Kind: api.APIGateway,
-						Name: "gateway",
-					}},
-					Status: api.ConfigEntryStatus{Conditions: []api.Condition{}},
-				},
 				&api.HTTPRouteConfigEntry{
 					Kind: api.HTTPRoute,
 					Name: "http-route-two",
@@ -742,7 +728,19 @@ func TestBinder_Lifecycle(t *testing.T) {
 						Kind: api.APIGateway,
 						Name: "gateway",
 					}},
-					Status: api.ConfigEntryStatus{Conditions: []api.Condition{}},
+				},
+				&api.TCPRouteConfigEntry{
+					Kind: api.TCPRoute,
+					Name: "tcp-route-two",
+					Meta: map[string]string{
+						"k8s-name":      "tcp-route-two",
+						"k8s-namespace": "",
+					},
+					// dropped ref to gateway
+					Parents: []api.ResourceReference{{
+						Kind: api.APIGateway,
+						Name: "gateway",
+					}},
 				},
 			},
 			expectedConsulDeletions: []api.ResourceReference{

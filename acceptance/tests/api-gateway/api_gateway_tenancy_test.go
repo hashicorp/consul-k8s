@@ -148,17 +148,17 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
 			})
 
-			retryCheck(t, 2, func(r *retry.R) {
+			retryCheck(t, 10, func(r *retry.R) {
 				// since the sync operation should fail above, check that we don't have the entry in Consul.
 				_, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", &api.QueryOptions{
-					Namespace: gatewayNamespace,
+					Namespace: namespaceForConsul(c.namespaceMirroring, gatewayNamespace),
 				})
 				require.Error(r, err)
 				require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "api-gateway" / "gateway")`)
 			})
 
 			// route failure
-			retryCheck(t, 2, func(r *retry.R) {
+			retryCheck(t, 10, func(r *retry.R) {
 				var httproute gwv1beta1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
@@ -174,10 +174,10 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Synced", "Synced"))
 			})
 
-			retryCheck(t, 2, func(r *retry.R) {
+			retryCheck(t, 10, func(r *retry.R) {
 				// since we're not bound, check to make sure that the route doesn't target the gateway in Consul.
 				entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, "route", &api.QueryOptions{
-					Namespace: routeNamespace,
+					Namespace: namespaceForConsul(c.namespaceMirroring, routeNamespace),
 				})
 				require.NoError(r, err)
 				route := entry.(*api.HTTPRouteConfigEntry)
@@ -187,10 +187,10 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				require.Len(r, route.Parents, 0)
 			})
 
-			retryCheck(t, 2, func(r *retry.R) {
+			retryCheck(t, 10, func(r *retry.R) {
 				// we only sync validly referenced certificates over, so check to make sure it is not created.
 				_, _, err := consulClient.ConfigEntries().Get(api.InlineCertificate, "certificate", &api.QueryOptions{
-					Namespace: certificateNamespace,
+					Namespace: namespaceForConsul(c.namespaceMirroring, certificateNamespace),
 				})
 				require.Error(r, err)
 				require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "inline-certificate" / "certificate")`)
@@ -219,13 +219,12 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// check the Consul gateway is updated, with the listener.
-			retryCheck(t, 2, func(r *retry.R) {
+			retryCheck(t, 10, func(r *retry.R) {
 				entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", &api.QueryOptions{
-					Namespace: gatewayNamespace,
+					Namespace: namespaceForConsul(c.namespaceMirroring, gatewayNamespace),
 				})
 				require.NoError(r, err)
 				gateway := entry.(*api.APIGatewayConfigEntry)
-				fmt.Println(*gateway)
 
 				require.EqualValues(r, "gateway", gateway.Meta["k8s-name"])
 				require.EqualValues(r, gatewayNamespace, gateway.Meta["k8s-namespace"])
@@ -235,7 +234,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// route updated with gateway and services allowed
-			retryCheck(t, 2, func(r *retry.R) {
+			retryCheck(t, 10, func(r *retry.R) {
 				var httproute gwv1beta1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
@@ -250,10 +249,10 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// now check to make sure that the route is updated and valid
-			retryCheck(t, 2, func(r *retry.R) {
+			retryCheck(t, 10, func(r *retry.R) {
 				// since we're not bound, check to make sure that the route doesn't target the gateway in Consul.
 				entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, "route", &api.QueryOptions{
-					Namespace: routeNamespace,
+					Namespace: namespaceForConsul(c.namespaceMirroring, routeNamespace),
 				})
 				require.NoError(r, err)
 				route := entry.(*api.HTTPRouteConfigEntry)
@@ -264,9 +263,9 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// and check to make sure that the certificate exists
-			retryCheck(t, 2, func(r *retry.R) {
+			retryCheck(t, 10, func(r *retry.R) {
 				entry, _, err := consulClient.ConfigEntries().Get(api.InlineCertificate, "certificate", &api.QueryOptions{
-					Namespace: certificateNamespace,
+					Namespace: namespaceForConsul(c.namespaceMirroring, certificateNamespace),
 				})
 				require.NoError(r, err)
 				certificate := entry.(*api.InlineCertificateConfigEntry)
@@ -418,4 +417,11 @@ func createReferenceGrant(t *testing.T, client client.Client, name, from, to str
 			}},
 		},
 	}))
+}
+
+func namespaceForConsul(namespaceMirroringEnabled bool, namespace string) string {
+	if namespaceMirroringEnabled {
+		return namespace
+	}
+	return ""
 }

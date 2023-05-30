@@ -214,24 +214,12 @@ func (r *Binder) dropConsulRouteParent(snapshot *Snapshot, object client.Object,
 			entry.Parents = common.Filter(entry.Parents, func(parent api.ResourceReference) bool {
 				return consulParentMatches(entry.Namespace, gateway, parent)
 			})
-			entry.Status.Conditions = common.Filter(entry.Status.Conditions, func(condition api.Condition) bool {
-				if condition.Resource == nil {
-					return false
-				}
-				return consulParentMatches(entry.Namespace, gateway, *condition.Resource)
-			})
 			return entry
 		})
 	case *gwv1alpha2.TCPRoute:
 		resources.MutateTCPRoute(client.ObjectKeyFromObject(object), r.handleRouteSyncStatus(snapshot, object), func(entry api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
 			entry.Parents = common.Filter(entry.Parents, func(parent api.ResourceReference) bool {
 				return consulParentMatches(entry.Namespace, gateway, parent)
-			})
-			entry.Status.Conditions = common.Filter(entry.Status.Conditions, func(condition api.Condition) bool {
-				if condition.Resource == nil {
-					return false
-				}
-				return consulParentMatches(entry.Namespace, gateway, *condition.Resource)
 			})
 			return entry
 		})
@@ -242,14 +230,19 @@ func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client
 	key := client.ObjectKeyFromObject(object)
 
 	parents := mapset.NewSet()
+	// the normalized set keeps us from accidentally adding the same thing
+	// twice due to the Consul server normalizing our refs.
+	normalized := make(map[api.ResourceReference]api.ResourceReference)
 	for section := range results.boundSections().Iter() {
-		parents.Add(api.ResourceReference{
+		ref := api.ResourceReference{
 			Kind:        api.APIGateway,
 			Name:        gatewayConsulKey.Name,
 			SectionName: section.(string),
 			Namespace:   gatewayConsulKey.Namespace,
 			Partition:   gatewayConsulKey.Partition,
-		})
+		}
+		parents.Add(ref)
+		normalized[common.NormalizeMeta(ref)] = ref
 	}
 
 	switch object.(type) {
@@ -260,6 +253,9 @@ func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client
 					// drop any references that already exist
 					if parents.Contains(parent) {
 						parents.Remove(parent)
+					}
+					if id, ok := normalized[parent]; ok {
+						parents.Remove(id)
 					}
 				}
 
