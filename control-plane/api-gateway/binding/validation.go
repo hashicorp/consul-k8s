@@ -182,7 +182,7 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 		}
 
 		key := common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, namespace)
-		secret := resources.Secret(key)
+		secret := resources.Certificate(key)
 
 		if secret == nil {
 			err = errListenerInvalidCertificateRef_NotFound

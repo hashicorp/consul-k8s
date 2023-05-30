@@ -107,6 +107,7 @@ type ResourceMap struct {
 
 	services     map[types.NamespacedName]api.ResourceReference
 	meshServices map[types.NamespacedName]api.ResourceReference
+	certificates mapset.Set
 
 	// this acts a a secondary store of what has not yet
 	// been processed for the sake of garbage collection.
@@ -133,6 +134,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		processedCertificates:    mapset.NewSet(),
 		services:                 make(map[types.NamespacedName]api.ResourceReference),
 		meshServices:             make(map[types.NamespacedName]api.ResourceReference),
+		certificates:             mapset.NewSet(),
 		consulTCPRoutes:          make(map[api.ResourceReference]*consulTCPRoute),
 		consulHTTPRoutes:         make(map[api.ResourceReference]*consulHTTPRoute),
 		consulInlineCertificates: make(map[api.ResourceReference]mapset.Set),
@@ -144,11 +146,11 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 }
 
 func (s *ResourceMap) AddService(id types.NamespacedName, name string) {
-	s.services[id] = api.ResourceReference{
+	s.services[id] = NormalizeMeta(api.ResourceReference{
 		Name:      name,
 		Namespace: s.translator.Namespace(id.Namespace),
 		Partition: s.translator.ConsulPartition,
-	}
+	})
 }
 
 func (s *ResourceMap) Service(id types.NamespacedName) api.ResourceReference {
@@ -162,11 +164,11 @@ func (s *ResourceMap) HasService(id types.NamespacedName) bool {
 
 func (s *ResourceMap) AddMeshService(service v1alpha1.MeshService) {
 	key := client.ObjectKeyFromObject(&service)
-	s.meshServices[key] = api.ResourceReference{
+	s.meshServices[key] = NormalizeMeta(api.ResourceReference{
 		Name:      service.Spec.Name,
 		Namespace: s.translator.Namespace(service.Namespace),
 		Partition: s.translator.ConsulPartition,
-	}
+	})
 }
 
 func (s *ResourceMap) MeshService(id types.NamespacedName) api.ResourceReference {
@@ -179,6 +181,9 @@ func (s *ResourceMap) HasMeshService(id types.NamespacedName) bool {
 }
 
 func (s *ResourceMap) Certificate(key types.NamespacedName) *corev1.Secret {
+	if !s.certificates.Contains(key) {
+		return nil
+	}
 	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
 	if secret, ok := s.certificateGateways[consulKey]; ok {
 		return &secret.secret
@@ -188,6 +193,7 @@ func (s *ResourceMap) Certificate(key types.NamespacedName) *corev1.Secret {
 
 func (s *ResourceMap) ReferenceCountCertificate(secret corev1.Secret) {
 	key := client.ObjectKeyFromObject(&secret)
+	s.certificates.Add(key)
 	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
 	if _, ok := s.certificateGateways[consulKey]; !ok {
 		s.certificateGateways[consulKey] = &certificate{
@@ -510,16 +516,6 @@ func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error
 	})
 
 	return nil
-}
-
-func (s *ResourceMap) Secret(key types.NamespacedName) *corev1.Secret {
-	consulKey := s.toConsulReference(api.InlineCertificate, key)
-
-	certificate, ok := s.certificateGateways[NormalizeMeta(consulKey)]
-	if !ok {
-		return nil
-	}
-	return &certificate.secret
 }
 
 func (s *ResourceMap) Mutations() []*ConsulUpdateOperation {

@@ -98,8 +98,8 @@ func newTestResourceMap(t *testing.T, resources resourceMapResources) *common.Re
 func TestBinder_Lifecycle(t *testing.T) {
 	t.Parallel()
 
-	certificateOne, secretOne := generateTestCertificate(t, "", "secret-one")
-	certificateTwo, secretTwo := generateTestCertificate(t, "", "secret-two")
+	certificateOne, secretOne := generateTestCertificate(t, "default", "secret-one")
+	certificateTwo, secretTwo := generateTestCertificate(t, "default", "secret-two")
 
 	for name, tt := range map[string]struct {
 		resources               resourceMapResources
@@ -255,7 +255,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Name: "gateway",
 					Meta: map[string]string{
 						"k8s-name":      "gateway",
-						"k8s-namespace": "",
+						"k8s-namespace": "default",
 					},
 					Listeners: []api.APIGatewayListener{{
 						Protocol: "http",
@@ -316,7 +316,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Name: "gateway",
 					Meta: map[string]string{
 						"k8s-name":      "gateway",
-						"k8s-namespace": "",
+						"k8s-namespace": "default",
 					},
 					Listeners: []api.APIGatewayListener{},
 				},
@@ -385,7 +385,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Name: "gateway",
 					Meta: map[string]string{
 						"k8s-name":      "gateway",
-						"k8s-namespace": "",
+						"k8s-namespace": "default",
 					},
 					Listeners: []api.APIGatewayListener{},
 				},
@@ -441,7 +441,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Name: "gateway",
 					Meta: map[string]string{
 						"k8s-name":      "gateway",
-						"k8s-namespace": "",
+						"k8s-namespace": "default",
 					},
 					Listeners: []api.APIGatewayListener{},
 				},
@@ -510,7 +510,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Name: "gateway",
 					Meta: map[string]string{
 						"k8s-name":      "gateway",
-						"k8s-namespace": "",
+						"k8s-namespace": "default",
 					},
 					Listeners: []api.APIGatewayListener{},
 				},
@@ -2101,9 +2101,14 @@ func addClassConfig(g gwv1beta1.Gateway) *gwv1beta1.Gateway {
 func gatewayWithFinalizer(spec gwv1beta1.GatewaySpec) gwv1beta1.Gateway {
 	spec.GatewayClassName = testGatewayClassObjectName
 
+	typeMeta := metav1.TypeMeta{}
+	typeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("Gateway"))
+
 	return gwv1beta1.Gateway{
+		TypeMeta: typeMeta,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "gateway",
+			Namespace:  "default",
 			Finalizers: []string{common.GatewayFinalizer},
 		},
 		Spec: spec,
