@@ -485,9 +485,9 @@ func (s *ResourceMap) CanGCTCPRouteOnUnbind(id api.ResourceReference) bool {
 }
 
 func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error {
-	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
+	consulKey := s.toConsulReference(api.InlineCertificate, key)
 
-	certificate, ok := s.certificateGateways[consulKey]
+	certificate, ok := s.certificateGateways[NormalizeMeta(consulKey)]
 	if !ok {
 		return nil
 	}
@@ -515,7 +515,7 @@ func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error
 func (s *ResourceMap) Secret(key types.NamespacedName) *corev1.Secret {
 	consulKey := s.toConsulReference(api.InlineCertificate, key)
 
-	certificate, ok := s.certificateGateways[consulKey]
+	certificate, ok := s.certificateGateways[NormalizeMeta(consulKey)]
 	if !ok {
 		return nil
 	}
