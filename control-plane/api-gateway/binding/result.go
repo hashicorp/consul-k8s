@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	// override function for tests
+	// override function for tests.
 	timeFunc = metav1.Now
 )
 

@@ -37,7 +37,7 @@ func routeGroupKindsEqual(a, b gwv1beta1.RouteGroupKind) bool {
 }
 
 // this intentionally ignores the last set time so we don't
-// always fail a conditional check per-reconciliation
+// always fail a conditional check per-reconciliation.
 func conditionsEqual(a, b metav1.Condition) bool {
 	return a.Type == b.Type &&
 		a.Status == b.Status &&

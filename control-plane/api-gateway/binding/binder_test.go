@@ -2098,17 +2098,6 @@ func addClassConfig(g gwv1beta1.Gateway) *gwv1beta1.Gateway {
 	return &g
 }
 
-func consulCertificateNamespaceName(namespace, name string) *api.InlineCertificateConfigEntry {
-	return &api.InlineCertificateConfigEntry{
-		Kind: api.InlineCertificate,
-		Name: name,
-		Meta: map[string]string{
-			"k8s-name":      name,
-			"k8s-namespace": namespace,
-		},
-	}
-}
-
 func gatewayWithFinalizer(spec gwv1beta1.GatewaySpec) gwv1beta1.Gateway {
 	spec.GatewayClassName = testGatewayClassObjectName
 
@@ -2164,12 +2153,6 @@ func testHTTPRoute(name string, parents []string, services []string) gwv1beta1.H
 	}
 }
 
-func testHTTPRouteNamespace(name, namespace string, parents []string, services []string) gwv1beta1.HTTPRoute {
-	route := testHTTPRoute(name, parents, services)
-	route.Namespace = namespace
-	return route
-}
-
 func testHTTPRouteBackends(name, namespace string, services []gwv1beta1.BackendObjectReference, parents []gwv1beta1.ParentReference) *gwv1beta1.HTTPRoute {
 	var rules []gwv1beta1.HTTPRouteRule
 	for _, service := range services {
@@ -2221,12 +2204,6 @@ func testHTTPRouteStatus(name string, services []string, parentStatuses []gwv1be
 	route := testHTTPRoute(name, parentRefs, services)
 	route.Status.RouteStatus.Parents = parentStatuses
 
-	return route
-}
-
-func testHTTPRouteStatusNamespace(name, namespace string, services []string, parentStatuses []gwv1beta1.RouteParentStatus, extraParents ...string) gwv1beta1.HTTPRoute {
-	route := testHTTPRouteStatus(name, services, parentStatuses, extraParents...)
-	route.Namespace = namespace
 	return route
 }
 
@@ -2302,12 +2279,6 @@ func testTCPRouteStatusBackends(name, namespace string, services []gwv1beta1.Bac
 	return route
 }
 
-func testTCPRouteNamespace(name, namespace string, parents []string, services []string) gwv1alpha2.TCPRoute {
-	route := testTCPRoute(name, parents, services)
-	route.Namespace = namespace
-	return route
-}
-
 func testTCPRouteStatus(name string, services []string, parentStatuses []gwv1beta1.RouteParentStatus, extraParents ...string) gwv1alpha2.TCPRoute {
 	parentRefs := extraParents
 
@@ -2318,12 +2289,6 @@ func testTCPRouteStatus(name string, services []string, parentStatuses []gwv1bet
 	route := testTCPRoute(name, parentRefs, services)
 	route.Status.RouteStatus.Parents = parentStatuses
 
-	return route
-}
-
-func testTCPRouteStatusNamespace(name, namespace string, services []string, parentStatuses []gwv1beta1.RouteParentStatus, extraParents ...string) gwv1alpha2.TCPRoute {
-	route := testTCPRouteStatus(name, services, parentStatuses, extraParents...)
-	route.Namespace = namespace
 	return route
 }
 

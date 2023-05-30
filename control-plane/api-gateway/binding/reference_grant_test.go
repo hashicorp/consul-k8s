@@ -480,7 +480,7 @@ func TestReferenceAllowed(t *testing.T) {
 			toNamespace: FromNamespace,
 			toName:      string(objName),
 			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
-				gwv1beta1.ReferenceGrant{
+				{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: FromNamespace,
@@ -575,7 +575,7 @@ func TestReferenceAllowed(t *testing.T) {
 			toNamespace: ToNamespace,
 			toName:      string(objName),
 			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
-				gwv1beta1.ReferenceGrant{
+				{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: ToNamespace,
