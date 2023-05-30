@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package apigateway
+package common
 
 import (
 	"strings"
@@ -9,7 +9,42 @@ import (
 	"github.com/hashicorp/consul/api"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
+
+func GatewayStatusesEqual(a, b gwv1beta1.GatewayStatus) bool {
+	return slices.EqualFunc(a.Addresses, b.Addresses, gatewayStatusesAddressesEqual) &&
+		slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual) &&
+		slices.EqualFunc(a.Listeners, b.Listeners, gatewayStatusesListenersEqual)
+}
+
+func gatewayStatusesAddressesEqual(a, b gwv1beta1.GatewayAddress) bool {
+	return BothNilOrEqual(a.Type, b.Type) &&
+		a.Value == b.Value
+}
+
+func gatewayStatusesListenersEqual(a, b gwv1beta1.ListenerStatus) bool {
+	return a.AttachedRoutes == b.AttachedRoutes &&
+		a.Name == b.Name &&
+		slices.EqualFunc(a.SupportedKinds, b.SupportedKinds, routeGroupKindsEqual) &&
+		slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
+}
+
+func routeGroupKindsEqual(a, b gwv1beta1.RouteGroupKind) bool {
+	return BothNilOrEqual(a.Group, b.Group) &&
+		a.Kind == b.Kind
+}
+
+// this intentionally ignores the last set time so we don't
+// always fail a conditional check per-reconciliation
+func conditionsEqual(a, b metav1.Condition) bool {
+	return a.Type == b.Type &&
+		a.Status == b.Status &&
+		a.Reason == b.Reason &&
+		a.Message == b.Message &&
+		a.ObservedGeneration == b.ObservedGeneration
+}
 
 func EntriesEqual(a, b api.ConfigEntry) bool {
 	switch aCast := a.(type) {
@@ -67,7 +102,7 @@ func (e entryComparator) apiGatewayListenersEqual(a, b api.APIGatewayListener) b
 		a.Name == b.Name &&
 		a.Port == b.Port &&
 		// normalize the protocol name
-		strings.ToLower(a.Protocol) == strings.ToLower(b.Protocol) &&
+		strings.EqualFold(a.Protocol, b.Protocol) &&
 		e.apiGatewayListenerTLSConfigurationsEqual(a.TLS, b.TLS)
 }
 
@@ -205,19 +240,6 @@ func (e entryComparator) certificatesEqual(a, b api.InlineCertificateConfigEntry
 		maps.Equal(a.Meta, b.Meta) &&
 		a.Certificate == b.Certificate &&
 		a.PrivateKey == b.PrivateKey
-}
-
-func bothNilOrEqual[T comparable](one, two *T) bool {
-	if one == nil && two == nil {
-		return true
-	}
-	if one == nil {
-		return false
-	}
-	if two == nil {
-		return false
-	}
-	return *one == *two
 }
 
 func bothNilOrEqualFunc[T any](one, two *T, fn func(T, T) bool) bool {

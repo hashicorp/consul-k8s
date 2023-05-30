@@ -10,13 +10,14 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 var (
-	// this is used pretty much every reference grants need to be checked
+	// This is used for any error related to a lack of proper reference grant creation.
 	errRefNotPermitted = errors.New("reference not permitted due to lack of ReferenceGrant")
 )
 
@@ -49,8 +50,8 @@ type routeValidationResult struct {
 // a validation error.
 func (v routeValidationResult) Type() string {
 	return (&metav1.GroupKind{
-		Group: valueOr(v.backend.Group, ""),
-		Kind:  valueOr(v.backend.Kind, "Service"),
+		Group: common.ValueOr(v.backend.Group, ""),
+		Kind:  common.ValueOr(v.backend.Kind, common.KindService),
 	}).String()
 }
 

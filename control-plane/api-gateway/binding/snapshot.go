@@ -4,7 +4,7 @@
 package binding
 
 import (
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 )
@@ -15,10 +15,10 @@ type KubernetesSnapshot struct {
 	// Updates is the list of objects that need to have
 	// aspects of their metadata or spec updated in Kubernetes
 	// (i.e. for finalizers or annotations)
-	Updates *apigateway.KubernetesUpdates
+	Updates *common.KubernetesUpdates
 	// StatusUpdates is the list of objects that need
 	// to have their statuses updated in Kubernetes
-	StatusUpdates *apigateway.KubernetesUpdates
+	StatusUpdates *common.KubernetesUpdates
 }
 
 // ConsulSnapshot contains all the operations required
@@ -26,7 +26,7 @@ type KubernetesSnapshot struct {
 type ConsulSnapshot struct {
 	// Updates is the list of ConfigEntry objects that should
 	// either be updated or created in Consul
-	Updates []*apigateway.ConsulUpdateOperation
+	Updates []*common.ConsulUpdateOperation
 	// Deletions is a list of references that ought to be
 	// deleted in Consul
 	Deletions []api.ResourceReference
@@ -58,8 +58,8 @@ type Snapshot struct {
 func NewSnapshot() *Snapshot {
 	return &Snapshot{
 		Kubernetes: &KubernetesSnapshot{
-			Updates:       apigateway.NewKubernetesUpdates(),
-			StatusUpdates: apigateway.NewKubernetesUpdates(),
+			Updates:       common.NewKubernetesUpdates(),
+			StatusUpdates: common.NewKubernetesUpdates(),
 		},
 		Consul: &ConsulSnapshot{},
 	}

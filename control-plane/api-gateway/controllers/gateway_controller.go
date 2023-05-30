@@ -27,24 +27,18 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/binding"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/gatekeeper"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 )
 
-const (
-	gatewayFinalizer = "gateway-finalizer.consul.hashicorp.com"
-
-	kindGateway = "Gateway"
-)
-
 // GatewayControllerConfig holds the values necessary for configuring the GatewayController.
 type GatewayControllerConfig struct {
-	HelmConfig              apigateway.HelmConfig
+	HelmConfig              common.HelmConfig
 	ConsulClientConfig      *consul.Config
 	ConsulServerConnMgr     consul.ServerConnectionManager
 	NamespacesEnabled       bool
@@ -57,9 +51,9 @@ type GatewayControllerConfig struct {
 // GatewayController reconciles a Gateway object.
 // The Gateway is responsible for defining the behavior of API gateways.
 type GatewayController struct {
-	HelmConfig            apigateway.HelmConfig
+	HelmConfig            common.HelmConfig
 	Log                   logr.Logger
-	Translator            apigateway.ResourceTranslator
+	Translator            common.ResourceTranslator
 	cache                 *cache.Cache
 	gatewayCache          *cache.GatewayCache
 	allowK8sNamespacesSet mapset.Set
@@ -128,7 +122,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// construct our resource map
 	referenceValidator := binding.NewReferenceValidator(grants)
-	resources := apigateway.NewResourceMap(r.Translator, referenceValidator, log)
+	resources := common.NewResourceMap(r.Translator, referenceValidator, log)
 
 	if err := r.fetchCertificatesForGateway(ctx, resources, gateway); err != nil {
 		log.Error(err, "unable to fetch certificates for gateway")
@@ -283,14 +277,6 @@ func (r *GatewayController) updateAndResetStatus(ctx context.Context, o client.O
 	return nil
 }
 
-func derefAll[T any](vs []*T) []T {
-	e := make([]T, 0, len(vs))
-	for _, v := range vs {
-		e = append(e, *v)
-	}
-	return e
-}
-
 func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 	es := []T{}
 	for _, e := range entries {
@@ -338,7 +324,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
 		HelmConfig: config.HelmConfig,
-		Translator: apigateway.ResourceTranslator{
+		Translator: common.ResourceTranslator{
 			EnableConsulNamespaces: config.HelmConfig.EnableNamespaces,
 			ConsulDestNamespace:    config.HelmConfig.ConsulDestinationNamespace,
 			EnableK8sMirroring:     config.HelmConfig.EnableNamespaceMirroring,
@@ -410,13 +396,6 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		).Complete(r)
 }
 
-func serviceToNamespacedName(s *api.CatalogService) types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: s.ServiceMeta[constants.MetaKeyKubeNS],
-		Name:      s.ServiceMeta[constants.MetaKeyKubeServiceName],
-	}
-}
-
 // transformGatewayClass will check the list of GatewayClass objects for a matching
 // class, then return a list of reconcile Requests for it.
 func (r *GatewayController) transformGatewayClass(ctx context.Context) func(o client.Object) []reconcile.Request {
@@ -428,7 +407,7 @@ func (r *GatewayController) transformGatewayClass(ctx context.Context) func(o cl
 		}); err != nil {
 			return nil
 		}
-		return objectsToRequests(pointersOf(gatewayList.Items))
+		return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
 	}
 }
 
@@ -437,7 +416,7 @@ func (r *GatewayController) transformGatewayClass(ctx context.Context) func(o cl
 func (r *GatewayController) transformHTTPRoute(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		route := o.(*gwv1beta1.HTTPRoute)
-		return refsToRequests(parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs))
+		return refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
 	}
 }
 
@@ -446,7 +425,7 @@ func (r *GatewayController) transformHTTPRoute(ctx context.Context) func(o clien
 func (r *GatewayController) transformTCPRoute(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		route := o.(*gwv1alpha2.TCPRoute)
-		return refsToRequests(parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs))
+		return refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
 	}
 }
 
@@ -461,7 +440,7 @@ func (r *GatewayController) transformSecret(ctx context.Context) func(o client.O
 		}); err != nil {
 			return nil
 		}
-		return objectsToRequests(pointersOf(gatewayList.Items))
+		return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
 	}
 }
 
@@ -477,7 +456,7 @@ func (r *GatewayController) transformReferenceGrant(ctx context.Context) func(o 
 			return nil
 		}
 
-		return objectsToRequests(pointersOf(gatewayList.Items))
+		return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
 	}
 }
 
@@ -494,7 +473,7 @@ func (r *GatewayController) transformMeshService(ctx context.Context) func(o cli
 
 // transformConsulGateway will return a list of gateways that this corresponds to.
 func (r *GatewayController) transformConsulGateway(entry api.ConfigEntry) []types.NamespacedName {
-	return []types.NamespacedName{apigateway.EntryToNamespacedName(entry)}
+	return []types.NamespacedName{common.EntryToNamespacedName(entry)}
 }
 
 // transformConsulHTTPRoute will return a list of gateways that need to be reconciled.
@@ -513,7 +492,7 @@ func (r *GatewayController) transformConsulHTTPRoute(ctx context.Context) func(e
 		var gateways []types.NamespacedName
 		for parent := range parents.Iter() {
 			if gateway := r.cache.Get(parent.(api.ResourceReference)); gateway != nil {
-				gateways = append(gateways, apigateway.EntryToNamespacedName(gateway))
+				gateways = append(gateways, common.EntryToNamespacedName(gateway))
 			}
 		}
 		return gateways
@@ -535,7 +514,7 @@ func (r *GatewayController) transformConsulTCPRoute(ctx context.Context) func(en
 		var gateways []types.NamespacedName
 		for parent := range parents.Iter() {
 			if gateway := r.cache.Get(parent.(api.ResourceReference)); gateway != nil {
-				gateways = append(gateways, apigateway.EntryToNamespacedName(gateway))
+				gateways = append(gateways, common.EntryToNamespacedName(gateway))
 			}
 		}
 		return gateways
@@ -555,7 +534,7 @@ func (r *GatewayController) transformConsulInlineCertificate(ctx context.Context
 		for _, entry := range r.cache.List(api.APIGateway) {
 			gateway := entry.(*api.APIGatewayConfigEntry)
 			if gatewayReferencesCertificate(certificateKey, gateway) {
-				gateways = append(gateways, apigateway.EntryToNamespacedName(gateway))
+				gateways = append(gateways, common.EntryToNamespacedName(gateway))
 			}
 		}
 
@@ -596,7 +575,7 @@ func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tc
 		r.Log.Error(err, "unable to list TCPRoutes")
 	}
 	for _, route := range tcpRouteList.Items {
-		for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+		for _, ref := range common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs) {
 			requestSet[ref] = struct{}{}
 		}
 	}
@@ -608,7 +587,7 @@ func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tc
 		r.Log.Error(err, "unable to list HTTPRoutes")
 	}
 	for _, route := range httpRouteList.Items {
-		for _, ref := range parentRefs(gwv1beta1.GroupVersion.Group, kindGateway, route.Namespace, route.Spec.ParentRefs) {
+		for _, ref := range common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs) {
 			requestSet[ref] = struct{}{}
 		}
 	}
@@ -616,23 +595,6 @@ func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tc
 	requests := []reconcile.Request{}
 	for request := range requestSet {
 		requests = append(requests, reconcile.Request{NamespacedName: request})
-	}
-	return requests
-}
-
-// objectsToRequests takes a list of objects and returns a list of
-// reconcile Requests.
-func objectsToRequests[T metav1.Object](objects []T) []reconcile.Request {
-	requests := make([]reconcile.Request, 0, len(objects))
-
-	// TODO: is it possible to receive empty objects?
-	for _, object := range objects {
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: object.GetNamespace(),
-				Name:      object.GetName(),
-			},
-		})
 	}
 	return requests
 }
@@ -661,35 +623,6 @@ func refsToRequests(objects []types.NamespacedName) []reconcile.Request {
 		})
 	}
 	return requests
-}
-
-// parentRefs takes a list of ParentReference objects and returns a list of NamespacedName objects.
-func parentRefs(group, kind, namespace string, refs []gwv1beta1.ParentReference) []types.NamespacedName {
-	indexed := make([]types.NamespacedName, 0, len(refs))
-	for _, parent := range refs {
-		if nilOrEqual(parent.Group, group) && nilOrEqual(parent.Kind, kind) {
-			indexed = append(indexed, indexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace))
-		}
-	}
-	return indexed
-}
-
-func nilOrEqual[T ~string](v *T, check string) bool {
-	return v == nil || string(*v) == check
-}
-
-func indexedNamespacedNameWithDefault[T ~string, U ~string, V ~string](t T, u *U, v V) types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: derefStringOr(u, v),
-		Name:      string(t),
-	}
-}
-
-func derefStringOr[T ~string, U ~string](v *T, val U) string {
-	if v == nil {
-		return string(val)
-	}
-	return string(*v)
 }
 
 // kubernetes helpers
@@ -730,7 +663,7 @@ func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gatew
 }
 
 func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1beta1.Gateway) ([]corev1.Pod, error) {
-	labels := apigateway.LabelsForGateway(&gateway)
+	labels := common.LabelsForGateway(&gateway)
 
 	var list corev1.PodList
 
@@ -741,7 +674,7 @@ func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway 
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *apigateway.ResourceMap) ([]gwv1beta1.HTTPRoute, error) {
+func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1beta1.HTTPRoute, error) {
 	var list gwv1beta1.HTTPRouteList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
@@ -757,7 +690,7 @@ func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway ty
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName, resources *apigateway.ResourceMap) ([]gwv1alpha2.TCPRoute, error) {
+func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1alpha2.TCPRoute, error) {
 	var list gwv1alpha2.TCPRouteList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
@@ -805,7 +738,7 @@ func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gatew
 
 // resource map construction routines
 
-func (c *GatewayController) fetchControlledGateways(ctx context.Context, resources *apigateway.ResourceMap) error {
+func (c *GatewayController) fetchControlledGateways(ctx context.Context, resources *common.ResourceMap) error {
 	set := mapset.NewSet()
 
 	list := gwv1beta1.GatewayClassList{}
@@ -831,14 +764,14 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 	return nil
 }
 
-func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *apigateway.ResourceMap, gateway gwv1beta1.Gateway) error {
+func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *common.ResourceMap, gateway gwv1beta1.Gateway) error {
 	certificates := mapset.NewSet()
 
 	for _, listener := range gateway.Spec.Listeners {
 		if listener.TLS != nil {
 			for _, cert := range listener.TLS.CertificateRefs {
-				if nilOrEqual(cert.Group, "") && nilOrEqual(cert.Kind, "Secret") {
-					certificates.Add(apigateway.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace))
+				if common.NilOrEqual(cert.Group, "") && common.NilOrEqual(cert.Kind, common.KindSecret) {
+					certificates.Add(common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace))
 				}
 			}
 		}
@@ -853,7 +786,7 @@ func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, res
 	return nil
 }
 
-func (c *GatewayController) fetchSecret(ctx context.Context, resources *apigateway.ResourceMap, key types.NamespacedName) error {
+func (c *GatewayController) fetchSecret(ctx context.Context, resources *common.ResourceMap, key types.NamespacedName) error {
 	var secret corev1.Secret
 	if err := c.Client.Get(ctx, key, &secret); err != nil {
 		return client.IgnoreNotFound(err)
@@ -864,18 +797,18 @@ func (c *GatewayController) fetchSecret(ctx context.Context, resources *apigatew
 	return nil
 }
 
-func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *apigateway.ResourceMap, tcpRoutes []gwv1alpha2.TCPRoute, httpRoutes []gwv1beta1.HTTPRoute) error {
+func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *common.ResourceMap, tcpRoutes []gwv1alpha2.TCPRoute, httpRoutes []gwv1beta1.HTTPRoute) error {
 	serviceBackends := mapset.NewSet()
 	meshServiceBackends := mapset.NewSet()
 
 	for _, route := range httpRoutes {
 		for _, rule := range route.Spec.Rules {
 			for _, backend := range rule.BackendRefs {
-				if apigateway.DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&
-					apigateway.DerefEqual(backend.Kind, v1alpha1.MeshServiceKind) {
-					meshServiceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
-				} else if apigateway.NilOrEqual(backend.Group, "") && apigateway.NilOrEqual(backend.Kind, "Service") {
-					serviceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
+				if common.DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&
+					common.DerefEqual(backend.Kind, v1alpha1.MeshServiceKind) {
+					meshServiceBackends.Add(common.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
+				} else if common.NilOrEqual(backend.Group, "") && common.NilOrEqual(backend.Kind, "Service") {
+					serviceBackends.Add(common.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
 				}
 			}
 		}
@@ -884,11 +817,11 @@ func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resource
 	for _, route := range tcpRoutes {
 		for _, rule := range route.Spec.Rules {
 			for _, backend := range rule.BackendRefs {
-				if apigateway.DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&
-					apigateway.DerefEqual(backend.Kind, v1alpha1.MeshServiceKind) {
-					meshServiceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
-				} else if apigateway.NilOrEqual(backend.Group, "") && apigateway.NilOrEqual(backend.Kind, "Service") {
-					serviceBackends.Add(apigateway.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
+				if common.DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&
+					common.DerefEqual(backend.Kind, v1alpha1.MeshServiceKind) {
+					meshServiceBackends.Add(common.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
+				} else if common.NilOrEqual(backend.Group, "") && common.NilOrEqual(backend.Kind, "Service") {
+					serviceBackends.Add(common.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
 				}
 			}
 		}
@@ -908,7 +841,7 @@ func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resource
 	return nil
 }
 
-func (c *GatewayController) fetchMeshService(ctx context.Context, resources *apigateway.ResourceMap, key types.NamespacedName) error {
+func (c *GatewayController) fetchMeshService(ctx context.Context, resources *common.ResourceMap, key types.NamespacedName) error {
 	var service v1alpha1.MeshService
 	if err := c.Client.Get(ctx, key, &service); err != nil {
 		return client.IgnoreNotFound(err)
@@ -919,7 +852,7 @@ func (c *GatewayController) fetchMeshService(ctx context.Context, resources *api
 	return nil
 }
 
-func (c *GatewayController) fetchServicesForEndpoints(ctx context.Context, resources *apigateway.ResourceMap, key types.NamespacedName) error {
+func (c *GatewayController) fetchServicesForEndpoints(ctx context.Context, resources *common.ResourceMap, key types.NamespacedName) error {
 	if shouldIgnore(key.Namespace, c.denyK8sNamespacesSet, c.allowK8sNamespacesSet) {
 		return nil
 	}
@@ -967,7 +900,7 @@ func (c *GatewayController) getConsulGateway(ref api.ResourceReference) *api.API
 	return nil
 }
 
-func (c *GatewayController) getConsulHTTPRoutes(ref api.ResourceReference, resources *apigateway.ResourceMap) []api.HTTPRouteConfigEntry {
+func (c *GatewayController) getConsulHTTPRoutes(ref api.ResourceReference, resources *common.ResourceMap) []api.HTTPRouteConfigEntry {
 	var filtered []api.HTTPRouteConfigEntry
 
 	for _, route := range configEntriesTo[*api.HTTPRouteConfigEntry](c.cache.List(api.HTTPRoute)) {
@@ -979,7 +912,7 @@ func (c *GatewayController) getConsulHTTPRoutes(ref api.ResourceReference, resou
 	return filtered
 }
 
-func (c *GatewayController) getConsulTCPRoutes(ref api.ResourceReference, resources *apigateway.ResourceMap) []api.TCPRouteConfigEntry {
+func (c *GatewayController) getConsulTCPRoutes(ref api.ResourceReference, resources *common.ResourceMap) []api.TCPRouteConfigEntry {
 	var filtered []api.TCPRouteConfigEntry
 
 	for _, route := range configEntriesTo[*api.TCPRouteConfigEntry](c.cache.List(api.TCPRoute)) {
@@ -1007,8 +940,8 @@ func routeReferencesGateway(namespace string, ref api.ResourceReference, refs []
 	}
 
 	for _, parent := range refs {
-		if apigateway.EmptyOrEqual(parent.Kind, api.APIGateway) {
-			if apigateway.DefaultOrEqual(parent.Namespace, namespace, ref.Namespace) &&
+		if common.EmptyOrEqual(parent.Kind, api.APIGateway) {
+			if common.DefaultOrEqual(parent.Namespace, namespace, ref.Namespace) &&
 				parent.Name == ref.Name {
 				return true
 			}

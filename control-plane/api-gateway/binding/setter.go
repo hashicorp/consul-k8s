@@ -4,7 +4,7 @@
 package binding
 
 import (
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -54,7 +54,7 @@ func (s *setter) setRouteConditionOnAllRefs(route client.Object, condition metav
 	condition.ObservedGeneration = route.GetGeneration()
 
 	parents := getRouteParentsStatus(route)
-	statuses := apigateway.Filter(getRouteParentsStatus(route), func(status gwv1beta1.RouteParentStatus) bool {
+	statuses := common.Filter(getRouteParentsStatus(route), func(status gwv1beta1.RouteParentStatus) bool {
 		return string(status.ControllerName) != s.controllerName
 	})
 
@@ -70,24 +70,6 @@ func (s *setter) setRouteConditionOnAllRefs(route client.Object, condition metav
 	return updated
 }
 
-// removeStatuses removes all statuses set by the given controller from an route's status.
-func (s *setter) removeStatuses(route client.Object) bool {
-	modified := false
-	filtered := []gwv1beta1.RouteParentStatus{}
-	for _, status := range getRouteParentsStatus(route) {
-		if string(status.ControllerName) == s.controllerName {
-			modified = true
-			continue
-		}
-		filtered = append(filtered, status)
-	}
-
-	if modified {
-		setRouteParentsStatus(route, filtered)
-	}
-	return modified
-}
-
 // getParentStatus returns the section of a status referenced by the given parent reference.
 func (s *setter) getParentStatus(statuses []gwv1beta1.RouteParentStatus, parent *gwv1beta1.ParentReference) gwv1beta1.RouteParentStatus {
 	var parentRef gwv1beta1.ParentReference
@@ -96,7 +78,7 @@ func (s *setter) getParentStatus(statuses []gwv1beta1.RouteParentStatus, parent 
 	}
 
 	for _, status := range statuses {
-		if parentsEqual(status.ParentRef, parentRef) && string(status.ControllerName) == s.controllerName {
+		if common.ParentsEqual(status.ParentRef, parentRef) && string(status.ControllerName) == s.controllerName {
 			return status
 		}
 	}
@@ -111,7 +93,7 @@ func (s *setter) removeParentStatus(statuses []gwv1beta1.RouteParentStatus, pare
 	found := false
 	filtered := []gwv1beta1.RouteParentStatus{}
 	for _, status := range statuses {
-		if parentsEqual(status.ParentRef, parent) && string(status.ControllerName) == s.controllerName {
+		if common.ParentsEqual(status.ParentRef, parent) && string(status.ControllerName) == s.controllerName {
 			found = true
 			continue
 		}
@@ -141,19 +123,10 @@ func setCondition(conditions []metav1.Condition, condition metav1.Condition) ([]
 // setParentStatus updates or inserts the set of parent statuses with the newly modified parent.
 func (s *setter) setParentStatus(statuses []gwv1beta1.RouteParentStatus, parent gwv1beta1.RouteParentStatus) []gwv1beta1.RouteParentStatus {
 	for i, status := range statuses {
-		if parentsEqual(status.ParentRef, parent.ParentRef) && status.ControllerName == parent.ControllerName {
+		if common.ParentsEqual(status.ParentRef, parent.ParentRef) && status.ControllerName == parent.ControllerName {
 			statuses[i] = parent
 			return statuses
 		}
 	}
 	return append(statuses, parent)
-}
-
-// parentsEqual checks for equality between two parent references.
-func parentsEqual(one, two gwv1beta1.ParentReference) bool {
-	return bothNilOrEqual(one.Group, two.Group) &&
-		bothNilOrEqual(one.Kind, two.Kind) &&
-		bothNilOrEqual(one.SectionName, two.SectionName) &&
-		bothNilOrEqual(one.Port, two.Port) &&
-		one.Name == two.Name
 }

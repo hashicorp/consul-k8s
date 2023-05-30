@@ -7,7 +7,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/go-logr/logr"
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,19 +46,19 @@ func (r *GatewayCache) ServicesFor(ref api.ResourceReference) []api.CatalogServi
 	r.dataMutex.RLock()
 	defer r.dataMutex.RUnlock()
 
-	return r.data[apigateway.NormalizeMeta(ref)]
+	return r.data[common.NormalizeMeta(ref)]
 }
 
 func (r *GatewayCache) EnsureSubscribed(ref api.ResourceReference, resource types.NamespacedName) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if _, exists := r.subscribedGateways[apigateway.NormalizeMeta(ref)]; exists {
+	if _, exists := r.subscribedGateways[common.NormalizeMeta(ref)]; exists {
 		return
 	}
 
 	ctx, cancel := context.WithCancel(r.ctx)
-	r.subscribedGateways[apigateway.NormalizeMeta(ref)] = cancel
+	r.subscribedGateways[common.NormalizeMeta(ref)] = cancel
 	go r.subscribeToGateway(ctx, ref, resource)
 }
 
@@ -66,9 +66,9 @@ func (r *GatewayCache) RemoveSubscription(ref api.ResourceReference) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if cancel, exists := r.subscribedGateways[apigateway.NormalizeMeta(ref)]; exists {
+	if cancel, exists := r.subscribedGateways[common.NormalizeMeta(ref)]; exists {
 		cancel()
-		delete(r.subscribedGateways, apigateway.NormalizeMeta(ref))
+		delete(r.subscribedGateways, common.NormalizeMeta(ref))
 	}
 }
 
@@ -114,10 +114,10 @@ func (r *GatewayCache) subscribeToGateway(ctx context.Context, ref api.ResourceR
 
 		opts.WaitIndex = meta.LastIndex
 
-		derefed := derefAll(services)
+		derefed := common.DerefAll(services)
 
 		r.dataMutex.Lock()
-		r.data[apigateway.NormalizeMeta(ref)] = derefed
+		r.data[common.NormalizeMeta(ref)] = derefed
 		r.dataMutex.Unlock()
 
 		event := event.GenericEvent{
@@ -133,12 +133,4 @@ func (r *GatewayCache) subscribeToGateway(ctx context.Context, ref api.ResourceR
 		case r.events <- event:
 		}
 	}
-}
-
-func derefAll[T any](vs []*T) []T {
-	e := make([]T, 0, len(vs))
-	for _, v := range vs {
-		e = append(e, *v)
-	}
-	return e
 }

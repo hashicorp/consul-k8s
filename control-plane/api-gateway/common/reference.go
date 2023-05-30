@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package apigateway
+package common
 
 import (
 	"sync"
@@ -11,7 +11,7 @@ import (
 
 // ReferenceMap is contains a map of config entries stored
 // by their normalized resource references (with empty string
-// for namespaces and partitions stored as "default")
+// for namespaces and partitions stored as "default").
 type ReferenceMap struct {
 	data  map[api.ResourceReference]api.ConfigEntry
 	mutex sync.RWMutex

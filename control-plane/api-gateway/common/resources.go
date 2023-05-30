@@ -1,4 +1,7 @@
-package apigateway
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
+package common
 
 import (
 	mapset "github.com/deckarep/golang-set"

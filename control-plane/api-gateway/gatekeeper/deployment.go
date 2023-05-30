@@ -6,10 +6,10 @@ package gatekeeper
 import (
 	"context"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,7 +24,7 @@ const (
 	defaultInstances int32 = 1
 )
 
-func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
+func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	// Get Deployment if it exists.
 	existingDeployment := &appsv1.Deployment{}
 	exists := false
@@ -84,7 +84,7 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, nsname types.Namespac
 	return err
 }
 
-func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
+func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
 	initContainer, err := initContainer(config, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
@@ -99,16 +99,16 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      gateway.Name,
 			Namespace: gateway.Namespace,
-			Labels:    apigateway.LabelsForGateway(&gateway),
+			Labels:    common.LabelsForGateway(&gateway),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: deploymentReplicas(gcc, currentReplicas),
 			Selector: &metav1.LabelSelector{
-				MatchLabels: apigateway.LabelsForGateway(&gateway),
+				MatchLabels: common.LabelsForGateway(&gateway),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: apigateway.LabelsForGateway(&gateway),
+					Labels: common.LabelsForGateway(&gateway),
 					Annotations: map[string]string{
 						"consul.hashicorp.com/connect-inject": "false",
 					},
@@ -135,7 +135,7 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 									Weight: 1,
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: apigateway.LabelsForGateway(&gateway),
+											MatchLabels: common.LabelsForGateway(&gateway),
 										},
 										TopologyKey: "kubernetes.io/hostname",
 									},

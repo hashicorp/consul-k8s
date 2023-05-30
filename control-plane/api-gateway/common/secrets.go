@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package apigateway
+package common
 
 import (
 	"crypto/tls"
@@ -52,9 +52,7 @@ func ParseCertificateData(secret corev1.Secret) (cert string, privateKey string,
 func validateCertificateHosts(certificate *x509.Certificate) error {
 	hosts := []string{certificate.Subject.CommonName}
 
-	for _, name := range certificate.DNSNames {
-		hosts = append(hosts, name)
-	}
+	hosts = append(hosts, certificate.DNSNames...)
 
 	for _, ip := range certificate.IPAddresses {
 		hosts = append(hosts, ip.String())

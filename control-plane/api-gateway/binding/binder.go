@@ -5,8 +5,7 @@ package binding
 
 import (
 	mapset "github.com/deckarep/golang-set"
-	"github.com/google/go-cmp/cmp"
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -16,43 +15,12 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-const (
-	// gatewayFinalizer is the finalizer we add to any gateway object.
-	gatewayFinalizer = "gateway-finalizer.consul.hashicorp.com"
-
-	// namespaceNameLabel represents that label added automatically to namespaces in newer Kubernetes clusters.
-	namespaceNameLabel = "kubernetes.io/metadata.name"
-)
-
-var (
-	// constants extracted for ease of use.
-	kindGateway = "Gateway"
-	kindSecret  = "Secret"
-	betaGroup   = gwv1beta1.GroupVersion.Group
-
-	// the list of kinds we can support by listener protocol.
-	supportedKindsForProtocol = map[gwv1beta1.ProtocolType][]gwv1beta1.RouteGroupKind{
-		gwv1beta1.HTTPProtocolType: {{
-			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
-			Kind:  "HTTPRoute",
-		}},
-		gwv1beta1.HTTPSProtocolType: {{
-			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
-			Kind:  "HTTPRoute",
-		}},
-		gwv1beta1.TCPProtocolType: {{
-			Group: (*gwv1alpha2.Group)(&gwv1alpha2.GroupVersion.Group),
-			Kind:  "TCPRoute",
-		}},
-	}
-)
-
 // BinderConfig configures a binder instance with all of the information
 // that it needs to know to generate a snapshot of bound state.
 type BinderConfig struct {
 	// Translator instance initialized with proper name/namespace translation
 	// configuration from helm.
-	Translator apigateway.ResourceTranslator
+	Translator common.ResourceTranslator
 	// ControllerName is the name of the controller used in determining which
 	// gateways we control, also leveraged for setting route statuses.
 	ControllerName string
@@ -100,7 +68,7 @@ type BinderConfig struct {
 
 	// Resources is a map containing all service targets to verify
 	// against the routing backends.
-	Resources *apigateway.ResourceMap
+	Resources *common.ResourceMap
 }
 
 // Binder is used for generating a Snapshot of all operations that should occur both
@@ -164,7 +132,7 @@ func (b *Binder) Snapshot() *Snapshot {
 
 		// we don't have a deletion but if we add a finalizer for the gateway, then just add it and return
 		// otherwise try and resolve as much as possible
-		if ensureFinalizer(&b.config.Gateway) || updated {
+		if common.EnsureFinalizer(&b.config.Gateway) || updated {
 			// if we've added the finalizer or serialized the class config, then update
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
 			return snapshot
@@ -183,11 +151,11 @@ func (b *Binder) Snapshot() *Snapshot {
 	// attempt to bind all routes
 
 	for _, r := range b.config.HTTPRoutes {
-		b.bindRoute(pointerTo(r), boundCounts, snapshot)
+		b.bindRoute(common.PointerTo(r), boundCounts, snapshot)
 	}
 
 	for _, r := range b.config.TCPRoutes {
-		b.bindRoute(pointerTo(r), boundCounts, snapshot)
+		b.bindRoute(common.PointerTo(r), boundCounts, snapshot)
 	}
 
 	// process secrets
@@ -215,7 +183,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		snapshot.UpsertGatewayDeployment = true
 
 		entry := b.config.Translator.ToAPIGateway(b.config.Gateway, b.config.Resources)
-		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &apigateway.ConsulUpdateOperation{
+		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &common.ConsulUpdateOperation{
 			Entry:    entry,
 			OnUpdate: b.handleGatewaySyncStatus(snapshot, &b.config.Gateway),
 		})
@@ -262,10 +230,7 @@ func (b *Binder) Snapshot() *Snapshot {
 
 		// only mark the gateway as needing a status update if there's a diff with its old
 		// status, this keeps the controller from infinitely reconciling
-		if !cmp.Equal(status, b.config.Gateway.Status, cmp.FilterPath(func(p cmp.Path) bool {
-			path := p.String()
-			return path == "Listeners.Conditions.LastTransitionTime" || path == "Conditions.LastTransitionTime"
-		}, cmp.Ignore())) {
+		if !common.GatewayStatusesEqual(status, b.config.Gateway.Status) {
 			b.config.Gateway.Status = status
 			snapshot.Kubernetes.StatusUpdates.Add(&b.config.Gateway)
 		}
@@ -280,7 +245,7 @@ func (b *Binder) Snapshot() *Snapshot {
 				Namespace: service.Namespace,
 			})
 		}
-		if removeFinalizer(&b.config.Gateway) {
+		if common.RemoveFinalizer(&b.config.Gateway) {
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
 		}
 	}
@@ -288,7 +253,7 @@ func (b *Binder) Snapshot() *Snapshot {
 	return snapshot
 }
 
-func secretsForGateway(gateway gwv1beta1.Gateway, resources *apigateway.ResourceMap) mapset.Set {
+func secretsForGateway(gateway gwv1beta1.Gateway, resources *common.ResourceMap) mapset.Set {
 	set := mapset.NewSet()
 
 	for _, listener := range gateway.Spec.Listeners {
@@ -298,8 +263,8 @@ func secretsForGateway(gateway gwv1beta1.Gateway, resources *apigateway.Resource
 
 		for _, cert := range listener.TLS.CertificateRefs {
 			if resources.GatewayCanReferenceSecret(gateway, cert) {
-				if apigateway.NilOrEqual(cert.Group, "") && apigateway.NilOrEqual(cert.Kind, "Secret") {
-					key := apigateway.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace)
+				if common.NilOrEqual(cert.Group, "") && common.NilOrEqual(cert.Kind, common.KindSecret) {
+					key := common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace)
 					set.Add(key)
 				}
 			}
@@ -339,13 +304,13 @@ func addressesFromLoadBalancer(service *corev1.Service) []gwv1beta1.GatewayAddre
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
 		if ingress.IP != "" {
 			addresses = append(addresses, gwv1beta1.GatewayAddress{
-				Type:  pointerTo(gwv1beta1.IPAddressType),
+				Type:  common.PointerTo(gwv1beta1.IPAddressType),
 				Value: ingress.IP,
 			})
 		}
 		if ingress.Hostname != "" {
 			addresses = append(addresses, gwv1beta1.GatewayAddress{
-				Type:  pointerTo(gwv1beta1.HostnameAddressType),
+				Type:  common.PointerTo(gwv1beta1.HostnameAddressType),
 				Value: ingress.Hostname,
 			})
 		}
@@ -359,7 +324,7 @@ func addressesFromClusterIP(service *corev1.Service) []gwv1beta1.GatewayAddress 
 
 	if service.Spec.ClusterIP != "" {
 		addresses = append(addresses, gwv1beta1.GatewayAddress{
-			Type:  pointerTo(gwv1beta1.IPAddressType),
+			Type:  common.PointerTo(gwv1beta1.IPAddressType),
 			Value: service.Spec.ClusterIP,
 		})
 	}
@@ -375,7 +340,7 @@ func addressesFromPods(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
 		if pod.Status.PodIP != "" {
 			if _, found := seenIPs[pod.Status.PodIP]; !found {
 				addresses = append(addresses, gwv1beta1.GatewayAddress{
-					Type:  pointerTo(gwv1beta1.IPAddressType),
+					Type:  common.PointerTo(gwv1beta1.IPAddressType),
 					Value: pod.Status.PodIP,
 				})
 				seenIPs[pod.Status.PodIP] = struct{}{}
@@ -394,7 +359,7 @@ func addressesFromPodHosts(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
 		if pod.Status.HostIP != "" {
 			if _, found := seenIPs[pod.Status.HostIP]; !found {
 				addresses = append(addresses, gwv1beta1.GatewayAddress{
-					Type:  pointerTo(gwv1beta1.IPAddressType),
+					Type:  common.PointerTo(gwv1beta1.IPAddressType),
 					Value: pod.Status.HostIP,
 				})
 				seenIPs[pod.Status.HostIP] = struct{}{}
@@ -403,4 +368,9 @@ func addressesFromPodHosts(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
 	}
 
 	return addresses
+}
+
+// isDeleted checks if the deletion timestamp is set for an object.
+func isDeleted(object client.Object) bool {
+	return !object.GetDeletionTimestamp().IsZero()
 }

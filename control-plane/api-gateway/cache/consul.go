@@ -14,7 +14,7 @@ import (
 	"golang.org/x/exp/slices"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
@@ -42,7 +42,7 @@ type Cache struct {
 	serverMgr consul.ServerConnectionManager
 	logger    logr.Logger
 
-	cache      map[string]*apigateway.ReferenceMap
+	cache      map[string]*common.ReferenceMap
 	cacheMutex *sync.Mutex
 
 	subscribers     map[string][]*Subscription
@@ -57,9 +57,9 @@ type Cache struct {
 }
 
 func New(config Config) *Cache {
-	cache := make(map[string]*apigateway.ReferenceMap, len(Kinds))
+	cache := make(map[string]*common.ReferenceMap, len(Kinds))
 	for _, kind := range Kinds {
-		cache[kind] = apigateway.NewReferenceMap()
+		cache[kind] = common.NewReferenceMap()
 	}
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
@@ -180,10 +180,10 @@ func (c *Cache) subscribeToConsul(ctx context.Context, kind string) {
 func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind string, entries []api.ConfigEntry) {
 	c.cacheMutex.Lock()
 
-	cache := apigateway.NewReferenceMap()
+	cache := common.NewReferenceMap()
 
 	for _, entry := range entries {
-		cache.Set(entryToReference(entry), entry)
+		cache.Set(common.EntryToReference(entry), entry)
 	}
 
 	diffs := c.cache[kind].Diff(cache)
@@ -250,10 +250,10 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 		return nil
 	}
 
-	ref := entryToReference(entry)
+	ref := common.EntryToReference(entry)
 
 	old := entryMap.Get(ref)
-	if old != nil && apigateway.EntriesEqual(old, entry) {
+	if old != nil && common.EntriesEqual(old, entry) {
 		return nil
 	}
 
@@ -414,13 +414,4 @@ func ignoreACLsDisabled(err error) error {
 		return nil
 	}
 	return err
-}
-
-func entryToReference(entry api.ConfigEntry) api.ResourceReference {
-	return api.ResourceReference{
-		Kind:      entry.GetKind(),
-		Name:      entry.GetName(),
-		Partition: entry.GetPartition(),
-		Namespace: entry.GetNamespace(),
-	}
 }

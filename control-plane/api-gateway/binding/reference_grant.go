@@ -4,7 +4,7 @@
 package binding
 
 import (
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,7 +16,7 @@ type referenceValidator struct {
 	grants map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant
 }
 
-func NewReferenceValidator(grants []gwv1beta1.ReferenceGrant) apigateway.ReferenceValidator {
+func NewReferenceValidator(grants []gwv1beta1.ReferenceGrant) common.ReferenceValidator {
 	byNamespace := make(map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant)
 	for _, grant := range grants {
 		grantsForNamespace, ok := byNamespace[grant.Namespace]
@@ -40,7 +40,7 @@ func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gatewa
 
 	// Kind should default to Secret if not set
 	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/object_reference_types.go#LL59C21-L59C21
-	toNS, toGK := createValuesFromRef(secretRef.Namespace, secretRef.Group, secretRef.Kind, "Secret")
+	toNS, toGK := createValuesFromRef(secretRef.Namespace, secretRef.Group, secretRef.Kind, common.KindSecret)
 
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(secretRef.Name))
 }
@@ -54,7 +54,7 @@ func (rv *referenceValidator) HTTPRouteCanReferenceGateway(httproute gwv1beta1.H
 
 	// Kind should default to Gateway if not set
 	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/shared_types.go#L48
-	toNS, toGK := createValuesFromRef(parentRef.Namespace, parentRef.Group, parentRef.Kind, "Gateway")
+	toNS, toGK := createValuesFromRef(parentRef.Namespace, parentRef.Group, parentRef.Kind, common.KindGateway)
 
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(parentRef.Name))
 }
@@ -68,10 +68,9 @@ func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.H
 
 	// Kind should default to Service if not set
 	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/object_reference_types.go#L106
-	toNS, toGK := createValuesFromRef(backendRef.Namespace, backendRef.Group, backendRef.Kind, "Service")
+	toNS, toGK := createValuesFromRef(backendRef.Namespace, backendRef.Group, backendRef.Kind, common.KindService)
 
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(backendRef.Name))
-
 }
 
 func (rv *referenceValidator) TCPRouteCanReferenceGateway(tcpRoute gwv1alpha2.TCPRoute, parentRef gwv1beta1.ParentReference) bool {
@@ -83,7 +82,7 @@ func (rv *referenceValidator) TCPRouteCanReferenceGateway(tcpRoute gwv1alpha2.TC
 
 	// Kind should default to Gateway if not set
 	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/shared_types.go#L48
-	toNS, toGK := createValuesFromRef(parentRef.Namespace, parentRef.Group, parentRef.Kind, "Gateway")
+	toNS, toGK := createValuesFromRef(parentRef.Namespace, parentRef.Group, parentRef.Kind, common.KindGateway)
 
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(parentRef.Name))
 }
@@ -97,7 +96,7 @@ func (rv *referenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TC
 
 	// Kind should default to Service if not set
 	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/object_reference_types.go#L106
-	toNS, toGK := createValuesFromRef(backendRef.Namespace, backendRef.Group, backendRef.Kind, "Service")
+	toNS, toGK := createValuesFromRef(backendRef.Namespace, backendRef.Group, backendRef.Kind, common.KindService)
 
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(backendRef.Name))
 }

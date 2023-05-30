@@ -11,6 +11,7 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
@@ -149,9 +150,9 @@ func gatewayForSecret(o client.Object) []string {
 			continue
 		}
 		for _, cert := range listener.TLS.CertificateRefs {
-			if nilOrEqual(cert.Group, "") && nilOrEqual(cert.Kind, "Secret") {
+			if common.NilOrEqual(cert.Group, "") && common.NilOrEqual(cert.Kind, "Secret") {
 				// If an explicit Secret namespace is not provided, use the Gateway namespace to lookup the provided Secret Name.
-				secretReferences = append(secretReferences, indexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace).String())
+				secretReferences = append(secretReferences, common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace).String())
 			}
 		}
 	}
@@ -174,8 +175,8 @@ func servicesForHTTPRoute(o client.Object) []string {
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
 		for _, ref := range rule.BackendRefs {
-			if nilOrEqual(ref.Group, "") && nilOrEqual(ref.Kind, "Service") {
-				backendRef := indexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+			if common.NilOrEqual(ref.Group, "") && common.NilOrEqual(ref.Kind, "Service") {
+				backendRef := common.IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
 				for _, member := range refs {
 					if member == backendRef {
 						continue BACKEND_LOOP
@@ -194,9 +195,8 @@ func meshServicesForHTTPRoute(o client.Object) []string {
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
 		for _, ref := range rule.BackendRefs {
-			if ref.Group != nil && string(*ref.Group) == v1alpha1.ConsulHashicorpGroup &&
-				ref.Kind != nil && string(*ref.Kind) == v1alpha1.MeshServiceKind {
-				backendRef := indexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+			if common.DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && common.DerefEqual(ref.Kind, v1alpha1.MeshServiceKind) {
+				backendRef := common.IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
 				for _, member := range refs {
 					if member == backendRef {
 						continue BACKEND_LOOP
@@ -215,8 +215,8 @@ func servicesForTCPRoute(o client.Object) []string {
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
 		for _, ref := range rule.BackendRefs {
-			if nilOrEqual(ref.Group, "") && nilOrEqual(ref.Kind, "Service") {
-				backendRef := indexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+			if common.NilOrEqual(ref.Group, "") && common.NilOrEqual(ref.Kind, common.KindService) {
+				backendRef := common.IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
 				for _, member := range refs {
 					if member == backendRef {
 						continue BACKEND_LOOP
@@ -235,9 +235,8 @@ func meshServicesForTCPRoute(o client.Object) []string {
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
 		for _, ref := range rule.BackendRefs {
-			if ref.Group != nil && string(*ref.Group) == v1alpha1.ConsulHashicorpGroup &&
-				ref.Kind != nil && string(*ref.Kind) == v1alpha1.MeshServiceKind {
-				backendRef := indexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+			if common.DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && common.DerefEqual(ref.Kind, v1alpha1.MeshServiceKind) {
+				backendRef := common.IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
 				for _, member := range refs {
 					if member == backendRef {
 						continue BACKEND_LOOP
@@ -253,9 +252,9 @@ func meshServicesForTCPRoute(o client.Object) []string {
 func gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference) []string {
 	var references []string
 	for _, parent := range refs {
-		if nilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) && nilOrEqual(parent.Kind, "Gateway") {
+		if common.NilOrEqual(parent.Group, common.BetaGroup) && common.NilOrEqual(parent.Kind, common.KindGateway) {
 			// If an explicit Gateway namespace is not provided, use the Route namespace to lookup the provided Gateway Namespace.
-			references = append(references, indexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace).String())
+			references = append(references, common.IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace).String())
 		}
 	}
 	return references

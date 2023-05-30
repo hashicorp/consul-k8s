@@ -5,7 +5,7 @@ package binding
 
 import (
 	mapset "github.com/deckarep/golang-set"
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,14 +40,14 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 
 	if isDeleted(route) {
 		// mark the route as needing to get cleaned up if we detect that it's being deleted
-		if removeFinalizer(route) {
+		if common.RemoveFinalizer(route) {
 			kubernetesNeedsUpdate = true
 		}
 		return
 	}
 
 	if r.isGatewayDeleted() {
-		if canGCOnUnbind(routeConsulKey, r.config.Resources) && removeFinalizer(route) {
+		if canGCOnUnbind(routeConsulKey, r.config.Resources) && common.RemoveFinalizer(route) {
 			kubernetesNeedsUpdate = true
 		}
 
@@ -61,7 +61,7 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 		return
 	}
 
-	if ensureFinalizer(route) {
+	if common.EnsureFinalizer(route) {
 		kubernetesNeedsUpdate = true
 		return
 	}
@@ -152,8 +152,6 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 	}
 
 	r.mutateRouteWithBindingResults(snapshot, route, r.nonNormalizedConsulKey, r.config.Resources, results)
-
-	return
 }
 
 // parentsForRoute constructs a list of Consul route parent references based on what parents actually bound
@@ -166,9 +164,9 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv1beta1.ParentReference) []gwv1beta1.ParentReference {
 	references := []gwv1beta1.ParentReference{}
 	for _, ref := range refs {
-		if apigateway.NilOrEqual(ref.Group, betaGroup) &&
-			apigateway.NilOrEqual(ref.Kind, kindGateway) &&
-			gateway.Namespace == valueOr(ref.Namespace, namespace) &&
+		if common.NilOrEqual(ref.Group, common.BetaGroup) &&
+			common.NilOrEqual(ref.Kind, common.KindGateway) &&
+			gateway.Namespace == common.ValueOr(ref.Namespace, namespace) &&
 			gateway.Name == string(ref.Name) {
 			references = append(references, ref)
 		}
@@ -195,7 +193,7 @@ func listenersFor(gateway *gwv1beta1.Gateway, name *gwv1beta1.SectionName) []gwv
 }
 
 func consulParentMatches(namespace string, gatewayKey api.ResourceReference, parent api.ResourceReference) bool {
-	gatewayKey = apigateway.NormalizeMeta(gatewayKey)
+	gatewayKey = common.NormalizeMeta(gatewayKey)
 
 	if parent.Namespace == "" {
 		parent.Namespace = namespace
@@ -204,7 +202,7 @@ func consulParentMatches(namespace string, gatewayKey api.ResourceReference, par
 		parent.Kind = api.APIGateway
 	}
 
-	parent = apigateway.NormalizeMeta(parent)
+	parent = common.NormalizeMeta(parent)
 
 	return parent.Kind == api.APIGateway &&
 		parent.Name == gatewayKey.Name &&
@@ -212,14 +210,14 @@ func consulParentMatches(namespace string, gatewayKey api.ResourceReference, par
 		parent.Partition == gatewayKey.Partition
 }
 
-func (r *Binder) dropConsulRouteParent(snapshot *Snapshot, object client.Object, gateway api.ResourceReference, resources *apigateway.ResourceMap) {
+func (r *Binder) dropConsulRouteParent(snapshot *Snapshot, object client.Object, gateway api.ResourceReference, resources *common.ResourceMap) {
 	switch object.(type) {
 	case *gwv1beta1.HTTPRoute:
 		resources.MutateHTTPRoute(client.ObjectKeyFromObject(object), r.handleRouteSyncStatus(snapshot, object), func(entry api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry {
-			entry.Parents = apigateway.Filter(entry.Parents, func(parent api.ResourceReference) bool {
+			entry.Parents = common.Filter(entry.Parents, func(parent api.ResourceReference) bool {
 				return consulParentMatches(entry.Namespace, gateway, parent)
 			})
-			entry.Status.Conditions = apigateway.Filter(entry.Status.Conditions, func(condition api.Condition) bool {
+			entry.Status.Conditions = common.Filter(entry.Status.Conditions, func(condition api.Condition) bool {
 				if condition.Resource == nil {
 					return false
 				}
@@ -229,10 +227,10 @@ func (r *Binder) dropConsulRouteParent(snapshot *Snapshot, object client.Object,
 		})
 	case *gwv1alpha2.TCPRoute:
 		resources.MutateTCPRoute(client.ObjectKeyFromObject(object), r.handleRouteSyncStatus(snapshot, object), func(entry api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
-			entry.Parents = apigateway.Filter(entry.Parents, func(parent api.ResourceReference) bool {
+			entry.Parents = common.Filter(entry.Parents, func(parent api.ResourceReference) bool {
 				return consulParentMatches(entry.Namespace, gateway, parent)
 			})
-			entry.Status.Conditions = apigateway.Filter(entry.Status.Conditions, func(condition api.Condition) bool {
+			entry.Status.Conditions = common.Filter(entry.Status.Conditions, func(condition api.Condition) bool {
 				if condition.Resource == nil {
 					return false
 				}
@@ -243,7 +241,7 @@ func (r *Binder) dropConsulRouteParent(snapshot *Snapshot, object client.Object,
 	}
 }
 
-func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client.Object, gatewayConsulKey api.ResourceReference, resources *apigateway.ResourceMap, results parentBindResults) {
+func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client.Object, gatewayConsulKey api.ResourceReference, resources *common.ResourceMap, results parentBindResults) {
 	key := client.ObjectKeyFromObject(object)
 
 	parents := mapset.NewSet()
@@ -309,7 +307,7 @@ func entryKind(object client.Object) string {
 	return ""
 }
 
-func canGCOnUnbind(id api.ResourceReference, resources *apigateway.ResourceMap) bool {
+func canGCOnUnbind(id api.ResourceReference, resources *common.ResourceMap) bool {
 	switch id.Kind {
 	case api.HTTPRoute:
 		return resources.CanGCHTTPRouteOnUnbind(id)
@@ -317,25 +315,6 @@ func canGCOnUnbind(id api.ResourceReference, resources *apigateway.ResourceMap) 
 		return resources.CanGCTCPRouteOnUnbind(id)
 	}
 	return true
-}
-
-func setParents(entry api.ConfigEntry, parents []api.ResourceReference) {
-	switch v := entry.(type) {
-	case *api.HTTPRouteConfigEntry:
-		v.Parents = parents
-	case *api.TCPRouteConfigEntry:
-		v.Parents = parents
-	}
-}
-
-func getConsulParents(entry api.ConfigEntry) []api.ResourceReference {
-	switch v := entry.(type) {
-	case *api.HTTPRouteConfigEntry:
-		return v.Parents
-	case *api.TCPRouteConfigEntry:
-		return v.Parents
-	}
-	return nil
 }
 
 func getRouteHostnames(object client.Object) []gwv1beta1.Hostname {
@@ -378,20 +357,20 @@ func setRouteParentsStatus(object client.Object, parents []gwv1beta1.RouteParent
 func getRouteBackends(object client.Object) []gwv1beta1.BackendRef {
 	switch v := object.(type) {
 	case *gwv1beta1.HTTPRoute:
-		return apigateway.Flatten(apigateway.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1beta1.HTTPRouteRule) []gwv1beta1.BackendRef {
-			return apigateway.ConvertSliceFunc(rule.BackendRefs, func(rule gwv1beta1.HTTPBackendRef) gwv1beta1.BackendRef {
+		return common.Flatten(common.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1beta1.HTTPRouteRule) []gwv1beta1.BackendRef {
+			return common.ConvertSliceFunc(rule.BackendRefs, func(rule gwv1beta1.HTTPBackendRef) gwv1beta1.BackendRef {
 				return rule.BackendRef
 			})
 		}))
 	case *gwv1alpha2.TCPRoute:
-		return apigateway.Flatten(apigateway.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1alpha2.TCPRouteRule) []gwv1beta1.BackendRef {
+		return common.Flatten(common.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1alpha2.TCPRouteRule) []gwv1beta1.BackendRef {
 			return rule.BackendRefs
 		}))
 	}
 	return nil
 }
 
-func canReferenceGateway(object client.Object, ref gwv1beta1.ParentReference, resources *apigateway.ResourceMap) bool {
+func canReferenceGateway(object client.Object, ref gwv1beta1.ParentReference, resources *common.ResourceMap) bool {
 	switch v := object.(type) {
 	case *gwv1beta1.HTTPRoute:
 		return resources.HTTPRouteCanReferenceGateway(*v, ref)
@@ -401,7 +380,7 @@ func canReferenceGateway(object client.Object, ref gwv1beta1.ParentReference, re
 	return false
 }
 
-func canReferenceBackend(object client.Object, ref gwv1beta1.BackendRef, resources *apigateway.ResourceMap) bool {
+func canReferenceBackend(object client.Object, ref gwv1beta1.BackendRef, resources *common.ResourceMap) bool {
 	switch v := object.(type) {
 	case *gwv1beta1.HTTPRoute:
 		return resources.HTTPRouteCanReferenceBackend(*v, ref)

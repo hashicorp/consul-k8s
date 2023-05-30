@@ -6,7 +6,7 @@ package binding
 import (
 	"strings"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -19,9 +19,27 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
+var (
+	// the list of kinds we can support by listener protocol.
+	supportedKindsForProtocol = map[gwv1beta1.ProtocolType][]gwv1beta1.RouteGroupKind{
+		gwv1beta1.HTTPProtocolType: {{
+			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
+			Kind:  "HTTPRoute",
+		}},
+		gwv1beta1.HTTPSProtocolType: {{
+			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
+			Kind:  "HTTPRoute",
+		}},
+		gwv1beta1.TCPProtocolType: {{
+			Group: (*gwv1alpha2.Group)(&gwv1alpha2.GroupVersion.Group),
+			Kind:  "TCPRoute",
+		}},
+	}
+)
+
 // validateRefs validates backend references for a route, determining whether or
 // not they were found in the list of known connect-injected services.
-func validateRefs(route client.Object, refs []gwv1beta1.BackendRef, resources *apigateway.ResourceMap) routeValidationResults {
+func validateRefs(route client.Object, refs []gwv1beta1.BackendRef, resources *common.ResourceMap) routeValidationResults {
 	namespace := route.GetNamespace()
 
 	var result routeValidationResults
@@ -30,11 +48,11 @@ func validateRefs(route client.Object, refs []gwv1beta1.BackendRef, resources *a
 
 		nsn := types.NamespacedName{
 			Name:      string(backendRef.Name),
-			Namespace: valueOr(backendRef.Namespace, namespace),
+			Namespace: common.ValueOr(backendRef.Namespace, namespace),
 		}
 
-		isServiceRef := apigateway.NilOrEqual(backendRef.Group, "") && apigateway.NilOrEqual(backendRef.Kind, "Service")
-		isMeshServiceRef := derefEqual(backendRef.Group, v1alpha1.ConsulHashicorpGroup) && derefEqual(backendRef.Kind, v1alpha1.MeshServiceKind)
+		isServiceRef := common.NilOrEqual(backendRef.Group, "") && common.NilOrEqual(backendRef.Kind, common.KindService)
+		isMeshServiceRef := common.DerefEqual(backendRef.Group, v1alpha1.ConsulHashicorpGroup) && common.DerefEqual(backendRef.Kind, v1alpha1.MeshServiceKind)
 
 		if !isServiceRef && !isMeshServiceRef {
 			result = append(result, routeValidationResult{
@@ -117,7 +135,7 @@ func (m mergedListeners) validateProtocol() error {
 	var protocol *gwv1beta1.ProtocolType
 	for _, l := range m {
 		if protocol == nil {
-			protocol = pointerTo(l.listener.Protocol)
+			protocol = common.PointerTo(l.listener.Protocol)
 		}
 		if *protocol != l.listener.Protocol {
 			return errListenerProtocolConflict
@@ -133,7 +151,7 @@ func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener
 		if l.index == index {
 			continue
 		}
-		if bothNilOrEqual(listener.Hostname, l.listener.Hostname) {
+		if common.BothNilOrEqual(listener.Hostname, l.listener.Hostname) {
 			return errListenerHostnameConflict
 		}
 	}
@@ -142,7 +160,7 @@ func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener
 
 // validateTLS validates that the TLS configuration for a given listener is valid and that
 // the certificates that it references exist.
-func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, resources *apigateway.ResourceMap) (error, error) {
+func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, resources *common.ResourceMap) (error, error) {
 	namespace := gateway.Namespace
 
 	if tls == nil {
@@ -153,7 +171,7 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 
 	for _, cert := range tls.CertificateRefs {
 		// break on the first error
-		if !apigateway.NilOrEqual(cert.Group, "") || !apigateway.NilOrEqual(cert.Kind, "Secret") {
+		if !common.NilOrEqual(cert.Group, "") || !common.NilOrEqual(cert.Kind, common.KindSecret) {
 			err = errListenerInvalidCertificateRef_NotSupported
 			break
 		}
@@ -163,7 +181,7 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 			break
 		}
 
-		key := apigateway.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, namespace)
+		key := common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, namespace)
 		secret := resources.Secret(key)
 
 		if secret == nil {
@@ -183,13 +201,13 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 }
 
 func validateCertificateData(secret corev1.Secret) error {
-	_, _, err := apigateway.ParseCertificateData(secret)
+	_, _, err := common.ParseCertificateData(secret)
 	return err
 }
 
 // validateListeners validates the given listeners both internally and with respect to each
 // other for purposes of setting "Conflicted" status conditions.
-func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener, resources *apigateway.ResourceMap) listenerValidationResults {
+func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener, resources *common.ResourceMap) listenerValidationResults {
 	var results listenerValidationResults
 	merged := make(map[gwv1beta1.PortNumber]mergedListeners)
 	for i, listener := range listeners {
@@ -306,7 +324,7 @@ func routeKindIsAllowedForListener(kinds []gwv1beta1.RouteGroupKind, gk schema.G
 	}
 
 	for _, kind := range kinds {
-		if string(kind.Kind) == gk.Kind && apigateway.NilOrEqual(kind.Group, gk.Group) {
+		if string(kind.Kind) == gk.Kind && common.NilOrEqual(kind.Group, gk.Group) {
 			return true
 		}
 	}
@@ -327,7 +345,7 @@ func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRout
 // toNamespaceSet constructs a list of labels used to match a Namespace.
 func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
 	// If namespace label is not set, implicitly insert it to support older Kubernetes versions
-	if labels[namespaceNameLabel] == name {
+	if labels[common.NamespaceNameLabel] == name {
 		// Already set, avoid copies
 		return klabels.Set(labels)
 	}
@@ -336,13 +354,6 @@ func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
 	for k, v := range labels {
 		ret[k] = v
 	}
-	ret[namespaceNameLabel] = name
+	ret[common.NamespaceNameLabel] = name
 	return klabels.Set(ret)
-}
-
-func derefEqual[T ~string](v *T, check string) bool {
-	if v == nil {
-		return false
-	}
-	return string(*v) == check
 }

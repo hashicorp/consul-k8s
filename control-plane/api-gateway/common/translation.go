@@ -1,4 +1,7 @@
-package apigateway
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
+package common
 
 import (
 	"strings"
@@ -249,9 +252,8 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		Set: make(map[string]string),
 	}
 
-	toRemove := []string{}
 	for _, filter := range filters {
-		toRemove = append(toRemove, filter.RequestHeaderModifier.Remove...)
+		consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
 
 		for _, toAdd := range filter.RequestHeaderModifier.Add {
 			consulFilter.Add[string(toAdd.Name)] = toAdd.Value
