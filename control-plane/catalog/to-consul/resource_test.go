@@ -1662,8 +1662,8 @@ func TestServiceResource_addIngress(t *testing.T) {
 					},
 				},
 				Status: networkingv1.IngressStatus{
-					LoadBalancer: corev1.LoadBalancerStatus{
-						Ingress: []corev1.LoadBalancerIngress{{IP: "1.2.3.4"}},
+					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+						Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "1.2.3.4"}},
 					},
 				},
 			},
@@ -1709,8 +1709,8 @@ func TestServiceResource_addIngress(t *testing.T) {
 					},
 				},
 				Status: networkingv1.IngressStatus{
-					LoadBalancer: corev1.LoadBalancerStatus{
-						Ingress: []corev1.LoadBalancerIngress{{IP: "1.2.3.4"}},
+					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+						Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "1.2.3.4"}},
 					},
 				},
 			},
