@@ -206,7 +206,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			}
 
 			expectedProbe := &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					TCPSocket: &corev1.TCPSocketAction{
 						Port: intstr.FromInt(constants.ProxyDefaultInboundPort),
 					},
@@ -425,7 +425,7 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
 	}
 	container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 	expectedProbe := &corev1.Probe{
-		Handler: corev1.Handler{
+		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Port: intstr.FromInt(21000),
 				Path: "/ready",
@@ -511,7 +511,7 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) 
 	}
 	expectedProbe := []*corev1.Probe{
 		{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(21000),
 					Path: "/ready",
@@ -520,7 +520,7 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) 
 			InitialDelaySeconds: 1,
 		},
 		{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(21001),
 					Path: "/ready",
@@ -669,7 +669,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 
 				port := constants.ProxyDefaultInboundPort + i
 				expectedProbe := &corev1.Probe{
-					Handler: corev1.Handler{
+					ProbeHandler: corev1.ProbeHandler{
 						TCPSocket: &corev1.TCPSocketAction{
 							Port: intstr.FromInt(port),
 						},

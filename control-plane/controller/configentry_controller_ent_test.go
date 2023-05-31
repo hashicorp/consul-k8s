@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
@@ -201,7 +201,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 
 				r := in.GetController(
 					fakeClient,
-					logrtest.TestLogger{T: t},
+					logrtest.New(t),
 					s,
 					&controller.ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
@@ -463,7 +463,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 
 				r := in.GetControllerFunc(
 					fakeClient,
-					logrtest.TestLogger{T: t},
+					logrtest.New(t),
 					s,
 					&controller.ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,
@@ -712,7 +712,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 
 				r := in.GetControllerFunc(
 					fakeClient,
-					logrtest.TestLogger{T: t},
+					logrtest.New(t),
 					s,
 					&controller.ConfigEntryController{
 						ConsulClientConfig:         testClient.Cfg,

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
@@ -250,7 +250,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 
 			validator := &ServiceIntentionsWebhook{
 				Client:  client,
-				Logger:  logrtest.TestLogger{T: t},
+				Logger:  logrtest.New(t),
 				decoder: decoder,
 				ConsulMeta: common.ConsulMeta{
 					NamespacesEnabled: true,
@@ -439,7 +439,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 
 			validator := &ServiceIntentionsWebhook{
 				Client:  client,
-				Logger:  logrtest.TestLogger{T: t},
+				Logger:  logrtest.New(t),
 				decoder: decoder,
 				ConsulMeta: common.ConsulMeta{
 					NamespacesEnabled: true,
@@ -599,7 +599,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 
 				validator := &ServiceIntentionsWebhook{
 					Client:  client,
-					Logger:  logrtest.TestLogger{T: t},
+					Logger:  logrtest.New(t),
 					decoder: decoder,
 					ConsulMeta: common.ConsulMeta{
 						NamespacesEnabled: namespacesEnabled,
