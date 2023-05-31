@@ -1983,6 +1983,10 @@ func (in *RetryPolicyBackOff) DeepCopy() *RetryPolicyBackOff {
 		return nil
 	}
 	out := new(RetryPolicyBackOff)
+	in.DeepCopyInto(out)
+	return out
+}
+
 func (in *ReadWriteRatesConfig) DeepCopyInto(out *ReadWriteRatesConfig) {
 	*out = *in
 }

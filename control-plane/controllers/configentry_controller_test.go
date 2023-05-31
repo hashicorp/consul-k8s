@@ -461,24 +461,22 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				}
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
-				compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
-					jwt, ok := consulEntry.(*capi.JWTProviderConfigEntry)
-					require.True(t, ok, "cast error")
-					require.Equal(t, capi.JWTProvider, jwt.Kind)
-					require.Equal(t, "test-jwt-provider", jwt.Name)
-					require.Equal(t,
-						&capi.JSONWebKeySet{
-							Local: &capi.LocalJWKS{
-								Filename: "jwks.txt",
-							},
+				jwt, ok := consulEntry.(*capi.JWTProviderConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, capi.JWTProvider, jwt.Kind)
+				require.Equal(t, "test-jwt-provider", jwt.Name)
+				require.Equal(t,
+					&capi.JSONWebKeySet{
+						Local: &capi.LocalJWKS{
+							Filename: "jwks.txt",
 						},
-						jwt.JSONWebKeySet,
-					)
-					require.Equal(t, "test-issuer", jwt.Issuer)
-				},
+					},
+					jwt.JSONWebKeySet,
+				)
+				require.Equal(t, "test-issuer", jwt.Issuer)
 			},
 		},
-		{			
+		{
 			kubeKind:   "ControlPlaneRequestLimit",
 			consulKind: capi.RateLimitIPConfig,
 			configEntryResource: &v1alpha1.ControlPlaneRequestLimit{
