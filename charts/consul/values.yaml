@@ -557,7 +557,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: "hashicorp/consul-dataplane:1.1.0"
+  imageConsulDataplane: "hashicorppreview/consul-dataplane:1.1-dev"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -649,6 +649,21 @@ global:
   #
   # @type: map
   extraLabels: {}
+
+  # Optional PEM-encoded CA certificates that will be added to trusted system CAs.
+  #
+  # Example:
+  #
+  # ```yaml
+  # trustedCAs: [
+  #   |
+  #   -----BEGIN CERTIFICATE-----
+  #   MIIC7jCCApSgAwIBAgIRAIq2zQEVexqxvtxP6J0bXAwwCgYIKoZIzj0EAwIwgbkx
+  #   ...
+  # ]
+  # ```
+  # @type: array<string>
+  trustedCAs: [ ]
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
@@ -3275,3 +3290,10 @@ telemetryCollector:
   # Optional priorityClassName.
   # @type: string
   priorityClassName: ""
+
+  # A list of extra environment variables to set within the stateful set.
+  # These could be used to include proxy settings required for cloud auto-join
+  # feature, in case kubernetes cluster is behind egress http proxies. Additionally,
+  # it could be used to configure custom consul parameters.
+  # @type: map
+  extraEnvironmentVars: { }

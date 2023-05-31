@@ -18,7 +18,9 @@ spec:
     spec:
       containers:
         - name: static-server
-          image: docker.mirror.hashicorp.services/hashicorp/http-echo:latest
+          # Using alpine vs latest as there is a build issue with M1s. Also other tests in multiport-app reference
+          # alpine so standardizing this.
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
           args:
             - -text="hello world"
             - -listen=:8080
