@@ -178,6 +178,22 @@ func TestController(t *testing.T) {
 					require.Equal(r, "certFile", terminatingGatewayEntry.Services[0].CertFile)
 					require.Equal(r, "keyFile", terminatingGatewayEntry.Services[0].KeyFile)
 					require.Equal(r, "sni", terminatingGatewayEntry.Services[0].SNI)
+
+					// jwt-provider
+					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "test-jwt-provider", nil)
+					require.NoError(r, err)
+					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
+					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
+					require.Equal(r, "jwks.txt", jwtProviderConfigEntry.JSONWebKeySet.Local.Filename)
+					require.Equal(r, "test-issuer", jwtProviderConfigEntry.Issuer)
+					require.Equal(r, []string{"aud1", "aud2"}, jwtProviderConfigEntry.Issuer)
+					require.Equal(r, "x-jwt-header", jwtProviderConfigEntry.Locations[0].Header.Name)
+					require.Equal(r, "x-query-param", jwtProviderConfigEntry.Locations[1].QueryParam.Name)
+					require.Equal(r, "session-id", jwtProviderConfigEntry.Locations[2].Cookie.Name)
+					require.Equal(r, "x-forwarded-jwt", jwtProviderConfigEntry.Forwarding.HeaderName)
+					require.True(r, jwtProviderConfigEntry.Forwarding.PadForwardPayloadHeader)
+					require.Equal(r, 45, jwtProviderConfigEntry.ClockSkewSeconds)
+					require.Equal(r, 15, jwtProviderConfigEntry.CacheConfig)
 				})
 			}
 

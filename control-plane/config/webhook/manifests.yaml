@@ -57,6 +57,27 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-v1alpha1-jwtprovider
+  failurePolicy: Fail
+  name: mutate-jwtprovider.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - jwtproviders
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-v1alpha1-mesh
   failurePolicy: Fail
   name: mutate-mesh.consul.hashicorp.com

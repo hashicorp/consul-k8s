@@ -432,6 +432,50 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, "sni", resource.Services[0].SNI)
 			},
 		},
+		{
+			kubeKind:   "JWTProvider",
+			consulKind: capi.JWTProvider,
+			configEntryResource: &v1alpha1.JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-jwt-provider",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.JWTProviderSpec{
+					JSONWebKeySet: &v1alpha1.JSONWebKeySet{
+						Local: &v1alpha1.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					Issuer: "test-issuer",
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &JWTProviderController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				jwt, ok := consulEntry.(*capi.JWTProviderConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, capi.JWTProvider, jwt.Kind)
+				require.Equal(t, "test-jwt-provider", jwt.Name)
+				require.Equal(t,
+					&capi.JSONWebKeySet{
+						Local: &capi.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					jwt.JSONWebKeySet,
+				)
+				require.Equal(t, "test-issuer", jwt.Issuer)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -909,6 +953,57 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				require.Equal(t, "new-sni", resource.Services[0].SNI)
 			},
 		},
+
+		{
+			kubeKind:   "JWTProvider",
+			consulKind: capi.JWTProvider,
+			configEntryResource: &v1alpha1.JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-jwt-provider",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.JWTProviderSpec{
+					JSONWebKeySet: &v1alpha1.JSONWebKeySet{
+						Local: &v1alpha1.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					Issuer: "test-issuer",
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &JWTProviderController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				jwt := resource.(*v1alpha1.JWTProvider)
+				jwt.Spec.Issuer = "test-updated-issuer"
+				jwt.Spec.Audiences = []string{"aud1"}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				jwt, ok := consulEntry.(*capi.JWTProviderConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, capi.JWTProvider, jwt.Kind)
+				require.Equal(t, "test-jwt-provider", jwt.Name)
+				require.Equal(t,
+					&capi.JSONWebKeySet{
+						Local: &capi.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					jwt.JSONWebKeySet,
+				)
+				require.Equal(t, "test-updated-issuer", jwt.Issuer)
+				require.Equal(t, []string{"aud1"}, jwt.Audiences)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1300,6 +1395,37 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+		},
+		{
+			kubeKind:   "JWTProvider",
+			consulKind: capi.JWTProvider,
+			configEntryResourceWithDeletion: &v1alpha1.JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              common.Global,
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.JWTProviderSpec{
+					JSONWebKeySet: &v1alpha1.JSONWebKeySet{
+						Local: &v1alpha1.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					Issuer: "test-issuer",
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &JWTProviderController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{

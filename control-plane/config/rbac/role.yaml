@@ -69,6 +69,26 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
+  - jwtproviders
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - jwtproviders/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
   - mesh
   verbs:
   - create

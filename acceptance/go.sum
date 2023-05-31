@@ -362,6 +362,8 @@ github.com/gruntwork-io/terratest v0.31.2 h1:xvYHA80MUq5kx670dM18HInewOrrQrAN+Xb
 github.com/gruntwork-io/terratest v0.31.2/go.mod h1:EEgJie28gX/4AD71IFqgMj6e99KP5mi81hEtzmDjxTo=
 github.com/hashicorp/consul-k8s/control-plane v0.0.0-20221117191905-0b1cc2b631e3 h1:4wROIZB8Y4cN/wPILChc2zQ/q00z1VyJitdgyLbITdU=
 github.com/hashicorp/consul-k8s/control-plane v0.0.0-20221117191905-0b1cc2b631e3/go.mod h1:j9Db/whkzvNC+KP2GftY0HxxleLm9swxXjlu3tYaOAw=
+github.com/hashicorp/consul/api v1.10.1-0.20230530193107-04a0d0133ae4 h1:6kUTk+YBgA5X5b3gNAoI18WEK4/t75LcWSimEgmpFdg=
+github.com/hashicorp/consul/api v1.10.1-0.20230530193107-04a0d0133ae4/go.mod h1:tXfrC6o0yFTgAW46xd5Ic8STHc9oIBcRVBcwhX5KNCQ=
 github.com/hashicorp/consul/api v1.20.0 h1:9IHTjNVSZ7MIwjlW3N3a7iGiykCMDpxZu8jsxFJh0yc=
 github.com/hashicorp/consul/api v1.20.0/go.mod h1:nR64eD44KQ59Of/ECwt2vUmIK2DKsDzAwTmwmLl8Wpo=
 github.com/hashicorp/consul/sdk v0.13.1 h1:EygWVWWMczTzXGpO93awkHFzfUka6hLYJ0qhETd+6lY=
@@ -749,6 +751,8 @@ golang.org/x/exp v0.0.0-20191227195350-da58074b4299/go.mod h1:2RIsYlXP63K8oxa1u0
 golang.org/x/exp v0.0.0-20200119233911-0405dc783f0a/go.mod h1:2RIsYlXP63K8oxa1u096TMicItID8zy7Y6sNkU49FU4=
 golang.org/x/exp v0.0.0-20200207192155-f17229e696bd/go.mod h1:J/WKrq2StrnmMY6+EHIKF9dgMWnmCNThgcyBT1FY9mM=
 golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6/go.mod h1:3jZMyOhIsHpP37uCMkUooju7aAi5cS1Q23tOzKc+0MU=
+golang.org/x/exp v0.0.0-20230321023759-10a507213a29 h1:ooxPy7fPvB4kwsA2h+iBNHkAbp/4JxTSwCmvdjEYmug=
+golang.org/x/exp v0.0.0-20230321023759-10a507213a29/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
 golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
 golang.org/x/image v0.0.0-20190802002840-cff245a6509b/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
