@@ -907,7 +907,7 @@ load _helpers
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.customExporterConfig="foo"' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].args')
+      yq '.spec.template.spec.containers[0].command')
 
   local actual=$(echo $flags | yq -r '.  | any(contains("-config-file-path /consul/config/config.json"))')
   [ "${actual}" = "true" ]
@@ -976,4 +976,26 @@ load _helpers
   local actualTemplateBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
+}
+
+#--------------------------------------------------------------------
+# extraEnvironmentVariables
+
+@test "telemetryCollector/Deployment: extra environment variables" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.extraEnvironmentVars.HCP_AUTH_TLS=insecure' \
+      --set 'telemetryCollector.extraEnvironmentVars.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_AUTH_TLS")) | .[0].value' | tee /dev/stderr)
+  [ "${actual}" = "insecure" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "foo")) | .[0].value' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
 }

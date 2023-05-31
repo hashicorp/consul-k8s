@@ -207,16 +207,28 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-telemetry-collector agent
-        {{- if .Values.telemetryCollector.customExporterConfig }}
-        args:
-        - -config-file-path /consul/config/config.json
-        {{ end }}
-        {{- if .Values.telemetryCollector.customExporterConfig }}
+          {{- if .Values.global.trustedCAs }}
+          {{- range $i, $cert := .Values.global.trustedCAs }}
+          cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
+          {{- $cert | nindent 10 }}
+          EOF
+          {{- end }}
+          {{- end }}
+
+          consul-telemetry-collector agent \
+          {{- if .Values.telemetryCollector.customExporterConfig }}
+          -config-file-path /consul/config/config.json \
+          {{ end }}
         volumeMounts:
+          {{- if .Values.telemetryCollector.customExporterConfig }}
           - name: config
             mountPath: /consul/config
-        {{- end }}
+          {{- end }}
+          {{- if .Values.global.trustedCAs }}
+          - name: trusted-cas
+            mountPath: /trusted-cas
+            readOnly: false
+          {{- end }}
         resources:
         {{- if .Values.telemetryCollector.resources }}
           {{- toYaml .Values.telemetryCollector.resources | nindent 12 }}
