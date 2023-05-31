@@ -16,11 +16,12 @@ import (
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/translation"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
@@ -29,21 +30,18 @@ import (
 func Test_resourceCache_diff(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		newCache resourceCache
+		newCache *common.ReferenceMap
 	}
 	tests := []struct {
 		name     string
-		oldCache resourceCache
+		oldCache *common.ReferenceMap
 		args     args
 		want     []api.ConfigEntry
 	}{
 		{
 			name: "no difference",
-			oldCache: resourceCache{
-				api.ResourceReference{
-					Kind: api.HTTPRoute,
-					Name: "my route",
-				}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+			oldCache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
 					Kind: api.HTTPRoute,
 					Name: "my route",
 					Parents: []api.ResourceReference{
@@ -123,14 +121,11 @@ func Test_resourceCache_diff(t *testing.T) {
 					Hostnames: []string{"hostname.com"},
 					Meta:      map[string]string{},
 					Status:    api.ConfigEntryStatus{},
-				}),
-			},
+				},
+			})[api.HTTPRoute],
 			args: args{
-				newCache: resourceCache{
-					api.ResourceReference{
-						Kind: api.HTTPRoute,
-						Name: "my route",
-					}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+				newCache: loadedReferenceMaps([]api.ConfigEntry{
+					&api.HTTPRouteConfigEntry{
 						Kind: api.HTTPRoute,
 						Name: "my route",
 						Parents: []api.ResourceReference{
@@ -210,18 +205,15 @@ func Test_resourceCache_diff(t *testing.T) {
 						Hostnames: []string{"hostname.com"},
 						Meta:      map[string]string{},
 						Status:    api.ConfigEntryStatus{},
-					}),
-				},
+					},
+				})[api.HTTPRoute],
 			},
 			want: []api.ConfigEntry{},
 		},
 		{
 			name: "resource exists in old cache but not new one",
-			oldCache: resourceCache{
-				api.ResourceReference{
-					Kind: api.HTTPRoute,
-					Name: "my route",
-				}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+			oldCache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
 					Kind: api.HTTPRoute,
 					Name: "my route",
 					Parents: []api.ResourceReference{
@@ -301,11 +293,8 @@ func Test_resourceCache_diff(t *testing.T) {
 					Hostnames: []string{"hostname.com"},
 					Meta:      map[string]string{},
 					Status:    api.ConfigEntryStatus{},
-				}),
-				api.ResourceReference{
-					Kind: api.HTTPRoute,
-					Name: "my route 2",
-				}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+				},
+				&api.HTTPRouteConfigEntry{
 					Kind: api.HTTPRoute,
 					Name: "my route 2",
 					Parents: []api.ResourceReference{
@@ -385,14 +374,11 @@ func Test_resourceCache_diff(t *testing.T) {
 					Hostnames: []string{"hostname.com"},
 					Meta:      map[string]string{},
 					Status:    api.ConfigEntryStatus{},
-				}),
-			},
+				},
+			})[api.HTTPRoute],
 			args: args{
-				newCache: resourceCache{
-					api.ResourceReference{
-						Kind: api.HTTPRoute,
-						Name: "my route",
-					}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+				newCache: loadedReferenceMaps([]api.ConfigEntry{
+					&api.HTTPRouteConfigEntry{
 						Kind: api.HTTPRoute,
 						Name: "my route",
 						Parents: []api.ResourceReference{
@@ -472,11 +458,11 @@ func Test_resourceCache_diff(t *testing.T) {
 						Hostnames: []string{"hostname.com"},
 						Meta:      map[string]string{},
 						Status:    api.ConfigEntryStatus{},
-					}),
-				},
+					},
+				})[api.HTTPRoute],
 			},
 			want: []api.ConfigEntry{
-				api.ConfigEntry(&api.HTTPRouteConfigEntry{
+				&api.HTTPRouteConfigEntry{
 					Kind: api.HTTPRoute,
 					Name: "my route 2",
 					Parents: []api.ResourceReference{
@@ -556,16 +542,13 @@ func Test_resourceCache_diff(t *testing.T) {
 					Hostnames: []string{"hostname.com"},
 					Meta:      map[string]string{},
 					Status:    api.ConfigEntryStatus{},
-				}),
+				},
 			},
 		},
 		{
 			name: "resource exists in new cache but not old one",
-			oldCache: resourceCache{
-				api.ResourceReference{
-					Kind: api.HTTPRoute,
-					Name: "my route",
-				}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+			oldCache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
 					Kind: api.HTTPRoute,
 					Name: "my route",
 					Parents: []api.ResourceReference{
@@ -645,14 +628,11 @@ func Test_resourceCache_diff(t *testing.T) {
 					Hostnames: []string{"hostname.com"},
 					Meta:      map[string]string{},
 					Status:    api.ConfigEntryStatus{},
-				}),
-			},
+				},
+			})[api.HTTPRoute],
 			args: args{
-				newCache: resourceCache{
-					api.ResourceReference{
-						Kind: api.HTTPRoute,
-						Name: "my route",
-					}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+				newCache: loadedReferenceMaps([]api.ConfigEntry{
+					&api.HTTPRouteConfigEntry{
 						Kind: api.HTTPRoute,
 						Name: "my route",
 						Parents: []api.ResourceReference{
@@ -732,12 +712,8 @@ func Test_resourceCache_diff(t *testing.T) {
 						Hostnames: []string{"hostname.com"},
 						Meta:      map[string]string{},
 						Status:    api.ConfigEntryStatus{},
-					}),
-
-					api.ResourceReference{
-						Kind: api.HTTPRoute,
-						Name: "my route 2",
-					}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+					},
+					&api.HTTPRouteConfigEntry{
 						Kind: api.HTTPRoute,
 						Name: "my route 2",
 						Parents: []api.ResourceReference{
@@ -817,11 +793,11 @@ func Test_resourceCache_diff(t *testing.T) {
 						Hostnames: []string{"hostname.com"},
 						Meta:      map[string]string{},
 						Status:    api.ConfigEntryStatus{},
-					}),
-				},
+					},
+				})[api.HTTPRoute],
 			},
 			want: []api.ConfigEntry{
-				api.ConfigEntry(&api.HTTPRouteConfigEntry{
+				&api.HTTPRouteConfigEntry{
 					Kind: api.HTTPRoute,
 					Name: "my route 2",
 					Parents: []api.ResourceReference{
@@ -901,16 +877,13 @@ func Test_resourceCache_diff(t *testing.T) {
 					Hostnames: []string{"hostname.com"},
 					Meta:      map[string]string{},
 					Status:    api.ConfigEntryStatus{},
-				}),
+				},
 			},
 		},
 		{
 			name: "same ref new cache has a greater modify index",
-			oldCache: resourceCache{
-				api.ResourceReference{
-					Kind: api.HTTPRoute,
-					Name: "my route",
-				}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+			oldCache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
 					Kind:        api.HTTPRoute,
 					Name:        "my route",
 					ModifyIndex: 1,
@@ -991,14 +964,11 @@ func Test_resourceCache_diff(t *testing.T) {
 					Hostnames: []string{"hostname.com"},
 					Meta:      map[string]string{},
 					Status:    api.ConfigEntryStatus{},
-				}),
-			},
+				},
+			})[api.HTTPRoute],
 			args: args{
-				newCache: resourceCache{
-					api.ResourceReference{
-						Kind: api.HTTPRoute,
-						Name: "my route",
-					}: api.ConfigEntry(&api.HTTPRouteConfigEntry{
+				newCache: loadedReferenceMaps([]api.ConfigEntry{
+					&api.HTTPRouteConfigEntry{
 						Kind:        api.HTTPRoute,
 						Name:        "my route",
 						ModifyIndex: 10,
@@ -1079,11 +1049,11 @@ func Test_resourceCache_diff(t *testing.T) {
 						Hostnames: []string{"hostname.com"},
 						Meta:      map[string]string{},
 						Status:    api.ConfigEntryStatus{},
-					}),
-				},
+					},
+				})[api.HTTPRoute],
 			},
 			want: []api.ConfigEntry{
-				api.ConfigEntry(&api.HTTPRouteConfigEntry{
+				&api.HTTPRouteConfigEntry{
 					Kind:        api.HTTPRoute,
 					Name:        "my route",
 					ModifyIndex: 10,
@@ -1164,7 +1134,7 @@ func Test_resourceCache_diff(t *testing.T) {
 					Hostnames: []string{"hostname.com"},
 					Meta:      map[string]string{},
 					Status:    api.ConfigEntryStatus{},
-				}),
+				},
 			},
 		},
 	}
@@ -1172,7 +1142,7 @@ func Test_resourceCache_diff(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := tt.oldCache.diff(tt.args.newCache)
+			got := tt.oldCache.Diff(tt.args.newCache)
 			if diff := cmp.Diff(got, tt.want); diff != "" {
 				t.Errorf("resourceCache.diff mismatch (-want +got):\n%s", diff)
 			}
@@ -1185,7 +1155,7 @@ func TestCache_Subscribe(t *testing.T) {
 	type args struct {
 		ctx        context.Context
 		kind       string
-		translator translation.TranslatorFn
+		translator TranslatorFn
 	}
 	tests := []struct {
 		name             string
@@ -1327,7 +1297,7 @@ func TestCache_Write(t *testing.T) {
 				},
 				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 				NamespacesEnabled:   false,
-				Logger:              logr.Logger{},
+				Logger:              logrtest.NewTestLogger(t),
 			})
 
 			entry := &api.HTTPRouteConfigEntry{
@@ -1427,7 +1397,7 @@ func TestCache_Get(t *testing.T) {
 		name  string
 		args  args
 		want  api.ConfigEntry
-		cache map[string]resourceCache
+		cache map[string]*common.ReferenceMap
 	}{
 		{
 			name: "entry exists",
@@ -1442,26 +1412,18 @@ func TestCache_Get(t *testing.T) {
 				Name: "api-gw",
 				Meta: map[string]string{},
 			},
-			cache: map[string]resourceCache{
-				api.APIGateway: {
-					api.ResourceReference{
-						Kind: api.APIGateway,
-						Name: "api-gw",
-					}: &api.APIGatewayConfigEntry{
-						Kind: api.APIGateway,
-						Name: "api-gw",
-						Meta: map[string]string{},
-					},
-					api.ResourceReference{
-						Kind: api.APIGateway,
-						Name: "api-gw-2",
-					}: &api.APIGatewayConfigEntry{
-						Kind: api.APIGateway,
-						Name: "api-gw-2",
-						Meta: map[string]string{},
-					},
+			cache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.APIGatewayConfigEntry{
+					Kind: api.APIGateway,
+					Name: "api-gw",
+					Meta: map[string]string{},
 				},
-			},
+				&api.APIGatewayConfigEntry{
+					Kind: api.APIGateway,
+					Name: "api-gw-2",
+					Meta: map[string]string{},
+				},
+			}),
 		},
 		{
 			name: "entry does not exist",
@@ -1472,26 +1434,18 @@ func TestCache_Get(t *testing.T) {
 				},
 			},
 			want: nil,
-			cache: map[string]resourceCache{
-				api.APIGateway: {
-					api.ResourceReference{
-						Kind: api.APIGateway,
-						Name: "api-gw",
-					}: &api.APIGatewayConfigEntry{
-						Kind: api.APIGateway,
-						Name: "api-gw",
-						Meta: map[string]string{},
-					},
-					api.ResourceReference{
-						Kind: api.APIGateway,
-						Name: "api-gw-2",
-					}: &api.APIGatewayConfigEntry{
-						Kind: api.APIGateway,
-						Name: "api-gw-2",
-						Meta: map[string]string{},
-					},
+			cache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.APIGatewayConfigEntry{
+					Kind: api.APIGateway,
+					Name: "api-gw",
+					Meta: map[string]string{},
 				},
-			},
+				&api.APIGatewayConfigEntry{
+					Kind: api.APIGateway,
+					Name: "api-gw-2",
+					Meta: map[string]string{},
+				},
+			}),
 		},
 		{
 			name: "kind key does not exist",
@@ -1502,18 +1456,13 @@ func TestCache_Get(t *testing.T) {
 				},
 			},
 			want: nil,
-			cache: map[string]resourceCache{
-				api.HTTPRoute: {
-					api.ResourceReference{
-						Kind: api.HTTPRoute,
-						Name: "api-gw",
-					}: &api.HTTPRouteConfigEntry{
-						Kind: api.HTTPRoute,
-						Name: "route",
-						Meta: map[string]string{},
-					},
+			cache: loadedReferenceMaps([]api.ConfigEntry{
+				&api.HTTPRouteConfigEntry{
+					Kind: api.HTTPRoute,
+					Name: "route",
+					Meta: map[string]string{},
 				},
-			},
+			}),
 		},
 	}
 	for _, tt := range tests {
@@ -1614,30 +1563,18 @@ func Test_Run(t *testing.T) {
 		NamespacesEnabled:   false,
 		Logger:              logrtest.NewTestLogger(t),
 	})
-	prevCache := make(map[string]resourceCache)
+	prevCache := make(map[string]*common.ReferenceMap)
 	for kind, cache := range c.cache {
-		resCache := make(resourceCache)
-		for resourceRef, entry := range cache {
-			resCache[resourceRef] = entry
+		resCache := common.NewReferenceMap()
+		for _, entry := range cache.Entries() {
+			resCache.Set(common.EntryToReference(entry), entry)
 		}
 		prevCache[kind] = resCache
 	}
 
-	expectedCache := map[string]resourceCache{
-		api.APIGateway: {
-			{Kind: api.APIGateway, Name: gw.Name}: gw,
-		},
-		api.TCPRoute: {
-			{Kind: api.TCPRoute, Name: tcpRoute.Name}: tcpRoute,
-		},
-		api.HTTPRoute: {
-			{Kind: api.HTTPRoute, Name: httpRouteOne.Name}: httpRouteOne,
-			{Kind: api.HTTPRoute, Name: httpRouteTwo.Name}: httpRouteTwo,
-		},
-		api.InlineCertificate: {
-			{Kind: api.InlineCertificate, Name: inlineCert.Name}: inlineCert,
-		},
-	}
+	expectedCache := loadedReferenceMaps([]api.ConfigEntry{
+		gw, tcpRoute, httpRouteOne, httpRouteTwo, inlineCert,
+	})
 
 	ctx, cancelFn := context.WithCancel(context.Background())
 
@@ -1696,9 +1633,6 @@ func Test_Run(t *testing.T) {
 		}
 	})
 
-	c.SubscribeServices(ctx, func(cs *api.CatalogService) []types.NamespacedName { return nil }).Cancel()
-	c.SubscribePeerings(ctx, func(cs *api.Peering) []types.NamespacedName { return nil }).Cancel()
-
 	// mark this subscription as ended
 	canceledSub.Cancel()
 
@@ -1736,14 +1670,19 @@ func Test_Run(t *testing.T) {
 	// cancel the context so the Run function exits
 	cancelFn()
 
+	sorter := func(x, y api.ConfigEntry) bool {
+		return x.GetName() < y.GetName()
+	}
 	// Check cache
 	// expect the cache to have changed
-	if diff := cmp.Diff(prevCache, c.cache); diff == "" {
-		t.Error("Expect cache to have changed but it did not")
-	}
+	for _, kind := range Kinds {
+		if diff := cmp.Diff(prevCache[kind].Entries(), c.cache[kind].Entries(), cmpopts.SortSlices(sorter)); diff == "" {
+			t.Error("Expect cache to have changed but it did not")
+		}
 
-	if diff := cmp.Diff(expectedCache, c.cache); diff != "" {
-		t.Errorf("Cache.cache mismatch (-want +got):\n%s", diff)
+		if diff := cmp.Diff(expectedCache[kind].Entries(), c.cache[kind].Entries(), cmpopts.SortSlices(sorter)); diff != "" {
+			t.Errorf("Cache.cache mismatch (-want +got):\n%s", diff)
+		}
 	}
 }
 
@@ -2025,4 +1964,18 @@ func TestCache_Delete(t *testing.T) {
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
+}
+
+func loadedReferenceMaps(entries []api.ConfigEntry) map[string]*common.ReferenceMap {
+	refs := make(map[string]*common.ReferenceMap)
+
+	for _, entry := range entries {
+		refMap, ok := refs[entry.GetKind()]
+		if !ok {
+			refMap = common.NewReferenceMap()
+		}
+		refMap.Set(common.EntryToReference(entry), entry)
+		refs[entry.GetKind()] = refMap
+	}
+	return refs
 }

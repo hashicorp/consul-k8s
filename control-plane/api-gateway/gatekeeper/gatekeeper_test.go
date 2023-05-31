@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	common "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -44,7 +44,7 @@ var (
 		{
 			Name:     "Listener 2",
 			Port:     8081,
-			Protocol: "UDP",
+			Protocol: "TCP",
 		},
 	}
 )
@@ -52,7 +52,7 @@ var (
 type testCase struct {
 	gateway            gwv1beta1.Gateway
 	gatewayClassConfig v1alpha1.GatewayClassConfig
-	helmConfig         apigateway.HelmConfig
+	helmConfig         common.HelmConfig
 
 	initialResources resources
 	finalResources   resources
@@ -85,15 +85,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       apigateway.HelmConfig{},
+			helmConfig:       common.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -120,15 +120,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       apigateway.HelmConfig{},
+			helmConfig:       common.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -144,7 +144,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -168,15 +168,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{},
@@ -196,7 +196,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -222,15 +222,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{
@@ -269,7 +269,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "2"),
@@ -297,15 +297,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{
@@ -324,7 +324,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -370,15 +370,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(5)),
-						MaxInstances:     ptrTo(int32(7)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(5)),
+						MaxInstances:     common.PointerTo(int32(7)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{},
+			helmConfig: common.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
@@ -438,15 +438,15 @@ func TestDelete(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{},
+			helmConfig: common.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -475,15 +475,15 @@ func TestDelete(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{},
+			helmConfig: common.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -498,7 +498,7 @@ func TestDelete(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -528,15 +528,15 @@ func TestDelete(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{
@@ -555,7 +555,7 @@ func TestDelete(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -770,8 +770,8 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
-					Controller:         ptrTo(true),
-					BlockOwnerDeletion: ptrTo(true),
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
 				},
 			},
 		},
@@ -828,8 +828,8 @@ func configureRole(name, namespace string, labels map[string]string, resourceVer
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
-					Controller:         ptrTo(true),
-					BlockOwnerDeletion: ptrTo(true),
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
 				},
 			},
 		},
@@ -854,8 +854,8 @@ func configureService(name, namespace string, labels, annotations map[string]str
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
-					Controller:         ptrTo(true),
-					BlockOwnerDeletion: ptrTo(true),
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
 				},
 			},
 		},
@@ -883,14 +883,10 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
-					Controller:         ptrTo(true),
-					BlockOwnerDeletion: ptrTo(true),
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
 				},
 			},
 		},
 	}
-}
-
-func ptrTo[T any](t T) *T {
-	return &t
 }

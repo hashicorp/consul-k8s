@@ -6,10 +6,10 @@ package gatekeeper
 import (
 	"context"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,7 +26,7 @@ var (
 	}
 )
 
-func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
+func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	if gcc.Spec.ServiceType == nil {
 		return g.deleteService(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
@@ -68,8 +68,9 @@ func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClas
 	ports := []corev1.ServicePort{}
 	for _, listener := range gateway.Spec.Listeners {
 		ports = append(ports, corev1.ServicePort{
-			Name:     string(listener.Name),
-			Protocol: corev1.Protocol(listener.Protocol),
+			Name: string(listener.Name),
+			// only TCP-based services are supported for now
+			Protocol: corev1.ProtocolTCP,
 			Port:     int32(listener.Port),
 		})
 	}
@@ -90,11 +91,11 @@ func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClas
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        gateway.Name,
 			Namespace:   gateway.Namespace,
-			Labels:      apigateway.LabelsForGateway(&gateway),
+			Labels:      common.LabelsForGateway(&gateway),
 			Annotations: annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: apigateway.LabelsForGateway(&gateway),
+			Selector: common.LabelsForGateway(&gateway),
 			Type:     *gcc.Spec.ServiceType,
 			Ports:    ports,
 		},

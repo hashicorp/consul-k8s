@@ -31,7 +31,7 @@ const (
 )
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
-func TestAPIGateway(t *testing.T) {
+func TestAPIGateway_Basic(t *testing.T) {
 	cases := []struct {
 		secure bool
 	}{
@@ -110,7 +110,7 @@ func TestAPIGateway(t *testing.T) {
 
 				// check our statuses
 				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
-				require.Len(r, gateway.Status.Listeners, 2)
+				require.Len(r, gateway.Status.Listeners, 3)
 				require.EqualValues(r, 1, gateway.Status.Listeners[0].AttachedRoutes)
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
@@ -119,6 +119,10 @@ func TestAPIGateway(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, falseCondition("Conflicted", "NoConflicts"))
 				checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+				require.EqualValues(r, 1, gateway.Status.Listeners[2].AttachedRoutes)
+				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, falseCondition("Conflicted", "NoConflicts"))
+				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, falseCondition("ResolvedRefs", "InvalidCertificateRef"))
 
 				// check that we have an address to use
 				require.Len(r, gateway.Status.Addresses, 1)

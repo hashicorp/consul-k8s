@@ -32,10 +32,10 @@ func TestSetter(t *testing.T) {
 			},
 		},
 	}
-	require.True(t, setter.setHTTPRouteCondition(route, &parentRef, condition))
-	require.False(t, setter.setHTTPRouteCondition(route, &parentRefDup, condition))
-	require.False(t, setter.setHTTPRouteCondition(route, &parentRefDup, condition))
-	require.False(t, setter.setHTTPRouteCondition(route, &parentRefDup, condition))
+	require.True(t, setter.setRouteCondition(route, &parentRef, condition))
+	require.False(t, setter.setRouteCondition(route, &parentRefDup, condition))
+	require.False(t, setter.setRouteCondition(route, &parentRefDup, condition))
+	require.False(t, setter.setRouteCondition(route, &parentRefDup, condition))
 
 	require.Len(t, route.Status.Parents, 1)
 	require.Len(t, route.Status.Parents[0].Conditions, 1)
