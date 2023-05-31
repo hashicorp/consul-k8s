@@ -477,7 +477,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
 	}
 
-	if r.EnableTelemetryCollector {
+	if r.EnableTelemetryCollector && proxyConfig.Config != nil {
 		proxyConfig.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/connect-inject"
 	}
 
@@ -760,7 +760,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		}
 	}
 
-	if r.EnableTelemetryCollector {
+	if r.EnableTelemetryCollector && service.Proxy != nil && service.Proxy.Config != nil {
 		service.Proxy.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/service"
 	}
 
