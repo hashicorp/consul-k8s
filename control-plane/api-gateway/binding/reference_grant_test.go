@@ -1,18 +1,17 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package controllers
+package binding
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/runtime"
+	"testing"
+
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const (
@@ -34,7 +33,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 
 	objName := gwv1beta1.ObjectName("mysecret")
 
-	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
+	basicValidReferenceGrant := gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ToNamespace,
@@ -67,7 +66,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 		ctx                context.Context
 		gateway            gwv1beta1.Gateway
 		secret             gwv1beta1.SecretObjectReference
-		k8sReferenceGrants []runtime.Object
+		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"gateway allowed to secret": {
 			canReference: true,
@@ -90,7 +89,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 				Namespace: &secretRefNamespace,
 				Name:      objName,
 			},
-			k8sReferenceGrants: []runtime.Object{
+			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
 				basicValidReferenceGrant,
 			},
 		},
@@ -98,15 +97,9 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
-			require.NoError(t, gwv1beta1.AddToScheme(s))
+			rv := NewReferenceValidator(tc.k8sReferenceGrants)
+			canReference := rv.GatewayCanReferenceSecret(tc.gateway, tc.secret)
 
-			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.k8sReferenceGrants...).Build()
-			rv := NewReferenceValidator(client)
-			canReference, err := rv.GatewayCanReferenceSecret(tc.ctx, tc.gateway, tc.secret)
-
-			require.Equal(t, tc.err, err)
 			require.Equal(t, tc.canReference, canReference)
 		})
 	}
@@ -117,7 +110,7 @@ func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 
 	objName := gwv1beta1.ObjectName("mygateway")
 
-	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
+	basicValidReferenceGrant := gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ToNamespace,
@@ -150,7 +143,7 @@ func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 		ctx                context.Context
 		httpRoute          gwv1beta1.HTTPRoute
 		gatewayRef         gwv1beta1.ParentReference
-		k8sReferenceGrants []runtime.Object
+		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"httproute allowed to gateway": {
 			canReference: true,
@@ -175,7 +168,7 @@ func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 				SectionName: nil,
 				Port:        nil,
 			},
-			k8sReferenceGrants: []runtime.Object{
+			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
 				basicValidReferenceGrant,
 			},
 		},
@@ -183,15 +176,9 @@ func TestHTTPRouteCanReferenceGateway(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
-			require.NoError(t, gwv1beta1.AddToScheme(s))
+			rv := NewReferenceValidator(tc.k8sReferenceGrants)
+			canReference := rv.HTTPRouteCanReferenceGateway(tc.httpRoute, tc.gatewayRef)
 
-			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.k8sReferenceGrants...).Build()
-			rv := NewReferenceValidator(client)
-			canReference, err := rv.HTTPRouteCanReferenceGateway(tc.ctx, tc.httpRoute, tc.gatewayRef)
-
-			require.Equal(t, tc.err, err)
 			require.Equal(t, tc.canReference, canReference)
 		})
 	}
@@ -202,7 +189,7 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 
 	objName := gwv1beta1.ObjectName("myBackendRef")
 
-	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
+	basicValidReferenceGrant := gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ToNamespace,
@@ -235,7 +222,7 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 		ctx                context.Context
 		httpRoute          gwv1beta1.HTTPRoute
 		backendRef         gwv1beta1.BackendRef
-		k8sReferenceGrants []runtime.Object
+		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"httproute allowed to gateway": {
 			canReference: true,
@@ -262,7 +249,7 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 				},
 				Weight: nil,
 			},
-			k8sReferenceGrants: []runtime.Object{
+			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
 				basicValidReferenceGrant,
 			},
 		},
@@ -270,15 +257,9 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
-			require.NoError(t, gwv1beta1.AddToScheme(s))
+			rv := NewReferenceValidator(tc.k8sReferenceGrants)
+			canReference := rv.HTTPRouteCanReferenceBackend(tc.httpRoute, tc.backendRef)
 
-			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.k8sReferenceGrants...).Build()
-			rv := NewReferenceValidator(client)
-			canReference, err := rv.HTTPRouteCanReferenceBackend(tc.ctx, tc.httpRoute, tc.backendRef)
-
-			require.Equal(t, tc.err, err)
 			require.Equal(t, tc.canReference, canReference)
 		})
 	}
@@ -289,7 +270,7 @@ func TestTCPRouteCanReferenceGateway(t *testing.T) {
 
 	objName := gwv1beta1.ObjectName("mygateway")
 
-	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
+	basicValidReferenceGrant := gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ToNamespace,
@@ -322,7 +303,7 @@ func TestTCPRouteCanReferenceGateway(t *testing.T) {
 		ctx                context.Context
 		tcpRoute           gwv1alpha2.TCPRoute
 		gatewayRef         gwv1beta1.ParentReference
-		k8sReferenceGrants []runtime.Object
+		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"tcpRoute allowed to gateway": {
 			canReference: true,
@@ -347,7 +328,7 @@ func TestTCPRouteCanReferenceGateway(t *testing.T) {
 				SectionName: nil,
 				Port:        nil,
 			},
-			k8sReferenceGrants: []runtime.Object{
+			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
 				basicValidReferenceGrant,
 			},
 		},
@@ -355,15 +336,9 @@ func TestTCPRouteCanReferenceGateway(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
-			require.NoError(t, gwv1beta1.AddToScheme(s))
+			rv := NewReferenceValidator(tc.k8sReferenceGrants)
+			canReference := rv.TCPRouteCanReferenceGateway(tc.tcpRoute, tc.gatewayRef)
 
-			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.k8sReferenceGrants...).Build()
-			rv := NewReferenceValidator(client)
-			canReference, err := rv.TCPRouteCanReferenceGateway(tc.ctx, tc.tcpRoute, tc.gatewayRef)
-
-			require.Equal(t, tc.err, err)
 			require.Equal(t, tc.canReference, canReference)
 		})
 	}
@@ -374,7 +349,7 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 
 	objName := gwv1beta1.ObjectName("myBackendRef")
 
-	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
+	basicValidReferenceGrant := gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ToNamespace,
@@ -407,7 +382,7 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 		ctx                context.Context
 		tcpRoute           gwv1alpha2.TCPRoute
 		backendRef         gwv1beta1.BackendRef
-		k8sReferenceGrants []runtime.Object
+		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"tcpRoute allowed to gateway": {
 			canReference: true,
@@ -434,7 +409,7 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 				},
 				Weight: nil,
 			},
-			k8sReferenceGrants: []runtime.Object{
+			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
 				basicValidReferenceGrant,
 			},
 		},
@@ -442,15 +417,9 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
-			require.NoError(t, gwv1beta1.AddToScheme(s))
+			rv := NewReferenceValidator(tc.k8sReferenceGrants)
+			canReference := rv.TCPRouteCanReferenceBackend(tc.tcpRoute, tc.backendRef)
 
-			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.k8sReferenceGrants...).Build()
-			rv := NewReferenceValidator(client)
-			canReference, err := rv.TCPRouteCanReferenceBackend(tc.ctx, tc.tcpRoute, tc.backendRef)
-
-			require.Equal(t, tc.err, err)
 			require.Equal(t, tc.canReference, canReference)
 		})
 	}
@@ -461,7 +430,7 @@ func TestReferenceAllowed(t *testing.T) {
 
 	objName := gwv1beta1.ObjectName("myObject")
 
-	basicValidReferenceGrant := &gwv1beta1.ReferenceGrant{
+	basicValidReferenceGrant := gwv1beta1.ReferenceGrant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ToNamespace,
@@ -493,7 +462,7 @@ func TestReferenceAllowed(t *testing.T) {
 		toGK               metav1.GroupKind
 		toNamespace        string
 		toName             string
-		k8sReferenceGrants []runtime.Object
+		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"same namespace": {
 			refAllowed: true,
@@ -510,8 +479,8 @@ func TestReferenceAllowed(t *testing.T) {
 			},
 			toNamespace: FromNamespace,
 			toName:      string(objName),
-			k8sReferenceGrants: []runtime.Object{
-				&gwv1beta1.ReferenceGrant{
+			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
+				{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: FromNamespace,
@@ -550,7 +519,7 @@ func TestReferenceAllowed(t *testing.T) {
 			},
 			toNamespace: ToNamespace,
 			toName:      string(objName),
-			k8sReferenceGrants: []runtime.Object{
+			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
 				basicValidReferenceGrant,
 			},
 		},
@@ -569,7 +538,7 @@ func TestReferenceAllowed(t *testing.T) {
 			},
 			toNamespace: ToNamespace,
 			toName:      string(objName),
-			k8sReferenceGrants: []runtime.Object{
+			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
 				basicValidReferenceGrant,
 			},
 		},
@@ -605,8 +574,8 @@ func TestReferenceAllowed(t *testing.T) {
 			},
 			toNamespace: ToNamespace,
 			toName:      string(objName),
-			k8sReferenceGrants: []runtime.Object{
-				&gwv1beta1.ReferenceGrant{
+			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
+				{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: ToNamespace,
@@ -634,15 +603,9 @@ func TestReferenceAllowed(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
-			require.NoError(t, gwv1beta1.AddToScheme(s))
+			rv := NewReferenceValidator(tc.k8sReferenceGrants).(*referenceValidator)
+			refAllowed := rv.referenceAllowed(tc.fromGK, tc.fromNamespace, tc.toGK, tc.toNamespace, tc.toName)
 
-			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.k8sReferenceGrants...).Build()
-
-			refAllowed, err := referenceAllowed(tc.ctx, tc.fromGK, tc.fromNamespace, tc.toGK, tc.toNamespace, tc.toName, client)
-
-			require.Equal(t, tc.err, err)
 			require.Equal(t, tc.refAllowed, refAllowed)
 		})
 	}

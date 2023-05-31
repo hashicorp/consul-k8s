@@ -6,6 +6,7 @@ package binding
 import (
 	"strings"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -13,26 +14,45 @@ import (
 	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
+var (
+	// the list of kinds we can support by listener protocol.
+	supportedKindsForProtocol = map[gwv1beta1.ProtocolType][]gwv1beta1.RouteGroupKind{
+		gwv1beta1.HTTPProtocolType: {{
+			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
+			Kind:  "HTTPRoute",
+		}},
+		gwv1beta1.HTTPSProtocolType: {{
+			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
+			Kind:  "HTTPRoute",
+		}},
+		gwv1beta1.TCPProtocolType: {{
+			Group: (*gwv1alpha2.Group)(&gwv1alpha2.GroupVersion.Group),
+			Kind:  "TCPRoute",
+		}},
+	}
+)
+
 // validateRefs validates backend references for a route, determining whether or
 // not they were found in the list of known connect-injected services.
-func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[types.NamespacedName]api.CatalogService, meshServices map[types.NamespacedName]v1alpha1.MeshService) routeValidationResults {
+func validateRefs(route client.Object, refs []gwv1beta1.BackendRef, resources *common.ResourceMap) routeValidationResults {
+	namespace := route.GetNamespace()
+
 	var result routeValidationResults
 	for _, ref := range refs {
-		nsn := types.NamespacedName{
-			Name:      string(ref.BackendObjectReference.Name),
-			Namespace: valueOr(ref.BackendObjectReference.Namespace, namespace),
-		}
-
-		// TODO: check reference grants
-
 		backendRef := ref.BackendObjectReference
 
-		isServiceRef := nilOrEqual(backendRef.Group, "") && nilOrEqual(backendRef.Kind, "Service")
-		isMeshServiceRef := derefEqual(backendRef.Group, v1alpha1.ConsulHashicorpGroup) && derefEqual(backendRef.Kind, v1alpha1.MeshServiceKind)
+		nsn := types.NamespacedName{
+			Name:      string(backendRef.Name),
+			Namespace: common.ValueOr(backendRef.Namespace, namespace),
+		}
+
+		isServiceRef := common.NilOrEqual(backendRef.Group, "") && common.NilOrEqual(backendRef.Kind, common.KindService)
+		isMeshServiceRef := common.DerefEqual(backendRef.Group, v1alpha1.ConsulHashicorpGroup) && common.DerefEqual(backendRef.Kind, v1alpha1.MeshServiceKind)
 
 		if !isServiceRef && !isMeshServiceRef {
 			result = append(result, routeValidationResult{
@@ -43,26 +63,31 @@ func validateRefs(namespace string, refs []gwv1beta1.BackendRef, services map[ty
 			continue
 		}
 
-		if isServiceRef {
-			if _, found := services[nsn]; !found {
-				result = append(result, routeValidationResult{
-					namespace: nsn.Namespace,
-					backend:   ref,
-					err:       errRouteBackendNotFound,
-				})
-				continue
-			}
+		if isServiceRef && !resources.HasService(nsn) {
+			result = append(result, routeValidationResult{
+				namespace: nsn.Namespace,
+				backend:   ref,
+				err:       errRouteBackendNotFound,
+			})
+			continue
 		}
 
-		if isMeshServiceRef {
-			if _, found := meshServices[nsn]; !found {
-				result = append(result, routeValidationResult{
-					namespace: nsn.Namespace,
-					backend:   ref,
-					err:       errRouteBackendNotFound,
-				})
-				continue
-			}
+		if isMeshServiceRef && !resources.HasMeshService(nsn) {
+			result = append(result, routeValidationResult{
+				namespace: nsn.Namespace,
+				backend:   ref,
+				err:       errRouteBackendNotFound,
+			})
+			continue
+		}
+
+		if !canReferenceBackend(route, ref, resources) {
+			result = append(result, routeValidationResult{
+				namespace: nsn.Namespace,
+				backend:   ref,
+				err:       errRefNotPermitted,
+			})
+			continue
 		}
 
 		result = append(result, routeValidationResult{
@@ -110,7 +135,7 @@ func (m mergedListeners) validateProtocol() error {
 	var protocol *gwv1beta1.ProtocolType
 	for _, l := range m {
 		if protocol == nil {
-			protocol = pointerTo(l.listener.Protocol)
+			protocol = common.PointerTo(l.listener.Protocol)
 		}
 		if *protocol != l.listener.Protocol {
 			return errListenerProtocolConflict
@@ -126,7 +151,7 @@ func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener
 		if l.index == index {
 			continue
 		}
-		if bothNilOrEqual(listener.Hostname, l.listener.Hostname) {
+		if common.BothNilOrEqual(listener.Hostname, l.listener.Hostname) {
 			return errListenerHostnameConflict
 		}
 	}
@@ -135,32 +160,36 @@ func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener
 
 // validateTLS validates that the TLS configuration for a given listener is valid and that
 // the certificates that it references exist.
-func validateTLS(namespace string, tls *gwv1beta1.GatewayTLSConfig, certificates []corev1.Secret) (error, error) {
+func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, resources *common.ResourceMap) (error, error) {
+	namespace := gateway.Namespace
+
 	if tls == nil {
 		return nil, nil
 	}
 
-	// TODO: Resource Grants
-
 	var err error
-MAIN_LOOP:
-	for _, ref := range tls.CertificateRefs {
+
+	for _, cert := range tls.CertificateRefs {
 		// break on the first error
-		if !nilOrEqual(ref.Group, "") || !nilOrEqual(ref.Kind, "Secret") {
+		if !common.NilOrEqual(cert.Group, "") || !common.NilOrEqual(cert.Kind, common.KindSecret) {
 			err = errListenerInvalidCertificateRef_NotSupported
-			break MAIN_LOOP
-		}
-		ns := valueOr(ref.Namespace, namespace)
-
-		for _, secret := range certificates {
-			if secret.Namespace == ns && secret.Name == string(ref.Name) {
-				continue MAIN_LOOP
-			}
+			break
 		}
 
-		// not found, set error
-		err = errListenerInvalidCertificateRef_NotFound
-		break MAIN_LOOP
+		if !resources.GatewayCanReferenceSecret(gateway, cert) {
+			err = errRefNotPermitted
+			break
+		}
+
+		key := common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, namespace)
+		secret := resources.Certificate(key)
+
+		if secret == nil {
+			err = errListenerInvalidCertificateRef_NotFound
+			break
+		}
+
+		err = validateCertificateData(*secret)
 	}
 
 	if tls.Mode != nil && *tls.Mode == gwv1beta1.TLSModePassthrough {
@@ -171,9 +200,14 @@ MAIN_LOOP:
 	return nil, err
 }
 
+func validateCertificateData(secret corev1.Secret) error {
+	_, _, err := common.ParseCertificateData(secret)
+	return err
+}
+
 // validateListeners validates the given listeners both internally and with respect to each
 // other for purposes of setting "Conflicted" status conditions.
-func validateListeners(namespace string, listeners []gwv1beta1.Listener, secrets []corev1.Secret) listenerValidationResults {
+func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener, resources *common.ResourceMap) listenerValidationResults {
 	var results listenerValidationResults
 	merged := make(map[gwv1beta1.PortNumber]mergedListeners)
 	for i, listener := range listeners {
@@ -186,7 +220,7 @@ func validateListeners(namespace string, listeners []gwv1beta1.Listener, secrets
 	for i, listener := range listeners {
 		var result listenerValidationResult
 
-		err, refErr := validateTLS(namespace, listener.TLS, secrets)
+		err, refErr := validateTLS(gateway, listener.TLS, resources)
 		result.refErr = refErr
 		if err != nil {
 			result.acceptedErr = err
@@ -290,7 +324,7 @@ func routeKindIsAllowedForListener(kinds []gwv1beta1.RouteGroupKind, gk schema.G
 	}
 
 	for _, kind := range kinds {
-		if string(kind.Kind) == gk.Kind && nilOrEqual(kind.Group, gk.Group) {
+		if string(kind.Kind) == gk.Kind && common.NilOrEqual(kind.Group, gk.Group) {
 			return true
 		}
 	}
@@ -311,7 +345,7 @@ func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRout
 // toNamespaceSet constructs a list of labels used to match a Namespace.
 func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
 	// If namespace label is not set, implicitly insert it to support older Kubernetes versions
-	if labels[namespaceNameLabel] == name {
+	if labels[common.NamespaceNameLabel] == name {
 		// Already set, avoid copies
 		return klabels.Set(labels)
 	}
@@ -320,13 +354,6 @@ func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
 	for k, v := range labels {
 		ret[k] = v
 	}
-	ret[namespaceNameLabel] = name
+	ret[common.NamespaceNameLabel] = name
 	return klabels.Set(ret)
-}
-
-func derefEqual[T ~string](v *T, check string) bool {
-	if v == nil {
-		return false
-	}
-	return string(*v) == check
 }

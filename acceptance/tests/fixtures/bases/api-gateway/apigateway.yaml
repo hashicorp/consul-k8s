@@ -11,6 +11,21 @@ spec:
   - protocol: HTTP
     port: 8080
     name: http
+    allowedRoutes:
+      namespaces:
+        from: "All"
   - protocol: TCP
     port: 8081
     name: tcp
+    allowedRoutes:
+      namespaces:
+        from: "All"
+  - protocol: HTTPS
+    port: 8082
+    name: https
+    tls:
+      certificateRefs:
+        - name: "certificate"
+    allowedRoutes:
+      namespaces:
+        from: "All"

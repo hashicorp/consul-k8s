@@ -15,7 +15,7 @@ import (
 	"sync"
 	"syscall"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -485,8 +485,8 @@ func (c *Command) Run(args []string) int {
 	}
 
 	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
-		HelmConfig: apigateway.HelmConfig{
-			ConsulConfig: apigateway.ConsulConfig{
+		HelmConfig: gatewaycommon.HelmConfig{
+			ConsulConfig: gatewaycommon.ConsulConfig{
 				Address:    c.consul.Addresses,
 				GRPCPort:   consulConfig.GRPCPort,
 				HTTPPort:   consulConfig.HTTPPort,
@@ -508,10 +508,13 @@ func (c *Command) Run(args []string) int {
 			ConsulPartition:            c.consul.Partition,
 			ConsulCACert:               string(caCertPem),
 		},
-		ConsulClientConfig:  consulConfig,
-		ConsulServerConnMgr: watcher,
-		NamespacesEnabled:   c.flagEnableNamespaces,
-		Partition:           c.consul.Partition,
+		AllowK8sNamespacesSet:   allowK8sNamespaces,
+		DenyK8sNamespacesSet:    denyK8sNamespaces,
+		ConsulClientConfig:      consulConfig,
+		ConsulServerConnMgr:     watcher,
+		NamespacesEnabled:       c.flagEnableNamespaces,
+		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
+		Partition:               c.consul.Partition,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
