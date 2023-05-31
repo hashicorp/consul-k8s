@@ -24,7 +24,7 @@ type ControlPlaneRequestLimitController struct {
 //+kubebuilder:rbac:groups=consul.hashicorp.com,resources=controlplanerequestlimits/status,verbs=get;update;patch
 
 func (r *ControlPlaneRequestLimitController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ExportedServices{})
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.ControlPlaneRequestLimit{})
 }
 
 func (r *ControlPlaneRequestLimitController) Logger(name types.NamespacedName) logr.Logger {
@@ -36,5 +36,5 @@ func (r *ControlPlaneRequestLimitController) UpdateStatus(ctx context.Context, o
 }
 
 func (r *ControlPlaneRequestLimitController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &consulv1alpha1.ExportedServices{}, r)
+	return setupWithManager(mgr, &consulv1alpha1.ControlPlaneRequestLimit{}, r)
 }
