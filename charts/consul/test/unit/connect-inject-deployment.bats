@@ -216,7 +216,7 @@ load _helpers
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.metrics.enableTelemetryCollector=true' \
+      --set 'global.metrics.enableTelemetryCollector=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
