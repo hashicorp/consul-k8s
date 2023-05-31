@@ -32,7 +32,7 @@ type ControlPlaneRequestLimitWebhook struct {
 // NOTE: The below line cannot be combined with any other comment. If it is
 // it will break the code generation.
 //
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-exportedservices,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=exportedservices,versions=v1alpha1,name=mutate-exportedservices.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-controlplanerequestlimits,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=controlplanerequestlimits,versions=v1alpha1,name=mutate-controlplanerequestlimits.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
 func (v *ControlPlaneRequestLimitWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var limit ControlPlaneRequestLimit
