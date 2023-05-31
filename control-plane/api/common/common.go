@@ -15,6 +15,7 @@ const (
 	IngressGateway     string = "ingressgateway"
 	TerminatingGateway string = "terminatinggateway"
 	SamenessGroup      string = "samenessgroup"
+	JWTProvider        string = "jwtprovider"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"
