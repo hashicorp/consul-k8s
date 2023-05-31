@@ -586,7 +586,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, 100.0, resource.Session.ReadRate)
 				require.Equal(t, 100.0, resource.Session.WriteRate)
 				require.Equal(t, 100.0, resource.Txn.ReadRate)
-				require.Equal(t, 100.0, resource.Txn.WriteRate)
+				require.Equal(t, 100.0, resource.Txn.WriteRate, 100.0)
 			},
 		},
 	}

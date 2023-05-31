@@ -252,7 +252,7 @@ func TestController(t *testing.T) {
 				logger.Log(t, "patching terminating-gateway custom resource")
 				patchReadRate := 99
 				patchWriteRate := 99
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "control-plane-request-limit", "control-plane-request-limit", "-p", fmt.Sprintf(`{"spec": {"readRate": %d, "writeRate": %d}}`, patchReadRate, patchWriteRate, "--type=merge"))
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "controlplanerequestlimit", "control-plane-request-limit", "-p", fmt.Sprintf(`{"spec": {"readRate": %d, "writeRate": %d}}`, patchReadRate, patchWriteRate), "--type=merge")
 
 				logger.Log(t, "patching JWTProvider custom resource")
 				patchIssuer := "other-issuer"
@@ -448,7 +448,7 @@ func TestController(t *testing.T) {
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 
 					// control-plane-request-limit
-					_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfigEntry, "control-plane-request-limit", nil)
+					_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "control-plane-request-limit", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})
