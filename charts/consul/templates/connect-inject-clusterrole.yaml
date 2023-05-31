@@ -71,6 +71,7 @@ rules:
   - list
   - watch
   - delete
+  - update
 - apiGroups: [ "rbac.authorization.k8s.io" ]
   resources: [ "roles" ]
   verbs:

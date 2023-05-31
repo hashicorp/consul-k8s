@@ -9,9 +9,21 @@ import (
 	"sort"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+)
+
+var (
+	// override function for tests.
+	timeFunc = metav1.Now
+)
+
+var (
+	// This is used for any error related to a lack of proper reference grant creation.
+	errRefNotPermitted = errors.New("reference not permitted due to lack of ReferenceGrant")
 )
 
 var (
@@ -25,7 +37,6 @@ var (
 	errRouteNoMatchingListenerHostname      = errors.New("listener cannot bind route with a non-aligned hostname")
 	errRouteInvalidKind                     = errors.New("invalid backend kind")
 	errRouteBackendNotFound                 = errors.New("backend not found")
-	errRouteRefNotPermitted                 = errors.New("reference not permitted due to lack of ReferenceGrant")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
@@ -44,8 +55,8 @@ type routeValidationResult struct {
 // a validation error.
 func (v routeValidationResult) Type() string {
 	return (&metav1.GroupKind{
-		Group: valueOr(v.backend.Group, ""),
-		Kind:  valueOr(v.backend.Kind, "Service"),
+		Group: common.ValueOr(v.backend.Group, ""),
+		Kind:  common.ValueOr(v.backend.Kind, common.KindService),
 	}).String()
 }
 
@@ -81,7 +92,7 @@ func (e routeValidationResults) Condition() metav1.Condition {
 					Reason:  "BackendNotFound",
 					Message: fmt.Sprintf("%s: %s", v.String(), err.Error()),
 				}
-			case errRouteRefNotPermitted:
+			case errRefNotPermitted:
 				return metav1.Condition{
 					Type:    "ResolvedRefs",
 					Status:  metav1.ConditionFalse,
@@ -167,6 +178,10 @@ func (b bindResults) Condition() metav1.Condition {
 			if result.err == errRouteNoMatchingListenerHostname {
 				reason = "NoMatchingListenerHostname"
 			}
+			// or if we have a ref not permitted, then use that
+			if result.err == errRefNotPermitted {
+				reason = "RefNotPermitted"
+			}
 		}
 	}
 
@@ -188,6 +203,18 @@ type parentBindResult struct {
 // attempted to bind to a gateway using its parent references.
 type parentBindResults []parentBindResult
 
+func (p parentBindResults) boundSections() mapset.Set {
+	set := mapset.NewSet()
+	for _, result := range p {
+		for _, r := range result.results {
+			if r.err == nil {
+				set.Add(string(r.section))
+			}
+		}
+	}
+	return set
+}
+
 var (
 	// Each of the below are specified in the Gateway spec under ListenerConditionReason
 	// the general usage is that each error is specified as errListener* where * corresponds
@@ -200,6 +227,7 @@ var (
 	errListenerProtocolConflict                   = errors.New("listener protocol conflicts with another listener")
 	errListenerInvalidCertificateRef_NotFound     = errors.New("certificate not found")
 	errListenerInvalidCertificateRef_NotSupported = errors.New("certificate type is not supported")
+	errListenerInvalidCertificateRef_InvalidData  = errors.New("certificate is invalid or does not contain a supported server name")
 
 	// Below is where any custom generic listener validation errors should go.
 	// We map anything under here to a custom ListenerConditionReason of Invalid on
@@ -223,7 +251,7 @@ type listenerValidationResult struct {
 
 // acceptedCondition constructs the condition for the Accepted status type.
 func (l listenerValidationResult) acceptedCondition(generation int64) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 	switch l.acceptedErr {
 	case errListenerPortUnavailable:
 		return metav1.Condition{
@@ -267,7 +295,7 @@ func (l listenerValidationResult) acceptedCondition(generation int64) metav1.Con
 
 // conflictedCondition constructs the condition for the Conflicted status type.
 func (l listenerValidationResult) conflictedCondition(generation int64) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 
 	switch l.conflictedErr {
 	case errListenerProtocolConflict:
@@ -302,10 +330,10 @@ func (l listenerValidationResult) conflictedCondition(generation int64) metav1.C
 
 // acceptedCondition constructs the condition for the ResolvedRefs status type.
 func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 
 	switch l.refErr {
-	case errListenerInvalidCertificateRef_NotFound:
+	case errListenerInvalidCertificateRef_NotFound, errListenerInvalidCertificateRef_NotSupported, errListenerInvalidCertificateRef_InvalidData:
 		return metav1.Condition{
 			Type:               "ResolvedRefs",
 			Status:             metav1.ConditionFalse,
@@ -314,11 +342,11 @@ func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1
 			Message:            l.refErr.Error(),
 			LastTransitionTime: now,
 		}
-	case errListenerInvalidCertificateRef_NotSupported:
+	case errRefNotPermitted:
 		return metav1.Condition{
 			Type:               "ResolvedRefs",
 			Status:             metav1.ConditionFalse,
-			Reason:             "InvalidCertificateRef",
+			Reason:             "RefNotPermitted",
 			ObservedGeneration: generation,
 			Message:            l.refErr.Error(),
 			LastTransitionTime: now,
@@ -387,7 +415,7 @@ type gatewayValidationResult struct {
 
 // programmedCondition returns a condition for the Programmed status type.
 func (l gatewayValidationResult) programmedCondition(generation int64) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 
 	switch l.programmedErr {
 	case errGatewayPending_Pods, errGatewayPending_Consul:
@@ -415,7 +443,7 @@ func (l gatewayValidationResult) programmedCondition(generation int64) metav1.Co
 // for whether or not any of the gateway's listeners are invalid, if they are, it overrides whatever
 // Reason is set as an error on the result and instead uses the ListenersNotValid reason.
 func (l gatewayValidationResult) acceptedCondition(generation int64, listenersInvalid bool) metav1.Condition {
-	now := metav1.Now()
+	now := timeFunc()
 
 	if l.acceptedErr == nil {
 		if listenersInvalid {

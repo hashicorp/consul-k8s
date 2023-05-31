@@ -7,17 +7,17 @@ import (
 	"context"
 	"errors"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, config apigateway.HelmConfig) error {
+func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, config common.HelmConfig) error {
 	if config.AuthMethod == "" {
 		return g.deleteServiceAccount(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
@@ -74,7 +74,7 @@ func (g *Gatekeeper) serviceAccount(gateway gwv1beta1.Gateway) *corev1.ServiceAc
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      gateway.Name,
 			Namespace: gateway.Namespace,
-			Labels:    apigateway.LabelsForGateway(&gateway),
+			Labels:    common.LabelsForGateway(&gateway),
 		},
 	}
 }
