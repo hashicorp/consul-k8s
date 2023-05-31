@@ -39,8 +39,11 @@ type TestFlags struct {
 	flagConsulK8sImage        string
 	flagConsulVersion         string
 	flagEnvoyImage            string
+	flagConsulCollectorImage  string
 	flagVaultHelmChartVersion string
 	flagVaultServerVersion    string
+
+	flagHCPResourceID string
 
 	flagNoCleanupOnFailure bool
 
@@ -74,8 +77,11 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagConsulVersion, "consul-version", "", "The consul version used for all tests.")
 	flag.StringVar(&t.flagHelmChartVersion, "helm-chart-version", config.HelmChartPath, "The helm chart used for all tests.")
 	flag.StringVar(&t.flagEnvoyImage, "envoy-image", "", "The Envoy image to use for all tests.")
+	flag.StringVar(&t.flagConsulCollectorImage, "consul-collector-image", "", "The consul collector image to use for all tests.")
 	flag.StringVar(&t.flagVaultServerVersion, "vault-server-version", "", "The vault serverversion used for all tests.")
 	flag.StringVar(&t.flagVaultHelmChartVersion, "vault-helm-chart-version", "", "The Vault helm chart used for all tests.")
+
+	flag.StringVar(&t.flagHCPResourceID, "hcp-resource-id", "", "The hcp resource id to use for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
@@ -176,8 +182,11 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		ConsulK8SImage:        t.flagConsulK8sImage,
 		ConsulVersion:         consulVersion,
 		EnvoyImage:            t.flagEnvoyImage,
+		ConsulCollectorImage:  t.flagConsulCollectorImage,
 		VaultHelmChartVersion: t.flagVaultHelmChartVersion,
 		VaultServerVersion:    t.flagVaultServerVersion,
+
+		HCPResourceID: t.flagHCPResourceID,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,

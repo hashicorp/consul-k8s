@@ -214,6 +214,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```go
     // ServiceRouter is the Schema for the servicerouters API
     // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+    // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
     // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
     type ServiceRouter struct {
     ```
@@ -232,7 +233,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```
 1. Go to the Consul `api` package for the config entry, e.g. https://github.com/hashicorp/consul/blob/main/api/config_entry_gateways.go
 1. Copy the top-level fields over into the `Spec` struct except for
-   `Kind`, `Name`, `Namespace`, `Meta`, `CreateIndex` and `ModifyIndex`. In this
+   `Kind`, `Name`, `Namespace`, `Partition`, `Meta`, `CreateIndex` and `ModifyIndex`. In this
    example, the top-level fields remaining are `TLS` and `Listeners`:
    
     ```go

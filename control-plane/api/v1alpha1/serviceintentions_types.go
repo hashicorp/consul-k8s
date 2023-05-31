@@ -59,6 +59,8 @@ type ServiceIntentionsSpec struct {
 	// The order of this list does not matter, but out of convenience Consul will always store this
 	// reverse sorted by intention precedence, as that is the order that they will be evaluated at enforcement time.
 	Sources SourceIntentions `json:"sources,omitempty"`
+	// JWT specifies the configuration to validate a JSON Web Token for all incoming requests.
+	JWT *IntentionJWTRequirement `json:"jwt,omitempty"`
 }
 
 type IntentionDestination struct {
@@ -108,6 +110,8 @@ type IntentionPermission struct {
 	Action IntentionAction `json:"action,omitempty"`
 	// HTTP is a set of HTTP-specific authorization criteria.
 	HTTP *IntentionHTTPPermission `json:"http,omitempty"`
+	// JWT specifies configuration to validate a JSON Web Token for incoming requests.
+	JWT *IntentionJWTRequirement `json:"jwt,omitempty"`
 }
 
 type IntentionHTTPPermission struct {
@@ -140,6 +144,30 @@ type IntentionHTTPHeaderPermission struct {
 	Regex string `json:"regex,omitempty"`
 	// Invert inverts the logic of the match.
 	Invert bool `json:"invert,omitempty"`
+}
+
+type IntentionJWTRequirement struct {
+	// Providers is a list of providers to consider when verifying a JWT.
+	Providers []*IntentionJWTProvider `json:"providers,omitempty"`
+}
+
+type IntentionJWTProvider struct {
+	// Name is the name of the JWT provider. There MUST be a corresponding
+	// "jwt-provider" config entry with this name.
+	Name string `json:"name,omitempty"`
+
+	// VerifyClaims is a list of additional claims to verify in a JWT's payload.
+	VerifyClaims []*IntentionJWTClaimVerification `json:"verifyClaims,omitempty"`
+}
+
+type IntentionJWTClaimVerification struct {
+	// Path is the path to the claim in the token JSON.
+	Path []string `json:"path,omitempty"`
+
+	// Value is the expected value at the given path. If the type at the path
+	// is a list then we verify that this value is contained in the list. If
+	// the type at the path is a string then we verify that this value matches.
+	Value string `json:"value,omitempty"`
 }
 
 // IntentionAction is the action that the intention represents. This
@@ -226,6 +254,7 @@ func (in *ServiceIntentions) ToConsul(datacenter string) api.ConfigEntry {
 		Name:      in.Spec.Destination.Name,
 		Namespace: in.Spec.Destination.Namespace,
 		Sources:   in.Spec.Sources.toConsul(),
+		JWT:       in.Spec.JWT.toConsul(),
 		Meta:      meta(datacenter),
 	}
 }
@@ -234,10 +263,26 @@ func (in *ServiceIntentions) ConsulGlobalResource() bool {
 	return false
 }
 
+func normalizeEmptyToDefault(value string) string {
+	if value == "" {
+		return "default"
+	}
+	return value
+}
+
 func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	configEntry, ok := candidate.(*capi.ServiceIntentionsConfigEntry)
 	if !ok {
 		return false
+	}
+
+	specialEquality := cmp.Options{
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Sources.Namespace"
+		}, cmp.Transformer("NormalizeNamespace", normalizeEmptyToDefault)),
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Sources.Partition"
+		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
 	}
 
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
@@ -245,7 +290,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 		in.ToConsul(""),
 		configEntry,
 		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
-		cmpopts.IgnoreFields(capi.SourceIntention{}, "Partition", "Namespace", "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
+		cmpopts.IgnoreFields(capi.SourceIntention{}, "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
 		cmpopts.IgnoreUnexported(),
 		cmpopts.EquateEmpty(),
 		// Consul will sort the sources by precedence when returning the resource
@@ -255,6 +300,7 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 			// piggyback on strings.Compare that returns -1 if a < b.
 			return strings.Compare(sourceIntentionSortKey(a), sourceIntentionSortKey(b)) == -1
 		}),
+		specialEquality,
 	)
 }
 
@@ -279,6 +325,8 @@ func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
+
+	errs = append(errs, in.Spec.JWT.validate(path.Child("jwt"))...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -377,6 +425,7 @@ func (in IntentionPermissions) toConsul() []*capi.IntentionPermission {
 		consulIntentionPermissions = append(consulIntentionPermissions, &capi.IntentionPermission{
 			Action: permission.Action.toConsul(),
 			HTTP:   permission.HTTP.toConsul(),
+			JWT:    permission.JWT.toConsul(),
 		})
 	}
 	return consulIntentionPermissions
@@ -412,15 +461,54 @@ func (in IntentionHTTPHeaderPermissions) toConsul() []capi.IntentionHTTPHeaderPe
 	return headerPermissions
 }
 
+func (in *IntentionJWTRequirement) toConsul() *capi.IntentionJWTRequirement {
+	if in == nil {
+		return nil
+	}
+	var providers []*capi.IntentionJWTProvider
+	for _, p := range in.Providers {
+		providers = append(providers, p.toConsul())
+	}
+	return &capi.IntentionJWTRequirement{
+		Providers: providers,
+	}
+}
+
+func (in *IntentionJWTProvider) toConsul() *capi.IntentionJWTProvider {
+	if in == nil {
+		return nil
+	}
+	var claims []*capi.IntentionJWTClaimVerification
+	for _, c := range in.VerifyClaims {
+		claims = append(claims, c.toConsul())
+	}
+	return &capi.IntentionJWTProvider{
+		Name:         in.Name,
+		VerifyClaims: claims,
+	}
+}
+
+func (in *IntentionJWTClaimVerification) toConsul() *capi.IntentionJWTClaimVerification {
+	if in == nil {
+		return nil
+	}
+	return &capi.IntentionJWTClaimVerification{
+		Path:  in.Path,
+		Value: in.Value,
+	}
+}
+
 func (in IntentionPermissions) validate(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
 	for i, permission := range in {
-		if err := permission.Action.validate(path.Child("permissions").Index(i)); err != nil {
+		permPath := path.Child("permissions").Index(i)
+		if err := permission.Action.validate(permPath); err != nil {
 			errs = append(errs, err)
 		}
 		if permission.HTTP != nil {
-			errs = append(errs, permission.HTTP.validate(path.Child("permissions").Index(i))...)
+			errs = append(errs, permission.HTTP.validate(permPath)...)
 		}
+		errs = append(errs, permission.JWT.validate(permPath.Child("jwt"))...)
 	}
 	return errs
 }
@@ -521,6 +609,27 @@ func numNotEmpty(ss ...string) int {
 		}
 	}
 	return count
+}
+
+func (in *IntentionJWTRequirement) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if in == nil {
+		return errs
+	}
+
+	for i, p := range in.Providers {
+		if err := p.validate(path.Child("providers").Index(i)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
+}
+
+func (in *IntentionJWTProvider) validate(path *field.Path) *field.Error {
+	if in != nil && in.Name == "" {
+		return field.Invalid(path.Child("name"), in.Name, "JWT provider name is required")
+	}
+	return nil
 }
 
 // sourceIntentionSortKey returns a string that can be used to sort intention

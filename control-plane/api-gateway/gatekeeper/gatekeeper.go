@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,7 +30,7 @@ func New(log logr.Logger, client client.Client) *Gatekeeper {
 }
 
 // Upsert creates or updates the resources for handling routing of network traffic.
-func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
+func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	g.Log.Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", gateway.Namespace, gateway.Name))
 
 	if err := g.upsertRole(ctx, gateway, gcc, config); err != nil {
@@ -83,7 +83,7 @@ func (g Gatekeeper) namespacedName(gateway gwv1beta1.Gateway) types.NamespacedNa
 	}
 }
 
-func (g Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config apigateway.HelmConfig) string {
+func (g Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config common.HelmConfig) string {
 	if config.AuthMethod == "" {
 		return ""
 	}

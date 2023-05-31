@@ -32,6 +32,20 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# consul.name
+
+@test "telemetryCollector/Service: name is constant regardless of consul name" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/telemetry-collector-service.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'consul.name=foobar' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-telemetry-collector" ]
+}
+
+#--------------------------------------------------------------------
 # annotations
 
 @test "telemetryCollector/Service: no annotations by default" {

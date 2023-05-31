@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -432,6 +432,50 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, "sni", resource.Services[0].SNI)
 			},
 		},
+		{
+			kubeKind:   "JWTProvider",
+			consulKind: capi.JWTProvider,
+			configEntryResource: &v1alpha1.JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-jwt-provider",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.JWTProviderSpec{
+					JSONWebKeySet: &v1alpha1.JSONWebKeySet{
+						Local: &v1alpha1.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					Issuer: "test-issuer",
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &JWTProviderController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				jwt, ok := consulEntry.(*capi.JWTProviderConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, capi.JWTProvider, jwt.Kind)
+				require.Equal(t, "test-jwt-provider", jwt.Name)
+				require.Equal(t,
+					&capi.JSONWebKeySet{
+						Local: &capi.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					jwt.JSONWebKeySet,
+				)
+				require.Equal(t, "test-issuer", jwt.Issuer)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -453,7 +497,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				req.True(written)
 			}
 
-			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.NewTestLogger(t))
+			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),
@@ -909,6 +953,57 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				require.Equal(t, "new-sni", resource.Services[0].SNI)
 			},
 		},
+
+		{
+			kubeKind:   "JWTProvider",
+			consulKind: capi.JWTProvider,
+			configEntryResource: &v1alpha1.JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-jwt-provider",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.JWTProviderSpec{
+					JSONWebKeySet: &v1alpha1.JSONWebKeySet{
+						Local: &v1alpha1.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					Issuer: "test-issuer",
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &JWTProviderController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				jwt := resource.(*v1alpha1.JWTProvider)
+				jwt.Spec.Issuer = "test-updated-issuer"
+				jwt.Spec.Audiences = []string{"aud1"}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				jwt, ok := consulEntry.(*capi.JWTProviderConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, capi.JWTProvider, jwt.Kind)
+				require.Equal(t, "test-jwt-provider", jwt.Name)
+				require.Equal(t,
+					&capi.JSONWebKeySet{
+						Local: &capi.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					jwt.JSONWebKeySet,
+				)
+				require.Equal(t, "test-updated-issuer", jwt.Issuer)
+				require.Equal(t, []string{"aud1"}, jwt.Audiences)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -953,7 +1048,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				c.updateF(c.configEntryResource)
 				err = fakeClient.Update(ctx, c.configEntryResource)
 				req.NoError(err)
-				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.NewTestLogger(t))
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
@@ -1310,6 +1405,37 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				}
 			},
 		},
+		{
+			kubeKind:   "JWTProvider",
+			consulKind: capi.JWTProvider,
+			configEntryResourceWithDeletion: &v1alpha1.JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              common.Global,
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.JWTProviderSpec{
+					JSONWebKeySet: &v1alpha1.JSONWebKeySet{
+						Local: &v1alpha1.LocalJWKS{
+							Filename: "jwks.txt",
+						},
+					},
+					Issuer: "test-issuer",
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &JWTProviderController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1345,7 +1471,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
 				}
-				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.NewTestLogger(t))
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 				resp, err := r.Reconcile(context.Background(), ctrl.Request{
 					NamespacedName: namespacedName,
 				})
@@ -1392,7 +1518,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 
 	reconciler := &ServiceDefaultsController{
 		Client: fakeClient,
-		Log:    logrtest.NewTestLogger(t),
+		Log:    logrtest.New(t),
 		ConfigEntryController: &ConfigEntryController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
@@ -1459,7 +1585,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 	consulClient := testClient.APIClient
 	reconciler := &ServiceDefaultsController{
 		Client: fakeClient,
-		Log:    logrtest.NewTestLogger(t),
+		Log:    logrtest.New(t),
 		ConfigEntryController: &ConfigEntryController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
@@ -1551,7 +1677,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				// Attempt to create the entry in Kube and run reconcile.
 				reconciler := ServiceDefaultsController{
 					Client: fakeClient,
-					Log:    logrtest.NewTestLogger(t),
+					Log:    logrtest.New(t),
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClientConfig:  testClient.Cfg,
 						ConsulServerConnMgr: testClient.Watcher,
@@ -1615,7 +1741,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			consulClient := testClient.APIClient
 			reconciler := &ServiceDefaultsController{
 				Client: fakeClient,
-				Log:    logrtest.NewTestLogger(t),
+				Log:    logrtest.New(t),
 				ConfigEntryController: &ConfigEntryController{
 					ConsulClientConfig:  testClient.Cfg,
 					ConsulServerConnMgr: testClient.Watcher,
@@ -1695,7 +1821,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	testClient.TestServer.WaitForServiceIntentions(t)
 
-	logger := logrtest.NewTestLogger(t)
+	logger := logrtest.New(t)
 
 	svcDefaultsReconciler := ServiceDefaultsController{
 		Client: fakeClient,
@@ -1833,7 +1959,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			require.True(t, success, "config entry was not created")
 
 			// Set up the reconciler.
-			logger := logrtest.NewTestLogger(t)
+			logger := logrtest.New(t)
 			svcDefaultsReconciler := ServiceDefaultsController{
 				Client: fakeClient,
 				Log:    logger,
@@ -2109,7 +2235,7 @@ func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
 			testClient.TestServer.WaitForLeader(t)
 			consulClient := testClient.APIClient
 
-			ctrl := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.NewTestLogger(t))
+			ctrl := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),

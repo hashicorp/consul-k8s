@@ -483,6 +483,8 @@ global:
   gossipEncryption:
     secretKey: key
     secretName: consul-gossip-key
+  metrics:
+    enableTelemetryCollector: true
   tls:
     caCert:
       secretKey: tls.crt
@@ -494,6 +496,15 @@ server:
   replicas: 3
   serverCert:
     secretName: consul-server-cert
+telemetryCollector:
+  cloud:
+    clientId:
+      secretKey: client-id
+      secretName: consul-hcp-client-id
+    clientSecret:
+      secretKey: client-secret
+      secretName: consul-hcp-client-secret
+  enabled: true
 `
 
 	const expectedWithoutOptional = `connectInject:
@@ -521,6 +532,8 @@ global:
   gossipEncryption:
     secretKey: key
     secretName: consul-gossip-key
+  metrics:
+    enableTelemetryCollector: true
   tls:
     caCert:
       secretKey: tls.crt
@@ -532,6 +545,15 @@ server:
   replicas: 3
   serverCert:
     secretName: consul-server-cert
+telemetryCollector:
+  cloud:
+    clientId:
+      secretKey: client-id
+      secretName: consul-hcp-client-id
+    clientSecret:
+      secretKey: client-secret
+      secretName: consul-hcp-client-secret
+  enabled: true
 `
 
 	cloudPreset := &CloudPreset{}
