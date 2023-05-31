@@ -62,7 +62,14 @@ func NewClient(config *capi.Config, consulAPITimeout time.Duration) (*capi.Clien
 
 	if version.IsFIPS() {
 		// make sure we are also using FIPS Consul
-		// TODO: check version
+		var versionInfo map[string]interface{}
+		_, err := client.Raw().Query("/v1/agent/version", versionInfo, nil)
+		if err != nil {
+			return nil, fmt.Errorf("This is a FIPS build of consul-k8s, which should be used with FIPS Consul. Unable to verify FIPS Consul while setting up Consul API client.")
+		}
+		if val, ok := versionInfo["FIPS"]; !ok || val == "" {
+			return nil, fmt.Errorf("This is a FIPS build of consul-k8s, which should be used with FIPS Consul. A non-FIPS version of Consul was detected while setting up Consul API client.")
+		}
 	}
 
 	return client, nil
