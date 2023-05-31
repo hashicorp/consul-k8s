@@ -222,11 +222,10 @@ spec:
           {{- end }}
           {{- end }}
 
-          consul-telemetry-collector agent
-        {{- if .Values.telemetryCollector.customExporterConfig }}
-        args:
-        - -config-file-path /consul/config/config.json
-        {{ end }}
+          consul-telemetry-collector agent \
+          {{- if .Values.telemetryCollector.customExporterConfig }}
+          -config-file-path /consul/config/config.json \
+          {{ end }}
         volumeMounts:
           {{- if .Values.telemetryCollector.customExporterConfig }}
           - name: config

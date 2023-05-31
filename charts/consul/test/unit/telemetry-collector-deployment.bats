@@ -921,7 +921,7 @@ load _helpers
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.customExporterConfig="foo"' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].args')
+      yq '.spec.template.spec.containers[0].command')
 
   local actual=$(echo $flags | yq -r '.  | any(contains("-config-file-path /consul/config/config.json"))')
   [ "${actual}" = "true" ]
