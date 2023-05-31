@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/sdk/iptables"
@@ -48,7 +48,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "basic bare minimum pod",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -78,7 +78,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "proxy health checks enabled",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -111,7 +111,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "metrics enabled",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -145,7 +145,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "metrics enabled with incorrect annotation",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -180,7 +180,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "overwrite probes, transparent proxy annotation set",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -221,7 +221,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude inbound ports",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -254,7 +254,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude outbound ports",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -287,7 +287,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude outbound CIDRs",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -320,7 +320,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude UIDs",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -352,7 +352,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude inbound ports, outbound ports, outbound CIDRs, and UIDs",
 			webhook: MeshWebhook{
-				Log:                   logrtest.NewTestLogger(t),
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,

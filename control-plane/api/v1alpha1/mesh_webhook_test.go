@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -97,7 +97,7 @@ func TestValidateMesh(t *testing.T) {
 
 			validator := &MeshWebhook{
 				Client:  client,
-				Logger:  logrtest.NewTestLogger(t),
+				Logger:  logrtest.New(t),
 				decoder: decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{
