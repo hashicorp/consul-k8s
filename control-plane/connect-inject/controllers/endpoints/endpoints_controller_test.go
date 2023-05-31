@@ -1165,7 +1165,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 							Port:    443,
 						},
 					},
-					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						Config: map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/service")},
+					},
 					NodeMeta: map[string]string{
 						"synthetic-node": "true",
 						"test-node":      "true",
@@ -1374,8 +1376,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 					},
-					ServiceTags:  []string{},
-					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
+					ServiceTags: []string{},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						Config: map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/service")},
+					},
 				},
 			},
 			expectedHealthChecks: []*api.HealthCheck{
