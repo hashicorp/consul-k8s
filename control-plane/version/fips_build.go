@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// IsFIPS returns true if Consul is operating in FIPS-140-2 mode.
+// IsFIPS returns true if consul-k8s is operating in FIPS-140-2 mode.
 func IsFIPS() bool {
 	return true
 }
