@@ -552,7 +552,7 @@ global:
     # Configures the Helm chart’s components to forward envoy metrics for the Consul service mesh to the
     # consul-telemetry-collector. This includes gateway metrics and sidecar metrics.
     # @type: boolean
-    enableTelemetryCollector: true
+    enableTelemetryCollector: false
 
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
