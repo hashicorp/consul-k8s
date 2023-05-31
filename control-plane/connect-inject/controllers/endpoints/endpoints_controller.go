@@ -671,6 +671,9 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		ID:      pod.Name,
 		Address: pod.Status.PodIP,
 		Meta:    meta,
+		Proxy: &api.AgentServiceConnectProxyConfig{
+			Config: map[string]interface{}{},
+		},
 	}
 
 	gatewayServiceName, ok := pod.Annotations[constants.AnnotationGatewayConsulServiceName]
