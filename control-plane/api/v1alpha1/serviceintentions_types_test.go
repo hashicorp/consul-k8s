@@ -165,9 +165,35 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 											"PUT",
 										},
 									},
+									JWT: &IntentionJWTRequirement{
+										Providers: []*IntentionJWTProvider{
+											{
+												Name: "okta-nested",
+												VerifyClaims: []*IntentionJWTClaimVerification{
+													{
+														Path:  []string{"perms", "role"},
+														Value: "admin-nested",
+													},
+												},
+											},
+										},
+									},
 								},
 							},
 							Description: "an L7 config",
+						},
+					},
+					JWT: &IntentionJWTRequirement{
+						Providers: []*IntentionJWTProvider{
+							{
+								Name: "okta",
+								VerifyClaims: []*IntentionJWTClaimVerification{
+									{
+										Path:  []string{"perms", "role"},
+										Value: "admin",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -220,9 +246,35 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 										"PUT",
 									},
 								},
+								JWT: &capi.IntentionJWTRequirement{
+									Providers: []*capi.IntentionJWTProvider{
+										{
+											Name: "okta-nested",
+											VerifyClaims: []*capi.IntentionJWTClaimVerification{
+												{
+													Path:  []string{"perms", "role"},
+													Value: "admin-nested",
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 						Description: "an L7 config",
+					},
+				},
+				JWT: &capi.IntentionJWTRequirement{
+					Providers: []*capi.IntentionJWTProvider{
+						{
+							Name: "okta",
+							VerifyClaims: []*capi.IntentionJWTClaimVerification{
+								{
+									Path:  []string{"perms", "role"},
+									Value: "admin",
+								},
+							},
+						},
 					},
 				},
 				Meta: nil,
@@ -376,9 +428,35 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 											"PUT",
 										},
 									},
+									JWT: &IntentionJWTRequirement{
+										Providers: []*IntentionJWTProvider{
+											{
+												Name: "okta-nested",
+												VerifyClaims: []*IntentionJWTClaimVerification{
+													{
+														Path:  []string{"perms", "role"},
+														Value: "admin-nested",
+													},
+												},
+											},
+										},
+									},
 								},
 							},
 							Description: "an L7 config",
+						},
+					},
+					JWT: &IntentionJWTRequirement{
+						Providers: []*IntentionJWTProvider{
+							{
+								Name: "okta",
+								VerifyClaims: []*IntentionJWTClaimVerification{
+									{
+										Path:  []string{"perms", "role"},
+										Value: "admin",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -436,9 +514,35 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 										"PUT",
 									},
 								},
+								JWT: &capi.IntentionJWTRequirement{
+									Providers: []*capi.IntentionJWTProvider{
+										{
+											Name: "okta-nested",
+											VerifyClaims: []*capi.IntentionJWTClaimVerification{
+												{
+													Path:  []string{"perms", "role"},
+													Value: "admin-nested",
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 						Description: "an L7 config",
+					},
+				},
+				JWT: &capi.IntentionJWTRequirement{
+					Providers: []*capi.IntentionJWTProvider{
+						{
+							Name: "okta",
+							VerifyClaims: []*capi.IntentionJWTClaimVerification{
+								{
+									Path:  []string{"perms", "role"},
+									Value: "admin",
+								},
+							},
+						},
 					},
 				},
 				Meta: map[string]string{
@@ -741,9 +845,35 @@ func TestServiceIntentions_Validate(t *testing.T) {
 											"PUT",
 										},
 									},
+									JWT: &IntentionJWTRequirement{
+										Providers: []*IntentionJWTProvider{
+											{
+												Name: "okta-nested",
+												VerifyClaims: []*IntentionJWTClaimVerification{
+													{
+														Path:  []string{"perms", "role"},
+														Value: "admin-nested",
+													},
+												},
+											},
+										},
+									},
 								},
 							},
 							Description: "an L7 config",
+						},
+					},
+					JWT: &IntentionJWTRequirement{
+						Providers: []*IntentionJWTProvider{
+							{
+								Name: "okta",
+								VerifyClaims: []*IntentionJWTClaimVerification{
+									{
+										Path:  []string{"perms", "role"},
+										Value: "admin",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -1620,6 +1750,66 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				`partition cannot use or contain wildcard '*'`,
 				`peer cannot use or contain wildcard '*'`,
 				`samenessgroup cannot use or contain wildcard '*'`,
+			},
+		},
+		"invalid empty jwt provider name at top-level": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name: "dest-service",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "bar",
+							Action: "allow",
+						},
+					},
+					JWT: &IntentionJWTRequirement{
+						Providers: []*IntentionJWTProvider{
+							{
+								Name: "",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.jwt.providers[0].name: Invalid value: "": JWT provider name is required`,
+			},
+		},
+		"invalid empty jwt provider name in permissions": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name: "dest-service",
+					},
+					Sources: SourceIntentions{
+						{
+							Name: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									JWT: &IntentionJWTRequirement{
+										Providers: []*IntentionJWTProvider{
+											{
+												Name: "",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.sources[0].permissions[0].jwt.providers[0].name: Invalid value: "": JWT provider name is required`,
 			},
 		},
 	}
