@@ -46,11 +46,14 @@ type TestConfig struct {
 
 	DisablePeering bool
 
-	HelmChartVersion string
-	ConsulImage      string
-	ConsulK8SImage   string
-	ConsulVersion    *version.Version
-	EnvoyImage       string
+	HelmChartVersion     string
+	ConsulImage          string
+	ConsulK8SImage       string
+	ConsulVersion        *version.Version
+	EnvoyImage           string
+	ConsulCollectorImage string
+
+	HCPResourceID string
 
 	VaultHelmChartVersion string
 	VaultServerVersion    string
