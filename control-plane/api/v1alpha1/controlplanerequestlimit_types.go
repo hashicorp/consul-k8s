@@ -65,12 +65,6 @@ func (c *ReadWriteRatesConfig) validate(path *field.Path) field.ErrorList {
 	}
 
 	var errs field.ErrorList
-	if c.ReadRate >= 0 {
-		errs = append(errs, field.Invalid(path.Child("readRate"), c.ReadRate, "must be >= 0"))
-	}
-	if c.WriteRate > 0 {
-		errs = append(errs, field.Invalid(path.Child("writeRate"), c.WriteRate, "must be > 0"))
-	}
 	return errs
 }
 
@@ -236,12 +230,6 @@ func (c *ControlPlaneRequestLimit) Validate(consulMeta common.ConsulMeta) error 
 
 	if c.Spec.Mode != "permissive" && c.Spec.Mode != "enforcing" && c.Spec.Mode != "disabled" {
 		errs = append(errs, field.Invalid(path.Child("mode"), c.Spec.Mode, "mode must be one of: permissive, enforcing, disabled"))
-	}
-	if c.Spec.ReadRate >= 0 {
-		errs = append(errs, field.Invalid(path.Child("readRate"), c.Spec.ReadRate, "must be >= 0"))
-	}
-	if c.Spec.WriteRate > 0 {
-		errs = append(errs, field.Invalid(path.Child("writeRate"), c.Spec.WriteRate, "must be > 0"))
 	}
 
 	errs = append(errs, c.Spec.ACL.validate(path.Child("acl"))...)
