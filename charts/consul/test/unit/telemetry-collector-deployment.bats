@@ -74,6 +74,20 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# consul.name
+
+@test "telemetryCollector/Deployment: name is constant regardless of consul name" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'consul.name=foobar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].name' | tee /dev/stderr)
+  [ "${actual}" = "consul-telemetry-collector" ]
+}
+
+#--------------------------------------------------------------------
 # global.tls.enabled
 
 @test "telemetryCollector/Deployment: Adds tls-ca-cert volume when global.tls.enabled is true" {
@@ -929,6 +943,67 @@ load _helpers
       yq '.spec.template.spec.initContainers[1].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
+#--------------------------------------------------------------------
+# trustedCAs
+
+@test "telemetryCollector/Deployment: trustedCAs: if trustedCAs is set command is modified correctly" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-0.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "telemetryCollector/Deployment: trustedCAs: if multiple Trusted cas were set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      --set 'global.trustedCAs[1]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0]'  | tee /dev/stderr)
+
+
+  local actual=$(echo $object | jq '.command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-0.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object | jq '.command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-1.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "telemetryCollector/Deployment: trustedCAs: if trustedCAs is set /trusted-cas volumeMount is added" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr | yq -r '.spec.template.spec' | tee /dev/stderr)
+  local actual=$(echo $object | jq -r '.volumes[] | select(.name == "trusted-cas") | .name' | tee /dev/stderr)
+  [ "${actual}" = "trusted-cas" ]
+}
+
+
+@test "telemetryCollector/Deployment: trustedCAs: if trustedCAs is set SSL_CERT_DIR env var is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "SSL_CERT_DIR")' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "SSL_CERT_DIR" ]
+  local actual=$(echo $object | jq -r '.value' | tee /dev/stderr)
+  [ "${actual}" = "/etc/ssl/certs:/trusted-cas" ]
+}
 
 #--------------------------------------------------------------------
 # extraLabels
@@ -976,4 +1051,26 @@ load _helpers
   local actualTemplateBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
+}
+
+#--------------------------------------------------------------------
+# extraEnvironmentVariables
+
+@test "telemetryCollector/Deployment: extra environment variables" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.extraEnvironmentVars.HCP_AUTH_TLS=insecure' \
+      --set 'telemetryCollector.extraEnvironmentVars.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_AUTH_TLS")) | .[0].value' | tee /dev/stderr)
+  [ "${actual}" = "insecure" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "foo")) | .[0].value' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
 }
