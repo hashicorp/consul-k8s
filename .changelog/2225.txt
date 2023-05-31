@@ -1,0 +1,3 @@
+```release-note:security
+Bump `controller-runtime` to address CVEs in dependencies.
+```
