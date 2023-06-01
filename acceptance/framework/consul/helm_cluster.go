@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 // HelmCluster implements Cluster and uses Helm
@@ -44,6 +49,7 @@ type HelmCluster struct {
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
 	releaseName        string
+	runtimeClient      client.Client
 	kubernetesClient   kubernetes.Interface
 	noCleanupOnFailure bool
 	debugDirectory     string
@@ -98,6 +104,7 @@ func NewHelmCluster(
 		ctx:                ctx,
 		helmOptions:        opts,
 		releaseName:        releaseName,
+		runtimeClient:      ctx.ControllerRuntimeClient(t),
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		debugDirectory:     cfg.DebugDirectory,
@@ -154,6 +161,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
+		requirement, err := labels.NewRequirement("release", selection.Equals, []string{h.releaseName})
+		require.NoError(r, err)
+
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall
 		// we don't care that they're stopped gracefully.
@@ -233,6 +243,34 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 
+		// Forcibly delete all gateway classes and remove their finalizers.
+		err = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+		require.NoError(r, err)
+
+		var gatewayClassList gwv1beta1.GatewayClassList
+		err = h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
+			LabelSelector: labels.NewSelector().Add(*requirement),
+		})
+		require.NoError(r, err)
+		for _, item := range gatewayClassList.Items {
+			item.SetFinalizers([]string{})
+			require.NoError(r, h.runtimeClient.Update(context.Background(), &item))
+		}
+
+		// Forcibly delete all gateway class configs and remove their finalizers.
+		err = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.HasLabels{"release=" + h.releaseName})
+		require.NoError(r, err)
+
+		var gatewayClassConfigList v1alpha1.GatewayClassConfigList
+		err = h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
+			LabelSelector: labels.NewSelector().Add(*requirement),
+		})
+		require.NoError(r, err)
+		for _, item := range gatewayClassConfigList.Items {
+			item.SetFinalizers([]string{})
+			require.NoError(r, h.runtimeClient.Update(context.Background(), &item))
+		}
+
 		// Verify all Consul Pods are deleted.
 		pods, err = h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
 		require.NoError(r, err)
@@ -290,6 +328,24 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			if strings.Contains(job.Name, h.releaseName) {
 				r.Errorf("Found job which should have been deleted: %s", job.Name)
 			}
+		}
+
+		// Verify all Gateway Classes are deleted.
+		err = h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
+			LabelSelector: labels.NewSelector().Add(*requirement),
+		})
+		require.NoError(r, err)
+		for _, gatewayClass := range gatewayClassList.Items {
+			r.Errorf("Found gateway class which should have been deleted: %s", gatewayClass.Name)
+		}
+
+		// Verify all Gateway Class Configs are deleted.
+		err = h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
+			LabelSelector: labels.NewSelector().Add(*requirement),
+		})
+		require.NoError(r, err)
+		for _, gatewayClassConfig := range gatewayClassConfigList.Items {
+			r.Errorf("Found gateway class config which should have been deleted: %s", gatewayClassConfig.Name)
 		}
 	})
 }
