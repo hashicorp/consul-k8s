@@ -226,7 +226,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1alpha1-controlplanerequestlimit
+      path: /mutate-v1alpha1-controlplanerequestlimits
   failurePolicy: Fail
   admissionReviewVersions:
     - "v1beta1"

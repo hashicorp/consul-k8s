@@ -23,9 +23,11 @@ func TestControlPlaneRequestLimit_ToConsul(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: ControlPlaneRequestLimitSpec{
-					Mode:      "disabled",
-					ReadRate:  0,
-					WriteRate: 0,
+					Mode: "disabled",
+					ReadWriteRatesConfig: &ReadWriteRatesConfig{
+						ReadRate:  0,
+						WriteRate: 0,
+					},
 				},
 			},
 			&consul.RateLimitIPConfigEntry{
@@ -46,9 +48,11 @@ func TestControlPlaneRequestLimit_ToConsul(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: ControlPlaneRequestLimitSpec{
-					Mode:      "permissive",
-					ReadRate:  100.0,
-					WriteRate: 100.0,
+					Mode: "permissive",
+					ReadWriteRatesConfig: &ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
 					ACL: &ReadWriteRatesConfig{
 						ReadRate:  100.0,
 						WriteRate: 100.0,
@@ -209,9 +213,11 @@ func TestControlPlaneRequestLimit_MatchesConsul(t *testing.T) {
 					Name: "my-test-service",
 				},
 				Spec: ControlPlaneRequestLimitSpec{
-					Mode:      "permissive",
-					ReadRate:  100.0,
-					WriteRate: 100.0,
+					Mode: "permissive",
+					ReadWriteRatesConfig: &ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
 					ACL: &ReadWriteRatesConfig{
 						ReadRate:  100.0,
 						WriteRate: 100.0,

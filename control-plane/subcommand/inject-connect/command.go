@@ -826,7 +826,7 @@ func (c *Command) Run(args []string) int {
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.JWTProvider),
 			ConsulMeta: consulMeta,
 		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-controlplanerequestlimit",
+	mgr.GetWebhookServer().Register("/mutate-v1alpha1-controlplanerequestlimits",
 		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ControlPlaneRequestLimitWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ControlPlaneRequestLimit),

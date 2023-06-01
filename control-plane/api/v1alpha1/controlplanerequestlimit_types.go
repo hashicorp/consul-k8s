@@ -65,27 +65,34 @@ func (c *ReadWriteRatesConfig) validate(path *field.Path) field.ErrorList {
 	}
 
 	var errs field.ErrorList
+
+	if c.ReadRate < 0 {
+		errs = append(errs, field.Invalid(path.Child("readRate"), c.ReadRate, "readRate must be >= 0"))
+	}
+
+	if c.WriteRate <= 0 {
+		errs = append(errs, field.Invalid(path.Child("writeRate"), c.WriteRate, "writeRate must be > 0"))
+	}
 	return errs
 }
 
 // ControlPlaneRequestLimitSpec defines the desired state of ControlPlaneRequestLimit.
 type ControlPlaneRequestLimitSpec struct {
-	Mode           string                `json:"mode,omitempty"`
-	ReadRate       float64               `json:"readRate,omitempty"`
-	WriteRate      float64               `json:"writeRate,omitempty"`
-	ACL            *ReadWriteRatesConfig `json:"acl,omitempty"`
-	Catalog        *ReadWriteRatesConfig `json:"catalog,omitempty"`
-	ConfigEntry    *ReadWriteRatesConfig `json:"configEntry,omitempty"`
-	ConnectCA      *ReadWriteRatesConfig `json:"connectCA,omitempty"`
-	Coordinate     *ReadWriteRatesConfig `json:"coordinate,omitempty"`
-	DiscoveryChain *ReadWriteRatesConfig `json:"discoveryChain,omitempty"`
-	Health         *ReadWriteRatesConfig `json:"health,omitempty"`
-	Intention      *ReadWriteRatesConfig `json:"intention,omitempty"`
-	KV             *ReadWriteRatesConfig `json:"kv,omitempty"`
-	Tenancy        *ReadWriteRatesConfig `json:"tenancy,omitempty"`
-	PreparedQuery  *ReadWriteRatesConfig `json:"perparedQuery,omitempty"`
-	Session        *ReadWriteRatesConfig `json:"session,omitempty"`
-	Txn            *ReadWriteRatesConfig `json:"txn,omitempty"`
+	Mode                  string `json:"mode,omitempty"`
+	*ReadWriteRatesConfig `json:",inline"`
+	ACL                   *ReadWriteRatesConfig `json:"acl,omitempty"`
+	Catalog               *ReadWriteRatesConfig `json:"catalog,omitempty"`
+	ConfigEntry           *ReadWriteRatesConfig `json:"configEntry,omitempty"`
+	ConnectCA             *ReadWriteRatesConfig `json:"connectCA,omitempty"`
+	Coordinate            *ReadWriteRatesConfig `json:"coordinate,omitempty"`
+	DiscoveryChain        *ReadWriteRatesConfig `json:"discoveryChain,omitempty"`
+	Health                *ReadWriteRatesConfig `json:"health,omitempty"`
+	Intention             *ReadWriteRatesConfig `json:"intention,omitempty"`
+	KV                    *ReadWriteRatesConfig `json:"kv,omitempty"`
+	Tenancy               *ReadWriteRatesConfig `json:"tenancy,omitempty"`
+	PreparedQuery         *ReadWriteRatesConfig `json:"perparedQuery,omitempty"`
+	Session               *ReadWriteRatesConfig `json:"session,omitempty"`
+	Txn                   *ReadWriteRatesConfig `json:"txn,omitempty"`
 }
 
 // GetObjectMeta returns object meta.
@@ -232,6 +239,7 @@ func (c *ControlPlaneRequestLimit) Validate(consulMeta common.ConsulMeta) error 
 		errs = append(errs, field.Invalid(path.Child("mode"), c.Spec.Mode, "mode must be one of: permissive, enforcing, disabled"))
 	}
 
+	errs = append(errs, c.Spec.ReadWriteRatesConfig.validate(path)...)
 	errs = append(errs, c.Spec.ACL.validate(path.Child("acl"))...)
 	errs = append(errs, c.Spec.ConfigEntry.validate(path.Child("configEntry"))...)
 	errs = append(errs, c.Spec.ConnectCA.validate(path.Child("connectCA"))...)
