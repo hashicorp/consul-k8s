@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/controller"
@@ -102,7 +102,7 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 
 			controller := &controller.ExportedServicesController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 				Scheme: s,
 				ConfigEntryController: &controller.ConfigEntryController{
 					ConsulClientConfig:         testClient.Cfg,
@@ -217,7 +217,7 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 
 			controller := &controller.ExportedServicesController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 				Scheme: s,
 				ConfigEntryController: &controller.ConfigEntryController{
 					ConsulClientConfig:         testClient.Cfg,
@@ -355,7 +355,7 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 
 			controller := &controller.ExportedServicesController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 				Scheme: s,
 				ConfigEntryController: &controller.ConfigEntryController{
 					ConsulClientConfig:         testClient.Cfg,

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -449,7 +449,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				req.True(written)
 			}
 
-			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 			namespacedName := types.NamespacedName{
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),
@@ -949,7 +949,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				c.updateF(c.configEntryResource)
 				err = fakeClient.Update(ctx, c.configEntryResource)
 				req.NoError(err)
-				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
@@ -1341,7 +1341,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
 				}
-				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.TestLogger{T: t})
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 				resp, err := r.Reconcile(context.Background(), ctrl.Request{
 					NamespacedName: namespacedName,
 				})
@@ -1388,7 +1388,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 
 	reconciler := &ServiceDefaultsController{
 		Client: fakeClient,
-		Log:    logrtest.TestLogger{T: t},
+		Log:    logrtest.New(t),
 		ConfigEntryController: &ConfigEntryController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
@@ -1455,7 +1455,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 	consulClient := testClient.APIClient
 	reconciler := &ServiceDefaultsController{
 		Client: fakeClient,
-		Log:    logrtest.TestLogger{T: t},
+		Log:    logrtest.New(t),
 		ConfigEntryController: &ConfigEntryController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
@@ -1547,7 +1547,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				// Attempt to create the entry in Kube and run reconcile.
 				reconciler := ServiceDefaultsController{
 					Client: fakeClient,
-					Log:    logrtest.TestLogger{T: t},
+					Log:    logrtest.New(t),
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClientConfig:  testClient.Cfg,
 						ConsulServerConnMgr: testClient.Watcher,
@@ -1611,7 +1611,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			consulClient := testClient.APIClient
 			reconciler := &ServiceDefaultsController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 				ConfigEntryController: &ConfigEntryController{
 					ConsulClientConfig:  testClient.Cfg,
 					ConsulServerConnMgr: testClient.Watcher,
@@ -1691,7 +1691,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	testClient.TestServer.WaitForServiceIntentions(t)
 
-	logger := logrtest.TestLogger{T: t}
+	logger := logrtest.New(t)
 
 	svcDefaultsReconciler := ServiceDefaultsController{
 		Client: fakeClient,
@@ -1829,7 +1829,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			require.True(t, success, "config entry was not created")
 
 			// Set up the reconciler.
-			logger := logrtest.TestLogger{T: t}
+			logger := logrtest.New(t)
 			svcDefaultsReconciler := ServiceDefaultsController{
 				Client: fakeClient,
 				Log:    logger,
