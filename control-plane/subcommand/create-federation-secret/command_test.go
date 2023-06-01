@@ -323,7 +323,7 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 
 			// Set up Consul server with TLS.
 			caFile, certFile, keyFile := test.GenerateServerCerts(t)
-			a, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
+			testserver, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
 				cfg.CAFile = caFile
 				cfg.CertFile = certFile
 				cfg.KeyFile = keyFile
@@ -333,11 +333,11 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 				}
 			})
 			require.NoError(t, err)
-			defer a.Stop()
+			defer testserver.Stop()
 
 			// Construct Consul client.
 			client, err := api.NewClient(&api.Config{
-				Address: a.HTTPSAddr,
+				Address: testserver.HTTPSAddr,
 				Scheme:  "https",
 				TLSConfig: api.TLSConfig{
 					CAFile: caFile,
@@ -362,7 +362,7 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 				// Redefine the client with the bootstrap token set so
 				// subsequent calls will succeed.
 				client, err = api.NewClient(&api.Config{
-					Address: a.HTTPSAddr,
+					Address: testserver.HTTPSAddr,
 					Scheme:  "https",
 					TLSConfig: api.TLSConfig{
 						CAFile: caFile,
@@ -447,7 +447,7 @@ func TestRun_ACLs_K8SNamespaces_ResourcePrefixes(tt *testing.T) {
 				"-ca-file", caFile,
 				"-server-ca-cert-file", caFile,
 				"-server-ca-key-file", keyFile,
-				"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
+				"-http-addr", fmt.Sprintf("https://%s", testserver.HTTPSAddr),
 				"-consul-api-timeout", "10s",
 			}
 			if c.aclsEnabled {
@@ -506,27 +506,31 @@ func TestRun_WaitsForMeshGatewayInstances(t *testing.T) {
 
 	// Set up Consul server with TLS.
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
-	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+	testserver, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.CAFile = caFile
 		c.CertFile = certFile
 		c.KeyFile = keyFile
 	})
 	require.NoError(t, err)
-	defer a.Stop()
+	defer testserver.Stop()
 
 	// Create a mesh gateway instance after a delay.
 	meshGWIP := "192.168.0.1"
 	meshGWPort := 443
 	go func() {
-		time.Sleep(500 * time.Millisecond)
-		client, err := api.NewClient(&api.Config{
-			Address: a.HTTPSAddr,
-			Scheme:  "https",
-			TLSConfig: api.TLSConfig{
-				CAFile: caFile,
-			},
+		var client *api.Client
+		timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+		retry.RunWith(timer, t, func(r *retry.R) {
+			client, err = api.NewClient(&api.Config{
+				Address: testserver.HTTPSAddr,
+				Scheme:  "https",
+				TLSConfig: api.TLSConfig{
+					CAFile: caFile,
+				},
+			})
+			require.NoError(t, err)
 		})
-		require.NoError(t, err)
+
 		err = client.Agent().ServiceRegister(&api.AgentServiceRegistration{
 			Name: "mesh-gateway",
 			TaggedAddresses: map[string]api.ServiceAddress{
@@ -554,7 +558,7 @@ func TestRun_WaitsForMeshGatewayInstances(t *testing.T) {
 		"-ca-file", caFile,
 		"-server-ca-cert-file", certFile,
 		"-server-ca-key-file", keyFile,
-		"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
+		"-http-addr", fmt.Sprintf("https://%s", testserver.HTTPSAddr),
 		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
@@ -575,15 +579,15 @@ func TestRun_MeshGatewayNoWANAddr(t *testing.T) {
 
 	// Set up Consul server with TLS.
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
-	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+	testserver, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.CAFile = caFile
 		c.CertFile = certFile
 		c.KeyFile = keyFile
 	})
 	require.NoError(t, err)
-	defer a.Stop()
+	defer testserver.Stop()
 	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPSAddr,
+		Address: testserver.HTTPSAddr,
 		Scheme:  "https",
 		TLSConfig: api.TLSConfig{
 			CAFile: caFile,
@@ -608,7 +612,7 @@ func TestRun_MeshGatewayNoWANAddr(t *testing.T) {
 		"-ca-file", caFile,
 		"-server-ca-cert-file", caFile,
 		"-server-ca-key-file", keyFile,
-		"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
+		"-http-addr", fmt.Sprintf("https://%s", testserver.HTTPSAddr),
 		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, exitCode, ui.ErrorWriter.String())
@@ -646,17 +650,17 @@ func TestRun_MeshGatewayUniqueAddrs(tt *testing.T) {
 
 			// Set up Consul server with TLS.
 			caFile, certFile, keyFile := test.GenerateServerCerts(t)
-			a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+			testserver, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 				c.CAFile = caFile
 				c.CertFile = certFile
 				c.KeyFile = keyFile
 			})
 			require.NoError(t, err)
-			defer a.Stop()
+			defer testserver.Stop()
 
 			// Create mesh gateway instances.
 			client, err := api.NewClient(&api.Config{
-				Address: a.HTTPSAddr,
+				Address: testserver.HTTPSAddr,
 				Scheme:  "https",
 				TLSConfig: api.TLSConfig{
 					CAFile: caFile,
@@ -694,7 +698,7 @@ func TestRun_MeshGatewayUniqueAddrs(tt *testing.T) {
 				"-ca-file", caFile,
 				"-server-ca-cert-file", caFile,
 				"-server-ca-key-file", keyFile,
-				"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
+				"-http-addr", fmt.Sprintf("https://%s", testserver.HTTPSAddr),
 				"-consul-api-timeout", "10s",
 			})
 			require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
@@ -725,7 +729,7 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 
 	// Set up Consul server with TLS.
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
-	a, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
+	testserver, err := testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
 		cfg.CAFile = caFile
 		cfg.CertFile = certFile
 		cfg.KeyFile = keyFile
@@ -733,11 +737,11 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 		cfg.ACL.DefaultPolicy = "deny"
 	})
 	require.NoError(t, err)
-	defer a.Stop()
+	defer testserver.Stop()
 
 	// Construct Consul client.
 	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPSAddr,
+		Address: testserver.HTTPSAddr,
 		Scheme:  "https",
 		TLSConfig: api.TLSConfig{
 			CAFile: caFile,
@@ -762,7 +766,7 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 	// Redefine the client with the bootstrap token set so
 	// subsequent calls will succeed.
 	client, err = api.NewClient(&api.Config{
-		Address: a.HTTPSAddr,
+		Address: testserver.HTTPSAddr,
 		Scheme:  "https",
 		TLSConfig: api.TLSConfig{
 			CAFile: caFile,
@@ -807,20 +811,22 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 
 	// Create replication token secret after a delay.
 	go func() {
-		time.Sleep(400 * time.Millisecond)
-		_, err := k8s.CoreV1().Secrets("default").Create(
-			context.Background(),
-			&v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "prefix-" + common.ACLReplicationTokenName + "-acl-token",
-					Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+		timer := &retry.Timer{Timeout: 6 * time.Second, Wait: 400 * time.Millisecond}
+		retry.RunWith(timer, t, func(r *retry.R) {
+			_, err := k8s.CoreV1().Secrets("default").Create(
+				context.Background(),
+				&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "prefix-" + common.ACLReplicationTokenName + "-acl-token",
+						Labels: map[string]string{common.CLILabelKey: common.CLILabelValue},
+					},
+					Data: map[string][]byte{
+						common.ACLTokenSecretKey: []byte(replicationToken),
+					},
 				},
-				Data: map[string][]byte{
-					common.ACLTokenSecretKey: []byte(replicationToken),
-				},
-			},
-			metav1.CreateOptions{})
-		require.NoError(t, err)
+				metav1.CreateOptions{})
+			require.NoError(t, err)
+		})
 	}()
 
 	// Run the command.
@@ -836,7 +842,7 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 		"-ca-file", caFile,
 		"-server-ca-cert-file", caFile,
 		"-server-ca-key-file", keyFile,
-		"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
+		"-http-addr", fmt.Sprintf("https://%s", testserver.HTTPSAddr),
 		"-export-replication-token",
 		"-consul-api-timeout", "10s",
 	}
@@ -860,17 +866,17 @@ func TestRun_UpdatesSecret(t *testing.T) {
 
 	// Set up Consul server with TLS.
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
-	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+	testserver, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.CAFile = caFile
 		c.CertFile = certFile
 		c.KeyFile = keyFile
 	})
 	require.NoError(t, err)
-	defer a.Stop()
+	defer testserver.Stop()
 
 	// Create a mesh gateway instance.
 	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPSAddr,
+		Address: testserver.HTTPSAddr,
 		Scheme:  "https",
 		TLSConfig: api.TLSConfig{
 			CAFile: caFile,
@@ -907,7 +913,7 @@ func TestRun_UpdatesSecret(t *testing.T) {
 			"-ca-file", caFile,
 			"-server-ca-cert-file", certFile,
 			"-server-ca-key-file", keyFile,
-			"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
+			"-http-addr", fmt.Sprintf("https://%s", testserver.HTTPSAddr),
 			"-consul-api-timeout", "10s",
 		})
 		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
@@ -949,7 +955,7 @@ func TestRun_UpdatesSecret(t *testing.T) {
 			"-ca-file", caFile,
 			"-server-ca-cert-file", caFile,
 			"-server-ca-key-file", keyFile,
-			"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
+			"-http-addr", fmt.Sprintf("https://%s", testserver.HTTPSAddr),
 			"-consul-api-timeout", "10s",
 		})
 		require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
@@ -978,31 +984,33 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 	k8s := fake.NewSimpleClientset()
 
 	// Set up Consul server with TLS. Start after a 500ms delay.
-	var a *testutil.TestServer
+	var testserver *testutil.TestServer
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		time.Sleep(500 * time.Millisecond)
-		var err error
-		a, err = testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
-			cfg.CAFile = caFile
-			cfg.CertFile = certFile
-			cfg.KeyFile = keyFile
-			cfg.Ports = &testutil.TestPortConfig{
-				DNS:     randomPorts[0],
-				HTTP:    randomPorts[1],
-				HTTPS:   randomPorts[2],
-				SerfLan: randomPorts[3],
-				SerfWan: randomPorts[4],
-				Server:  randomPorts[5],
-			}
+		timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
+		retry.RunWith(timer, t, func(r *retry.R) {
+			var err error
+			testserver, err = testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
+				cfg.CAFile = caFile
+				cfg.CertFile = certFile
+				cfg.KeyFile = keyFile
+				cfg.Ports = &testutil.TestPortConfig{
+					DNS:     randomPorts[0],
+					HTTP:    randomPorts[1],
+					HTTPS:   randomPorts[2],
+					SerfLan: randomPorts[3],
+					SerfWan: randomPorts[4],
+					Server:  randomPorts[5],
+				}
+			})
+			require.NoError(t, err)
 		})
-		require.NoError(t, err)
 
 		// Construct Consul client.
 		client, err := api.NewClient(&api.Config{
-			Address: a.HTTPSAddr,
+			Address: testserver.HTTPSAddr,
 			Scheme:  "https",
 			TLSConfig: api.TLSConfig{
 				CAFile: caFile,
@@ -1025,8 +1033,8 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 		require.NoError(t, err)
 	}()
 	defer func() {
-		if a != nil {
-			a.Stop()
+		if testserver != nil {
+			testserver.Stop()
 		}
 	}()
 
@@ -1065,17 +1073,17 @@ func TestRun_Autoencrypt(t *testing.T) {
 
 	// Set up Consul server with TLS.
 	caFile, certFile, keyFile := test.GenerateServerCerts(t)
-	a, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+	testserver, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.CAFile = caFile
 		c.CertFile = certFile
 		c.KeyFile = keyFile
 	})
 	require.NoError(t, err)
-	defer a.Stop()
+	defer testserver.Stop()
 
 	// Create a mesh gateway instance.
 	client, err := api.NewClient(&api.Config{
-		Address: a.HTTPSAddr,
+		Address: testserver.HTTPSAddr,
 		Scheme:  "https",
 		TLSConfig: api.TLSConfig{
 			CAFile: caFile,
@@ -1111,7 +1119,7 @@ func TestRun_Autoencrypt(t *testing.T) {
 		// was being used as the CA (since it's not a CA).
 		"-server-ca-cert-file", keyFile,
 		"-server-ca-key-file", keyFile,
-		"-http-addr", fmt.Sprintf("https://%s", a.HTTPSAddr),
+		"-http-addr", fmt.Sprintf("https://%s", testserver.HTTPSAddr),
 		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
