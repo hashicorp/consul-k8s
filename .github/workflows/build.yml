@@ -65,7 +65,7 @@ jobs:
 
   build:
     needs: [get-go-version, get-product-version]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04 # the GLIBC is too high on 22.04
     strategy:
       matrix:
         include:
