@@ -198,6 +198,11 @@ spec:
             medium: "Memory"
         {{- end }}
         {{- end }}
+        {{- if .Values.global.trustedCAs }}
+        - name: trusted-cas
+          emptyDir:
+            medium: "Memory"
+        {{- end }}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -338,11 +343,23 @@ spec:
                   key: {{ .Values.global.cloud.scadaAddress.secretKey }}
             {{- end}}          
             {{- end }}
+            {{- if .Values.global.trustedCAs }}
+            - name: SSL_CERT_DIR
+              value: "/etc/ssl/certs:/trusted-cas"
+            {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
             - "/bin/sh"
             - "-ec"
             - |
+              {{- if .Values.global.trustedCAs }}
+              {{- range $i, $cert := .Values.global.trustedCAs }}
+              cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
+              {{- $cert | nindent 14 }}
+              EOF
+              {{- end }}
+              {{- end }}
+
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
@@ -408,6 +425,11 @@ spec:
             - name: vault-ca
               mountPath: /consul/vault-ca/
               readOnly: true
+            {{- end }}
+            {{- if .Values.global.trustedCAs }}
+            - name: trusted-cas
+              mountPath: /trusted-cas
+              readOnly: false
             {{- end }}
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}

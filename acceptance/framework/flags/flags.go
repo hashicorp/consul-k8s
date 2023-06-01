@@ -31,11 +31,14 @@ type TestFlags struct {
 
 	flagEnableTransparentProxy bool
 
-	flagHelmChartVersion string
-	flagConsulImage      string
-	flagConsulK8sImage   string
-	flagConsulVersion    string
-	flagEnvoyImage       string
+	flagHelmChartVersion     string
+	flagConsulImage          string
+	flagConsulK8sImage       string
+	flagConsulVersion        string
+	flagEnvoyImage           string
+	flagConsulCollectorImage string
+
+	flagHCPResourceID string
 
 	flagNoCleanupOnFailure bool
 
@@ -69,6 +72,9 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagConsulVersion, "consul-version", "", "The consul version used for all tests.")
 	flag.StringVar(&t.flagHelmChartVersion, "helm-chart-version", config.HelmChartPath, "The helm chart used for all tests.")
 	flag.StringVar(&t.flagEnvoyImage, "envoy-image", "", "The Envoy image to use for all tests.")
+	flag.StringVar(&t.flagConsulCollectorImage, "consul-collector-image", "", "The consul collector image to use for all tests.")
+
+	flag.StringVar(&t.flagHCPResourceID, "hcp-resource-id", "", "The hcp resource id to use for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
@@ -163,11 +169,14 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 		DisablePeering: t.flagDisablePeering,
 
-		HelmChartVersion: t.flagHelmChartVersion,
-		ConsulImage:      t.flagConsulImage,
-		ConsulK8SImage:   t.flagConsulK8sImage,
-		ConsulVersion:    consulVersion,
-		EnvoyImage:       t.flagEnvoyImage,
+		HelmChartVersion:     t.flagHelmChartVersion,
+		ConsulImage:          t.flagConsulImage,
+		ConsulK8SImage:       t.flagConsulK8sImage,
+		ConsulVersion:        consulVersion,
+		EnvoyImage:           t.flagEnvoyImage,
+		ConsulCollectorImage: t.flagConsulCollectorImage,
+
+		HCPResourceID: t.flagHCPResourceID,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
