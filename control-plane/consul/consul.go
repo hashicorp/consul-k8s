@@ -8,10 +8,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	capi "github.com/hashicorp/consul/api"
-
-	"github.com/hashicorp/consul-k8s/control-plane/version"
 )
 
 //go:generate mockery --name ServerConnectionManager --inpkg
@@ -59,7 +58,6 @@ func NewClient(config *capi.Config, consulAPITimeout time.Duration) (*capi.Clien
 		return nil, err
 	}
 	client.AddHeader("User-Agent", fmt.Sprintf("consul-k8s/%s", version.GetHumanVersion()))
-
 	return client, nil
 }
 

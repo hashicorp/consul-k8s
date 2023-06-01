@@ -239,7 +239,7 @@ jobs:
           path: out/${{ env.DEB_PACKAGE }}
 
   build-docker:
-    name: Docker ${{ matrix.arch }} ${{ matrix.fips }} default release build
+    name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build
     needs: [get-product-version, build]
     runs-on: ubuntu-latest
     strategy:
@@ -258,11 +258,11 @@ jobs:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
-          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_linux_${{ matrix.arch }}.zip
-          path: control-plane/dist/cni/linux/${{ matrix.arch }}
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_linux_${{ matrix.goarch }}.zip
+          path: control-plane/dist/cni/linux/${{ matrix.goarch }}
       - name: extract consul-cni zip
         env:
-          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
+          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.goarch }}
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
@@ -278,7 +278,7 @@ jobs:
             echo "Test PASSED"
           version: ${{ env.version }}
           target: release-default
-          arch: ${{ matrix.arch }}
+          arch: ${{ matrix.goarch }}
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane 
           workdir: control-plane

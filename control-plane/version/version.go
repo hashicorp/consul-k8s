@@ -34,17 +34,17 @@ func GetHumanVersion() string {
 	}
 	version = fmt.Sprintf("v%s", version)
 
-	if IsFIPS() {
-		version = fmt.Sprintf("%s+fips", version)
-	}
-
 	release := VersionPrerelease
 	if GitDescribe == "" && release == "" {
 		release = "dev"
 	}
 
+	if IsFIPS() {
+		version += ".fips1402"
+	}
+
 	if release != "" {
-		if !strings.HasSuffix(version, "-"+release) {
+		if !strings.Contains(version, "-"+release) {
 			// if we tagged a prerelease version then the release is in the version already
 			version += fmt.Sprintf("-%s", release)
 		}
