@@ -24,7 +24,7 @@ func TestControlPlaneRequestLimit_ToConsul(t *testing.T) {
 				},
 				Spec: ControlPlaneRequestLimitSpec{
 					Mode: "disabled",
-					ReadWriteRatesConfig: &ReadWriteRatesConfig{
+					ReadWriteRatesConfig: ReadWriteRatesConfig{
 						ReadRate:  0,
 						WriteRate: 0,
 					},
@@ -49,7 +49,7 @@ func TestControlPlaneRequestLimit_ToConsul(t *testing.T) {
 				},
 				Spec: ControlPlaneRequestLimitSpec{
 					Mode: "permissive",
-					ReadWriteRatesConfig: &ReadWriteRatesConfig{
+					ReadWriteRatesConfig: ReadWriteRatesConfig{
 						ReadRate:  100.0,
 						WriteRate: 100.0,
 					},
@@ -214,7 +214,7 @@ func TestControlPlaneRequestLimit_MatchesConsul(t *testing.T) {
 				},
 				Spec: ControlPlaneRequestLimitSpec{
 					Mode: "permissive",
-					ReadWriteRatesConfig: &ReadWriteRatesConfig{
+					ReadWriteRatesConfig: ReadWriteRatesConfig{
 						ReadRate:  100.0,
 						WriteRate: 100.0,
 					},

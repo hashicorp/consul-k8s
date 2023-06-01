@@ -78,21 +78,21 @@ func (c *ReadWriteRatesConfig) validate(path *field.Path) field.ErrorList {
 
 // ControlPlaneRequestLimitSpec defines the desired state of ControlPlaneRequestLimit.
 type ControlPlaneRequestLimitSpec struct {
-	Mode                  string `json:"mode,omitempty"`
-	*ReadWriteRatesConfig `json:",inline"`
-	ACL                   *ReadWriteRatesConfig `json:"acl,omitempty"`
-	Catalog               *ReadWriteRatesConfig `json:"catalog,omitempty"`
-	ConfigEntry           *ReadWriteRatesConfig `json:"configEntry,omitempty"`
-	ConnectCA             *ReadWriteRatesConfig `json:"connectCA,omitempty"`
-	Coordinate            *ReadWriteRatesConfig `json:"coordinate,omitempty"`
-	DiscoveryChain        *ReadWriteRatesConfig `json:"discoveryChain,omitempty"`
-	Health                *ReadWriteRatesConfig `json:"health,omitempty"`
-	Intention             *ReadWriteRatesConfig `json:"intention,omitempty"`
-	KV                    *ReadWriteRatesConfig `json:"kv,omitempty"`
-	Tenancy               *ReadWriteRatesConfig `json:"tenancy,omitempty"`
-	PreparedQuery         *ReadWriteRatesConfig `json:"perparedQuery,omitempty"`
-	Session               *ReadWriteRatesConfig `json:"session,omitempty"`
-	Txn                   *ReadWriteRatesConfig `json:"txn,omitempty"`
+	Mode                 string `json:"mode,omitempty"`
+	ReadWriteRatesConfig `json:",inline"`
+	ACL                  *ReadWriteRatesConfig `json:"acl,omitempty"`
+	Catalog              *ReadWriteRatesConfig `json:"catalog,omitempty"`
+	ConfigEntry          *ReadWriteRatesConfig `json:"configEntry,omitempty"`
+	ConnectCA            *ReadWriteRatesConfig `json:"connectCA,omitempty"`
+	Coordinate           *ReadWriteRatesConfig `json:"coordinate,omitempty"`
+	DiscoveryChain       *ReadWriteRatesConfig `json:"discoveryChain,omitempty"`
+	Health               *ReadWriteRatesConfig `json:"health,omitempty"`
+	Intention            *ReadWriteRatesConfig `json:"intention,omitempty"`
+	KV                   *ReadWriteRatesConfig `json:"kv,omitempty"`
+	Tenancy              *ReadWriteRatesConfig `json:"tenancy,omitempty"`
+	PreparedQuery        *ReadWriteRatesConfig `json:"perparedQuery,omitempty"`
+	Session              *ReadWriteRatesConfig `json:"session,omitempty"`
+	Txn                  *ReadWriteRatesConfig `json:"txn,omitempty"`
 }
 
 // GetObjectMeta returns object meta.
