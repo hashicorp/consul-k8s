@@ -996,6 +996,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 		expectedProxySvcInstances  []*api.CatalogService
 		expectedHealthChecks       []*api.HealthCheck
 		metricsEnabled             bool
+		telemetryCollectorDisabled bool
 		nodeMeta                   map[string]string
 		expErr                     string
 	}{
@@ -1078,6 +1079,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
+						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
 					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
 					ServiceTags: []string{},
@@ -1163,7 +1165,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 							Port:    443,
 						},
 					},
-					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						Config: map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/service")},
+					},
 					NodeMeta: map[string]string{
 						"synthetic-node": "true",
 						"test-node":      "true",
@@ -1186,6 +1190,80 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			name:          "Mesh Gateway with Metrics enabled",
 			svcName:       "mesh-gateway",
 			consulSvcName: "mesh-gateway",
+			k8sObjects: func() []runtime.Object {
+				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
+					constants.AnnotationGatewayConsulServiceName: "mesh-gateway",
+					constants.AnnotationGatewayWANSource:         "Static",
+					constants.AnnotationGatewayWANAddress:        "2.3.4.5",
+					constants.AnnotationGatewayWANPort:           "443",
+					constants.AnnotationMeshGatewayContainerPort: "8443",
+					constants.AnnotationGatewayKind:              meshGateway})
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mesh-gateway",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP: "1.2.3.4",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "mesh-gateway",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{gateway, endpoint}
+			},
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "mesh-gateway",
+					ServiceName:    "mesh-gateway",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    8443,
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "mesh-gateway", metaKeyKubeServiceName: "mesh-gateway", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceTags:    []string{},
+					ServiceTaggedAddresses: map[string]api.ServiceAddress{
+						"lan": {
+							Address: "1.2.3.4",
+							Port:    8443,
+						},
+						"wan": {
+							Address: "2.3.4.5",
+							Port:    443,
+						},
+					},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						Config: map[string]interface{}{
+							"envoy_prometheus_bind_addr":                "1.2.3.4:20200",
+							"envoy_telemetry_collector_bind_socket_dir": "/consul/service",
+						},
+					},
+				},
+			},
+			expectedHealthChecks: []*api.HealthCheck{
+				{
+					CheckID:     "default/mesh-gateway",
+					ServiceName: "mesh-gateway",
+					ServiceID:   "mesh-gateway",
+					Name:        consulKubernetesCheckName,
+					Status:      api.HealthPassing,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
+				},
+			},
+			metricsEnabled: true,
+		},
+		{
+			name:                       "Mesh_Gateway_with_Metrics_enabled_and_telemetry_collector_disabled",
+			svcName:                    "mesh-gateway",
+			consulSvcName:              "mesh-gateway",
+			telemetryCollectorDisabled: true,
 			k8sObjects: func() []runtime.Object {
 				gateway := createGatewayPod("mesh-gateway", "1.2.3.4", map[string]string{
 					constants.AnnotationGatewayConsulServiceName: "mesh-gateway",
@@ -1298,8 +1376,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 					},
-					ServiceTags:  []string{},
-					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
+					ServiceTags: []string{},
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						Config: map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/service")},
+					},
 				},
 			},
 			expectedHealthChecks: []*api.HealthCheck{
@@ -1362,7 +1442,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceTags: []string{},
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{
 						Config: map[string]interface{}{
-							"envoy_prometheus_bind_addr": "1.2.3.4:20200",
+							"envoy_prometheus_bind_addr":                "1.2.3.4:20200",
+							"envoy_telemetry_collector_bind_socket_dir": "/consul/service",
 						},
 					},
 				},
@@ -1462,6 +1543,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 									"address": "0.0.0.0",
 								},
 							},
+							"envoy_telemetry_collector_bind_socket_dir": "/consul/service",
 						},
 					},
 				},
@@ -1562,7 +1644,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 									"address": "0.0.0.0",
 								},
 							},
-							"envoy_prometheus_bind_addr": "1.2.3.4:20200",
+							"envoy_prometheus_bind_addr":                "1.2.3.4:20200",
+							"envoy_telemetry_collector_bind_socket_dir": "/consul/service",
 						},
 					},
 				},
@@ -1647,6 +1730,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
+						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
 					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
 					ServiceTags: []string{},
@@ -1661,6 +1745,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod2-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
+						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
 					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
 					ServiceTags: []string{},
@@ -1786,6 +1871,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
+						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
 					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
 					ServiceTags: []string{},
@@ -1800,6 +1886,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod2-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
+						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
 					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
 					ServiceTags: []string{},
@@ -1912,7 +1999,8 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 							},
 						},
 						Config: map[string]interface{}{
-							"envoy_prometheus_bind_addr": "0.0.0.0:12345",
+							"envoy_prometheus_bind_addr":                "0.0.0.0:12345",
+							"envoy_telemetry_collector_bind_socket_dir": "/consul/connect-inject",
 						},
 					},
 					ServiceMeta: map[string]string{
@@ -2013,6 +2101,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
+						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
 					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
 					ServiceTags: []string{},
@@ -2072,6 +2161,9 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					EnableGatewayMetrics: true,
 				}
 			}
+
+			ep.EnableTelemetryCollector = !tt.telemetryCollectorDisabled
+
 			namespacedName := types.NamespacedName{
 				Namespace: "default",
 				Name:      tt.svcName,
