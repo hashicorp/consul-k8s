@@ -16,16 +16,24 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
+	cfg := suite.Config()
+
+	ver, err := version.NewVersion("1.2.0")
+	require.NoError(t, err)
+	if cfg.ConsulDataplaneVersion != nil && cfg.ConsulDataplaneVersion.LessThan(ver) {
+		t.Skipf("skipping this test because proxy lifecycle management is not supported in consul-dataplane version %v", cfg.ConsulDataplaneVersion.String())
+	}
+
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
-			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
 			releaseName := helpers.RandomName()
 
