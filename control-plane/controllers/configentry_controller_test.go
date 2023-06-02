@@ -485,9 +485,11 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ControlPlaneRequestLimitSpec{
-					Mode:      "permissive",
-					ReadRate:  100.0,
-					WriteRate: 100.0,
+					Mode: "permissive",
+					ReadWriteRatesConfig: v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
 					ACL: &v1alpha1.ReadWriteRatesConfig{
 						ReadRate:  100.0,
 						WriteRate: 100.0,
@@ -1123,9 +1125,11 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ControlPlaneRequestLimitSpec{
-					Mode:      "permissive",
-					ReadRate:  100.0,
-					WriteRate: 100.0,
+					Mode: "permissive",
+					ReadWriteRatesConfig: v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
 					ACL: &v1alpha1.ReadWriteRatesConfig{
 						ReadRate:  100.0,
 						WriteRate: 100.0,
@@ -1673,9 +1677,11 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v1alpha1.ControlPlaneRequestLimitSpec{
-					Mode:      "permissive",
-					ReadRate:  100.0,
-					WriteRate: 100.0,
+					Mode: "permissive",
+					ReadWriteRatesConfig: v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
 					ACL: &v1alpha1.ReadWriteRatesConfig{
 						ReadRate:  100.0,
 						WriteRate: 100.0,
