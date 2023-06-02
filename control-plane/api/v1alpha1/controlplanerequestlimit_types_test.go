@@ -362,6 +362,101 @@ func TestControlPlaneRequestLimit_MatchesConsul(t *testing.T) {
 	}
 }
 
+func TestControlPlaneRequestLimit_Validate(t *testing.T) {
+	invalidReadWriteRatesConfig := &ReadWriteRatesConfig{
+		ReadRate:  -1,
+		WriteRate: 0,
+	}
+
+	validReadWriteRatesConfig := &ReadWriteRatesConfig{
+		ReadRate:  100,
+		WriteRate: 100,
+	}
+
+	cases := map[string]struct {
+		input           *ControlPlaneRequestLimit
+		expectedErrMsgs []string
+	}{
+		"invalid": {
+			input: &ControlPlaneRequestLimit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.ControlPlaneRequestLimit,
+				},
+				Spec: ControlPlaneRequestLimitSpec{
+					Mode:           "invalid",
+					ACL:            invalidReadWriteRatesConfig,
+					Catalog:        invalidReadWriteRatesConfig,
+					ConfigEntry:    invalidReadWriteRatesConfig,
+					ConnectCA:      invalidReadWriteRatesConfig,
+					Coordinate:     invalidReadWriteRatesConfig,
+					DiscoveryChain: invalidReadWriteRatesConfig,
+					Health:         invalidReadWriteRatesConfig,
+					Intention:      invalidReadWriteRatesConfig,
+					KV:             invalidReadWriteRatesConfig,
+					Tenancy:        invalidReadWriteRatesConfig,
+					PreparedQuery:  invalidReadWriteRatesConfig,
+					Session:        invalidReadWriteRatesConfig,
+					Txn:            invalidReadWriteRatesConfig,
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.mode: Invalid value: "invalid": mode must be one of: permissive, enforcing, disabled`,
+				`spec.acl.readRate: Invalid value: -1: readRate must be >= 0, spec.acl.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.catalog.readRate: Invalid value: -1: readRate must be >= 0, spec.catalog.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.configEntry.readRate: Invalid value: -1: readRate must be >= 0, spec.configEntry.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.connectCA.readRate: Invalid value: -1: readRate must be >= 0, spec.connectCA.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.coordinate.readRate: Invalid value: -1: readRate must be >= 0, spec.coordinate.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.discoveryChain.readRate: Invalid value: -1: readRate must be >= 0, spec.discoveryChain.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.health.readRate: Invalid value: -1: readRate must be >= 0, spec.health.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.intention.readRate: Invalid value: -1: readRate must be >= 0, spec.intention.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.kv.readRate: Invalid value: -1: readRate must be >= 0, spec.kv.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.tenancy.readRate: Invalid value: -1: readRate must be >= 0, spec.tenancy.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.preparedQuery.readRate: Invalid value: -1: readRate must be >= 0, spec.preparedQuery.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.session.readRate: Invalid value: -1: readRate must be >= 0, spec.session.writeRate: Invalid value: 0: writeRate must be > 0`,
+				`spec.txn.readRate: Invalid value: -1: readRate must be >= 0, spec.txn.writeRate: Invalid value: 0: writeRate must be > 0`,
+			},
+		},
+		"valid": {
+			input: &ControlPlaneRequestLimit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.ControlPlaneRequestLimit,
+				},
+				Spec: ControlPlaneRequestLimitSpec{
+					Mode:           "permissive",
+					ACL:            validReadWriteRatesConfig,
+					Catalog:        validReadWriteRatesConfig,
+					ConfigEntry:    validReadWriteRatesConfig,
+					ConnectCA:      validReadWriteRatesConfig,
+					Coordinate:     validReadWriteRatesConfig,
+					DiscoveryChain: validReadWriteRatesConfig,
+					Health:         validReadWriteRatesConfig,
+					Intention:      validReadWriteRatesConfig,
+					KV:             validReadWriteRatesConfig,
+					Tenancy:        validReadWriteRatesConfig,
+					PreparedQuery:  validReadWriteRatesConfig,
+					Session:        validReadWriteRatesConfig,
+					Txn:            validReadWriteRatesConfig,
+				},
+			},
+			expectedErrMsgs: []string{},
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := testCase.input.Validate(common.ConsulMeta{})
+			if len(testCase.expectedErrMsgs) != 0 {
+				require.Error(t, err)
+				for _, s := range testCase.expectedErrMsgs {
+					require.Contains(t, err.Error(), s)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestControlPlaneRequestLimit_AddFinalizer(t *testing.T) {
 	controlPlaneRequestLimit := &ControlPlaneRequestLimit{}
 	controlPlaneRequestLimit.AddFinalizer("finalizer")

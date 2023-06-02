@@ -211,6 +211,42 @@ func TestController(t *testing.T) {
 					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
 					require.Equal(r, 0, rateLimitConfigEntry.ReadRate)
 					require.Equal(r, 0, rateLimitConfigEntry.WriteRate)
+
+					// control-plane-request-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "control-plane-request-limit", nil)
+					require.NoError(r, err)
+					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+					require.Equal(t, "permissive", rateLimitIPConfigEntry.Mode)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.ACL.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.ACL.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Catalog.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Catalog.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.ConfigEntry.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.ConfigEntry.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.ConnectCA.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.ConnectCA.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Coordinate.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Coordinate.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.DiscoveryChain.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.DiscoveryChain.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Health.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Health.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Intention.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Intention.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.KV.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.KV.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Tenancy.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Tenancy.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.PreparedQuery.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.PreparedQuery.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Session.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Session.WriteRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Txn.ReadRate)
+					require.Equal(t, 100.0, rateLimitIPConfigEntry.Txn.WriteRate, 100.0)
+
 				})
 			}
 
@@ -261,6 +297,9 @@ func TestController(t *testing.T) {
 				logger.Log(t, "patching ExportedServices custom resource")
 				patchPeer := "destination"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "exportedservices", "default", "-p", fmt.Sprintf(`{"spec": {"services": [{"name": "frontend", "consumers":  [{"peer":  "%s"}, {"samenessGroup":  "groupName"}]}]}}`, patchPeer), "--type=merge")
+
+				logger.Log(t, "patching control-plane-request-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "controlplanerequestlimit", "control-plane-request-limit", "-p", `{"spec": {"mode": "disabled"}}`, "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -351,6 +390,13 @@ func TestController(t *testing.T) {
 					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
 					require.Equal(r, 99, rateLimitConfigEntry.ReadRate)
 					require.Equal(r, 100, rateLimitConfigEntry.WriteRate)
+
+					// control-plane-request-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "control-plane-request-limit", nil)
+					require.NoError(r, err)
+					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+					require.Equal(r, rateLimitIPConfigEntry.Mode, "disabled")
 				})
 			}
 
@@ -388,6 +434,9 @@ func TestController(t *testing.T) {
 
 				logger.Log(t, "deleting exported-services custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "exportedservices", "default")
+
+				logger.Log(t, "deleting control-plane-request-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "controlplanerequestlimit", "control-plane-request-limit")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -444,6 +493,11 @@ func TestController(t *testing.T) {
 					// exported-services
 					_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
 					_, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// control-plane-request-limit
+					_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "control-plane-request-limit", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 

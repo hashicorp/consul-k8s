@@ -241,6 +241,7 @@ func (c *ControlPlaneRequestLimit) Validate(consulMeta common.ConsulMeta) error 
 
 	errs = append(errs, c.Spec.ReadWriteRatesConfig.validate(path)...)
 	errs = append(errs, c.Spec.ACL.validate(path.Child("acl"))...)
+	errs = append(errs, c.Spec.Catalog.validate(path.Child("catalog"))...)
 	errs = append(errs, c.Spec.ConfigEntry.validate(path.Child("configEntry"))...)
 	errs = append(errs, c.Spec.ConnectCA.validate(path.Child("connectCA"))...)
 	errs = append(errs, c.Spec.Coordinate.validate(path.Child("coordinate"))...)
