@@ -17,9 +17,10 @@ import (
 )
 
 const (
+	allCapabilities              = "all"
+	netBindCapability            = "NET_BIND_SERVICE"
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
-	sidecarUserAndGroupID        = 5995
 	defaultPrometheusScrapePath  = "/metrics"
 	defaultEnvoyProxyConcurrency = 1
 	volumeName                   = "consul-connect-inject-data"
@@ -103,10 +104,16 @@ func consulDataplaneContainer(config common.HelmConfig, name, namespace string) 
 	// skip setting the security context and let OpenShift set it for us.
 	if !config.EnableOpenShift {
 		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
-			RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
-			RunAsNonRoot:           pointer.Bool(true),
 			ReadOnlyRootFilesystem: pointer.Bool(true),
+			// We have to run as root if we want to bind to any
+			// sort of privileged ports. The drop "all" is intended
+			// to drop any Linux capabilities you'd get as root
+			// other than NET_BIND_SERVICE.
+			RunAsUser: pointer.Int64(0),
+			Capabilities: &corev1.Capabilities{
+				Add:  []corev1.Capability{netBindCapability},
+				Drop: []corev1.Capability{allCapabilities},
+			},
 		}
 	}
 
