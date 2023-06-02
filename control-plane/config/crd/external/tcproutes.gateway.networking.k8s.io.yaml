@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -9,16 +6,16 @@ metadata:
     gateway.networking.k8s.io/bundle-version: v0.6.2
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
-  name: tlsroutes.gateway.networking.k8s.io
+  name: tcproutes.gateway.networking.k8s.io
 spec:
   group: gateway.networking.k8s.io
   names:
     categories:
       - gateway-api
-    kind: TLSRoute
-    listKind: TLSRouteList
-    plural: tlsroutes
-    singular: tlsroute
+    kind: TCPRoute
+    listKind: TCPRouteList
+    plural: tcproutes
+    singular: tcproute
   scope: Namespaced
   versions:
     - additionalPrinterColumns:
@@ -28,7 +25,7 @@ spec:
       name: v1alpha2
       schema:
         openAPIV3Schema:
-          description: "The TLSRoute resource is similar to TCPRoute, but can be configured to match against TLS-specific metadata. This allows more flexibility in matching streams for a given TLS listener. \n If you need to forward traffic to a single target for a TLS listener, you could choose to use a TCPRoute with a TLS listener."
+          description: TCPRoute provides a way to route TCP requests. When combined with a Gateway listener, it can be used to forward connections on the port specified by the listener to a set of backends specified by the TCPRoute.
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -39,18 +36,8 @@ spec:
             metadata:
               type: object
             spec:
-              description: Spec defines the desired state of TLSRoute.
+              description: Spec defines the desired state of TCPRoute.
               properties:
-                hostnames:
-                  description: "Hostnames defines a set of SNI names that should match against the SNI attribute of TLS ClientHello message in TLS handshake. This matches the RFC 1123 definition of a hostname with 2 notable exceptions: \n 1. IPs are not allowed in SNI names per RFC 6066. 2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard    label must appear by itself as the first label. \n If a hostname is specified by both the Listener and TLSRoute, there must be at least one intersecting hostname for the TLSRoute to be attached to the Listener. For example: \n * A Listener with `test.example.com` as the hostname matches TLSRoutes   that have either not specified any hostnames, or have specified at   least one of `test.example.com` or `*.example.com`. * A Listener with `*.example.com` as the hostname matches TLSRoutes   that have either not specified any hostnames or have specified at least   one hostname that matches the Listener hostname. For example,   `test.example.com` and `*.example.com` would both match. On the other   hand, `example.com` and `test.example.net` would not match. \n If both the Listener and TLSRoute have specified hostnames, any TLSRoute hostnames that do not match the Listener hostname MUST be ignored. For example, if a Listener specified `*.example.com`, and the TLSRoute specified `test.example.com` and `test.example.net`, `test.example.net` must not be considered for a match. \n If both the Listener and TLSRoute have specified hostnames, and none match with the criteria above, then the TLSRoute is not accepted. The implementation must raise an 'Accepted' Condition with a status of `False` in the corresponding RouteParentStatus. \n Support: Core"
-                  items:
-                    description: "Hostname is the fully qualified domain name of a network host. This matches the RFC 1123 definition of a hostname with 2 notable exceptions: \n  1. IPs are not allowed.  2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard     label must appear by itself as the first label. \n Hostname can be \"precise\" which is a domain name without the terminating dot of a network host (e.g. \"foo.example.com\") or \"wildcard\", which is a domain name prefixed with a single wildcard label (e.g. `*.example.com`). \n Note that as per RFC1035 and RFC1123, a *label* must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character. No other punctuation is allowed."
-                    maxLength: 253
-                    minLength: 1
-                    pattern: ^(\*\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-                    type: string
-                  maxItems: 16
-                  type: array
                 parentRefs:
                   description: "ParentRefs references the resources (usually Gateways) that a Route wants to be attached to. Note that the referenced parent resource needs to allow this for the attachment to be complete. For Gateways, that means the Gateway needs to allow attachment from Routes of this kind and namespace. \n The only kind of parent resource with \"Core\" support is Gateway. This API may be extended in the future to support additional kinds of parent resources such as one of the route kinds. \n It is invalid to reference an identical parent more than once. It is valid to reference multiple distinct sections within the same parent resource, such as 2 Listeners within a Gateway. \n It is possible to separately reference multiple distinct objects that may be collapsed by an implementation. For example, some implementations may choose to merge compatible Gateway Listeners together. If that is the case, the list of routes attached to those resources should also be merged. \n Note that for ParentRefs that cross namespace boundaries, there are specific rules. Cross-namespace references are only valid if they are explicitly allowed by something in the namespace they are referring to. For example, Gateway has the AllowedRoutes field, and ReferenceGrant provides a generic way to enable any other kind of cross-namespace reference."
                   items:
@@ -98,12 +85,12 @@ spec:
                   maxItems: 32
                   type: array
                 rules:
-                  description: Rules are a list of TLS matchers and actions.
+                  description: Rules are a list of TCP matchers and actions.
                   items:
-                    description: TLSRouteRule is the configuration for a given rule.
+                    description: TCPRouteRule is the configuration for a given rule.
                     properties:
                       backendRefs:
-                        description: "BackendRefs defines the backend(s) where matching requests should be sent. If unspecified or invalid (refers to a non-existent resource or a Service with no endpoints), the rule performs no forwarding; if no filters are specified that would result in a response being sent, the underlying implementation must actively reject request attempts to this backend, by rejecting the connection or returning a 500 status code. Request rejections must respect weight; if an invalid backend is requested to have 80% of requests, then 80% of requests must be rejected instead. \n Support: Core for Kubernetes Service \n Support: Implementation-specific for any other resource \n Support for weight: Extended"
+                        description: "BackendRefs defines the backend(s) where matching requests should be sent. If unspecified or invalid (refers to a non-existent resource or a Service with no endpoints), the underlying implementation MUST actively reject connection attempts to this backend. Connection rejections must respect weight; if an invalid backend is requested to have 80% of connections, then 80% of connections must be rejected instead. \n Support: Core for Kubernetes Service \n Support: Implementation-specific for any other resource \n Support for weight: Extended"
                         items:
                           description: "BackendRef defines how a Route should forward a request to a Kubernetes resource. \n Note that when a namespace is specified, a ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details."
                           properties:
@@ -158,7 +145,7 @@ spec:
                 - rules
               type: object
             status:
-              description: Status defines the current state of TLSRoute.
+              description: Status defines the current state of TCPRoute.
               properties:
                 parents:
                   description: "Parents is a list of parent resources (usually Gateways) that are associated with the route, and the status of the route with respect to each parent. When this route attaches to a parent, the controller that manages the parent must add an entry to this list when the controller first sees the route and should update the entry as appropriate when the route or gateway is modified. \n Note that parent references that cannot be resolved by an implementation of this API will not be added to this list. Implementations of this API can only populate Route status for the Gateways/parent resources they are responsible for. \n A maximum of 32 Gateways will be represented in this list. An empty list means the route has not been attached to any Gateway."

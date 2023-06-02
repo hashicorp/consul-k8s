@@ -11,7 +11,7 @@ copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make c
 	@cd hack/copy-crds-to-chart; go run ./...
 
 generate-external-crds: ## Generate CRDs for externally defined CRDs and copy them to charts/consul. Usage: make generate-external-crds
-	@cd ./charts/consul/crds/; \
+	@cd ./control-plane/config/crd/external; \
 		kustomize build | yq --split-exp '.metadata.name + ".yaml"' --no-doc
 
 bats-tests: ## Run Helm chart bats tests.
