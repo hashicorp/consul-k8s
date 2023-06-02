@@ -207,14 +207,6 @@ func TestController(t *testing.T) {
 					// control-plane-request-limit
 					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "control-plane-request-limit", nil)
 					require.NoError(r, err)
-					rateLimitConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
-					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
-					require.Equal(r, 0, rateLimitConfigEntry.ReadRate)
-					require.Equal(r, 0, rateLimitConfigEntry.WriteRate)
-
-					// control-plane-request-limit
-					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "control-plane-request-limit", nil)
-					require.NoError(r, err)
 					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
 					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
 					require.Equal(t, "permissive", rateLimitIPConfigEntry.Mode)
@@ -284,11 +276,6 @@ func TestController(t *testing.T) {
 				logger.Log(t, "patching terminating-gateway custom resource")
 				patchSNI := "patch-sni"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "terminatinggateway", "terminating-gateway", "-p", fmt.Sprintf(`{"spec": {"services": [{"name":"name","caFile":"caFile","certFile":"certFile","keyFile":"keyFile","sni":"%s"}]}}`, patchSNI), "--type=merge")
-
-				logger.Log(t, "patching terminating-gateway custom resource")
-				patchReadRate := 99
-				patchWriteRate := 99
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "controlplanerequestlimit", "control-plane-request-limit", "-p", fmt.Sprintf(`{"spec": {"readRate": %d, "writeRate": %d}}`, patchReadRate, patchWriteRate), "--type=merge")
 
 				logger.Log(t, "patching JWTProvider custom resource")
 				patchIssuer := "other-issuer"
@@ -382,14 +369,6 @@ func TestController(t *testing.T) {
 					exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
 					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
 					require.Equal(r, patchPeer, exportedServicesConfigEntry.Services[0].Consumers[0].Peer)
-
-					// control-plane-request-limit
-					entry, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "control-plane-request-limit", nil)
-					require.NoError(r, err)
-					rateLimitConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
-					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
-					require.Equal(r, 99, rateLimitConfigEntry.ReadRate)
-					require.Equal(r, 100, rateLimitConfigEntry.WriteRate)
 
 					// control-plane-request-limit
 					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "control-plane-request-limit", nil)
@@ -492,12 +471,6 @@ func TestController(t *testing.T) {
 
 					// exported-services
 					_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
-					_, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// control-plane-request-limit
-					_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "control-plane-request-limit", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 
