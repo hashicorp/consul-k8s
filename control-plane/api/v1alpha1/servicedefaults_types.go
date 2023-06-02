@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -465,13 +466,20 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 	if in == nil {
 		return nil
 	}
+	var baseEjectiontime *time.Duration
+	if in.BaseEjectionTime == nil {
+		dur := time.Second * 30
+		baseEjectiontime = &dur
+	} else {
+		baseEjectiontime = &in.BaseEjectionTime.Duration
+	}
 
 	return &capi.PassiveHealthCheck{
 		Interval:                in.Interval.Duration,
 		MaxFailures:             in.MaxFailures,
 		EnforcingConsecutive5xx: in.EnforcingConsecutive5xx,
 		MaxEjectionPercent:      in.MaxEjectionPercent,
-		BaseEjectionTime:        &in.BaseEjectionTime.Duration,
+		BaseEjectionTime:        baseEjectiontime,
 	}
 }
 
