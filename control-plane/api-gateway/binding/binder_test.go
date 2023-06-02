@@ -54,15 +54,16 @@ var (
 )
 
 type resourceMapResources struct {
-	grants           []gwv1beta1.ReferenceGrant
-	secrets          []corev1.Secret
-	gateways         []gwv1beta1.Gateway
-	httpRoutes       []gwv1beta1.HTTPRoute
-	tcpRoutes        []gwv1alpha2.TCPRoute
-	meshServices     []v1alpha1.MeshService
-	services         []types.NamespacedName
-	consulHTTPRoutes []api.HTTPRouteConfigEntry
-	consulTCPRoutes  []api.TCPRouteConfigEntry
+	grants                   []gwv1beta1.ReferenceGrant
+	secrets                  []corev1.Secret
+	gateways                 []gwv1beta1.Gateway
+	httpRoutes               []gwv1beta1.HTTPRoute
+	tcpRoutes                []gwv1alpha2.TCPRoute
+	meshServices             []v1alpha1.MeshService
+	services                 []types.NamespacedName
+	consulInlineCertificates []api.InlineCertificateConfigEntry
+	consulHTTPRoutes         []api.HTTPRouteConfigEntry
+	consulTCPRoutes          []api.TCPRouteConfigEntry
 }
 
 func newTestResourceMap(t *testing.T, resources resourceMapResources) *common.ResourceMap {
@@ -339,14 +340,16 @@ func TestBinder_Lifecycle(t *testing.T) {
 						},
 					},
 				}},
-				ConsulHTTPRoutes: []api.HTTPRouteConfigEntry{{
+			}),
+			resources: resourceMapResources{
+				consulHTTPRoutes: []api.HTTPRouteConfigEntry{{
 					Kind: api.HTTPRoute,
 					Name: "route",
 					Parents: []api.ResourceReference{
 						{Kind: api.APIGateway, Name: "gateway"},
 					},
 				}},
-			}),
+			},
 			expectedUpdates: []client.Object{
 				&gwv1beta1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
@@ -464,14 +467,16 @@ func TestBinder_Lifecycle(t *testing.T) {
 						},
 					},
 				}},
-				ConsulTCPRoutes: []api.TCPRouteConfigEntry{{
+			}),
+			resources: resourceMapResources{
+				consulTCPRoutes: []api.TCPRouteConfigEntry{{
 					Kind: api.TCPRoute,
 					Name: "route",
 					Parents: []api.ResourceReference{
 						{Kind: api.APIGateway, Name: "gateway"},
 					},
 				}},
-			}),
+			},
 			expectedUpdates: []client.Object{
 				&gwv1alpha2.TCPRoute{
 					ObjectMeta: metav1.ObjectMeta{
@@ -573,7 +578,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 						}},
 					}),
 				},
-				ConsulHTTPRoutes: []api.HTTPRouteConfigEntry{
+			}),
+			resources: resourceMapResources{
+				consulHTTPRoutes: []api.HTTPRouteConfigEntry{
 					{
 						Kind: api.HTTPRoute, Name: "http-route-two", Meta: map[string]string{
 							"k8s-name":      "http-route-two",
@@ -594,7 +601,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 						},
 					},
 				},
-				ConsulTCPRoutes: []api.TCPRouteConfigEntry{
+				consulTCPRoutes: []api.TCPRouteConfigEntry{
 					{
 						Kind: api.TCPRoute, Name: "tcp-route-two",
 						Meta: map[string]string{
@@ -617,12 +624,10 @@ func TestBinder_Lifecycle(t *testing.T) {
 						},
 					},
 				},
-				ConsulInlineCertificates: []api.InlineCertificateConfigEntry{
+				consulInlineCertificates: []api.InlineCertificateConfigEntry{
 					*certificateOne,
 					*certificateTwo,
 				},
-			}),
-			resources: resourceMapResources{
 				secrets: []corev1.Secret{
 					secretOne,
 					secretTwo,
@@ -755,8 +760,6 @@ func TestBinder_Lifecycle(t *testing.T) {
 			tt.resources.gateways = append(tt.resources.gateways, tt.config.Gateway)
 			tt.resources.httpRoutes = append(tt.resources.httpRoutes, tt.config.HTTPRoutes...)
 			tt.resources.tcpRoutes = append(tt.resources.tcpRoutes, tt.config.TCPRoutes...)
-			tt.resources.consulHTTPRoutes = append(tt.resources.consulHTTPRoutes, tt.config.ConsulHTTPRoutes...)
-			tt.resources.consulTCPRoutes = append(tt.resources.consulTCPRoutes, tt.config.ConsulTCPRoutes...)
 
 			tt.config.Resources = newTestResourceMap(t, tt.resources)
 			tt.config.ControllerName = testControllerName
@@ -849,8 +852,6 @@ func TestBinder_Registrations(t *testing.T) {
 			tt.resources.gateways = append(tt.resources.gateways, tt.config.Gateway)
 			tt.resources.httpRoutes = append(tt.resources.httpRoutes, tt.config.HTTPRoutes...)
 			tt.resources.tcpRoutes = append(tt.resources.tcpRoutes, tt.config.TCPRoutes...)
-			tt.resources.consulHTTPRoutes = append(tt.resources.consulHTTPRoutes, tt.config.ConsulHTTPRoutes...)
-			tt.resources.consulTCPRoutes = append(tt.resources.consulTCPRoutes, tt.config.ConsulTCPRoutes...)
 
 			tt.config.Resources = newTestResourceMap(t, tt.resources)
 			tt.config.ControllerName = testControllerName
