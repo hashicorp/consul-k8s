@@ -807,10 +807,10 @@ server:
   # ```yaml
   # resources:
   #   requests:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   #   limits:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   # ```
   #
@@ -818,10 +818,10 @@ server:
   # @type: map
   resources:
     requests:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
     limits:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
 
   # The security context for the server pods. This should be a YAML map corresponding to a
