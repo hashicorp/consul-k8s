@@ -87,14 +87,14 @@ func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedNam
 // resourceMutator is passed to create or update functions to mutate Kubernetes resources.
 type resourceMutator = func() error
 
-func (g Gatekeeper) namespacedName(gateway gwv1beta1.Gateway) types.NamespacedName {
+func (g *Gatekeeper) namespacedName(gateway gwv1beta1.Gateway) types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: gateway.Namespace,
 		Name:      gateway.Name,
 	}
 }
 
-func (g Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config common.HelmConfig) string {
+func (g *Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config common.HelmConfig) string {
 	if config.AuthMethod == "" {
 		return ""
 	}
