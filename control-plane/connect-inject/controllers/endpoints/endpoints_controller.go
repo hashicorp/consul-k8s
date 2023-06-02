@@ -917,55 +917,64 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
 	// Get services matching metadata.
 	nodesWithSvcs, err := r.serviceInstancesForK8sNodes(apiClient, k8sSvcName, k8sSvcNamespace)
-	if err != nil {
-		r.Log.Error(err, "failed to get service instances", "name", k8sSvcName)
-		return err
-	}
 
-	// Deregister each service instance that matches the metadata.
-	for _, nodeSvcs := range nodesWithSvcs {
-		for _, svc := range nodeSvcs.Services {
-			// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
-			// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
-			// every service instance.
-			var serviceDeregistered bool
-			if endpointsAddressesMap != nil {
-				if _, ok := endpointsAddressesMap[svc.Address]; !ok {
-					// If the service address is not in the Endpoints addresses, deregister it.
+	if nodesWithSvcs != nil {
+		// Deregister each service instance that matches the metadata.
+		for _, nodeSvcs := range nodesWithSvcs {
+			for _, svc := range nodeSvcs.Services {
+				// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
+				// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
+				// every service instance.
+				var serviceDeregistered bool
+				if endpointsAddressesMap != nil {
+					if _, ok := endpointsAddressesMap[svc.Address]; !ok {
+						// If the service address is not in the Endpoints addresses, deregister it.
+						r.Log.Info("deregistering service from consul", "svc", svc.ID)
+						var callErr error
+						_, callErr = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
+							Node:      nodeSvcs.Node.Node,
+							ServiceID: svc.ID,
+							Namespace: svc.Namespace,
+						}, nil)
+						if callErr != nil {
+							r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
+							err = multierror.Append(err, callErr)		
+						} else {
+							serviceDeregistered = true
+						}
+					}
+				} else {
 					r.Log.Info("deregistering service from consul", "svc", svc.ID)
-					_, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
+					var callErr error
+					_, callErr = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
 						Node:      nodeSvcs.Node.Node,
 						ServiceID: svc.ID,
 						Namespace: svc.Namespace,
 					}, nil)
-					if err != nil {
+					if callErr != nil {
 						r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
-						return err
+						err = multierror.Append(err, callErr)		
+					} else {
+						serviceDeregistered = true
 					}
-					serviceDeregistered = true
 				}
-			} else {
-				r.Log.Info("deregistering service from consul", "svc", svc.ID)
-				if _, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
-					Node:      nodeSvcs.Node.Node,
-					ServiceID: svc.ID,
-					Namespace: svc.Namespace,
-				}, nil); err != nil {
-					r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
-					return err
-				}
-				serviceDeregistered = true
-			}
 
-			if r.AuthMethod != "" && serviceDeregistered {
-				r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
-				err = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
-				if err != nil {
-					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
-					return err
+				if r.AuthMethod != "" && serviceDeregistered {
+					r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
+					var callErr error
+					callErr = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
+					if callErr != nil {
+						r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
+						err = multierror.Append(err, callErr)		
+					}
 				}
 			}
 		}
+	}
+
+	if err != nil {
+		r.Log.Error(err, "Errors during deregistration of service instances", "name", k8sSvcName)
+		return err
 	}
 
 	return nil
@@ -1090,16 +1099,41 @@ func getTokenMetaFromDescription(description string) (map[string]string, error) 
 
 func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServiceName, k8sServiceNamespace string) ([]*api.CatalogNodeServiceList, error) {
 	var serviceList []*api.CatalogNodeServiceList
+	
 	// Get a list of k8s nodes.
-	var nodeList corev1.NodeList
-	err := r.Client.List(r.Context, &nodeList)
+	var k8sNodeList corev1.NodeList
+	r.Log.Info("Finding nodes from k8s api")
+	err := r.Client.List(r.Context, &k8sNodeList)
 	if err != nil {
 		return nil, err
 	}
-	for _, node := range nodeList.Items {
+	r.Log.Info("Node count in k8s", "k8sCount", len(k8sNodeList.Items))
+
+	// The nodelist may have changed between this point and when the event was raised
+	// For example, if a pod is evicted because a node has been deleted, there is no guarantee that that node will show up here
+
+	// query consul catalog for a list of nodes supporting this service
+	// quite a lot of results as synthetic nodes are never deregistered ... :-(
+	r.Log.Info("Finding synthetic nodes in consul")
+	var nodeList []*api.Node
+	filter := fmt.Sprintf(`Meta[%q] == %q `, "synthetic-node", "true")
+	nodeList, _, err = apiClient.Catalog().Nodes(&api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
+	if err != nil {
+		return nil, err
+	}
+	r.Log.Info("Node count in consul", "consulCount", len(nodeList))
+	
+	for _, node := range nodeList {
 		var nodeServices *api.CatalogNodeServiceList
-		nodeServices, err = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, common.ConsulNodeNameFromK8sNode(node.Name))
-		serviceList = append(serviceList, nodeServices)
+		var callErr error
+		r.Log.Info("Finding services on consul node", "k8sServiceName", k8sServiceName, "k8sServiceNamespace", k8sServiceNamespace, "node", node.Node)
+		nodeServices, callErr = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, node.Node)
+		if err != nil {
+			err = multierror.Append(err, callErr)		
+		} else {
+			r.Log.Info("Found services on consul node", "consulServiceCount", len(nodeServices.Services), "node", node.Node)
+			serviceList = append(serviceList, nodeServices)
+		}
 	}
 
 	return serviceList, err
