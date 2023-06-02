@@ -68,7 +68,7 @@ type ReferenceValidator interface {
 }
 
 type certificate struct {
-	secret   corev1.Secret
+	secret   *corev1.Secret
 	gateways mapset.Set
 }
 
@@ -118,9 +118,8 @@ type ResourceMap struct {
 	gatewayResources      map[api.ResourceReference]*resourceSet
 
 	// consul resources for a gateway
-	consulTCPRoutes          map[api.ResourceReference]*consulTCPRoute
-	consulHTTPRoutes         map[api.ResourceReference]*consulHTTPRoute
-	consulInlineCertificates map[api.ResourceReference]mapset.Set
+	consulTCPRoutes  map[api.ResourceReference]*consulTCPRoute
+	consulHTTPRoutes map[api.ResourceReference]*consulHTTPRoute
 
 	// mutations
 	consulMutations []*ConsulUpdateOperation
@@ -128,20 +127,19 @@ type ResourceMap struct {
 
 func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator, logger logr.Logger) *ResourceMap {
 	return &ResourceMap{
-		translator:               translator,
-		referenceValidator:       validator,
-		logger:                   logger,
-		processedCertificates:    mapset.NewSet(),
-		services:                 make(map[types.NamespacedName]api.ResourceReference),
-		meshServices:             make(map[types.NamespacedName]api.ResourceReference),
-		certificates:             mapset.NewSet(),
-		consulTCPRoutes:          make(map[api.ResourceReference]*consulTCPRoute),
-		consulHTTPRoutes:         make(map[api.ResourceReference]*consulHTTPRoute),
-		consulInlineCertificates: make(map[api.ResourceReference]mapset.Set),
-		certificateGateways:      make(map[api.ResourceReference]*certificate),
-		tcpRouteGateways:         make(map[api.ResourceReference]*tcpRoute),
-		httpRouteGateways:        make(map[api.ResourceReference]*httpRoute),
-		gatewayResources:         make(map[api.ResourceReference]*resourceSet),
+		translator:            translator,
+		referenceValidator:    validator,
+		logger:                logger,
+		processedCertificates: mapset.NewSet(),
+		services:              make(map[types.NamespacedName]api.ResourceReference),
+		meshServices:          make(map[types.NamespacedName]api.ResourceReference),
+		certificates:          mapset.NewSet(),
+		consulTCPRoutes:       make(map[api.ResourceReference]*consulTCPRoute),
+		consulHTTPRoutes:      make(map[api.ResourceReference]*consulHTTPRoute),
+		certificateGateways:   make(map[api.ResourceReference]*certificate),
+		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
+		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
+		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
 	}
 }
 
@@ -190,7 +188,7 @@ func (s *ResourceMap) Certificate(key types.NamespacedName) *corev1.Secret {
 	}
 	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
 	if secret, ok := s.certificateGateways[consulKey]; ok {
-		return &secret.secret
+		return secret.secret
 	}
 	return nil
 }
@@ -201,7 +199,7 @@ func (s *ResourceMap) ReferenceCountCertificate(secret corev1.Secret) {
 	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
 	if _, ok := s.certificateGateways[consulKey]; !ok {
 		s.certificateGateways[consulKey] = &certificate{
-			secret:   secret,
+			secret:   &secret,
 			gateways: mapset.NewSet(),
 		}
 	}
@@ -320,6 +318,21 @@ func (s *ResourceMap) ReferenceCountConsulTCPRoute(route api.TCPRouteConfigEntry
 	s.consulTCPRoutes[NormalizeMeta(key)] = set
 }
 
+func (s *ResourceMap) ReferenceCountConsulCertificate(cert api.InlineCertificateConfigEntry) {
+	key := s.objectReference(&cert)
+
+	var referenced *certificate
+	if existing, ok := s.certificateGateways[NormalizeMeta(key)]; ok {
+		referenced = existing
+	} else {
+		referenced = &certificate{
+			gateways: mapset.NewSet(),
+		}
+	}
+
+	s.certificateGateways[NormalizeMeta(key)] = referenced
+}
+
 func (s *ResourceMap) consulGatewaysForRoute(namespace string, refs []api.ResourceReference) mapset.Set {
 	gateways := mapset.NewSet()
 
@@ -400,21 +413,28 @@ func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUp
 
 	consulRoute, ok := s.consulHTTPRoutes[consulKey]
 	if ok {
-		// remove from the consulHTTPRoutes map since we don't want to
-		// GC it in the end
-		delete(s.consulHTTPRoutes, consulKey)
 		mutated := mutateFn(&consulRoute.route, *translated)
+		if len(mutated.Parents) != 0 {
+			// if we don't have any parents set, we keep this around to allow the route
+			// to be GC'd.
+			delete(s.consulHTTPRoutes, consulKey)
+			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+				Entry:    &mutated,
+				OnUpdate: onUpdate,
+			})
+		}
+		return
+	}
+	mutated := mutateFn(nil, *translated)
+	if len(mutated.Parents) != 0 {
+		// if we don't have any parents set, we keep this around to allow the route
+		// to be GC'd.
+		delete(s.consulHTTPRoutes, consulKey)
 		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
 			Entry:    &mutated,
 			OnUpdate: onUpdate,
 		})
-		return
 	}
-	mutated := mutateFn(nil, *translated)
-	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-		Entry:    &mutated,
-		OnUpdate: onUpdate,
-	})
 }
 
 func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
@@ -422,15 +442,16 @@ func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(er
 
 	consulRoute, ok := s.consulHTTPRoutes[consulKey]
 	if ok {
-		// remove from the consulHTTPRoutes map since we don't want to
-		// GC it in the end
-		delete(s.consulHTTPRoutes, consulKey)
 		mutated := mutateFn(consulRoute.route)
-		// add it to the mutation set
-		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-			Entry:    &mutated,
-			OnUpdate: onUpdate,
-		})
+		if len(mutated.Parents) != 0 {
+			// if we don't have any parents set, we keep this around to allow the route
+			// to be GC'd.
+			delete(s.consulHTTPRoutes, consulKey)
+			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+				Entry:    &mutated,
+				OnUpdate: onUpdate,
+			})
+		}
 	}
 }
 
@@ -454,20 +475,28 @@ func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, onUpd
 
 	consulRoute, ok := s.consulTCPRoutes[consulKey]
 	if ok {
-		// remove from the consulTCPRoutes map since we don't want to
-		// GC it in the end
 		mutated := mutateFn(&consulRoute.route, *translated)
+		if len(mutated.Parents) != 0 {
+			// if we don't have any parents set, we keep this around to allow the route
+			// to be GC'd.
+			delete(s.consulTCPRoutes, consulKey)
+			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+				Entry:    &mutated,
+				OnUpdate: onUpdate,
+			})
+		}
+		return
+	}
+	mutated := mutateFn(nil, *translated)
+	if len(mutated.Parents) != 0 {
+		// if we don't have any parents set, we keep this around to allow the route
+		// to be GC'd.
+		delete(s.consulTCPRoutes, consulKey)
 		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
 			Entry:    &mutated,
 			OnUpdate: onUpdate,
 		})
-		return
 	}
-	mutated := mutateFn(nil, *translated)
-	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-		Entry:    &mutated,
-		OnUpdate: onUpdate,
-	})
 }
 
 func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
@@ -475,15 +504,16 @@ func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(err
 
 	consulRoute, ok := s.consulTCPRoutes[consulKey]
 	if ok {
-		// remove from the consulTCPRoutes map since we don't want to
-		// GC it in the end
-		delete(s.consulTCPRoutes, consulKey)
 		mutated := mutateFn(consulRoute.route)
-		// add it to the mutation set
-		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-			Entry:    &mutated,
-			OnUpdate: onUpdate,
-		})
+		if len(mutated.Parents) != 0 {
+			// if we don't have any parents set, we keep this around to allow the route
+			// to be GC'd.
+			delete(s.consulTCPRoutes, consulKey)
+			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+				Entry:    &mutated,
+				OnUpdate: onUpdate,
+			})
+		}
 	}
 }
 
@@ -502,7 +532,11 @@ func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error
 		return nil
 	}
 
-	consulCertificate, err := s.translator.ToInlineCertificate(certificate.secret)
+	if certificate.secret == nil {
+		return nil
+	}
+
+	consulCertificate, err := s.translator.ToInlineCertificate(*certificate.secret)
 	if err != nil {
 		return err
 	}

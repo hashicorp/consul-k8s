@@ -53,19 +53,8 @@ type BinderConfig struct {
 	// Service is the deployed service associated with the Gateway deployment.
 	Service *corev1.Service
 
-	// TODO: Do we need to pass in Routes that have references to a Gateway in their statuses
-	// for cleanup purposes or is the below enough for record keeping?
-
 	// ConsulGateway is the config entry we've created in Consul.
 	ConsulGateway *api.APIGatewayConfigEntry
-	// ConsulHTTPRoutes are a list of HTTPRouteConfigEntry objects that currently reference the
-	// Gateway we've created in Consul.
-	ConsulHTTPRoutes []api.HTTPRouteConfigEntry
-	// ConsulTCPRoutes are a list of TCPRouteConfigEntry objects that currently reference the
-	// Gateway we've created in Consul.
-	ConsulTCPRoutes []api.TCPRouteConfigEntry
-	// ConsulInlineCertificates is a list of certificates that have been created in Consul.
-	ConsulInlineCertificates []api.InlineCertificateConfigEntry
 	// GatewayServices are the services associated with the Gateway
 	ConsulGatewayServices []api.CatalogService
 
