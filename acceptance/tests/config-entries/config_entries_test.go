@@ -194,6 +194,15 @@ func TestController(t *testing.T) {
 					require.True(r, jwtProviderConfigEntry.Forwarding.PadForwardPayloadHeader)
 					require.Equal(r, 45, jwtProviderConfigEntry.ClockSkewSeconds)
 					require.Equal(r, 15, jwtProviderConfigEntry.CacheConfig.Size)
+
+					// exported-services
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+					require.NoError(r, err)
+					exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+					require.Equal(r, "frontend", exportedServicesConfigEntry.Services[0].Name)
+					require.Equal(r, "peerName", exportedServicesConfigEntry.Services[0].Consumers[0].Peer)
+					require.Equal(r, "groupName", exportedServicesConfigEntry.Services[0].Consumers[1].SamenessGroup)
 				})
 			}
 
@@ -233,8 +242,12 @@ func TestController(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "terminatinggateway", "terminating-gateway", "-p", fmt.Sprintf(`{"spec": {"services": [{"name":"name","caFile":"caFile","certFile":"certFile","keyFile":"keyFile","sni":"%s"}]}}`, patchSNI), "--type=merge")
 
 				logger.Log(t, "patching JWTProvider custom resource")
-				patchCacheSize := 25
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "jwtprovider", "jwt-provider", "-p", fmt.Sprintf(`{"spec": {"cacheConfig": {"size": "%d"}}}`, patchCacheSize), "--type=merge")
+				patchIssuer := "other-issuer"
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "jwtprovider", "jwt-provider", "-p", fmt.Sprintf(`{"spec": {"issuer": "%s"}}`, patchIssuer), "--type=merge")
+
+				logger.Log(t, "patching ExportedServices custom resource")
+				patchPeer := "destination"
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "exportedservices", "default", "-p", fmt.Sprintf(`{"spec": {"services": [{"name": "frontend", "consumers":  [{"peer":  "%s"}, {"samenessGroup":  "groupName"}]}]}}`, patchPeer), "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -304,12 +317,19 @@ func TestController(t *testing.T) {
 					require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
 					require.Equal(r, patchSNI, terminatingGatewayEntry.Services[0].SNI)
 
-					// JWT Provider
+					// jwt-provider
 					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
 					require.NoError(r, err)
 					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
 					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
-					require.Equal(r, patchCacheSize, jwtProviderConfigEntry.CacheConfig.Size)
+					require.Equal(r, patchIssuer, jwtProviderConfigEntry.Issuer)
+
+					// exported-services
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+					require.NoError(r, err)
+					exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+					require.Equal(r, patchPeer, exportedServicesConfigEntry.Services[0].Consumers[0].Peer)
 				})
 			}
 
@@ -342,8 +362,11 @@ func TestController(t *testing.T) {
 				logger.Log(t, "deleting terminating-gateway custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "terminatinggateway", "terminating-gateway")
 
-				logger.Log(t, "deleting jwtProvider custom resource")
+				logger.Log(t, "deleting jwt-provider custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "jwtprovider", "jwt-provider")
+
+				logger.Log(t, "deleting exported-services custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "exportedservices", "default")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -394,6 +417,11 @@ func TestController(t *testing.T) {
 
 					// jwt-provider
 					_, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// exported-services
+					_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})
