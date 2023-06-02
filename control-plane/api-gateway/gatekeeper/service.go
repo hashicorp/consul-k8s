@@ -53,8 +53,8 @@ func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gatewa
 	return nil
 }
 
-func (g *Gatekeeper) deleteService(ctx context.Context, nsname types.NamespacedName) error {
-	if err := g.Client.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
+func (g *Gatekeeper) deleteService(ctx context.Context, gwName types.NamespacedName) error {
+	if err := g.Client.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: gwName.Name, Namespace: gwName.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
