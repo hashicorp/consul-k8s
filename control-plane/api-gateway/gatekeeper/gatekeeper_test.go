@@ -61,6 +61,7 @@ type testCase struct {
 type resources struct {
 	deployments     []*appsv1.Deployment
 	roles           []*rbac.Role
+	roleBindings    []*rbac.RoleBinding
 	services        []*corev1.Service
 	serviceAccounts []*corev1.ServiceAccount
 }
@@ -187,6 +188,9 @@ func TestUpsert(t *testing.T) {
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
 				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -240,6 +244,9 @@ func TestUpsert(t *testing.T) {
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
 				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -259,6 +266,9 @@ func TestUpsert(t *testing.T) {
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
+				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -315,6 +325,9 @@ func TestUpsert(t *testing.T) {
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
 				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -339,6 +352,9 @@ func TestUpsert(t *testing.T) {
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
+				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -546,6 +562,9 @@ func TestDelete(t *testing.T) {
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
 				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -609,6 +628,10 @@ func joinResources(resources resources) (objs []client.Object) {
 		objs = append(objs, role)
 	}
 
+	for _, roleBinding := range resources.roleBindings {
+		objs = append(objs, roleBinding)
+	}
+
 	for _, service := range resources.services {
 		objs = append(objs, service)
 	}
@@ -664,6 +687,22 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 		require.Equal(t, expected, actual)
 	}
 
+	for _, expected := range resources.roleBindings {
+		actual := &rbac.RoleBinding{}
+		err := client.Get(context.Background(), types.NamespacedName{
+			Name:      expected.Name,
+			Namespace: expected.Namespace,
+		}, actual)
+		if err != nil {
+			return err
+		}
+
+		// Patch the createdAt label
+		actual.Labels[createdAtLabelKey] = createdAtLabelValue
+
+		require.Equal(t, expected, actual)
+	}
+
 	for _, expected := range resources.services {
 		actual := &corev1.Service{}
 		err := client.Get(context.Background(), types.NamespacedName{
@@ -700,12 +739,12 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 	return nil
 }
 
-func validateResourcesAreDeleted(t *testing.T, client client.Client, resources resources) error {
+func validateResourcesAreDeleted(t *testing.T, k8sClient client.Client, resources resources) error {
 	t.Helper()
 
 	for _, expected := range resources.deployments {
 		actual := &appsv1.Deployment{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
@@ -717,7 +756,7 @@ func validateResourcesAreDeleted(t *testing.T, client client.Client, resources r
 
 	for _, expected := range resources.roles {
 		actual := &rbac.Role{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
@@ -727,9 +766,21 @@ func validateResourcesAreDeleted(t *testing.T, client client.Client, resources r
 		require.Error(t, err)
 	}
 
+	for _, expected := range resources.roleBindings {
+		actual := &rbac.RoleBinding{}
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
+			Name:      expected.Name,
+			Namespace: expected.Namespace,
+		}, actual)
+		if !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("expected rolebinding %s to be deleted", expected.Name)
+		}
+		require.Error(t, err)
+	}
+
 	for _, expected := range resources.services {
 		actual := &corev1.Service{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
@@ -741,7 +792,7 @@ func validateResourcesAreDeleted(t *testing.T, client client.Client, resources r
 
 	for _, expected := range resources.serviceAccounts {
 		actual := &corev1.ServiceAccount{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
@@ -834,6 +885,42 @@ func configureRole(name, namespace string, labels map[string]string, resourceVer
 			},
 		},
 		Rules: []rbac.PolicyRule{},
+	}
+}
+
+func configureRoleBinding(name, namespace string, labels map[string]string, resourceVersion string) *rbac.RoleBinding {
+	return &rbac.RoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "rbac.authorization.k8s.io/v1",
+			Kind:       "RoleBinding",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Namespace:       namespace,
+			Labels:          labels,
+			ResourceVersion: resourceVersion,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					Kind:               "Gateway",
+					Name:               name,
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
+				},
+			},
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     name,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      name,
+				Namespace: namespace,
+			},
+		},
 	}
 }
 
