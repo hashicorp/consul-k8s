@@ -1,0 +1,3 @@
+```release-note:improvement
+cli: add consul-telemetry-gateway allow-all intention for -demo
+```
