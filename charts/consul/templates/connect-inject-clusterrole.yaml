@@ -73,7 +73,7 @@ rules:
   - delete
   - update
 - apiGroups: [ "rbac.authorization.k8s.io" ]
-  resources: [ "roles" ]
+  resources: [ "roles", "rolebindings" ]
   verbs:
   - get
   - list
