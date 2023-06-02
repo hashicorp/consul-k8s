@@ -122,10 +122,8 @@ func TestRemoteDevCloud(t *testing.T) {
 		"global.gossipEncryption.autoGenerate": "false",
 		"global.tls.enabled":                   "true",
 		"global.tls.enableAutoEncrypt":         "true",
-		"global.image":                         "consul:local",
 
 		"telemetryCollector.enabled":                   "true",
-		"telemetryCollector.image":                     cfg.ConsulCollectorImage,
 		"telemetryCollector.cloud.clientId.secretName": clientIDSecretName,
 		"telemetryCollector.cloud.clientId.secretKey":  clientIDSecretKey,
 
@@ -135,6 +133,13 @@ func TestRemoteDevCloud(t *testing.T) {
 		// set TLS to insecure
 
 		"telemetryCollector.extraEnvironmentVars.HCP_API_ADDRESS": apiHostSecretKeyValue,
+	}
+
+	if cfg.ConsulImage != "" {
+		helmValues["global.image"] = cfg.ConsulImage
+	}
+	if cfg.ConsulCollectorImage != "" {
+		helmValues["telemetryCollector.image"] = cfg.ConsulCollectorImage
 	}
 
 	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
