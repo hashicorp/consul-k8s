@@ -30,6 +30,7 @@ func New(log logr.Logger, client client.Client) *Gatekeeper {
 }
 
 // Upsert creates or updates the resources for handling routing of network traffic.
+// This is done in order based on dependencies between resources.
 func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	g.Log.Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", gateway.Namespace, gateway.Name))
 
