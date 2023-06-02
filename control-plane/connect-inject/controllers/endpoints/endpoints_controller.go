@@ -1080,7 +1080,7 @@ func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServi
 		var nodeServices *api.CatalogNodeServiceList
 		var callErr error
 		nodeServices, callErr = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, common.ConsulNodeNameFromK8sNode(node.Name))
-		if err != nul {
+		if err != nil {
 			err = multierror.Append(err, callErr)		
 		} else {
 			serviceList = append(serviceList, nodeServices)
