@@ -52,16 +52,7 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 }
 
 func (g *Gatekeeper) deleteRole(ctx context.Context, gwName types.NamespacedName) error {
-	// Delete the Role
 	if err := g.Client.Delete(ctx, &rbac.Role{ObjectMeta: metav1.ObjectMeta{Name: gwName.Name, Namespace: gwName.Namespace}}); err != nil {
-		if k8serrors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	// Delete the RoleBinding
-	if err := g.Client.Delete(ctx, &rbac.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: gwName.Name, Namespace: gwName.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
