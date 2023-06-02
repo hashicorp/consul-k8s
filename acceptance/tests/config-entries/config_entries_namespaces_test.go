@@ -159,13 +159,6 @@ func TestControllerNamespaces(t *testing.T) {
 					require.True(r, ok, "could not cast to ProxyConfigEntry")
 					require.Equal(r, api.MeshGatewayModeLocal, proxyDefaultEntry.MeshGateway.Mode)
 
-					// exported-services
-					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
-					require.NoError(r, err)
-					exportedServicesEntry, ok := entry.(*api.ExportedServicesConfigEntry)
-					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
-					require.Equal(r, "frontend", exportedServicesEntry.Services[0].Name)
-
 					// mesh
 					entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", defaultOpts)
 					require.NoError(r, err)
@@ -216,6 +209,33 @@ func TestControllerNamespaces(t *testing.T) {
 					require.Equal(r, "certFile", terminatingGatewayEntry.Services[0].CertFile)
 					require.Equal(r, "keyFile", terminatingGatewayEntry.Services[0].KeyFile)
 					require.Equal(r, "sni", terminatingGatewayEntry.Services[0].SNI)
+
+					// jwt-provider
+					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.NoError(r, err)
+					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
+					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
+					require.Equal(r, "jwks.txt", jwtProviderConfigEntry.JSONWebKeySet.Local.Filename)
+					require.Equal(r, "test-issuer", jwtProviderConfigEntry.Issuer)
+					require.ElementsMatch(r, []string{"aud1", "aud2"}, jwtProviderConfigEntry.Audiences)
+					require.Equal(r, "x-jwt-header", jwtProviderConfigEntry.Locations[0].Header.Name)
+					require.Equal(r, "x-query-param", jwtProviderConfigEntry.Locations[1].QueryParam.Name)
+					require.Equal(r, "session-id", jwtProviderConfigEntry.Locations[2].Cookie.Name)
+					require.Equal(r, "x-forwarded-jwt", jwtProviderConfigEntry.Forwarding.HeaderName)
+					require.True(r, jwtProviderConfigEntry.Forwarding.PadForwardPayloadHeader)
+					require.Equal(r, 45, jwtProviderConfigEntry.ClockSkewSeconds)
+					require.Equal(r, 15, jwtProviderConfigEntry.CacheConfig.Size)
+
+					// exported-services
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+					require.NoError(r, err)
+					exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+					require.Equal(r, "frontend", exportedServicesConfigEntry.Services[0].Name)
+					require.Equal(r, "frontend", exportedServicesConfigEntry.Services[0].Namespace)
+					require.Equal(r, "partitionName", exportedServicesConfigEntry.Services[0].Consumers[0].Partition)
+					require.Equal(r, "peerName", exportedServicesConfigEntry.Services[0].Consumers[1].Peer)
+					require.Equal(r, "groupName", exportedServicesConfigEntry.Services[0].Consumers[2].SamenessGroup)
 				})
 			}
 
@@ -232,10 +252,6 @@ func TestControllerNamespaces(t *testing.T) {
 				logger.Log(t, "patching proxy-defaults custom resource")
 				patchMeshGatewayMode := "remote"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "proxydefaults", "global", "-p", fmt.Sprintf(`{"spec":{"meshGateway":{"mode": "%s"}}}`, patchMeshGatewayMode), "--type=merge")
-
-				logger.Log(t, "patching partition-exports custom resource")
-				patchServiceName := "backend"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "exportedservices", "default", "-p", fmt.Sprintf(`{"spec":{"services":[{"name": "%s", "namespace": "front", "consumers":[{"partition": "foo"}]}]}}`, patchServiceName), "--type=merge")
 
 				logger.Log(t, "patching mesh custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "mesh", "mesh", "-p", fmt.Sprintf(`{"spec":{"transparentProxy":{"meshDestinationsOnly": %t}}}`, false), "--type=merge")
@@ -257,6 +273,14 @@ func TestControllerNamespaces(t *testing.T) {
 				logger.Log(t, "patching terminating-gateway custom resource")
 				patchSNI := "patch-sni"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "terminatinggateway", "terminating-gateway", "-p", fmt.Sprintf(`{"spec": {"services": [{"name":"name","caFile":"caFile","certFile":"certFile","keyFile":"keyFile","sni":"%s"}]}}`, patchSNI), "--type=merge")
+
+				logger.Log(t, "patching jwt-provider custom resource")
+				patchIssuer := "other-issuer"
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "jwtprovider", "jwt-provider", "-p", fmt.Sprintf(`{"spec": {"issuer": "%s"}}`, patchIssuer), "--type=merge")
+
+				logger.Log(t, "patching exported-services custom resource")
+				patchPartition := "destination"
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "exportedservices", "default", "-p", fmt.Sprintf(`{"spec": {"services": [{"name": "frontend", "namespace": "frontend", "consumers":  [{"partition":  "%s"}, {"peer":  "peerName"}, {"samenessGroup":  "groupName"}]}]}}`, patchPartition), "--type=merge")
 
 				counter := &retry.Counter{Count: 20, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -280,13 +304,6 @@ func TestControllerNamespaces(t *testing.T) {
 					proxyDefaultsEntry, ok := entry.(*api.ProxyConfigEntry)
 					require.True(r, ok, "could not cast to ProxyConfigEntry")
 					require.Equal(r, api.MeshGatewayModeRemote, proxyDefaultsEntry.MeshGateway.Mode)
-
-					// partition-exports
-					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
-					require.NoError(r, err)
-					exportedServicesEntry, ok := entry.(*api.ExportedServicesConfigEntry)
-					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
-					require.Equal(r, "backend", exportedServicesEntry.Services[0].Name)
 
 					// mesh
 					entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", defaultOpts)
@@ -331,6 +348,20 @@ func TestControllerNamespaces(t *testing.T) {
 					terminatingGatewayEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
 					require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
 					require.Equal(r, patchSNI, terminatingGatewayEntry.Services[0].SNI)
+
+					// jwt-Provider
+					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.NoError(r, err)
+					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
+					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
+					require.Equal(r, patchIssuer, jwtProviderConfigEntry.Issuer)
+
+					// exported-services
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+					require.NoError(r, err)
+					exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+					require.Equal(r, patchPartition, exportedServicesConfigEntry.Services[0].Consumers[0].Partition)
 				})
 			}
 
@@ -344,9 +375,6 @@ func TestControllerNamespaces(t *testing.T) {
 
 				logger.Log(t, "deleting proxy-defaults custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "proxydefaults", "global")
-
-				logger.Log(t, "deleting partition-exports custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "exportedservices", "default")
 
 				logger.Log(t, "deleting mesh custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "mesh", "mesh")
@@ -366,6 +394,12 @@ func TestControllerNamespaces(t *testing.T) {
 				logger.Log(t, "deleting terminating-gateway custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "terminatinggateway", "terminating-gateway")
 
+				logger.Log(t, "deleting jwt-provider custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "jwtprovider", "jwt-provider")
+
+				logger.Log(t, "deleting exported-services custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "exportedservices", "default")
+
 				counter := &retry.Counter{Count: 20, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
 					// service-defaults
@@ -380,11 +414,6 @@ func TestControllerNamespaces(t *testing.T) {
 
 					// proxy-defaults
 					_, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", defaultOpts)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// partition-exports
-					_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 
@@ -415,6 +444,16 @@ func TestControllerNamespaces(t *testing.T) {
 
 					// terminating-gateway
 					_, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "terminating-gateway", queryOpts)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// jwt-provider
+					_, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// exported-services
+					_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})
