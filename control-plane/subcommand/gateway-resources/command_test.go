@@ -65,7 +65,7 @@ func TestRun_flagValidation(t *testing.T) {
 				flagChart:                  "test",
 				flagApp:                    "test",
 			},
-			expectedErr: "-release must be set",
+			expectedErr: "-release-name must be set",
 		},
 		"required component": {
 			cmd: Command{
@@ -242,7 +242,7 @@ func TestRun(t *testing.T) {
 				"-heritage", "test",
 				"-chart", "test",
 				"-app", "test",
-				"-release", "test",
+				"-release-name", "test",
 				"-component", "test",
 				"-controller-name", "test",
 			})

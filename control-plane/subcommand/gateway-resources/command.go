@@ -96,7 +96,7 @@ func (c *Command) init() {
 		"Helm chart name for created objects.")
 	c.flags.StringVar(&c.flagApp, "app", "",
 		"Helm chart app for created objects.")
-	c.flags.StringVar(&c.flagRelease, "release", "",
+	c.flags.StringVar(&c.flagRelease, "release-name", "",
 		"Helm chart release for created objects.")
 	c.flags.StringVar(&c.flagComponent, "component", "",
 		"Helm chart component for created objects.")
@@ -241,7 +241,7 @@ func (c *Command) validateFlags() error {
 		return errors.New("-app must be set")
 	}
 	if c.flagRelease == "" {
-		return errors.New("-release must be set")
+		return errors.New("-release-name must be set")
 	}
 	if c.flagComponent == "" {
 		return errors.New("-component must be set")
