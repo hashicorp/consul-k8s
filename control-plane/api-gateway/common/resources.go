@@ -400,21 +400,28 @@ func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUp
 
 	consulRoute, ok := s.consulHTTPRoutes[consulKey]
 	if ok {
-		// remove from the consulHTTPRoutes map since we don't want to
-		// GC it in the end
-		delete(s.consulHTTPRoutes, consulKey)
 		mutated := mutateFn(&consulRoute.route, *translated)
+		if len(mutated.Parents) != 0 {
+			// if we don't have any parents set, we keep this around to allow the route
+			// to be GC'd.
+			delete(s.consulHTTPRoutes, consulKey)
+			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+				Entry:    &mutated,
+				OnUpdate: onUpdate,
+			})
+		}
+		return
+	}
+	mutated := mutateFn(nil, *translated)
+	if len(mutated.Parents) != 0 {
+		// if we don't have any parents set, we keep this around to allow the route
+		// to be GC'd.
+		delete(s.consulHTTPRoutes, consulKey)
 		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
 			Entry:    &mutated,
 			OnUpdate: onUpdate,
 		})
-		return
 	}
-	mutated := mutateFn(nil, *translated)
-	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-		Entry:    &mutated,
-		OnUpdate: onUpdate,
-	})
 }
 
 func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
@@ -422,15 +429,16 @@ func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(er
 
 	consulRoute, ok := s.consulHTTPRoutes[consulKey]
 	if ok {
-		// remove from the consulHTTPRoutes map since we don't want to
-		// GC it in the end
-		delete(s.consulHTTPRoutes, consulKey)
 		mutated := mutateFn(consulRoute.route)
-		// add it to the mutation set
-		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-			Entry:    &mutated,
-			OnUpdate: onUpdate,
-		})
+		if len(mutated.Parents) != 0 {
+			// if we don't have any parents set, we keep this around to allow the route
+			// to be GC'd.
+			delete(s.consulHTTPRoutes, consulKey)
+			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+				Entry:    &mutated,
+				OnUpdate: onUpdate,
+			})
+		}
 	}
 }
 
@@ -454,20 +462,28 @@ func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, onUpd
 
 	consulRoute, ok := s.consulTCPRoutes[consulKey]
 	if ok {
-		// remove from the consulTCPRoutes map since we don't want to
-		// GC it in the end
 		mutated := mutateFn(&consulRoute.route, *translated)
+		if len(mutated.Parents) != 0 {
+			// if we don't have any parents set, we keep this around to allow the route
+			// to be GC'd.
+			delete(s.consulTCPRoutes, consulKey)
+			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+				Entry:    &mutated,
+				OnUpdate: onUpdate,
+			})
+		}
+		return
+	}
+	mutated := mutateFn(nil, *translated)
+	if len(mutated.Parents) != 0 {
+		// if we don't have any parents set, we keep this around to allow the route
+		// to be GC'd.
+		delete(s.consulTCPRoutes, consulKey)
 		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
 			Entry:    &mutated,
 			OnUpdate: onUpdate,
 		})
-		return
 	}
-	mutated := mutateFn(nil, *translated)
-	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-		Entry:    &mutated,
-		OnUpdate: onUpdate,
-	})
 }
 
 func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
@@ -475,15 +491,16 @@ func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(err
 
 	consulRoute, ok := s.consulTCPRoutes[consulKey]
 	if ok {
-		// remove from the consulTCPRoutes map since we don't want to
-		// GC it in the end
-		delete(s.consulTCPRoutes, consulKey)
 		mutated := mutateFn(consulRoute.route)
-		// add it to the mutation set
-		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-			Entry:    &mutated,
-			OnUpdate: onUpdate,
-		})
+		if len(mutated.Parents) != 0 {
+			// if we don't have any parents set, we keep this around to allow the route
+			// to be GC'd.
+			delete(s.consulTCPRoutes, consulKey)
+			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
+				Entry:    &mutated,
+				OnUpdate: onUpdate,
+			})
+		}
 	}
 }
 

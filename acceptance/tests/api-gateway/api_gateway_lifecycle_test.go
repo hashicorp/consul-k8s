@@ -5,6 +5,7 @@ package apigateway
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -60,60 +61,29 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 		k8sClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{})
 	})
 
-	// create three gateway classes, two we control, one we don't
-	controlledGatewayClassOneName := "controlled-gateway-class-one"
-	controlledGatewayClassOne := &gwv1beta1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: controlledGatewayClassOneName,
-		},
-		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: gatewayClassControllerName,
-			ParametersRef: &gwv1beta1.ParametersReference{
-				Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
-				Kind:  gwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
-				Name:  gatewayClassConfigName,
-			},
-		},
-	}
-	controlledGatewayClassTwoName := "controlled-gateway-class-two"
-	controlledGatewayClassTwo := &gwv1beta1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: controlledGatewayClassTwoName,
-		},
-		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: gatewayClassControllerName,
-			ParametersRef: &gwv1beta1.ParametersReference{
-				Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
-				Kind:  gwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
-				Name:  gatewayClassConfigName,
-			},
-		},
-	}
-	uncontrolledGatewayClassName := "uncontrolled-gateway-class"
-	uncontrolledGatewayClass := &gwv1beta1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: uncontrolledGatewayClassName,
-		},
-		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: "example.com/some-controller",
-		},
+	gatewayParametersRef := &gwv1beta1.ParametersReference{
+		Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+		Kind:  gwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
+		Name:  gatewayClassConfigName,
 	}
 
+	// create three gateway classes, two we control, one we don't
+	controlledGatewayClassOneName := "controlled-gateway-class-one"
 	logger.Log(t, "creating controlled gateway class one")
-	err = k8sClient.Create(context.Background(), controlledGatewayClassOne)
-	require.NoError(t, err)
+	createGatewayClass(t, k8sClient, controlledGatewayClassOneName, gatewayClassControllerName, gatewayParametersRef)
+
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		logger.Log(t, "deleting all gateway classes")
 		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{})
 	})
 
+	controlledGatewayClassTwoName := "controlled-gateway-class-two"
 	logger.Log(t, "creating controlled gateway class two")
-	err = k8sClient.Create(context.Background(), controlledGatewayClassTwo)
-	require.NoError(t, err)
+	createGatewayClass(t, k8sClient, controlledGatewayClassTwoName, gatewayClassControllerName, gatewayParametersRef)
 
-	logger.Log(t, "creating an uncontrolled gateway class")
-	err = k8sClient.Create(context.Background(), uncontrolledGatewayClass)
-	require.NoError(t, err)
+	uncontrolledGatewayClassName := "uncontrolled-gateway-class"
+	logger.Log(t, "creating uncontrolled gateway class")
+	createGatewayClass(t, k8sClient, uncontrolledGatewayClassName, "example.com/some-controller", nil)
 
 	// Create a certificate to reference in listeners
 	certificateInfo := generateCertificate(t, nil, "certificate.consul.local")
@@ -141,262 +111,88 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// Create three gateways with a basic HTTPS listener to correspond to the three classes
 	controlledGatewayOneName := "controlled-gateway-one"
-	controlledGatewayOne := &gwv1beta1.Gateway{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      controlledGatewayOneName,
-			Namespace: defaultNamespace,
-		},
-		Spec: gwv1beta1.GatewaySpec{
-			GatewayClassName: gwv1beta1.ObjectName(controlledGatewayClassOneName),
-			Listeners: []gwv1beta1.Listener{{
-				Name:     gwv1beta1.SectionName("listener"),
-				Protocol: gwv1beta1.HTTPSProtocolType,
-				Port:     8443,
-				TLS: &gwv1beta1.GatewayTLSConfig{
-					CertificateRefs: []gwv1beta1.SecretObjectReference{{
-						Name: gwv1beta1.ObjectName(certificateName),
-					}},
-				},
-			}},
-		},
-	}
-	controlledGatewayTwoName := "controlled-gateway-two"
-	controlledGatewayTwo := &gwv1beta1.Gateway{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      controlledGatewayTwoName,
-			Namespace: defaultNamespace,
-		},
-		Spec: gwv1beta1.GatewaySpec{
-			GatewayClassName: gwv1beta1.ObjectName(controlledGatewayClassTwoName),
-			Listeners: []gwv1beta1.Listener{{
-				Name:     gwv1beta1.SectionName("listener"),
-				Protocol: gwv1beta1.HTTPSProtocolType,
-				Port:     8443,
-				TLS: &gwv1beta1.GatewayTLSConfig{
-					CertificateRefs: []gwv1beta1.SecretObjectReference{{
-						Name: gwv1beta1.ObjectName(certificateName),
-					}},
-				},
-			}},
-		},
-	}
-	uncontrolledGatewayName := "uncontrolled-gateway"
-	uncontrolledGateway := &gwv1beta1.Gateway{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      uncontrolledGatewayName,
-			Namespace: defaultNamespace,
-		},
-		Spec: gwv1beta1.GatewaySpec{
-			GatewayClassName: gwv1beta1.ObjectName(uncontrolledGatewayClassName),
-			Listeners: []gwv1beta1.Listener{{
-				Name:     gwv1beta1.SectionName("listener"),
-				Protocol: gwv1beta1.HTTPSProtocolType,
-				Port:     8443,
-				TLS: &gwv1beta1.GatewayTLSConfig{
-					CertificateRefs: []gwv1beta1.SecretObjectReference{{
-						Name: gwv1beta1.ObjectName(certificateName),
-					}},
-				},
-			}},
-		},
-	}
-
 	logger.Log(t, "creating controlled gateway one")
-	err = k8sClient.Create(context.Background(), controlledGatewayOne)
-	require.NoError(t, err)
+	controlledGatewayOne := createGateway(t, k8sClient, controlledGatewayOneName, defaultNamespace, controlledGatewayClassOneName, certificateName)
+
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		logger.Log(t, "deleting all gateways")
 		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.Gateway{}, client.InNamespace(defaultNamespace))
 	})
 
+	controlledGatewayTwoName := "controlled-gateway-two"
 	logger.Log(t, "creating controlled gateway two")
-	err = k8sClient.Create(context.Background(), controlledGatewayTwo)
-	require.NoError(t, err)
+	controlledGatewayTwo := createGateway(t, k8sClient, controlledGatewayTwoName, defaultNamespace, controlledGatewayClassTwoName, certificateName)
 
-	logger.Log(t, "creating an uncontrolled gateway")
-	err = k8sClient.Create(context.Background(), uncontrolledGateway)
-	require.NoError(t, err)
+	uncontrolledGatewayName := "uncontrolled-gateway"
+	logger.Log(t, "creating uncontrolled gateway")
+	_ = createGateway(t, k8sClient, uncontrolledGatewayName, defaultNamespace, uncontrolledGatewayClassName, certificateName)
 
 	// create two http routes associated with the first controlled gateway
 	routeOneName := "route-one"
-	routeOne := &gwv1beta1.HTTPRoute{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      routeOneName,
-			Namespace: defaultNamespace,
-		},
-		Spec: gwv1beta1.HTTPRouteSpec{
-			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-				ParentRefs: []gwv1beta1.ParentReference{
-					{Name: gwv1beta1.ObjectName(controlledGatewayOneName)},
-				},
-			},
-			Rules: []gwv1beta1.HTTPRouteRule{
-				{BackendRefs: []gwv1beta1.HTTPBackendRef{
-					{BackendRef: gwv1beta1.BackendRef{
-						BackendObjectReference: gwv1beta1.BackendObjectReference{Name: gwv1beta1.ObjectName(targetName)},
-					}},
-				}},
-			},
-		},
-	}
-
-	routeTwoName := "route-two"
-	routeTwo := &gwv1beta1.HTTPRoute{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      routeTwoName,
-			Namespace: defaultNamespace,
-		},
-		Spec: gwv1beta1.HTTPRouteSpec{
-			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-				ParentRefs: []gwv1beta1.ParentReference{
-					{Name: gwv1beta1.ObjectName(controlledGatewayOneName)},
-				},
-			},
-			Rules: []gwv1beta1.HTTPRouteRule{
-				{BackendRefs: []gwv1beta1.HTTPBackendRef{
-					{BackendRef: gwv1beta1.BackendRef{
-						BackendObjectReference: gwv1beta1.BackendObjectReference{Name: gwv1beta1.ObjectName(targetName)},
-					}},
-				}},
-			},
-		},
-	}
-
 	logger.Log(t, "creating route one")
-	err = k8sClient.Create(context.Background(), routeOne)
-	require.NoError(t, err)
+	routeOne := createRoute(t, k8sClient, routeOneName, defaultNamespace, controlledGatewayOneName, targetName)
+
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		logger.Log(t, "deleting all http routes")
 		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.HTTPRoute{}, client.InNamespace(defaultNamespace))
 	})
 
+	routeTwoName := "route-two"
 	logger.Log(t, "creating route two")
-	err = k8sClient.Create(context.Background(), routeTwo)
-	require.NoError(t, err)
+	routeTwo := createRoute(t, k8sClient, routeTwoName, defaultNamespace, controlledGatewayTwoName, targetName)
 
-	// Scenarios: Swapping a route to another controlled gateway should clean up the old parent statuses and references on Consul resources
+	// Scenario: Swapping a route to another controlled gateway should clean up the old parent statuses and references on Consul resources
 
 	// check that the route is bound properly and objects are reflected in Consul
 	logger.Log(t, "checking that http route one is bound to gateway one")
-	retryCheck(t, 10, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeOneName, Namespace: defaultNamespace}, &route)
-		require.NoError(r, err)
-
-		require.Len(r, route.Status.Parents, 1)
-		require.EqualValues(r, gatewayClassControllerName, route.Status.Parents[0].ControllerName)
-		require.EqualValues(r, controlledGatewayOneName, route.Status.Parents[0].ParentRef.Name)
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Synced", "Synced"))
-	})
+	checkRouteBound(t, k8sClient, routeOneName, defaultNamespace, controlledGatewayOneName)
 
 	logger.Log(t, "checking that http route one is synchronized to Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, routeOneName, nil)
-		require.NoError(r, err)
-		route := entry.(*api.HTTPRouteConfigEntry)
-
-		require.Len(r, route.Parents, 1)
-		require.Equal(r, controlledGatewayOneName, route.Parents[0].Name)
-	})
+	checkConsulRouteParent(t, consulClient, routeOneName, controlledGatewayOneName)
 
 	// update the route to point to the other controlled gateway
 	logger.Log(t, "updating route one to be bound to gateway two")
-	err = k8sClient.Get(context.Background(), client.ObjectKeyFromObject(routeOne), routeOne)
-	require.NoError(t, err)
-	routeOne.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(controlledGatewayTwoName)
-	err = k8sClient.Update(context.Background(), routeOne)
-	require.NoError(t, err)
+	updateKubernetes(t, k8sClient, routeOne, func(r *gwv1beta1.HTTPRoute) {
+		r.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(controlledGatewayTwoName)
+	})
 
 	// check that the route is bound properly and objects are reflected in Consul
 	logger.Log(t, "checking that http route one is bound to gateway two")
-	retryCheck(t, 10, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeOneName, Namespace: defaultNamespace}, &route)
-		require.NoError(r, err)
-
-		require.Len(r, route.Status.Parents, 1)
-		require.EqualValues(r, gatewayClassControllerName, route.Status.Parents[0].ControllerName)
-		require.EqualValues(r, controlledGatewayTwoName, route.Status.Parents[0].ParentRef.Name)
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Synced", "Synced"))
-	})
+	checkRouteBound(t, k8sClient, routeOneName, defaultNamespace, controlledGatewayTwoName)
 
 	logger.Log(t, "checking that http route one is synchronized to Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, routeOneName, nil)
-		require.NoError(r, err)
-		route := entry.(*api.HTTPRouteConfigEntry)
+	checkConsulRouteParent(t, consulClient, routeOneName, controlledGatewayTwoName)
 
-		require.Len(r, route.Parents, 1)
-		require.Equal(r, controlledGatewayTwoName, route.Parents[0].Name)
-	})
-
-	// Scenarios: Binding a route to a controlled gateway and then associating it with another gateway we don’t control should clean up Consul resources, route statuses, and finalizers
+	// Scenario: Binding a route to a controlled gateway and then associating it with another gateway we don’t control should clean up Consul resources, route statuses, and finalizers
 	// check that the route is bound properly and objects are reflected in Consul
 
 	// check that our second http route is bound properly
 	logger.Log(t, "checking that http route two is bound to gateway two")
-	retryCheck(t, 10, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeTwoName, Namespace: defaultNamespace}, &route)
-		require.NoError(r, err)
-
-		require.Len(r, route.Status.Parents, 1)
-		require.EqualValues(r, gatewayClassControllerName, route.Status.Parents[0].ControllerName)
-		require.EqualValues(r, controlledGatewayTwoName, route.Status.Parents[0].ParentRef.Name)
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Synced", "Synced"))
-	})
+	checkRouteBound(t, k8sClient, routeTwoName, defaultNamespace, controlledGatewayTwoName)
 
 	logger.Log(t, "checking that http route two is synchronized to Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, routeTwoName, nil)
-		require.NoError(r, err)
-		route := entry.(*api.HTTPRouteConfigEntry)
-
-		require.Len(r, route.Parents, 1)
-		require.Equal(r, controlledGatewayTwoName, route.Parents[0].Name)
-	})
+	checkConsulRouteParent(t, consulClient, routeTwoName, controlledGatewayTwoName)
 
 	// update the route to point to the uncontrolled gateway
 	logger.Log(t, "updating route two to be bound to an uncontrolled gateway")
-	err = k8sClient.Get(context.Background(), client.ObjectKeyFromObject(routeTwo), routeTwo)
-	require.NoError(t, err)
-	routeTwo.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(uncontrolledGatewayName)
-	err = k8sClient.Update(context.Background(), routeTwo)
-	require.NoError(t, err)
+	updateKubernetes(t, k8sClient, routeTwo, func(r *gwv1beta1.HTTPRoute) {
+		r.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(uncontrolledGatewayName)
+	})
 
 	// check that the route is unbound and all Consul objects and Kubernetes statuses are cleaned up
 	logger.Log(t, "checking that http route two is cleaned up because we no longer control it")
-	retryCheck(t, 10, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeTwoName, Namespace: defaultNamespace}, &route)
-		require.NoError(r, err)
-
-		require.Len(r, route.Status.Parents, 0)
-		require.Len(r, route.Finalizers, 0)
-	})
+	checkEmptyRoute(t, k8sClient, routeTwoName, defaultNamespace)
 
 	logger.Log(t, "checking that http route two is deleted from Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		_, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, routeTwoName, nil)
-		require.Error(r, err)
-		require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "http-route" / "route-two")`)
-	})
+	checkConsulNotExists(t, consulClient, api.HTTPRoute, routeTwoName)
 
-	// Scenarios: Switching a controlled gateway’s protocol that causes a route to unbind should cause the route to drop the parent ref in Consul and result in proper statuses set in Kubernetes
+	// Scenario: Switching a controlled gateway’s protocol that causes a route to unbind should cause the route to drop the parent ref in Consul and result in proper statuses set in Kubernetes
 
 	// swap the gateway's protocol and see the route unbind
 	logger.Log(t, "marking gateway two as using TCP")
-	err = k8sClient.Get(context.Background(), client.ObjectKeyFromObject(controlledGatewayTwo), controlledGatewayTwo)
-	require.NoError(t, err)
-	controlledGatewayTwo.Spec.Listeners[0].Protocol = gwv1beta1.TCPProtocolType
-	err = k8sClient.Update(context.Background(), controlledGatewayTwo)
-	require.NoError(t, err)
+	updateKubernetes(t, k8sClient, controlledGatewayTwo, func(g *gwv1beta1.Gateway) {
+		g.Spec.Listeners[0].Protocol = gwv1beta1.TCPProtocolType
+	})
 
 	// check that the route is unbound and all Consul objects and Kubernetes statuses are cleaned up
 	logger.Log(t, "checking that http route one is not bound to gateway two")
@@ -410,16 +206,10 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 		checkStatusCondition(r, route.Status.Parents[0].Conditions, falseCondition("Accepted", "NotAllowedByListeners"))
 	})
 
-	logger.Log(t, "checking the route one does not have a reference to gateway one in Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, routeOneName, nil)
-		require.NoError(r, err)
-		route := entry.(*api.HTTPRouteConfigEntry)
+	logger.Log(t, "checking that route one is deleted from Consul")
+	checkConsulNotExists(t, consulClient, api.HTTPRoute, routeOneName)
 
-		require.Len(r, route.Parents, 0)
-	})
-
-	// Scenarios: Deleting a gateway should result in routes only referencing it to get cleaned up from Consul and their statuses/finalizers cleared, but routes referencing another controlled gateway should still exist in Consul and only have their statuses cleaned up from referencing the gateway we previously controlled. Any referenced certificates should also get cleaned up.
+	// Scenario: Deleting a gateway should result in routes only referencing it to get cleaned up from Consul and their statuses/finalizers cleared, but routes referencing another controlled gateway should still exist in Consul and only have their statuses cleaned up from referencing the gateway we previously controlled. Any referenced certificates should also get cleaned up.
 
 	// delete gateway two
 	logger.Log(t, "deleting gateway two in Kubernetes")
@@ -428,76 +218,36 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// check that the gateway is deleted from Consul
 	logger.Log(t, "checking that gateway two is deleted from Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		_, _, err := consulClient.ConfigEntries().Get(api.APIGateway, controlledGatewayTwoName, nil)
-		require.Error(r, err)
-		require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "api-gateway" / "controlled-gateway-two")`)
-	})
+	checkConsulNotExists(t, consulClient, api.APIGateway, controlledGatewayTwoName)
 
 	// check that the Kubernetes route is cleaned up and the entries deleted from Consul
 	logger.Log(t, "checking that http route one is cleaned up in Kubernetes")
-	retryCheck(t, 10, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeOneName, Namespace: defaultNamespace}, &route)
-		require.NoError(r, err)
+	checkEmptyRoute(t, k8sClient, routeOneName, defaultNamespace)
 
-		require.Len(r, route.Status, 0)
-		require.Len(r, route.Finalizers, 0)
-	})
-
-	logger.Log(t, "checking that http route one is deleted from Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		_, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, routeOneName, nil)
-		require.Error(r, err)
-		require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "http-route" / "route-one")`)
-	})
-
-	// Scenarios: Changing a gateway class name on a gateway to something we don’t control should have the same affect as deleting it with the addition of cleaning up our finalizer from the gateway.
+	// Scenario: Changing a gateway class name on a gateway to something we don’t control should have the same affect as deleting it with the addition of cleaning up our finalizer from the gateway.
 
 	// reset route one to point to our first gateway and check that it's bound properly
 	logger.Log(t, "remarking route one as bound to gateway one")
-	err = k8sClient.Get(context.Background(), client.ObjectKeyFromObject(routeOne), routeOne)
-	require.NoError(t, err)
-	routeOne.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(controlledGatewayOneName)
-	err = k8sClient.Update(context.Background(), routeOne)
-	require.NoError(t, err)
+	updateKubernetes(t, k8sClient, routeOne, func(r *gwv1beta1.HTTPRoute) {
+		r.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(controlledGatewayOneName)
+	})
 
 	logger.Log(t, "checking that http route one is bound to gateway one")
-	retryCheck(t, 10, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeOneName, Namespace: defaultNamespace}, &route)
-		require.NoError(r, err)
-
-		require.Len(r, route.Status.Parents, 1)
-		require.EqualValues(r, gatewayClassControllerName, route.Status.Parents[0].ControllerName)
-		require.EqualValues(r, controlledGatewayOneName, route.Status.Parents[0].ParentRef.Name)
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Synced", "Synced"))
-	})
+	checkRouteBound(t, k8sClient, routeOneName, defaultNamespace, controlledGatewayOneName)
 
 	logger.Log(t, "checking that http route one is synchronized to Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, routeOneName, nil)
-		require.NoError(r, err)
-		route := entry.(*api.HTTPRouteConfigEntry)
-
-		require.Len(r, route.Parents, 1)
-		require.Equal(r, controlledGatewayOneName, route.Parents[0].Name)
-	})
+	checkConsulRouteParent(t, consulClient, routeOneName, controlledGatewayOneName)
 
 	// make the gateway uncontrolled by pointing to a non-existent gateway class
 	logger.Log(t, "marking gateway one as not controlled by our controller")
-	err = k8sClient.Get(context.Background(), client.ObjectKeyFromObject(controlledGatewayOne), controlledGatewayOne)
-	require.NoError(t, err)
-	controlledGatewayOne.Spec.GatewayClassName = "non-existent"
-	err = k8sClient.Update(context.Background(), controlledGatewayOne)
-	require.NoError(t, err)
+	updateKubernetes(t, k8sClient, controlledGatewayOne, func(g *gwv1beta1.Gateway) {
+		g.Spec.GatewayClassName = "non-existent"
+	})
 
 	// check that the Kubernetes gateway is cleaned up
 	logger.Log(t, "checking that gateway one is cleaned up in Kubernetes")
 	retryCheck(t, 10, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
+		var route gwv1beta1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &route)
 		require.NoError(r, err)
 
@@ -506,53 +256,30 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// check that the gateway is deleted from Consul
 	logger.Log(t, "checking that gateway one is deleted from Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		_, _, err := consulClient.ConfigEntries().Get(api.APIGateway, controlledGatewayOneName, nil)
-		require.Error(r, err)
-		require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "api-gateway" / "controlled-gateway-one")`)
-	})
+	checkConsulNotExists(t, consulClient, api.APIGateway, controlledGatewayOneName)
 
 	// check that the Kubernetes route is cleaned up and the entries deleted from Consul
 	logger.Log(t, "checking that http route one is cleaned up in Kubernetes")
-	retryCheck(t, 10, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeOneName, Namespace: defaultNamespace}, &route)
-		require.NoError(r, err)
-
-		require.Len(r, route.Status, 0)
-		require.Len(r, route.Finalizers, 0)
-	})
+	checkEmptyRoute(t, k8sClient, routeOneName, defaultNamespace)
 
 	logger.Log(t, "checking that http route one is deleted from Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		_, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, routeOneName, nil)
-		require.Error(r, err)
-		require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "http-route" / "route-one")`)
-	})
+	checkConsulNotExists(t, consulClient, api.HTTPRoute, routeOneName)
 
-	// Scenarios: Deleting a certificate referenced by a gateway’s listener should make the listener invalid and drop it from Consul.
+	// Scenario: Deleting a certificate referenced by a gateway’s listener should make the listener invalid and drop it from Consul.
 
 	// reset the gateway
 	logger.Log(t, "remarking gateway one as controlled by our controller")
-	err = k8sClient.Get(context.Background(), client.ObjectKeyFromObject(controlledGatewayOne), controlledGatewayOne)
-	require.NoError(t, err)
-	controlledGatewayOne.Spec.GatewayClassName = gwv1beta1.ObjectName(controlledGatewayClassOneName)
-	err = k8sClient.Update(context.Background(), controlledGatewayOne)
-	require.NoError(t, err)
+	updateKubernetes(t, k8sClient, controlledGatewayOne, func(g *gwv1beta1.Gateway) {
+		g.Spec.GatewayClassName = gwv1beta1.ObjectName(controlledGatewayClassOneName)
+	})
 
 	// make sure it exists
 	logger.Log(t, "checking that gateway one is synchronized to Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		_, _, err := consulClient.ConfigEntries().Get(api.APIGateway, controlledGatewayOneName, nil)
-		require.NoError(r, err)
-	})
+	checkConsulExists(t, consulClient, api.APIGateway, controlledGatewayOneName)
 
 	// make sure our certificate exists
 	logger.Log(t, "checking that the certificate is synchronized to Consul")
-	retryCheck(t, 10, func(r *retry.R) {
-		_, _, err := consulClient.ConfigEntries().Get(api.InlineCertificate, certificateName, nil)
-		require.NoError(r, err)
-	})
+	checkConsulExists(t, consulClient, api.InlineCertificate, certificateName)
 
 	// delete the certificate in Kubernetes
 	logger.Log(t, "deleting the certificate in Kubernetes")
@@ -561,10 +288,152 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// make sure the certificate no longer exists in Consul
 	logger.Log(t, "checking that the certificate is deleted from Consul")
+	checkConsulNotExists(t, consulClient, api.InlineCertificate, certificateName)
+}
+
+func checkConsulNotExists(t *testing.T, client *api.Client, kind, name string) {
+	t.Helper()
+
 	retryCheck(t, 10, func(r *retry.R) {
-		// we only sync validly referenced certificates over, so check to make sure it is not created.
-		_, _, err := consulClient.ConfigEntries().Get(api.InlineCertificate, certificateName, nil)
+		_, _, err := client.ConfigEntries().Get(kind, name, nil)
 		require.Error(r, err)
-		require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "inline-certificate" / "certificate")`)
+		require.EqualError(r, err, fmt.Sprintf("Unexpected response code: 404 (Config entry not found for %q / %q)", kind, name))
 	})
+}
+
+func checkConsulExists(t *testing.T, client *api.Client, kind, name string) {
+	t.Helper()
+
+	retryCheck(t, 10, func(r *retry.R) {
+		_, _, err := client.ConfigEntries().Get(kind, name, nil)
+		require.NoError(r, err)
+	})
+}
+
+func checkConsulRouteParent(t *testing.T, client *api.Client, name, parent string) {
+	t.Helper()
+
+	retryCheck(t, 10, func(r *retry.R) {
+		entry, _, err := client.ConfigEntries().Get(api.HTTPRoute, name, nil)
+		require.NoError(r, err)
+		route := entry.(*api.HTTPRouteConfigEntry)
+
+		require.Len(r, route.Parents, 1)
+		require.Equal(r, parent, route.Parents[0].Name)
+	})
+}
+
+func checkEmptyRoute(t *testing.T, client client.Client, name, namespace string) {
+	t.Helper()
+
+	retryCheck(t, 10, func(r *retry.R) {
+		var route gwv1beta1.HTTPRoute
+		err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &route)
+		require.NoError(r, err)
+
+		require.Len(r, route.Status.Parents, 0)
+		require.Len(r, route.Finalizers, 0)
+	})
+}
+
+func checkRouteBound(t *testing.T, client client.Client, name, namespace, parent string) {
+	t.Helper()
+
+	retryCheck(t, 10, func(r *retry.R) {
+		var route gwv1beta1.HTTPRoute
+		err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &route)
+		require.NoError(r, err)
+
+		require.Len(r, route.Status.Parents, 1)
+		require.EqualValues(r, gatewayClassControllerName, route.Status.Parents[0].ControllerName)
+		require.EqualValues(r, parent, route.Status.Parents[0].ParentRef.Name)
+		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+		checkStatusCondition(r, route.Status.Parents[0].Conditions, trueCondition("Synced", "Synced"))
+	})
+}
+
+func updateKubernetes[T client.Object](t *testing.T, k8sClient client.Client, o T, fn func(o T)) {
+	t.Helper()
+
+	err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(o), o)
+	require.NoError(t, err)
+	fn(o)
+	err = k8sClient.Update(context.Background(), o)
+	require.NoError(t, err)
+}
+
+func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1beta1.HTTPRoute {
+	t.Helper()
+
+	route := &gwv1beta1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: gwv1beta1.HTTPRouteSpec{
+			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+				ParentRefs: []gwv1beta1.ParentReference{
+					{Name: gwv1beta1.ObjectName(parent)},
+				},
+			},
+			Rules: []gwv1beta1.HTTPRouteRule{
+				{BackendRefs: []gwv1beta1.HTTPBackendRef{
+					{BackendRef: gwv1beta1.BackendRef{
+						BackendObjectReference: gwv1beta1.BackendObjectReference{Name: gwv1beta1.ObjectName(target)},
+					}},
+				}},
+			},
+		},
+	}
+
+	err := client.Create(context.Background(), route)
+	require.NoError(t, err)
+	return route
+}
+
+func createGateway(t *testing.T, client client.Client, name, namespace, gatewayClass, certificate string) *gwv1beta1.Gateway {
+	t.Helper()
+
+	gateway := &gwv1beta1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: gwv1beta1.GatewaySpec{
+			GatewayClassName: gwv1beta1.ObjectName(gatewayClass),
+			Listeners: []gwv1beta1.Listener{{
+				Name:     gwv1beta1.SectionName("listener"),
+				Protocol: gwv1beta1.HTTPSProtocolType,
+				Port:     8443,
+				TLS: &gwv1beta1.GatewayTLSConfig{
+					CertificateRefs: []gwv1beta1.SecretObjectReference{{
+						Name: gwv1beta1.ObjectName(certificate),
+					}},
+				},
+			}},
+		},
+	}
+
+	err := client.Create(context.Background(), gateway)
+	require.NoError(t, err)
+
+	return gateway
+}
+
+func createGatewayClass(t *testing.T, client client.Client, name, controllerName string, parameters *gwv1beta1.ParametersReference) {
+	t.Helper()
+
+	gatewayClass := &gwv1beta1.GatewayClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: gwv1beta1.GatewayClassSpec{
+			ControllerName: gwv1beta1.GatewayController(controllerName),
+			ParametersRef:  parameters,
+		},
+	}
+
+	err := client.Create(context.Background(), gatewayClass)
+	require.NoError(t, err)
 }

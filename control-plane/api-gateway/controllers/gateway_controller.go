@@ -417,7 +417,12 @@ func (r *GatewayController) transformGatewayClass(ctx context.Context) func(o cl
 func (r *GatewayController) transformHTTPRoute(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		route := o.(*gwv1beta1.HTTPRoute)
-		return refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
+
+		refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
+		statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+			return parentStatus.ParentRef
+		})))
+		return append(refs, statusRefs...)
 	}
 }
 
@@ -426,7 +431,12 @@ func (r *GatewayController) transformHTTPRoute(ctx context.Context) func(o clien
 func (r *GatewayController) transformTCPRoute(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		route := o.(*gwv1alpha2.TCPRoute)
-		return refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
+
+		refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
+		statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+			return parentStatus.ParentRef
+		})))
+		return append(refs, statusRefs...)
 	}
 }
 
