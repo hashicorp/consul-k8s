@@ -168,6 +168,7 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 			})
 	}
 
+	// TODO This is violating the SecurityContextConstraints when config.EnableOpenShift
 	container.SecurityContext = &corev1.SecurityContext{
 		RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
 		RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
