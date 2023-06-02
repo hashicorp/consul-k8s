@@ -24,19 +24,13 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 	}
 
 	role := &rbac.Role{}
-	exists := false
 
-	// Get ServiceAccount
+	// If the Role already exists, ensure that we own the Role
+	// TODO Do this for the RoleBinding as well
 	err := g.Client.Get(ctx, g.namespacedName(gateway), role)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
-	} else if k8serrors.IsNotFound(err) {
-		exists = false
-	} else {
-		exists = true
-	}
-
-	if exists {
+	} else if !k8serrors.IsNotFound(err) {
 		// Ensure we own the Role.
 		for _, ref := range role.GetOwnerReferences() {
 			if ref.UID == gateway.GetUID() && ref.Name == gateway.GetName() {
@@ -44,7 +38,7 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 				return nil
 			}
 		}
-		return errors.New("Role not owned by controller")
+		return errors.New("role not owned by controller")
 	}
 
 	role = g.role(gateway, gcc)
@@ -55,11 +49,29 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 		return err
 	}
 
+	// Create or update the RoleBinding
+	roleBinding := g.roleBinding(gateway, role)
+	if err := ctrl.SetControllerReference(&gateway, roleBinding, g.Client.Scheme()); err != nil {
+		return err
+	}
+	if err := g.Client.Create(ctx, roleBinding); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (g *Gatekeeper) deleteRole(ctx context.Context, nsname types.NamespacedName) error {
+	// Delete the Role
 	if err := g.Client.Delete(ctx, &rbac.Role{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	// Delete the RoleBinding
+	if err := g.Client.Delete(ctx, &rbac.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
@@ -87,4 +99,28 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 		})
 	}
 	return role
+}
+
+func (g *Gatekeeper) roleBinding(gateway gwv1beta1.Gateway, role *rbac.Role) *rbac.RoleBinding {
+	serviceAccount := g.serviceAccount(gateway)
+
+	return &rbac.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      gateway.Name,
+			Namespace: gateway.Namespace,
+			Labels:    common.LabelsForGateway(&gateway),
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     role.Name,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      serviceAccount.Name,
+				Namespace: serviceAccount.Namespace,
+			},
+		},
+	}
 }
