@@ -74,6 +74,7 @@ rules:
   - watch
   - delete
   - update
+# TODO Can we gate this so that we're only granting when necessary?
 - apiGroups: [ "rbac.authorization.k8s.io" ]
   resources: [ "roles", "rolebindings" ]
   verbs:
