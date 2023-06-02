@@ -1,0 +1,4 @@
+This is here purely so we can embed it so the HelmDeployment that references does not fail. Otherwise, at the time of writing, we get:
+
+==> Installing Consul demo application
+ ! open demo/crds: file does not exist

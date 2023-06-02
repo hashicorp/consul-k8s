@@ -330,6 +330,91 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 	}
 }
 
+func TestPasstiveHealthCheckConsul(t *testing.T) {
+	baseDur := time.Second * 30
+	baseEjection := time.Second * 60
+	baseInt := uint32(1)
+	for name, tc := range map[string]struct {
+		input  *PassiveHealthCheck
+		output *capi.PassiveHealthCheck
+	}{
+		"basenil": {},
+		"base": {
+			input:  &PassiveHealthCheck{},
+			output: &capi.PassiveHealthCheck{BaseEjectionTime: &baseDur},
+		},
+		"with_interval": {
+			input: &PassiveHealthCheck{
+				Interval: metav1.Duration{Duration: baseDur},
+			},
+			output: &capi.PassiveHealthCheck{
+				Interval:         time.Second * 30,
+				BaseEjectionTime: &baseDur,
+			},
+		},
+		"with_interval_maxfailures": {
+			input: &PassiveHealthCheck{
+				Interval:    metav1.Duration{Duration: baseDur},
+				MaxFailures: 100,
+			},
+			output: &capi.PassiveHealthCheck{
+				MaxFailures:      100,
+				Interval:         time.Second * 30,
+				BaseEjectionTime: &baseDur,
+			},
+		},
+		"with_interval_maxfailures_enforcing": {
+			input: &PassiveHealthCheck{
+				Interval:                metav1.Duration{Duration: baseDur},
+				MaxFailures:             100,
+				EnforcingConsecutive5xx: &baseInt,
+			},
+			output: &capi.PassiveHealthCheck{
+				MaxFailures:             100,
+				Interval:                time.Second * 30,
+				BaseEjectionTime:        &baseDur,
+				EnforcingConsecutive5xx: &baseInt,
+			},
+		},
+		"with_interval_maxfailures_enforcing_maxejection": {
+			input: &PassiveHealthCheck{
+				Interval:                metav1.Duration{Duration: baseDur},
+				MaxFailures:             100,
+				EnforcingConsecutive5xx: &baseInt,
+				MaxEjectionPercent:      &baseInt,
+			},
+			output: &capi.PassiveHealthCheck{
+				MaxFailures:             100,
+				Interval:                time.Second * 30,
+				BaseEjectionTime:        &baseDur,
+				EnforcingConsecutive5xx: &baseInt,
+				MaxEjectionPercent:      &baseInt,
+			},
+		},
+		"with_interval_maxfailures_enforcing_maxejection_baseejection": {
+			input: &PassiveHealthCheck{
+				Interval:                metav1.Duration{Duration: baseDur},
+				MaxFailures:             100,
+				EnforcingConsecutive5xx: &baseInt,
+				MaxEjectionPercent:      &baseInt,
+				BaseEjectionTime:        &metav1.Duration{Duration: baseEjection},
+			},
+			output: &capi.PassiveHealthCheck{
+				MaxFailures:             100,
+				Interval:                time.Second * 30,
+				BaseEjectionTime:        &baseEjection,
+				EnforcingConsecutive5xx: &baseInt,
+				MaxEjectionPercent:      &baseInt,
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			output := tc.input.toConsul()
+			require.Equal(t, tc.output, output)
+		})
+	}
+}
+
 func TestServiceDefaults_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
 		internal *ServiceDefaults
