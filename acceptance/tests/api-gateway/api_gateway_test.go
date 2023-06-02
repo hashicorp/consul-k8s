@@ -175,7 +175,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			// finally we check that we can actually route to the service via the gateway
 			k8sOptions := ctx.KubectlOptions(t)
-			targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+			targetAddress := fmt.Sprintf("http://%s/", gatewayAddress)
 
 			if c.secure {
 				// check that intentions keep our connection from happening
