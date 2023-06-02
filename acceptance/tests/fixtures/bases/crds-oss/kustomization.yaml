@@ -11,3 +11,4 @@ resources:
   - servicerouter.yaml
   - servicesplitter.yaml
   - terminatinggateway.yaml
+  - jwtprovider.yaml

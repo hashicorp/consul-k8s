@@ -216,6 +216,22 @@ func TestControllerNamespaces(t *testing.T) {
 					require.Equal(r, "certFile", terminatingGatewayEntry.Services[0].CertFile)
 					require.Equal(r, "keyFile", terminatingGatewayEntry.Services[0].KeyFile)
 					require.Equal(r, "sni", terminatingGatewayEntry.Services[0].SNI)
+
+					// jwt-provider
+					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.NoError(r, err)
+					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
+					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
+					require.Equal(r, "jwks.txt", jwtProviderConfigEntry.JSONWebKeySet.Local.Filename)
+					require.Equal(r, "test-issuer", jwtProviderConfigEntry.Issuer)
+					require.ElementsMatch(r, []string{"aud1", "aud2"}, jwtProviderConfigEntry.Audiences)
+					require.Equal(r, "x-jwt-header", jwtProviderConfigEntry.Locations[0].Header.Name)
+					require.Equal(r, "x-query-param", jwtProviderConfigEntry.Locations[1].QueryParam.Name)
+					require.Equal(r, "session-id", jwtProviderConfigEntry.Locations[2].Cookie.Name)
+					require.Equal(r, "x-forwarded-jwt", jwtProviderConfigEntry.Forwarding.HeaderName)
+					require.True(r, jwtProviderConfigEntry.Forwarding.PadForwardPayloadHeader)
+					require.Equal(r, 45, jwtProviderConfigEntry.ClockSkewSeconds)
+					require.Equal(r, 15, jwtProviderConfigEntry.CacheConfig.Size)
 				})
 			}
 
@@ -257,6 +273,10 @@ func TestControllerNamespaces(t *testing.T) {
 				logger.Log(t, "patching terminating-gateway custom resource")
 				patchSNI := "patch-sni"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "terminatinggateway", "terminating-gateway", "-p", fmt.Sprintf(`{"spec": {"services": [{"name":"name","caFile":"caFile","certFile":"certFile","keyFile":"keyFile","sni":"%s"}]}}`, patchSNI), "--type=merge")
+
+				logger.Log(t, "patching JWTProvider custom resource")
+				patchCacheSize := 25
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "jwtprovider", "jwt-provider", "-p", fmt.Sprintf(`{"spec": {"cacheConfig": {"size": "%d"}}}`, patchCacheSize), "--type=merge")
 
 				counter := &retry.Counter{Count: 20, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -331,6 +351,13 @@ func TestControllerNamespaces(t *testing.T) {
 					terminatingGatewayEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
 					require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
 					require.Equal(r, patchSNI, terminatingGatewayEntry.Services[0].SNI)
+
+					// JWT Provider
+					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.NoError(r, err)
+					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
+					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
+					require.Equal(r, patchCacheSize, jwtProviderConfigEntry.CacheConfig.Size)
 				})
 			}
 
@@ -365,6 +392,9 @@ func TestControllerNamespaces(t *testing.T) {
 
 				logger.Log(t, "deleting terminating-gateway custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "terminatinggateway", "terminating-gateway")
+
+				logger.Log(t, "deleting jwtProvider custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "jwtprovider", "jwt-provider")
 
 				counter := &retry.Counter{Count: 20, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -417,6 +447,12 @@ func TestControllerNamespaces(t *testing.T) {
 					_, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "terminating-gateway", queryOpts)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// jwt-provider
+					_, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
 				})
 			}
 		})
