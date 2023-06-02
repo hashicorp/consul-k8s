@@ -452,11 +452,12 @@ func (r *GatewayController) transformSecret(ctx context.Context) func(o client.O
 		secret := o.(*corev1.Secret)
 		gatewayList := &gwv1beta1.GatewayList{}
 		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, secret.Name),
+			FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, client.ObjectKeyFromObject(secret).String()),
 		}); err != nil {
 			return nil
 		}
-		return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
+		requests := common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
+		return requests
 	}
 }
 
