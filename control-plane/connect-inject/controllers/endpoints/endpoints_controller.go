@@ -1078,8 +1078,9 @@ func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServi
 	}
 	for _, node := range nodeList.Items {
 		var nodeServices *api.CatalogNodeServiceList
-		nodeServices, err = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, common.ConsulNodeNameFromK8sNode(node.Name))
-		serviceList = append(serviceList, nodeServices)
+		var callErr error
+		nodeServices, callErr = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, common.ConsulNodeNameFromK8sNode(node.Name))
+		err = multierror.Append(err, callErr)		
 	}
 
 	return serviceList, err
