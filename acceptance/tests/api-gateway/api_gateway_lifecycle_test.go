@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -196,7 +197,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// check that the route is unbound and all Consul objects and Kubernetes statuses are cleaned up
 	logger.Log(t, "checking that http route one is not bound to gateway two")
-	retryCheck(t, 30, func(r *retry.R) {
+	retryCheck(t, 10, 2*time.Second, func(r *retry.R) {
 		var route gwv1beta1.HTTPRoute
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeOneName, Namespace: defaultNamespace}, &route)
 		require.NoError(r, err)
@@ -246,7 +247,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// check that the Kubernetes gateway is cleaned up
 	logger.Log(t, "checking that gateway one is cleaned up in Kubernetes")
-	retryCheck(t, 30, func(r *retry.R) {
+	retryCheck(t, 10, 2*time.Second, func(r *retry.R) {
 		var route gwv1beta1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &route)
 		require.NoError(r, err)
@@ -299,7 +300,7 @@ func checkConsulNotExists(t *testing.T, client *api.Client, kind, name string, n
 		opts.Namespace = namespace[0]
 	}
 
-	retryCheck(t, 30, func(r *retry.R) {
+	retryCheck(t, 30, 5*time.Second, func(r *retry.R) {
 		_, _, err := client.ConfigEntries().Get(kind, name, opts)
 		require.Error(r, err)
 		require.EqualError(r, err, fmt.Sprintf("Unexpected response code: 404 (Config entry not found for %q / %q)", kind, name))
@@ -309,7 +310,7 @@ func checkConsulNotExists(t *testing.T, client *api.Client, kind, name string, n
 func checkConsulExists(t *testing.T, client *api.Client, kind, name string) {
 	t.Helper()
 
-	retryCheck(t, 30, func(r *retry.R) {
+	retryCheck(t, 30, 5*time.Second, func(r *retry.R) {
 		_, _, err := client.ConfigEntries().Get(kind, name, nil)
 		require.NoError(r, err)
 	})
@@ -318,7 +319,7 @@ func checkConsulExists(t *testing.T, client *api.Client, kind, name string) {
 func checkConsulRouteParent(t *testing.T, client *api.Client, name, parent string) {
 	t.Helper()
 
-	retryCheck(t, 30, func(r *retry.R) {
+	retryCheck(t, 30, 5*time.Second, func(r *retry.R) {
 		entry, _, err := client.ConfigEntries().Get(api.HTTPRoute, name, nil)
 		require.NoError(r, err)
 		route := entry.(*api.HTTPRouteConfigEntry)
@@ -331,7 +332,7 @@ func checkConsulRouteParent(t *testing.T, client *api.Client, name, parent strin
 func checkEmptyRoute(t *testing.T, client client.Client, name, namespace string) {
 	t.Helper()
 
-	retryCheck(t, 30, func(r *retry.R) {
+	retryCheck(t, 30, 5*time.Second, func(r *retry.R) {
 		var route gwv1beta1.HTTPRoute
 		err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &route)
 		require.NoError(r, err)
@@ -344,7 +345,7 @@ func checkEmptyRoute(t *testing.T, client client.Client, name, namespace string)
 func checkRouteBound(t *testing.T, client client.Client, name, namespace, parent string) {
 	t.Helper()
 
-	retryCheck(t, 30, func(r *retry.R) {
+	retryCheck(t, 30, 5*time.Second, func(r *retry.R) {
 		var route gwv1beta1.HTTPRoute
 		err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &route)
 		require.NoError(r, err)
