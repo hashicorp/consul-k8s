@@ -148,14 +148,8 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
 			})
 
-			retryCheck(t, 10, func(r *retry.R) {
-				// since the sync operation should fail above, check that we don't have the entry in Consul.
-				_, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", &api.QueryOptions{
-					Namespace: namespaceForConsul(c.namespaceMirroring, gatewayNamespace),
-				})
-				require.Error(r, err)
-				require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "api-gateway" / "gateway")`)
-			})
+			// since the sync operation should fail above, check that we don't have the entry in Consul.
+			checkConsulNotExists(t, consulClient, api.APIGateway, "gateway", namespaceForConsul(c.namespaceMirroring, gatewayNamespace))
 
 			// route failure
 			retryCheck(t, 10, func(r *retry.R) {
@@ -170,31 +164,13 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				require.EqualValues(r, gatewayNamespace, *httproute.Status.Parents[0].ParentRef.Namespace)
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("Accepted", "RefNotPermitted"))
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
-				// the route itself actually gets synced to Consul
-				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Synced", "Synced"))
 			})
 
-			retryCheck(t, 10, func(r *retry.R) {
-				// since we're not bound, check to make sure that the route doesn't target the gateway in Consul.
-				entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, "route", &api.QueryOptions{
-					Namespace: namespaceForConsul(c.namespaceMirroring, routeNamespace),
-				})
-				require.NoError(r, err)
-				route := entry.(*api.HTTPRouteConfigEntry)
+			// since we're not bound to anything, check to make sure that the route doesn't get created in Consul.
+			checkConsulNotExists(t, consulClient, api.HTTPRoute, "route", namespaceForConsul(c.namespaceMirroring, routeNamespace))
 
-				require.EqualValues(r, "route", route.Meta["k8s-name"])
-				require.EqualValues(r, routeNamespace, route.Meta["k8s-namespace"])
-				require.Len(r, route.Parents, 0)
-			})
-
-			retryCheck(t, 10, func(r *retry.R) {
-				// we only sync validly referenced certificates over, so check to make sure it is not created.
-				_, _, err := consulClient.ConfigEntries().Get(api.InlineCertificate, "certificate", &api.QueryOptions{
-					Namespace: namespaceForConsul(c.namespaceMirroring, certificateNamespace),
-				})
-				require.Error(r, err)
-				require.EqualError(r, err, `Unexpected response code: 404 (Config entry not found for "inline-certificate" / "certificate")`)
-			})
+			// we only sync validly referenced certificates over, so check to make sure it is not created.
+			checkConsulNotExists(t, consulClient, api.InlineCertificate, "certificate", namespaceForConsul(c.namespaceMirroring, certificateNamespace))
 
 			// now create reference grants
 			createReferenceGrant(t, k8sClient, "gateway-certificate", gatewayNamespace, certificateNamespace)

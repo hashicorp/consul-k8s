@@ -63,6 +63,9 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 		}
 
 		// drop the status conditions
+		if r.statusSetter.removeRouteReferences(route, filteredParentStatuses) {
+			kubernetesNeedsStatusUpdate = true
+		}
 		if r.statusSetter.removeRouteReferences(route, filteredParents) {
 			kubernetesNeedsStatusUpdate = true
 		}

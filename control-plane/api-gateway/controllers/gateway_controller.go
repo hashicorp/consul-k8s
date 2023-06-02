@@ -129,6 +129,15 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// fetch our inline certificates from cache, this needs to happen
+	// here since the certificates need to be reference counted before
+	// the gateways.
+	r.fetchConsulInlineCertificates(resources)
+
+	// add our current gateway even if it's not controlled by us so we
+	// can garbage collect any resources for it.
+	resources.ReferenceCountGateway(gateway)
+
 	if err := r.fetchControlledGateways(ctx, resources); err != nil {
 		log.Error(err, "unable to fetch controlled gateways")
 		return ctrl.Result{}, err
@@ -153,31 +162,27 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	// fetch all consul objects from cache
+	// fetch the rest of the consul objects from cache
 	consulServices := r.getConsulServices(consulKey)
 	consulGateway := r.getConsulGateway(consulKey)
-	consulHTTPRoutes := r.getConsulHTTPRoutes(consulKey, resources)
-	consulTCPRoutes := r.getConsulTCPRoutes(consulKey, resources)
-	consulInlineCertificates := r.getConsulInlineCertificates()
+	r.fetchConsulHTTPRoutes(consulKey, resources)
+	r.fetchConsulTCPRoutes(consulKey, resources)
 
 	binder := binding.NewBinder(binding.BinderConfig{
-		Logger:                   log,
-		Translator:               r.Translator,
-		ControllerName:           GatewayClassControllerName,
-		Namespaces:               namespaces,
-		GatewayClassConfig:       gatewayClassConfig,
-		GatewayClass:             gatewayClass,
-		Gateway:                  gateway,
-		Pods:                     pods,
-		Service:                  service,
-		HTTPRoutes:               httpRoutes,
-		TCPRoutes:                tcpRoutes,
-		Resources:                resources,
-		ConsulGateway:            consulGateway,
-		ConsulHTTPRoutes:         consulHTTPRoutes,
-		ConsulTCPRoutes:          consulTCPRoutes,
-		ConsulInlineCertificates: consulInlineCertificates,
-		ConsulGatewayServices:    consulServices,
+		Logger:                log,
+		Translator:            r.Translator,
+		ControllerName:        GatewayClassControllerName,
+		Namespaces:            namespaces,
+		GatewayClassConfig:    gatewayClassConfig,
+		GatewayClass:          gatewayClass,
+		Gateway:               gateway,
+		Pods:                  pods,
+		Service:               service,
+		HTTPRoutes:            httpRoutes,
+		TCPRoutes:             tcpRoutes,
+		Resources:             resources,
+		ConsulGateway:         consulGateway,
+		ConsulGatewayServices: consulServices,
 	})
 
 	updates := binder.Snapshot()
@@ -911,37 +916,26 @@ func (c *GatewayController) getConsulGateway(ref api.ResourceReference) *api.API
 	return nil
 }
 
-func (c *GatewayController) getConsulHTTPRoutes(ref api.ResourceReference, resources *common.ResourceMap) []api.HTTPRouteConfigEntry {
-	var filtered []api.HTTPRouteConfigEntry
-
+func (c *GatewayController) fetchConsulHTTPRoutes(ref api.ResourceReference, resources *common.ResourceMap) {
 	for _, route := range configEntriesTo[*api.HTTPRouteConfigEntry](c.cache.List(api.HTTPRoute)) {
 		if routeReferencesGateway(route.Namespace, ref, route.Parents) {
-			filtered = append(filtered, *route)
 			resources.ReferenceCountConsulHTTPRoute(*route)
 		}
 	}
-	return filtered
 }
 
-func (c *GatewayController) getConsulTCPRoutes(ref api.ResourceReference, resources *common.ResourceMap) []api.TCPRouteConfigEntry {
-	var filtered []api.TCPRouteConfigEntry
-
+func (c *GatewayController) fetchConsulTCPRoutes(ref api.ResourceReference, resources *common.ResourceMap) {
 	for _, route := range configEntriesTo[*api.TCPRouteConfigEntry](c.cache.List(api.TCPRoute)) {
 		if routeReferencesGateway(route.Namespace, ref, route.Parents) {
-			filtered = append(filtered, *route)
 			resources.ReferenceCountConsulTCPRoute(*route)
 		}
 	}
-	return filtered
 }
 
-func (c *GatewayController) getConsulInlineCertificates() []api.InlineCertificateConfigEntry {
-	var filtered []api.InlineCertificateConfigEntry
-
+func (c *GatewayController) fetchConsulInlineCertificates(resources *common.ResourceMap) {
 	for _, cert := range configEntriesTo[*api.InlineCertificateConfigEntry](c.cache.List(api.InlineCertificate)) {
-		filtered = append(filtered, *cert)
+		resources.ReferenceCountConsulCertificate(*cert)
 	}
-	return filtered
 }
 
 func routeReferencesGateway(namespace string, ref api.ResourceReference, refs []api.ResourceReference) bool {

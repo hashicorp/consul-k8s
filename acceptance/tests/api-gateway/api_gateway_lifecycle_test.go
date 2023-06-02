@@ -291,11 +291,16 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	checkConsulNotExists(t, consulClient, api.InlineCertificate, certificateName)
 }
 
-func checkConsulNotExists(t *testing.T, client *api.Client, kind, name string) {
+func checkConsulNotExists(t *testing.T, client *api.Client, kind, name string, namespace ...string) {
 	t.Helper()
 
+	opts := &api.QueryOptions{}
+	if len(namespace) != 0 {
+		opts.Namespace = namespace[0]
+	}
+
 	retryCheck(t, 10, func(r *retry.R) {
-		_, _, err := client.ConfigEntries().Get(kind, name, nil)
+		_, _, err := client.ConfigEntries().Get(kind, name, opts)
 		require.Error(r, err)
 		require.EqualError(r, err, fmt.Sprintf("Unexpected response code: 404 (Config entry not found for %q / %q)", kind, name))
 	})
