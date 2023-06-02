@@ -129,13 +129,13 @@ func (c *ControlPlaneRequestLimit) ConsulKind() string {
 // ConsulGlobalResource returns if the resource exists in the default
 // Consul namespace only.
 func (c *ControlPlaneRequestLimit) ConsulGlobalResource() bool {
-	return false
+	return true
 }
 
 // ConsulMirroringNS returns the Consul namespace that the config entry should
 // be created in if namespaces and mirroring are enabled.
 func (c *ControlPlaneRequestLimit) ConsulMirroringNS() string {
-	return c.Namespace
+	return common.DefaultConsulNamespace
 }
 
 // KubeKind returns the Kube config entry kind, i.e. servicedefaults, not

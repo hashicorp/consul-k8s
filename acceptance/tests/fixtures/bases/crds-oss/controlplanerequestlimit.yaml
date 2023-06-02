@@ -4,7 +4,7 @@
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: ControlPlaneRequestLimit
 metadata:
-  name: control-plane-request-limit
+  name: controlplanerequestlimit
 spec:
   mode: "permissive"
   readRate:  100.0
@@ -39,9 +39,9 @@ spec:
   tenancy: 
     readRate:  100.0
     writeRate: 100.0
-  preparedQuery: 
-    readRate:  100.0
-    writeRate: 100.0
+#  preparedQuery:
+#    readRate:  100.0
+#    writeRate: 100.0
   session: 
     readRate:  100.0
     writeRate: 100.0

@@ -422,20 +422,21 @@ func TestControlPlaneRequestLimit_Validate(t *testing.T) {
 					Name: common.ControlPlaneRequestLimit,
 				},
 				Spec: ControlPlaneRequestLimitSpec{
-					Mode:           "permissive",
-					ACL:            validReadWriteRatesConfig,
-					Catalog:        validReadWriteRatesConfig,
-					ConfigEntry:    validReadWriteRatesConfig,
-					ConnectCA:      validReadWriteRatesConfig,
-					Coordinate:     validReadWriteRatesConfig,
-					DiscoveryChain: validReadWriteRatesConfig,
-					Health:         validReadWriteRatesConfig,
-					Intention:      validReadWriteRatesConfig,
-					KV:             validReadWriteRatesConfig,
-					Tenancy:        validReadWriteRatesConfig,
-					PreparedQuery:  validReadWriteRatesConfig,
-					Session:        validReadWriteRatesConfig,
-					Txn:            validReadWriteRatesConfig,
+					Mode:                 "permissive",
+					ReadWriteRatesConfig: *validReadWriteRatesConfig,
+					ACL:                  validReadWriteRatesConfig,
+					Catalog:              validReadWriteRatesConfig,
+					ConfigEntry:          validReadWriteRatesConfig,
+					ConnectCA:            validReadWriteRatesConfig,
+					Coordinate:           validReadWriteRatesConfig,
+					DiscoveryChain:       validReadWriteRatesConfig,
+					Health:               validReadWriteRatesConfig,
+					Intention:            validReadWriteRatesConfig,
+					KV:                   validReadWriteRatesConfig,
+					Tenancy:              validReadWriteRatesConfig,
+					PreparedQuery:        validReadWriteRatesConfig,
+					Session:              validReadWriteRatesConfig,
+					Txn:                  validReadWriteRatesConfig,
 				},
 			},
 			expectedErrMsgs: []string{},
@@ -546,11 +547,11 @@ func TestControlPlaneRequestLimit_KubernetesName(t *testing.T) {
 }
 
 func TestControlPlaneRequestLimit_ConsulNamespace(t *testing.T) {
-	require.Equal(t, "bar", (&ControlPlaneRequestLimit{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
+	require.Equal(t, "default", (&ControlPlaneRequestLimit{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}).ConsulMirroringNS())
 }
 
 func TestControlPlaneRequestLimit_ConsulGlobalResource(t *testing.T) {
-	require.False(t, (&ControlPlaneRequestLimit{}).ConsulGlobalResource())
+	require.True(t, (&ControlPlaneRequestLimit{}).ConsulGlobalResource())
 }
 
 func TestControlPlaneRequestLimit_ObjectMeta(t *testing.T) {
