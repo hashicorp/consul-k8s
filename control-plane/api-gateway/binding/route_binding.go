@@ -20,6 +20,11 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 	// on non-enterprise installations
 	routeConsulKey := r.config.Translator.NonNormalizedConfigEntryReference(entryKind(route), client.ObjectKeyFromObject(route))
 	filteredParents := filterParentRefs(r.key, route.GetNamespace(), getRouteParents(route))
+	filteredParentStatuses := filterParentRefs(r.key, route.GetNamespace(),
+		common.ConvertSliceFunc(getRouteParentsStatus(route), func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+			return parentStatus.ParentRef
+		}),
+	)
 
 	// flags to mark that some operation needs to occur
 	kubernetesNeedsUpdate := false
@@ -58,6 +63,9 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 		}
 
 		// drop the status conditions
+		if r.statusSetter.removeRouteReferences(route, filteredParentStatuses) {
+			kubernetesNeedsStatusUpdate = true
+		}
 		if r.statusSetter.removeRouteReferences(route, filteredParents) {
 			kubernetesNeedsStatusUpdate = true
 		}
@@ -69,8 +77,6 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 		return
 	}
 
-	// TODO: scrub route refs from statuses that no longer exist
-
 	validation := validateRefs(route, getRouteBackends(route), r.config.Resources)
 	// the spec is dumb and makes you set a parent for any status, even when the
 	// status is not with respect to a parent, as is the case of resolved refs
@@ -79,6 +85,14 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 		if r.statusSetter.setRouteCondition(route, &parent, validation.Condition()) {
 			kubernetesNeedsStatusUpdate = true
 		}
+	}
+	// if we're orphaned from this gateway we'll
+	// always need a status update.
+	if len(filteredParents) == 0 {
+		// we already checked that these refs existed, so no need to check
+		// the return value here.
+		_ = r.statusSetter.removeRouteReferences(route, filteredParentStatuses)
+		kubernetesNeedsStatusUpdate = true
 	}
 
 	namespace := r.config.Namespaces[route.GetNamespace()]
@@ -227,6 +241,11 @@ func (r *Binder) dropConsulRouteParent(snapshot *Snapshot, object client.Object,
 }
 
 func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client.Object, gatewayConsulKey api.ResourceReference, resources *common.ResourceMap, results parentBindResults) {
+	if results.boundSections().Cardinality() == 0 {
+		r.dropConsulRouteParent(snapshot, object, r.nonNormalizedConsulKey, r.config.Resources)
+		return
+	}
+
 	key := client.ObjectKeyFromObject(object)
 
 	parents := mapset.NewSet()
