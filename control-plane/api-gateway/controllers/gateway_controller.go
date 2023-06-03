@@ -456,8 +456,7 @@ func (r *GatewayController) transformSecret(ctx context.Context) func(o client.O
 		}); err != nil {
 			return nil
 		}
-		requests := common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
-		return requests
+		return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
 	}
 }
 
