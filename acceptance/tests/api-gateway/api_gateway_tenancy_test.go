@@ -152,7 +152,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			checkConsulNotExists(t, consulClient, api.APIGateway, "gateway", namespaceForConsul(c.namespaceMirroring, gatewayNamespace))
 
 			// route failure
-			retryCheck(t, 10, func(r *retry.R) {
+			retryCheck(t, 30, func(r *retry.R) {
 				var httproute gwv1beta1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
@@ -178,7 +178,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			createReferenceGrant(t, k8sClient, "route-service", routeNamespace, serviceNamespace)
 
 			// gateway updated with references allowed
-			retryCheck(t, 10, func(r *retry.R) {
+			retryCheck(t, 30, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
@@ -195,7 +195,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// check the Consul gateway is updated, with the listener.
-			retryCheck(t, 10, func(r *retry.R) {
+			retryCheck(t, 30, func(r *retry.R) {
 				entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", &api.QueryOptions{
 					Namespace: namespaceForConsul(c.namespaceMirroring, gatewayNamespace),
 				})
@@ -210,7 +210,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// route updated with gateway and services allowed
-			retryCheck(t, 10, func(r *retry.R) {
+			retryCheck(t, 30, func(r *retry.R) {
 				var httproute gwv1beta1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
@@ -225,7 +225,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// now check to make sure that the route is updated and valid
-			retryCheck(t, 10, func(r *retry.R) {
+			retryCheck(t, 30, func(r *retry.R) {
 				// since we're not bound, check to make sure that the route doesn't target the gateway in Consul.
 				entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, "route", &api.QueryOptions{
 					Namespace: namespaceForConsul(c.namespaceMirroring, routeNamespace),
@@ -239,7 +239,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// and check to make sure that the certificate exists
-			retryCheck(t, 10, func(r *retry.R) {
+			retryCheck(t, 30, func(r *retry.R) {
 				entry, _, err := consulClient.ConfigEntries().Get(api.InlineCertificate, "certificate", &api.QueryOptions{
 					Namespace: namespaceForConsul(c.namespaceMirroring, certificateNamespace),
 				})
