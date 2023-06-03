@@ -153,56 +153,38 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		"--wait": nil,
 	}
 
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 100}, t, func(r *retry.R) {
-		requirement, err := labels.NewRequirement("release", selection.Equals, []string{h.releaseName})
-		require.NoError(r, err)
+	// Clean up any stuck gateway resources, note that we swallow all errors from
+	// here down since the terratest helm installation may actually already be
+	// deleted at this point, in which case these operations will fail on non-existent
+	// CRD cleanups.
+	requirement, err := labels.NewRequirement("release", selection.Equals, []string{h.releaseName})
+	require.NoError(t, err)
 
-		// Forcibly delete all gateway classes and remove their finalizers.
-		err = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
-		require.NoError(r, err)
+	// Forcibly delete all gateway classes and remove their finalizers.
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
 
-		var gatewayClassList gwv1beta1.GatewayClassList
-		err = h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
-			LabelSelector: labels.NewSelector().Add(*requirement),
-		})
-		require.NoError(r, err)
+	var gatewayClassList gwv1beta1.GatewayClassList
+	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
+		LabelSelector: labels.NewSelector().Add(*requirement),
+	}) == nil {
 		for _, item := range gatewayClassList.Items {
 			item.SetFinalizers([]string{})
-			require.NoError(r, h.runtimeClient.Update(context.Background(), &item))
+			_ = h.runtimeClient.Update(context.Background(), &item)
 		}
+	}
 
-		// Verify all Gateway Classes are deleted.
-		err = h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
-			LabelSelector: labels.NewSelector().Add(*requirement),
-		})
-		require.NoError(r, err)
-		for _, gatewayClass := range gatewayClassList.Items {
-			r.Errorf("Found gateway class which should have been deleted: %s", gatewayClass.Name)
-		}
+	// Forcibly delete all gateway class configs and remove their finalizers.
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.HasLabels{"release=" + h.releaseName})
 
-		// Forcibly delete all gateway class configs and remove their finalizers.
-		err = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.HasLabels{"release=" + h.releaseName})
-		require.NoError(r, err)
-
-		var gatewayClassConfigList v1alpha1.GatewayClassConfigList
-		err = h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
-			LabelSelector: labels.NewSelector().Add(*requirement),
-		})
-		require.NoError(r, err)
+	var gatewayClassConfigList v1alpha1.GatewayClassConfigList
+	if h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
+		LabelSelector: labels.NewSelector().Add(*requirement),
+	}) == nil {
 		for _, item := range gatewayClassConfigList.Items {
 			item.SetFinalizers([]string{})
-			require.NoError(r, h.runtimeClient.Update(context.Background(), &item))
+			_ = h.runtimeClient.Update(context.Background(), &item)
 		}
-
-		// Verify all Gateway Class Configs are deleted.
-		err = h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
-			LabelSelector: labels.NewSelector().Add(*requirement),
-		})
-		require.NoError(r, err)
-		for _, gatewayClassConfig := range gatewayClassConfigList.Items {
-			r.Errorf("Found gateway class config which should have been deleted: %s", gatewayClassConfig.Name)
-		}
-	})
+	}
 
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
