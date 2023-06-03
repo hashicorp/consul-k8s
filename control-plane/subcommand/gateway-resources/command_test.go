@@ -20,28 +20,28 @@ func TestRun_flagValidation(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		cmd         Command
+		cmd         *Command
 		expectedErr string
 	}{
 		"required gateway class config name": {
-			cmd:         Command{},
+			cmd:         &Command{},
 			expectedErr: "-gateway-class-config-name must be set",
 		},
 		"required gateway class name": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 			},
 			expectedErr: "-gateway-class-name must be set",
 		},
 		"required heritage": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 			},
 			expectedErr: "-heritage must be set",
 		},
 		"required chart": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
@@ -49,7 +49,7 @@ func TestRun_flagValidation(t *testing.T) {
 			expectedErr: "-chart must be set",
 		},
 		"required app": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
@@ -58,7 +58,7 @@ func TestRun_flagValidation(t *testing.T) {
 			expectedErr: "-app must be set",
 		},
 		"required release": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
@@ -68,7 +68,7 @@ func TestRun_flagValidation(t *testing.T) {
 			expectedErr: "-release-name must be set",
 		},
 		"required component": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
@@ -79,7 +79,7 @@ func TestRun_flagValidation(t *testing.T) {
 			expectedErr: "-component must be set",
 		},
 		"required controller name": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
@@ -91,7 +91,7 @@ func TestRun_flagValidation(t *testing.T) {
 			expectedErr: "-controller-name must be set",
 		},
 		"required valid tolerations": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
@@ -105,7 +105,7 @@ func TestRun_flagValidation(t *testing.T) {
 			expectedErr: "error decoding tolerations: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `foo` into []gatewayresources.toleration",
 		},
 		"required valid nodeSelector": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
@@ -119,7 +119,7 @@ func TestRun_flagValidation(t *testing.T) {
 			expectedErr: "error decoding node selector: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `foo` into map[string]string",
 		},
 		"required valid service annotations": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
@@ -133,7 +133,7 @@ func TestRun_flagValidation(t *testing.T) {
 			expectedErr: "error decoding service annotations: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `foo` into []string",
 		},
 		"valid without optional flags": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
@@ -145,7 +145,7 @@ func TestRun_flagValidation(t *testing.T) {
 			},
 		},
 		"valid with optional flags": {
-			cmd: Command{
+			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
 				flagHeritage:               "test",
