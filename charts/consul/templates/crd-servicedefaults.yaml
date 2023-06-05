@@ -292,7 +292,7 @@ spec:
                               capped by max_ejection_time (Default 300s). Defaults
                               to 30000ms or 30s.
                             type: string
-                          enforcing_consecutive_5xx:
+                          enforcingConsecutive5xx:
                             description: EnforcingConsecutive5xx is the % chance that
                               a host will be actually ejected when an outlier status
                               is detected through consecutive 5xx. This setting can
@@ -409,7 +409,7 @@ spec:
                                 is capped by max_ejection_time (Default 300s). Defaults
                                 to 30000ms or 30s.
                               type: string
-                            enforcing_consecutive_5xx:
+                            enforcingConsecutive5xx:
                               description: EnforcingConsecutive5xx is the % chance
                                 that a host will be actually ejected when an outlier
                                 status is detected through consecutive 5xx. This setting
