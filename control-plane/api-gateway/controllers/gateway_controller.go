@@ -369,10 +369,6 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformSecret(ctx)),
 		).
 		Watches(
-			source.NewKindWithCache(&gwv1beta1.ReferenceGrant{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant(ctx)),
-		).
-		Watches(
 			source.NewKindWithCache(&v1alpha1.MeshService{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformMeshService(ctx)),
 		).
@@ -573,9 +569,14 @@ func gatewayReferencesCertificate(certificateKey api.ResourceReference, gateway 
 // by a TCPRoute or HTTPRoute that references the service.
 func (r *GatewayController) transformEndpoints(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
-		key := client.ObjectKeyFromObject(o).String()
+		key := client.ObjectKeyFromObject(o)
+		endpoints := o.(*corev1.Endpoints)
 
-		return r.gatewaysForRoutesReferencing(ctx, TCPRoute_ServiceIndex, HTTPRoute_ServiceIndex, key)
+		if shouldIgnore(key.Namespace, r.denyK8sNamespacesSet, r.allowK8sNamespacesSet) || isLabeledIgnore(endpoints.Labels) {
+			return nil
+		}
+
+		return r.gatewaysForRoutesReferencing(ctx, TCPRoute_ServiceIndex, HTTPRoute_ServiceIndex, key.String())
 	}
 }
 
