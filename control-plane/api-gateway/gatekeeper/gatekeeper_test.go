@@ -210,6 +210,76 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 		},
+		"create a new gateway where the GatewayClassConfig has a default number of instances greater than the maximum on the GatewayClassConfig": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(8)),
+						MaxInstances:     common.PointerTo(int32(5)),
+						MinInstances:     common.PointerTo(int32(2)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig:       common.HelmConfig{},
+			initialResources: resources{},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+		},
+		"create a new gateway where the GatewayClassConfig has a default number of instances lesser than the minimum on the GatewayClassConfig": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(1)),
+						MaxInstances:     common.PointerTo(int32(5)),
+						MinInstances:     common.PointerTo(int32(2)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig:       common.HelmConfig{},
+			initialResources: resources{},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 2, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+		},
 		"update a gateway, adding a listener to a service": {
 			gateway: gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
@@ -398,6 +468,84 @@ func TestUpsert(t *testing.T) {
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
+				},
+			},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+		},
+		"update a gateway deployment by scaling it lower than the minimum number of instances on the GatewayClassConfig": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(5)),
+						MinInstances:     common.PointerTo(int32(2)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{},
+			initialResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 1, nil, nil, "", "1"),
+				},
+			},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 2, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+		},
+		"update a gateway deployment by scaling it higher than the maximum number of instances on the GatewayClassConfig": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(5)),
+						MinInstances:     common.PointerTo(int32(2)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{},
+			initialResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 10, nil, nil, "", "1"),
 				},
 			},
 			finalResources: resources{
