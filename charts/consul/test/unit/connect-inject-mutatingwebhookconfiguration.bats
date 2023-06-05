@@ -60,7 +60,7 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'global.peering.enabled=true' \
       . | tee /dev/stderr |
-      yq '.webhooks[11].name | contains("peeringacceptors.consul.hashicorp.com")' | tee /dev/stderr)
+      yq '.webhooks[12].name | contains("peeringacceptors.consul.hashicorp.com")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(helm template \
       -s templates/connect-inject-mutatingwebhookconfiguration.yaml  \
@@ -69,6 +69,6 @@ load _helpers
       --set 'meshGateway.enabled=true' \
       --set 'global.peering.enabled=true' \
       . | tee /dev/stderr |
-      yq '.webhooks[12].name | contains("peeringdialers.consul.hashicorp.com")' | tee /dev/stderr)
+      yq '.webhooks[13].name | contains("peeringdialers.consul.hashicorp.com")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

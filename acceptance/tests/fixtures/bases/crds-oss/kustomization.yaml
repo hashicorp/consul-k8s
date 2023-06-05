@@ -13,3 +13,4 @@ resources:
 - terminatinggateway.yaml
 - jwtprovider.yaml
 - exportedservices.yaml
+- controlplanerequestlimit.yaml
