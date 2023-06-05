@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.16-dev
+  image: dstoughhashicorp/consul:62d4b9afd35c6db55e72da82e560fdd0f62e4c4e
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -557,7 +557,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: "docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.2-dev"
+  imageConsulDataplane: "dstoughhashicorp/consul-dataplane:9989ce4e26be80be1fb68f1ba52ceb0f8fdf085d"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
