@@ -2,12 +2,15 @@
 # SPDX-License-Identifier: MPL-2.0
 
 resources:
-  - ingressgateway.yaml
-  - mesh.yaml
-  - proxydefaults.yaml
-  - servicedefaults.yaml
-  - serviceintentions.yaml
-  - serviceresolver.yaml
-  - servicerouter.yaml
-  - servicesplitter.yaml
-  - terminatinggateway.yaml
+- ingressgateway.yaml
+- mesh.yaml
+- proxydefaults.yaml
+- servicedefaults.yaml
+- serviceintentions.yaml
+- serviceresolver.yaml
+- servicerouter.yaml
+- servicesplitter.yaml
+- terminatinggateway.yaml
+- jwtprovider.yaml
+- exportedservices.yaml
+- controlplanerequestlimit.yaml

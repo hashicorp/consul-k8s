@@ -8,9 +8,14 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -292,6 +297,92 @@ func TestTransformTCPRoute(t *testing.T) {
 
 			fn := controller.transformTCPRoute(context.Background())
 			require.ElementsMatch(t, tt.expected, fn(tt.route))
+		})
+	}
+}
+
+func TestTransformSecret(t *testing.T) {
+	t.Parallel()
+
+	gateway := &gwv1beta1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gateway",
+			Namespace: "test",
+		},
+		Spec: gwv1beta1.GatewaySpec{
+			Listeners: []gwv1beta1.Listener{
+				{Name: "terminate", TLS: &gwv1beta1.GatewayTLSConfig{
+					Mode: common.PointerTo(gwv1beta1.TLSModeTerminate),
+					CertificateRefs: []gwv1beta1.SecretObjectReference{
+						{Name: "secret-no-namespace"},
+						{Name: "secret-namespace", Namespace: common.PointerTo(gwv1beta1.Namespace("other"))},
+					},
+				}},
+				{Name: "passthrough", TLS: &gwv1beta1.GatewayTLSConfig{
+					Mode: common.PointerTo(gwv1beta1.TLSModePassthrough),
+					CertificateRefs: []gwv1beta1.SecretObjectReference{
+						{Name: "passthrough", Namespace: common.PointerTo(gwv1beta1.Namespace("other"))},
+					},
+				}},
+			},
+		},
+	}
+
+	for name, tt := range map[string]struct {
+		secret   *corev1.Secret
+		expected []reconcile.Request
+	}{
+		"explicit namespace from parent": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "secret-namespace", Namespace: "other"},
+			},
+			expected: []reconcile.Request{
+				{NamespacedName: types.NamespacedName{Name: "gateway", Namespace: "test"}},
+			},
+		},
+		"implicit namespace from parent": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "secret-no-namespace", Namespace: "test"},
+			},
+			expected: []reconcile.Request{
+				{NamespacedName: types.NamespacedName{Name: "gateway", Namespace: "test"}},
+			},
+		},
+		"mismatched namespace": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "secret-no-namespace", Namespace: "other"},
+			},
+		},
+		"mismatched names": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "something", Namespace: "test"},
+			},
+		},
+		"passthrough ignored": {
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "passthrough", Namespace: "other"},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tt := tt
+
+			t.Parallel()
+
+			s := runtime.NewScheme()
+			require.NoError(t, clientgoscheme.AddToScheme(s))
+			require.NoError(t, gwv1alpha2.Install(s))
+			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, v1alpha1.AddToScheme(s))
+
+			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s)).WithRuntimeObjects(gateway).Build()
+
+			controller := GatewayController{
+				Client: fakeClient,
+			}
+
+			fn := controller.transformSecret(context.Background())
+			require.ElementsMatch(t, tt.expected, fn(tt.secret))
 		})
 	}
 }

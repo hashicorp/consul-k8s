@@ -75,8 +75,8 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	return nil
 }
 
-func (g *Gatekeeper) deleteDeployment(ctx context.Context, nsname types.NamespacedName) error {
-	err := g.Client.Delete(ctx, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}})
+func (g *Gatekeeper) deleteDeployment(ctx context.Context, gwName types.NamespacedName) error {
+	err := g.Client.Delete(ctx, &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: gwName.Name, Namespace: gwName.Namespace}})
 	if k8serrors.IsNotFound(err) {
 		return nil
 	}

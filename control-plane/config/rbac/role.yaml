@@ -29,6 +29,26 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
+  - controlplanerequestlimits
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - controlplanerequestlimits/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
   - exportedservices
   verbs:
   - create

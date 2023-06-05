@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: MPL-2.0
 
 apiVersion: consul.hashicorp.com/v1alpha1
-kind: ServiceExports
+kind: ExportedServices
 metadata:
-  name: exports
+  name: default
 spec:
   services:
   - name: frontend
-    namespace: frontend
     consumers:
-    - partition: other
+    - peer: peerName
+    - samenessGroup: groupName
