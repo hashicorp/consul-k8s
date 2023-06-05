@@ -187,4 +187,29 @@ data:
       }
     }
   {{- end }}
+  {{- if .Values.server.auditLogs.enabled }}
+  audit-logging.json: |-
+    {
+      "audit": {
+        "enabled": "true",
+        "sink": {
+          {{- $countOuter := 0 | int }}
+          {{- range .Values.server.auditLogs.sinks }}
+          {{- if ne $countOuter 0 }},{{end}}
+          {{- $countOuter = add1 $countOuter }}
+          "{{ .name }}": {
+            {{- $countInner := 0 | int }}
+            {{- range $k, $v := . }}
+              {{- if ne $k "name" }}
+              {{- if ne $countInner 0 }},{{end}}
+              {{- $countInner = add1 $countInner }}
+              "{{ $k }}": "{{ $v }}"
+              {{- end }}
+            {{- end }}
+          }
+          {{- end }}
+        }
+      }
+    }
+  {{- end }}
 {{- end }}
