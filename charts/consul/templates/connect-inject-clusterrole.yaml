@@ -27,6 +27,7 @@ rules:
   - gatewayclassconfigs
   - meshservices
   - samenessgroups
+  - controlplanerequestlimits
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers
@@ -54,6 +55,7 @@ rules:
   - ingressgateways/status
   - terminatinggateways/status
   - samenessgroups/status
+  - controlplanerequestlimits/status
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors/status
   - peeringdialers/status

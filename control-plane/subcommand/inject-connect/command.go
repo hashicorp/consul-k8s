@@ -646,6 +646,15 @@ func (c *Command) Run(args []string) int {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.JWTProvider)
 		return 1
 	}
+	if err = (&controllers.ControlPlaneRequestLimitController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ControlPlaneRequestLimit),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", apicommon.ControlPlaneRequestLimit)
+		return 1
+	}
 
 	if err = mgr.AddReadyzCheck("ready", webhook.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
 		setupLog.Error(err, "unable to create readiness check", "controller", endpoints.Controller{})
@@ -815,6 +824,12 @@ func (c *Command) Run(args []string) int {
 		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.JWTProviderWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.JWTProvider),
+			ConsulMeta: consulMeta,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v1alpha1-controlplanerequestlimits",
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ControlPlaneRequestLimitWebhook{
+			Client:     mgr.GetClient(),
+			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ControlPlaneRequestLimit),
 			ConsulMeta: consulMeta,
 		}})
 
