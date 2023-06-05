@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	common "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -44,7 +44,7 @@ var (
 		{
 			Name:     "Listener 2",
 			Port:     8081,
-			Protocol: "UDP",
+			Protocol: "TCP",
 		},
 	}
 )
@@ -52,7 +52,7 @@ var (
 type testCase struct {
 	gateway            gwv1beta1.Gateway
 	gatewayClassConfig v1alpha1.GatewayClassConfig
-	helmConfig         apigateway.HelmConfig
+	helmConfig         common.HelmConfig
 
 	initialResources resources
 	finalResources   resources
@@ -61,6 +61,7 @@ type testCase struct {
 type resources struct {
 	deployments     []*appsv1.Deployment
 	roles           []*rbac.Role
+	roleBindings    []*rbac.RoleBinding
 	services        []*corev1.Service
 	serviceAccounts []*corev1.ServiceAccount
 }
@@ -85,15 +86,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       apigateway.HelmConfig{},
+			helmConfig:       common.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -120,15 +121,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       apigateway.HelmConfig{},
+			helmConfig:       common.HelmConfig{},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -144,7 +145,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -168,15 +169,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{},
@@ -187,6 +188,9 @@ func TestUpsert(t *testing.T) {
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
 				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -196,7 +200,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -222,15 +226,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{
@@ -239,6 +243,9 @@ func TestUpsert(t *testing.T) {
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
+				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -260,6 +267,9 @@ func TestUpsert(t *testing.T) {
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
 				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -269,7 +279,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "2"),
@@ -297,15 +307,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{
@@ -314,6 +324,9 @@ func TestUpsert(t *testing.T) {
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
+				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -324,7 +337,7 @@ func TestUpsert(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -339,6 +352,9 @@ func TestUpsert(t *testing.T) {
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
+				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -370,15 +386,15 @@ func TestUpsert(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(5)),
-						MaxInstances:     ptrTo(int32(7)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(5)),
+						MaxInstances:     common.PointerTo(int32(7)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{},
+			helmConfig: common.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
@@ -438,15 +454,15 @@ func TestDelete(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{},
+			helmConfig: common.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -475,15 +491,15 @@ func TestDelete(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{},
+			helmConfig: common.HelmConfig{},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -498,7 +514,7 @@ func TestDelete(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -528,15 +544,15 @@ func TestDelete(t *testing.T) {
 				},
 				Spec: v1alpha1.GatewayClassConfigSpec{
 					DeploymentSpec: v1alpha1.DeploymentSpec{
-						DefaultInstances: ptrTo(int32(3)),
-						MaxInstances:     ptrTo(int32(3)),
-						MinInstances:     ptrTo(int32(1)),
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
-					ServiceType:     (*corev1.ServiceType)(ptrTo("NodePort")),
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: apigateway.HelmConfig{
+			helmConfig: common.HelmConfig{
 				AuthMethod: "method",
 			},
 			initialResources: resources{
@@ -545,6 +561,9 @@ func TestDelete(t *testing.T) {
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1"),
+				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -555,7 +574,7 @@ func TestDelete(t *testing.T) {
 						},
 						{
 							Name:     "Listener 2",
-							Protocol: "UDP",
+							Protocol: "TCP",
 							Port:     8081,
 						},
 					}, "1"),
@@ -607,6 +626,10 @@ func joinResources(resources resources) (objs []client.Object) {
 
 	for _, role := range resources.roles {
 		objs = append(objs, role)
+	}
+
+	for _, roleBinding := range resources.roleBindings {
+		objs = append(objs, roleBinding)
 	}
 
 	for _, service := range resources.services {
@@ -664,6 +687,22 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 		require.Equal(t, expected, actual)
 	}
 
+	for _, expected := range resources.roleBindings {
+		actual := &rbac.RoleBinding{}
+		err := client.Get(context.Background(), types.NamespacedName{
+			Name:      expected.Name,
+			Namespace: expected.Namespace,
+		}, actual)
+		if err != nil {
+			return err
+		}
+
+		// Patch the createdAt label
+		actual.Labels[createdAtLabelKey] = createdAtLabelValue
+
+		require.Equal(t, expected, actual)
+	}
+
 	for _, expected := range resources.services {
 		actual := &corev1.Service{}
 		err := client.Get(context.Background(), types.NamespacedName{
@@ -700,12 +739,12 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 	return nil
 }
 
-func validateResourcesAreDeleted(t *testing.T, client client.Client, resources resources) error {
+func validateResourcesAreDeleted(t *testing.T, k8sClient client.Client, resources resources) error {
 	t.Helper()
 
 	for _, expected := range resources.deployments {
 		actual := &appsv1.Deployment{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
@@ -717,7 +756,7 @@ func validateResourcesAreDeleted(t *testing.T, client client.Client, resources r
 
 	for _, expected := range resources.roles {
 		actual := &rbac.Role{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
@@ -727,9 +766,21 @@ func validateResourcesAreDeleted(t *testing.T, client client.Client, resources r
 		require.Error(t, err)
 	}
 
+	for _, expected := range resources.roleBindings {
+		actual := &rbac.RoleBinding{}
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
+			Name:      expected.Name,
+			Namespace: expected.Namespace,
+		}, actual)
+		if !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("expected rolebinding %s to be deleted", expected.Name)
+		}
+		require.Error(t, err)
+	}
+
 	for _, expected := range resources.services {
 		actual := &corev1.Service{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
@@ -741,7 +792,7 @@ func validateResourcesAreDeleted(t *testing.T, client client.Client, resources r
 
 	for _, expected := range resources.serviceAccounts {
 		actual := &corev1.ServiceAccount{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
@@ -770,8 +821,8 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
-					Controller:         ptrTo(true),
-					BlockOwnerDeletion: ptrTo(true),
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
 				},
 			},
 		},
@@ -828,12 +879,48 @@ func configureRole(name, namespace string, labels map[string]string, resourceVer
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
-					Controller:         ptrTo(true),
-					BlockOwnerDeletion: ptrTo(true),
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
 				},
 			},
 		},
 		Rules: []rbac.PolicyRule{},
+	}
+}
+
+func configureRoleBinding(name, namespace string, labels map[string]string, resourceVersion string) *rbac.RoleBinding {
+	return &rbac.RoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "rbac.authorization.k8s.io/v1",
+			Kind:       "RoleBinding",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Namespace:       namespace,
+			Labels:          labels,
+			ResourceVersion: resourceVersion,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					Kind:               "Gateway",
+					Name:               name,
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
+				},
+			},
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     name,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      name,
+				Namespace: namespace,
+			},
+		},
 	}
 }
 
@@ -854,8 +941,8 @@ func configureService(name, namespace string, labels, annotations map[string]str
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
-					Controller:         ptrTo(true),
-					BlockOwnerDeletion: ptrTo(true),
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
 				},
 			},
 		},
@@ -883,14 +970,10 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 					APIVersion:         "gateway.networking.k8s.io/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
-					Controller:         ptrTo(true),
-					BlockOwnerDeletion: ptrTo(true),
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
 				},
 			},
 		},
 	}
-}
-
-func ptrTo[T any](t T) *T {
-	return &t
 }

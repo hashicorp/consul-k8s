@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
@@ -45,7 +46,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 						Name: "the config",
 					},
 					Spec: v1alpha1.GatewayClassConfigSpec{
-						ServiceType: pointerTo(corev1.ServiceType("serviceType")),
+						ServiceType: common.PointerTo(corev1.ServiceType("serviceType")),
 						NodeSelector: map[string]string{
 							"selector": "of node",
 						},
@@ -83,7 +84,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 						Name: "the config",
 					},
 					Spec: v1alpha1.GatewayClassConfigSpec{
-						ServiceType: pointerTo(corev1.ServiceType("serviceType")),
+						ServiceType: common.PointerTo(corev1.ServiceType("serviceType")),
 						NodeSelector: map[string]string{
 							"selector": "of node",
 						},
@@ -111,7 +112,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-gw",
 						Annotations: map[string]string{
-							annotationConfigKey: `{"serviceType":"serviceType","nodeSelector":{"selector":"of node"},"tolerations":[{"key":"key","operator":"op","value":"120","effect":"to the moon","tolerationSeconds":0}],"copyAnnotations":{"service":["service"]}}`,
+							common.AnnotationGatewayClassConfig: `{"serviceType":"serviceType","nodeSelector":{"selector":"of node"},"tolerations":[{"key":"key","operator":"op","value":"120","effect":"to the moon","tolerationSeconds":0}],"copyAnnotations":{"service":["service"]}}`,
 						},
 					},
 					Spec:   gwv1beta1.GatewaySpec{},
@@ -123,7 +124,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 						Name: "the config",
 					},
 					Spec: v1alpha1.GatewayClassConfigSpec{
-						ServiceType: pointerTo(corev1.ServiceType("serviceType")),
+						ServiceType: common.PointerTo(corev1.ServiceType("serviceType")),
 						NodeSelector: map[string]string{
 							"selector": "of node",
 						},
@@ -152,7 +153,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 						Name: "my-gw",
 						Annotations: map[string]string{
 							// we remove the opening brace to make unmarshalling fail
-							annotationConfigKey: `"serviceType":"serviceType","nodeSelector":{"selector":"of node"},"tolerations":[{"key":"key","operator":"op","value":"120","effect":"to the moon","tolerationSeconds":0}],"copyAnnotations":{"service":["service"]}}`,
+							common.AnnotationGatewayClassConfig: `"serviceType":"serviceType","nodeSelector":{"selector":"of node"},"tolerations":[{"key":"key","operator":"op","value":"120","effect":"to the moon","tolerationSeconds":0}],"copyAnnotations":{"service":["service"]}}`,
 						},
 					},
 					Spec:   gwv1beta1.GatewaySpec{},
@@ -164,7 +165,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 						Name: "the config",
 					},
 					Spec: v1alpha1.GatewayClassConfigSpec{
-						ServiceType: pointerTo(corev1.ServiceType("serviceType")),
+						ServiceType: common.PointerTo(corev1.ServiceType("serviceType")),
 						NodeSelector: map[string]string{
 							"selector": "of node",
 						},
@@ -195,7 +196,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 			}
 
 			var config v1alpha1.GatewayClassConfig
-			err := json.Unmarshal([]byte(tt.args.gw.Annotations[annotationConfigKey]), &config.Spec)
+			err := json.Unmarshal([]byte(tt.args.gw.Annotations[common.AnnotationGatewayClassConfig]), &config.Spec)
 			require.NoError(t, err)
 
 			if diff := cmp.Diff(config.Spec, tt.args.gwcc.Spec); diff != "" {

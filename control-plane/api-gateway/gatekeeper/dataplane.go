@@ -10,22 +10,23 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
+	allCapabilities              = "all"
+	netBindCapability            = "NET_BIND_SERVICE"
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
-	sidecarUserAndGroupID        = 5995
 	defaultPrometheusScrapePath  = "/metrics"
 	defaultEnvoyProxyConcurrency = 1
 	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config apigateway.HelmConfig, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -103,17 +104,23 @@ func consulDataplaneContainer(config apigateway.HelmConfig, name, namespace stri
 	// skip setting the security context and let OpenShift set it for us.
 	if !config.EnableOpenShift {
 		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
-			RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
-			RunAsNonRoot:           pointer.Bool(true),
 			ReadOnlyRootFilesystem: pointer.Bool(true),
+			// We have to run as root if we want to bind to any
+			// sort of privileged ports. The drop "all" is intended
+			// to drop any Linux capabilities you'd get as root
+			// other than NET_BIND_SERVICE.
+			RunAsUser: pointer.Int64(0),
+			Capabilities: &corev1.Capabilities{
+				Add:  []corev1.Capability{netBindCapability},
+				Drop: []corev1.Capability{allCapabilities},
+			},
 		}
 	}
 
 	return container, nil
 }
 
-func getDataplaneArgs(namespace string, config apigateway.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
+func getDataplaneArgs(namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 

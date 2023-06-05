@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -18,25 +18,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config apigateway.HelmConfig) error {
+func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	if config.AuthMethod == "" {
 		return g.deleteRole(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
 	role := &rbac.Role{}
-	exists := false
 
-	// Get ServiceAccount
+	// If the Role already exists, ensure that we own the Role
 	err := g.Client.Get(ctx, g.namespacedName(gateway), role)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
-	} else if k8serrors.IsNotFound(err) {
-		exists = false
-	} else {
-		exists = true
-	}
-
-	if exists {
+	} else if !k8serrors.IsNotFound(err) {
 		// Ensure we own the Role.
 		for _, ref := range role.GetOwnerReferences() {
 			if ref.UID == gateway.GetUID() && ref.Name == gateway.GetName() {
@@ -44,7 +37,7 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 				return nil
 			}
 		}
-		return errors.New("Role not owned by controller")
+		return errors.New("role not owned by controller")
 	}
 
 	role = g.role(gateway, gcc)
@@ -58,8 +51,8 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 	return nil
 }
 
-func (g *Gatekeeper) deleteRole(ctx context.Context, nsname types.NamespacedName) error {
-	if err := g.Client.Delete(ctx, &rbac.Role{ObjectMeta: metav1.ObjectMeta{Name: nsname.Name, Namespace: nsname.Namespace}}); err != nil {
+func (g *Gatekeeper) deleteRole(ctx context.Context, gwName types.NamespacedName) error {
+	if err := g.Client.Delete(ctx, &rbac.Role{ObjectMeta: metav1.ObjectMeta{Name: gwName.Name, Namespace: gwName.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
@@ -74,10 +67,11 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      gateway.Name,
 			Namespace: gateway.Namespace,
-			Labels:    apigateway.LabelsForGateway(&gateway),
+			Labels:    common.LabelsForGateway(&gateway),
 		},
 		Rules: []rbac.PolicyRule{},
 	}
+
 	if gcc.Spec.PodSecurityPolicy != "" {
 		role.Rules = append(role.Rules, rbac.PolicyRule{
 			APIGroups:     []string{"policy"},
@@ -86,5 +80,6 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 			Verbs:         []string{"use"},
 		})
 	}
+
 	return role
 }

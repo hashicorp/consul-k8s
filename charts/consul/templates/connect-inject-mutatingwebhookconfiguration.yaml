@@ -222,6 +222,27 @@ webhooks:
     resources:
     - exportedservices
   sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-controlplanerequestlimits
+  failurePolicy: Fail
+  admissionReviewVersions:
+    - "v1beta1"
+    - "v1"
+  name: mutate-controlplanerequestlimit.consul.hashicorp.com
+  rules:
+    - apiGroups:
+        - consul.hashicorp.com
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - controlplanerequestlimits
+  sideEffects: None
 - name: {{ template "consul.fullname" . }}-connect-injector.consul.hashicorp.com
   # The webhook will fail scheduling all pods that are not part of consul if all replicas of the webhook are unhealthy.
   objectSelector:
@@ -313,4 +334,25 @@ webhooks:
         - samenessgroups
   sideEffects: None
 {{- end }}
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-jwtprovider
+  failurePolicy: Fail
+  name: mutate-jwtprovider.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - jwtproviders
+  sideEffects: None
 {{- end }}

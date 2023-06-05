@@ -11,7 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	apigateway "github.com/hashicorp/consul-k8s/control-plane/api-gateway"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"k8s.io/utils/pointer"
 )
@@ -33,7 +33,7 @@ type initContainerCommandData struct {
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func initContainer(config apigateway.HelmConfig, name, namespace string) (corev1.Container, error) {
+func initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         config.AuthMethod,
 		LogLevel:           config.LogLevel,

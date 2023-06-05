@@ -16,6 +16,9 @@ const (
 	// MetaKeyKubeNS is the meta key name for Kubernetes namespace used for the Consul services.
 	MetaKeyKubeNS = "k8s-namespace"
 
+	// MetaKeyKubeName is the meta key name for Kubernetes object name used for a Consul object.
+	MetaKeyKubeName = "k8s-name"
+
 	// MetaKeyKubeServiceName is the meta key name for Kubernetes service name used for the Consul services.
 	MetaKeyKubeServiceName = "k8s-service-name"
 

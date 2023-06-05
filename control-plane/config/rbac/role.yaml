@@ -5,7 +5,6 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
@@ -26,6 +25,26 @@ rules:
   - secrets/status
   verbs:
   - get
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - controlplanerequestlimits
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - controlplanerequestlimits/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - consul.hashicorp.com
   resources:
@@ -62,6 +81,26 @@ rules:
   - consul.hashicorp.com
   resources:
   - ingressgateways/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - jwtproviders
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - jwtproviders/status
   verbs:
   - get
   - patch
