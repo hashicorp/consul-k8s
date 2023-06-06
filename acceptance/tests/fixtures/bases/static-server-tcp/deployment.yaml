@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: static-server-tcp
+  name: static-server-tcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static-server-tcp
+  template:
+    metadata:
+      labels:
+        app: static-server-tcp
+    spec:
+      containers:
+        - name: tcp-echo
+          image: docker.io/istio/tcp-echo-server:1.2
+          args: [ "81,8181", "hello" ]
+          ports:
+            - containerPort: 81
+            - containerPort: 8181

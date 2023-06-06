@@ -29,3 +29,12 @@ spec:
     allowedRoutes:
       namespaces:
         from: "All"
+  - protocol: TCP
+    port: 8181
+    name: securetcp
+    tls:
+      certificateRefs:
+        - name: "certificate"
+    allowedRoutes:
+      namespaces:
+        from: "All"
