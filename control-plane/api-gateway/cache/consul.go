@@ -160,7 +160,11 @@ func (c *Cache) subscribeToConsul(ctx context.Context, kind string) {
 
 		entries, meta, err := client.ConfigEntries().List(kind, opts.WithContext(ctx))
 		if err != nil {
-			c.logger.Error(err, fmt.Sprintf("error fetching config entries for kind: %s", kind))
+			// if we timeout we don't care about the error message because it's expected to happen on long polls
+			// any other error we want to alert on
+			if !strings.Contains(strings.ToLower(err.Error()), "timeout") {
+				c.logger.Error(err, fmt.Sprintf("error fetching config entries for kind: %s", kind))
+			}
 			continue
 		}
 
