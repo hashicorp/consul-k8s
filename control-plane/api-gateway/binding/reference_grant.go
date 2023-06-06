@@ -4,12 +4,13 @@
 package binding
 
 import (
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
 
 type referenceValidator struct {
@@ -45,20 +46,6 @@ func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gatewa
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(secretRef.Name))
 }
 
-func (rv *referenceValidator) HTTPRouteCanReferenceGateway(httproute gwv1beta1.HTTPRoute, parentRef gwv1beta1.ParentReference) bool {
-	fromNS := httproute.GetNamespace()
-	fromGK := metav1.GroupKind{
-		Group: httproute.GroupVersionKind().Group,
-		Kind:  httproute.GroupVersionKind().Kind,
-	}
-
-	// Kind should default to Gateway if not set
-	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/shared_types.go#L48
-	toNS, toGK := createValuesFromRef(parentRef.Namespace, parentRef.Group, parentRef.Kind, common.BetaGroup, common.KindGateway)
-
-	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(parentRef.Name))
-}
-
 func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
 	fromNS := httproute.GetNamespace()
 	fromGK := metav1.GroupKind{
@@ -71,20 +58,6 @@ func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.H
 	toNS, toGK := createValuesFromRef(backendRef.Namespace, backendRef.Group, backendRef.Kind, "", common.KindService)
 
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(backendRef.Name))
-}
-
-func (rv *referenceValidator) TCPRouteCanReferenceGateway(tcpRoute gwv1alpha2.TCPRoute, parentRef gwv1beta1.ParentReference) bool {
-	fromNS := tcpRoute.GetNamespace()
-	fromGK := metav1.GroupKind{
-		Group: tcpRoute.GroupVersionKind().Group,
-		Kind:  tcpRoute.GroupVersionKind().Kind,
-	}
-
-	// Kind should default to Gateway if not set
-	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/shared_types.go#L48
-	toNS, toGK := createValuesFromRef(parentRef.Namespace, parentRef.Group, parentRef.Kind, common.BetaGroup, common.KindGateway)
-
-	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(parentRef.Name))
 }
 
 func (rv *referenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool {
