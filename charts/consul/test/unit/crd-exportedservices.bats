@@ -7,7 +7,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/crd-exportedservices.yaml  \
       . | tee /dev/stderr |
-      yq 'length > 0' | tee /dev/stderr)
+      yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

@@ -2006,6 +2006,12 @@ connectInject:
 
   # Configuration settings for the Consul API Gateway integration.
   apiGateway:
+    # Enables Consul on Kubernetes to manage the CRDs used for Gateway API.
+    # Setting this to true will install the CRDs used for the Gateway API when Consul on Kubernetes is installed.
+    # These CRDs can clash with existing Gateway API CRDs if they are already installed in your cluster.
+    # If this setting is false, you will need to install the Gateway API CRDs manually.
+    manageExternalCRDs: true
+
     # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
     managedGatewayClass:
       # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)

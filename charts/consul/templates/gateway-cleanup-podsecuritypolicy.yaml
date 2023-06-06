@@ -1,5 +1,4 @@
-{{- if .Values.global.enablePodSecurityPolicies }}
-{{- if .Values.connectInject.enabled }}
+{{- if (and .Values.connectInject.enabled .Values.global.enablePodSecurityPolicies)}}
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -30,5 +29,4 @@ spec:
   fsGroup:
     rule: 'RunAsAny'
   readOnlyRootFilesystem: false
-{{- end }}
 {{- end }}
