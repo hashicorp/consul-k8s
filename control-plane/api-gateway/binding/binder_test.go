@@ -15,9 +15,6 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +22,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
 )
 
 func init() {
@@ -34,9 +35,8 @@ func init() {
 }
 
 const (
-	testGatewayClassName                    = "gateway-class"
-	testControllerName                      = "test-controller"
-	routeListenerReferenceGrantErrorMessage = `http-listener-allowed-selector: reference not permitted due to lack of ReferenceGrant; http-listener-default-same: reference not permitted due to lack of ReferenceGrant; http-listener-explicit-all-allowed: reference not permitted due to lack of ReferenceGrant; http-listener-explicit-allowed-same: reference not permitted due to lack of ReferenceGrant; http-listener-hostname: reference not permitted due to lack of ReferenceGrant; http-listener-mismatched-kind-allowed: reference not permitted due to lack of ReferenceGrant; http-listener-tls: reference not permitted due to lack of ReferenceGrant; tcp-listener-allowed-selector: reference not permitted due to lack of ReferenceGrant; tcp-listener-default-same: reference not permitted due to lack of ReferenceGrant; tcp-listener-explicit-all-allowed: reference not permitted due to lack of ReferenceGrant; tcp-listener-explicit-allowed-same: reference not permitted due to lack of ReferenceGrant; tcp-listener-mismatched-kind-allowed: reference not permitted due to lack of ReferenceGrant; tcp-listener-tls: reference not permitted due to lack of ReferenceGrant`
+	testGatewayClassName = "gateway-class"
+	testControllerName   = "test-controller"
 )
 
 var (
@@ -1113,9 +1113,9 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 							Message: "resolved backend references",
 						}, {
 							Type:    "Accepted",
-							Status:  metav1.ConditionFalse,
-							Reason:  "NotAllowedByListeners",
-							Message: routeListenerReferenceGrantErrorMessage,
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
 						},
 					}},
 				}),
@@ -1628,9 +1628,9 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 							Message: "resolved backend references",
 						}, {
 							Type:    "Accepted",
-							Status:  metav1.ConditionFalse,
-							Reason:  "NotAllowedByListeners",
-							Message: routeListenerReferenceGrantErrorMessage,
+							Status:  metav1.ConditionTrue,
+							Reason:  "Accepted",
+							Message: "route accepted",
 						},
 					}},
 				}),
