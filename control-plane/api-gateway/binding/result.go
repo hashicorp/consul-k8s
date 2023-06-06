@@ -10,21 +10,18 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
 
-var (
-	// override function for tests.
-	timeFunc = metav1.Now
-)
+// override function for tests.
+var timeFunc = metav1.Now
 
-var (
-	// This is used for any error related to a lack of proper reference grant creation.
-	errRefNotPermitted = errors.New("reference not permitted due to lack of ReferenceGrant")
-)
+// This is used for any error related to a lack of proper reference grant creation.
+var errRefNotPermitted = errors.New("reference not permitted due to lack of ReferenceGrant")
 
 var (
 	// Each of the below are specified in the Gateway spec under RouteConditionReason

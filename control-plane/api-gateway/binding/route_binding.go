@@ -5,13 +5,14 @@ package binding
 
 import (
 	mapset "github.com/deckarep/golang-set"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul/api"
 )
 
 // bindRoute contains the main logic for binding a route to a given gateway.
@@ -104,14 +105,6 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 		var result bindResults
 
 		for _, listener := range listenersFor(&r.config.Gateway, ref.SectionName) {
-			if !canReferenceGateway(route, ref, r.config.Resources) {
-				result = append(result, bindResult{
-					section: listener.Name,
-					err:     errRefNotPermitted,
-				})
-				continue
-			}
-
 			if !routeKindIsAllowedForListener(supportedKindsForProtocol[listener.Protocol], groupKind) {
 				result = append(result, bindResult{
 					section: listener.Name,
@@ -382,16 +375,6 @@ func getRouteBackends(object client.Object) []gwv1beta1.BackendRef {
 		}))
 	}
 	return nil
-}
-
-func canReferenceGateway(object client.Object, ref gwv1beta1.ParentReference, resources *common.ResourceMap) bool {
-	switch v := object.(type) {
-	case *gwv1beta1.HTTPRoute:
-		return resources.HTTPRouteCanReferenceGateway(*v, ref)
-	case *gwv1alpha2.TCPRoute:
-		return resources.TCPRouteCanReferenceGateway(*v, ref)
-	}
-	return false
 }
 
 func canReferenceBackend(object client.Object, ref gwv1beta1.BackendRef, resources *common.ResourceMap) bool {
