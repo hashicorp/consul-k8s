@@ -342,7 +342,7 @@ func (c *Cache) ensureRole(client *api.Client) (string, error) {
 
 	role := &api.ACLRole{
 		Name:        aclRoleName,
-		Description: fmt.Sprintf("ACL Role for Managed API Gateways"),
+		Description: "ACL Role for Managed API Gateways",
 		Policies:    []*api.ACLLink{{ID: policyID}},
 	}
 
