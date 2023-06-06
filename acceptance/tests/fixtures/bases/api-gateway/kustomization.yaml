@@ -1,6 +1,8 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+sortOptions:
+  order: fifo
 resources:
   - gatewayclassconfig.yaml
   - gatewayclass.yaml
