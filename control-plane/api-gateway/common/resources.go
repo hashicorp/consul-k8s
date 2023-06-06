@@ -401,7 +401,7 @@ func (s *ResourceMap) gatewaysForRoute(namespace string, refs []gwv1beta1.Parent
 	return gateways
 }
 
-func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
+func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUpdate func(error, api.ConfigEntryStatus), mutateFn func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
 	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
 
 	route, ok := s.httpRouteGateways[consulKey]
@@ -419,8 +419,10 @@ func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUp
 			// to be GC'd.
 			delete(s.consulHTTPRoutes, consulKey)
 			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-				Entry:    &mutated,
-				OnUpdate: onUpdate,
+				Entry: &mutated,
+				OnUpdate: func(err error) {
+					onUpdate(err, mutated.Status)
+				},
 			})
 		}
 		return
@@ -431,13 +433,15 @@ func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUp
 		// to be GC'd.
 		delete(s.consulHTTPRoutes, consulKey)
 		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-			Entry:    &mutated,
-			OnUpdate: onUpdate,
+			Entry: &mutated,
+			OnUpdate: func(err error) {
+				onUpdate(err, mutated.Status)
+			},
 		})
 	}
 }
 
-func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
+func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(error, api.ConfigEntryStatus), mutateFn func(api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
 	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
 
 	consulRoute, ok := s.consulHTTPRoutes[consulKey]
@@ -448,8 +452,10 @@ func (s *ResourceMap) MutateHTTPRoute(key types.NamespacedName, onUpdate func(er
 			// to be GC'd.
 			delete(s.consulHTTPRoutes, consulKey)
 			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-				Entry:    &mutated,
-				OnUpdate: onUpdate,
+				Entry: &mutated,
+				OnUpdate: func(err error) {
+					onUpdate(err, mutated.Status)
+				},
 			})
 		}
 	}
@@ -462,12 +468,11 @@ func (s *ResourceMap) CanGCHTTPRouteOnUnbind(id api.ResourceReference) bool {
 	return true
 }
 
-func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(*api.TCPRouteConfigEntry, api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
+func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, onUpdate func(error, api.ConfigEntryStatus), mutateFn func(*api.TCPRouteConfigEntry, api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
 	consulKey := NormalizeMeta(s.toConsulReference(api.TCPRoute, key))
 
 	route, ok := s.tcpRouteGateways[consulKey]
 	if !ok {
-
 		return
 	}
 
@@ -481,8 +486,10 @@ func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, onUpd
 			// to be GC'd.
 			delete(s.consulTCPRoutes, consulKey)
 			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-				Entry:    &mutated,
-				OnUpdate: onUpdate,
+				Entry: &mutated,
+				OnUpdate: func(err error) {
+					onUpdate(err, mutated.Status)
+				},
 			})
 		}
 		return
@@ -493,13 +500,15 @@ func (s *ResourceMap) TranslateAndMutateTCPRoute(key types.NamespacedName, onUpd
 		// to be GC'd.
 		delete(s.consulTCPRoutes, consulKey)
 		s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-			Entry:    &mutated,
-			OnUpdate: onUpdate,
+			Entry: &mutated,
+			OnUpdate: func(err error) {
+				onUpdate(err, mutated.Status)
+			},
 		})
 	}
 }
 
-func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(error), mutateFn func(api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
+func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(error, api.ConfigEntryStatus), mutateFn func(api.TCPRouteConfigEntry) api.TCPRouteConfigEntry) {
 	consulKey := NormalizeMeta(s.toConsulReference(api.TCPRoute, key))
 
 	consulRoute, ok := s.consulTCPRoutes[consulKey]
@@ -510,8 +519,10 @@ func (s *ResourceMap) MutateTCPRoute(key types.NamespacedName, onUpdate func(err
 			// to be GC'd.
 			delete(s.consulTCPRoutes, consulKey)
 			s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-				Entry:    &mutated,
-				OnUpdate: onUpdate,
+				Entry: &mutated,
+				OnUpdate: func(err error) {
+					onUpdate(err, mutated.Status)
+				},
 			})
 		}
 	}
