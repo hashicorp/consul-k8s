@@ -13,6 +13,7 @@ import (
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdFetchServerRegion "github.com/hashicorp/consul-k8s/control-plane/subcommand/fetch-server-region"
 	cmdGatewayCleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup"
+	cmdGatewayResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
@@ -52,6 +53,10 @@ func init() {
 
 		"gateway-cleanup": func() (cli.Command, error) {
 			return &cmdGatewayCleanup.Command{UI: ui}, nil
+		},
+
+		"gateway-resources": func() (cli.Command, error) {
+			return &cmdGatewayResources.Command{UI: ui}, nil
 		},
 
 		"server-acl-init": func() (cli.Command, error) {
