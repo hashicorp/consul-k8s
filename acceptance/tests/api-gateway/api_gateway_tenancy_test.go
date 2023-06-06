@@ -146,7 +146,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				require.EqualValues(r, 0, gateway.Status.Listeners[0].AttachedRoutes)
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
-				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
+				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "Accepted"))
 			})
 
 			// since the sync operation should fail above, check that we don't have the entry in Consul.
@@ -163,8 +163,8 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				require.EqualValues(r, "gateway", httproute.Status.Parents[0].ParentRef.Name)
 				require.NotNil(r, httproute.Status.Parents[0].ParentRef.Namespace)
 				require.EqualValues(r, gatewayNamespace, *httproute.Status.Parents[0].ParentRef.Namespace)
-				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("Accepted", "RefNotPermitted"))
-				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 			})
 
 			// since we're not bound to anything, check to make sure that the route doesn't get created in Consul.
