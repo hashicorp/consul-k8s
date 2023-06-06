@@ -35,7 +35,6 @@ func TestPartitions_Gateway(t *testing.T) {
 
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
-	const defaultNamespace = "default"
 
 	defaultPartitionClusterContext := env.DefaultContext(t)
 	secondaryPartitionClusterContext := env.Context(t, environment.SecondaryContextName)
