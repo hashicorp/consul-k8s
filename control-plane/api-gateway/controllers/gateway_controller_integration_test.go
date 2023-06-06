@@ -80,6 +80,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	_ = resourceCache.Subscribe(ctx, api.InlineCertificate, gwCtrl.transformConsulInlineCertificate(ctx))
 
 	k8sGWObj := createAllFieldsSetAPIGW(t, ctx, k8sClient)
+	httpRouteObj := createAllFieldsSetHTTPRoute(t, ctx, k8sClient, k8sGWObj)
 
 	// reconcile so we add the finalizer
 	_, err := gwCtrl.Reconcile(ctx, reconcile.Request{
@@ -99,24 +100,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	httpRouteObj := createAllFieldsSetHTTPRoute(t, ctx, k8sClient, k8sGWObj)
-	// reconcile again so that we get the creation with the finalizer
-	_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: k8sGWObj.Namespace,
-			Name:      k8sGWObj.Name,
-		},
-	})
-
-	// reconcile again so that we get the creation with the finalizer
-	_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: k8sGWObj.Namespace,
-			Name:      k8sGWObj.Name,
-		},
-	})
-	require.NoError(t, err)
-
+	// reconcile again so that we get the route bound to the gateway
 	_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: k8sGWObj.Namespace,
@@ -126,17 +110,17 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	require.NoError(t, err)
 
 	// get the creation events from the upsert
-	gwEvent := <-gwSub.Events()
+	<-gwSub.Events()
 	<-httpRouteSub.Events()
 
 	gwNamespaceName := types.NamespacedName{
-		Name:      gwEvent.Object.GetName(),
-		Namespace: gwEvent.Object.GetNamespace(),
+		Name:      k8sGWObj.Name,
+		Namespace: k8sGWObj.Namespace,
 	}
 
 	httpRouteNamespaceName := types.NamespacedName{
-		Name:      httpRouteObj.GetName(),
-		Namespace: httpRouteObj.GetNamespace(),
+		Name:      httpRouteObj.Name,
+		Namespace: httpRouteObj.Namespace,
 	}
 
 	gwRef := gwCtrl.Translator.ConfigEntryReference(api.APIGateway, gwNamespaceName)
