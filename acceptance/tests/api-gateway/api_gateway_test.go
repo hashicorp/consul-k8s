@@ -110,6 +110,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 				// check our statuses
 				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
 				require.Len(r, gateway.Status.Listeners, 3)
 				require.EqualValues(r, 1, gateway.Status.Listeners[0].AttachedRoutes)
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
@@ -157,6 +158,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			require.EqualValues(t, "gateway", httproute.Status.Parents[0].ParentRef.Name)
 			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
 			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 
 			// check that the Consul entries were created
 			entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
