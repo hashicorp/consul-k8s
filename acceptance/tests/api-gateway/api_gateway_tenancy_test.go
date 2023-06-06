@@ -19,6 +19,12 @@ import (
 	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -28,11 +34,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 var (
@@ -142,7 +143,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Conditions, falseCondition("Synced", "SyncError"))
 
 				require.Len(r, gateway.Status.Listeners, 1)
-				require.EqualValues(r, 0, gateway.Status.Listeners[0].AttachedRoutes)
+				require.EqualValues(r, 1, gateway.Status.Listeners[0].AttachedRoutes)
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
@@ -162,19 +163,15 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				require.EqualValues(r, "gateway", httproute.Status.Parents[0].ParentRef.Name)
 				require.NotNil(r, httproute.Status.Parents[0].ParentRef.Namespace)
 				require.EqualValues(r, gatewayNamespace, *httproute.Status.Parents[0].ParentRef.Namespace)
-				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("Accepted", "RefNotPermitted"))
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, falseCondition("ResolvedRefs", "RefNotPermitted"))
 			})
-
-			// since we're not bound to anything, check to make sure that the route doesn't get created in Consul.
-			checkConsulNotExists(t, consulClient, api.HTTPRoute, "route", namespaceForConsul(c.namespaceMirroring, routeNamespace))
 
 			// we only sync validly referenced certificates over, so check to make sure it is not created.
 			checkConsulNotExists(t, consulClient, api.InlineCertificate, "certificate", namespaceForConsul(c.namespaceMirroring, certificateNamespace))
 
 			// now create reference grants
 			createReferenceGrant(t, k8sClient, "gateway-certificate", gatewayNamespace, certificateNamespace)
-			createReferenceGrant(t, k8sClient, "route-gateway", routeNamespace, gatewayNamespace)
 			createReferenceGrant(t, k8sClient, "route-service", routeNamespace, serviceNamespace)
 
 			// gateway updated with references allowed
