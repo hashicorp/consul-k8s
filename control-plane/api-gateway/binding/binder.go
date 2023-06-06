@@ -152,7 +152,6 @@ func (b *Binder) Snapshot() *Snapshot {
 
 	// process secrets
 	gatewaySecrets := secretsForGateway(b.config.Gateway, b.config.Resources)
-	certs := mapset.NewSet()
 	if !isGatewayDeleted {
 		// we only do this if the gateway isn't going to be deleted so that the
 		// resources can get GC'd
@@ -163,7 +162,6 @@ func (b *Binder) Snapshot() *Snapshot {
 				b.config.Logger.Error(err, "error parsing referenced secret, ignoring")
 				continue
 			}
-			certs.Add(secret)
 		}
 	}
 
@@ -180,10 +178,14 @@ func (b *Binder) Snapshot() *Snapshot {
 		snapshot.GatewayClassConfig = gatewayClassConfig
 		snapshot.UpsertGatewayDeployment = true
 
+		var consulStatus api.ConfigEntryStatus
+		if b.config.ConsulGateway != nil {
+			consulStatus = b.config.ConsulGateway.Status
+		}
 		entry := b.config.Translator.ToAPIGateway(b.config.Gateway, b.config.Resources)
 		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &common.ConsulUpdateOperation{
 			Entry:    entry,
-			OnUpdate: b.handleGatewaySyncStatus(snapshot, &b.config.Gateway),
+			OnUpdate: b.handleGatewaySyncStatus(snapshot, &b.config.Gateway, consulStatus),
 		})
 
 		registrations := registrationsForPods(entry.Namespace, b.config.Gateway, registrationPods)

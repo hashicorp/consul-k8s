@@ -280,6 +280,7 @@ func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client
 
 				// set the old parent states
 				new.Parents = old.Parents
+				new.Status = old.Status
 			}
 			// and now add what is left
 			for parent := range parents.Iter() {
@@ -299,6 +300,7 @@ func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client
 
 				// set the old parent states
 				new.Parents = old.Parents
+				new.Status = old.Status
 			}
 			// and now add what is left
 			for parent := range parents.Iter() {
@@ -402,8 +404,8 @@ func canReferenceBackend(object client.Object, ref gwv1beta1.BackendRef, resourc
 	return false
 }
 
-func (r *Binder) handleRouteSyncStatus(snapshot *Snapshot, object client.Object) func(error) {
-	return func(err error) {
+func (r *Binder) handleRouteSyncStatus(snapshot *Snapshot, object client.Object) func(error, api.ConfigEntryStatus) {
+	return func(err error, status api.ConfigEntryStatus) {
 		condition := metav1.Condition{
 			Type:               "Synced",
 			Status:             metav1.ConditionTrue,
@@ -425,10 +427,15 @@ func (r *Binder) handleRouteSyncStatus(snapshot *Snapshot, object client.Object)
 		if r.statusSetter.setRouteConditionOnAllRefs(object, condition) {
 			snapshot.Kubernetes.StatusUpdates.Add(object)
 		}
+		if consulCondition := consulCondition(object.GetGeneration(), status); consulCondition != nil {
+			if r.statusSetter.setRouteConditionOnAllRefs(object, *consulCondition) {
+				snapshot.Kubernetes.StatusUpdates.Add(object)
+			}
+		}
 	}
 }
 
-func (r *Binder) handleGatewaySyncStatus(snapshot *Snapshot, gateway *gwv1beta1.Gateway) func(error) {
+func (r *Binder) handleGatewaySyncStatus(snapshot *Snapshot, gateway *gwv1beta1.Gateway, status api.ConfigEntryStatus) func(error) {
 	return func(err error) {
 		condition := metav1.Condition{
 			Type:               "Synced",
@@ -453,5 +460,30 @@ func (r *Binder) handleGatewaySyncStatus(snapshot *Snapshot, gateway *gwv1beta1.
 			gateway.Status.Conditions = conditions
 			snapshot.Kubernetes.StatusUpdates.Add(gateway)
 		}
+
+		if consulCondition := consulCondition(gateway.Generation, status); consulCondition != nil {
+			if conditions, updated := setCondition(gateway.Status.Conditions, *consulCondition); updated {
+				gateway.Status.Conditions = conditions
+				snapshot.Kubernetes.StatusUpdates.Add(gateway)
+			}
+		}
 	}
+}
+
+func consulCondition(generation int64, status api.ConfigEntryStatus) *metav1.Condition {
+	for _, c := range status.Conditions {
+		// we only care about the top-level status that isn't in reference
+		// to a resource.
+		if c.Type == "Accepted" && c.Resource.Name == "" {
+			return &metav1.Condition{
+				Type:               "ConsulAccepted",
+				Reason:             c.Reason,
+				Status:             metav1.ConditionStatus(c.Status),
+				Message:            c.Message,
+				ObservedGeneration: generation,
+				LastTransitionTime: timeFunc(),
+			}
+		}
+	}
+	return nil
 }
