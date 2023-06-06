@@ -10,7 +10,6 @@ on:
       - main
       # Push events to branches matching refs/heads/release/**
       - "release/**"
-      - skpratt/fips2-build
 
 env:
   PKG_NAME: "consul-k8s"

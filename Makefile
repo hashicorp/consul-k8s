@@ -49,11 +49,11 @@ control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-
        --push \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
-control-plane-fips-dev-docker-multi-arch: ## Build consul-k8s-control-plane FIPS dev multi-arch Docker image.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a "arm64 amd64" --fips
-	@docker buildx create --use && docker buildx build -t '$(REMOTE_DEV_IMAGE)' \
-       --platform linux/amd64,linux/arm64 \
+control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker image.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH) --fips
+	@docker build -t '$(DEV_IMAGE)' \
        --target=dev \
+       --build-arg 'TARGETARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
