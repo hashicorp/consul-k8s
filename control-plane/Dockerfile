@@ -92,7 +92,11 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
-RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
+
+# for FIPS CGO glibc compatibility in alpine
+# see https://github.com/golang/go/issues/59305
+RUN ln -s /lib/libc.so.6 /usr/lib/libresolv.so.2
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS
