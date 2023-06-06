@@ -1,9 +1,16 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+terraform {
+  required_providers {
+    aws = {
+      version = ">= 4.0.0"
+    }
+  }
+}
+
 provider "aws" {
-  version = ">= 2.28.1"
-  region  = var.region
+  region = var.region
 
   assume_role {
     role_arn = var.role_arn
@@ -28,7 +35,7 @@ resource "random_string" "suffix" {
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
-  version = "3.11.0"
+  version = "4.0.0"
 
   name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
