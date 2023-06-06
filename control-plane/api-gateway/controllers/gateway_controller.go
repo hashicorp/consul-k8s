@@ -188,6 +188,11 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	updates := binder.Snapshot()
 
 	if updates.UpsertGatewayDeployment {
+		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
+			log.Error(err, "error linking token policy")
+			return ctrl.Result{}, err
+		}
+
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
 			log.Error(err, "unable to update gateway resources")
@@ -255,16 +260,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Info("update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.Client.Status().Update(ctx, update); err != nil {
 			log.Error(err, "error updating status")
-			return ctrl.Result{}, err
-		}
-	}
-
-	// link up policy - TODO: this is really a nasty hack to inject a known policy with
-	// mesh == read on the provisioned gateway token if needed, figure out some other
-	// way of handling it.
-	if updates.UpsertGatewayDeployment {
-		if err := r.cache.LinkPolicy(ctx, nonNormalizedConsulKey.Name, nonNormalizedConsulKey.Namespace); err != nil {
-			log.Error(err, "error linking token policy")
 			return ctrl.Result{}, err
 		}
 	}

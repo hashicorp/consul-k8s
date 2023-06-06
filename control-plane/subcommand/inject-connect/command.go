@@ -500,7 +500,7 @@ func (c *Command) Run(args []string) int {
 			PeeringEnabled:             c.flagEnablePeering,
 			EnableOpenShift:            c.flagEnableOpenShift,
 			EnableNamespaceMirroring:   c.flagEnableK8SNSMirroring,
-			AuthMethod:                 c.flagACLAuthMethod,
+			AuthMethod:                 c.consul.ConsulLogin.AuthMethod,
 			LogLevel:                   c.flagLogLevel,
 			LogJSON:                    c.flagLogJSON,
 			TLSEnabled:                 c.consul.UseTLS,
