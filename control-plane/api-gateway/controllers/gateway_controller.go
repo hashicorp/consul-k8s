@@ -20,8 +20,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -321,6 +323,12 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	c := cache.New(cacheConfig)
 	gwc := cache.NewGatewayCache(ctx, cacheConfig)
 
+	predicate, _ := predicate.LabelSelectorPredicate(
+		*metav1.SetAsLabelSelector(map[string]string{
+			common.ManagedLabel: "true",
+		}),
+	)
+
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
@@ -374,6 +382,11 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Watches(
 			source.NewKindWithCache(&corev1.Endpoints{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints(ctx)),
+		).
+		Watches(
+			&source.Kind{Type: &corev1.Pod{}},
+			handler.EnqueueRequestsFromMapFunc(r.transformPods(ctx)),
+			builder.WithPredicates(predicate),
 		).
 		Watches(
 			// Subscribe to changes from Consul for APIGateways
@@ -562,6 +575,20 @@ func gatewayReferencesCertificate(certificateKey api.ResourceReference, gateway 
 		}
 	}
 	return false
+}
+
+func (r *GatewayController) transformPods(ctx context.Context) func(o client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		pod := o.(*corev1.Pod)
+
+		if gateway, managed := common.GatewayFromPod(pod); managed {
+			return []reconcile.Request{
+				{NamespacedName: gateway},
+			}
+		}
+
+		return nil
+	}
 }
 
 // transformEndpoints will return a list of gateways that are referenced
