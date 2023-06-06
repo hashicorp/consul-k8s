@@ -12,7 +12,7 @@ import (
 // Cluster represents a consul cluster object.
 type Cluster interface {
 	// SetupConsulClient returns a new Consul client.
-	SetupConsulClient(t *testing.T, secure bool) (*api.Client, string)
+	SetupConsulClient(t *testing.T, secure bool, release ...string) (*api.Client, string)
 
 	// Create creates a new Consul Cluster.
 	Create(t *testing.T)
