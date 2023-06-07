@@ -808,10 +808,10 @@ server:
   # ```yaml
   # resources:
   #   requests:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   #   limits:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   # ```
   #
@@ -819,10 +819,10 @@ server:
   # @type: map
   resources:
     requests:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
     limits:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
 
   # The security context for the server pods. This should be a YAML map corresponding to a
@@ -2060,6 +2060,12 @@ connectInject:
 
   # Configuration settings for the Consul API Gateway integration.
   apiGateway:
+    # Enables Consul on Kubernetes to manage the CRDs used for Gateway API.
+    # Setting this to true will install the CRDs used for the Gateway API when Consul on Kubernetes is installed.
+    # These CRDs can clash with existing Gateway API CRDs if they are already installed in your cluster.
+    # If this setting is false, you will need to install the Gateway API CRDs manually.
+    manageExternalCRDs: true
+
     # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
     managedGatewayClass:
       # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
@@ -2331,14 +2337,14 @@ connectInject:
     requests:
       # Recommended production default: 500Mi
       # @type: string
-      memory: "50Mi"
+      memory: "200Mi"
       # Recommended production default: 250m
       # @type: string
       cpu: "50m"
     limits:
       # Recommended production default: 500Mi
       # @type: string
-      memory: "50Mi"
+      memory: "200Mi"
       # Recommended production default: 250m
       # @type: string
       cpu: "50m"

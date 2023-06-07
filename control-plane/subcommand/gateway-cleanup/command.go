@@ -173,7 +173,7 @@ func (c *Command) Help() string {
 
 const synopsis = "Clean up global gateway resources prior to uninstall."
 const help = `
-Usage: consul-k8s-control-plane gateay-cleanup [options]
+Usage: consul-k8s-control-plane gateway-cleanup [options]
 
   Deletes installed gateway class and gateway class config objects
 	prior to helm uninstallation. This is required due to finalizers
