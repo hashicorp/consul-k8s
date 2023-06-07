@@ -207,3 +207,33 @@ load _helpers
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
 }
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "tlsInit/Job: use global.logLevel by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "tlsInit/Job: override global.logLevel when server.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'server.logLevel=error' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=error"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

@@ -196,7 +196,7 @@ spec:
                   -gateway-kind="terminating-gateway" \
                   -proxy-id-file=/consul/service/proxy-id \
                   -service-name={{ .name }} \
-                  -log-level={{ default $root.Values.global.logLevel }} \
+                  -log-level={{ default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel }} \
                   -log-json={{ $root.Values.global.logJSON }}
           volumeMounts:
             - name: consul-service

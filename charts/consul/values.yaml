@@ -289,6 +289,9 @@ global:
     # The key within the Kubernetes secret or Vault secret key that holds the gossip
     # encryption key.
     secretKey: ""
+    # Override global log verbosity level for gossip-encryption-autogenerate-job pods. One of "debug", "info", "warn", or "error".
+    # @type: string
+    logLevel: ""
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
@@ -523,6 +526,10 @@ global:
     # @type: string
     k8sAuthMethodHost: null
 
+    # Override global log verbosity level for the create-federation-secret-job pods. One of "debug", "info", "warn", or "error".
+    # @type: string
+    logLevel: ""
+
   # Configures metrics for Consul service mesh
   metrics:
     # Configures the Helm chart’s components
@@ -675,6 +682,10 @@ server:
   # @default: global.enabled
   # @type: boolean
   enabled: "-"
+
+  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   # The name of the Docker image (including any tag) for the containers running
   # Consul server agents.
@@ -2503,6 +2514,10 @@ meshGateway:
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
+  # Override global log verbosity level for mesh-gateway-deployment pods. One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
+
   # Number of replicas for the Deployment.
   replicas: 1
 
@@ -2715,6 +2730,10 @@ ingressGateways:
   # Enable ingress gateway deployment. Requires `connectInject.enabled=true`.
   enabled: false
 
+  # Override global log verbosity level for ingress-gateways-deployment pods. One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
+
   # Defaults sets default values for all gateway fields. With the exception
   # of annotations, defining any of these values in the `gateways` list
   # will override the default values provided here. Annotations will
@@ -2880,6 +2899,10 @@ ingressGateways:
 terminatingGateways:
   # Enable terminating gateway deployment. Requires `connectInject.enabled=true`.
   enabled: false
+
+  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   # Defaults sets default values for all gateway fields. With the exception
   # of annotations, defining any of these values in the `gateways` list
@@ -3218,6 +3241,10 @@ telemetryCollector:
   # Enables the consul-telemetry-collector deployment
   # @type: boolean
   enabled: false
+
+  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   # The name of the Docker image (including any tag) for the containers running
   # the consul-telemetry-collector
