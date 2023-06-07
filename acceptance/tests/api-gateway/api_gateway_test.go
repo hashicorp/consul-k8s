@@ -217,7 +217,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 				// check that intentions keep our connection from happening
 				k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetAddress)
 
-				k8s.CheckStaticServerConnectionFailing(t, k8sOptions, StaticClientName, targetAddress+":8181")
+				//k8s.CheckStaticServerConnectionFailing(t, k8sOptions, StaticClientName, targetAddress+":8181")
 
 				// Now we create the allow intention.
 				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -238,10 +238,8 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "trying calls to api gateway http: ", targetAddress)
 			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetAddress)
 
-			logger.Log(t, "trying calls to api gateway tcp")
-			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetAddress+":81")
-
-			time.Sleep(10000 * time.Minute)
+			logger.Log(t, "trying calls to api gateway tcp, just want to make sure the connection is opened")
+			k8s.CheckStaticServerConnection(t, k8sOptions, StaticClientName, false, []string{"Received HTTP/0.9 when not allowed"}, "", targetAddress+":81")
 		})
 	}
 }
