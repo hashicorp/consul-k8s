@@ -1145,10 +1145,12 @@ server:
     caCert: null
 
   # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing 
-  # and configure a sink and filters for their audit logs
+  # and configure a sink and filters for their audit logs. Please refer to
+  # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
+  # for further information.
   auditLogs:
     # Controls whether Consul logs out each time a user performs an operation.
-    # ACLs must be enabled to use this feature.
+    # global.acls.manageSystemACLs must be enabled to use this feature.
     enabled: false
 
     # A single entry of the sink object provides configuration for the destination to which Consul 
