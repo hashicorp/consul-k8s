@@ -513,7 +513,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			r.Service.Address = ip
 			// Adding information about service weight.
 			// Overrides the existing weight if present
-			if weight, ok := svc.Annotations[annotationServiceWeight]; ok || weight != "" {
+			if weight, ok := svc.Annotations[annotationServiceWeight]; ok && weight != "" {
 				err := setServiceWeight(weight, len(ips), &r)
 				if err != nil {
 					t.Log.Debug("assertion: The service with ",
@@ -561,7 +561,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 				// Adding information about service weight.
 				// Overrides the existing weight if present
-				if weight, ok := svc.Annotations[annotationServiceWeight]; ok || weight != "" {
+				if weight, ok := svc.Annotations[annotationServiceWeight]; ok && weight != "" {
 					ingress_count := len(svc.Status.LoadBalancer.Ingress)
 					err := setServiceWeight(weight, ingress_count, &r)
 					if err != nil {
