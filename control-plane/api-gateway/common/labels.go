@@ -6,6 +6,8 @@ package common
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -13,7 +15,7 @@ const (
 	nameLabel      = "gateway.consul.hashicorp.com/name"
 	namespaceLabel = "gateway.consul.hashicorp.com/namespace"
 	createdAtLabel = "gateway.consul.hashicorp.com/created"
-	managedLabel   = "gateway.consul.hashicorp.com/managed"
+	ManagedLabel   = "gateway.consul.hashicorp.com/managed"
 )
 
 // LabelsForGateway formats the default labels that appear on objects managed by the controllers.
@@ -22,6 +24,16 @@ func LabelsForGateway(gateway *gwv1beta1.Gateway) map[string]string {
 		nameLabel:      gateway.Name,
 		namespaceLabel: gateway.Namespace,
 		createdAtLabel: fmt.Sprintf("%d", gateway.CreationTimestamp.Unix()),
-		managedLabel:   "true",
+		ManagedLabel:   "true",
 	}
+}
+
+func GatewayFromPod(pod *corev1.Pod) (types.NamespacedName, bool) {
+	if pod.Labels[ManagedLabel] == "true" {
+		return types.NamespacedName{
+			Name:      pod.Labels[nameLabel],
+			Namespace: pod.Labels[namespaceLabel],
+		}, true
+	}
+	return types.NamespacedName{}, false
 }
