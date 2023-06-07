@@ -21,7 +21,7 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.25."
+  version_prefix = "1.25.9"
 }
 
 # We assume that the subnets are already created to save time.
