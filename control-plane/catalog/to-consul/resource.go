@@ -671,8 +671,12 @@ func (t *ServiceResource) setServiceWeight(weight string, appsCount int, r consu
 	if err != nil {
 		return err
 	} else if weightI > 1 {
+		var perAppWeight = weightI / appsCount
+		if perAppWeight < 1 {
+			perAppWeight = 1
+		}
 		r.Service.Weights = consulapi.AgentWeights{
-			Passing: weightI / appsCount,
+			Passing: perAppWeight,
 		}
 	}
 	return nil
