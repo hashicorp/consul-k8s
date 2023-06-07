@@ -60,7 +60,7 @@ func TestInstall(t *testing.T) {
 			}
 
 			// Run proxy list and get the two results.
-			listOut, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "list")
+			listOut, err := cli.Run(ctx.KubectlOptions(t), "proxy", "list")
 			require.NoError(t, err)
 			logger.Log(t, string(listOut))
 			list := translateListOutput(listOut)
@@ -69,15 +69,16 @@ func TestInstall(t *testing.T) {
 				require.Equal(t, "Sidecar", proxyType)
 			}
 
+			kubeOpts := ctx.KubectlOptions(t)
+
 			// Run proxy read and check that the connection is present in the output.
 			retrier := &retry.Timer{Timeout: 160 * time.Second, Wait: 2 * time.Second}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
-					out, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "read", podName)
-					require.NoError(t, err)
+					out, err := cli.Run(kubeOpts, "proxy", "read", podName)
+					require.NoError(r, err)
 
 					output := string(out)
-					logger.Log(t, output)
 
 					// Both proxies must see their own local agent and app as clusters.
 					require.Regexp(r, "consul-dataplane.*STATIC", output)
@@ -98,7 +99,7 @@ func TestInstall(t *testing.T) {
 			require.NoError(t, err)
 
 			clientPodName := clientPod.Items[0].Name
-			upstreamsOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "upstreams", "-pod", clientPodName)
+			upstreamsOut, err := cli.Run(ctx.KubectlOptions(t), "troubleshoot", "upstreams", "-pod", clientPodName)
 			logger.Log(t, string(upstreamsOut))
 			require.NoError(t, err)
 
@@ -110,7 +111,7 @@ func TestInstall(t *testing.T) {
 				require.NoError(t, err)
 				serverIP := serverService.Items[0].Spec.ClusterIP
 
-				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
+				proxyOut, err := cli.Run(ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
 				require.NoError(t, err)
 				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
 				logger.Log(t, string(proxyOut))
@@ -118,7 +119,7 @@ func TestInstall(t *testing.T) {
 				// With tproxy disabled and explicit upstreams we need the envoy-id of the server
 				require.Regexp(t, "static-server", string(upstreamsOut))
 
-				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-envoy-id", "static-server")
+				proxyOut, err := cli.Run(ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-envoy-id", "static-server")
 				require.NoError(t, err)
 				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
 				logger.Log(t, string(proxyOut))

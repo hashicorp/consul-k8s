@@ -6,11 +6,8 @@ package cli
 import (
 	"fmt"
 	"os/exec"
-	"strings"
-	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
 const (
@@ -28,7 +25,7 @@ func NewCLI() (*CLI, error) {
 }
 
 // Run runs the CLI with the given args.
-func (c *CLI) Run(t *testing.T, options *k8s.KubectlOptions, args ...string) ([]byte, error) {
+func (c *CLI) Run(options *k8s.KubectlOptions, args ...string) ([]byte, error) {
 	if !c.initialized {
 		return nil, fmt.Errorf("CLI must be initialized before calling Run, use `cli.NewCLI()` to initialize.")
 	}
@@ -41,7 +38,6 @@ func (c *CLI) Run(t *testing.T, options *k8s.KubectlOptions, args ...string) ([]
 		args = append(args, "-context", options.ContextName)
 	}
 
-	logger.Logf(t, "Running `consul-k8s %s`", strings.Join(args, " "))
 	cmd := exec.Command(cliBinaryName, args...)
 	return cmd.Output()
 }
