@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -45,7 +46,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	k8sClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s)).Build()
 	consulTestServerClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	logger := logrtest.New(t)
 
 	cacheCfg := cache.Config{
@@ -76,11 +77,10 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 
 	gwSub := resourceCache.Subscribe(ctx, api.APIGateway, gwCtrl.transformConsulGateway)
 	httpRouteSub := resourceCache.Subscribe(ctx, api.HTTPRoute, gwCtrl.transformConsulHTTPRoute(ctx))
-	_ = resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
-	_ = resourceCache.Subscribe(ctx, api.InlineCertificate, gwCtrl.transformConsulInlineCertificate(ctx))
+	tcpRouteSub := resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
+	inlineCertSub := resourceCache.Subscribe(ctx, api.InlineCertificate, gwCtrl.transformConsulInlineCertificate(ctx))
 
 	k8sGWObj := createAllFieldsSetAPIGW(t, ctx, k8sClient)
-	httpRouteObj := createAllFieldsSetHTTPRoute(t, ctx, k8sClient, k8sGWObj)
 
 	// reconcile so we add the finalizer
 	_, err := gwCtrl.Reconcile(ctx, reconcile.Request{
@@ -100,6 +100,9 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	cert := createAllFieldsSetCert(t, ctx, k8sClient)
+	httpRouteObj := createAllFieldsSetHTTPRoute(t, ctx, k8sClient, k8sGWObj)
+	tcpRouteObj := createAllFieldsSetTCPRoute(t, ctx, k8sClient, k8sGWObj)
 	// reconcile again so that we get the route bound to the gateway
 	_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
 		NamespacedName: types.NamespacedName{
@@ -109,10 +112,53 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// get the creation events from the upsert
-	<-gwSub.Events()
-	<-httpRouteSub.Events()
+	// reconcile again so that we get the route bound to the gateway
+	_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: k8sGWObj.Namespace,
+			Name:      k8sGWObj.Name,
+		},
+	})
+	require.NoError(t, err)
 
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+	// wg.Add(4)
+	go func(w *sync.WaitGroup) {
+		gwDone := false
+		httpRouteDone := false
+		tcpRouteDone := false
+		inlineCertDone := false
+		for {
+			// get the creation events from the upsert and then continually read from channel so we dont block other subs
+			select {
+			case <-ctx.Done():
+				return
+			case <-gwSub.Events():
+				if !gwDone {
+					gwDone = true
+					wg.Done()
+				}
+			case <-httpRouteSub.Events():
+				if !httpRouteDone {
+					httpRouteDone = true
+					wg.Done()
+				}
+			case <-tcpRouteSub.Events():
+				if !tcpRouteDone {
+					tcpRouteDone = true
+					wg.Done()
+				}
+			case <-inlineCertSub.Events():
+				if !inlineCertDone {
+					inlineCertDone = true
+					wg.Done()
+				}
+			}
+		}
+	}(wg)
+
+	wg.Wait()
 	gwNamespaceName := types.NamespacedName{
 		Name:      k8sGWObj.Name,
 		Namespace: k8sGWObj.Namespace,
@@ -123,10 +169,25 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 		Namespace: httpRouteObj.Namespace,
 	}
 
+	tcpRouteNamespaceName := types.NamespacedName{
+		Name:      tcpRouteObj.Name,
+		Namespace: tcpRouteObj.Namespace,
+	}
+
+	certNamespaceName := types.NamespacedName{
+		Name:      cert.Name,
+		Namespace: cert.Namespace,
+	}
+
 	gwRef := gwCtrl.Translator.ConfigEntryReference(api.APIGateway, gwNamespaceName)
 	httpRouteRef := gwCtrl.Translator.ConfigEntryReference(api.HTTPRoute, httpRouteNamespaceName)
+	tcpRouteRef := gwCtrl.Translator.ConfigEntryReference(api.TCPRoute, tcpRouteNamespaceName)
+	certRef := gwCtrl.Translator.ConfigEntryReference(api.InlineCertificate, certNamespaceName)
+
 	curGWModifyIndex := resourceCache.Get(gwRef).GetModifyIndex()
 	curHTTPRouteModifyIndex := resourceCache.Get(httpRouteRef).GetModifyIndex()
+	curTCPRouteModifyIndex := resourceCache.Get(tcpRouteRef).GetModifyIndex()
+	curCertModifyIndex := resourceCache.Get(certRef).GetModifyIndex()
 
 	err = k8sClient.Get(ctx, gwNamespaceName, k8sGWObj)
 	require.NoError(t, err)
@@ -136,8 +197,16 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	require.NoError(t, err)
 	curHTTPRouteResourceVersion := httpRouteObj.ResourceVersion
 
+	err = k8sClient.Get(ctx, tcpRouteNamespaceName, tcpRouteObj)
+	require.NoError(t, err)
+	curTCPRouteResourceVersion := tcpRouteObj.ResourceVersion
+
+	err = k8sClient.Get(ctx, certNamespaceName, cert)
+	require.NoError(t, err)
+	curCertResourceVersion := cert.ResourceVersion
+
 	go func() {
-		// reconcile gateway again without any changes
+		// reconcile multiple times with no changes to be sure
 		for i := 0; i < 5; i++ {
 			_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -157,12 +226,25 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 		require.NoError(t, err)
 		newHTTPRouteResourceVersion := httpRouteObj.ResourceVersion
 
+		err = k8sClient.Get(ctx, tcpRouteNamespaceName, tcpRouteObj)
+		require.NoError(t, err)
+		newTCPRouteResourceVersion := tcpRouteObj.ResourceVersion
+
+		err = k8sClient.Get(ctx, certNamespaceName, cert)
+		require.NoError(t, err)
+		newCertResourceVersion := cert.ResourceVersion
+
 		return curGWModifyIndex == resourceCache.Get(gwRef).GetModifyIndex() &&
 			curGWResourceVersion == newGWResourceVersion &&
 			curHTTPRouteModifyIndex == resourceCache.Get(httpRouteRef).GetModifyIndex() &&
-			curHTTPRouteResourceVersion == newHTTPRouteResourceVersion
+			curHTTPRouteResourceVersion == newHTTPRouteResourceVersion &&
+			curTCPRouteModifyIndex == resourceCache.Get(tcpRouteRef).GetModifyIndex() &&
+			curTCPRouteResourceVersion == newTCPRouteResourceVersion &&
+			curCertModifyIndex == resourceCache.Get(certRef).GetModifyIndex() &&
+			curCertResourceVersion == newCertResourceVersion
 	}, time.Duration(2*time.Second), time.Duration(500*time.Millisecond), fmt.Sprintf("curGWModifyIndex: %d, newIndx: %d", curGWModifyIndex, resourceCache.Get(gwRef).GetModifyIndex()),
 	)
+	cancel()
 }
 
 func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.WithWatch) *gwv1beta1.Gateway {
@@ -172,19 +254,22 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 	listenerOnePort := 3366
 	listenerOneProtocol := "https"
 
-	// listener one tls config
-	listenerOneCertName := "one-cert"
-	listenerOneCertK8sNamespace := ""
-	cert := generateTestCertificate(t, listenerOneCertK8sNamespace, listenerOneCertName)
-
-	err := k8sClient.Create(ctx, &cert)
-	require.NoError(t, err)
-
 	// listener two configuration
 	listenerTwoName := "listener-two"
 	listenerTwoHostname := "*.consul.io"
 	listenerTwoPort := 5432
 	listenerTwoProtocol := "http"
+
+	// listener three configuration
+	listenerThreeName := "listener-three"
+	listenerThreePort := 8081
+	listenerThreeProtocol := "tcp"
+
+	// listener four configuration
+	listenerFourName := "listener-four"
+	listenerFourHostname := "*.consul.io"
+	listenerFourPort := 5433
+	listenerFourProtocol := "http"
 
 	// Write gw to k8s
 	gwClassCfg := &v1alpha1.GatewayClassConfig{
@@ -236,14 +321,14 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 					TLS: &gwv1beta1.GatewayTLSConfig{
 						CertificateRefs: []gwv1beta1.SecretObjectReference{
 							{
-								Name:      gwv1beta1.ObjectName(listenerOneCertName),
-								Namespace: common.PointerTo(gwv1beta1.Namespace(listenerOneCertK8sNamespace)),
+								Kind:      common.PointerTo(gwv1beta1.Kind("Secret")),
+								Name:      gwv1beta1.ObjectName("one-cert"),
+								Namespace: common.PointerTo(gwv1beta1.Namespace("consul")),
 							},
 						},
 					},
 					AllowedRoutes: &gwv1beta1.AllowedRoutes{
 						Namespaces: &gwv1beta1.RouteNamespaces{
-							// TODO: do we support "selector" here?
 							From: common.PointerTo(gwv1beta1.FromNamespaces("All")),
 						},
 					},
@@ -255,8 +340,34 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 					Protocol: gwv1beta1.ProtocolType(listenerTwoProtocol),
 					AllowedRoutes: &gwv1beta1.AllowedRoutes{
 						Namespaces: &gwv1beta1.RouteNamespaces{
-							// TODO: do we support "selector" here?
 							From: common.PointerTo(gwv1beta1.FromNamespaces("Same")),
+						},
+					},
+				},
+				{
+					Name:     gwv1beta1.SectionName(listenerThreeName),
+					Port:     gwv1beta1.PortNumber(listenerThreePort),
+					Protocol: gwv1beta1.ProtocolType(listenerThreeProtocol),
+					AllowedRoutes: &gwv1beta1.AllowedRoutes{
+						Namespaces: &gwv1beta1.RouteNamespaces{
+							From: common.PointerTo(gwv1beta1.FromNamespaces("All")),
+						},
+					},
+				},
+				{
+					Name:     gwv1beta1.SectionName(listenerFourName),
+					Hostname: common.PointerTo(gwv1beta1.Hostname(listenerFourHostname)),
+					Port:     gwv1beta1.PortNumber(listenerFourPort),
+					Protocol: gwv1beta1.ProtocolType(listenerFourProtocol),
+					AllowedRoutes: &gwv1beta1.AllowedRoutes{
+						Namespaces: &gwv1beta1.RouteNamespaces{
+							From: common.PointerTo(gwv1beta1.FromNamespaces("Selector")),
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									common.NamespaceNameLabel: "consul",
+								},
+								MatchExpressions: []metav1.LabelSelectorRequirement{},
+							},
 						},
 					},
 				},
@@ -264,7 +375,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 		},
 	}
 
-	err = k8sClient.Create(ctx, gwClassCfg)
+	err := k8sClient.Create(ctx, gwClassCfg)
 	require.NoError(t, err)
 
 	err = k8sClient.Create(ctx, gwClass)
@@ -348,34 +459,6 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 	require.NoError(t, err)
 
 	err = k8sClient.Create(ctx, deployment)
-	require.NoError(t, err)
-
-	refGrant := gwv1beta1.ReferenceGrant{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ReferenceGrant",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "grant",
-			Namespace: "consul",
-		},
-		Spec: gwv1beta1.ReferenceGrantSpec{
-			From: []gwv1beta1.ReferenceGrantFrom{
-				{
-					Group: "gateway.networking.k8s.io",
-					Kind:  "HTTPRoute",
-				},
-			},
-			To: []gwv1beta1.ReferenceGrantTo{
-				{
-					Group: "gateway.networking.k8s.io",
-					Kind:  "Gateway",
-				},
-			},
-		},
-	}
-
-	err = k8sClient.Create(ctx, &refGrant)
 	require.NoError(t, err)
 
 	route := &gwv1beta1.HTTPRoute{
@@ -488,10 +571,53 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 }
 
 func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *v1alpha2.TCPRoute {
-	return &v1alpha2.TCPRoute{}
+	route := &v1alpha2.TCPRoute{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "TCPRoute",
+			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "tcp-route",
+		},
+		Spec: gwv1alpha2.TCPRouteSpec{
+			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+				ParentRefs: []gwv1beta1.ParentReference{
+					{
+						Kind:        (*gwv1beta1.Kind)(&gw.Kind),
+						Namespace:   (*gwv1beta1.Namespace)(&gw.Namespace),
+						Name:        gwv1beta1.ObjectName(gw.Name),
+						SectionName: &gw.Spec.Listeners[2].Name,
+						Port:        &gw.Spec.Listeners[2].Port,
+					},
+				},
+			},
+			Rules: []gwv1alpha2.TCPRouteRule{
+				{
+					BackendRefs: []gwv1beta1.BackendRef{
+						{
+							BackendObjectReference: gwv1beta1.BackendObjectReference{
+								Name: "Service",
+								Port: common.PointerTo(gwv1beta1.PortNumber(25000)),
+							},
+							Weight: common.PointerTo(int32(50)),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err := k8sClient.Create(ctx, route)
+	require.NoError(t, err)
+
+	return route
 }
 
-func generateTestCertificate(t *testing.T, namespace, name string) corev1.Secret {
+func createAllFieldsSetCert(t *testing.T, ctx context.Context, k8sClient client.WithWatch) *corev1.Secret {
+	// listener one tls config
+	certName := "one-cert"
+	certNS := "consul"
+
 	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	require.NoError(t, err)
 
@@ -527,14 +653,19 @@ func generateTestCertificate(t *testing.T, namespace, name string) corev1.Secret
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	})
 
-	return corev1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
+			Namespace: certNS,
+			Name:      certName,
 		},
 		Data: map[string][]byte{
 			corev1.TLSCertKey:       certBytes,
 			corev1.TLSPrivateKeyKey: privateKeyBytes,
 		},
 	}
+
+	err = k8sClient.Create(ctx, secret)
+	require.NoError(t, err)
+
+	return secret
 }
