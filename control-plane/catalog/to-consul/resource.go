@@ -508,6 +508,18 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			r.Service = &rs
 			r.Service.ID = serviceID(r.Service.Service, ip)
 			r.Service.Address = ip
+			// Adding information about service weight.
+			// Overrides the existing weight if present
+			if weight, ok := svc.Annotations[annotationServiceWeight]; ok || weight != "" {
+				err := t.setServiceWeight(weight, len(ips), r)
+				if err != nil {
+					t.Log.Debug("assertion: The service with ",
+						"key", key,
+						"service", baseService.Service,
+						"namespace", baseService.Namespace,
+						"expects a positive integer value, however observed value was not integer: ", weight)
+				}
+			}
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 
@@ -543,6 +555,20 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				r.Service = &rs
 				r.Service.ID = serviceID(r.Service.Service, addr)
 				r.Service.Address = addr
+
+				// Adding information about service weight.
+				// Overrides the existing weight if present
+				if weight, ok := svc.Annotations[annotationServiceWeight]; ok || weight != "" {
+					ingress_count := len(svc.Status.LoadBalancer.Ingress)
+					err := t.setServiceWeight(weight, ingress_count, r)
+					if err != nil {
+						t.Log.Debug("assertion: The service with ",
+							"key", key,
+							"service", baseService.Service,
+							"namespace", baseService.Namespace,
+							"expects a positive integer value, however observed value was not integer: ", weight)
+					}
+				}
 
 				t.consulMap[key] = append(t.consulMap[key], &r)
 			}
@@ -636,6 +662,20 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	case corev1.ServiceTypeClusterIP:
 		t.registerServiceInstance(baseNode, baseService, key, overridePortName, overridePortNumber, true)
 	}
+}
+
+// Sets the passing service weight
+func (t *ServiceResource) setServiceWeight(weight string, appsCount int, r consulapi.CatalogRegistration) error {
+	// error validation if the input param is a number
+	weightI, err := strconv.Atoi(weight)
+	if err != nil {
+		return err
+	} else if weightI > 1 {
+		r.Service.Weights = consulapi.AgentWeights{
+			Passing: weightI / appsCount,
+		}
+	}
+	return nil
 }
 
 func (t *ServiceResource) registerServiceInstance(
