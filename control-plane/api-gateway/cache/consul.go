@@ -4,10 +4,12 @@
 package cache
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -18,6 +20,33 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
+)
+
+func init() {
+	gatewayTpl = template.Must(template.New("root").Parse(strings.TrimSpace(gatewayRulesTpl)))
+}
+
+type templateArgs struct {
+	EnableNamespaces bool
+}
+
+var (
+	gatewayTpl      *template.Template
+	gatewayRulesTpl = `
+mesh = "read"
+{{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+		node_prefix "" {
+			policy = "read"
+		}
+    service_prefix "" {
+      policy = "write"
+    }
+{{- if .EnableNamespaces }}
+	}
+{{- end }}
+`
 )
 
 const (
@@ -282,6 +311,66 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	return nil
 }
 
+func (c *Cache) ensurePolicy(client *api.Client) (string, error) {
+	policy := c.gatewayPolicy()
+
+	created, _, err := client.ACL().PolicyCreate(&policy, &api.WriteOptions{})
+
+	if isPolicyExistsErr(err, policy.Name) {
+		existing, _, err := client.ACL().PolicyReadByName(policy.Name, &api.QueryOptions{})
+		if err != nil {
+			return "", err
+		}
+		return existing.ID, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return created.ID, nil
+}
+
+func (c *Cache) ensureRole(client *api.Client) (string, error) {
+	policyID, err := c.ensurePolicy(client)
+	if err != nil {
+		return "", err
+	}
+
+	aclRoleName := "managed-gateway-acl-role"
+	aclRole, _, err := client.ACL().RoleReadByName(aclRoleName, &api.QueryOptions{})
+	if err != nil {
+		return "", err
+	}
+	if aclRole != nil {
+		return aclRoleName, nil
+	}
+
+	role := &api.ACLRole{
+		Name:        aclRoleName,
+		Description: "ACL Role for Managed API Gateways",
+		Policies:    []*api.ACLLink{{ID: policyID}},
+	}
+
+	_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
+	return aclRoleName, err
+}
+
+func (c *Cache) gatewayPolicy() api.ACLPolicy {
+	var data bytes.Buffer
+	if err := gatewayTpl.Execute(&data, templateArgs{
+		EnableNamespaces: c.namespacesEnabled,
+	}); err != nil {
+		// just panic if we can't compile the simple template
+		// as it means something else is going severly wrong.
+		panic(err)
+	}
+
+	return api.ACLPolicy{
+		Name:        "api-gateway-token-policy",
+		Description: "API Gateway token Policy",
+		Rules:       data.String(),
+	}
+}
+
 // Get returns a config entry from the cache that corresponds to the given resource reference.
 func (c *Cache) Get(ref api.ResourceReference) api.ConfigEntry {
 	c.cacheMutex.Lock()
@@ -335,56 +424,42 @@ func (c *Cache) List(kind string) []api.ConfigEntry {
 	return refMap.Entries()
 }
 
-// LinkPolicy links a mesh write policy to a token associated with the service.
-func (c *Cache) LinkPolicy(ctx context.Context, name, namespace string) error {
+func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 	if err != nil {
 		return err
 	}
 
-	options := &api.QueryOptions{}
-
-	if c.namespacesEnabled {
-		options.Namespace = namespace
-	}
-
-	policies, _, err := client.ACL().PolicyList(options.WithContext(ctx))
+	role, err := c.ensureRole(client)
 	if err != nil {
 		return ignoreACLsDisabled(err)
 	}
 
-	links := []*api.ACLLink{}
-	for _, policy := range policies {
-		if strings.HasPrefix(policy.Name, "connect-inject-policy") {
-			links = append(links, &api.ACLLink{
-				Name: policy.Name,
-			})
-		}
+	bindingRule := &api.ACLBindingRule{
+		Description: fmt.Sprintf("Binding Rule for %s/%s", namespace, service),
+		AuthMethod:  authMethod,
+		Selector:    fmt.Sprintf("serviceaccount.name==%q and serviceaccount.namespace==%q", service, namespace),
+		BindType:    api.BindingRuleBindTypeRole,
+		BindName:    role,
 	}
 
-	tokens, _, err := client.ACL().TokenList(options.WithContext(ctx))
+	existingRules, _, err := client.ACL().BindingRuleList(authMethod, &api.QueryOptions{})
 	if err != nil {
-		return ignoreACLsDisabled(err)
+		return err
 	}
 
-	for _, token := range tokens {
-		for _, identity := range token.ServiceIdentities {
-			if identity.ServiceName == name {
-				token, _, err := client.ACL().TokenRead(token.AccessorID, options.WithContext(ctx))
-				if err != nil {
-					return ignoreACLsDisabled(err)
-				}
-				token.Policies = links
-
-				_, _, err = client.ACL().TokenUpdate(token, &api.WriteOptions{})
-				if err != nil {
-					return ignoreACLsDisabled(err)
-				}
-			}
+	for _, existingRule := range existingRules {
+		if existingRule.BindName == bindingRule.BindName && existingRule.Description == bindingRule.Description {
+			bindingRule.ID = existingRule.ID
 		}
 	}
 
-	return nil
+	if bindingRule.ID == "" {
+		_, _, err := client.ACL().BindingRuleCreate(bindingRule, &api.WriteOptions{})
+		return err
+	}
+	_, _, err = client.ACL().BindingRuleUpdate(bindingRule, &api.WriteOptions{})
+	return err
 }
 
 // Register registers a service in Consul.
@@ -414,8 +489,19 @@ func (c *Cache) Deregister(ctx context.Context, deregistration api.CatalogDeregi
 }
 
 func ignoreACLsDisabled(err error) error {
+	if err == nil {
+		return nil
+	}
 	if err.Error() == "Unexpected response code: 401 (ACL support disabled)" {
 		return nil
 	}
 	return err
+}
+
+// isPolicyExistsErr returns true if err is due to trying to call the
+// policy create API when the policy already exists.
+func isPolicyExistsErr(err error, policyName string) bool {
+	return err != nil &&
+		strings.Contains(err.Error(), "Unexpected response code: 500") &&
+		strings.Contains(err.Error(), fmt.Sprintf("Invalid Policy: A Policy with Name %q already exists", policyName))
 }
