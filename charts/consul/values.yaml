@@ -808,10 +808,10 @@ server:
   # ```yaml
   # resources:
   #   requests:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   #   limits:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   # ```
   #
@@ -819,10 +819,10 @@ server:
   # @type: map
   resources:
     requests:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
     limits:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
 
   # The security context for the server pods. This should be a YAML map corresponding to a
@@ -2283,14 +2283,14 @@ connectInject:
     requests:
       # Recommended production default: 500Mi
       # @type: string
-      memory: "50Mi"
+      memory: "200Mi"
       # Recommended production default: 250m
       # @type: string
       cpu: "50m"
     limits:
       # Recommended production default: 500Mi
       # @type: string
-      memory: "50Mi"
+      memory: "200Mi"
       # Recommended production default: 250m
       # @type: string
       cpu: "50m"
