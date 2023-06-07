@@ -1,0 +1,10 @@
+```release-note:improvement
+Add support to provide the logLevel flag via helm for multiple low level components. Introduces the following fields
+1. server.logLevel
+2. global.federation.logLevel
+3. global.gossipEncryption.logLevel
+4. meshGateway.logLevel
+5. ingressGateways.logLevel
+6. terminatingGateways.logLevel
+7. telemetryCollector.logLevel
+```
