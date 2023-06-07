@@ -514,7 +514,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			// Adding information about service weight.
 			// Overrides the existing weight if present
 			if weight, ok := svc.Annotations[annotationServiceWeight]; ok || weight != "" {
-				err := t.setServiceWeight(weight, len(ips), r)
+				err := setServiceWeight(weight, len(ips), &r)
 				if err != nil {
 					t.Log.Debug("assertion: The service with ",
 						"key", key,
@@ -563,7 +563,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				// Overrides the existing weight if present
 				if weight, ok := svc.Annotations[annotationServiceWeight]; ok || weight != "" {
 					ingress_count := len(svc.Status.LoadBalancer.Ingress)
-					err := t.setServiceWeight(weight, ingress_count, r)
+					err := setServiceWeight(weight, ingress_count, &r)
 					if err != nil {
 						t.Log.Debug("assertion: The service with ",
 							"key", key,
@@ -665,24 +665,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	case corev1.ServiceTypeClusterIP:
 		t.registerServiceInstance(baseNode, baseService, key, overridePortName, overridePortNumber, true)
 	}
-}
-
-// Sets the passing service weight
-func (t *ServiceResource) setServiceWeight(weight string, appsCount int, r consulapi.CatalogRegistration) error {
-	// error validation if the input param is a number
-	weightI, err := strconv.Atoi(weight)
-	if err != nil {
-		return err
-	} else if weightI > 1 {
-		var perAppWeight = weightI / appsCount
-		if perAppWeight < 1 {
-			perAppWeight = 1
-		}
-		r.Service.Weights = consulapi.AgentWeights{
-			Passing: perAppWeight,
-		}
-	}
-	return nil
 }
 
 func (t *ServiceResource) registerServiceInstance(
@@ -1042,4 +1024,27 @@ func (t *ServiceResource) isIngressService(key string) bool {
 // consulHealthCheckID deterministically generates a health check ID based on service ID and Kubernetes namespace.
 func consulHealthCheckID(k8sNS string, serviceID string) string {
 	return fmt.Sprintf("%s/%s", k8sNS, serviceID)
+}
+
+// Sets the passing service weight
+func setServiceWeight(weight string, appsCount int, r *consulapi.CatalogRegistration) error {
+	// error validation if the input param is a number
+	weightI, err := strconv.Atoi(weight)
+	if err != nil {
+		return err
+	}
+
+	if weightI <= 1 {
+		return nil
+	}
+
+	var perAppWeight = weightI / appsCount
+	if perAppWeight < 1 {
+		perAppWeight = 1
+	}
+	r.Service.Weights = consulapi.AgentWeights{
+		Passing: perAppWeight,
+	}
+
+	return nil
 }
