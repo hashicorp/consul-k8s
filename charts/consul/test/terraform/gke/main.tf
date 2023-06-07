@@ -1,6 +1,17 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+terraform {
+  required_providers {
+    google = {
+      version = "~> 4.58.0"
+    }
+  }
+}
+
 provider "google" {
   project = var.project
-  version = "~> 3.49.0"
+  zone    = var.zone
 }
 
 resource "random_id" "suffix" {
@@ -11,6 +22,11 @@ resource "random_id" "suffix" {
 data "google_container_engine_versions" "main" {
   location       = var.zone
   version_prefix = "1.25."
+}
+
+# We assume that the subnets are already created to save time.
+data "google_compute_subnetwork" "subnet" {
+  name = var.subnet
 }
 
 resource "google_container_cluster" "cluster" {
@@ -25,8 +41,9 @@ resource "google_container_cluster" "cluster" {
   node_version       = data.google_container_engine_versions.main.latest_master_version
   node_config {
     tags         = ["consul-k8s-${random_id.suffix[count.index].dec}"]
-    machine_type = "e2-standard-4"
+    machine_type = "e2-standard-8"
   }
+  subnetwork      = data.google_compute_subnetwork.subnet.name
   resource_labels = var.labels
 }
 
