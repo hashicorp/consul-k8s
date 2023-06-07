@@ -1533,6 +1533,6 @@ key2: value2' \
       yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
-    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
