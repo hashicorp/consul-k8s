@@ -53,7 +53,7 @@ by contacting us at [security@hashicorp.com](mailto:security@hashicorp.com).
 
 The following pre-requisites must be met before installing Consul on Kubernetes. 
 
-  * **Kubernetes 1.23.x - 1.26.x** - This represents the earliest versions of Kubernetes tested.
+  * **Kubernetes 1.24.x - 1.27.x** - This represents the earliest versions of Kubernetes tested.
     It is possible that this chart works with earlier versions, but it is
     untested.
   * Helm install
