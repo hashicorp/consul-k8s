@@ -40,8 +40,6 @@ func TestPeering_Gateway(t *testing.T) {
 
 	const staticServerPeer = "server"
 	const staticClientPeer = "client"
-	const defaultNamespace = "default"
-	const destinationNamespace = staticServerName
 
 	staticServerPeerClusterContext := env.DefaultContext(t)
 	staticClientPeerClusterContext := env.Context(t, environment.SecondaryContextName)
