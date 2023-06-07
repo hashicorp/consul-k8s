@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
@@ -60,6 +61,7 @@ type Config struct {
 	ConsulClientConfig      *consul.Config
 	ConsulServerConnMgr     consul.ServerConnectionManager
 	NamespacesEnabled       bool
+	Datacenter              string
 	CrossNamespaceACLPolicy string
 	Logger                  logr.Logger
 }
@@ -83,6 +85,8 @@ type Cache struct {
 	synced chan struct{}
 
 	kinds []string
+
+	datacenter string
 }
 
 func New(config Config) *Cache {
@@ -104,6 +108,7 @@ func New(config Config) *Cache {
 		synced:                  make(chan struct{}, len(Kinds)),
 		logger:                  config.Logger,
 		crossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
+		datacenter:              config.Datacenter,
 	}
 }
 
@@ -216,6 +221,19 @@ func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind strin
 	cache := common.NewReferenceMap()
 
 	for _, entry := range entries {
+		meta := entry.GetMeta()
+		if meta[constants.MetaKeyKubeName] == "" || meta[constants.MetaKeyDatacenter] != c.datacenter {
+			// Don't process things that don't belong to us. The main reason
+			// for this is so that we don't garbage collect config entries that
+			// are either user-created or that another controller running in a
+			// federated datacenter creates. While we still allow for competing controllers
+			// syncing/overriding each other due to conflicting Kubernetes objects in
+			// two federated clusters (which is what the rest of the controllers also allow
+			// for), we don't want to delete a config entry just because we don't have
+			// its corresponding Kubernetes object if we know it belongs to another datacenter.
+			continue
+		}
+
 		cache.Set(common.EntryToReference(entry), entry)
 	}
 
@@ -336,6 +354,7 @@ func (c *Cache) ensureRole(client *api.Client) (string, error) {
 	}
 
 	aclRoleName := "managed-gateway-acl-role"
+
 	aclRole, _, err := client.ACL().RoleReadByName(aclRoleName, &api.QueryOptions{})
 	if err != nil {
 		return "", err

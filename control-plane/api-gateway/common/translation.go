@@ -23,6 +23,7 @@ type ResourceTranslator struct {
 	EnableK8sMirroring     bool
 	MirroringPrefix        string
 	ConsulPartition        string
+	Datacenter             string
 }
 
 func (t ResourceTranslator) NonNormalizedConfigEntryReference(kind string, id types.NamespacedName) api.ResourceReference {
@@ -65,10 +66,10 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *R
 		Name:      gateway.Name,
 		Namespace: namespace,
 		Partition: t.ConsulPartition,
-		Meta: map[string]string{
+		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   gateway.Namespace,
 			constants.MetaKeyKubeName: gateway.Name,
-		},
+		}),
 		Listeners: listeners,
 	}
 }
@@ -128,10 +129,10 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 		Name:      route.Name,
 		Namespace: namespace,
 		Partition: t.ConsulPartition,
-		Meta: map[string]string{
+		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   route.Namespace,
 			constants.MetaKeyKubeName: route.Name,
-		},
+		}),
 		Hostnames: hostnames,
 		Rules:     rules,
 	}
@@ -292,10 +293,10 @@ func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *Res
 		Name:      route.Name,
 		Namespace: namespace,
 		Partition: t.ConsulPartition,
-		Meta: map[string]string{
+		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   route.Namespace,
 			constants.MetaKeyKubeName: route.Name,
-		},
+		}),
 		Services: services,
 	}
 }
@@ -346,10 +347,10 @@ func (t ResourceTranslator) ToInlineCertificate(secret corev1.Secret) (*api.Inli
 		Partition:   t.ConsulPartition,
 		Certificate: strings.TrimSpace(certificate),
 		PrivateKey:  strings.TrimSpace(privateKey),
-		Meta: map[string]string{
+		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   secret.Namespace,
 			constants.MetaKeyKubeName: secret.Name,
-		},
+		}),
 	}, nil
 }
 
@@ -360,4 +361,12 @@ func EntryToNamespacedName(entry api.ConfigEntry) types.NamespacedName {
 		Namespace: meta[constants.MetaKeyKubeNS],
 		Name:      meta[constants.MetaKeyKubeName],
 	}
+}
+
+func (t ResourceTranslator) addDatacenterToMeta(meta map[string]string) map[string]string {
+	if t.Datacenter == "" {
+		return meta
+	}
+	meta[constants.MetaKeyDatacenter] = t.Datacenter
+	return meta
 }

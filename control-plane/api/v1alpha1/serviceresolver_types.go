@@ -425,7 +425,7 @@ func (in *ServiceResolverRedirect) validate(path *field.Path, consulMeta common.
 			"service resolver redirect cannot be empty"))
 	}
 
-	if consulMeta.Partition != "default" && in.Datacenter != "" {
+	if consulMeta.Partition != "default" && consulMeta.Partition != "" && in.Datacenter != "" {
 		errs = append(errs, field.Invalid(path.Child("datacenter"), in.Datacenter,
 			"cross-datacenter redirect is only supported in the default partition"))
 	}
