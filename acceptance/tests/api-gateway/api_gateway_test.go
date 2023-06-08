@@ -81,6 +81,17 @@ func TestAPIGateway_Basic(t *testing.T) {
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
 			})
 
+			// Create certificate secret, we do this separately since
+			// applying the secret will make an invalid certificate that breaks other tests
+			logger.Log(t, "creating certificate secret")
+			out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+			require.NoError(t, err, out)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				// Ignore errors here because if the test ran as expected
+				// the custom resources will have been deleted.
+				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+			})
+
 			// patch certificate with data
 			logger.Log(t, "patching certificate secret with generated data")
 			certificate := generateCertificate(t, nil, "gateway.test.local")
@@ -259,7 +270,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			// Test that we can make a call to the api gateway
 			// via the static-client pod. It should route to the static-server pod.
-			logger.Log(t, "trying calls to api gateway http: ", targetHTTPAddress) // TODO: Melisa remove before merging
+			logger.Log(t, "trying calls to api gateway http")
 			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPAddress)
 
 			logger.Log(t, "trying calls to api gateway tcp")
