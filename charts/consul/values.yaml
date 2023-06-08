@@ -89,7 +89,7 @@ global:
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
   imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.2.0-dev
-  pullPolicy: ""
+  imageK8SpullPolicy: ""
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -561,7 +561,7 @@ global:
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: "hashicorppreview/consul-dataplane:1.1-dev"
-  pullPolicy: ""
+  imageConsulDataplanePullPolicy: ""
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -2267,7 +2267,7 @@ connectInject:
   # Defaults to global.image.
   # @type: string
   imageConsul: null
-  pullPolicy: ""
+  imageConsulPullPolicy: ""
 
   # Override global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string
@@ -3036,7 +3036,7 @@ apiGateway:
   # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
   # @default: envoyproxy/envoy:<latest supported version>
   imageEnvoy: "envoyproxy/envoy:v1.25.1"
-  pullPolicy: ""
+  imageEnvoyPullPolicy: ""
 
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
   # @type: string

@@ -258,7 +258,7 @@ spec:
         {{- end}}
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         image: {{ .Values.global.imageK8S }}
-        imagePullPolicy:  {{- default Always .Values.global.pullPolicy }}
+        imagePullPolicy:  {{- default Always .Values.global.imageK8SpullPolicy }}
         volumeMounts:
         - mountPath: /consul/login
           name: consul-data
