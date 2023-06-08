@@ -528,7 +528,7 @@ func TestRun_WaitsForMeshGatewayInstances(t *testing.T) {
 					CAFile: caFile,
 				},
 			})
-			require.NoError(t, err)
+			require.NoError(r, err)
 		})
 
 		err = client.Agent().ServiceRegister(&api.AgentServiceRegistration{
@@ -825,7 +825,7 @@ func TestRun_ReplicationSecretDelay(t *testing.T) {
 					},
 				},
 				metav1.CreateOptions{})
-			require.NoError(t, err)
+			require.NoError(r, err)
 		})
 	}()
 
@@ -1005,7 +1005,7 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 					Server:  randomPorts[5],
 				}
 			})
-			require.NoError(t, err)
+			require.NoError(r, err)
 		})
 
 		// Construct Consul client.
