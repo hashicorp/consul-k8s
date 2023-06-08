@@ -7,4 +7,3 @@ resources:
   - apigateway.yaml
   - httproute.yaml
   - meshservice.yaml
-  - certificate.yaml
