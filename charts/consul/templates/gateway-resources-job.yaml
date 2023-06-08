@@ -43,7 +43,7 @@ spec:
             - gateway-resources
             - -gateway-class-name=consul-api-gateway
             - -gateway-class-config-name=consul-api-gateway
-            - -controller-name=hashicorp.com/consul-api-gateway-controller
+            - -controller-name=consul.hashicorp.com/gatewayclass-controller
             - -app={{template "consul.name" .}}
             - -chart={{template "consul.chart" .}}
             - -heritage={{ .Release.Service }}
