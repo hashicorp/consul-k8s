@@ -1037,7 +1037,7 @@ func getServiceWeight(weight string) (int, error) {
 	}
 
 	if weightI <= 1 {
-		return -1, fmt.Errorf("expected an interger greater than 1")
+		return -1, fmt.Errorf("expecting the service annotation %s value to be greater than 1", annotationServiceWeight)
 	}
 
 	return weightI, nil
