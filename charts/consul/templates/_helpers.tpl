@@ -194,6 +194,7 @@ This template is for an init container.
 {{- define "consul.getAutoEncryptClientCA" -}}
 - name: get-auto-encrypt-client-ca
   image: {{ .Values.global.imageK8S }}
+  imagePullPolicy:  {{- default Always .Values.global.pullPolicy }}
   command:
     - "/bin/sh"
     - "-ec"

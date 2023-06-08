@@ -37,6 +37,7 @@ spec:
       containers:
         - name: gateway-resources
           image: {{ .Values.global.imageK8S }}
+          imagePullPolicy:  {{- default Always .Values.global.pullPolicy }}
           command:
             - consul-k8s-control-plane
           args:
