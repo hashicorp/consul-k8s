@@ -513,8 +513,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			r.Service.Address = ip
 			// Adding information about service weight.
 			// Overrides the existing weight if present
-			// Adding information about service weight.
-			// Overrides the existing weight if present
 			if weight, ok := svc.Annotations[annotationServiceWeight]; ok && weight != "" {
 				weightI, err := getServiceWeight(weight)
 				if err == nil {
