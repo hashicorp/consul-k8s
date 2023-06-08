@@ -49,6 +49,17 @@ control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-
        --push \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
+control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker image.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH) --fips
+	@docker build -t '$(DEV_IMAGE)' \
+       --target=dev \
+       --build-arg 'TARGETARCH=$(GOARCH)' \
+       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
+       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
+       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       --push \
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+
 control-plane-test: ## Run go test for the control plane.
 	cd control-plane; go test ./...
 
@@ -97,6 +108,10 @@ terraform-fmt:
 cli-dev:
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
+
+cli-fips-dev:
+	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
+	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
 
 
 cli-lint: ## Run linter in the control-plane directory.
