@@ -6,7 +6,6 @@
 
 #TODO generate this dynamically
 consulImage="hashicorppreview/consul-enterprise:1.16-dev"
-consulK8sImage="hashicorppreview/consul-k8s-control-plane:1.2.0-dev"
 
 echo creating kind cluster
 testID=$RANDOM
@@ -117,16 +116,15 @@ kubectl wait --for=condition=Ready --timeout=60s --namespace=metallb-system pods
 
 
 #echo helm install
-helm install --values "$workdir"/consul-config.yaml consul ./charts/consul --namespace consul --set global.imageK8S="$consulK8sImage" --set global.image="$consulImage"
+helm install --values "$workdir"/consul-config.yaml consul ./charts/consul --namespace consul --set global.imageK8S="$imageName" --set global.image="$consulImage"
 
-
-kubectl wait --for=condition=Ready --timeout=60s  pods --all
-
-cp $workdir/kustomization.yaml $workdir/proxydefaults.yaml $workdir/gateway-api/conformance/
+cp $workdir/kustomization.yaml $workdir/gateway-api/conformance/
+cp $workdir/proxydefaults.yaml $workdir/gateway-api/conformance/
+ls $workdir/gateway-api/conformance/
 cd $workdir/gateway-api/conformance/
 kubectl kustomize ./ --output ./base/manifests.yaml
 
-kubectl wait --for=condition=Ready --timeout=60s  pods --all
+kubectl wait --for=condition=Ready --timeout=60s  pods --all --namespace consul
 
 go test -v -timeout 10m ./ --gateway-class=consul-api-gateway
 
