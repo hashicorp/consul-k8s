@@ -9,9 +9,7 @@ metadata:
     app: static-server-tcp
 spec:
   ports:
-    - name: tcp-port
-      port: 81
-    - name: tcp-secure
-      port: 8181
+    - name: http
+      port: 8080
   selector:
     app: static-server-tcp
