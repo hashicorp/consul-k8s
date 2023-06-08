@@ -190,7 +190,8 @@ function build_consul_local {
 
    if [ $GOTAGS == "fips" ]; then
      CGO_ENABLED=1
-   else CGO_ENABLED=0
+   else
+     CGO_ENABLED=0
    fi
 
    echo "GOEXPERIMENT: $GOEXPERIMENT, GOTAGS: $GOTAGS CGO_ENABLED: $CGO_ENABLED" >> ~/debug.txt

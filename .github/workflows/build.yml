@@ -133,10 +133,14 @@ jobs:
         run: |
           # Uninstall standard Go and use microsoft/go instead
           rm -rf /home/runner/actions-runner/_work/_tool/go
-          curl https://aka.ms/golang/release/latest/go1.20.linux-amd64.tar.gz -Lo go1.20.linux-amd64.tar.gz
-          tar -C $HOME -xf go1.20.linux-amd64.tar.gz
+          curl https://aka.ms/golang/release/latest/go${{ matrix.go }}-1.linux-amd64.tar.gz -Lo go${{ matrix.go }}.linux-amd64.tar.gz
+          tar -C $HOME -xf go${{ matrix.go }}.linux-amd64.tar.gz
           chmod +x $HOME/go/bin
           export PATH=$HOME/go/bin:$PATH
+          if [ $(which go) != "$HOME/go/bin/go" ]; then
+            echo "Unable to verify microsoft/go toolchain"
+            exit 1
+          fi
 
       - name: Install cross-compiler for FIPS on arm
         if: ${{ matrix.fips == '.fips1402' && matrix.goarch == 'arm64' }}
@@ -257,11 +261,11 @@ jobs:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
-          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_linux_${{ matrix.goarch }}.zip
-          path: control-plane/dist/cni/linux/${{ matrix.goarch }}
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos}}_${{ matrix.goarch }}.zip
+          path: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
       - name: extract consul-cni zip
         env:
-          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.goarch }}
+          ZIP_LOCATION: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
@@ -293,8 +297,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: ["amd64"]
-        fips: [ ".fips1402", "" ]
+        include:
+          - { arch: "amd64" }
+          - { arch: "amd64", fips: ".fips1402" }
     env:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
