@@ -288,7 +288,7 @@ type certificateInfo struct {
 func generateCertificate(t *testing.T, ca *certificateInfo, commonName string) *certificateInfo {
 	t.Helper()
 
-	bits := 1024
+	bits := 2048
 	privateKey, err := rsa.GenerateKey(rand.Reader, bits)
 	require.NoError(t, err)
 
