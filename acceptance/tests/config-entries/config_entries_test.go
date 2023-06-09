@@ -79,15 +79,12 @@ func TestController(t *testing.T) {
 
 			// Test creation.
 			{
-				runner := func() (string, error) {
-					return k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/crds-oss")
-				}
 				logger.Log(t, "creating custom resources")
 				retry.Run(t, func(r *retry.R) {
 					// Retry the kubectl apply because we've seen sporadic
 					// "connection refused" errors where the mutating webhook
 					// endpoint fails initially.
-					out, err := runner()
+					out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/crds-oss")
 					require.NoError(r, err, out)
 				})
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
