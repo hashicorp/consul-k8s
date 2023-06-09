@@ -515,7 +515,9 @@ func (c *Command) Run(args []string) int {
 		NamespacesEnabled:       c.flagEnableNamespaces,
 		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 		Partition:               c.consul.Partition,
+		Datacenter:              c.consul.Datacenter,
 	})
+
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return 1
