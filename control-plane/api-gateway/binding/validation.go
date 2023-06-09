@@ -206,7 +206,10 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 
 func validateCertificateData(secret corev1.Secret) error {
 	_, _, err := common.ParseCertificateData(secret)
-	return err
+	if err != nil {
+		return errListenerInvalidCertificateRef_InvalidData
+	}
+	return nil
 }
 
 // validateListeners validates the given listeners both internally and with respect to each
