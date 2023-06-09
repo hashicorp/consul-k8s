@@ -53,7 +53,7 @@ spec:
       containers:
         - name: server-acl-init-cleanup
           image: {{ .Values.global.imageK8S }}
-          imagePullPolicy:  {{- default Always .Values.global.imageK8SpullPolicy }}
+          imagePullPolicy:  {{ default "Always" .Values.global.imageK8SpullPolicy }}
           command:
             - consul-k8s-control-plane
           args:

@@ -225,7 +225,7 @@ spec:
       initContainers:
       - name: locality-init
         image: {{ .Values.global.imageK8S }}
-        imagePullPolicy:  {{- default Always .Values.global.imageK8SpullPolicy }}
+        imagePullPolicy:  {{ default "Always" .Values.global.imageK8SpullPolicy }}
         env:
         - name: NODE_NAME
           valueFrom:
