@@ -225,6 +225,7 @@ var (
 	errListenerInvalidCertificateRef_NotFound     = errors.New("certificate not found")
 	errListenerInvalidCertificateRef_NotSupported = errors.New("certificate type is not supported")
 	errListenerInvalidCertificateRef_InvalidData  = errors.New("certificate is invalid or does not contain a supported server name")
+	errListenerInvalidRouteKinds                  = errors.New("allowed route kind is invalid")
 
 	// Below is where any custom generic listener validation errors should go.
 	// We map anything under here to a custom ListenerConditionReason of Invalid on
@@ -243,6 +244,8 @@ type listenerValidationResult struct {
 	conflictedErr error
 	// status type: ResolvedRefs
 	refErr error
+	// status type: ResolvedRefs (but with internal validation)
+	routeKindErr error
 	// TODO: programmed
 }
 
@@ -328,6 +331,17 @@ func (l listenerValidationResult) conflictedCondition(generation int64) metav1.C
 // acceptedCondition constructs the condition for the ResolvedRefs status type.
 func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1.Condition {
 	now := timeFunc()
+
+	if l.routeKindErr != nil {
+		return metav1.Condition{
+			Type:               "ResolvedRefs",
+			Status:             metav1.ConditionFalse,
+			Reason:             "InvalidRouteKinds",
+			ObservedGeneration: generation,
+			Message:            l.routeKindErr.Error(),
+			LastTransitionTime: now,
+		}
+	}
 
 	switch l.refErr {
 	case errListenerInvalidCertificateRef_NotFound, errListenerInvalidCertificateRef_NotSupported, errListenerInvalidCertificateRef_InvalidData:
