@@ -209,6 +209,24 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.RemoveSubscription(nonNormalizedConsulKey)
+		// make sure we have deregister all services even if they haven't
+		// hit cache yet
+		services, err := r.gatewayCache.FetchServicesFor(ctx, consulKey)
+		if err != nil {
+			log.Error(err, "unable to fetch latest services for gateways")
+			return ctrl.Result{}, err
+		}
+		for _, service := range services {
+			log.Info("deregistering service in Consul", "id", service.ServiceID)
+			if err := r.cache.Deregister(ctx, api.CatalogDeregistration{
+				Node:      service.Node,
+				ServiceID: service.ServiceID,
+				Namespace: service.Namespace,
+			}); err != nil {
+				log.Error(err, "error deregistering service")
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
@@ -235,19 +253,22 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	for _, registration := range updates.Consul.Registrations {
-		log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
-		if err := r.cache.Register(ctx, registration); err != nil {
-			log.Error(err, "error registering service")
-			return ctrl.Result{}, err
+	if updates.UpsertGatewayDeployment {
+		// if we don't hit this conditional, we forcibly deregister everything
+		for _, registration := range updates.Consul.Registrations {
+			log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
+			if err := r.cache.Register(ctx, registration); err != nil {
+				log.Error(err, "error registering service")
+				return ctrl.Result{}, err
+			}
 		}
-	}
 
-	for _, deregistration := range updates.Consul.Deregistrations {
-		log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
-		if err := r.cache.Deregister(ctx, deregistration); err != nil {
-			log.Error(err, "error deregistering service")
-			return ctrl.Result{}, err
+		for _, deregistration := range updates.Consul.Deregistrations {
+			log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
+			if err := r.cache.Deregister(ctx, deregistration); err != nil {
+				log.Error(err, "error deregistering service")
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
