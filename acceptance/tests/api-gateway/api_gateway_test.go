@@ -5,7 +5,9 @@ package apigateway
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	"strconv"
 	"testing"
 	"time"
@@ -79,11 +81,38 @@ func TestAPIGateway_Basic(t *testing.T) {
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
 			})
 
-			logger.Log(t, "creating target server")
+			// Create certificate secret, we do this separately since
+			// applying the secret will make an invalid certificate that breaks other tests
+			logger.Log(t, "creating certificate secret")
+			out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+			require.NoError(t, err, out)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				// Ignore errors here because if the test ran as expected
+				// the custom resources will have been deleted.
+				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+			})
+
+			// patch certificate with data
+			logger.Log(t, "patching certificate secret with generated data")
+			certificate := generateCertificate(t, nil, "gateway.test.local")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "certificate", "-p", fmt.Sprintf(`{"data":{"tls.crt":"%s","tls.key":"%s"}}`, base64.StdEncoding.EncodeToString(certificate.CertPEM), base64.StdEncoding.EncodeToString(certificate.PrivateKeyPEM)), "--type=merge")
+
+			logger.Log(t, "creating target http server")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
-			logger.Log(t, "patching route to target server")
+			logger.Log(t, "patching route to target http server")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+
+			logger.Log(t, "creating target tcp server")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
+
+			logger.Log(t, "creating tcp-route")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				// Ignore errors here because if the test ran as expected
+				// the custom resources will have been deleted.
+				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
+			})
 
 			// We use the static-client pod so that we can make calls to the api gateway
 			// via kubectl exec without needing a route into the cluster from the test machine.
@@ -112,18 +141,19 @@ func TestAPIGateway_Basic(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
 				require.Len(r, gateway.Status.Listeners, 3)
+
 				require.EqualValues(r, 1, gateway.Status.Listeners[0].AttachedRoutes)
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
 				checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-				require.EqualValues(r, 0, gateway.Status.Listeners[1].AttachedRoutes)
+				require.EqualValues(r, 1, gateway.Status.Listeners[1].AttachedRoutes)
 				checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, falseCondition("Conflicted", "NoConflicts"))
 				checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 				require.EqualValues(r, 1, gateway.Status.Listeners[2].AttachedRoutes)
 				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, trueCondition("Accepted", "Accepted"))
 				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, falseCondition("Conflicted", "NoConflicts"))
-				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, falseCondition("ResolvedRefs", "InvalidCertificateRef"))
+				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 
 				// check that we have an address to use
 				require.Len(r, gateway.Status.Addresses, 1)
@@ -160,6 +190,23 @@ func TestAPIGateway_Basic(t *testing.T) {
 			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 
+			// tcp route checks
+			var tcpRoute gwv1alpha2.TCPRoute
+			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: "default"}, &tcpRoute)
+			require.NoError(t, err)
+
+			// check our finalizers
+			require.Len(t, tcpRoute.Finalizers, 1)
+			require.EqualValues(t, gatewayFinalizer, tcpRoute.Finalizers[0])
+
+			// check parent status
+			require.Len(t, tcpRoute.Status.Parents, 1)
+			require.EqualValues(t, gatewayClassControllerName, tcpRoute.Status.Parents[0].ControllerName)
+			require.EqualValues(t, "gateway", tcpRoute.Status.Parents[0].ParentRef.Name)
+			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
+
 			// check that the Consul entries were created
 			entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
 			require.NoError(t, err)
@@ -167,21 +214,32 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "http-route", nil)
 			require.NoError(t, err)
-			route := entry.(*api.HTTPRouteConfigEntry)
+			httpRoute := entry.(*api.HTTPRouteConfigEntry)
+
+			entry, _, err = consulClient.ConfigEntries().Get(api.TCPRoute, "tcp-route", nil)
+			require.NoError(t, err)
+			route := entry.(*api.TCPRouteConfigEntry)
 
 			// now check the gateway status conditions
 			checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
 
 			// and the route status conditions
+			checkConsulStatusCondition(t, httpRoute.Status.Conditions, trueConsulCondition("Bound", "Bound"))
 			checkConsulStatusCondition(t, route.Status.Conditions, trueConsulCondition("Bound", "Bound"))
 
 			// finally we check that we can actually route to the service via the gateway
 			k8sOptions := ctx.KubectlOptions(t)
-			targetAddress := fmt.Sprintf("http://%s/", gatewayAddress)
+			targetHTTPAddress := fmt.Sprintf("http://%s", gatewayAddress)
+			targetHTTPSAddress := fmt.Sprintf("https://%s", gatewayAddress)
+			targetTCPAddress := fmt.Sprintf("http://%s:81", gatewayAddress)
 
 			if c.secure {
 				// check that intentions keep our connection from happening
-				k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetAddress)
+				k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddress)
+
+				k8s.CheckStaticServerConnectionFailing(t, k8sOptions, StaticClientName, targetTCPAddress)
+
+				k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-k", targetHTTPSAddress)
 
 				// Now we create the allow intention.
 				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -195,12 +253,31 @@ func TestAPIGateway_Basic(t *testing.T) {
 					},
 				}, nil)
 				require.NoError(t, err)
+
+				// Now we create the allow intention tcp.
+				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+					Kind: api.ServiceIntentions,
+					Name: "static-server-tcp",
+					Sources: []*api.SourceIntention{
+						{
+							Name:   "gateway",
+							Action: api.IntentionActionAllow,
+						},
+					},
+				}, nil)
+				require.NoError(t, err)
 			}
 
 			// Test that we can make a call to the api gateway
 			// via the static-client pod. It should route to the static-server pod.
-			logger.Log(t, "trying calls to api gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetAddress)
+			logger.Log(t, "trying calls to api gateway http")
+			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPAddress)
+
+			logger.Log(t, "trying calls to api gateway tcp")
+			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetTCPAddress)
+
+			logger.Log(t, "trying calls to api gateway https")
+			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPSAddress, "-k")
 		})
 	}
 }
