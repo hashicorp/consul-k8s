@@ -52,6 +52,24 @@ func (r *GatewayCache) ServicesFor(ref api.ResourceReference) []api.CatalogServi
 	return r.data[common.NormalizeMeta(ref)]
 }
 
+func (r *GatewayCache) FetchServicesFor(ctx context.Context, ref api.ResourceReference) ([]api.CatalogService, error) {
+	client, err := consul.NewClientFromConnMgr(r.config, r.serverMgr)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := &api.QueryOptions{}
+	if ref.Namespace != "" {
+		opts.Namespace = ref.Namespace
+	}
+
+	services, _, err := client.Catalog().Service(ref.Name, "", opts.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return common.DerefAll(services), nil
+}
+
 func (r *GatewayCache) EnsureSubscribed(ref api.ResourceReference, resource types.NamespacedName) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()

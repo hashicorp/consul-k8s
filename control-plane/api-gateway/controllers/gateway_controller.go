@@ -209,6 +209,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.RemoveSubscription(nonNormalizedConsulKey)
+		// make sure we have deregister all services even if they haven't
+		// hit cache yet
+		if err := r.deregisterAllServices(ctx, consulKey); err != nil {
+			log.Error(err, "error deregistering services")
+			return ctrl.Result{}, err
+		}
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
@@ -235,19 +241,24 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	for _, registration := range updates.Consul.Registrations {
-		log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
-		if err := r.cache.Register(ctx, registration); err != nil {
-			log.Error(err, "error registering service")
-			return ctrl.Result{}, err
+	if updates.UpsertGatewayDeployment {
+		// We only do some registration/deregistraion if we still have a valid gateway
+		// otherwise, we've already deregistered everything related to the gateway, so
+		// no need to do any of the following.
+		for _, registration := range updates.Consul.Registrations {
+			log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
+			if err := r.cache.Register(ctx, registration); err != nil {
+				log.Error(err, "error registering service")
+				return ctrl.Result{}, err
+			}
 		}
-	}
 
-	for _, deregistration := range updates.Consul.Deregistrations {
-		log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
-		if err := r.cache.Deregister(ctx, deregistration); err != nil {
-			log.Error(err, "error deregistering service")
-			return ctrl.Result{}, err
+		for _, deregistration := range updates.Consul.Deregistrations {
+			log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
+			if err := r.cache.Deregister(ctx, deregistration); err != nil {
+				log.Error(err, "error deregistering service")
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
@@ -268,6 +279,23 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *GatewayController) deregisterAllServices(ctx context.Context, consulKey api.ResourceReference) error {
+	services, err := r.gatewayCache.FetchServicesFor(ctx, consulKey)
+	if err != nil {
+		return err
+	}
+	for _, service := range services {
+		if err := r.cache.Deregister(ctx, api.CatalogDeregistration{
+			Node:      service.Node,
+			ServiceID: service.ServiceID,
+			Namespace: service.Namespace,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *GatewayController) updateAndResetStatus(ctx context.Context, o client.Object) error {
