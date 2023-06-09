@@ -188,7 +188,7 @@ function build_consul_local {
    #   build with go install.
    #   The GOXPARALLEL environment variable is used if set
 
-   if [ $GOTAGS == "fips" ]; then
+   if [ "${GOTAGS:-}" == "fips" ]; then
      CGO_ENABLED=1
    else
      CGO_ENABLED=0
