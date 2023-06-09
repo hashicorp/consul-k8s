@@ -191,7 +191,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if updates.UpsertGatewayDeployment {
 		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
-			log.Error(err, "error linking token policy")
+			log.Error(err, "error creating role binding")
 			return ctrl.Result{}, err
 		}
 
