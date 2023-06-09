@@ -54,7 +54,6 @@ type GatewayControllerConfig struct {
 // GatewayController reconciles a Gateway object.
 // The Gateway is responsible for defining the behavior of API gateways.
 type GatewayController struct {
-	Name       string
 	HelmConfig common.HelmConfig
 	Log        logr.Logger
 	Translator common.ResourceTranslator
@@ -788,7 +787,7 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
 		if string(ref.Group) != v1alpha1.GroupVersion.Group ||
 			ref.Kind != v1alpha1.GatewayClassConfigKind ||
-			string(gatewayClassConfig.Spec.ControllerName) != c.Name {
+			gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
 			// we don't have supported params, so return nil
 			return nil, nil
 		}
@@ -815,7 +814,7 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 
 	list := gwv1beta1.GatewayClassList{}
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, c.Name),
+		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, common.GatewayClassControllerName),
 	}); err != nil {
 		return err
 	}
