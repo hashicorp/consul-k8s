@@ -68,7 +68,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			namespace:   "",
 			certFn:      createCert,
 			gwFn:        createFunkyCasingFieldsAPIGW,
-			httpRouteFn: createAllFieldsSetHTTPRoute,
+			httpRouteFn: createFunkyCasingFieldsHTTPRoute,
 			tcpRouteFn:  createFunkyCasingFieldsTCPRoute,
 		},
 	}
@@ -78,6 +78,10 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			k8sClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s)).Build()
 			consulTestServerClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			ctx, cancel := context.WithCancel(context.Background())
+
+			t.Cleanup(func() {
+				cancel()
+			})
 			logger := logrtest.New(t)
 
 			cacheCfg := cache.Config{
@@ -272,7 +276,6 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 					curCertResourceVersion == newCertResourceVersion
 			}, time.Duration(2*time.Second), time.Duration(500*time.Millisecond), fmt.Sprintf("curGWModifyIndex: %d, newIndx: %d", curGWModifyIndex, resourceCache.Get(gwRef).GetModifyIndex()),
 			)
-			cancel()
 		})
 	}
 }
@@ -1208,7 +1211,7 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 									Value: "q",
 								},
 							},
-							Method: common.PointerTo(gwv1beta1.HTTPMethod("GET")),
+							Method: common.PointerTo(gwv1beta1.HTTPMethod("geT")),
 						},
 					},
 					Filters: []gwv1beta1.HTTPRouteFilter{
