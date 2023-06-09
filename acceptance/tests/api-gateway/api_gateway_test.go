@@ -27,7 +27,7 @@ import (
 
 const (
 	StaticClientName           = "static-client"
-	gatewayClassControllerName = "hashicorp.com/consul-api-gateway-controller"
+	gatewayClassControllerName = "consul.hashicorp.com/gateway-controller"
 	gatewayClassFinalizer      = "gateway-exists-finalizer.consul.hashicorp.com"
 	gatewayFinalizer           = "gateway-finalizer.consul.hashicorp.com"
 )
