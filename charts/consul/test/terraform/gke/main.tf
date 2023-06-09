@@ -1,9 +1,16 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+terraform {
+  required_providers {
+    google = {
+      version = "~> 4.58.0"
+    }
+  }
+}
+
 provider "google" {
   project = var.project
-  version = "~> 4.58.0"
   zone    = var.zone
 }
 

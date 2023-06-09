@@ -64,7 +64,7 @@ jobs:
 
   build:
     needs: [get-go-version, get-product-version]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04 # the GLIBC is too high on 22.04
     strategy:
       matrix:
         include:
@@ -79,20 +79,28 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-        # control-plane
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: ".fips1402" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: ".fips1402" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: ".fips1402" }
+
+          # control-plane
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-            # solaris is only built for the control plane
+          # solaris is only built for the control plane
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-        # consul-cni
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: ".fips1402" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: ".fips1402" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: ".fips1402"  }
+
+          # consul-cni
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
@@ -104,10 +112,14 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: ".fips1402" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: ".fips1402" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: ".fips1402" }
+
 
       fail-fast: true
 
-    name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build    
+    name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} ${{ matrix.fips }} build
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
 
@@ -115,6 +127,25 @@ jobs:
         uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
         with:
           go-version: ${{ matrix.go }}
+
+      - name: Replace Go for Windows FIPS with Microsoft Go
+        if: ${{ matrix.fips == '.fips1402' && matrix.goos == 'windows' }}
+        run: |
+          # Uninstall standard Go and use microsoft/go instead
+          rm -rf /home/runner/actions-runner/_work/_tool/go
+          curl https://aka.ms/golang/release/latest/go${{ matrix.go }}-1.linux-amd64.tar.gz -Lo go${{ matrix.go }}.linux-amd64.tar.gz
+          tar -C $HOME -xf go${{ matrix.go }}.linux-amd64.tar.gz
+          chmod +x $HOME/go/bin
+          export PATH=$HOME/go/bin:$PATH
+          if [ $(which go) != "$HOME/go/bin/go" ]; then
+            echo "Unable to verify microsoft/go toolchain"
+            exit 1
+          fi
+
+      - name: Install cross-compiler for FIPS on arm
+        if: ${{ matrix.fips == '.fips1402' && matrix.goarch == 'arm64' }}
+        run: |
+          sudo apt-get update --allow-releaseinfo-change-suite --allow-releaseinfo-change-version && sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build
         env:
@@ -130,14 +161,14 @@ jobs:
           export GIT_IMPORT=github.com/hashicorp/consul-k8s/${{ matrix.component }}/version
           export GOLDFLAGS="-X ${GIT_IMPORT}.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X ${GIT_IMPORT}.GitDescribe=${{ needs.get-product-version.outputs.product-version }}"
 
-          CGO_ENABLED=0 go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" .
-          zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
+          ${{ matrix.env }} go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" -tags=${{ matrix.gotags }} .
+          zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
 
       - name: Upload built binaries 
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
-          name: ${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
-          path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          name: ${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
             
       - name: Package rpm and deb files 
         if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
@@ -146,7 +177,7 @@ jobs:
           name: consul-k8s 
           description: "consul-k8s provides a cli interface to first-class integrations between Consul and Kubernetes."
           arch: ${{ matrix.goarch }}
-          version: ${{ needs.get-product-version.outputs.product-version }}
+          version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
           maintainer: "HashiCorp"
           homepage: "https://github.com/hashicorp/consul-k8s"
           license: "MPL-2.0"
@@ -171,7 +202,7 @@ jobs:
             cd /work
             rpm -ivh out/${{ env.RPM_PACKAGE }}
             CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
-            VERSION="v${{ needs.get-product-version.outputs.product-version }}"
+            VERSION="v${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}"
             if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
               echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
               exit 1
@@ -196,7 +227,7 @@ jobs:
             cd /work
             apt install ./out/${{ env.DEB_PACKAGE }}
             CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
-            VERSION="v${{ needs.get-product-version.outputs.product-version }}"
+            VERSION="v${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}"
             if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
               echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
               exit 1
@@ -211,24 +242,30 @@ jobs:
           path: out/${{ env.DEB_PACKAGE }}
 
   build-docker:
-    name: Docker ${{ matrix.arch }} default release build
+    name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build
     needs: [get-product-version, build]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: ["arm", "arm64", "386", "amd64"]
+        include:
+          - { goos: "linux", goarch: "arm" }
+          - { goos: "linux", goarch: "arm64" }
+          - { goos: "linux", goarch: "386" }
+          - { goos: "linux", goarch: "amd64" }
+          - { goos: "linux", goarch: "amd64", fips: ".fips1402" }
+          - { goos: "linux", goarch: "arm64", fips: ".fips1402" }
     env:
       repo: ${{ github.event.repository.name }}
-      version: ${{ needs.get-product-version.outputs.product-version }}
+      version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
-          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
-          path: control-plane/dist/cni/linux/${{ matrix.arch }}
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos}}_${{ matrix.goarch }}.zip
+          path: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
       - name: extract consul-cni zip
         env:
-          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
+          ZIP_LOCATION: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
@@ -244,7 +281,7 @@ jobs:
             echo "Test PASSED"
           version: ${{ env.version }}
           target: release-default
-          arch: ${{ matrix.arch }}
+          arch: ${{ matrix.goarch }}
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane 
           workdir: control-plane
@@ -255,20 +292,22 @@ jobs:
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
 
   build-docker-ubi-redhat-registry:
-    name: Docker ${{ matrix.arch }} UBI build for RedHat Registry
+    name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI build for RedHat Registry
     needs: [get-product-version, build]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: ["amd64"]
+        include:
+          - { arch: "amd64" }
+          - { arch: "amd64", fips: ".fips1402" }
     env:
       repo: ${{ github.event.repository.name }}
-      version: ${{ needs.get-product-version.outputs.product-version }}
+      version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
-          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_linux_${{ matrix.arch }}.zip
           path: control-plane/dist/cni/linux/${{ matrix.arch }}
       - name: extract consul-cni zip
         env:
@@ -297,20 +336,21 @@ jobs:
           redhat_tag: quay.io/redhat-isv-containers/611ca2f89a9b407267837100:${{env.version}}-ubi
 
   build-docker-ubi-dockerhub:
-    name: Docker ${{ matrix.arch }} UBI build for DockerHub
+    name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI build for DockerHub
     needs: [ get-product-version, build ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [ "amd64" ]
+        fips: [ ".fips1402", "" ]
     env:
       repo: ${{ github.event.repository.name }}
-      version: ${{ needs.get-product-version.outputs.product-version }}
+      version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
-          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_linux_${{ matrix.arch }}.zip
           path: control-plane/dist/cni/linux/${{ matrix.arch }}
       - name: extract consul-cni zip
         env:
