@@ -6,7 +6,7 @@ kind: Gateway
 metadata:
   name: gateway
 spec:
-  gatewayClassName: consul-api-gateway
+  gatewayClassName: consul
   listeners:
   - protocol: HTTPS
     port: 8080
