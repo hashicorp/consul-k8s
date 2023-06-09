@@ -22,8 +22,6 @@ import (
 )
 
 const (
-	GatewayClassControllerName = "hashicorp.com/consul-api-gateway-controller"
-
 	gatewayClassFinalizer = "gateway-exists-finalizer.consul.hashicorp.com"
 
 	// GatewayClass status fields.
