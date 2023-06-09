@@ -234,6 +234,11 @@ func TestBinder_Lifecycle(t *testing.T) {
 									Reason:  "Accepted",
 									Message: "listener accepted",
 								}, {
+									Type:    "Programmed",
+									Status:  metav1.ConditionTrue,
+									Reason:  "Programmed",
+									Message: "listener programmed",
+								}, {
 									Type:    "Conflicted",
 									Status:  metav1.ConditionFalse,
 									Reason:  "NoConflicts",
