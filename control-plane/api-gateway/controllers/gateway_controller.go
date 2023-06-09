@@ -54,9 +54,10 @@ type GatewayControllerConfig struct {
 // GatewayController reconciles a Gateway object.
 // The Gateway is responsible for defining the behavior of API gateways.
 type GatewayController struct {
-	HelmConfig            common.HelmConfig
-	Log                   logr.Logger
-	Translator            common.ResourceTranslator
+	HelmConfig common.HelmConfig
+	Log        logr.Logger
+	Translator common.ResourceTranslator
+
 	cache                 *cache.Cache
 	gatewayCache          *cache.GatewayCache
 	allowK8sNamespacesSet mapset.Set
@@ -174,7 +175,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	binder := binding.NewBinder(binding.BinderConfig{
 		Logger:                log,
 		Translator:            r.Translator,
-		ControllerName:        GatewayClassControllerName,
+		ControllerName:        common.GatewayClassControllerName,
 		Namespaces:            namespaces,
 		GatewayClassConfig:    gatewayClassConfig,
 		GatewayClass:          gatewayClass,
@@ -786,7 +787,7 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
 		if string(ref.Group) != v1alpha1.GroupVersion.Group ||
 			ref.Kind != v1alpha1.GatewayClassConfigKind ||
-			gatewayClassConfig.Spec.ControllerName != GatewayClassControllerName {
+			gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
 			// we don't have supported params, so return nil
 			return nil, nil
 		}
@@ -813,7 +814,7 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 
 	list := gwv1beta1.GatewayClassList{}
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, GatewayClassControllerName),
+		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, common.GatewayClassControllerName),
 	}); err != nil {
 		return err
 	}

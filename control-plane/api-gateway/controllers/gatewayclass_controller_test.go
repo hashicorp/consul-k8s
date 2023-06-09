@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/gateway-api/apis/v1beta1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
@@ -57,7 +58,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					Finalizers: []string{gatewayClassFinalizer},
 				},
 				Spec: gwv1beta1.GatewayClassSpec{
-					ControllerName: GatewayClassControllerName,
+					ControllerName: common.GatewayClassControllerName,
 				},
 			},
 			expectedResult:     ctrl.Result{},
@@ -81,7 +82,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					Finalizers: []string{},
 				},
 				Spec: gwv1beta1.GatewayClassSpec{
-					ControllerName: GatewayClassControllerName,
+					ControllerName: common.GatewayClassControllerName,
 				},
 			},
 			expectedResult:     ctrl.Result{},
@@ -127,7 +128,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					Finalizers: []string{gatewayClassFinalizer},
 				},
 				Spec: gwv1beta1.GatewayClassSpec{
-					ControllerName: GatewayClassControllerName,
+					ControllerName: common.GatewayClassControllerName,
 					ParametersRef: &gwv1beta1.ParametersReference{
 						Kind: "some-nonsense",
 					},
@@ -153,7 +154,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					Finalizers: []string{gatewayClassFinalizer},
 				},
 				Spec: gwv1beta1.GatewayClassSpec{
-					ControllerName: GatewayClassControllerName,
+					ControllerName: common.GatewayClassControllerName,
 					ParametersRef: &gwv1beta1.ParametersReference{
 						Kind: v1alpha1.GatewayClassConfigKind,
 						Name: "does-not-exist",
@@ -189,7 +190,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					DeletionTimestamp: &deletionTimestamp,
 				},
 				Spec: gwv1beta1.GatewayClassSpec{
-					ControllerName: GatewayClassControllerName,
+					ControllerName: common.GatewayClassControllerName,
 				},
 			},
 			expectedResult:     ctrl.Result{},
@@ -208,7 +209,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					DeletionTimestamp: &deletionTimestamp,
 				},
 				Spec: gwv1beta1.GatewayClassSpec{
-					ControllerName: GatewayClassControllerName,
+					ControllerName: common.GatewayClassControllerName,
 				},
 			},
 			k8sObjects: []runtime.Object{
@@ -246,7 +247,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 
 			r := &GatewayClassController{
 				Client:         fakeClient,
-				ControllerName: GatewayClassControllerName,
+				ControllerName: common.GatewayClassControllerName,
 				Log:            logrtest.New(t),
 			}
 			result, err := r.Reconcile(context.Background(), req)
