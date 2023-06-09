@@ -211,21 +211,9 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.gatewayCache.RemoveSubscription(nonNormalizedConsulKey)
 		// make sure we have deregister all services even if they haven't
 		// hit cache yet
-		services, err := r.gatewayCache.FetchServicesFor(ctx, consulKey)
-		if err != nil {
-			log.Error(err, "unable to fetch latest services for gateways")
+		if err := r.deregisterAllServices(ctx, consulKey); err != nil {
+			log.Error(err, "error deregistering services")
 			return ctrl.Result{}, err
-		}
-		for _, service := range services {
-			log.Info("deregistering service in Consul", "id", service.ServiceID)
-			if err := r.cache.Deregister(ctx, api.CatalogDeregistration{
-				Node:      service.Node,
-				ServiceID: service.ServiceID,
-				Namespace: service.Namespace,
-			}); err != nil {
-				log.Error(err, "error deregistering service")
-				return ctrl.Result{}, err
-			}
 		}
 	}
 
@@ -254,7 +242,9 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if updates.UpsertGatewayDeployment {
-		// if we don't hit this conditional, we forcibly deregister everything
+		// We only do some registration/deregistraion if we still have a valid gateway
+		// otherwise, we've already deregistered everything related to the gateway, so
+		// no need to do any of the following.
 		for _, registration := range updates.Consul.Registrations {
 			log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
 			if err := r.cache.Register(ctx, registration); err != nil {
@@ -289,6 +279,23 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *GatewayController) deregisterAllServices(ctx context.Context, consulKey api.ResourceReference) error {
+	services, err := r.gatewayCache.FetchServicesFor(ctx, consulKey)
+	if err != nil {
+		return err
+	}
+	for _, service := range services {
+		if err := r.cache.Deregister(ctx, api.CatalogDeregistration{
+			Node:      service.Node,
+			ServiceID: service.ServiceID,
+			Namespace: service.Namespace,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *GatewayController) updateAndResetStatus(ctx context.Context, o client.Object) error {
