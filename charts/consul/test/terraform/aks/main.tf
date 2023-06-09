@@ -55,7 +55,7 @@ resource "azurerm_kubernetes_cluster" "default" {
   location                          = azurerm_resource_group.default[count.index].location
   resource_group_name               = azurerm_resource_group.default[count.index].name
   dns_prefix                        = "consul-k8s-${random_id.suffix[count.index].dec}"
-  kubernetes_version                = "1.26"
+  kubernetes_version                = "1.24.10"
   role_based_access_control_enabled = true
 
   // We're setting the network plugin and other network properties explicitly
