@@ -213,8 +213,8 @@ func (p parentBindResults) boundSections() mapset.Set {
 }
 
 var (
-	// Each of the below are specified in the Gateway spec under ListenerConditionReason
-	// the general usage is that each error is specified as errListener* where * corresponds
+	// Each of the below are specified in the Gateway spec under ListenerConditionReason.
+	// The general usage is that each error is specified as errListener* where * corresponds
 	// to the ListenerConditionReason given in the spec. If a reason is overloaded and can
 	// be used with two different types of things (i.e. something is not found or it's not supported)
 	// then we distinguish those two usages with errListener*_Usage.
@@ -226,6 +226,7 @@ var (
 	errListenerInvalidCertificateRef_NotSupported = errors.New("certificate type is not supported")
 	errListenerInvalidCertificateRef_InvalidData  = errors.New("certificate is invalid or does not contain a supported server name")
 	errListenerInvalidRouteKinds                  = errors.New("allowed route kind is invalid")
+	errListenerProgrammed_Invalid                 = errors.New("listener cannot be programmed because it is invalid")
 
 	// Below is where any custom generic listener validation errors should go.
 	// We map anything under here to a custom ListenerConditionReason of Invalid on
@@ -246,7 +247,34 @@ type listenerValidationResult struct {
 	refErr error
 	// status type: ResolvedRefs (but with internal validation)
 	routeKindErr error
-	// TODO: programmed
+}
+
+// programmedCondition constructs the condition for the Programmed status type.
+// If there are no validation errors for the listener, we mark it as programmed.
+// If there are validation errors for the listener, we mark it as invalid.
+func (l listenerValidationResult) programmedCondition(generation int64) metav1.Condition {
+	now := timeFunc()
+
+	switch {
+	case l.acceptedErr != nil, l.conflictedErr != nil, l.refErr != nil, l.routeKindErr != nil:
+		return metav1.Condition{
+			Type:               "Programmed",
+			Status:             metav1.ConditionFalse,
+			Reason:             "Invalid",
+			ObservedGeneration: generation,
+			Message:            errListenerProgrammed_Invalid.Error(),
+			LastTransitionTime: now,
+		}
+	default:
+		return metav1.Condition{
+			Type:               "Programmed",
+			Status:             metav1.ConditionTrue,
+			Reason:             "Programmed",
+			ObservedGeneration: generation,
+			Message:            "listener programmed",
+			LastTransitionTime: now,
+		}
+	}
 }
 
 // acceptedCondition constructs the condition for the Accepted status type.
@@ -378,6 +406,7 @@ func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1
 func (l listenerValidationResult) Conditions(generation int64) []metav1.Condition {
 	return []metav1.Condition{
 		l.acceptedCondition(generation),
+		l.programmedCondition(generation),
 		l.conflictedCondition(generation),
 		l.resolvedRefsCondition(generation),
 	}
