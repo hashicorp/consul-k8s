@@ -46,6 +46,7 @@ type GatewayControllerConfig struct {
 	NamespacesEnabled       bool
 	CrossNamespaceACLPolicy string
 	Partition               string
+	Datacenter              string
 	AllowK8sNamespacesSet   mapset.Set
 	DenyK8sNamespacesSet    mapset.Set
 }
@@ -317,6 +318,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		ConsulClientConfig:      config.ConsulClientConfig,
 		ConsulServerConnMgr:     config.ConsulServerConnMgr,
 		NamespacesEnabled:       config.NamespacesEnabled,
+		Datacenter:              config.Datacenter,
 		CrossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
 		Logger:                  mgr.GetLogger(),
 	}
@@ -332,13 +334,14 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
-		HelmConfig: config.HelmConfig,
+		HelmConfig: config.HelmConfig.Normalize(),
 		Translator: common.ResourceTranslator{
 			EnableConsulNamespaces: config.HelmConfig.EnableNamespaces,
 			ConsulDestNamespace:    config.HelmConfig.ConsulDestinationNamespace,
 			EnableK8sMirroring:     config.HelmConfig.EnableNamespaceMirroring,
 			MirroringPrefix:        config.HelmConfig.NamespaceMirroringPrefix,
 			ConsulPartition:        config.HelmConfig.ConsulPartition,
+			Datacenter:             config.Datacenter,
 		},
 		denyK8sNamespacesSet:  config.DenyK8sNamespacesSet,
 		allowK8sNamespacesSet: config.AllowK8sNamespacesSet,
