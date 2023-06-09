@@ -10,7 +10,7 @@ metadata:
     release: {{ .Release.Name }}
     component: api-gateway-controller
 spec:
-  controllerName: consul.hashicorp.com/gateway-controller
+  controllerName: hashicorp.com/consul-api-gateway-controller
   parametersRef:
     group: api-gateway.consul.hashicorp.com
     kind: GatewayClassConfig
