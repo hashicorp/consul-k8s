@@ -113,6 +113,9 @@ COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 USER 100
 CMD /bin/${BIN_NAME}
 
+# Duplicate target for FIPS builds
+FROM release-default AS release-default-fips
+
 # -----------------------------------
 # Dockerfile target for consul-k8s with UBI as its base image. Used for running on
 # OpenShift.
@@ -175,6 +178,8 @@ COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 USER 100
 CMD /bin/${BIN_NAME}
 
+# Duplicate target for FIPS builds
+FROM ubi AS ubi-fips
 # ===================================
 # 
 #   Set default target to 'dev'.
