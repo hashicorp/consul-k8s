@@ -271,6 +271,7 @@ jobs:
           unzip -j *.zip
       - name: Docker Build (Action)
         uses: hashicorp/actions-docker-build@v1
+        if: ${{ !matrix.fips }}
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
@@ -290,6 +291,29 @@ jobs:
           dev_tags: |
             hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
+
+      - name: Docker FIPS Build (Action)
+        uses: hashicorp/actions-docker-build@v1
+        if: ${{ matrix.fips }}
+        with:
+          smoke_test: |
+            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
+            if [ "${TEST_VERSION}" != "v${version}" ]; then
+              echo "Test FAILED"
+              exit 1
+            fi
+            echo "Test PASSED"
+          version: ${{ env.version }}
+          target: release-default-fips # duplicate target to distinguish FIPS builds in CRT machinery
+          arch: ${{ matrix.goarch }}
+          pkg_name: consul-k8s-control-plane_${{ env.version }}
+          bin_name: consul-k8s-control-plane
+          workdir: control-plane
+          tags: |
+            docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}
+          dev_tags: |
+            hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}-${{ github.sha }}
 
   build-docker-ubi-redhat-registry:
     name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI build for RedHat Registry
@@ -318,7 +342,9 @@ jobs:
       - name: Copy LICENSE
         run:
          cp LICENSE ./control-plane
-      - uses: hashicorp/actions-docker-build@v1
+      - name: Docker Build (Action)
+        if: ${{ !matrix.fips }}
+        uses: hashicorp/actions-docker-build@v1
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
@@ -334,6 +360,24 @@ jobs:
           bin_name: consul-k8s-control-plane
           workdir: control-plane
           redhat_tag: quay.io/redhat-isv-containers/611ca2f89a9b407267837100:${{env.version}}-ubi
+      - name: Docker FIPS Build (Action)
+        if: ${{ matrix.fips }}
+        uses: hashicorp/actions-docker-build@v1
+        with:
+          smoke_test: |
+            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
+            if [ "${TEST_VERSION}" != "v${version}" ]; then
+              echo "Test FAILED"
+              exit 1
+            fi
+            echo "Test PASSED"
+          version: ${{ env.version }}
+          target: ubi-fips # duplicate target to distinguish FIPS builds in CRT machinery
+          arch: ${{ matrix.arch }}
+          pkg_name: consul-k8s-control-plane_${{ env.version }}
+          bin_name: consul-k8s-control-plane
+          workdir: control-plane
+          redhat_tag: quay.io/redhat-isv-containers/6483ed53b430df51b731406c:${{env.version}}-ubi # this is different than the non-FIPS one
 
   build-docker-ubi-dockerhub:
     name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI build for DockerHub
@@ -361,7 +405,9 @@ jobs:
       - name: Copy LICENSE
         run:
           cp LICENSE ./control-plane
-      - uses: hashicorp/actions-docker-build@v1
+      - name: Docker Build (Action)
+        uses: hashicorp/actions-docker-build@v1
+        if: ${{ !matrix.fips }}
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
@@ -380,4 +426,26 @@ jobs:
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
           dev_tags: |
             hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}    
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}
+      - name: Docker FIPS Build (Action)
+        uses: hashicorp/actions-docker-build@v1
+        if: ${{ matrix.fips }}
+        with:
+          smoke_test: |
+            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
+            if [ "${TEST_VERSION}" != "v${version}" ]; then
+              echo "Test FAILED"
+              exit 1
+            fi
+            echo "Test PASSED"
+          version: ${{ env.version }}
+          target: ubi-fips # duplicate target to distinguish FIPS builds in CRT machinery
+          arch: ${{ matrix.arch }}
+          pkg_name: consul-k8s-control-plane_${{ env.version }}
+          bin_name: consul-k8s-control-plane
+          workdir: control-plane
+          tags: |
+            docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
+          dev_tags: |
+            hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi-${{ github.sha }}
