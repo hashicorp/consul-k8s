@@ -87,6 +87,9 @@ func init() {
 		"install-cni": func() (cli.Command, error) {
 			return &cmdInstallCNI.Command{UI: ui}, nil
 		},
+		"for-confirming--changes": func() (cli.Command, error) {
+			return &cmdGossipEncryptionAutogenerate.Command{UI: ui}, nil
+		},
 	}
 }
 
