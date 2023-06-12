@@ -1938,6 +1938,17 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod1.Annotations[constants.AnnotationUpstreams] = "upstream1:1234"
 				pod1.Annotations[constants.AnnotationEnableMetrics] = "true"
 				pod1.Annotations[constants.AnnotationPrometheusScrapePort] = "12345"
+				pod1.Spec.NodeName = "my-node"
+				node := &corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-node",
+						Namespace: "default",
+						Labels: map[string]string{
+							corev1.LabelTopologyRegion: "us-west-1",
+							corev1.LabelTopologyZone:   "us-west-1a",
+						},
+					},
+				}
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -1958,7 +1969,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 					},
 				}
-				return []runtime.Object{pod1, endpoint}
+				return []runtime.Object{pod1, node, endpoint}
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
@@ -1978,6 +1989,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					},
 					ServiceTags:  []string{"abc,123", "pod1"},
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
+					ServiceLocality: &api.Locality{
+						Region: "us-west-1",
+						Zone:   "us-west-1a",
+					},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -2190,6 +2205,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServicePort, instance.ServicePort)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTags, instance.ServiceTags)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceLocality, instance.ServiceLocality)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTaggedAddresses, instance.ServiceTaggedAddresses)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceProxy, instance.ServiceProxy)
 				if tt.nodeMeta != nil {
@@ -2234,6 +2250,36 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseLocality(t *testing.T) {
+	t.Run("no labels", func(t *testing.T) {
+		n := corev1.Node{}
+		require.Nil(t, parseLocality(n))
+	})
+
+	t.Run("zone only", func(t *testing.T) {
+		n := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					corev1.LabelTopologyZone: "us-west-1a",
+				},
+			},
+		}
+		require.Nil(t, parseLocality(n))
+	})
+
+	t.Run("everything", func(t *testing.T) {
+		n := corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					corev1.LabelTopologyRegion: "us-west-1",
+					corev1.LabelTopologyZone:   "us-west-1a",
+				},
+			},
+		}
+		require.Equal(t, &api.Locality{Region: "us-west-1", Zone: "us-west-1a"}, parseLocality(n))
+	})
 }
 
 // Tests updating an Endpoints object.
