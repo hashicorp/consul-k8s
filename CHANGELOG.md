@@ -1,3 +1,50 @@
+## 1.2.0 (June 12, 2023)
+
+SECURITY:
+
+* Bump Dockerfile base image to `alpine:3.18`. Resolves [CVE-2023-2650](https://github.com/advisories/GHSA-gqxg-9vfr-p9cg) vulnerability in openssl@3.0.8-r4 [[GH-2284](https://github.com/hashicorp/consul-k8s/issues/2284)]
+* Fix Prometheus CVEs by bumping controller-runtime. [[GH-2183](https://github.com/hashicorp/consul-k8s/issues/2183)]
+* Upgrade to use Go 1.20.4.
+This resolves vulnerabilities [CVE-2023-24537](https://github.com/advisories/GHSA-9f7g-gqwh-jpf5)(`go/scanner`),
+[CVE-2023-24538](https://github.com/advisories/GHSA-v4m2-x4rp-hv22)(`html/template`),
+[CVE-2023-24534](https://github.com/advisories/GHSA-8v5j-pwr7-w5f8)(`net/textproto`) and
+[CVE-2023-24536](https://github.com/advisories/GHSA-9f7g-gqwh-jpf5)(`mime/multipart`).
+Also, `golang.org/x/net` has been updated to v0.7.0 to resolve CVEs [CVE-2022-41721
+](https://github.com/advisories/GHSA-fxg5-wq6x-vr4w
+), [CVE-2022-27664](https://github.com/advisories/GHSA-69cg-p879-7622) and [CVE-2022-41723
+](https://github.com/advisories/GHSA-vvpx-j8f3-3w6h
+.) [[GH-2102](https://github.com/hashicorp/consul-k8s/issues/2102)]
+
+FEATURES:
+
+* Add support for configuring Consul server-side rate limiting [[GH-2166](https://github.com/hashicorp/consul-k8s/issues/2166)]
+* api-gateway: Add API Gateway for Consul on Kubernetes leveraging Consul native API Gateway configuration. [[GH-2152](https://github.com/hashicorp/consul-k8s/issues/2152)]
+* crd: Add `mutualTLSMode` to the ProxyDefaults and ServiceDefaults CRDs and `allowEnablingPermissiveMutualTLS` to the Mesh CRD to support configuring permissive mutual TLS. [[GH-2100](https://github.com/hashicorp/consul-k8s/issues/2100)]
+* helm: Add `JWTProvider` CRD for configuring the `jwt-provider` config entry. [[GH-2209](https://github.com/hashicorp/consul-k8s/issues/2209)]
+* helm: Update the ServiceIntentions CRD to support `JWT` fields. [[GH-2213](https://github.com/hashicorp/consul-k8s/issues/2213)]
+
+IMPROVEMENTS:
+
+* cli: update minimum go version for project to 1.20. [[GH-2102](https://github.com/hashicorp/consul-k8s/issues/2102)]
+* control-plane: add FIPS support [[GH-2165](https://github.com/hashicorp/consul-k8s/issues/2165)]
+* control-plane: server ACL Init always appends both, the secrets from the serviceAccount's secretRefs and the one created by the Helm chart, to support Openshift secret handling. [[GH-1770](https://github.com/hashicorp/consul-k8s/issues/1770)]
+* control-plane: set agent localities on Consul servers to the server node's `topology.kubernetes.io/region` label. [[GH-2093](https://github.com/hashicorp/consul-k8s/issues/2093)]
+* control-plane: update alpine to 3.17 in the Docker image. [[GH-1934](https://github.com/hashicorp/consul-k8s/issues/1934)]
+* control-plane: update minimum go version for project to 1.20. [[GH-2102](https://github.com/hashicorp/consul-k8s/issues/2102)]
+* helm: Kubernetes v1.27 is now supported. Minimum tested version of Kubernetes is now v1.24. [[GH-2304](https://github.com/hashicorp/consul-k8s/issues/2304)]
+* helm: Update the default amount of memory used by the connect-inject controller so that its less likely to get OOM killed. [[GH-2249](https://github.com/hashicorp/consul-k8s/issues/2249)]
+* helm: add failover policy field to service resolver and proxy default CRDs [[GH-2030](https://github.com/hashicorp/consul-k8s/issues/2030)]
+* helm: add samenessGroup CRD [[GH-2048](https://github.com/hashicorp/consul-k8s/issues/2048)]
+* helm: add samenessGroup field to exported services CRD [[GH-2075](https://github.com/hashicorp/consul-k8s/issues/2075)]
+* helm: add samenessGroup field to service resolver CRD [[GH-2086](https://github.com/hashicorp/consul-k8s/issues/2086)]
+* helm: add samenessGroup field to source intention CRD [[GH-2097](https://github.com/hashicorp/consul-k8s/issues/2097)]
+* helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.1.0`. [[GH-1953](https://github.com/hashicorp/consul-k8s/issues/1953)]
+
+BUG FIXES:
+
+* control-plane: Fix casing of the Enforce Consecutive 5xx field on Service Defaults and acceptance test fixtures. [[GH-2266](https://github.com/hashicorp/consul-k8s/issues/2266)]
+* control-plane: fix issue where consul-connect-injector acl token was unintentionally being deleted and not recreated when a container was restarted due to a livenessProbe failure. [[GH-1914](https://github.com/hashicorp/consul-k8s/issues/1914)]
+
 ## 1.1.2 (June 5, 2023)
 
 SECURITY:
