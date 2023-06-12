@@ -4,7 +4,4 @@ FROM hashicorppreview/consul-k8s-control-plane:1.0.0-alpha1-windows as windows
 
 COPY "consul-k8s-control-plane.exe" "C:\consul-k8s-control-plane.exe"
 
-# Set Path
-RUN SETX /M path "%PATH%;C:\consul-k8s-control-plane.exe;C:\Program Files\Go\bin;"
-
 ENTRYPOINT ["consul-k8s-control-plane.exe"]
