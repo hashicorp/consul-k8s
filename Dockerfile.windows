@@ -2,6 +2,8 @@
 # We will need to use it later when we have build support for windows images.
 FROM hashicorppreview/consul-k8s-control-plane:1.0.0-alpha1-windows as windows
 
+COMMAND sh
+
 ARG PRODUCT_NAME
 ARG PRODUCT_VERSION
 ARG PRODUCT_REVISION
@@ -42,4 +44,4 @@ COPY "consul-k8s-control-plane.exe" "C:\consul-k8s-control-plane.exe"
 RUN SETX /M path "%PATH%;C:\consul-k8s-control-plane.exe;C:\Program Files\Go\bin;"
 
 # SHELL [ "bash.exe" ]
-CMD ["consul-k8s-control-plane.exe"]
+ENTRYPOINT ["consul-k8s-control-plane.exe"]
