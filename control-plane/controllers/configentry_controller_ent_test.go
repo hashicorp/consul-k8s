@@ -87,6 +87,119 @@ func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 				require.Equal(t, "", resource.Members[0].Partition)
 			},
 		},
+		{
+			kubeKind:   "ControlPlaneRequestLimit",
+			consulKind: capi.RateLimitIPConfig,
+			configEntryResource: &v1alpha1.ControlPlaneRequestLimit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ControlPlaneRequestLimitSpec{
+					Mode: "permissive",
+					ReadWriteRatesConfig: v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					ACL: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Catalog: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					ConfigEntry: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					ConnectCA: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Coordinate: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					DiscoveryChain: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Health: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Intention: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					KV: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Tenancy: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					PreparedQuery: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Session: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Txn: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &ControlPlaneRequestLimitController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				resource, ok := consulEntry.(*capi.RateLimitIPConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, "permissive", resource.Mode)
+				require.Equal(t, 100.0, resource.ReadRate)
+				require.Equal(t, 100.0, resource.WriteRate)
+				require.Equal(t, 100.0, resource.ACL.ReadRate)
+				require.Equal(t, 100.0, resource.ACL.WriteRate)
+				require.Equal(t, 100.0, resource.Catalog.ReadRate)
+				require.Equal(t, 100.0, resource.Catalog.WriteRate)
+				require.Equal(t, 100.0, resource.ConfigEntry.ReadRate)
+				require.Equal(t, 100.0, resource.ConfigEntry.WriteRate)
+				require.Equal(t, 100.0, resource.ConnectCA.ReadRate)
+				require.Equal(t, 100.0, resource.ConnectCA.WriteRate)
+				require.Equal(t, 100.0, resource.Coordinate.ReadRate)
+				require.Equal(t, 100.0, resource.Coordinate.WriteRate)
+				require.Equal(t, 100.0, resource.DiscoveryChain.ReadRate)
+				require.Equal(t, 100.0, resource.DiscoveryChain.WriteRate)
+				require.Equal(t, 100.0, resource.Health.ReadRate)
+				require.Equal(t, 100.0, resource.Health.WriteRate)
+				require.Equal(t, 100.0, resource.Intention.ReadRate)
+				require.Equal(t, 100.0, resource.Intention.WriteRate)
+				require.Equal(t, 100.0, resource.KV.ReadRate)
+				require.Equal(t, 100.0, resource.KV.WriteRate)
+				require.Equal(t, 100.0, resource.Tenancy.ReadRate)
+				require.Equal(t, 100.0, resource.Tenancy.WriteRate)
+				require.Equal(t, 100.0, resource.PreparedQuery.ReadRate)
+				require.Equal(t, 100.0, resource.PreparedQuery.WriteRate)
+				require.Equal(t, 100.0, resource.Session.ReadRate)
+				require.Equal(t, 100.0, resource.Session.WriteRate)
+				require.Equal(t, 100.0, resource.Txn.ReadRate)
+				require.Equal(t, 100.0, resource.Txn.WriteRate, 100.0)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -191,6 +304,123 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 				require.Equal(t, "", resource.Members[0].Partition)
 			},
 		},
+		{
+			kubeKind:   "ControlPlaneRequestLimit",
+			consulKind: capi.RateLimitIPConfig,
+			configEntryResource: &v1alpha1.ControlPlaneRequestLimit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.ControlPlaneRequestLimitSpec{
+					Mode: "permissive",
+					ReadWriteRatesConfig: v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					ACL: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Catalog: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					ConfigEntry: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					ConnectCA: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Coordinate: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					DiscoveryChain: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Health: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Intention: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					KV: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Tenancy: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					PreparedQuery: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Session: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Txn: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &ControlPlaneRequestLimitController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			updateF: func(resource common.ConfigEntryResource) {
+				ipRateLimit := resource.(*v1alpha1.ControlPlaneRequestLimit)
+				ipRateLimit.Spec.Mode = "enforcing"
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				resource, ok := consulEntry.(*capi.RateLimitIPConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, "enforcing", resource.Mode)
+				require.Equal(t, 100.0, resource.ReadRate)
+				require.Equal(t, 100.0, resource.WriteRate)
+				require.Equal(t, 100.0, resource.ACL.ReadRate)
+				require.Equal(t, 100.0, resource.ACL.WriteRate)
+				require.Equal(t, 100.0, resource.Catalog.ReadRate)
+				require.Equal(t, 100.0, resource.Catalog.WriteRate)
+				require.Equal(t, 100.0, resource.ConfigEntry.ReadRate)
+				require.Equal(t, 100.0, resource.ConfigEntry.WriteRate)
+				require.Equal(t, 100.0, resource.ConnectCA.ReadRate)
+				require.Equal(t, 100.0, resource.ConnectCA.WriteRate)
+				require.Equal(t, 100.0, resource.Coordinate.ReadRate)
+				require.Equal(t, 100.0, resource.Coordinate.WriteRate)
+				require.Equal(t, 100.0, resource.DiscoveryChain.ReadRate)
+				require.Equal(t, 100.0, resource.DiscoveryChain.WriteRate)
+				require.Equal(t, 100.0, resource.Health.ReadRate)
+				require.Equal(t, 100.0, resource.Health.WriteRate)
+				require.Equal(t, 100.0, resource.Intention.ReadRate)
+				require.Equal(t, 100.0, resource.Intention.WriteRate)
+				require.Equal(t, 100.0, resource.KV.ReadRate)
+				require.Equal(t, 100.0, resource.KV.WriteRate)
+				require.Equal(t, 100.0, resource.Tenancy.ReadRate)
+				require.Equal(t, 100.0, resource.Tenancy.WriteRate)
+				require.Equal(t, 100.0, resource.PreparedQuery.ReadRate)
+				require.Equal(t, 100.0, resource.PreparedQuery.WriteRate)
+				require.Equal(t, 100.0, resource.Session.ReadRate)
+				require.Equal(t, 100.0, resource.Session.WriteRate)
+				require.Equal(t, 100.0, resource.Txn.ReadRate)
+				require.Equal(t, 100.0, resource.Txn.WriteRate)
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -286,6 +516,89 @@ func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
 				return &SamenessGroupController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+		},
+		{
+
+			kubeKind:   "ControlPlaneRequestLimit",
+			consulKind: capi.RateLimitIPConfig,
+			configEntryResourceWithDeletion: &v1alpha1.ControlPlaneRequestLimit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         kubeNS,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
+				},
+				Spec: v1alpha1.ControlPlaneRequestLimitSpec{
+					Mode: "permissive",
+					ReadWriteRatesConfig: v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					ACL: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Catalog: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					ConfigEntry: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					ConnectCA: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Coordinate: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					DiscoveryChain: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Health: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Intention: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					KV: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Tenancy: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					PreparedQuery: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Session: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+					Txn: &v1alpha1.ReadWriteRatesConfig{
+						ReadRate:  100.0,
+						WriteRate: 100.0,
+					},
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &ControlPlaneRequestLimitController{
 					Client: client,
 					Log:    logger,
 					ConfigEntryController: &ConfigEntryController{
