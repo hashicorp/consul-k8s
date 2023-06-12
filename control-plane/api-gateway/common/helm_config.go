@@ -3,7 +3,12 @@
 
 package common
 
-import "time"
+import (
+	"strings"
+	"time"
+)
+
+const componentAuthMethod = "k8s-component-auth-method"
 
 // HelmConfig is the configuration of gateways that comes in from the user's Helm values.
 type HelmConfig struct {
@@ -32,4 +37,21 @@ type ConsulConfig struct {
 	GRPCPort   int
 	HTTPPort   int
 	APITimeout time.Duration
+}
+
+func (h HelmConfig) Normalize() HelmConfig {
+	if h.AuthMethod != "" {
+		// strip off any DC naming off the back in case we're
+		// in a secondary DC, in which case our auth method is
+		// going to be a globally scoped auth method, and we want
+		// to target the locally scoped one, which is the auth
+		// method without the DC-specific suffix.
+		tokens := strings.Split(h.AuthMethod, componentAuthMethod)
+		if len(tokens) != 2 {
+			// skip the normalization if we can't do it.
+			return h
+		}
+		h.AuthMethod = tokens[0] + componentAuthMethod
+	}
+	return h
 }

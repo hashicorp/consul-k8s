@@ -476,7 +476,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if err := (&gatewaycontrollers.GatewayClassController{
-		ControllerName: gatewaycontrollers.GatewayClassControllerName,
+		ControllerName: gatewaycommon.GatewayClassControllerName,
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("GatewayClass"),
 	}).SetupWithManager(ctx, mgr); err != nil {
@@ -515,7 +515,9 @@ func (c *Command) Run(args []string) int {
 		NamespacesEnabled:       c.flagEnableNamespaces,
 		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 		Partition:               c.consul.Partition,
+		Datacenter:              c.consul.Datacenter,
 	})
+
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return 1

@@ -214,7 +214,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		for i, listener := range b.config.Gateway.Spec.Listeners {
 			status.Listeners = append(status.Listeners, gwv1beta1.ListenerStatus{
 				Name:           listener.Name,
-				SupportedKinds: supportedKindsForProtocol[listener.Protocol],
+				SupportedKinds: supportedKinds(listener),
 				AttachedRoutes: int32(boundCounts[listener.Name]),
 				Conditions:     listenerValidation.Conditions(b.config.Gateway.Generation, i),
 			})
@@ -373,4 +373,16 @@ func addressesFromPodHosts(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
 // isDeleted checks if the deletion timestamp is set for an object.
 func isDeleted(object client.Object) bool {
 	return !object.GetDeletionTimestamp().IsZero()
+}
+
+func supportedKinds(listener gwv1beta1.Listener) []gwv1beta1.RouteGroupKind {
+	if listener.AllowedRoutes != nil && listener.AllowedRoutes.Kinds != nil {
+		return common.Filter(listener.AllowedRoutes.Kinds, func(kind gwv1beta1.RouteGroupKind) bool {
+			if _, ok := allSupportedRouteKinds[kind.Kind]; !ok {
+				return true
+			}
+			return !common.NilOrEqual(kind.Group, gwv1beta1.GroupVersion.Group)
+		})
+	}
+	return supportedKindsForProtocol[listener.Protocol]
 }
