@@ -377,7 +377,7 @@ jobs:
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane
           workdir: control-plane
-          redhat_tag: quay.io/redhat-isv-containers/6483ed53b430df51b731406c:${{env.version}}-ubi # this is different than the non-FIPS one
+          redhat_tag: quay.io/redhat-isv-containers/6486b1beabfc4e51588c0416:${{env.version}}-ubi # this is different than the non-FIPS one
 
   build-docker-ubi-dockerhub:
     name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI build for DockerHub
