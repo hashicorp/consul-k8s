@@ -42,4 +42,4 @@ COPY "consul-k8s-control-plane.exe" "C:\consul-k8s-control-plane.exe"
 RUN SETX /M path "%PATH%;C:\consul-k8s-control-plane.exe;C:\Program Files\Go\bin;"
 
 # SHELL [ "bash.exe" ]
-ENTRYPOINT ["consul-k8s-control-plane.exe"]
+CMD ["consul-k8s-control-plane.exe"]
