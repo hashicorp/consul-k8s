@@ -665,12 +665,9 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (cor
 		return volumeMount, "", errors.New("unable to find service account token volumeMount")
 	}
 
-	fmt.Println("token check is windows")
-
 	tokenPath := "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
 	if isWindows(pod) {
-		fmt.Println("is windows true for tocken")
 		tokenPath = "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token"
 	}
 
