@@ -80,8 +80,7 @@ spec:
       {{- end }}
       containers:
         - name: partition-init-job
-          image: "{{ .Values.global.imageK8S.repository }}:{{ .Values.global.imageK8S.tag }}"
-          imagePullPolicy:  {{ default .Values.global.imagePullPolicy .Values.global.imageK8S.pullPolicy }}
+          image: {{ .Values.global.imageK8S }}
           env:
           {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
           {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}

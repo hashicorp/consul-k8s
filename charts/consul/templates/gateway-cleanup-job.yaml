@@ -36,13 +36,12 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-gateway-cleanup
       containers:
         - name: gateway-cleanup
-          image: "{{ .Values.global.imageK8S.repository }}:{{ .Values.global.imageK8S.tag }}"
-          imagePullPolicy:  {{ default .Values.global.imagePullPolicy .Values.global.imageK8S.pullPolicy }}
+          image: {{ .Values.global.imageK8S }}
           command:
             - consul-k8s-control-plane
           args:
             - gateway-cleanup
-            - -gateway-class-name=consul-api-gateway
+            - -gateway-class-name=consul
             - -gateway-class-config-name=consul-api-gateway
           resources:
             requests:

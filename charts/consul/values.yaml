@@ -52,8 +52,6 @@ global:
     # Changing the partition name would require an un-install and a re-install with the updated name.
     # Must be "default" in the server cluster ie the Kubernetes cluster that the Consul server pods are deployed onto.
     name: "default"
-  
-  imagePullPolicy: "Always" 
 
   # The name (and tag) of the Consul Docker image for clients and servers.
   # This can be overridden per component. This should be pinned to a specific
@@ -68,11 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image:
-    repository: "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise"
-    tag: "1.16-dev"
-    pullPolicy: ""
-
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.16-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -92,10 +86,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S:
-    repository: "docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane"
-    tag: "1.2.0-dev"
-    pullPolicy: ""
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.2.0-dev
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -566,10 +557,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane:
-    repository: "hashicorppreview/consul-dataplane"
-    tag: "1.1-dev"
-    pullPolicy: ""
+  imageConsulDataplane: "hashicorppreview/consul-dataplane:1.1-dev"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -691,10 +679,7 @@ server:
   # The name of the Docker image (including any tag) for the containers running
   # Consul server agents.
   # @type: string
-  image:
-    repository: ""
-    tag: ""
-    pullPolicy: ""
+  image: null
 
   # The number of server agents to run. This determines the fault tolerance of
   # the cluster. Please refer to the [deployment table](https://developer.hashicorp.com/consul/docs/architecture/consensus#deployment-table)
@@ -1266,11 +1251,8 @@ client:
   # The name of the Docker image (including any tag) for the containers
   # running Consul client agents.
   # @type: string
-  imageK8S:
-    repository: ""
-    tag: ""
-    pullPolicy: ""
-  
+  image: null
+
   # A list of valid [`-retry-join` values](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_retry_join).
   # If this is `null` (default), then the clients will attempt to automatically
   # join the server cluster running within Kubernetes.
@@ -1728,10 +1710,7 @@ syncCatalog:
   # The name of the Docker image (including any tag) for consul-k8s-control-plane
   # to run the sync program.
   # @type: string
-  image:
-    repository: ""
-    tag: ""
-    pullPolicy: ""
+  image: null
 
   # If true, all valid services in K8S are
   # synced by default. If false, the service must be [annotated](https://developer.hashicorp.com/consul/docs/k8s/service-sync#enable-and-disable-sync)
@@ -1979,10 +1958,7 @@ connectInject:
 
   # Image for consul-k8s-control-plane that contains the injector.
   # @type: string
-  image:
-    repository: ""
-    tag: ""
-    pullPolicy: ""
+  image: null
 
   # If true, the injector will inject the
   # Connect sidecar into all pods by default. Otherwise, pods must specify the
@@ -2283,7 +2259,6 @@ connectInject:
   # Defaults to global.image.
   # @type: string
   imageConsul: null
-  imageConsulPullPolicy: ""
 
   # Override global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string
@@ -3046,17 +3021,12 @@ apiGateway:
   #
   # ~> **Note:** Using API Gateway <= 0.4 with external servers requires setting `client.enabled: true`.
   # @type: string
-  image:
-    repository: ""
-    tag: ""
-    pullPolicy: ""
+  image: null
+
   # The name (and tag) of the Envoy Docker image used for the
   # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
   # @default: envoyproxy/envoy:<latest supported version>
-  imageEnvoy:
-    repository: "envoyproxy/envoy"
-    tag: "v1.25.1"
-    pullPolicy: ""
+  imageEnvoy: "envoyproxy/envoy:v1.25.1"
 
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
   # @type: string
@@ -3252,11 +3222,7 @@ telemetryCollector:
   # The name of the Docker image (including any tag) for the containers running
   # the consul-telemetry-collector
   # @type: string
-  image:
-    repository: "hashicorp/consul-telemetry-collector"
-    tag: "0.0.1"
-    pullPolicy: ""
-
+  image: "hashicorp/consul-telemetry-collector:0.0.1"
 
   # The resource settings for consul-telemetry-collector pods.
   # @recurse: false

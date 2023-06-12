@@ -52,8 +52,7 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init-cleanup
       containers:
         - name: server-acl-init-cleanup
-          image: "{{ .Values.global.imageK8S.repository }}:{{ .Values.global.imageK8S.tag }}"
-          imagePullPolicy:  {{ default .Values.global.imagePullPolicy .Values.global.imageK8S.pullPolicy }}
+          image: {{ .Values.global.imageK8S }}
           command:
             - consul-k8s-control-plane
           args:

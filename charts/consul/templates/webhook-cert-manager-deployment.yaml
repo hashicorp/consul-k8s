@@ -49,8 +49,7 @@ spec:
             -config-file=/bootstrap/config/webhook-config.json \
             -deployment-name={{ template "consul.fullname" . }}-webhook-cert-manager \
             -deployment-namespace={{ .Release.Namespace }}
-        image: "{{ .Values.global.imageK8S.repository }}:{{ .Values.global.imageK8S.tag }}"
-        imagePullPolicy:  {{ default .Values.global.imagePullPolicy .Values.global.imageK8S.pullPolicy }}
+        image: {{ .Values.global.imageK8S }}
         name: webhook-cert-manager
         resources:
           limits:

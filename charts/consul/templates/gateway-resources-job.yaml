@@ -36,15 +36,14 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-gateway-resources
       containers:
         - name: gateway-resources
-          image: "{{ .Values.global.imageK8S.repository }}:{{ .Values.global.imageK8S.tag }}"
-          imagePullPolicy:  {{ default .Values.global.imagePullPolicy .Values.global.imageK8S.pullPolicy }}
+          image: {{ .Values.global.imageK8S }}
           command:
             - consul-k8s-control-plane
           args:
             - gateway-resources
-            - -gateway-class-name=consul-api-gateway
+            - -gateway-class-name=consul
             - -gateway-class-config-name=consul-api-gateway
-            - -controller-name=hashicorp.com/consul-api-gateway-controller
+            - -controller-name=consul.hashicorp.com/gateway-controller
             - -app={{template "consul.name" .}}
             - -chart={{template "consul.chart" .}}
             - -heritage={{ .Release.Service }}
