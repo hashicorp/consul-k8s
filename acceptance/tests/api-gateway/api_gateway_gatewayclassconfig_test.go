@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,7 +37,6 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	releaseName := helpers.RandomName()
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 	consulCluster.Create(t)
-
 	// Override the default proxy config settings for this test
 	consulClient, _ := consulCluster.SetupConsulClient(t, false)
 	_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
@@ -49,6 +47,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		},
 	}, nil)
 	require.NoError(t, err)
+
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	namespace := "gateway-namespace"
 
@@ -166,6 +165,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(0))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, minInstances, gateway)
+
 }
 
 func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *int32) {
