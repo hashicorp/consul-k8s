@@ -63,8 +63,8 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   image:
-    consulAPIGateway: {{ .Values.apiGateway.image }}
-    envoy: {{ .Values.apiGateway.imageEnvoy }}
+    consulAPIGateway: "{{ .Values.apiGateway.image.repository }}:{{ .Values.apiGateway.image.tag }}"
+    envoy: "{{ .Values.apiGateway.imageEnvoy.repository }}:{{ .Values.apiGateway.imageEnvoy.tag }}"
   {{- if .Values.apiGateway.managedGatewayClass.nodeSelector }}
   nodeSelector:
     {{ tpl .Values.apiGateway.managedGatewayClass.nodeSelector . | indent 4 | trim }}

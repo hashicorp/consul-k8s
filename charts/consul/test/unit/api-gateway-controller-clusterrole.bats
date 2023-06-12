@@ -14,7 +14,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/api-gateway-controller-clusterrole.yaml  \
       --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      --set 'apiGateway.image.repository=foo' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -26,7 +26,7 @@ load _helpers
       -s templates/api-gateway-controller-clusterrole.yaml \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      --set 'apiGateway.image.repository=foo' \
       . | tee /dev/stderr |
       yq '.rules[] | select((.resources[0] == "podsecuritypolicies") and (.verbs[0] == "use")) | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -38,7 +38,7 @@ load _helpers
       -s templates/api-gateway-controller-clusterrole.yaml \
       --set 'global.enablePodSecurityPolicies=true' \
       --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      --set 'apiGateway.image.repository=foo' \
       . | tee /dev/stderr |
       yq '.rules[] | select((.resources[0] == "roles") and (.resources[1] == "rolebindings") and (.verbs | contains(["create","get","list","watch"]))) | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]

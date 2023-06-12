@@ -56,8 +56,8 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-api-gateway-controller
       containers:
       - name: api-gateway-controller
-        image: {{ .Values.apiGateway.image }}
-        imagePullPolicy:  {{ default "Always" .Values.apiGateway.pullPolicy }}
+        image: "{{ .Values.apiGateway.image.repository }}:{{ .Values.apiGateway.image.tag }}"
+        imagePullPolicy:  {{ default .Values.global.imagePullPolicy .Values.apiGateway.image.pullPolicy }}
         ports:
         - containerPort: 9090
           name: sds
@@ -220,7 +220,7 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: copy-consul-bin
         image: {{ .Values.global.image | quote }}
-        imagePullPolicy:  {{ default "Always" .Values.global.pullPolicy }}
+        imagePullPolicy:  {{ .Values.global.imagePullPolicy }}
         command:
         - cp
         - /bin/consul
@@ -257,8 +257,8 @@ spec:
           value: {{ .Values.global.datacenter }}
         {{- end}}
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
-        image: {{ .Values.global.imageK8S }}
-        imagePullPolicy:  {{ default "Always" .Values.global.imageK8SpullPolicy }}
+        image: "{{ .Values.global.imageK8S.repository }}:{{ .Values.global.imageK8S.tag }}"
+        imagePullPolicy:  {{ default .Values.global.imagePullPolicy .Values.global.imageK8S.pullPolicy }}
         volumeMounts:
         - mountPath: /consul/login
           name: consul-data

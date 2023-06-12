@@ -47,7 +47,7 @@ load _helpers
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'global.imageK8S=foo' \
+      --set 'global.imageK8S.repository=foo' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
   [ "${actual}" = "foo" ]

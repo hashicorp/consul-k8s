@@ -36,8 +36,8 @@ spec:
       serviceAccountName: {{ template "consul.fullname" . }}-gateway-resources
       containers:
         - name: gateway-resources
-          image: {{ .Values.global.imageK8S }}
-          imagePullPolicy:  {{ default "Always" .Values.global.imageK8SpullPolicy }}
+          image: "{{ .Values.global.imageK8S.repository }}:{{ .Values.global.imageK8S.tag }}"
+          imagePullPolicy:  {{ default .Values.global.imagePullPolicy .Values.global.imageK8S.pullPolicy }}
           command:
             - consul-k8s-control-plane
           args:
