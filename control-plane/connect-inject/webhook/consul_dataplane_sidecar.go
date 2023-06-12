@@ -232,11 +232,14 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		args = append(args,
 			"-credential-type=login",
 			"-login-auth-method="+w.AuthMethod,
-			"-login-bearer-token-path=test-ashesh",
+			"-login-bearer-token-path="+bearerTokenFile,
 			"-login-meta="+fmt.Sprintf("pod=%s/%s", namespace.Name, pod.Name),
 		)
 		args = append(args,
 			"-hello=world",
+			"-login-auth-method="+w.AuthMethod,
+			"-login-bearer-token-path="+bearerTokenFile,
+			"-login-meta="+fmt.Sprintf("pod=%s/%s", namespace.Name, pod.Name),
 		)
 		if w.EnableNamespaces {
 			if w.EnableK8SNSMirroring {
