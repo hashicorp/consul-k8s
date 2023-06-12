@@ -46,7 +46,6 @@ type Command struct {
 	flagRedirectTrafficConfig string
 	flagLogLevel              string
 	flagLogJSON               bool
-	flagIsWindows             bool
 
 	flagProxyIDFile string // Location to write the output proxyID. Default is defaultProxyIDFile.
 	flagMultiPort   bool
@@ -85,8 +84,6 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flagSet.BoolVar(&c.flagIsWindows, "is-windows", false,
-		"If pod is running on windows or not")
 
 	if c.serviceRegistrationPollingAttempts == 0 {
 		c.serviceRegistrationPollingAttempts = defaultServicePollingRetries
@@ -186,7 +183,7 @@ func (c *Command) Run(args []string) int {
 
 	// todo (agentless): this should eventually be passed to consul-dataplane as a string so we don't need to write it to file.
 	if c.consul.UseTLS && c.consul.CACertPEM != "" {
-		if c.flagIsWindows {
+		if c.consul.IsWindows {
 			if err = common.WriteFileWithPerms(constants.ConsulCAFileWindows, c.consul.CACertPEM, 0444); err != nil {
 				c.logger.Error("error writing CA cert file", "error", err)
 				return 1
