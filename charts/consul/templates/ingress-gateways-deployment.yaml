@@ -310,7 +310,7 @@ spec:
         {{- end }}
         {{- if $root.Values.global.acls.manageSystemACLs }}
         - -credential-type=login
-        - -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token
+        - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
         - -login-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method
         {{- if $root.Values.global.adminPartitions.enabled }}
         - -login-partition={{ $root.Values.global.adminPartitions.name }}

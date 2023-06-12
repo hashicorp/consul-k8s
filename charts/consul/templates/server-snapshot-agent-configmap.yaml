@@ -16,7 +16,7 @@ data:
       "snapshot_agent": {
         "login": {
           "auth_method": "{{ template "consul.fullname" . }}-k8s-component-auth-method",
-          "bearer_token_file": "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+          "bearer_token_file": "/var/run/secrets/kubernetes.io/serviceaccount/token",
           "meta": {"component": "snapshot-agent"}
         }
       }

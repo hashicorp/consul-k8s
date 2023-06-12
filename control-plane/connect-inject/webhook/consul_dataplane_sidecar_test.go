@@ -42,7 +42,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.AuthMethod = "test-auth-method"
 			},
-			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and namespace mirroring": {
@@ -51,7 +51,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableNamespaces = true
 				w.EnableK8SNSMirroring = true
 			},
-			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and single destination namespace": {
@@ -60,7 +60,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableNamespaces = true
 				w.ConsulDestinationNamespace = "test-ns"
 			},
-			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and partitions": {
@@ -68,7 +68,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.AuthMethod = "test-auth-method"
 				w.ConsulPartition = "test-part"
 			},
-			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled -telemetry-prom-scrape-path=/metrics",
 		},
 		"with TLS and CA cert provided": {
@@ -632,7 +632,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				expArgs = []string{
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
-						"-login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
+						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
 						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
@@ -1403,7 +1403,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				LogJSON:       false,
 				AuthMethod:    "test-auth-method",
 			},
-			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -tls-disabled -telemetry-prom-scrape-path=/metrics",
 			[]corev1.EnvVar{
 				{
@@ -1426,7 +1426,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				EnableNamespaces:     true,
 				EnableK8SNSMirroring: true,
 			},
-			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
 			[]corev1.EnvVar{
 				{
@@ -1449,7 +1449,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "test-ns",
 			},
-			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled -telemetry-prom-scrape-path=/metrics",
 			[]corev1.EnvVar{
 				{
@@ -1471,7 +1471,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				AuthMethod:      "test-auth-method",
 				ConsulPartition: "test-part",
 			},
-			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled -telemetry-prom-scrape-path=/metrics",
 			[]corev1.EnvVar{
 				{
