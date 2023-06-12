@@ -146,7 +146,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
@@ -247,7 +247,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
@@ -669,7 +669,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
@@ -740,7 +740,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
@@ -995,7 +995,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
@@ -1067,7 +1067,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
@@ -1241,7 +1241,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
@@ -1331,7 +1331,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",

@@ -13,7 +13,7 @@ import (
 
 const (
 	// Default location of the service account token on a kubernetes host.
-	defaultTokenPath = "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token"
+	defaultTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
 
 // createKubeConfig creates the kubeconfig file that the consul-cni plugin will use to communicate with the
