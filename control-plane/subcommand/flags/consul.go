@@ -111,7 +111,7 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 		}
 	}
 
-	defaultConsulLoginBearerTokenFile := "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	defaultConsulLoginBearerTokenFile := "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token"
 	if bearerTokenFileEnvVar := os.Getenv(LoginBearerTokenFileEnvVar); bearerTokenFileEnvVar != "" {
 		defaultConsulLoginBearerTokenFile = bearerTokenFileEnvVar
 	}

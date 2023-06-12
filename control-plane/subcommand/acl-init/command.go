@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	defaultBearerTokenFile = "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token"
 	defaultTokenSinkFile   = "/consul/login/acl-token"
 )
 

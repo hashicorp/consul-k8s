@@ -78,7 +78,7 @@ func TestConsulFlags_Flags(t *testing.T) {
 				APITimeout: 5 * time.Second,
 				ConsulACLFlags: ConsulACLFlags{
 					ConsulLogin: ConsulLoginFlags{
-						BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+						BearerTokenFile: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
 					},
 				},
 			},
@@ -97,7 +97,7 @@ func TestConsulFlags_Flags(t *testing.T) {
 				APITimeout: 5 * time.Second,
 				ConsulACLFlags: ConsulACLFlags{
 					ConsulLogin: ConsulLoginFlags{
-						BearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+						BearerTokenFile: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
 					},
 				},
 			},

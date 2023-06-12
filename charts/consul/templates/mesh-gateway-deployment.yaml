@@ -253,7 +253,7 @@ spec:
         {{- end }}
         {{- if .Values.global.acls.manageSystemACLs }}
         - -credential-type=login
-        - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token
         {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
         - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
         - -login-datacenter={{ .Values.global.federation.primaryDatacenter }}
