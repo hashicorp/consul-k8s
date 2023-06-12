@@ -204,7 +204,7 @@ func (b *Binder) Snapshot() *Snapshot {
 				snapshot.Consul.Deregistrations = append(snapshot.Consul.Deregistrations, api.CatalogDeregistration{
 					Node:      service.Node,
 					ServiceID: service.ServiceID,
-					Namespace: service.Namespace,
+					Namespace: b.config.Translator.Namespace(service.Namespace),
 				})
 			}
 		}

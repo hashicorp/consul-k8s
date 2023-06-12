@@ -291,9 +291,7 @@ func (r *GatewayController) deregisterAllServices(ctx context.Context, consulKey
 		deregistration := api.CatalogDeregistration{
 			Node:      service.Node,
 			ServiceID: service.ServiceID,
-		}
-		if r.HelmConfig.EnableNamespaces {
-			deregistration.Namespace = service.Namespace
+			Namespace: r.Translator.Namespace(service.Namespace),
 		}
 
 		if err := r.cache.Deregister(ctx, deregistration); err != nil {
