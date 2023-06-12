@@ -127,10 +127,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	}
 	command := []string{initContainerCommandInterpreter, "-ec", buf.String()}
 
-	if isWindows {
-		command = []string{buf.String()}
-	}
-
 	container := corev1.Container{
 		Name:  initContainerName,
 		Image: imageConsulK8s,
