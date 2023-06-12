@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -198,7 +199,7 @@ func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *
 		require.NoError(r, err)
 		require.EqualValues(r, *wantNumber, len(podList.Items))
 
-		//TODO (sarahalsmiller) this block is identifies a potential bug in service deregistration. Uncomment when fixed
+		//TODO (sarahalsmiller) this block is identifies a potential bug in service deregistration. Uncomment when fixed.
 		//service, _, err := consulClient.Catalog().Service(name, "", nil)
 		//require.NoError(r, err)
 		//require.EqualValues(r, *wantNumber, len(service))
