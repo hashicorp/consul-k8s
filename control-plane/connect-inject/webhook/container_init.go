@@ -319,6 +319,7 @@ const initContainerCommandTplLinux = `
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
+  -is-windows="{{ .IsWindows }} \
   {{- if .AuthMethod }}
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \
@@ -328,7 +329,6 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -proxy-id-file=/consul/connect-inject/proxyid-{{ .ServiceName }} \
   {{- if not .AuthMethod }}
   -service-name="{{ .ServiceName }}" \
-  -is-windows="{{ .IsWindows }} \
   {{- end }}
   {{- end }}
 `
@@ -339,6 +339,7 @@ const initContainerCommandTplWindows = `
 consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
+  -is-windows="{{ .IsWindows }} \
   {{- if .AuthMethod }}
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \
@@ -348,7 +349,6 @@ consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=$
   -proxy-id-file=C:\\consul\\connect-inject\\proxyid-{{ .ServiceName }} \
   {{- if not .AuthMethod }}
   -service-name="{{ .ServiceName }}" \
-  -is-windows="{{ .IsWindows }} \
   {{- end }}
   {{- end }}
 `
