@@ -187,6 +187,10 @@ func (c *Command) Run(args []string) int {
 			c.logger.Error("error writing CA cert file", "error", err)
 			return 1
 		}
+		if err = common.WriteFileWithPerms(constants.ConsulCAFileWindows, c.consul.CACertPEM, 0444); err != nil {
+			c.logger.Error("error writing CA cert file", "error", err)
+			return 1
+		}
 	}
 
 	if c.flagRedirectTrafficConfig != "" {
