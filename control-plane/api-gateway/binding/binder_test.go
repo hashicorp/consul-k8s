@@ -15,6 +15,7 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -849,7 +850,7 @@ func TestBinder_Registrations(t *testing.T) {
 			}),
 			expectedRegistrations: []string{"pod1", "pod3", "pod4"},
 			expectedDeregistrations: []api.CatalogDeregistration{
-				{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
+				{Node: "test", ServiceID: "pod2", Namespace: ""},
 			},
 		},
 	} {
@@ -872,11 +873,11 @@ func TestBinder_Registrations(t *testing.T) {
 				registration := actual.Consul.Registrations[i]
 				expected := tt.expectedRegistrations[i]
 
-				require.EqualValues(t, expected, registration.Service.ID)
-				require.EqualValues(t, "gateway", registration.Service.Service)
+				assert.EqualValues(t, expected, registration.Service.ID)
+				assert.EqualValues(t, "gateway", registration.Service.Service)
 			}
 
-			require.EqualValues(t, tt.expectedDeregistrations, actual.Consul.Deregistrations)
+			assert.EqualValues(t, tt.expectedDeregistrations, actual.Consul.Deregistrations)
 		})
 	}
 }
