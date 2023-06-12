@@ -288,13 +288,11 @@ func (r *GatewayController) deregisterAllServices(ctx context.Context, consulKey
 		return err
 	}
 	for _, service := range services {
-		deregistration := api.CatalogDeregistration{
+		if err := r.cache.Deregister(ctx, api.CatalogDeregistration{
 			Node:      service.Node,
 			ServiceID: service.ServiceID,
 			Namespace: r.Translator.Namespace(service.Namespace),
-		}
-
-		if err := r.cache.Deregister(ctx, deregistration); err != nil {
+		}); err != nil {
 			return err
 		}
 	}
