@@ -319,7 +319,7 @@ const initContainerCommandTplLinux = `
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
-  -is-windows="{{ .IsWindows }} \
+  -is-windows="{{ .IsWindows }}" \
   {{- if .AuthMethod }}
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \
@@ -339,7 +339,7 @@ const initContainerCommandTplWindows = `
 consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
-  -is-windows="{{ .IsWindows }} \
+  -is-windows="{{ .IsWindows }}" \
   {{- if .AuthMethod }}
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \
