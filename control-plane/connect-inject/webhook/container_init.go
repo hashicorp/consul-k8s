@@ -45,15 +45,13 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if isWindows(pod) {
 		connectInjectDir = "C:\\consul\\connect-inject"
 		imageConsulK8s = w.ImageConsulK8SWindows
-		initContainerCommandInterpreter = ""
+		initContainerCommandInterpreter = "sh"
 		initContainerCommandTpl = initContainerCommandTplWindows
-		w.Log.Info("is Windos True")
 	} else {
 		connectInjectDir = "/consul/connect-inject"
 		imageConsulK8s = w.ImageConsulK8S
 		initContainerCommandInterpreter = "/bin/sh"
 		initContainerCommandTpl = initContainerCommandTplLinux
-		w.Log.Info("is Window Fasle")
 	}
 
 	// Check if tproxy is enabled on this pod.
@@ -121,6 +119,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if multiPort {
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
+	command := []string{initContainerCommandInterpreter, "-ec", buf.String()}
+
 	container := corev1.Container{
 		Name:  initContainerName,
 		Image: imageConsulK8s,
@@ -168,7 +168,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		},
 		Resources:    w.InitContainerResources,
 		VolumeMounts: volMounts,
-		Command:      []string{initContainerCommandInterpreter, "-ec", buf.String()},
+		Command:      command,
 	}
 
 	if w.TLSEnabled {
