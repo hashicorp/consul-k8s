@@ -41,7 +41,9 @@ type initContainerCommandData struct {
 func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	var connectInjectDir, imageConsulK8s, initContainerCommandInterpreter, initContainerCommandTpl string
 
-	if isWindows(pod) {
+	isWindows := isWindows(pod)
+
+	if isWindows {
 		connectInjectDir = "C:\\consul\\connect-inject"
 		imageConsulK8s = w.ImageConsulK8SWindows
 		initContainerCommandInterpreter = "sh"
@@ -58,7 +60,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if err != nil {
 		return corev1.Container{}, err
 	}
-	if tproxyEnabled && isWindows(pod) {
+	if tproxyEnabled && isWindows {
 		err = errors.New("transparent proxy is not supported on windows")
 		return corev1.Container{}, err
 	}
@@ -324,6 +326,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -proxy-id-file=/consul/connect-inject/proxyid-{{ .ServiceName }} \
   {{- if not .AuthMethod }}
   -service-name="{{ .ServiceName }}" \
+  -is-windows="{{ isWindows }} \
   {{- end }}
   {{- end }}
 `
@@ -343,6 +346,7 @@ consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=$
   -proxy-id-file=C:\\consul\\connect-inject\\proxyid-{{ .ServiceName }} \
   {{- if not .AuthMethod }}
   -service-name="{{ .ServiceName }}" \
+  -is-windows="{{ isWindows }} \
   {{- end }}
   {{- end }}
 `
