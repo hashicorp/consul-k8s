@@ -44,7 +44,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if isWindows(pod) {
 		connectInjectDir = "C:\\consul\\connect-inject"
 		imageConsulK8s = w.ImageConsulK8SWindows
-		initContainerCommandInterpreter = "sh"
+		initContainerCommandInterpreter = ""
 		initContainerCommandTpl = initContainerCommandTplWindows
 	} else {
 		connectInjectDir = "/consul/connect-inject"
@@ -165,7 +165,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		},
 		Resources:    w.InitContainerResources,
 		VolumeMounts: volMounts,
-		Command:      []string{initContainerCommandInterpreter, "-ec", buf.String()},
+		Command:      []string{initContainerCommandInterpreter, buf.String()},
 	}
 
 	if w.TLSEnabled {
