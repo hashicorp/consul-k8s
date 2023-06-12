@@ -1144,6 +1144,60 @@ server:
     # @type: string
     caCert: null
 
+  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing 
+  # and configure a sink and filters for their audit logs. Please refer to
+  # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
+  # for further information.
+  auditLogs:
+    # Controls whether Consul logs out each time a user performs an operation.
+    # global.acls.manageSystemACLs must be enabled to use this feature.
+    enabled: false
+
+    # A single entry of the sink object provides configuration for the destination to which Consul 
+    # will log auditing events.
+    #
+    # Example:
+    #
+    # ```yaml
+    # sinks:
+    #   - name: My Sink
+    #     type: file
+    #     format: json
+    #     path: /tmp/audit.json
+    #     delivery_guarantee: best-effort
+    #     rotate_duration: 24h
+    #     rotate_max_files: 15
+    #     rotate_bytes: 25165824
+    #     
+    # ```
+    #
+    # The sink object supports the following keys:
+    #
+    # - `name` - Name of the sink.
+    #
+    # - `type` - Type specifies what kind of sink this is. Currently only file sinks are available
+    #
+    # - `format` - Format specifies what format the events will be emitted with. Currently only `json`
+    #   events are emitted.
+    #
+    # - `path` - The directory and filename to write audit events to.
+    #
+    # - `delivery_guarantee` - Specifies the rules governing how audit events are written. Consul
+    #   only supports `best-effort` event delivery.
+    #
+    # - `mode` - The permissions to set on the audit log files.
+    #
+    # - `rotate_duration` - Specifies the interval by which the system rotates to a new log file.
+    #    At least one of `rotate_duration` or `rotate_bytes` must be configured to enable audit logging.
+    #
+    # - `rotate_bytes` -  Specifies how large an individual log file can grow before Consul rotates to a new file.
+    #    At least one of rotate_bytes or rotate_duration must be configured to enable audit logging.
+    #
+    # - `rotate_max_files` - Defines the limit that Consul should follow before it deletes old log files.
+    #
+    # @type: array<map>
+    sinks: []
+
   # Settings for potentially limiting timeouts, rate limiting on clients as well
   # as servers, and other settings to limit exposure too many requests, requests
   # waiting for too long, and other runtime considerations.
