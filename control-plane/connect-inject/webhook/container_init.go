@@ -35,8 +35,9 @@ type initContainerCommandData struct {
 	MultiPort bool
 
 	// Log settings for the connect-init command.
-	LogLevel string
-	LogJSON  bool
+	LogLevel  string
+	LogJSON   bool
+	IsWindows bool
 }
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
@@ -75,6 +76,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		MultiPort:  multiPort,
 		LogLevel:   w.LogLevel,
 		LogJSON:    w.LogJSON,
+		IsWindows:  isWindows,
 	}
 
 	// Create expected volume mounts
@@ -339,7 +341,7 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   -proxy-id-file=/consul/connect-inject/proxyid-{{ .ServiceName }} \
   {{- if not .AuthMethod }}
   -service-name="{{ .ServiceName }}" \
-  -is-windows="{{ isWindows }} \
+  -is-windows="{{ .IsWindows }} \
   {{- end }}
   {{- end }}
 `
@@ -359,7 +361,7 @@ consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=$
   -proxy-id-file=C:\\consul\\connect-inject\\proxyid-{{ .ServiceName }} \
   {{- if not .AuthMethod }}
   -service-name="{{ .ServiceName }}" \
-  -is-windows="{{ isWindows }} \
+  -is-windows="{{ .IsWindows }} \
   {{- end }}
   {{- end }}
 `
