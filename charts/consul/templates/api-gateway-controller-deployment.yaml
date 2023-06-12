@@ -58,7 +58,6 @@ spec:
       - name: api-gateway-controller
         image: {{ .Values.apiGateway.image }}
         imagePullPolicy: {{ .Values.global.imagePullPolicy }}
-        pull
         ports:
         - containerPort: 9090
           name: sds
