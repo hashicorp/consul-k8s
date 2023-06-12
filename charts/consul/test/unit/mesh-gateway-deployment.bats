@@ -505,7 +505,7 @@ key2: value2' \
       local actual=$(echo $command | yq -r '. | any(contains("credential-type=login"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
-      local actual=$(echo $command | yq -r '. | any(contains("-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token"))'| tee /dev/stderr)
+      local actual=$(echo $command | yq -r '. | any(contains("-login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token"))'| tee /dev/stderr)
       [ "${actual}" = "true" ]
 
       local actual=$(echo $command | yq -r '. | any(contains("-login-auth-method=release-name-consul-k8s-component-auth-method"))'| tee /dev/stderr)
