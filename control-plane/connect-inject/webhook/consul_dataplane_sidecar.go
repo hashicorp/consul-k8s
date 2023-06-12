@@ -232,12 +232,6 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 			"-login-bearer-token-path="+bearerTokenFile,
 			"-login-meta="+fmt.Sprintf("pod=%s/%s", namespace.Name, pod.Name),
 		)
-		args = append(args,
-			"-hello=world",
-			"-login-auth-method="+w.AuthMethod,
-			"-login-bearer-token-path="+bearerTokenFile,
-			"-login-meta="+fmt.Sprintf("pod=%s/%s", namespace.Name, pod.Name),
-		)
 		if w.EnableNamespaces {
 			if w.EnableK8SNSMirroring {
 				args = append(args, "-login-namespace=default")
@@ -263,7 +257,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 			if isWindows(pod) {
 				args = append(args, "-ca-certs="+constants.ConsulCAFileWindows)
 			} else {
-				args = append(args, "-ca-certs="+constants.ConsulCAFileWindows)
+				args = append(args, "-ca-certs="+constants.ConsulCAFile)
 			}
 		}
 	} else {
