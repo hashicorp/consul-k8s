@@ -168,7 +168,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		},
 		Resources:    w.InitContainerResources,
 		VolumeMounts: volMounts,
-		Command:      []string{initContainerCommandInterpreter, "", buf.String()},
+		Command:      []string{initContainerCommandInterpreter, "-ec", buf.String()},
 	}
 
 	if w.TLSEnabled {
