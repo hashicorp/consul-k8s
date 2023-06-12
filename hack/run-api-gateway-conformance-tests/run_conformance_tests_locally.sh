@@ -126,7 +126,7 @@ kubectl kustomize ./ --output ./base/manifests.yaml
 
 kubectl wait --for=condition=Ready --timeout=60s  pods --all --namespace consul
 
-go test -v -timeout 10m ./ --gateway-class=consul-api-gateway
+go test -v -timeout 10m ./ --gateway-class=consul
 
 rm -rf $workdir
 
