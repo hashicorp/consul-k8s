@@ -1,6 +1,6 @@
 # This dockerfile was not used to build images. It is here as a starting point.
 # We will need to use it later when we have build support for windows images.
-FROM mcr.microsoft.com/windows/servercore:ltsc2019 as windows
+FROM mcr.microsoft.com/windows/windowsservercore-ltsc2019 as windows
 
 ARG PRODUCT_NAME
 ARG PRODUCT_VERSION
