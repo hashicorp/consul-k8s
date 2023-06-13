@@ -50,6 +50,7 @@ spec:
             -deployment-name={{ template "consul.fullname" . }}-webhook-cert-manager \
             -deployment-namespace={{ .Release.Namespace }}
         image: {{ .Values.global.imageK8S }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         name: webhook-cert-manager
         resources:
           limits:
