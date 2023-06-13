@@ -124,6 +124,7 @@ spec:
       initContainers:
       - name: ent-license-acl-init
         image: {{ .Values.global.imageK8S }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         command:
           - "/bin/sh"
           - "-ec"
