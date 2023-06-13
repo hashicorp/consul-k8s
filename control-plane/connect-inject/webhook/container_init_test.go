@@ -72,7 +72,8 @@ func TestHandlerContainerInit(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -120,6 +121,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=debug \
   -log-json=true \
+  -is-windows=false \
   -service-account-name="a-service-account-name" \
   -service-name="web" \`,
 			[]corev1.EnvVar{
@@ -172,7 +174,8 @@ func TestHandlerContainerInit(t *testing.T) {
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=true \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -221,6 +224,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=debug \
   -log-json=true \
+  -is-windows=true \
   -service-account-name="a-service-account-name" \
   -service-name="web" \`,
 			[]corev1.EnvVar{
@@ -250,7 +254,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
