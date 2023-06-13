@@ -178,7 +178,7 @@ version:
 	@echo $(VERSION)
 
 consul-version:
-	@echo "hashicorp/consul-enterprise:1.16.0-rc1-ent"
+	@echo $(CONSUL_IMAGE_VERSION)
 
 consul-dataplane-version:
 	@echo $(CONSUL_DATAPLANE_IMAGE_VERSION)
