@@ -1,0 +1,3 @@
+```release-note:feature
+helm: Added imagePullPolicy global field which can be configured to override the default behaviour.
+```
