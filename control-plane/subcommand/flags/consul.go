@@ -179,7 +179,7 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 		"The time in seconds that the consul API client will wait for a response from the API before cancelling the request.")
 	fs.BoolVar(&f.SkipServerWatch, "skip-server-watch", skipServerWatch, "If true, skip watching server upstream."+
 		"This can also be specified via the CONSUL_SKIP_SERVER_WATCH environment variable.")
-	fs.BoolVar(&f.IsWindows, "is-windows", false, "flag is true if pod is running on windows nodes")
+	fs.BoolVar(&f.IsWindows, "is-windows", false, "If flag is true then pod is running on windows nodes")
 	return fs
 }
 
