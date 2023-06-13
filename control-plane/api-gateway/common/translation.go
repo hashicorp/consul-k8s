@@ -50,7 +50,7 @@ func (t ResourceTranslator) NormalizedResourceReference(kind, namespace string, 
 }
 
 func (t ResourceTranslator) Namespace(namespace string) string {
-	return namespaces.ConsulNamespace(namespace, t.EnableK8sMirroring, t.ConsulDestNamespace, t.EnableK8sMirroring, t.MirroringPrefix)
+	return namespaces.ConsulNamespace(namespace, t.EnableConsulNamespaces, t.ConsulDestNamespace, t.EnableK8sMirroring, t.MirroringPrefix)
 }
 
 // ToAPIGateway translates a kuberenetes API gateway into a Consul APIGateway Config Entry.
