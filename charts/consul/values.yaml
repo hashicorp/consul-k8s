@@ -808,10 +808,10 @@ server:
   # ```yaml
   # resources:
   #   requests:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   #   limits:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   # ```
   #
@@ -819,10 +819,10 @@ server:
   # @type: map
   resources:
     requests:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
     limits:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
 
   # The security context for the server pods. This should be a YAML map corresponding to a
@@ -1143,6 +1143,60 @@ server:
     # ```
     # @type: string
     caCert: null
+
+  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing 
+  # and configure a sink and filters for their audit logs. Please refer to
+  # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
+  # for further information.
+  auditLogs:
+    # Controls whether Consul logs out each time a user performs an operation.
+    # global.acls.manageSystemACLs must be enabled to use this feature.
+    enabled: false
+
+    # A single entry of the sink object provides configuration for the destination to which Consul 
+    # will log auditing events.
+    #
+    # Example:
+    #
+    # ```yaml
+    # sinks:
+    #   - name: My Sink
+    #     type: file
+    #     format: json
+    #     path: /tmp/audit.json
+    #     delivery_guarantee: best-effort
+    #     rotate_duration: 24h
+    #     rotate_max_files: 15
+    #     rotate_bytes: 25165824
+    #     
+    # ```
+    #
+    # The sink object supports the following keys:
+    #
+    # - `name` - Name of the sink.
+    #
+    # - `type` - Type specifies what kind of sink this is. Currently only file sinks are available
+    #
+    # - `format` - Format specifies what format the events will be emitted with. Currently only `json`
+    #   events are emitted.
+    #
+    # - `path` - The directory and filename to write audit events to.
+    #
+    # - `delivery_guarantee` - Specifies the rules governing how audit events are written. Consul
+    #   only supports `best-effort` event delivery.
+    #
+    # - `mode` - The permissions to set on the audit log files.
+    #
+    # - `rotate_duration` - Specifies the interval by which the system rotates to a new log file.
+    #    At least one of `rotate_duration` or `rotate_bytes` must be configured to enable audit logging.
+    #
+    # - `rotate_bytes` -  Specifies how large an individual log file can grow before Consul rotates to a new file.
+    #    At least one of rotate_bytes or rotate_duration must be configured to enable audit logging.
+    #
+    # - `rotate_max_files` - Defines the limit that Consul should follow before it deletes old log files.
+    #
+    # @type: array<map>
+    sinks: []
 
   # Settings for potentially limiting timeouts, rate limiting on clients as well
   # as servers, and other settings to limit exposure too many requests, requests
@@ -2006,6 +2060,12 @@ connectInject:
 
   # Configuration settings for the Consul API Gateway integration.
   apiGateway:
+    # Enables Consul on Kubernetes to manage the CRDs used for Gateway API.
+    # Setting this to true will install the CRDs used for the Gateway API when Consul on Kubernetes is installed.
+    # These CRDs can clash with existing Gateway API CRDs if they are already installed in your cluster.
+    # If this setting is false, you will need to install the Gateway API CRDs manually.
+    manageExternalCRDs: true
+
     # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
     managedGatewayClass:
       # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
@@ -2277,14 +2337,14 @@ connectInject:
     requests:
       # Recommended production default: 500Mi
       # @type: string
-      memory: "50Mi"
+      memory: "200Mi"
       # Recommended production default: 250m
       # @type: string
       cpu: "50m"
     limits:
       # Recommended production default: 500Mi
       # @type: string
-      memory: "50Mi"
+      memory: "200Mi"
       # Recommended production default: 250m
       # @type: string
       cpu: "50m"

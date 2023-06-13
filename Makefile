@@ -11,7 +11,7 @@ copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make c
 	@cd hack/copy-crds-to-chart; go run ./...
 
 generate-external-crds: ## Generate CRDs for externally defined CRDs and copy them to charts/consul. Usage: make generate-external-crds
-	@cd ./charts/consul/crds/; \
+	@cd ./control-plane/config/crd/external; \
 		kustomize build | yq --split-exp '.metadata.name + ".yaml"' --no-doc
 
 bats-tests: ## Run Helm chart bats tests.
@@ -43,6 +43,17 @@ control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-
 	@docker buildx create --use && docker buildx build -t '$(REMOTE_DEV_IMAGE)' \
        --platform linux/amd64,linux/arm64 \
        --target=dev \
+       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
+       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
+       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       --push \
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+
+control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker image.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH) --fips
+	@docker build -t '$(DEV_IMAGE)' \
+       --target=dev \
+       --build-arg 'TARGETARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
@@ -98,6 +109,10 @@ cli-dev:
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
 
+cli-fips-dev:
+	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
+	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
+
 
 cli-lint: ## Run linter in the control-plane directory.
 	cd cli; golangci-lint run -c ../.golangci.yml
@@ -139,7 +154,7 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.10.0 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen

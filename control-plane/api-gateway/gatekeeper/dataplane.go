@@ -142,9 +142,6 @@ func getDataplaneArgs(namespace string, config common.HelmConfig, bearerTokenFil
 			"-login-bearer-token-path="+bearerTokenFile,
 			"-login-meta="+fmt.Sprintf("gateway=%s/%s", namespace, name),
 		)
-		if config.EnableNamespaces {
-			args = append(args, "-login-namespace="+consulNamespace)
-		}
 		if config.ConsulPartition != "" {
 			args = append(args, "-login-partition="+config.ConsulPartition)
 		}

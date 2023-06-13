@@ -6,3 +6,4 @@ resources:
   - gatewayclass.yaml
   - apigateway.yaml
   - httproute.yaml
+  - meshservice.yaml

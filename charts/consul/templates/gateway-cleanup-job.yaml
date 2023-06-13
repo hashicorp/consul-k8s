@@ -41,7 +41,7 @@ spec:
             - consul-k8s-control-plane
           args:
             - gateway-cleanup
-            - -gateway-class-name=consul-api-gateway
+            - -gateway-class-name=consul
             - -gateway-class-config-name=consul-api-gateway
           resources:
             requests:

@@ -1,9 +1,16 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+terraform {
+  required_providers {
+    google = {
+      version = "~> 4.58.0"
+    }
+  }
+}
+
 provider "google" {
   project = var.project
-  version = "~> 4.58.0"
   zone    = var.zone
 }
 
@@ -14,7 +21,7 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.25."
+  version_prefix = "1.25.9"
 }
 
 # We assume that the subnets are already created to save time.

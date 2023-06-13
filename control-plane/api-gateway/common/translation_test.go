@@ -22,6 +22,7 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	logrtest "github.com/go-logr/logr/testing"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/api"
@@ -32,15 +33,11 @@ type fakeReferenceValidator struct{}
 func (v fakeReferenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
 	return true
 }
-func (v fakeReferenceValidator) HTTPRouteCanReferenceGateway(httproute gwv1beta1.HTTPRoute, parentRef gwv1beta1.ParentReference) bool {
-	return true
-}
+
 func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
 	return true
 }
-func (v fakeReferenceValidator) TCPRouteCanReferenceGateway(tcpRoute gwv1alpha2.TCPRoute, parentRef gwv1beta1.ParentReference) bool {
-	return true
-}
+
 func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool {
 	return true
 }

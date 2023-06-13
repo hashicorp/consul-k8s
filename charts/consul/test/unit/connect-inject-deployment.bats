@@ -960,7 +960,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
+  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"200Mi"},"requests":{"cpu":"50m","memory":"200Mi"}}' ]
 }
 
 @test "connectInject/Deployment: can set resources" {

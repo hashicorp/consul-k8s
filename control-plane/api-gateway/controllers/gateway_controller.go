@@ -20,8 +20,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -44,6 +46,7 @@ type GatewayControllerConfig struct {
 	NamespacesEnabled       bool
 	CrossNamespaceACLPolicy string
 	Partition               string
+	Datacenter              string
 	AllowK8sNamespacesSet   mapset.Set
 	DenyK8sNamespacesSet    mapset.Set
 }
@@ -51,9 +54,10 @@ type GatewayControllerConfig struct {
 // GatewayController reconciles a Gateway object.
 // The Gateway is responsible for defining the behavior of API gateways.
 type GatewayController struct {
-	HelmConfig            common.HelmConfig
-	Log                   logr.Logger
-	Translator            common.ResourceTranslator
+	HelmConfig common.HelmConfig
+	Log        logr.Logger
+	Translator common.ResourceTranslator
+
 	cache                 *cache.Cache
 	gatewayCache          *cache.GatewayCache
 	allowK8sNamespacesSet mapset.Set
@@ -171,7 +175,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	binder := binding.NewBinder(binding.BinderConfig{
 		Logger:                log,
 		Translator:            r.Translator,
-		ControllerName:        GatewayClassControllerName,
+		ControllerName:        common.GatewayClassControllerName,
 		Namespaces:            namespaces,
 		GatewayClassConfig:    gatewayClassConfig,
 		GatewayClass:          gatewayClass,
@@ -188,6 +192,11 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	updates := binder.Snapshot()
 
 	if updates.UpsertGatewayDeployment {
+		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
+			log.Error(err, "error creating role binding")
+			return ctrl.Result{}, err
+		}
+
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
 			log.Error(err, "unable to update gateway resources")
@@ -201,6 +210,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.RemoveSubscription(nonNormalizedConsulKey)
+		// make sure we have deregister all services even if they haven't
+		// hit cache yet
+		if err := r.deregisterAllServices(ctx, consulKey); err != nil {
+			log.Error(err, "error deregistering services")
+			return ctrl.Result{}, err
+		}
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
@@ -227,19 +242,24 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	for _, registration := range updates.Consul.Registrations {
-		log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
-		if err := r.cache.Register(ctx, registration); err != nil {
-			log.Error(err, "error registering service")
-			return ctrl.Result{}, err
+	if updates.UpsertGatewayDeployment {
+		// We only do some registration/deregistraion if we still have a valid gateway
+		// otherwise, we've already deregistered everything related to the gateway, so
+		// no need to do any of the following.
+		for _, registration := range updates.Consul.Registrations {
+			log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
+			if err := r.cache.Register(ctx, registration); err != nil {
+				log.Error(err, "error registering service")
+				return ctrl.Result{}, err
+			}
 		}
-	}
 
-	for _, deregistration := range updates.Consul.Deregistrations {
-		log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
-		if err := r.cache.Deregister(ctx, deregistration); err != nil {
-			log.Error(err, "error deregistering service")
-			return ctrl.Result{}, err
+		for _, deregistration := range updates.Consul.Deregistrations {
+			log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
+			if err := r.cache.Deregister(ctx, deregistration); err != nil {
+				log.Error(err, "error deregistering service")
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
@@ -259,17 +279,24 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	// link up policy - TODO: this is really a nasty hack to inject a known policy with
-	// mesh == read on the provisioned gateway token if needed, figure out some other
-	// way of handling it.
-	if updates.UpsertGatewayDeployment {
-		if err := r.cache.LinkPolicy(ctx, nonNormalizedConsulKey.Name, nonNormalizedConsulKey.Namespace); err != nil {
-			log.Error(err, "error linking token policy")
-			return ctrl.Result{}, err
+	return ctrl.Result{}, nil
+}
+
+func (r *GatewayController) deregisterAllServices(ctx context.Context, consulKey api.ResourceReference) error {
+	services, err := r.gatewayCache.FetchServicesFor(ctx, consulKey)
+	if err != nil {
+		return err
+	}
+	for _, service := range services {
+		if err := r.cache.Deregister(ctx, api.CatalogDeregistration{
+			Node:      service.Node,
+			ServiceID: service.ServiceID,
+			Namespace: service.Namespace,
+		}); err != nil {
+			return err
 		}
 	}
-
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func (r *GatewayController) updateAndResetStatus(ctx context.Context, o client.Object) error {
@@ -320,22 +347,30 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		ConsulClientConfig:      config.ConsulClientConfig,
 		ConsulServerConnMgr:     config.ConsulServerConnMgr,
 		NamespacesEnabled:       config.NamespacesEnabled,
+		Datacenter:              config.Datacenter,
 		CrossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
 		Logger:                  mgr.GetLogger(),
 	}
 	c := cache.New(cacheConfig)
 	gwc := cache.NewGatewayCache(ctx, cacheConfig)
 
+	predicate, _ := predicate.LabelSelectorPredicate(
+		*metav1.SetAsLabelSelector(map[string]string{
+			common.ManagedLabel: "true",
+		}),
+	)
+
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
-		HelmConfig: config.HelmConfig,
+		HelmConfig: config.HelmConfig.Normalize(),
 		Translator: common.ResourceTranslator{
 			EnableConsulNamespaces: config.HelmConfig.EnableNamespaces,
 			ConsulDestNamespace:    config.HelmConfig.ConsulDestinationNamespace,
 			EnableK8sMirroring:     config.HelmConfig.EnableNamespaceMirroring,
 			MirroringPrefix:        config.HelmConfig.NamespaceMirroringPrefix,
 			ConsulPartition:        config.HelmConfig.ConsulPartition,
+			Datacenter:             config.Datacenter,
 		},
 		denyK8sNamespacesSet:  config.DenyK8sNamespacesSet,
 		allowK8sNamespacesSet: config.AllowK8sNamespacesSet,
@@ -369,16 +404,17 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformSecret(ctx)),
 		).
 		Watches(
-			source.NewKindWithCache(&gwv1beta1.ReferenceGrant{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant(ctx)),
-		).
-		Watches(
 			source.NewKindWithCache(&v1alpha1.MeshService{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformMeshService(ctx)),
 		).
 		Watches(
 			source.NewKindWithCache(&corev1.Endpoints{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints(ctx)),
+		).
+		Watches(
+			&source.Kind{Type: &corev1.Pod{}},
+			handler.EnqueueRequestsFromMapFunc(r.transformPods(ctx)),
+			builder.WithPredicates(predicate),
 		).
 		Watches(
 			// Subscribe to changes from Consul for APIGateways
@@ -452,7 +488,7 @@ func (r *GatewayController) transformSecret(ctx context.Context) func(o client.O
 		secret := o.(*corev1.Secret)
 		gatewayList := &gwv1beta1.GatewayList{}
 		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, secret.Name),
+			FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, client.ObjectKeyFromObject(secret).String()),
 		}); err != nil {
 			return nil
 		}
@@ -569,13 +605,32 @@ func gatewayReferencesCertificate(certificateKey api.ResourceReference, gateway 
 	return false
 }
 
+func (r *GatewayController) transformPods(ctx context.Context) func(o client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		pod := o.(*corev1.Pod)
+
+		if gateway, managed := common.GatewayFromPod(pod); managed {
+			return []reconcile.Request{
+				{NamespacedName: gateway},
+			}
+		}
+
+		return nil
+	}
+}
+
 // transformEndpoints will return a list of gateways that are referenced
 // by a TCPRoute or HTTPRoute that references the service.
 func (r *GatewayController) transformEndpoints(ctx context.Context) func(o client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
-		key := client.ObjectKeyFromObject(o).String()
+		key := client.ObjectKeyFromObject(o)
+		endpoints := o.(*corev1.Endpoints)
 
-		return r.gatewaysForRoutesReferencing(ctx, TCPRoute_ServiceIndex, HTTPRoute_ServiceIndex, key)
+		if shouldIgnore(key.Namespace, r.denyK8sNamespacesSet, r.allowK8sNamespacesSet) || isLabeledIgnore(endpoints.Labels) {
+			return nil
+		}
+
+		return r.gatewaysForRoutesReferencing(ctx, TCPRoute_ServiceIndex, HTTPRoute_ServiceIndex, key.String())
 	}
 }
 
@@ -732,7 +787,7 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
 		if string(ref.Group) != v1alpha1.GroupVersion.Group ||
 			ref.Kind != v1alpha1.GatewayClassConfigKind ||
-			gatewayClassConfig.Spec.ControllerName != GatewayClassControllerName {
+			gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
 			// we don't have supported params, so return nil
 			return nil, nil
 		}
@@ -759,7 +814,7 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 
 	list := gwv1beta1.GatewayClassList{}
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, GatewayClassControllerName),
+		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, common.GatewayClassControllerName),
 	}); err != nil {
 		return err
 	}

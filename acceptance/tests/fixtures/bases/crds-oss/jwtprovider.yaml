@@ -4,31 +4,27 @@
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: JWTProvider
 metadata:
-  name: test-jwt-provider
+  name: jwt-provider
 spec:
   jsonWebKeySet:
     local:
       filename: "jwks.txt"
   issuer: "test-issuer"
   audiences:
-    - "aud1"
-    - "aud2"
+  - "aud1"
+  - "aud2"
   locations:
-    - header:
-        name: "x-jwt-header"
-        valuePrefix: "bearer"
-        forward: true
-    - queryParam:
-        name: "x-query-param"
-    - cookie:
-        name: "session-id"
+  - header:
+      name: "x-jwt-header"
+      valuePrefix: "bearer"
+      forward: true
+  - queryParam:
+      name: "x-query-param"
+  - cookie:
+      name: "session-id"
   forwarding:
     headerName: "x-forwarded-jwt"
     padForwardPayloadHeader: true
   clockSkewSeconds: 45
   cacheConfig:
     size: 15
-
-
-
-

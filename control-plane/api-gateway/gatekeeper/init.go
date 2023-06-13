@@ -147,11 +147,6 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 			})
 
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "CONSUL_LOGIN_NAMESPACE",
-			Value: consulNamespace,
-		})
-
 		if config.ConsulPartition != "" {
 			container.Env = append(container.Env, corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_PARTITION",

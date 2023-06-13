@@ -18,12 +18,6 @@ var (
 		"consul.hashicorp.com_peeringacceptors.yaml": {},
 		"consul.hashicorp.com_peeringdialers.yaml":   {},
 	}
-	// HACK IT (again)! These CRDs need to go in the Helm chart's crds directory which means they
-	// cannot have any templating in them. They need to be in the CRD directory because we install
-	// resources that reference them in the main installation sequence.
-	toCRDDir = map[string]struct{}{
-		"consul.hashicorp.com_gatewayclassconfigs.yaml": {},
-	}
 )
 
 func main() {
@@ -40,37 +34,40 @@ func main() {
 }
 
 func realMain(helmPath string) error {
-	return filepath.Walk("../../control-plane/config/crd/bases", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	root := "../../control-plane/config/crd/"
+	dirs := []string{"bases", "external"}
 
-		if info.IsDir() || filepath.Ext(path) != ".yaml" {
-			return nil
-		}
+	for _, dir := range dirs {
+		err := filepath.Walk(root+dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
 
-		printf("processing %s", filepath.Base(path))
+			if info.IsDir() || filepath.Ext(path) != ".yaml" || filepath.Base(path) == "kustomization.yaml" {
+				return nil
+			}
 
-		contentBytes, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		contents := string(contentBytes)
+			printf("processing %s", filepath.Base(path))
 
-		// Strip leading newline.
-		contents = strings.TrimPrefix(contents, "\n")
+			contentBytes, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			contents := string(contentBytes)
 
-		if _, ok := requiresPeering[info.Name()]; ok {
-			// Add {{- if and .Values.connectInject.enabled .Values.global.peering.enabled  }} {{- end }} wrapper.
-			contents = fmt.Sprintf("{{- if and .Values.connectInject.enabled .Values.global.peering.enabled }}\n%s{{- end }}\n", contents)
-		} else if _, ok := toCRDDir[info.Name()]; ok {
-			// No-op (we don't want templating).
-		} else {
-			// Add {{- if .Values.connectInject.enabled }} {{- end }} wrapper.
-			contents = fmt.Sprintf("{{- if .Values.connectInject.enabled }}\n%s{{- end }}\n", contents)
-		}
+			// Strip leading newline.
+			contents = strings.TrimPrefix(contents, "\n")
 
-		if _, ok := toCRDDir[info.Name()]; !ok {
+			if _, ok := requiresPeering[info.Name()]; ok {
+				// Add {{- if and .Values.connectInject.enabled .Values.global.peering.enabled  }} {{- end }} wrapper.
+				contents = fmt.Sprintf("{{- if and .Values.connectInject.enabled .Values.global.peering.enabled }}\n%s{{- end }}\n", contents)
+			} else if dir == "external" {
+				contents = fmt.Sprintf("{{- if and .Values.connectInject.enabled .Values.connectInject.apiGateway.manageExternalCRDs }}\n%s{{- end }}\n", contents)
+			} else {
+				// Add {{- if .Values.connectInject.enabled }} {{- end }} wrapper.
+				contents = fmt.Sprintf("{{- if .Values.connectInject.enabled }}\n%s{{- end }}\n", contents)
+			}
+
 			// Add labels, this is hacky because we're relying on the line number
 			// but it means we don't need to regex or yaml parse.
 			splitOnNewlines := strings.Split(contents, "\n")
@@ -84,20 +81,27 @@ func realMain(helmPath string) error {
 			}
 			withLabels := append(splitOnNewlines[0:9], append(labelLines, splitOnNewlines[9:]...)...)
 			contents = strings.Join(withLabels, "\n")
-		}
 
-		// Construct the destination filename.
-		filenameSplit := strings.Split(info.Name(), "_")
-		crdName := filenameSplit[1]
-		destinationPath := filepath.Join(helmPath, "templates", fmt.Sprintf("crd-%s", crdName))
-		if _, ok := toCRDDir[info.Name()]; ok {
-			destinationPath = filepath.Join(helmPath, "crds", formatCRDName(info.Name()))
-		}
+			var crdName string
+			if dir == "bases" {
+				// Construct the destination filename.
+				filenameSplit := strings.Split(info.Name(), "_")
+				crdName = filenameSplit[1]
+			} else if dir == "external" {
+				filenameSplit := strings.Split(info.Name(), ".")
+				crdName = filenameSplit[0] + ".yaml"
+			}
 
-		// Write it.
-		printf("writing to %s", destinationPath)
-		return os.WriteFile(destinationPath, []byte(contents), 0644)
-	})
+			destinationPath := filepath.Join(helmPath, "templates", fmt.Sprintf("crd-%s", crdName))
+			// Write it.
+			printf("writing to %s", destinationPath)
+			return os.WriteFile(destinationPath, []byte(contents), 0644)
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func printf(format string, args ...interface{}) {

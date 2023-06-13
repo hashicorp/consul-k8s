@@ -476,7 +476,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if err := (&gatewaycontrollers.GatewayClassController{
-		ControllerName: gatewaycontrollers.GatewayClassControllerName,
+		ControllerName: gatewaycommon.GatewayClassControllerName,
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("GatewayClass"),
 	}).SetupWithManager(ctx, mgr); err != nil {
@@ -500,7 +500,7 @@ func (c *Command) Run(args []string) int {
 			PeeringEnabled:             c.flagEnablePeering,
 			EnableOpenShift:            c.flagEnableOpenShift,
 			EnableNamespaceMirroring:   c.flagEnableK8SNSMirroring,
-			AuthMethod:                 c.flagACLAuthMethod,
+			AuthMethod:                 c.consul.ConsulLogin.AuthMethod,
 			LogLevel:                   c.flagLogLevel,
 			LogJSON:                    c.flagLogJSON,
 			TLSEnabled:                 c.consul.UseTLS,
@@ -515,7 +515,9 @@ func (c *Command) Run(args []string) int {
 		NamespacesEnabled:       c.flagEnableNamespaces,
 		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 		Partition:               c.consul.Partition,
+		Datacenter:              c.consul.Datacenter,
 	})
+
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return 1
@@ -644,6 +646,15 @@ func (c *Command) Run(args []string) int {
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.JWTProvider)
+		return 1
+	}
+	if err = (&controllers.ControlPlaneRequestLimitController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ControlPlaneRequestLimit),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", apicommon.ControlPlaneRequestLimit)
 		return 1
 	}
 
@@ -815,6 +826,12 @@ func (c *Command) Run(args []string) int {
 		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.JWTProviderWebhook{
 			Client:     mgr.GetClient(),
 			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.JWTProvider),
+			ConsulMeta: consulMeta,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v1alpha1-controlplanerequestlimits",
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ControlPlaneRequestLimitWebhook{
+			Client:     mgr.GetClient(),
+			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ControlPlaneRequestLimit),
 			ConsulMeta: consulMeta,
 		}})
 
