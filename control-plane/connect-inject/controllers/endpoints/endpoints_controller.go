@@ -941,6 +941,7 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 
 				if r.AuthMethod != "" && serviceDeregistered {
 					r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
+					var callErr error
 					callErr = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
 					if callErr != nil {
 						r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
