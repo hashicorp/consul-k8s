@@ -897,55 +897,63 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
 	// Get services matching metadata.
 	nodesWithSvcs, err := r.serviceInstancesForK8sNodes(apiClient, k8sSvcName, k8sSvcNamespace)
-	if err != nil {
-		r.Log.Error(err, "failed to get service instances", "name", k8sSvcName)
-		return err
-	}
 
-	// Deregister each service instance that matches the metadata.
-	for _, nodeSvcs := range nodesWithSvcs {
-		for _, svc := range nodeSvcs.Services {
-			// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
-			// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
-			// every service instance.
-			var serviceDeregistered bool
-			if endpointsAddressesMap != nil {
-				if _, ok := endpointsAddressesMap[svc.Address]; !ok {
-					// If the service address is not in the Endpoints addresses, deregister it.
+	if nodesWithSvcs != nil {
+		// Deregister each service instance that matches the metadata.
+		for _, nodeSvcs := range nodesWithSvcs {
+			for _, svc := range nodeSvcs.Services {
+				// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
+				// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
+				// every service instance.
+				var serviceDeregistered bool
+				if endpointsAddressesMap != nil {
+					if _, ok := endpointsAddressesMap[svc.Address]; !ok {
+						// If the service address is not in the Endpoints addresses, deregister it.
+						r.Log.Info("deregistering service from consul", "svc", svc.ID)
+						var callErr error
+						_, callErr = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
+							Node:      nodeSvcs.Node.Node,
+							ServiceID: svc.ID,
+							Namespace: svc.Namespace,
+						}, nil)
+						if callErr != nil {
+							r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
+							err = multierror.Append(err, callErr)		
+						} else {
+							serviceDeregistered = true
+						}
+					}
+				} else {
 					r.Log.Info("deregistering service from consul", "svc", svc.ID)
-					_, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
+					var callErr error
+					_, callErr = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
 						Node:      nodeSvcs.Node.Node,
 						ServiceID: svc.ID,
 						Namespace: svc.Namespace,
 					}, nil)
-					if err != nil {
+					if callErr != nil {
 						r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
-						return err
+						err = multierror.Append(err, callErr)		
+					} else {
+						serviceDeregistered = true
 					}
-					serviceDeregistered = true
 				}
-			} else {
-				r.Log.Info("deregistering service from consul", "svc", svc.ID)
-				if _, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
-					Node:      nodeSvcs.Node.Node,
-					ServiceID: svc.ID,
-					Namespace: svc.Namespace,
-				}, nil); err != nil {
-					r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
-					return err
-				}
-				serviceDeregistered = true
-			}
 
-			if r.AuthMethod != "" && serviceDeregistered {
-				r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
-				err = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
-				if err != nil {
-					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
-					return err
+				if r.AuthMethod != "" && serviceDeregistered {
+					r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
+					callErr = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
+					if callErr != nil {
+						r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
+						err = multierror.Append(err, callErr)		
+					}
 				}
 			}
 		}
+	}
+
+	if err != nil {
+		r.Log.Error(err, "Errors during deregistration of service instances", "name", k8sSvcName)
+		return err
 	}
 
 	return nil
