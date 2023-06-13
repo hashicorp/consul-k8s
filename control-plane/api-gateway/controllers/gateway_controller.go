@@ -212,7 +212,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.gatewayCache.RemoveSubscription(nonNormalizedConsulKey)
 		// make sure we have deregister all services even if they haven't
 		// hit cache yet
-		if err := r.deregisterAllServices(ctx, consulKey); err != nil {
+		if err := r.deregisterAllServices(ctx, nonNormalizedConsulKey); err != nil {
 			log.Error(err, "error deregistering services")
 			return ctrl.Result{}, err
 		}
