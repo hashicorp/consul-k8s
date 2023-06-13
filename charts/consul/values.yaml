@@ -87,7 +87,7 @@ global:
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
   imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.1.0-dev
-  imageK8SWindows: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane-windows:1.1.0-dev
+  imageK8SWindows: ""
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
