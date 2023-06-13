@@ -102,7 +102,7 @@ func TestConnectInject(t *testing.T) {
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
 					out, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "read", podName)
-					require.NoError(t, err)
+					require.NoError(r, err)
 
 					output := string(out)
 					logger.Log(t, output)
