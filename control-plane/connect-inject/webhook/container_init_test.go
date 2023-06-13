@@ -462,7 +462,8 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -505,7 +506,8 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -552,7 +554,8 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -595,7 +598,8 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -644,6 +648,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=false \
   -service-account-name="web" \
   -service-name="" \`,
 			[]corev1.EnvVar{
@@ -715,6 +720,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=false \
   -service-account-name="web" \
   -service-name="" \`,
 			[]corev1.EnvVar{
@@ -784,7 +790,8 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=true \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -828,7 +835,8 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=true \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -876,7 +884,8 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=true \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -920,7 +929,8 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \`,
+  -log-json=false \
+  -is-windows=true \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -970,6 +980,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=true \
   -service-account-name="web" \
   -service-name="" \`,
 			[]corev1.EnvVar{
@@ -999,7 +1010,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
@@ -1042,6 +1053,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=true \
   -service-account-name="web" \
   -service-name="" \`,
 			[]corev1.EnvVar{
@@ -1071,7 +1083,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
@@ -1191,6 +1203,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=false \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web \
   -service-name="web" \`,
@@ -1198,6 +1211,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=false \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web-admin \
   -service-name="web-admin" \`,
@@ -1229,6 +1243,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=false \
   -service-account-name="web" \
   -service-name="web" \
   -multiport=true \
@@ -1237,6 +1252,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=false \
   -service-account-name="web-admin" \
   -service-name="web-admin" \
   -multiport=true \
@@ -1279,6 +1295,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			[]string{`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=true \
   -multiport=true \
   -proxy-id-file=C:\\consul\\connect-inject\\proxyid-web \
   -service-name="web" \`,
@@ -1286,6 +1303,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=true \
   -multiport=true \
   -proxy-id-file=C:\\consul\\connect-inject\\proxyid-web-admin \
   -service-name="web-admin" \`,
@@ -1319,6 +1337,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			[]string{`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=true \
   -service-account-name="web" \
   -service-name="web" \
   -multiport=true \
@@ -1327,6 +1346,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
+  -is-windows=true \
   -service-account-name="web-admin" \
   -service-name="web-admin" \
   -multiport=true \
@@ -1335,11 +1355,11 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
 				},
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
-					Value: "/consul/serviceaccount-web-admin/token",
+					Value: "C:\\consul\\serviceaccount-web-admin\\token",
 				},
 			},
 		},

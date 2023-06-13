@@ -1290,6 +1290,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 		{
 			"windows with ACLs",
 			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
 				return pod
 			},
 			MeshWebhook{
@@ -1299,7 +1300,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				LogJSON:       false,
 				AuthMethod:    "test-auth-method",
 			},
-			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
 				"-login-meta=pod=k8snamespace/test-pod -tls-disabled -telemetry-prom-scrape-path=/metrics",
 			[]corev1.EnvVar{
 				{
@@ -1311,6 +1312,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 		{
 			"windows with ACLs and namespace mirroring",
 			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
 				return pod
 			},
 			MeshWebhook{
@@ -1322,7 +1324,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				EnableNamespaces:     true,
 				EnableK8SNSMirroring: true,
 			},
-			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
 			[]corev1.EnvVar{
 				{
@@ -1334,6 +1336,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 		{
 			"windows with ACLs and single destination namespace",
 			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
 				return pod
 			},
 			MeshWebhook{
@@ -1345,7 +1348,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "test-ns",
 			},
-			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled -telemetry-prom-scrape-path=/metrics",
 			[]corev1.EnvVar{
 				{
@@ -1357,6 +1360,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 		{
 			"windows with ACLs and partitions",
 			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
 				return pod
 			},
 			MeshWebhook{
@@ -1367,7 +1371,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				AuthMethod:      "test-auth-method",
 				ConsulPartition: "test-part",
 			},
-			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
 				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled -telemetry-prom-scrape-path=/metrics",
 			[]corev1.EnvVar{
 				{
@@ -1379,6 +1383,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 		{
 			"windows with TLS and CA cert provided",
 			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
 				return pod
 			},
 			MeshWebhook{
@@ -1390,7 +1395,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 				ConsulTLSServerName: "server.dc1.consul",
 				ConsulCACert:        "consul-ca-cert",
 			},
-			" -tls-server-name=server.dc1.consul -ca-certs=/consul/connect-inject/consul-ca.pem -telemetry-prom-scrape-path=/metrics",
+			" -tls-server-name=server.dc1.consul -ca-certs=C:\\consul\\connect-inject\\consul-ca.pem -telemetry-prom-scrape-path=/metrics",
 			[]corev1.EnvVar{
 				{
 					Name:  "TMPDIR",
@@ -1401,6 +1406,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 		{
 			"windows with TLS and no CA cert provided",
 			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
 				return pod
 			},
 			MeshWebhook{
@@ -1422,6 +1428,7 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 		{
 			"windows with single destination namespace",
 			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
 				return pod
 			},
 			MeshWebhook{
