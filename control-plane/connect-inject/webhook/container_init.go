@@ -44,7 +44,6 @@ type initContainerCommandData struct {
 func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	var connectInjectDir, imageConsulK8s, initContainerCommandInterpreter, initContainerCommandTpl string
 
-	w.Log.Info("checking for windows")
 	if isWindows(pod) {
 		connectInjectDir = "C:\\consul\\connect-inject"
 		imageConsulK8s = w.ImageConsulK8SWindows
