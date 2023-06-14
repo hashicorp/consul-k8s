@@ -110,6 +110,23 @@ func (b *Binder) Snapshot() *Snapshot {
 		}
 	}
 
+	for _, service := range b.config.ConsulGatewayServices {
+		podExists := false
+		for _, pod := range registrationPods {
+			if service.ServiceID == pod.Name {
+				podExists = true
+			}
+		}
+
+		if !podExists {
+			snapshot.Consul.Deregistrations = append(snapshot.Consul.Deregistrations, api.CatalogDeregistration{
+				Node:      service.Node,
+				ServiceID: service.ServiceID,
+				Namespace: service.Namespace,
+			})
+		}
+	}
+
 	gatewayClassConfig := b.config.GatewayClassConfig
 
 	isGatewayDeleted := b.isGatewayDeleted()
