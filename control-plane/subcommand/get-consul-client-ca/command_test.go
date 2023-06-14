@@ -135,7 +135,6 @@ func TestRun(t *testing.T) {
 // Test that if the Consul server is not available at first,
 // we continue to poll it until it comes up.
 func TestRun_ConsulServerAvailableLater(t *testing.T) {
-	t.Parallel()
 	outputFile, err := os.CreateTemp("", "ca")
 	require.NoError(t, err)
 	defer os.RemoveAll(outputFile.Name())
@@ -186,7 +185,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		"-server-port", fmt.Sprintf("%d", randomPorts[2]),
 		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
-		"-consul-api-timeout", "20s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter)
 
