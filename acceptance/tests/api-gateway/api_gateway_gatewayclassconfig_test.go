@@ -26,7 +26,7 @@ import (
 // GatewayClassConfig tests the creation of a gatewayclassconfig object and makes sure that its configuration
 // is properly applied to any child gateway objects, namely that the number of gateway instances match the defined
 // minInstances,maxInstances and defaultInstances parameters, and that changing the parent gateway does not affect
-// the child gateways
+// the child gateways.
 func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
@@ -37,7 +37,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	releaseName := helpers.RandomName()
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 	consulCluster.Create(t)
-	// Override the default proxy config settings for this test
+	// Override the default proxy config settings for this test.
 	consulClient, _ := consulCluster.SetupConsulClient(t, false)
 	_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
 		Kind: api.ProxyDefaults,
@@ -133,7 +133,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 
 	// Create gateway referencing gateway class config
 	gatewayName := "gateway"
-	logger.Log(t, "creating controlled gateway one")
+	logger.Log(t, "creating controlled gateway")
 	gateway := createGateway(t, k8sClient, gatewayName, namespace, gatewayClassName, certificateName)
 	// make sure it exists
 	logger.Log(t, "checking that gateway one is synchronized to Consul")
@@ -179,6 +179,8 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 		deployment.Spec.Replicas = scaleTo
 		err = client.Update(context.Background(), &deployment)
 		require.NoError(r, err)
+
+		//time.Sleep(time.Minute * 100)
 	})
 }
 
