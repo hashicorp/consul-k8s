@@ -200,7 +200,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	retrier := &retry.Timer{Timeout: 40 * time.Second, Wait: 2 * time.Second}
+	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 1 * time.Second}
 	// get the actual ca cert from consul
 	var expectedCARoot string
 	retry.RunWith(retrier, t, func(r *retry.R) {
