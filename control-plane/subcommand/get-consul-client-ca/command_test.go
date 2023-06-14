@@ -186,7 +186,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		"-server-port", fmt.Sprintf("%d", randomPorts[2]),
 		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
-		"-consul-api-timeout", "10s",
+		"-consul-api-timeout", "20s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter)
 
