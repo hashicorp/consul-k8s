@@ -41,10 +41,10 @@ func TestConnectInject_PermissiveMTLS(t *testing.T) {
 	logger.Logf(t, "Check that incoming non-mTLS connection fails in MutualTLSMode = strict")
 	k8s.CheckStaticServerConnectionFailing(t, kubectlOpts, "static-client", "http://static-server")
 
-	t.Logf("Set allowEnablingPermissiveMutualTLS = true")
+	logger.Log(t, "Set allowEnablingPermissiveMutualTLS = true")
 	writeCrd(t, connHelper, "../fixtures/cases/permissive-mtls/mesh-config-permissive-allowed.yaml")
 
-	t.Logf("Set mutualTLSMode = permissive for static-server")
+	logger.Log(t, "Set mutualTLSMode = permissive for static-server")
 	writeCrd(t, connHelper, "../fixtures/cases/permissive-mtls/service-defaults-static-server-permissive.yaml")
 
 	logger.Log(t, "Check that incoming mTLS connection is successful in MutualTLSMode = permissive")
@@ -53,13 +53,13 @@ func TestConnectInject_PermissiveMTLS(t *testing.T) {
 
 func deployNonMeshClient(t *testing.T, ch connhelper.ConnectHelper) {
 	t.Helper()
-	logger.Log(t, "Creating static-client deployment, with connect-inject=false / unset.")
+	logger.Log(t, "Creating static-client deployment with connect-inject=false")
 	k8s.DeployKustomize(t, ch.Ctx.KubectlOptions(t), ch.Cfg.NoCleanupOnFailure, ch.Cfg.DebugDirectory, "../fixtures/bases/static-client")
 	requirePodContainers(t, ch, "app=static-client", 1)
 }
 
 func deployStaticServer(t *testing.T, cfg *config.TestConfig, ch connhelper.ConnectHelper) {
-	t.Logf("Deploy static-server")
+	logger.Log(t, "Creating static-server deployment with connect-inject=true")
 	k8s.DeployKustomize(t, ch.Ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 	requirePodContainers(t, ch, "app=static-server", 2)
 }
