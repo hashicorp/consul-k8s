@@ -183,16 +183,13 @@ func (c *Command) Run(args []string) int {
 
 	// todo (agentless): this should eventually be passed to consul-dataplane as a string so we don't need to write it to file.
 	if c.consul.UseTLS && c.consul.CACertPEM != "" {
+		cAFile := constants.ConsulCAFile
 		if c.consul.IsWindows {
-			if err = common.WriteFileWithPerms(constants.ConsulCAFileWindows, c.consul.CACertPEM, 0444); err != nil {
-				c.logger.Error("error writing CA cert file", "error", err)
-				return 1
-			}
-		} else {
-			if err = common.WriteFileWithPerms(constants.ConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
-				c.logger.Error("error writing CA cert file", "error", err)
-				return 1
-			}
+			cAFile = constants.ConsulCAFileWindows
+		}
+		if err = common.WriteFileWithPerms(cAFile, c.consul.CACertPEM, 0444); err != nil {
+			c.logger.Error("error writing CA cert file", "error", err)
+			return 1
 		}
 	}
 
