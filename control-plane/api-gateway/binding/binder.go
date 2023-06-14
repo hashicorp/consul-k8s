@@ -110,8 +110,8 @@ func (b *Binder) Snapshot() *Snapshot {
 		}
 	}
 
-// Loop through the list of Consul services and deregister any instances
-// that have had their corresponding Pod deleted
+	// Loop through the list of Consul services and deregister any instances
+	// that have had their corresponding Pod deleted
 	for _, service := range b.config.ConsulGatewayServices {
 		podExists := false
 		for _, pod := range registrationPods {
