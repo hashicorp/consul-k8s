@@ -23,18 +23,21 @@ import (
 	"testing"
 )
 
-func TestAPIGateway_GatewayClassConfigEndToEnd(t *testing.T) {
+// GatewayClassConfig tests the creation of a gatewayclassconfig object and makes sure that its configuration
+// is properly applied to any child gateway objects, namely that the number of gateway instances match the defined
+// minInstances,maxInstances and defaultInstances parameters, and that changing the parent gateway does not affect
+// the child gateways
+func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 	helmValues := map[string]string{
 		"global.logLevel":       "trace",
 		"connectInject.enabled": "true",
 	}
-
 	releaseName := helpers.RandomName()
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
-
 	consulCluster.Create(t)
+
 	// Override the default proxy config settings for this test
 	consulClient, _ := consulCluster.SetupConsulClient(t, false)
 	_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
@@ -45,10 +48,9 @@ func TestAPIGateway_GatewayClassConfigEndToEnd(t *testing.T) {
 		},
 	}, nil)
 	require.NoError(t, err)
-
 	k8sClient := ctx.ControllerRuntimeClient(t)
-
 	namespace := "gateway-namespace"
+
 	//create clean namespace
 	err = k8sClient.Create(context.Background(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -100,7 +102,6 @@ func TestAPIGateway_GatewayClassConfigEndToEnd(t *testing.T) {
 	gatewayClassName := "gateway-class"
 	logger.Log(t, "creating controlled gateway class")
 	createGatewayClass(t, k8sClient, gatewayClassName, gatewayClassControllerName, gatewayParametersRef)
-
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		logger.Log(t, "deleting all gateway classes")
 		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{})
@@ -145,28 +146,25 @@ func TestAPIGateway_GatewayClassConfigEndToEnd(t *testing.T) {
 
 	// Scenario: Gateway deployment should match the default instances defined on the gateway class config
 	logger.Log(t, "checking that gateway instances match defined gateway class config")
-	checkNumberOfInstances(t, k8sClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
+	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
 
 	//Scenario: Updating the GatewayClassConfig should not affect gateways that have already been created
 	logger.Log(t, "updating gatewayclassconfig values")
 	err = k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayClassConfigName, Namespace: namespace}, gatewayClassConfig)
 	require.NoError(t, err)
-
 	gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = pointer.Int32(8)
 	gatewayClassConfig.Spec.DeploymentSpec.MinInstances = pointer.Int32(5)
 	err = k8sClient.Update(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
-
-	checkNumberOfInstances(t, k8sClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
+	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
 
 	//Scenario: gateways should be able to scale independently and not get overridden by the controller unless it's above the max
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, maxInstances)
-	checkNumberOfInstances(t, k8sClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
+	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(100))
-	checkNumberOfInstances(t, k8sClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
+	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(0))
-	checkNumberOfInstances(t, k8sClient, gateway.Name, gateway.Namespace, minInstances, gateway)
-
+	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, minInstances, gateway)
 }
 
 func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *int32) {
@@ -180,11 +178,10 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 		deployment.Spec.Replicas = scaleTo
 		err = client.Update(context.Background(), &deployment)
 		require.NoError(r, err)
-
 	})
-
 }
-func checkNumberOfInstances(t *testing.T, k8client client.Client, name, namespace string, wantNumber *int32, gateway *gwv1beta1.Gateway) {
+
+func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *api.Client, name, namespace string, wantNumber *int32, gateway *gwv1beta1.Gateway) {
 	t.Helper()
 
 	retryCheck(t, 30, func(r *retry.R) {
@@ -199,6 +196,11 @@ func checkNumberOfInstances(t *testing.T, k8client client.Client, name, namespac
 		labels := common.LabelsForGateway(gateway)
 		err = k8client.List(context.Background(), &podList, client.InNamespace(namespace), client.MatchingLabels(labels))
 		require.NoError(r, err)
-		require.EqualValues(r, *wantNumber, *deployment.Spec.Replicas)
+		require.EqualValues(r, *wantNumber, len(podList.Items))
+
+		//TODO (sarahalsmiller) this block is identifies a potential bug in service deregistration. Uncomment when fixed
+		//service, _, err := consulClient.Catalog().Service(name, "", nil)
+		//require.NoError(r, err)
+		//require.EqualValues(r, *wantNumber, len(service))
 	})
 }
