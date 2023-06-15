@@ -14,15 +14,12 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
 type GatewayCache struct {
 	config    Config
 	serverMgr consul.ServerConnectionManager
 	logger    logr.Logger
-
-	events chan event.GenericEvent
 
 	data      map[api.ResourceReference][]api.CatalogService
 	dataMutex sync.RWMutex
@@ -38,7 +35,6 @@ func NewGatewayCache(ctx context.Context, config Config) *GatewayCache {
 		config:             config,
 		serverMgr:          config.ConsulServerConnMgr,
 		logger:             config.Logger,
-		events:             make(chan event.GenericEvent),
 		data:               make(map[api.ResourceReference][]api.CatalogService),
 		subscribedGateways: make(map[api.ResourceReference]context.CancelFunc),
 		ctx:                ctx,
@@ -140,18 +136,5 @@ func (r *GatewayCache) subscribeToGateway(ctx context.Context, ref api.ResourceR
 		r.dataMutex.Lock()
 		r.data[common.NormalizeMeta(ref)] = derefed
 		r.dataMutex.Unlock()
-
-		event := event.GenericEvent{
-			Object: newConfigEntryObject(resource),
-		}
-
-		select {
-		case <-ctx.Done():
-			r.dataMutex.Lock()
-			delete(r.data, ref)
-			r.dataMutex.Unlock()
-			return
-		case r.events <- event:
-		}
 	}
 }
