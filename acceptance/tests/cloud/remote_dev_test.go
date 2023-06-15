@@ -4,6 +4,7 @@
 package cloud
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"os"
 	"testing"
@@ -19,6 +20,7 @@ import (
 
 	hcpgnm "github.com/hashicorp/hcp-sdk-go/clients/cloud-global-network-manager-service/preview/2022-02-15/client/global_network_manager_service"
 	"github.com/hashicorp/hcp-sdk-go/clients/cloud-global-network-manager-service/preview/2022-02-15/models"
+	hcpcfg "github.com/hashicorp/hcp-sdk-go/config"
 	"github.com/hashicorp/hcp-sdk-go/httpclient"
 	"github.com/hashicorp/hcp-sdk-go/resource"
 )
@@ -37,6 +39,15 @@ type hcp struct {
 }
 
 func TestRemoteDevCloud(t *testing.T) {
+	_, rIDok := os.LookupEnv("HCP_RESOURCE_ID")
+	_, cIDok := os.LookupEnv("HCP_CLIENT_ID")
+	_, cSECok := os.LookupEnv("HCP_CLIENT_SECRET")
+
+	if !rIDok || !cIDok || !cSECok {
+		t.Log("Must set HCP_RESOURCE_ID, HCP_CLIENT_ID and HCP_CLIENT_SECRET")
+		t.FailNow()
+	}
+
 	ctx := suite.Environment().DefaultContext(t)
 
 	kubectlOptions := ctx.KubectlOptions(t)
@@ -73,15 +84,6 @@ func TestRemoteDevCloud(t *testing.T) {
 		bootstrapTokenSecretKey  = "token"
 	)
 
-	os.Setenv("HCP_AUTH_URL", authUrlSecretKeyValue)
-	os.Setenv("HCP_API_HOST", apiHostSecretKeyValue)
-	os.Setenv("HCP_SCADA_ADDRESS", scadaAddressSecretKeyValue)
-	t.Cleanup(func() {
-		os.Unsetenv("HCP_AUTH_URL")
-		os.Unsetenv("HCP_API_HOST")
-		os.Unsetenv("HCP_SCADA_ADDRESS")
-
-	})
 	hcpCfg := hcp{
 		ResourceID:   resourceSecretKeyValue,
 		ClientID:     clientIDSecretKeyValue,
@@ -105,6 +107,7 @@ func TestRemoteDevCloud(t *testing.T) {
 	releaseName := helpers.RandomName()
 
 	helmValues := map[string]string{
+		"global.imagePullPolicy":             "IfNotPresent",
 		"global.cloud.enabled":               "true",
 		"global.cloud.resourceId.secretName": resourceSecretName,
 		"global.cloud.resourceId.secretKey":  resourceSecretKey,
@@ -174,9 +177,12 @@ func TestRemoteDevCloud(t *testing.T) {
 // to call to the agent bootstrap config endpoint and parse the response into a
 // CloudBootstrapConfig struct.
 func (c *hcp) fetchAgentBootstrapConfig(t *testing.T) string {
-
+	cfg, err := c.HCPConfig()
+	require.NoError(t, err)
 	logger.Log(t, "Fetching Consul cluster configuration from HCP")
-	httpClientCfg := httpclient.Config{}
+	httpClientCfg := httpclient.Config{
+		HCPConfig: cfg,
+	}
 	clientRuntime, err := httpclient.New(httpClientCfg)
 	require.NoError(t, err)
 
@@ -226,4 +232,21 @@ func (c *hcp) parseBootstrapConfigResponse(t *testing.T, bootstrapRepsonse *mode
 	require.NoError(t, err)
 
 	return consulConfig.ACL.Tokens.InitialManagement
+}
+
+func (c *hcp) HCPConfig(opts ...hcpcfg.HCPConfigOption) (hcpcfg.HCPConfig, error) {
+	if c.ClientID != "" && c.ClientSecret != "" {
+		opts = append(opts, hcpcfg.WithClientCredentials(c.ClientID, c.ClientSecret))
+	}
+	if c.AuthURL != "" {
+		opts = append(opts, hcpcfg.WithAuth(c.AuthURL, &tls.Config{}))
+	}
+	if c.APIHostname != "" {
+		opts = append(opts, hcpcfg.WithAPI(c.APIHostname, &tls.Config{}))
+	}
+	if c.ScadaAddress != "" {
+		opts = append(opts, hcpcfg.WithSCADA(c.ScadaAddress, &tls.Config{}))
+	}
+	opts = append(opts, hcpcfg.FromEnv(), hcpcfg.WithoutBrowserLogin())
+	return hcpcfg.NewHCPConfig(opts...)
 }

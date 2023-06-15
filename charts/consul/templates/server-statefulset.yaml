@@ -241,6 +241,7 @@ spec:
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
