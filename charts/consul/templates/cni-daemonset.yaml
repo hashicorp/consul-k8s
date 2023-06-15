@@ -61,6 +61,7 @@ spec:
         # This container installs the consul CNI binaries and CNI network config file on each node
         - name: install-cni
           image: {{ .Values.global.imageK8S }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           securityContext:
             privileged: true
           command:
