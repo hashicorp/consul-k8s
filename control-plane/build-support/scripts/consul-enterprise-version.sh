@@ -4,8 +4,8 @@
 FILE=$1
 VERSION=$(yq .global.image $FILE)
 
-if [[ "${VERSION}" == *"consul-enterprise:"* ]]; then
-	VERSION=$(echo ${VERSION} | sed "s/consul-enterprise:/consul:/g")
+if [[ !"${VERSION}" == *"consul:"* ]]; then
+	VERSION=$(echo ${VERSION} | sed "s/consul:/consul-enterprise:/g")
 fi
 
 echo "${VERSION}"

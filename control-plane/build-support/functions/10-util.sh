@@ -629,13 +629,8 @@ function update_version_helm {
 	sed_i ${SED_EXT} -e "s/(version:[[:space:]]*)[^\"]*/\1${full_version}/g" "${cfile}"
 	sed_i ${SED_EXT} -e "s/(appVersion:[[:space:]]*)[^\"]*/\1${full_consul_version}/g" "${cfile}"
 	sed_i ${SED_EXT} -e "s/(image:.*\/consul-k8s-control-plane:)[^\"]*/image: $4${full_version}/g" "${cfile}"
-	if ! test -z "$3"; then
-		sed_i ${SED_EXT} -e "s/(image:.*\/consul:)[^\"]*/image: $6:${full_consul_version}/g" "${cfile}"
-		sed_i ${SED_EXT} -e "s/(image:.*\/consul:)[^\"]*/image: $6:${full_consul_version}/g" "${vfile}"
-	else
-		sed_i ${SED_EXT} -e "s/(image:.*\/consul-enterprise:)[^\"]*/image: $6:${full_consul_version}/g" "${cfile}"
-		sed_i ${SED_EXT} -e "s/(image:.*\/consul-enterprise:)[^\"]*/image: $6:${full_consul_version}/g" "${vfile}"
-	fi
+	sed_i ${SED_EXT} -e "s/(image:.*\/consul:)[^\"]*/image: $6:${full_consul_version}/g" "${cfile}"
+	sed_i ${SED_EXT} -e "s/(image:.*\/consul:)[^\"]*/image: $6:${full_consul_version}/g" "${vfile}"
 
 	if test -z "$3"; then
 		sed_i ${SED_EXT} -e "s/(artifacthub.io\/prerelease:[[:space:]]*)[^\"]*/\1false/g" "${cfile}"
@@ -772,7 +767,7 @@ function prepare_dev {
 	#   * - error
 
 	echo "prepare_dev: dir:$1 consul-k8s:$5 consul:$6 date:"$3" mode:dev"
-	set_version "$1" "$5" "$3" "dev" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-k8s-control-plane:" "$6" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-enterprise"
+	set_version "$1" "$5" "$3" "dev" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-k8s-control-plane:" "$6" "docker.mirror.hashicorp.services\/hashicorppreview\/consul"
 
 	return 0
 }
