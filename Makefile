@@ -157,7 +157,7 @@ consul-enterprise-version:
 	@echo $(CONSUL_ENTERPRISE_IMAGE_VERSION)
 
 consul-dataplane-version:
-	@echo $(CONSUL_DATAPLANE_IMAGE_VERSION)
+	@echo "docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.0-dev"
 
 
 # ===========> Release Targets
