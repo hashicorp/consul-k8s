@@ -57,7 +57,6 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-service-account-name", "foo",
 				"-log-level", "invalid",
 				"-consul-node-name", "bar",
-				"-is-windows", "true",
 			},
 			expErr: "unknown log level: invalid",
 		},
