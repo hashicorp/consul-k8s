@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/cli/preset"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -29,7 +28,12 @@ type DevTokenResponse struct {
 }
 
 type hcp struct {
-	HCPConfig *preset.HCPConfig
+	ResourceID   string
+	ClientID     string
+	ClientSecret string
+	AuthURL      string
+	APIHostname  string
+	ScadaAddress string
 }
 
 func TestRemoteDevCloud(t *testing.T) {
@@ -78,10 +82,16 @@ func TestRemoteDevCloud(t *testing.T) {
 		os.Unsetenv("HCP_SCADA_ADDRESS")
 
 	})
+	hcpCfg := hcp{
+		ResourceID:   resourceSecretKeyValue,
+		ClientID:     clientIDSecretKeyValue,
+		ClientSecret: clientSecretKeyValue,
+		AuthURL:      authUrlSecretKeyValue,
+		APIHostname:  apiHostSecretKeyValue,
+		ScadaAddress: scadaAddressSecretKeyValue,
+	}
 
-	presetCfg := preset.GetHCPPresetFromEnv(resourceSecretKeyValue)
-	hcpCfg := hcp{HCPConfig: presetCfg}
-	bootstrapCfg := hcpCfg.fetchAgentBootstrapConfig(t)
+	aclToken := hcpCfg.fetchAgentBootstrapConfig(t)
 
 	cfg := suite.Config()
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, resourceSecretName, resourceSecretKey, resourceSecretKeyValue)
@@ -90,7 +100,7 @@ func TestRemoteDevCloud(t *testing.T) {
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, apiHostSecretName, apiHostSecretKey, apiHostSecretKeyValue)
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, authUrlSecretName, authUrlSecretKey, authUrlSecretKeyValue)
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, scadaAddressSecretName, scadaAddressSecretKey, scadaAddressSecretKeyValue)
-	consul.CreateK8sSecret(t, k8sClient, cfg, ns, bootstrapTokenSecretName, bootstrapTokenSecretKey, bootstrapCfg.ConsulConfig.ACL.Tokens.InitialManagement)
+	consul.CreateK8sSecret(t, k8sClient, cfg, ns, bootstrapTokenSecretName, bootstrapTokenSecretKey, aclToken)
 
 	releaseName := helpers.RandomName()
 
@@ -163,8 +173,7 @@ func TestRemoteDevCloud(t *testing.T) {
 // fetchAgentBootstrapConfig use the resource-id, client-id, and client-secret
 // to call to the agent bootstrap config endpoint and parse the response into a
 // CloudBootstrapConfig struct.
-func (c *hcp) fetchAgentBootstrapConfig(t *testing.T) *preset.CloudBootstrapConfig {
-	hcpConfig := preset.GetHCPPresetFromEnv(c.HCPConfig.ResourceID)
+func (c *hcp) fetchAgentBootstrapConfig(t *testing.T) string {
 
 	logger.Log(t, "Fetching Consul cluster configuration from HCP")
 	httpClientCfg := httpclient.Config{}
@@ -172,7 +181,7 @@ func (c *hcp) fetchAgentBootstrapConfig(t *testing.T) *preset.CloudBootstrapConf
 	require.NoError(t, err)
 
 	hcpgnmClient := hcpgnm.New(clientRuntime, nil)
-	clusterResource, err := resource.FromString(hcpConfig.ResourceID)
+	clusterResource, err := resource.FromString(c.ResourceID)
 	require.NoError(t, err)
 
 	params := hcpgnm.NewAgentBootstrapConfigParams().
@@ -189,17 +198,32 @@ func (c *hcp) fetchAgentBootstrapConfig(t *testing.T) *preset.CloudBootstrapConf
 	return c.parseBootstrapConfigResponse(t, bootstrapConfig)
 }
 
+// ConsulConfig represents 'cluster.consul_config' in the response
+// fetched from the agent bootstrap config endpoint in HCP.
+type ConsulConfig struct {
+	ACL ACL `json:"acl"`
+}
+
+// ACL represents 'cluster.consul_config.acl' in the response
+// fetched from the agent bootstrap config endpoint in HCP.
+type ACL struct {
+	Tokens Tokens `json:"tokens"`
+}
+
+// Tokens represents 'cluster.consul_config.acl.tokens' in the
+// response fetched from the agent bootstrap config endpoint in HCP.
+type Tokens struct {
+	Agent             string `json:"agent"`
+	InitialManagement string `json:"initial_management"`
+}
+
 // parseBootstrapConfigResponse unmarshals the boostrap parseBootstrapConfigResponse
 // and also sets the HCPConfig values to return CloudBootstrapConfig struct.
-func (c *hcp) parseBootstrapConfigResponse(t *testing.T, bootstrapRepsonse *models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse) *preset.CloudBootstrapConfig {
-	var cbc preset.CloudBootstrapConfig
-	var consulConfig preset.ConsulConfig
+func (c *hcp) parseBootstrapConfigResponse(t *testing.T, bootstrapRepsonse *models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse) string {
+
+	var consulConfig ConsulConfig
 	err := json.Unmarshal([]byte(bootstrapRepsonse.Bootstrap.ConsulConfig), &consulConfig)
 	require.NoError(t, err)
 
-	cbc.ConsulConfig = consulConfig
-	cbc.HCPConfig = *c.HCPConfig
-	cbc.BootstrapResponse = bootstrapRepsonse
-
-	return &cbc
+	return consulConfig.ACL.Tokens.InitialManagement
 }
