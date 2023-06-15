@@ -1,5 +1,6 @@
 VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
 CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
+CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
 CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-dataplane-version.sh charts/consul/values.yaml)
 
 # ===========> Helm Targets
@@ -179,6 +180,9 @@ version:
 
 consul-version:
 	@echo $(CONSUL_IMAGE_VERSION)
+
+consul-enterprise-version:
+	@echo $(CONSUL_ENTERPRISE_IMAGE_VERSION)
 
 consul-dataplane-version:
 	@echo $(CONSUL_DATAPLANE_IMAGE_VERSION)
