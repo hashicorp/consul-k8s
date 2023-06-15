@@ -15,6 +15,7 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +26,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul/api"
 )
 
 func init() {
