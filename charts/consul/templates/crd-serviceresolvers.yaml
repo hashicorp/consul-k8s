@@ -227,6 +227,15 @@ spec:
                         type: integer
                     type: object
                 type: object
+              prioritizeByLocality:
+                description: PrioritizeByLocality contains the configuration for
+                  locality aware routing.
+                properties:
+                  mode:
+                    description: Mode specifies the behavior of PrioritizeByLocality
+                      routing. Valid values are "", "none", and "failover".
+                    type: string
+                type: object
               redirect:
                 description: Redirect when configured, all attempts to resolve the
                   service this resolver defines will be substituted for the supplied
