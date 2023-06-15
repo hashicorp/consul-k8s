@@ -5,6 +5,8 @@ package apigateway
 
 import (
 	"context"
+	"testing"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -20,7 +22,6 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-	"testing"
 )
 
 // GatewayClassConfig tests the creation of a gatewayclassconfig object and makes sure that its configuration
@@ -161,7 +162,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	//Scenario: gateways should be able to scale independently and not get overridden by the controller unless it's above the max
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, maxInstances)
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
-	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(100))
+	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(10))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(0))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, minInstances, gateway)
