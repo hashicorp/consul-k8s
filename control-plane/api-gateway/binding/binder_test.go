@@ -810,9 +810,27 @@ func TestBinder_Registrations(t *testing.T) {
 					{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
 				},
 				Pods: []corev1.Pod{
-					{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
-					{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
-					{ObjectMeta: metav1.ObjectMeta{Name: "pod3"}},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod2"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod3"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
 				},
 			}),
 			expectedDeregistrations: []api.CatalogDeregistration{
