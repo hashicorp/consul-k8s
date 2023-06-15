@@ -375,7 +375,6 @@ global:
       # @type: string
       secretKey: null
 
-
     # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
     # labels for the tls-init and tls-init-cleanup jobs pod assignment, formatted as a multi-line string.
     #
