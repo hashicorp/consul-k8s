@@ -197,6 +197,7 @@ func (b *Binder) Snapshot() *Snapshot {
 			for _, registration := range registrations {
 				if service.ServiceID == registration.Service.ID {
 					found = true
+					break
 				}
 			}
 			if !found {
