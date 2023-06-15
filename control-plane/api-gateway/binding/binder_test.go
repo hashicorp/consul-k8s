@@ -809,6 +809,11 @@ func TestBinder_Registrations(t *testing.T) {
 					{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
 					{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
 				},
+				Pods: []corev1.Pod{
+					{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "pod3"}},
+				},
 			}),
 			expectedDeregistrations: []api.CatalogDeregistration{
 				{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
