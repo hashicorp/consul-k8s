@@ -181,8 +181,6 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 		deployment.Spec.Replicas = scaleTo
 		err = client.Update(context.Background(), &deployment)
 		require.NoError(r, err)
-
-		//time.Sleep(time.Minute * 100)
 	})
 }
 
@@ -203,8 +201,8 @@ func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *
 		require.NoError(r, err)
 		require.EqualValues(r, *wantNumber, len(podList.Items))
 
-		service, _, err := consulClient.Catalog().Service(name, "", nil)
+		services, _, err := consulClient.Catalog().Service(name, "", nil)
 		require.NoError(r, err)
-		require.EqualValues(r, *wantNumber, len(service))
+		require.EqualValues(r, *wantNumber, len(services))
 	})
 }
