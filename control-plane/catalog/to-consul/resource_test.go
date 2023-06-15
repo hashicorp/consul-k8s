@@ -102,64 +102,88 @@ func TestServiceWeight_ingress(t *testing.T) {
 // Test that Loadbalancer service weight is set from service annotation.
 func TestServiceWeight_externalIP(t *testing.T) {
 	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := newTestSyncer()
+	serviceResource := defaultServiceResource(client, syncer)
 
+	// Start the controller
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	// Insert an LB service
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
+	svc.Annotations[annotationServiceWeight] = "22"
+	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
+
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Verify what we got
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "3.3.3.3", actual[0].Service.Address)
+		require.Equal(r, 22, actual[0].Service.Weights.Passing)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "4.4.4.4", actual[1].Service.Address)
+		require.Equal(r, 22, actual[1].Service.Weights.Passing)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
+}
+
+// Test service weight
+func TestServiceWeight(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		Weight         string
+		ExpectError    bool
 		ExtectedWeight int
 	}{
 		"external-IP": {
 			Weight:         "22",
+			ExpectError:    false,
 			ExtectedWeight: 22,
 		},
 		"non-int-weight": {
 			Weight:         "non-int",
+			ExpectError:    true,
 			ExtectedWeight: 0,
 		},
 		"one-weight": {
 			Weight:         "1",
+			ExpectError:    true,
 			ExtectedWeight: 0,
 		},
 		"zero-weight": {
 			Weight:         "0",
+			ExpectError:    true,
+			ExtectedWeight: 0,
+		},
+		"negative-weight": {
+			Weight:         "-2",
+			ExpectError:    true,
 			ExtectedWeight: 0,
 		},
 		"greater-than-100-is-allowed": {
 			Weight:         "1000",
+			ExpectError:    false,
 			ExtectedWeight: 1000,
 		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			client := fake.NewSimpleClientset()
-			syncer := newTestSyncer()
-			serviceResource := defaultServiceResource(client, syncer)
-
-			// Start the controller
-			closer := controller.TestControllerRun(&serviceResource)
-			defer closer()
-
-			// Insert an LB service
-			svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
-			svc.Annotations[annotationServiceWeight] = c.Weight
-			svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
-
-			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
-			require.NoError(tt, err)
-
+			weightI, err := getServiceWeight(c.Weight)
 			// Verify what we got
 			retry.Run(tt, func(r *retry.R) {
-				syncer.Lock()
-				defer syncer.Unlock()
-				actual := syncer.Registrations
-				require.Len(r, actual, 2)
-				require.Equal(r, "foo", actual[0].Service.Service)
-				require.Equal(r, "3.3.3.3", actual[0].Service.Address)
-				require.Equal(r, c.ExtectedWeight, actual[0].Service.Weights.Passing)
-				require.Equal(r, "foo", actual[1].Service.Service)
-				require.Equal(r, "4.4.4.4", actual[1].Service.Address)
-				require.Equal(r, c.ExtectedWeight, actual[1].Service.Weights.Passing)
-				require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+				if c.ExpectError {
+					require.Error(r, err)
+				} else {
+					require.Equal(r, c.ExtectedWeight, weightI)
+				}
 			})
 		})
 	}
