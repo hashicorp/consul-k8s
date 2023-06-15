@@ -388,7 +388,6 @@ global:
     # @type: string
     nodeSelector: null
 
-
   # [Enterprise Only] `enableConsulNamespaces` indicates that you are running
   # Consul Enterprise v1.7+ with a valid Consul Enterprise license and would
   # like to make use of configuration beyond registering everything into
