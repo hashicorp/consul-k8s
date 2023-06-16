@@ -188,7 +188,7 @@ consul-dataplane-version:
 	@echo $(CONSUL_DATAPLANE_IMAGE_VERSION)
 
 kind-config:
-	@./control-plane/build-support/scripts/read-yaml.sh acceptance/ci-inputs/kind-inputs.yaml
+	@./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml
 
 
 # ===========> Release Targets
