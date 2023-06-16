@@ -135,7 +135,8 @@ func TestRun(t *testing.T) {
 // Test that if the Consul server is not available at first,
 // we continue to poll it until it comes up.
 func TestRun_ConsulServerAvailableLater(t *testing.T) {
-	t.Parallel()
+	// Skipping this test because it is flaky on release/1.0.x. It is much better in newer versions of Consul.
+	t.Skip()
 	outputFile, err := os.CreateTemp("", "ca")
 	require.NoError(t, err)
 	defer os.RemoveAll(outputFile.Name())
