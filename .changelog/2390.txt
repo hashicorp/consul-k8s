@@ -1,0 +1,3 @@
+```release-note:security
+Update [Go-Discover](https://github.com/hashicorp/go-discover) in the container has been updated to address [CVE-2020-14040](https://github.com/advisories/GHSA-5rcv-m4m3-hfh7)
+```

@@ -17,7 +17,7 @@
 # go-discover builds the discover binary (which we don't currently publish
 # either).
 FROM golang:1.19.2-alpine as go-discover
-RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@49f60c093101c9c5f6b04d5b1c80164251a761a6
+RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@214571b6a5309addf3db7775f4ee8cf4d264fd5f
 
 # dev copies the binary from a local build
 # -----------------------------------
