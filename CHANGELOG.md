@@ -1,9 +1,3 @@
-## 1.1.? (TODO DATE)
-SECURITY:
-* [Go-Discover](https://github.com/hashicorp/go-discover) in the container has been updated to address [CVE-2020-14040](https://github.com/advisories/GHSA-5rcv-m4m3-hfh7)
-
-
-
 ## 1.1.2 (June 5, 2023)
 
 SECURITY:
