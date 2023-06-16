@@ -69,8 +69,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \
-  -is-windows=false \`,
+  -log-json=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -118,7 +117,6 @@ func TestHandlerContainerInit(t *testing.T) {
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=debug \
   -log-json=true \
-  -is-windows=false \
   -service-account-name="a-service-account-name" \
   -service-name="web" \`,
 			[]corev1.EnvVar{
@@ -462,8 +460,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \
-  -is-windows=false \`,
+  -log-json=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -506,8 +503,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \
-  -is-windows=false \`,
+  -log-json=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -554,8 +550,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \
-  -is-windows=false \`,
+  -log-json=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -598,8 +593,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			},
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
-  -log-json=false \
-  -is-windows=false \`,
+  -log-json=false \`,
 			[]corev1.EnvVar{
 				{
 					Name:  "CONSUL_ADDRESSES",
@@ -648,7 +642,6 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
-  -is-windows=false \
   -service-account-name="web" \
   -service-name="" \`,
 			[]corev1.EnvVar{
@@ -720,7 +713,6 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
-  -is-windows=false \
   -service-account-name="web" \
   -service-name="" \`,
 			[]corev1.EnvVar{
@@ -1203,7 +1195,6 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
-  -is-windows=false \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web \
   -service-name="web" \`,
@@ -1211,7 +1202,6 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
-  -is-windows=false \
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-web-admin \
   -service-name="web-admin" \`,
@@ -1243,7 +1233,6 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
-  -is-windows=false \
   -service-account-name="web" \
   -service-name="web" \
   -multiport=true \
@@ -1252,7 +1241,6 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
-  -is-windows=false \
   -service-account-name="web-admin" \
   -service-name="web-admin" \
   -multiport=true \
