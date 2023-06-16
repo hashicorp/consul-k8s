@@ -35,6 +35,10 @@ var (
 			Kind:  "TCPRoute",
 		}},
 	}
+	allSupportedRouteKinds = map[gwv1beta1.Kind]struct{}{
+		gwv1beta1.Kind("HTTPRoute"): {},
+		gwv1beta1.Kind("TCPRoute"):  {},
+	}
 )
 
 // validateRefs validates backend references for a route, determining whether or
@@ -202,7 +206,10 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 
 func validateCertificateData(secret corev1.Secret) error {
 	_, _, err := common.ParseCertificateData(secret)
-	return err
+	if err != nil {
+		return errListenerInvalidCertificateRef_InvalidData
+	}
+	return nil
 }
 
 // validateListeners validates the given listeners both internally and with respect to each
@@ -231,6 +238,8 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 			} else if listener.Port == 20000 { //admin port
 				result.acceptedErr = errListenerPortUnavailable
 			}
+
+			result.routeKindErr = validateListenerAllowedRouteKinds(listener.AllowedRoutes)
 		}
 
 		if err := merged[listener.Port].validateProtocol(); err != nil {
@@ -242,6 +251,21 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 		results = append(results, result)
 	}
 	return results
+}
+
+func validateListenerAllowedRouteKinds(allowedRoutes *gwv1beta1.AllowedRoutes) error {
+	if allowedRoutes == nil {
+		return nil
+	}
+	for _, kind := range allowedRoutes.Kinds {
+		if _, ok := allSupportedRouteKinds[kind.Kind]; !ok {
+			return errListenerInvalidRouteKinds
+		}
+		if !common.NilOrEqual(kind.Group, gwv1beta1.GroupVersion.Group) {
+			return errListenerInvalidRouteKinds
+		}
+	}
+	return nil
 }
 
 // routeAllowedForListenerNamespaces determines whether the route is allowed

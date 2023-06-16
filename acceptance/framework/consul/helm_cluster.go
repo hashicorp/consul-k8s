@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 // HelmCluster implements Cluster and uses Helm
@@ -44,6 +49,7 @@ type HelmCluster struct {
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
 	releaseName        string
+	runtimeClient      client.Client
 	kubernetesClient   kubernetes.Interface
 	noCleanupOnFailure bool
 	debugDirectory     string
@@ -98,6 +104,7 @@ func NewHelmCluster(
 		ctx:                ctx,
 		helmOptions:        opts,
 		releaseName:        releaseName,
+		runtimeClient:      ctx.ControllerRuntimeClient(t),
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		debugDirectory:     cfg.DebugDirectory,
@@ -144,6 +151,39 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	// always idempotently clean up resources in the cluster.
 	h.helmOptions.ExtraArgs = map[string][]string{
 		"--wait": nil,
+	}
+
+	// Clean up any stuck gateway resources, note that we swallow all errors from
+	// here down since the terratest helm installation may actually already be
+	// deleted at this point, in which case these operations will fail on non-existent
+	// CRD cleanups.
+	requirement, err := labels.NewRequirement("release", selection.Equals, []string{h.releaseName})
+	require.NoError(t, err)
+
+	// Forcibly delete all gateway classes and remove their finalizers.
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+
+	var gatewayClassList gwv1beta1.GatewayClassList
+	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
+		LabelSelector: labels.NewSelector().Add(*requirement),
+	}) == nil {
+		for _, item := range gatewayClassList.Items {
+			item.SetFinalizers([]string{})
+			_ = h.runtimeClient.Update(context.Background(), &item)
+		}
+	}
+
+	// Forcibly delete all gateway class configs and remove their finalizers.
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.HasLabels{"release=" + h.releaseName})
+
+	var gatewayClassConfigList v1alpha1.GatewayClassConfigList
+	if h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
+		LabelSelector: labels.NewSelector().Add(*requirement),
+	}) == nil {
+		for _, item := range gatewayClassConfigList.Items {
+			item.SetFinalizers([]string{})
+			_ = h.runtimeClient.Update(context.Background(), &item)
+		}
 	}
 
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
@@ -306,13 +346,22 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
-func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int) string {
-	serverPod := fmt.Sprintf("%s-consul-server-0", h.releaseName)
+func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, release ...string) string {
+	releaseName := h.releaseName
+	if len(release) > 0 {
+		releaseName = release[0]
+	}
+	serverPod := fmt.Sprintf("%s-consul-server-0", releaseName)
 	return portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, h.helmOptions.KubectlOptions, h.logger)
 }
 
-func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.Client, configAddress string) {
+func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...string) (client *api.Client, configAddress string) {
 	t.Helper()
+
+	releaseName := h.releaseName
+	if len(release) > 0 {
+		releaseName = release[0]
+	}
 
 	namespace := h.helmOptions.KubectlOptions.Namespace
 	config := api.DefaultConfig()
@@ -336,9 +385,9 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.
 				// and will try to read the replication token from the federation secret.
 				// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
 				// Instead, we provide a replication token that serves the role of the bootstrap token.
-				aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), h.releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
+				aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
 				if err != nil && errors.IsNotFound(err) {
-					federationSecret := fmt.Sprintf("%s-consul-federation", h.releaseName)
+					federationSecret := fmt.Sprintf("%s-consul-federation", releaseName)
 					aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
 					require.NoError(r, err)
 					config.Token = string(aclSecret.Data["replicationToken"])
@@ -352,7 +401,7 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool) (client *api.
 		}
 	}
 
-	config.Address = h.CreatePortForwardTunnel(t, remotePort)
+	config.Address = h.CreatePortForwardTunnel(t, remotePort, release...)
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 

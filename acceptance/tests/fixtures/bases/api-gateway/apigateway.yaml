@@ -9,19 +9,19 @@ spec:
   gatewayClassName: gateway-class
   listeners:
   - protocol: HTTP
-    port: 8080
+    port: 80
     name: http
     allowedRoutes:
       namespaces:
         from: "All"
   - protocol: TCP
-    port: 8081
+    port: 81
     name: tcp
     allowedRoutes:
       namespaces:
         from: "All"
   - protocol: HTTPS
-    port: 8082
+    port: 443
     name: https
     tls:
       certificateRefs:

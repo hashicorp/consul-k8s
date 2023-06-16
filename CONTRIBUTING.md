@@ -1224,17 +1224,17 @@ Networking.
 
 To pull external CRDs into our Helm chart and make sure they get installed, we generate their configuration using
 [Kustomize](https://kustomize.io/) which can pull in Kubernetes config from external sources. We split these 
-generated CRDs into individual files and store them in the 
-[Helm `/crds` directory](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/).
+generated CRDs into individual files and store them in the `charts/consul/templates` directory.
 
 If you need to update the external CRDs we depend on, or add to them, you can do this by editing the 
-[crds/kustomization.yaml](/charts/consul/crds/kustomization.yaml) file. Once modified, running
+[control-plane/config/crd/external/kustomization.yaml](/control-plane/config/crd/external/kustomization.yaml) file. 
+Once modified, running
 
 ```bash
 make generate-external-crds
 ```
 
-will update the CRDs in the `/crds` directory.
+will update the CRDs in the `/templates` directory.
 
 ## Adding a Changelog Entry
 

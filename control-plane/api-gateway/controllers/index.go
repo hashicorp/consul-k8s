@@ -161,12 +161,18 @@ func gatewayForSecret(o client.Object) []string {
 
 func gatewaysForHTTPRoute(o client.Object) []string {
 	route := o.(*gwv1beta1.HTTPRoute)
-	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs)
+	statusRefs := common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+		return parentStatus.ParentRef
+	})
+	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs, statusRefs)
 }
 
 func gatewaysForTCPRoute(o client.Object) []string {
 	route := o.(*gwv1alpha2.TCPRoute)
-	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs)
+	statusRefs := common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+		return parentStatus.ParentRef
+	})
+	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs, statusRefs)
 }
 
 func servicesForHTTPRoute(o client.Object) []string {
@@ -249,9 +255,15 @@ func meshServicesForTCPRoute(o client.Object) []string {
 	return refs
 }
 
-func gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference) []string {
+func gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference, statusRefs []gwv1beta1.ParentReference) []string {
 	var references []string
 	for _, parent := range refs {
+		if common.NilOrEqual(parent.Group, common.BetaGroup) && common.NilOrEqual(parent.Kind, common.KindGateway) {
+			// If an explicit Gateway namespace is not provided, use the Route namespace to lookup the provided Gateway Namespace.
+			references = append(references, common.IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace).String())
+		}
+	}
+	for _, parent := range statusRefs {
 		if common.NilOrEqual(parent.Group, common.BetaGroup) && common.NilOrEqual(parent.Kind, common.KindGateway) {
 			// If an explicit Gateway namespace is not provided, use the Route namespace to lookup the provided Gateway Namespace.
 			references = append(references, common.IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace).String())

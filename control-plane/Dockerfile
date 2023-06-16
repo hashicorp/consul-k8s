@@ -22,7 +22,7 @@ RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@49f60
 # dev copies the binary from a local build
 # -----------------------------------
 # BIN_NAME is a requirement in the hashicorp docker github action 
-FROM alpine:3.17 AS dev
+FROM alpine:3.18 AS dev
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
@@ -74,7 +74,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM alpine:3.17 AS release-default
+FROM alpine:3.18 AS release-default
 
 ARG BIN_NAME=consul-k8s-control-plane
 ARG CNI_BIN_NAME=consul-cni
@@ -92,7 +92,11 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
-RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
+
+# for FIPS CGO glibc compatibility in alpine
+# see https://github.com/golang/go/issues/59305
+RUN ln -s /lib/libc.so.6 /usr/lib/libresolv.so.2
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS
@@ -108,6 +112,9 @@ COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}
+
+# Duplicate target for FIPS builds
+FROM release-default AS release-default-fips
 
 # -----------------------------------
 # Dockerfile target for consul-k8s with UBI as its base image. Used for running on
@@ -171,6 +178,8 @@ COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 USER 100
 CMD /bin/${BIN_NAME}
 
+# Duplicate target for FIPS builds
+FROM ubi AS ubi-fips
 # ===================================
 # 
 #   Set default target to 'dev'.

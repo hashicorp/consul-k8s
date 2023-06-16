@@ -53,19 +53,8 @@ type BinderConfig struct {
 	// Service is the deployed service associated with the Gateway deployment.
 	Service *corev1.Service
 
-	// TODO: Do we need to pass in Routes that have references to a Gateway in their statuses
-	// for cleanup purposes or is the below enough for record keeping?
-
 	// ConsulGateway is the config entry we've created in Consul.
 	ConsulGateway *api.APIGatewayConfigEntry
-	// ConsulHTTPRoutes are a list of HTTPRouteConfigEntry objects that currently reference the
-	// Gateway we've created in Consul.
-	ConsulHTTPRoutes []api.HTTPRouteConfigEntry
-	// ConsulTCPRoutes are a list of TCPRouteConfigEntry objects that currently reference the
-	// Gateway we've created in Consul.
-	ConsulTCPRoutes []api.TCPRouteConfigEntry
-	// ConsulInlineCertificates is a list of certificates that have been created in Consul.
-	ConsulInlineCertificates []api.InlineCertificateConfigEntry
 	// GatewayServices are the services associated with the Gateway
 	ConsulGatewayServices []api.CatalogService
 
@@ -163,7 +152,6 @@ func (b *Binder) Snapshot() *Snapshot {
 
 	// process secrets
 	gatewaySecrets := secretsForGateway(b.config.Gateway, b.config.Resources)
-	certs := mapset.NewSet()
 	if !isGatewayDeleted {
 		// we only do this if the gateway isn't going to be deleted so that the
 		// resources can get GC'd
@@ -174,7 +162,6 @@ func (b *Binder) Snapshot() *Snapshot {
 				b.config.Logger.Error(err, "error parsing referenced secret, ignoring")
 				continue
 			}
-			certs.Add(secret)
 		}
 	}
 
@@ -191,10 +178,14 @@ func (b *Binder) Snapshot() *Snapshot {
 		snapshot.GatewayClassConfig = gatewayClassConfig
 		snapshot.UpsertGatewayDeployment = true
 
+		var consulStatus api.ConfigEntryStatus
+		if b.config.ConsulGateway != nil {
+			consulStatus = b.config.ConsulGateway.Status
+		}
 		entry := b.config.Translator.ToAPIGateway(b.config.Gateway, b.config.Resources)
 		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &common.ConsulUpdateOperation{
 			Entry:    entry,
-			OnUpdate: b.handleGatewaySyncStatus(snapshot, &b.config.Gateway),
+			OnUpdate: b.handleGatewaySyncStatus(snapshot, &b.config.Gateway, consulStatus),
 		})
 
 		registrations := registrationsForPods(entry.Namespace, b.config.Gateway, registrationPods)
@@ -206,6 +197,7 @@ func (b *Binder) Snapshot() *Snapshot {
 			for _, registration := range registrations {
 				if service.ServiceID == registration.Service.ID {
 					found = true
+					break
 				}
 			}
 			if !found {
@@ -223,7 +215,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		for i, listener := range b.config.Gateway.Spec.Listeners {
 			status.Listeners = append(status.Listeners, gwv1beta1.ListenerStatus{
 				Name:           listener.Name,
-				SupportedKinds: supportedKindsForProtocol[listener.Protocol],
+				SupportedKinds: supportedKinds(listener),
 				AttachedRoutes: int32(boundCounts[listener.Name]),
 				Conditions:     listenerValidation.Conditions(b.config.Gateway.Generation, i),
 			})
@@ -382,4 +374,16 @@ func addressesFromPodHosts(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
 // isDeleted checks if the deletion timestamp is set for an object.
 func isDeleted(object client.Object) bool {
 	return !object.GetDeletionTimestamp().IsZero()
+}
+
+func supportedKinds(listener gwv1beta1.Listener) []gwv1beta1.RouteGroupKind {
+	if listener.AllowedRoutes != nil && listener.AllowedRoutes.Kinds != nil {
+		return common.Filter(listener.AllowedRoutes.Kinds, func(kind gwv1beta1.RouteGroupKind) bool {
+			if _, ok := allSupportedRouteKinds[kind.Kind]; !ok {
+				return true
+			}
+			return !common.NilOrEqual(kind.Group, gwv1beta1.GroupVersion.Group)
+		})
+	}
+	return supportedKindsForProtocol[listener.Protocol]
 }

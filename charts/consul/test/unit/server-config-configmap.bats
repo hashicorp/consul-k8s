@@ -1057,3 +1057,143 @@ load _helpers
 
   [ "${actual}" = "100" ]
 }
+
+#--------------------------------------------------------------------
+# server.auditLogs
+
+@test "server/ConfigMap: server.auditLogs is disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | jq -r .audit | tee /dev/stderr)
+
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled but ACLs are disabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'server.auditLogs.sinks[0].name=MySink' \
+      --set 'server.auditLogs.sinks[0].type=file' \
+      --set 'server.auditLogs.sinks[0].format=json' \
+      --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "ACLs must be enabled inorder to configure audit logs" ]]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled without sink inputs" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | jq -r .audit.sink | tee /dev/stderr)
+
+  [ "${actual}" = "{}" ]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled with 1 sink input object" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.auditLogs.sinks[0].name=MySink' \
+      --set 'server.auditLogs.sinks[0].type=file' \
+      --set 'server.auditLogs.sinks[0].format=json' \
+      --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.path | tee /dev/stderr)
+  [ "${actual}" = "/tmp/audit.json" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.delivery_guarantee | tee /dev/stderr)
+  [ "${actual}" = "best-effort" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_duration | tee /dev/stderr)
+  [ "${actual}" = "24h" ]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled with 1 sink input object and it does not contain the name attribute" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.auditLogs.sinks[0].name=MySink' \
+      --set 'server.auditLogs.sinks[0].type=file' \
+      --set 'server.auditLogs.sinks[0].format=json' \
+      --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | jq -r .audit.sink.name | tee /dev/stderr)
+
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled with multiple sink input objects" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.auditLogs.sinks[0].name=MySink1' \
+      --set 'server.auditLogs.sinks[0].type=file' \
+      --set 'server.auditLogs.sinks[0].format=json' \
+      --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
+      --set 'server.auditLogs.sinks[1].name=MySink2' \
+      --set 'server.auditLogs.sinks[1].type=file' \
+      --set 'server.auditLogs.sinks[1].format=json' \
+      --set 'server.auditLogs.sinks[1].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[1].rotate_max_files=15' \
+      --set 'server.auditLogs.sinks[1].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[1].path=/tmp/audit-2.json' \
+      --set 'server.auditLogs.sinks[2].name=MySink3' \
+      --set 'server.auditLogs.sinks[2].type=file' \
+      --set 'server.auditLogs.sinks[2].format=json' \
+      --set 'server.auditLogs.sinks[2].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[2].rotate_max_files=20' \
+      --set 'server.auditLogs.sinks[2].rotate_duration=18h' \
+      --set 'server.auditLogs.sinks[2].path=/tmp/audit-3.json' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.path | tee /dev/stderr)
+  [ "${actual}" = "/tmp/audit.json" ]
+  
+  local actual=$(echo $object |  jq -r .audit.sink.MySink3.path | tee /dev/stderr)
+  [ "${actual}" = "/tmp/audit-3.json" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink2.path | tee /dev/stderr)
+  [ "${actual}" = "/tmp/audit-2.json" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.name | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink3.delivery_guarantee | tee /dev/stderr)
+  [ "${actual}" = "best-effort" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink2.rotate_duration | tee /dev/stderr)
+  [ "${actual}" = "24h" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.format | tee /dev/stderr)
+  [ "${actual}" = "json" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink3.type | tee /dev/stderr)
+  [ "${actual}" = "file" ]
+}

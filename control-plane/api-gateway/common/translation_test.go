@@ -9,11 +9,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,6 +24,7 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	logrtest "github.com/go-logr/logr/testing"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/api"
@@ -32,17 +35,84 @@ type fakeReferenceValidator struct{}
 func (v fakeReferenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
 	return true
 }
-func (v fakeReferenceValidator) HTTPRouteCanReferenceGateway(httproute gwv1beta1.HTTPRoute, parentRef gwv1beta1.ParentReference) bool {
-	return true
-}
+
 func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
 	return true
 }
-func (v fakeReferenceValidator) TCPRouteCanReferenceGateway(tcpRoute gwv1alpha2.TCPRoute, parentRef gwv1beta1.ParentReference) bool {
-	return true
-}
+
 func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool {
 	return true
+}
+
+func TestTranslator_Namespace(t *testing.T) {
+	testCases := []struct {
+		EnableConsulNamespaces bool
+		ConsulDestNamespace    string
+		EnableK8sMirroring     bool
+		MirroringPrefix        string
+		Input, ExpectedOutput  string
+	}{
+		{
+			EnableConsulNamespaces: false,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     false,
+			MirroringPrefix:        "",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "",
+		},
+		{
+			EnableConsulNamespaces: false,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     true,
+			MirroringPrefix:        "",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "",
+		},
+		{
+			EnableConsulNamespaces: false,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     true,
+			MirroringPrefix:        "pre-",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "",
+		},
+		{
+			EnableConsulNamespaces: true,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     false,
+			MirroringPrefix:        "",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "default",
+		},
+		{
+			EnableConsulNamespaces: true,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     true,
+			MirroringPrefix:        "",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "namespace-1",
+		},
+		{
+			EnableConsulNamespaces: true,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     true,
+			MirroringPrefix:        "pre-",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "pre-namespace-1",
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%s_%d", t.Name(), i), func(t *testing.T) {
+			translator := ResourceTranslator{
+				EnableConsulNamespaces: tc.EnableConsulNamespaces,
+				ConsulDestNamespace:    tc.ConsulDestNamespace,
+				EnableK8sMirroring:     tc.EnableK8sMirroring,
+				MirroringPrefix:        tc.MirroringPrefix,
+			}
+			assert.Equal(t, tc.ExpectedOutput, translator.Namespace(tc.Input))
+		})
+	}
 }
 
 func TestTranslator_ToAPIGateway(t *testing.T) {

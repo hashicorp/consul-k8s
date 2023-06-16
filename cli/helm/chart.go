@@ -18,7 +18,6 @@ const (
 	chartFileName    = "Chart.yaml"
 	valuesFileName   = "values.yaml"
 	templatesDirName = "templates"
-	crdDirName       = "crds"
 )
 
 // LoadChart will attempt to load a Helm chart from the embedded file system.
@@ -88,25 +87,6 @@ func readChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile
 		}
 
 		file, err := readFile(chart, path.Join(chartDirName, templatesDirName, f.Name()), chartDirName)
-		if err != nil {
-			return nil, err
-		}
-		chartFiles = append(chartFiles, file)
-	}
-
-	// Load everything under crds/.
-	dirs, err = chart.ReadDir(path.Join(chartDirName, crdDirName))
-	if err != nil {
-		return nil, err
-	}
-
-	for _, f := range dirs {
-		if f.IsDir() || f.Name() == "kustomization.yaml" {
-			// We only need to include files in the crds directory.
-			continue
-		}
-
-		file, err := readFile(chart, path.Join(chartDirName, crdDirName, f.Name()), chartDirName)
 		if err != nil {
 			return nil, err
 		}

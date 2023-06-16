@@ -953,7 +953,6 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				require.Equal(t, "new-sni", resource.Services[0].SNI)
 			},
 		},
-
 		{
 			kubeKind:   "JWTProvider",
 			consulKind: capi.JWTProvider,

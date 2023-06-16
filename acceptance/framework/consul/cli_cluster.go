@@ -200,8 +200,13 @@ func (c *CLICluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) (*api.Client, string) {
+func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...string) (*api.Client, string) {
 	t.Helper()
+
+	releaseName := c.releaseName
+	if len(release) > 0 {
+		releaseName = release[0]
+	}
 
 	namespace := c.kubectlOptions.Namespace
 	config := api.DefaultConfig()
@@ -222,13 +227,13 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) (*api.Client, 
 		// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
 		// Instead, we provide a replication token that serves the role of the bootstrap token.
 
-		aclSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", c.releaseName)
+		aclSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", releaseName)
 		if c.releaseName == CLIReleaseName {
 			aclSecretName = "consul-bootstrap-acl-token"
 		}
 		aclSecret, err := c.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), aclSecretName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
-			federationSecret := fmt.Sprintf("%s-consul-federation", c.releaseName)
+			federationSecret := fmt.Sprintf("%s-consul-federation", releaseName)
 			if c.releaseName == CLIReleaseName {
 				federationSecret = "consul-federation"
 			}
@@ -242,8 +247,8 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) (*api.Client, 
 		}
 	}
 
-	serverPod := fmt.Sprintf("%s-consul-server-0", c.releaseName)
-	if c.releaseName == CLIReleaseName {
+	serverPod := fmt.Sprintf("%s-consul-server-0", releaseName)
+	if releaseName == CLIReleaseName {
 		serverPod = "consul-server-0"
 	}
 	tunnel := terratestk8s.NewTunnelWithLogger(

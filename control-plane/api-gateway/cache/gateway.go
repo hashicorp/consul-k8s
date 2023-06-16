@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package cache
 
 import (
@@ -11,15 +14,12 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
 type GatewayCache struct {
-	config    *consul.Config
+	config    Config
 	serverMgr consul.ServerConnectionManager
 	logger    logr.Logger
-
-	events chan event.GenericEvent
 
 	data      map[api.ResourceReference][]api.CatalogService
 	dataMutex sync.RWMutex
@@ -32,10 +32,9 @@ type GatewayCache struct {
 
 func NewGatewayCache(ctx context.Context, config Config) *GatewayCache {
 	return &GatewayCache{
-		config:             config.ConsulClientConfig,
+		config:             config,
 		serverMgr:          config.ConsulServerConnMgr,
 		logger:             config.Logger,
-		events:             make(chan event.GenericEvent),
 		data:               make(map[api.ResourceReference][]api.CatalogService),
 		subscribedGateways: make(map[api.ResourceReference]context.CancelFunc),
 		ctx:                ctx,
@@ -47,6 +46,24 @@ func (r *GatewayCache) ServicesFor(ref api.ResourceReference) []api.CatalogServi
 	defer r.dataMutex.RUnlock()
 
 	return r.data[common.NormalizeMeta(ref)]
+}
+
+func (r *GatewayCache) FetchServicesFor(ctx context.Context, ref api.ResourceReference) ([]api.CatalogService, error) {
+	client, err := consul.NewClientFromConnMgr(r.config.ConsulClientConfig, r.serverMgr)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := &api.QueryOptions{}
+	if r.config.NamespacesEnabled && ref.Namespace != "" {
+		opts.Namespace = ref.Namespace
+	}
+
+	services, _, err := client.Catalog().Service(ref.Name, "", opts.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return common.DerefAll(services), nil
 }
 
 func (r *GatewayCache) EnsureSubscribed(ref api.ResourceReference, resource types.NamespacedName) {
@@ -74,7 +91,7 @@ func (r *GatewayCache) RemoveSubscription(ref api.ResourceReference) {
 
 func (r *GatewayCache) subscribeToGateway(ctx context.Context, ref api.ResourceReference, resource types.NamespacedName) {
 	opts := &api.QueryOptions{}
-	if ref.Namespace != "" {
+	if r.config.NamespacesEnabled && ref.Namespace != "" {
 		opts.Namespace = ref.Namespace
 	}
 
@@ -96,7 +113,7 @@ func (r *GatewayCache) subscribeToGateway(ctx context.Context, ref api.ResourceR
 		retryBackoff := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 10)
 
 		if err := backoff.Retry(func() error {
-			client, err := consul.NewClientFromConnMgr(r.config, r.serverMgr)
+			client, err := consul.NewClientFromConnMgr(r.config.ConsulClientConfig, r.serverMgr)
 			if err != nil {
 				return err
 			}
@@ -119,18 +136,5 @@ func (r *GatewayCache) subscribeToGateway(ctx context.Context, ref api.ResourceR
 		r.dataMutex.Lock()
 		r.data[common.NormalizeMeta(ref)] = derefed
 		r.dataMutex.Unlock()
-
-		event := event.GenericEvent{
-			Object: newConfigEntryObject(resource),
-		}
-
-		select {
-		case <-ctx.Done():
-			r.dataMutex.Lock()
-			delete(r.data, ref)
-			r.dataMutex.Unlock()
-			return
-		case r.events <- event:
-		}
 	}
 }
