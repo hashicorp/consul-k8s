@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -623,15 +622,27 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (cor
 	// In the case of a multiPort pod, there may be another service account
 	// token mounted as a different volume. Its name must be <svc>-serviceaccount.
 	// If not we'll fall back to the service account for the pod.
+
+	isWindowsPod := isWindows(pod)
+
+	mountPath := fmt.Sprintf("/consul/serviceaccount-%s", multiPortSvcName)
+	if isWindowsPod {
+		mountPath = fmt.Sprintf("C:\\consul\\serviceaccount-%s", multiPortSvcName)
+	}
+
 	if multiPortSvcName != "" {
 		for _, v := range pod.Spec.Volumes {
 			if v.Name == fmt.Sprintf("%s-service-account", multiPortSvcName) {
-				mountPath := fmt.Sprintf("/consul/serviceaccount-%s", multiPortSvcName)
-				return corev1.VolumeMount{
+				volumeMount := corev1.VolumeMount{
 					Name:      v.Name,
 					ReadOnly:  true,
 					MountPath: mountPath,
-				}, filepath.Join(mountPath, "token"), nil
+				}
+				tokenPath := mountPath + "/" + "token"
+				if isWindowsPod {
+					tokenPath = mountPath + "\\" + "token"
+				}
+				return volumeMount, tokenPath, nil
 			}
 		}
 	}
@@ -653,7 +664,13 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (cor
 		return volumeMount, "", errors.New("unable to find service account token volumeMount")
 	}
 
-	return volumeMount, "/var/run/secrets/kubernetes.io/serviceaccount/token", nil
+	tokenPath := "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+	if isWindows(pod) {
+		tokenPath = "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token"
+	}
+
+	return volumeMount, tokenPath, nil
 }
 
 func (w *MeshWebhook) annotatedServiceNames(pod corev1.Pod) []string {

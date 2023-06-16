@@ -254,7 +254,11 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 			args = append(args, "-tls-server-name="+w.ConsulTLSServerName)
 		}
 		if w.ConsulCACert != "" {
-			args = append(args, "-ca-certs="+constants.ConsulCAFile)
+			if isWindows(pod) {
+				args = append(args, "-ca-certs="+constants.ConsulCAFileWindows)
+			} else {
+				args = append(args, "-ca-certs="+constants.ConsulCAFile)
+			}
 		}
 	} else {
 		args = append(args, "-tls-disabled")

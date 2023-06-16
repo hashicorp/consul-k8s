@@ -32,8 +32,9 @@ type initContainerCommandData struct {
 	MultiPort bool
 
 	// Log settings for the connect-init command.
-	LogLevel string
-	LogJSON  bool
+	LogLevel  string
+	LogJSON   bool
+	IsWindows bool
 }
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
@@ -41,7 +42,9 @@ type initContainerCommandData struct {
 func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	var connectInjectDir, imageConsulK8s, initContainerCommandInterpreter, initContainerCommandTpl string
 
-	if isWindows(pod) {
+	isWindows := isWindows(pod)
+
+	if isWindows {
 		connectInjectDir = "C:\\consul\\connect-inject"
 		imageConsulK8s = w.ImageConsulK8SWindows
 		initContainerCommandInterpreter = "sh"
@@ -58,7 +61,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if err != nil {
 		return corev1.Container{}, err
 	}
-	if tproxyEnabled && isWindows(pod) {
+	if tproxyEnabled && isWindows {
 		err = errors.New("transparent proxy is not supported on windows")
 		return corev1.Container{}, err
 	}
@@ -70,6 +73,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		MultiPort:  multiPort,
 		LogLevel:   w.LogLevel,
 		LogJSON:    w.LogJSON,
+		IsWindows:  isWindows,
 	}
 
 	// Create expected volume mounts
@@ -118,6 +122,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if multiPort {
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
+	command := []string{initContainerCommandInterpreter, "-ec", buf.String()}
+
 	container := corev1.Container{
 		Name:  initContainerName,
 		Image: imageConsulK8s,
@@ -165,7 +171,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		},
 		Resources:    w.InitContainerResources,
 		VolumeMounts: volMounts,
-		Command:      []string{initContainerCommandInterpreter, "-ec", buf.String()},
+		Command:      command,
 	}
 
 	if w.TLSEnabled {
@@ -332,6 +338,7 @@ const initContainerCommandTplWindows = `
 consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
+  -is-windows=true \
   {{- if .AuthMethod }}
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \
