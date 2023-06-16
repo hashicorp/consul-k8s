@@ -134,7 +134,7 @@ func TestServiceWeight_externalIP(t *testing.T) {
 	})
 }
 
-// Test service weight
+// Test service weight.
 func TestServiceWeight(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
