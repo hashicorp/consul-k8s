@@ -2,6 +2,9 @@ VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane
 CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
 CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
 CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-dataplane-version.sh charts/consul/values.yaml)
+KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindVersion)
+KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
+KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
 
 # ===========> Helm Targets
 
@@ -105,7 +108,6 @@ terraform-fmt:
 
 
 # ===========> CLI Targets
-
 cli-dev:
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
@@ -113,7 +115,6 @@ cli-dev:
 cli-fips-dev:
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
-
 
 cli-lint: ## Run linter in the control-plane directory.
 	cd cli; golangci-lint run -c ../.golangci.yml
@@ -186,6 +187,16 @@ consul-enterprise-version:
 
 consul-dataplane-version:
 	@echo $(CONSUL_DATAPLANE_IMAGE_VERSION)
+
+kind-version:
+	@echo $(KIND_VERSION)
+
+kind-node-image:
+	@echo $(KIND_NODE_IMAGE)
+
+kubectl-version:
+	@echo $(KUBECTL_VERSION)
+
 
 
 # ===========> Release Targets
