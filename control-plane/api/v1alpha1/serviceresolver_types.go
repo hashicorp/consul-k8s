@@ -79,6 +79,16 @@ type ServiceResolverSpec struct {
 	// LoadBalancer determines the load balancing policy and configuration for services
 	// issuing requests to this upstream service.
 	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
+	// PrioritizeByLocality controls whether the locality of services within the
+	// local partition will be used to prioritize connectivity.
+	PrioritizeByLocality *ServiceResolverPrioritizeByLocality `json:"prioritizeByLocality,omitempty"`
+}
+
+type ServiceResolverPrioritizeByLocality struct {
+	// Mode specifies the type of prioritization that will be performed
+	// when selecting nodes in the local partition.
+	// Valid values are: "" (default "none"), "none", and "failover".
+	Mode string `json:"mode,omitempty"`
 }
 
 type ServiceResolverRedirect struct {
@@ -300,15 +310,16 @@ func (in *ServiceResolver) SyncedConditionStatus() corev1.ConditionStatus {
 // ToConsul converts the entry into its Consul equivalent struct.
 func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceResolverConfigEntry{
-		Kind:           in.ConsulKind(),
-		Name:           in.ConsulName(),
-		DefaultSubset:  in.Spec.DefaultSubset,
-		Subsets:        in.Spec.Subsets.toConsul(),
-		Redirect:       in.Spec.Redirect.toConsul(),
-		Failover:       in.Spec.Failover.toConsul(),
-		ConnectTimeout: in.Spec.ConnectTimeout.Duration,
-		LoadBalancer:   in.Spec.LoadBalancer.toConsul(),
-		Meta:           meta(datacenter),
+		Kind:                 in.ConsulKind(),
+		Name:                 in.ConsulName(),
+		DefaultSubset:        in.Spec.DefaultSubset,
+		Subsets:              in.Spec.Subsets.toConsul(),
+		Redirect:             in.Spec.Redirect.toConsul(),
+		Failover:             in.Spec.Failover.toConsul(),
+		ConnectTimeout:       in.Spec.ConnectTimeout.Duration,
+		LoadBalancer:         in.Spec.LoadBalancer.toConsul(),
+		PrioritizeByLocality: in.Spec.PrioritizeByLocality.toConsul(),
+		Meta:                 meta(datacenter),
 	}
 }
 
@@ -338,6 +349,7 @@ func (in *ServiceResolver) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	errs = append(errs, in.Spec.Redirect.validate(path.Child("redirect"), consulMeta)...)
+	errs = append(errs, in.Spec.PrioritizeByLocality.validate(path.Child("prioritizeByLocality"))...)
 	errs = append(errs, in.Spec.Subsets.validate(path.Child("subsets"))...)
 	errs = append(errs, in.Spec.LoadBalancer.validate(path.Child("loadBalancer"))...)
 	errs = append(errs, in.validateEnterprise(consulMeta)...)
@@ -520,6 +532,16 @@ func (in *ServiceResolverFailover) toConsul() *capi.ServiceResolverFailover {
 	}
 }
 
+func (in *ServiceResolverPrioritizeByLocality) toConsul() *capi.ServiceResolverPrioritizeByLocality {
+	if in == nil {
+		return nil
+	}
+
+	return &capi.ServiceResolverPrioritizeByLocality{
+		Mode: in.Mode,
+	}
+}
+
 func (in ServiceResolverFailoverTarget) toConsul() capi.ServiceResolverFailoverTarget {
 	return capi.ServiceResolverFailoverTarget{
 		Service:       in.Service,
@@ -627,6 +649,25 @@ func (in *ServiceResolver) validateEnterprise(consulMeta common.ConsulMeta) fiel
 
 func (in *ServiceResolverFailover) isEmpty() bool {
 	return in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 && len(in.Targets) == 0 && in.Policy == nil && in.SamenessGroup == ""
+}
+
+func (in *ServiceResolverPrioritizeByLocality) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	if in == nil {
+		return nil
+	}
+
+	switch in.Mode {
+	case "":
+	case "none":
+	case "failover":
+	default:
+		asJSON, _ := json.Marshal(in)
+		errs = append(errs, field.Invalid(path, string(asJSON),
+			"mode must be one of '', 'none', or 'failover'"))
+	}
+	return errs
 }
 
 func (in *ServiceResolverFailover) validate(path *field.Path, consulMeta common.ConsulMeta) field.ErrorList {
