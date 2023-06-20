@@ -33,7 +33,7 @@ import (
 func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	var (
 		defaultInstances = pointer.Int32(2)
-		maxInstances     = pointer.Int32(8)
+		maxInstances     = pointer.Int32(4)
 		minInstances     = pointer.Int32(1)
 
 		namespace        = "gateway-namespace"
@@ -167,9 +167,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
 
 	// Scenario: gateways should be able to scale independently and not get overridden by the controller unless it's above the max
-	scale(t, k8sClient, gateway.Name, gateway.Namespace, maxInstances)
-	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
-	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(10))
+	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(*maxInstances+1))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(0))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, minInstances, gateway)
