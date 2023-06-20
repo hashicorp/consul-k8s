@@ -197,6 +197,17 @@ kind-node-image:
 kubectl-version:
 	@echo $(KUBECTL_VERSION)
 
+kind-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/kind_acceptance_test_packages.yaml"
+
+gke-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/gke_acceptance_test_packages.yaml"
+
+eks-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/eks_acceptance_test_packages.yaml"
+
+aks-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
 
 
 # ===========> Release Targets
