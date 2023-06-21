@@ -1988,7 +1988,7 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
-      --set 'acls.resources.foo=bar' \
+      --set 'global.acls.resources.foo=bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
