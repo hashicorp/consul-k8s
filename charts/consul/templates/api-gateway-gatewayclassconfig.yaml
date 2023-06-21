@@ -65,7 +65,6 @@ spec:
   image:
     consulAPIGateway: {{ .Values.apiGateway.image }}
     envoy: {{ .Values.apiGateway.imageEnvoy }}
-  imagePullPolicy: {{ .Values.global.imagePullPolicy }}
   {{- if .Values.apiGateway.managedGatewayClass.nodeSelector }}
   nodeSelector:
     {{ tpl .Values.apiGateway.managedGatewayClass.nodeSelector . | indent 4 | trim }}
