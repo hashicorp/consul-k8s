@@ -50,6 +50,7 @@ type TestFlags struct {
 	flagDebugDirectory string
 
 	flagUseAKS  bool
+	flagUseEKS  bool
 	flagUseGKE  bool
 	flagUseKind bool
 
@@ -121,6 +122,8 @@ func (t *TestFlags) init() {
 
 	flag.BoolVar(&t.flagUseAKS, "use-aks", false,
 		"If true, the tests will assume they are running against an AKS cluster(s).")
+	flag.BoolVar(&t.flagUseEKS, "use-eks", false,
+		"If true, the tests will assume they are running against an EKS cluster(s).")
 	flag.BoolVar(&t.flagUseGKE, "use-gke", false,
 		"If true, the tests will assume they are running against a GKE cluster(s).")
 	flag.BoolVar(&t.flagUseKind, "use-kind", false,
@@ -191,6 +194,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,
 		UseAKS:             t.flagUseAKS,
+		UseEKS:             t.flagUseEKS,
 		UseGKE:             t.flagUseGKE,
 		UseKind:            t.flagUseKind,
 	}
