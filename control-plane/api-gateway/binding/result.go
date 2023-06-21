@@ -34,6 +34,7 @@ var (
 	errRouteNoMatchingListenerHostname      = errors.New("listener cannot bind route with a non-aligned hostname")
 	errRouteInvalidKind                     = errors.New("invalid backend kind")
 	errRouteBackendNotFound                 = errors.New("backend not found")
+	errRouteNoMatchingListenerName          = errors.New("no listener found with matching name")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
@@ -171,13 +172,16 @@ func (b bindResults) Condition() metav1.Condition {
 	// if we only have a single binding error, we can get more specific
 	if len(b) == 1 {
 		for _, result := range b {
-			// if we have a hostname mismatch error, then use the more specific reason
-			if result.err == errRouteNoMatchingListenerHostname {
+			switch result.err {
+			case errRouteNoMatchingListenerHostname:
+				// if we have a hostname mismatch error, then use the more specific reason
 				reason = "NoMatchingListenerHostname"
-			}
-			// or if we have a ref not permitted, then use that
-			if result.err == errRefNotPermitted {
+			case errRefNotPermitted:
+				// or if we have a ref not permitted, then use that
 				reason = "RefNotPermitted"
+			case errRouteNoMatchingListenerName:
+				// or if the route declares a parent with a section name that we can't find
+				reason = "NoMatchingParent"
 			}
 		}
 	}
