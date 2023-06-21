@@ -106,9 +106,16 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 
 		listeners := listenersFor(&r.config.Gateway, ref.SectionName)
 
+		// If there are no matching listeners, then we failed to find the parent
 		if len(listeners) == 0 {
+			var sectionName gwv1beta1.SectionName
+			if ref.SectionName != nil {
+				sectionName = *ref.SectionName
+			}
+
 			result = append(result, bindResult{
-				err: errRouteNoMatchingListenerName,
+				section: sectionName,
+				err:     errRouteNoMatchingParent,
 			})
 		}
 
