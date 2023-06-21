@@ -34,7 +34,7 @@ var (
 	errRouteNoMatchingListenerHostname      = errors.New("listener cannot bind route with a non-aligned hostname")
 	errRouteInvalidKind                     = errors.New("invalid backend kind")
 	errRouteBackendNotFound                 = errors.New("backend not found")
-	errRouteNoMatchingListenerName          = errors.New("no listener found with matching name")
+	errRouteNoMatchingParent                = errors.New("no matching parent")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
@@ -129,13 +129,17 @@ type bindResult struct {
 type bindResults []bindResult
 
 // Error constructs a human readable error for bindResults, containing any errors that a route
-// had in binding to a gateway, note that this is only used if a route failed to bind to every
+// had in binding to a gateway. Note that this is only used if a route failed to bind to every
 // listener it attempted to bind to.
 func (b bindResults) Error() string {
 	messages := []string{}
 	for _, result := range b {
 		if result.err != nil {
-			messages = append(messages, fmt.Sprintf("%s: %s", result.section, result.err.Error()))
+			message := result.err.Error()
+			if result.section != "" {
+				message = fmt.Sprintf("%s: %s", result.section, result.err.Error())
+			}
+			messages = append(messages, message)
 		}
 	}
 
@@ -179,7 +183,7 @@ func (b bindResults) Condition() metav1.Condition {
 			case errRefNotPermitted:
 				// or if we have a ref not permitted, then use that
 				reason = "RefNotPermitted"
-			case errRouteNoMatchingListenerName:
+			case errRouteNoMatchingParent:
 				// or if the route declares a parent with a section name that we can't find
 				reason = "NoMatchingParent"
 			}
