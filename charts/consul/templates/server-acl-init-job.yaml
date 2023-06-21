@@ -300,9 +300,9 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
-        {{- if .Values.acls.resources }}
+        {{- if .Values.global.acls.resources }}
         resources:
-          {{- toYaml .Values.acls.resources | nindent 10 }}
+          {{- toYaml .Values.global.acls.resources | nindent 10 }}
         {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:
