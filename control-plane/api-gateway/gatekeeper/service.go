@@ -65,14 +65,22 @@ func (g *Gatekeeper) deleteService(ctx context.Context, gwName types.NamespacedN
 }
 
 func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) *corev1.Service {
+	seenPorts := map[gwv1beta1.PortNumber]struct{}{}
 	ports := []corev1.ServicePort{}
 	for _, listener := range gateway.Spec.Listeners {
+		if _, seen := seenPorts[listener.Port]; seen {
+			// We've already added this listener's port to the Service
+			continue
+		}
+
 		ports = append(ports, corev1.ServicePort{
 			Name: string(listener.Name),
 			// only TCP-based services are supported for now
 			Protocol: corev1.ProtocolTCP,
 			Port:     int32(listener.Port),
 		})
+
+		seenPorts[listener.Port] = struct{}{}
 	}
 
 	// Copy annotations from the Gateway, filtered by those allowed by the GatewayClassConfig.
