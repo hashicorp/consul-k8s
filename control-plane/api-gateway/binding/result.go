@@ -184,7 +184,7 @@ func (b bindResults) Condition() metav1.Condition {
 				// or if we have a ref not permitted, then use that
 				reason = "RefNotPermitted"
 			case errRouteNoMatchingParent:
-				// or if the route declares a parent with a section name that we can't find
+				// or if the route declares a parent that we can't find
 				reason = "NoMatchingParent"
 			}
 		}
