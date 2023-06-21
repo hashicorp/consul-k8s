@@ -258,7 +258,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
-	pod.Spec.Volumes = append(pod.Spec.Volumes, w.containerVolume())
+	pod.Spec.Volumes = append(pod.Spec.Volumes, w.containerVolume(isWindows(pod)))
 
 	// Optionally mount data volume to other containers
 	w.injectVolumeMount(pod)

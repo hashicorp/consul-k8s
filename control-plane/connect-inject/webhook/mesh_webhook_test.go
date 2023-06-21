@@ -194,7 +194,68 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
-
+		{
+			"pod with upstreams specified for windows",
+			MeshWebhook{
+				Log:                   logrtest.TestLogger{T: t},
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationUpstreams: "echo:1234,db:1234",
+							},
+						},
+						Spec: func() corev1.PodSpec {
+							windowsSpec := basicSpec
+							windowsSpec.NodeSelector = map[string]string{"kubernetes.io/os": "windows"}
+							return windowsSpec
+						}(),
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+			},
+		},
 		{
 			"empty pod with injection disabled",
 			MeshWebhook{
