@@ -62,9 +62,9 @@ spec:
             - -log-json={{ .Values.global.logJSON }}
             - -k8s-namespace={{ .Release.Namespace }}
             - {{ template "consul.fullname" . }}-server-acl-init
-          {{- if .Values.acls.resources }}
+          {{- if .Values.global.acls.resources }}
           resources:
-            {{- toYaml .Values.acls.resources | nindent 12 }}
+            {{- toYaml .Values.global.acls.resources | nindent 12 }}
           {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:
