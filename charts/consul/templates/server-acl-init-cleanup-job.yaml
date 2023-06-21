@@ -64,7 +64,7 @@ spec:
             - {{ template "consul.fullname" . }}-server-acl-init
           {{- if .Values.acls.resources }}
           resources:
-            {{- toYaml .Values.server.resources | nindent 12 }}
+            {{- toYaml .Values.acls.resources | nindent 12 }}
           {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:

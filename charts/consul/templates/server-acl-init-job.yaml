@@ -310,7 +310,7 @@ spec:
             {{- end }}
         {{- if .Values.acls.resources }}
         resources:
-          {{- toYaml .Values.server.resources | nindent 10 }}
+          {{- toYaml .Values.acls.resources | nindent 10 }}
         {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:
