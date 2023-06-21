@@ -1023,7 +1023,7 @@ func consulHealthCheckID(k8sNS string, serviceID string) string {
 	return fmt.Sprintf("%s/%s", k8sNS, serviceID)
 }
 
-// Calculates the passing service weight
+// Calculates the passing service weight.
 func getServiceWeight(weight string) (int, error) {
 	// error validation if the input param is a number
 	weightI, err := strconv.Atoi(weight)

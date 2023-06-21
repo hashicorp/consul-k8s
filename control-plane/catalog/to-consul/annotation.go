@@ -27,6 +27,6 @@ const (
 	// annotationServiceWeight is the key of the annotation that determines
 	// the traffic weight of the service which is spanned over multiple k8s cluster.
 	// e.g. Service `backend` in k8s cluster `A` receives 25% of the traffic
-	// compared to same `backend` service in k8s cluster `B`
+	// compared to same `backend` service in k8s cluster `B`.
 	annotationServiceWeight = "consul.hashicorp.com/service-weight"
 )
