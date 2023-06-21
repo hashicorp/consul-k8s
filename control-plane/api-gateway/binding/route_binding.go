@@ -104,7 +104,15 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 	for _, ref := range filteredParents {
 		var result bindResults
 
-		for _, listener := range listenersFor(&r.config.Gateway, ref.SectionName) {
+		listeners := listenersFor(&r.config.Gateway, ref.SectionName)
+
+		if len(listeners) == 0 {
+			result = append(result, bindResult{
+				err: errRouteNoMatchingListenerName,
+			})
+		}
+
+		for _, listener := range listeners {
 			if !routeKindIsAllowedForListener(supportedKindsForProtocol[listener.Protocol], groupKind) {
 				result = append(result, bindResult{
 					section: listener.Name,
@@ -179,9 +187,9 @@ func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv
 	return references
 }
 
-// listenersFor returns the listeners corresponding the given section name. If the section
-// name is actually specified, the returned set should just have one listener, if it is
-// unspecified, the all gatweway listeners should be returned.
+// listenersFor returns the listeners corresponding to the given section name. If the section
+// name is actually specified, the returned set will only contain the named listener. If it is
+// unspecified, then all gateway listeners will be returned.
 func listenersFor(gateway *gwv1beta1.Gateway, name *gwv1beta1.SectionName) []gwv1beta1.Listener {
 	listeners := []gwv1beta1.Listener{}
 	for _, listener := range gateway.Spec.Listeners {
