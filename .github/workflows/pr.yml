@@ -20,6 +20,6 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: curtbushko-fix-cni
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "consul-image":"${{ env.CONSUL_IMAGE }}" }'
