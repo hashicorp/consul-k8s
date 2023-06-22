@@ -3,7 +3,7 @@ name: pr
 on:
   pull_request:
 
-# THIS IS A TEST these should be the only settings that you will ever need to change
+# THIS IS A TEST  TEST these should be the only settings that you will ever need to change
 env:
   CONSUL_IMAGE: hashicorppreview/consul-enterprise:1.13-dev # Consul's enterprise version to use in tests
   BRANCH: ${{ github.head_ref || github.ref_name }}
