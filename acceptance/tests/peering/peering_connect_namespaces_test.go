@@ -129,7 +129,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			// share the same node network (docker bridge), we can use
 			// a NodePort service so that we can access node(s) in a different Kind cluster.
 			if cfg.UseKind {
-				staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
 			}
@@ -151,7 +150,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			}
 
 			if cfg.UseKind {
-				staticClientPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 				staticClientPeerHelmValues["meshGateway.service.type"] = "NodePort"
 				staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
 			}

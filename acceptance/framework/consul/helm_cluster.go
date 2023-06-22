@@ -568,7 +568,7 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 func defaultValues() map[string]string {
 	values := map[string]string{
 		"global.logLevel": "debug",
-		"server.replicas": "1",
+		"server.replicas": "3",
 		// Disable DNS since enabling it changes the policy for the anonymous token,
 		// which could result in tests passing due to that token having privileges to read services
 		// (false positive).

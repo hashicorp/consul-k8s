@@ -103,9 +103,7 @@ func TestPartitions_Sync(t *testing.T) {
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
-			serverHelmValues := map[string]string{
-				"server.exposeGossipAndRPCPorts": "true",
-			}
+			serverHelmValues := map[string]string{}
 
 			// On Kind, there are no load balancers but since all clusters
 			// share the same node network (docker bridge), we can use

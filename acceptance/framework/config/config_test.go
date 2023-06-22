@@ -19,7 +19,7 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 		want       map[string]string
 	}{
 		{
-			"returns empty map by default",
+			"defaults",
 			TestConfig{},
 			map[string]string{
 				"connectInject.transparentProxy.defaultEnabled": "false",
@@ -116,6 +116,16 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 			},
 			map[string]string{
 				"connectInject.cni.enabled":                     "true",
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
+		},
+		{
+			"sets server.affinity to null when running on kind",
+			TestConfig{
+				UseKind: true,
+			},
+			map[string]string{
+				"server.affinity": "null",
 				"connectInject.transparentProxy.defaultEnabled": "false",
 			},
 		},
