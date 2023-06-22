@@ -21,6 +21,6 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: mw/NET-4622-Release-0.49.x-acceptance-tests-broken-missing-packages
+        ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "consul-image":"${{ env.CONSUL_IMAGE }}", "golangci-lint-version":"${{ env.GOLANGCI_LINT_VERSION }}" }'
