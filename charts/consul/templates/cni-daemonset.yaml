@@ -50,6 +50,7 @@ spec:
       # Tell kubernetes that this daemonset is critical so that it will be scheduled on a new node before other pods
       priorityClassName: system-node-critical
       serviceAccountName: {{ template "consul.fullname" . }}-cni
+      automountServiceAccountToken: true
       {{- if not .Values.global.openshift.enabled }}
       securityContext:
         {{- toYaml .Values.connectInject.cni.securityContext | nindent 8 -}}
