@@ -155,9 +155,10 @@ func TestPartitions_Sync(t *testing.T) {
 				"global.tls.caCert.secretName": caCertSecretName,
 				"global.tls.caCert.secretKey":  "tls.crt",
 
-				"externalServers.enabled":       "true",
-				"externalServers.hosts[0]":      partitionSvcAddress,
-				"externalServers.tlsServerName": "server.dc1.consul",
+				"externalServers.enabled":         "true",
+				"externalServers.hosts[0]":        partitionSvcAddress,
+				"externalServers.tlsServerName":   "server.dc1.consul",
+				"externalServers.skipServerWatch": "true",
 			}
 
 			if c.ACLsEnabled {

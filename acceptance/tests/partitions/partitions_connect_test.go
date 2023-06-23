@@ -116,7 +116,7 @@ func TestPartitions_Connect(t *testing.T) {
 			// a NodePort service so that we can access node(s) in a different Kind cluster.
 			if cfg.UseKind {
 				defaultPartitionHelmValues["meshGateway.service.type"] = "NodePort"
-				defaultPartitionHelmValues["meshGateway.service.nodePort"] = "30200" // todo: do we need to set this port?
+				defaultPartitionHelmValues["meshGateway.service.nodePort"] = "30200"
 				defaultPartitionHelmValues["server.exposeService.type"] = "NodePort"
 				defaultPartitionHelmValues["server.exposeService.nodePort.https"] = "30000"
 				defaultPartitionHelmValues["server.exposeService.nodePort.grpc"] = "30100"
@@ -156,9 +156,10 @@ func TestPartitions_Connect(t *testing.T) {
 				"global.tls.caCert.secretName": caCertSecretName,
 				"global.tls.caCert.secretKey":  "tls.crt",
 
-				"externalServers.enabled":       "true",
-				"externalServers.hosts[0]":      partitionSvcAddress,
-				"externalServers.tlsServerName": "server.dc1.consul",
+				"externalServers.enabled":         "true",
+				"externalServers.hosts[0]":        partitionSvcAddress,
+				"externalServers.tlsServerName":   "server.dc1.consul",
+				"externalServers.skipServerWatch": "true",
 			}
 
 			if c.ACLsEnabled {

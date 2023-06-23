@@ -106,9 +106,10 @@ func TestPartitions_Gateway(t *testing.T) {
 		"global.tls.caCert.secretName": caCertSecretName,
 		"global.tls.caCert.secretKey":  "tls.crt",
 
-		"externalServers.enabled":       "true",
-		"externalServers.hosts[0]":      partitionSvcAddress,
-		"externalServers.tlsServerName": "server.dc1.consul",
+		"externalServers.enabled":         "true",
+		"externalServers.hosts[0]":        partitionSvcAddress,
+		"externalServers.tlsServerName":   "server.dc1.consul",
+		"externalServers.skipServerWatch": "true",
 	}
 
 	// Setup partition token and auth method host since ACLs enabled.
