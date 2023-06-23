@@ -86,6 +86,7 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
+								RetryOn:               []string{"gateway-error"},
 								RetryOnStatusCodes:    []uint32{500, 400},
 								RequestHeaders: &HTTPHeaderModifiers{
 									Add: map[string]string{
@@ -163,6 +164,7 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 							RequestTimeout:        1 * time.Second,
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
+							RetryOn:               []string{"gateway-error"},
 							RetryOnStatusCodes:    []uint32{500, 400},
 							RequestHeaders: &capi.HTTPHeaderModifiers{
 								Add: map[string]string{
@@ -289,6 +291,7 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
+								RetryOn:               []string{"gateway-error"},
 								RetryOnStatusCodes:    []uint32{500, 400},
 								RequestHeaders: &HTTPHeaderModifiers{
 									Add: map[string]string{

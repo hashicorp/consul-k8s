@@ -148,6 +148,13 @@ spec:
                           description: RetryOnConnectFailure allows for connection
                             failure errors to trigger a retry.
                           type: boolean
+                        retryOn:
+                          description: RetryOn is a flat list of conditions for Consul
+                            to retry requests based on the response from an upstream
+                            service.
+                          items:
+                            type: string
+                          type: array
                         retryOnStatusCodes:
                           description: RetryOnStatusCodes is a flat list of http response
                             status codes that are eligible for retry.
