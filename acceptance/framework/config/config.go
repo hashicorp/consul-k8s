@@ -53,6 +53,7 @@ type TestConfig struct {
 	DebugDirectory     string
 
 	UseAKS  bool
+	UseEKS  bool
 	UseGKE  bool
 	UseKind bool
 
