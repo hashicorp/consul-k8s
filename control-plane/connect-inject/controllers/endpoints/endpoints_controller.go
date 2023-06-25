@@ -1107,7 +1107,7 @@ func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServi
 	if err != nil {
 		return nil, err
 	}
-	r.Log.Info("Node count in k8s", len(k8sNodeList.Items))
+	r.Log.Info("Node count in k8s", "k8sCount", len(k8sNodeList.Items))
 
 	// The nodelist may have changed between this point and when the event was raised
 	// For example, if a pod is evicted because a node has been deleted, there is no guarantee that that node will show up here
@@ -1115,11 +1115,12 @@ func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServi
 	// query consul catalog for a list of nodes supporting this service
 	r.Log.Info("Finding synthetic nodes in consul")
 	var nodeList []*api.Node
-	nodeList, _, err = apiClient.Catalog().Nodes(&api.QueryOptions{Filter: "Meta[synthetic-node] == true", Namespace: namespaces.WildcardNamespace})
+	filter := fmt.Sprintf(`Meta[%q] == %q `, "synthetic-node", "true")
+	nodeList, _, err = apiClient.Catalog().Nodes(&api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
 	if err != nil {
 		return nil, err
 	}
-	r.Log.Info("Node count in consul", len(nodeList))
+	r.Log.Info("Node count in consul", "consulCount", len(nodeList))
 	
 	for _, node := range nodeList {
 		var nodeServices *api.CatalogNodeServiceList
