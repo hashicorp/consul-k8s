@@ -1101,19 +1101,20 @@ func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServi
 	var serviceList []*api.CatalogNodeServiceList
 	
 	// Get a list of k8s nodes.
-	var nodeList corev1.NodeList
+	var k8sNodeList corev1.NodeList
 	r.Log.Info("Finding nodes from k8s api")
-	err := r.Client.List(r.Context, &nodeList)
+	err := r.Client.List(r.Context, &k8sNodeList)
 	if err != nil {
 		return nil, err
 	}
-	r.Log.Info("Node count in k8s", len(nodeList))
+	r.Log.Info("Node count in k8s", len(k8sNodeList.Items))
 
 	// The nodelist may have changed between this point and when the event was raised
 	// For example, if a pod is evicted because a node has been deleted, there is no guarantee that that node will show up here
 
 	// query consul catalog for a list of nodes supporting this service
 	r.Log.Info("Finding synthetic nodes in consul")
+	var nodeList []*api.Node
 	nodeList, _, err = apiClient.Catalog().Nodes(&api.QueryOptions{Filter: "Meta[synthetic-node] == true", Namespace: namespaces.WildcardNamespace})
 	if err != nil {
 		return nil, err
@@ -1128,7 +1129,7 @@ func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServi
 		if err != nil {
 			err = multierror.Append(err, callErr)		
 		} else {
-			r.Log.Info("Found services on consul node", len(nodeServices), node.Node)
+			r.Log.Info("Found services on consul node", len(nodeServices.Services), node.Node)
 			serviceList = append(serviceList, nodeServices)
 		}
 	}
