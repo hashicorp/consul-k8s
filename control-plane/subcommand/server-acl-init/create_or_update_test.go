@@ -71,7 +71,7 @@ func TestCreateOrUpdateACLPolicy_ErrorsIfDescriptionDoesNotMatch(t *testing.T) {
 	require.Equal(policyDescription, rereadPolicy.Description)
 }
 
-func TestCreateOrUpdateACLPolicy_Update(t *testing.T) {
+func TestCreateOrUpdateACLPolicy(t *testing.T) {
 	require := require.New(t)
 	ui := cli.NewMockUi()
 	k8s := fake.NewSimpleClientset()
