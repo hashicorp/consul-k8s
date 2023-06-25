@@ -52,12 +52,6 @@ global:
     # Changing the partition name would require an un-install and a re-install with the updated name.
     # Must be "default" in the server cluster ie the Kubernetes cluster that the Consul server pods are deployed onto.
     name: "default"
-  
-  # Set imagePullPolicy for all images used. This is applies to all the images being used.
-  # One of "IfNotPresent", "Always", "Never"
-  # Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
-  # @type: string
-  imagePullPolicy: ""
 
   # The name (and tag) of the Consul Docker image for clients and servers.
   # This can be overridden per component. This should be pinned to a specific
@@ -436,6 +430,33 @@ global:
       # @type: string
       secretKey: null
 
+    # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods. 
+    # This should be a YAML map corresponding to a Kubernetes
+    # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+    # object.
+    #
+    # Example:
+    #
+    # ```yaml
+    # resources:
+    #   requests:
+    #     memory: '200Mi'
+    #     cpu: '100m'
+    #   limits:
+    #     memory: '200Mi'
+    #     cpu: '100m'
+    # ```
+    #
+    # @recurse: false
+    # @type: map
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "50Mi"
+        cpu: "50m"
+
     # partitionToken references a Vault secret containing the ACL token to be used in non-default partitions.
     # This value should only be provided in the default partition and only when setting
     # the `global.secretsBackend.vault.enabled` value to true.
@@ -563,7 +584,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: "hashicorppreview/consul-dataplane:1.1-dev"
+  imageConsulDataplane: "docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.2-dev"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
