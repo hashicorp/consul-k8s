@@ -1113,6 +1113,7 @@ func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServi
 	// For example, if a pod is evicted because a node has been deleted, there is no guarantee that that node will show up here
 
 	// query consul catalog for a list of nodes supporting this service
+	// quite a lot of results as synthetic nodes are never deregistered ... :-(
 	r.Log.Info("Finding synthetic nodes in consul")
 	var nodeList []*api.Node
 	filter := fmt.Sprintf(`Meta[%q] == %q `, "synthetic-node", "true")
@@ -1125,12 +1126,12 @@ func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServi
 	for _, node := range nodeList {
 		var nodeServices *api.CatalogNodeServiceList
 		var callErr error
-		r.Log.Info("Finding services on consul node", k8sServiceName, k8sServiceNamespace, node.Node)
+		r.Log.Info("Finding services on consul node", "k8sServiceName", k8sServiceName, "k8sServiceNamespace", k8sServiceNamespace, "node", node.Node)
 		nodeServices, callErr = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, node.Node)
 		if err != nil {
 			err = multierror.Append(err, callErr)		
 		} else {
-			r.Log.Info("Found services on consul node", len(nodeServices.Services), node.Node)
+			r.Log.Info("Found services on consul node", "consulServiceCount", len(nodeServices.Services), "node", node.Node)
 			serviceList = append(serviceList, nodeServices)
 		}
 	}
