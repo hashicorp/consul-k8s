@@ -1099,19 +1099,36 @@ func getTokenMetaFromDescription(description string) (map[string]string, error) 
 
 func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServiceName, k8sServiceNamespace string) ([]*api.CatalogNodeServiceList, error) {
 	var serviceList []*api.CatalogNodeServiceList
+	
 	// Get a list of k8s nodes.
 	var nodeList corev1.NodeList
+	r.Log.Info("Finding nodes from k8s api")
 	err := r.Client.List(r.Context, &nodeList)
 	if err != nil {
 		return nil, err
 	}
-	for _, node := range nodeList.Items {
+	r.Log.Info("Node count in k8s", len(nodeList))
+
+	// The nodelist may have changed between this point and when the event was raised
+	// For example, if a pod is evicted because a node has been deleted, there is no guarantee that that node will show up here
+
+	// query consul catalog for a list of nodes supporting this service
+	r.Log.Info("Finding synthetic nodes in consul")
+	nodeList, _, err = apiClient.Catalog().Nodes(&api.QueryOptions{Filter: "Meta[synthetic-node] == true", Namespace: namespaces.WildcardNamespace})
+	if err != nil {
+		return nil, err
+	}
+	r.Log.Info("Node count in consul", len(nodeList))
+	
+	for _, node := range nodeList {
 		var nodeServices *api.CatalogNodeServiceList
 		var callErr error
-		nodeServices, callErr = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, common.ConsulNodeNameFromK8sNode(node.Name))
+		r.Log.Info("Finding services on consul node", k8sServiceName, k8sServiceNamespace, node.Node)
+		nodeServices, callErr = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, node.Node)
 		if err != nil {
 			err = multierror.Append(err, callErr)		
 		} else {
+			r.Log.Info("Found services on consul node", len(nodeServices), node.Node)
 			serviceList = append(serviceList, nodeServices)
 		}
 	}
