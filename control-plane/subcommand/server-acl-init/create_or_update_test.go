@@ -156,6 +156,8 @@ func TestCreateOrUpdateACLPolicy(t *testing.T) {
 				readPolicy, _, err := consul.ACL().PolicyRead(tt.ID, nil)
 				require.NoError(err)
 				require.Equal(tt.Rules, readPolicy.Rules)
+				require.Equal(tt.PolicyName, readPolicy.Name)
+				require.Equal(tt.PolicyDescription, readPolicy.Description)
 			}
 		})
 	}
