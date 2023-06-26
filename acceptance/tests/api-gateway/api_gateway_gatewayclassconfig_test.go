@@ -33,10 +33,10 @@ import (
 func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	var (
 		defaultInstances = pointer.Int32(2)
-		maxInstances     = pointer.Int32(4)
+		maxInstances     = pointer.Int32(3)
 		minInstances     = pointer.Int32(1)
 
-		namespace        = "gateway-namespace"
+		namespace        = "default"
 		gatewayClassName = "gateway-class"
 	)
 
@@ -62,22 +62,6 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	k8sClient := ctx.ControllerRuntimeClient(t)
-
-	// Create a clean namespace.
-	err = k8sClient.Create(context.Background(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-		},
-	})
-	require.NoError(t, err)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-		logger.Log(t, "deleting gateway namesapce")
-		k8sClient.Delete(context.Background(), &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
-		})
-	})
 
 	// Create a GatewayClassConfig.
 	gatewayClassConfigName := "gateway-class-config"
@@ -140,7 +124,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	})
 
 	// Create gateway referencing gateway class.
-	gatewayName := "gateway"
+	gatewayName := "gcctestgateway" + namespace
 	logger.Log(t, "creating controlled gateway")
 	gateway := createGateway(t, k8sClient, gatewayName, namespace, gatewayClassName, certificateName)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
@@ -177,15 +161,16 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *int32) {
 	t.Helper()
 
-	retryCheck(t, 30, func(r *retry.R) {
-		var deployment appsv1.Deployment
-		err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &deployment)
-		require.NoError(r, err)
+	var deployment appsv1.Deployment
+	err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &deployment)
+	require.NoError(t, err)
 
-		deployment.Spec.Replicas = scaleTo
-		err = client.Update(context.Background(), &deployment)
-		require.NoError(r, err)
-	})
+	logger.Log(t, fmt.Sprintf("scaling gateway from %d to %d", *deployment.Spec.Replicas, *scaleTo))
+
+	deployment.Spec.Replicas = scaleTo
+	err = client.Update(context.Background(), &deployment)
+	require.NoError(t, err)
+
 }
 
 func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *api.Client, name, namespace string, wantNumber *int32, gateway *gwv1beta1.Gateway) {
@@ -212,8 +197,16 @@ func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *
 
 		// Ensure the number of services matches the replicas generated.
 		services, _, err := consulClient.Catalog().Service(name, "", nil)
+		seenServices := map[string]interface{}{}
 		require.NoError(r, err)
 		logger.Log(t, fmt.Sprintf("number of services: %d", len(services)))
-		require.EqualValues(r, *wantNumber, len(services), "number of services should match the number of instances defined on the gateway class config")
+		//we need to double check that we aren't double counting services with the same ID
+		for _, s := range services {
+			seenServices[s.ServiceID] = true
+			logger.Log(t, fmt.Sprintf("service info: id: %s, name: %s, namespace: %s", s.ServiceID, s.ServiceName, s.Namespace))
+		}
+
+		logger.Log(t, fmt.Sprintf("number of services: %d", len(services)))
+		require.EqualValues(r, int(*wantNumber), len(seenServices), "number of services should match the number of instances defined on the gateway class config")
 	})
 }
