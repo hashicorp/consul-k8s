@@ -103,45 +103,23 @@ func TestCreateOrUpdateACLPolicy(t *testing.T) {
 	require.NoError(err)
 	policyDescription := "policy-description"
 	policyName := "policy-name"
-	policy, _, err := consul.ACL().PolicyCreate(&api.ACLPolicy{
-		Name:        "new-policy-name",
-		Description: "new-policy-desc",
-	}, nil)
-	require.NoError(err)
 	cases := []struct {
 		Name              string
-		ID                string
 		PolicyDescription string
 		PolicyName        string
 		Rules             string
-		Err               error
-		ExpPolicy         *api.ACLPolicy
 	}{
 		{
 			Name:              "create",
-			ID:                "",
 			PolicyDescription: policyDescription,
 			PolicyName:        policyName,
 			Rules:             connectInjectRule,
-			Err:               nil,
-			ExpPolicy: &api.ACLPolicy{
-				Name:        policyName,
-				Description: policyDescription,
-				Rules:       connectInjectRule,
-			},
 		},
 		{
 			Name:              "update",
-			ID:                policy.ID,
-			PolicyDescription: policy.Description,
-			PolicyName:        policy.Name,
+			PolicyDescription: policyDescription,
+			PolicyName:        policyName,
 			Rules:             aclReplRule,
-			Err:               nil,
-			ExpPolicy: &api.ACLPolicy{
-				Name:        policyName,
-				Description: policyDescription,
-				Rules:       aclReplRule,
-			},
 		},
 	}
 	for _, tt := range cases {
@@ -151,14 +129,12 @@ func TestCreateOrUpdateACLPolicy(t *testing.T) {
 				Description: tt.PolicyDescription,
 				Rules:       tt.Rules,
 			}, consul)
-			require.Equal(tt.Err, err)
-			if tt.ID != "" {
-				readPolicy, _, err := consul.ACL().PolicyRead(tt.ID, nil)
-				require.NoError(err)
-				require.Equal(tt.Rules, readPolicy.Rules)
-				require.Equal(tt.PolicyName, readPolicy.Name)
-				require.Equal(tt.PolicyDescription, readPolicy.Description)
-			}
+			require.Nil(err)
+			policy, _, err := consul.ACL().PolicyReadByName(tt.PolicyName, nil)
+			require.Nil(err)
+			require.Equal(tt.Rules, policy.Rules)
+			require.Equal(tt.PolicyName, policy.Name)
+			require.Equal(tt.PolicyDescription, policy.Description)
 		})
 	}
 }
