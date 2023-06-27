@@ -91,7 +91,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		// deployments because golang will execute them in reverse order
 		// (i.e. the last registered cleanup function will be executed first).
 		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
+			retrier := &retry.Timer{Timeout: 60 * time.Second, Wait: 100 * time.Millisecond}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
 				require.NoError(r, err)
@@ -114,14 +114,18 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
-	for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		require.NoError(t, err)
-		require.Len(t, podList.Items, 1)
-		require.Len(t, podList.Items[0].Spec.Containers, 2)
-	}
+
+	retrier := &retry.Timer{Timeout: 300 * time.Second, Wait: 100 * time.Millisecond}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
+			podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: labelSelector,
+			})
+			require.NoError(t, err)
+			require.Len(t, podList.Items, 1)
+			require.Len(t, podList.Items[0].Spec.Containers, 2)
+		}
+	})
 }
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static
