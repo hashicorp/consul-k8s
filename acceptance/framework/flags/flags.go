@@ -39,8 +39,6 @@ type TestFlags struct {
 	flagConsulDataplaneVersion string
 	flagEnvoyImage             string
 
-	flagHCPResourceID string
-
 	flagNoCleanupOnFailure bool
 
 	flagDebugDirectory string
