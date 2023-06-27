@@ -1,3 +1,3 @@
-```release-note:bug
-control-plane: Always update ACL policies upon upgrade
+```release-note:breaking-change
+control-plane: Always update ACL policies for consul-connect-injector upon upgrade. 
 ```
