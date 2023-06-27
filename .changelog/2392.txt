@@ -1,6 +1,6 @@
 ```release-note:breaking-change
-control-plane: Always update ACL policies for consul-connect-injector upon upgrade. If you've manually updated your own ACL policies this will cause ACL issues with connect-inject. 
+control-plane: All policies managed by consul-k8s will now be updated on upgrade. If you previously edited the policies after install, your changes will be overwritten.
 ```
 ```release-note:bug
-control-plane: Always update ACL policies for consul-connect-injector upon upgrade.
+control-plane: All policies managed by consul-k8s will now be updated on upgrade. If you previously edited the policies after install, your changes will be overwritten.
 ```
