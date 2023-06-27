@@ -15,7 +15,6 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +22,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul/api"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -2330,8 +2331,16 @@ func controlledBinder(config BinderConfig) BinderConfig {
 	return config
 }
 
+func generateInvalidTestCertificate(t *testing.T, namespace, name string, keyLen int) (*api.InlineCertificateConfigEntry, corev1.Secret) {
+	return generateTestCertificateByKeyLen(t, namespace, name, keyLen)
+}
+
 func generateTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	return generateTestCertificateByKeyLen(t, namespace, name, common.MinKeyLength)
+}
+
+func generateTestCertificateByKeyLen(t *testing.T, namespace, name string, keyLen int) (*api.InlineCertificateConfigEntry, corev1.Secret) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, keyLen)
 	require.NoError(t, err)
 
 	usage := x509.KeyUsageCertSign
