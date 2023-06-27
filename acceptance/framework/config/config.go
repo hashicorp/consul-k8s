@@ -43,11 +43,13 @@ type TestConfig struct {
 
 	DisablePeering bool
 
-	HelmChartVersion string
-	ConsulImage      string
-	ConsulK8SImage   string
-	ConsulVersion    *version.Version
-	EnvoyImage       string
+	HelmChartVersion       string
+	ConsulImage            string
+	ConsulK8SImage         string
+	ConsulDataplaneImage   string
+	ConsulVersion          *version.Version
+	ConsulDataplaneVersion *version.Version
+	EnvoyImage             string
 
 	NoCleanupOnFailure bool
 	DebugDirectory     string
@@ -101,6 +103,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "global.image", t.ConsulImage)
 	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
+	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
 
 	return helmValues, nil
 }
