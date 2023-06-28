@@ -1,3 +1,35 @@
+## 1.0.8 (June 28, 2023)
+BREAKING CHANGES:
+
+* control-plane: All policies managed by consul-k8s will now be updated on upgrade. If you previously edited the policies after install, your changes will be overwritten. [[GH-2392](https://github.com/hashicorp/consul-k8s/issues/2392)]
+
+SECURITY:
+
+* Bump Dockerfile base image for RedHat UBI `consul-k8s-control-plane` image to `ubi-minimal:9.2`. [[GH-2204](https://github.com/hashicorp/consul-k8s/issues/2204)]
+* Bump Dockerfile base image to `alpine:3.18`. Resolves [CVE-2023-2650](https://github.com/advisories/GHSA-gqxg-9vfr-p9cg) vulnerability in openssl@3.0.8-r4 [[GH-2284](https://github.com/hashicorp/consul-k8s/issues/2284)]
+* Bump `controller-runtime` to address CVEs in dependencies. [[GH-2225](https://github.com/hashicorp/consul-k8s/issues/2225)]
+* Update [Go-Discover](https://github.com/hashicorp/go-discover) in the container has been updated to address [CVE-2020-14040](https://github.com/advisories/GHSA-5rcv-m4m3-hfh7) [[GH-2390](https://github.com/hashicorp/consul-k8s/issues/2390)]
+
+FEATURES:
+
+* Add support for configuring graceful shutdown proxy lifecycle management settings. [[GH-2233](https://github.com/hashicorp/consul-k8s/issues/2233)]
+* helm: Adds `acls.resources` field which can be configured to override the `resource` settings for the `server-acl-init` and `server-acl-init-cleanup` Jobs. [[GH-2416](https://github.com/hashicorp/consul-k8s/issues/2416)]
+* sync-catalog: add ability to support weighted loadbalancing by service annotation `consul.hashicorp.com/service-weight: <number>` [[GH-2293](https://github.com/hashicorp/consul-k8s/issues/2293)]
+
+IMPROVEMENTS:
+
+* (Consul Enterprise) Add support to provide inputs via helm for audit log related configuration [[GH-2265](https://github.com/hashicorp/consul-k8s/issues/2265)]
+* helm: Update the default amount of memory used by the connect-inject controller so that its less likely to get OOM killed. [[GH-2249](https://github.com/hashicorp/consul-k8s/issues/2249)]
+
+BUG FIXES:
+
+* control-plane: Always update ACL policies upon upgrade. [[GH-2392](https://github.com/hashicorp/consul-k8s/issues/2392)]
+* control-plane: Fix casing of the Enforce Consecutive 5xx field on Service Defaults and acceptance test fixtures. [[GH-2266](https://github.com/hashicorp/consul-k8s/issues/2266)]
+* control-plane: add support for idleTimeout in the Service Router config [[GH-2156](https://github.com/hashicorp/consul-k8s/issues/2156)]
+* control-plane: fix issue with json tags of service defaults fields EnforcingConsecutive5xx, MaxEjectionPercent and BaseEjectionTime. [[GH-2159](https://github.com/hashicorp/consul-k8s/issues/2159)]
+* control-plane: fix issue with multiport pods crashlooping due to dataplane port conflicts by ensuring dns redirection is disabled for non-tproxy pods [[GH-2176](https://github.com/hashicorp/consul-k8s/issues/2176)]
+* crd: fix bug on service intentions CRD causing some updates to be ignored. [[GH-2194](https://github.com/hashicorp/consul-k8s/issues/2194)]
+
 ## 1.0.7 (May 17, 2023)
 
 SECURITY:
