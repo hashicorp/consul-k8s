@@ -47,9 +47,14 @@ func TestVault_VaultNamespace(t *testing.T) {
 
 	logger.Log(t, "Creating secret for Vault license")
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
+	vaultServerVersion := "1.9.4-ent"
+	if cfg.VaultServerVersion != "" {
+		vaultServerVersion = cfg.VaultServerVersion
+	}
 	vaultHelmvalues := map[string]string{
-		"server.image.repository":             "docker.mirror.hashicorp.services/hashicorp/vault-enterprise",
-		"server.image.tag":                    "1.9.4-ent",
+		"server.image.repository": "docker.mirror.hashicorp.services/hashicorp/vault-enterprise",
+		//"server.image.tag":                    "1.9.4-ent",
+		"server.image.tag":                    vaultServerVersion,
 		"server.enterpriseLicense.secretName": vaultLicenseSecretName,
 		"server.enterpriseLicense.secretKey":  vaultLicenseSecretKey,
 	}

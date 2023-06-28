@@ -46,6 +46,8 @@ type TestFlags struct {
 	flagHCPResourceID string
 
 	flagNoCleanupOnFailure bool
+	flagNoCleanupWanFed    bool
+	flagTestDuration       string
 
 	flagDebugDirectory string
 
@@ -116,6 +118,11 @@ func (t *TestFlags) init() {
 		"If true, the tests will not cleanup Kubernetes resources they create when they finish running."+
 			"Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.")
 
+	flag.BoolVar(&t.flagNoCleanupWanFed, "no-cleanup-wan-fed", false,
+		"If true, the tests will not cleanup Kubernetes resources for Vault Wan Fed test")
+
+	flag.StringVar(&t.flagTestDuration, "test-duration", " ", "The time you need to work on the test.")
+
 	flag.StringVar(&t.flagDebugDirectory, "debug-directory", "", "The directory where to write debug information about failed test runs, "+
 		"such as logs and pod definitions. If not provided, a temporary directory will be created by the tests.")
 
@@ -155,43 +162,35 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	//vaultserverVersion, _ := version.NewVersion(t.flagVaultServerVersion)
 
 	return &config.TestConfig{
-		Kubeconfig:    t.flagKubeconfig,
-		KubeContext:   t.flagKubecontext,
-		KubeNamespace: t.flagNamespace,
-
-		EnableMultiCluster:     t.flagEnableMultiCluster,
-		SecondaryKubeconfig:    t.flagSecondaryKubeconfig,
-		SecondaryKubeContext:   t.flagSecondaryKubecontext,
-		SecondaryKubeNamespace: t.flagSecondaryNamespace,
-
-		EnableEnterprise:  t.flagEnableEnterprise,
-		EnterpriseLicense: t.flagEnterpriseLicense,
-
-		EnableOpenshift: t.flagEnableOpenshift,
-
+		Kubeconfig:                t.flagKubeconfig,
+		KubeContext:               t.flagKubecontext,
+		KubeNamespace:             t.flagNamespace,
+		EnableMultiCluster:        t.flagEnableMultiCluster,
+		SecondaryKubeconfig:       t.flagSecondaryKubeconfig,
+		SecondaryKubeContext:      t.flagSecondaryKubecontext,
+		SecondaryKubeNamespace:    t.flagSecondaryNamespace,
+		EnableEnterprise:          t.flagEnableEnterprise,
+		EnterpriseLicense:         t.flagEnterpriseLicense,
+		EnableOpenshift:           t.flagEnableOpenshift,
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
-
-		EnableCNI: t.flagEnableCNI,
-
-		EnableTransparentProxy: t.flagEnableTransparentProxy,
-
-		DisablePeering: t.flagDisablePeering,
-
-		HelmChartVersion:      t.flagHelmChartVersion,
-		ConsulImage:           t.flagConsulImage,
-		ConsulK8SImage:        t.flagConsulK8sImage,
-		ConsulVersion:         consulVersion,
-		EnvoyImage:            t.flagEnvoyImage,
-		ConsulCollectorImage:  t.flagConsulCollectorImage,
-		VaultHelmChartVersion: t.flagVaultHelmChartVersion,
-		VaultServerVersion:    t.flagVaultServerVersion,
-
-		HCPResourceID: t.flagHCPResourceID,
-
-		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
-		DebugDirectory:     tempDir,
-		UseAKS:             t.flagUseAKS,
-		UseGKE:             t.flagUseGKE,
-		UseKind:            t.flagUseKind,
+		EnableCNI:                 t.flagEnableCNI,
+		EnableTransparentProxy:    t.flagEnableTransparentProxy,
+		DisablePeering:            t.flagDisablePeering,
+		HelmChartVersion:          t.flagHelmChartVersion,
+		ConsulImage:               t.flagConsulImage,
+		ConsulK8SImage:            t.flagConsulK8sImage,
+		ConsulVersion:             consulVersion,
+		EnvoyImage:                t.flagEnvoyImage,
+		ConsulCollectorImage:      t.flagConsulCollectorImage,
+		HCPResourceID:             t.flagHCPResourceID,
+		VaultHelmChartVersion:     t.flagVaultHelmChartVersion,
+		VaultServerVersion:        t.flagVaultServerVersion,
+		NoCleanupOnFailure:        t.flagNoCleanupOnFailure,
+		NoCleanupWanFed:           t.flagNoCleanupWanFed,
+		TestDuration:              t.flagTestDuration,
+		DebugDirectory:            tempDir,
+		UseAKS:                    t.flagUseAKS,
+		UseGKE:                    t.flagUseGKE,
+		UseKind:                   t.flagUseKind,
 	}
 }
