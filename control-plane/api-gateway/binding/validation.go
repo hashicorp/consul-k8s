@@ -218,12 +218,7 @@ func validateCertificateData(secret corev1.Secret) error {
 		return errListenerInvalidCertificateRef_InvalidData
 	}
 
-	err = validateKeyLength(privateKey)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return validateKeyLength(privateKey)
 }
 
 func validateKeyLength(privateKey string) error {
@@ -287,7 +282,7 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 			_, supported := supportedKindsForProtocol[listener.Protocol]
 			if !supported {
 				result.acceptedErr = errListenerUnsupportedProtocol
-			} else if listener.Port == 20000 { //admin port
+			} else if listener.Port == 20000 { // admin port
 				result.acceptedErr = errListenerPortUnavailable
 			}
 
