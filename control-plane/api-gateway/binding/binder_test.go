@@ -2331,8 +2331,8 @@ func controlledBinder(config BinderConfig) BinderConfig {
 	return config
 }
 
-func generateInvalidTestCertificate(t *testing.T, namespace, name string, keyLen int) (*api.InlineCertificateConfigEntry, corev1.Secret) {
-	return generateTestCertificateByKeyLen(t, namespace, name, keyLen)
+func generateInvalidTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
+	return generateTestCertificateByKeyLen(t, namespace, name, common.MinKeyLength-1)
 }
 
 func generateTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
