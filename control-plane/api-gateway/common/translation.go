@@ -254,14 +254,16 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 	}
 
 	for _, filter := range filters {
-		consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
+		if filter.RequestHeaderModifier != nil {
+			consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
 
-		for _, toAdd := range filter.RequestHeaderModifier.Add {
-			consulFilter.Add[string(toAdd.Name)] = toAdd.Value
-		}
+			for _, toAdd := range filter.RequestHeaderModifier.Add {
+				consulFilter.Add[string(toAdd.Name)] = toAdd.Value
+			}
 
-		for _, toSet := range filter.RequestHeaderModifier.Set {
-			consulFilter.Set[string(toSet.Name)] = toSet.Value
+			for _, toSet := range filter.RequestHeaderModifier.Set {
+				consulFilter.Set[string(toSet.Name)] = toSet.Value
+			}
 		}
 
 		// we drop any path rewrites that are not prefix matches as we don't support those
