@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -68,6 +69,94 @@ func realMain(ctx context.Context) error {
 	eksClient := eks.New(clientSession, awsCfg)
 	ec2Client := ec2.New(clientSession, awsCfg)
 	elbClient := elb.New(clientSession, awsCfg)
+	iamClient := iam.New(clientSession, awsCfg)
+
+	// Find OIDC providers to delete.
+	oidcProvidersOutput, err := iamClient.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
+	type oidc struct {
+		arn      string
+		buildUrl string
+	}
+	toDeleteOidcArns := []*oidc{}
+	for _, providerEntry := range oidcProvidersOutput.OpenIDConnectProviderList {
+		arnString := ""
+		if providerEntry.Arn != nil {
+			arnString = *providerEntry.Arn
+		}
+		output, err := iamClient.ListOpenIDConnectProviderTags(&iam.ListOpenIDConnectProviderTagsInput{OpenIDConnectProviderArn: providerEntry.Arn})
+		if err != nil {
+			return err
+		}
+		for _, tag := range output.Tags {
+			if tag.Key != nil && *tag.Key == buildURLTag {
+				var buildUrl string
+				if tag.Value != nil {
+					buildUrl = *tag.Value
+				}
+				toDeleteOidcArns = append(toDeleteOidcArns, &oidc{arn: arnString, buildUrl: buildUrl})
+			}
+		}
+	}
+
+	oidcProvidersExist := true
+	if len(toDeleteOidcArns) == 0 {
+		fmt.Println("Found no OIDC Providers to clean up")
+		oidcProvidersExist = false
+	} else {
+		// Print out the OIDC Provider arns and the build tags.
+		var oidcPrint string
+		for _, oidcProvider := range toDeleteOidcArns {
+			oidcPrint += fmt.Sprintf("- %s (%s)\n", oidcProvider.arn, oidcProvider.buildUrl)
+		}
+
+		fmt.Printf("Found OIDC Providers:\n%s", oidcPrint)
+	}
+
+	// Check for approval.
+	if !flagAutoApprove && oidcProvidersExist {
+		type input struct {
+			text string
+			err  error
+		}
+		inputCh := make(chan input)
+
+		// Read input in a goroutine so we can also exit if we get a Ctrl-C
+		// (see select{} below).
+		go func() {
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Println("\nDo you want to delete these OIDC Providers (y/n)?")
+			inputStr, err := reader.ReadString('\n')
+			if err != nil {
+				inputCh <- input{err: err}
+				return
+			}
+			inputCh <- input{text: inputStr}
+		}()
+
+		select {
+		case in := <-inputCh:
+			if in.err != nil {
+				return in.err
+			}
+			inputTrimmed := strings.TrimSpace(in.text)
+			if inputTrimmed != "y" && inputTrimmed != "yes" {
+				return errors.New("exiting after negative")
+			}
+		case <-ctx.Done():
+			return errors.New("context cancelled")
+		}
+	}
+
+	// Actually delete the OIDC providers.
+	for _, oidcArn := range toDeleteOidcArns {
+		fmt.Printf("Deleting OIDC provider: %s\n", oidcArn.arn)
+		_, err := iamClient.DeleteOpenIDConnectProviderWithContext(ctx, &iam.DeleteOpenIDConnectProviderInput{
+			OpenIDConnectProviderArn: &oidcArn.arn,
+		})
+		if err != nil {
+			return err
+		}
+	}
 
 	// Find VPCs to delete. Most resources we create belong to a VPC, except
 	// for IAM resources, and so if there are no VPCs, that means all leftover resources have been deleted.
