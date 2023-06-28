@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: fixed issue where a HTTPRoute would break if a `URLRewrite` filter was defined.
+```
