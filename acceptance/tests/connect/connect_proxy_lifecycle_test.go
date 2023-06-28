@@ -3,15 +3,15 @@
 
 package connect
 
-type LifecycleShutdownConfig struct {
-	secure     bool
-	helmValues map[string]string
-}
-
-const (
-	helmDrainListenersKey     = "connectInject.sidecarProxy.lifecycle.defaultEnableShutdownDrainListeners"
-	helmGracePeriodSecondsKey = "connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds"
-)
+//type LifecycleShutdownConfig struct {
+//	secure     bool
+//	helmValues map[string]string
+//}
+//
+//const (
+//	helmDrainListenersKey     = "connectInject.sidecarProxy.lifecycle.defaultEnableShutdownDrainListeners"
+//	helmGracePeriodSecondsKey = "connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds"
+//)
 
 //// Test the endpoints controller cleans up force-killed pods.
 //func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
