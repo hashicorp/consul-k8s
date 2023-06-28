@@ -4,11 +4,11 @@
 package binding
 
 import (
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -17,6 +17,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul/api"
 )
 
 var (
@@ -204,10 +209,58 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 	return nil, err
 }
 
+// Envoy will silently reject any keys that are less than 2048 bytes long
+// https://github.com/envoyproxy/envoy/blob/main/source/extensions/transport_sockets/tls/context_impl.cc#L238
+const MinKeyLength = 2048
+
 func validateCertificateData(secret corev1.Secret) error {
-	_, _, err := common.ParseCertificateData(secret)
+	_, privateKey, err := common.ParseCertificateData(secret)
 	if err != nil {
 		return errListenerInvalidCertificateRef_InvalidData
+	}
+
+	err = validateKeyLength(privateKey)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateKeyLength(privateKey string) error {
+	// we can assume this is non-nil as it would've caused an error from common.ParseCertificate if it was
+	privateKeyBlock, _ := pem.Decode([]byte(privateKey))
+
+	if privateKeyBlock.Type != "RSA PRIVATE KEY" {
+		return nil
+	}
+
+	key, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
+	if err != nil {
+		return err
+	}
+
+	keyBitLen := key.N.BitLen()
+
+	if version.IsFIPS() {
+		return fipsLenCheck(keyBitLen)
+	}
+
+	return nonFipsLenCheck(keyBitLen)
+}
+
+func nonFipsLenCheck(keyLen int) error {
+	// ensure private key is of the correct length
+	if keyLen < MinKeyLength {
+		return errors.New("key length must be at least 2048 bits")
+	}
+
+	return nil
+}
+
+func fipsLenCheck(keyLen int) error {
+	if keyLen != 2048 && keyLen != 3072 && keyLen != 4096 {
+		return errors.New("key length invalid: only RSA lengths of 2048, 3072, and 4096 are allowed in FIPS mode")
 	}
 	return nil
 }

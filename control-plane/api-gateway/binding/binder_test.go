@@ -2332,11 +2332,11 @@ func controlledBinder(config BinderConfig) BinderConfig {
 }
 
 func generateInvalidTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
-	return generateTestCertificateByKeyLen(t, namespace, name, common.MinKeyLength-1)
+	return generateTestCertificateByKeyLen(t, namespace, name, MinKeyLength-1)
 }
 
 func generateTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
-	return generateTestCertificateByKeyLen(t, namespace, name, common.MinKeyLength)
+	return generateTestCertificateByKeyLen(t, namespace, name, MinKeyLength)
 }
 
 func generateTestCertificateByKeyLen(t *testing.T, namespace, name string, keyLen int) (*api.InlineCertificateConfigEntry, corev1.Secret) {
