@@ -39,6 +39,11 @@ var (
 	errNotDestroyed = errors.New("not yet destroyed")
 )
 
+type oidc struct {
+	arn      string
+	buildUrl string
+}
+
 func main() {
 	flag.BoolVar(&flagAutoApprove, "auto-approve", false, "Skip interactive approval before destroying.")
 	flag.Parse()
@@ -73,28 +78,34 @@ func realMain(ctx context.Context) error {
 
 	// Find OIDC providers to delete.
 	oidcProvidersOutput, err := iamClient.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
-	type oidc struct {
-		arn      string
-		buildUrl string
-	}
 	toDeleteOidcArns := []*oidc{}
 	for _, providerEntry := range oidcProvidersOutput.OpenIDConnectProviderList {
 		arnString := ""
 		if providerEntry.Arn != nil {
 			arnString = *providerEntry.Arn
 		}
-		output, err := iamClient.ListOpenIDConnectProviderTags(&iam.ListOpenIDConnectProviderTagsInput{OpenIDConnectProviderArn: providerEntry.Arn})
+		// Check if it's older than 8 hours.
+		older, err := oidcOlderThanEightHours(ctx, iamClient, providerEntry.Arn)
 		if err != nil {
 			return err
 		}
-		for _, tag := range output.Tags {
-			if tag.Key != nil && *tag.Key == buildURLTag {
-				var buildUrl string
-				if tag.Value != nil {
-					buildUrl = *tag.Value
-				}
-				toDeleteOidcArns = append(toDeleteOidcArns, &oidc{arn: arnString, buildUrl: buildUrl})
+		// Only add to delete list if it's older than 8 hours and has a buildURL tag.
+		if older {
+			output, err := iamClient.ListOpenIDConnectProviderTags(&iam.ListOpenIDConnectProviderTagsInput{OpenIDConnectProviderArn: providerEntry.Arn})
+			if err != nil {
+				return err
 			}
+			for _, tag := range output.Tags {
+				if tag.Key != nil && *tag.Key == buildURLTag {
+					var buildUrl string
+					if tag.Value != nil {
+						buildUrl = *tag.Value
+					}
+					toDeleteOidcArns = append(toDeleteOidcArns, &oidc{arn: arnString, buildUrl: buildUrl})
+				}
+			}
+		} else {
+			fmt.Printf("Skipping OIDC provider: %s because it's not over 8 hours old\n", arnString)
 		}
 	}
 
@@ -624,6 +635,25 @@ func realMain(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// oidcOlderThanEightHours checks if the oidc provider is older than 8 hours.
+func oidcOlderThanEightHours(ctx context.Context, iamClient *iam.IAM, oidcArn *string) (bool, error) {
+	fullOidc, err := iamClient.GetOpenIDConnectProviderWithContext(ctx, &iam.GetOpenIDConnectProviderInput{
+		OpenIDConnectProviderArn: oidcArn,
+	})
+	if err != nil {
+		return false, err
+	}
+	if fullOidc != nil {
+		if fullOidc.CreateDate != nil {
+			d := time.Since(*fullOidc.CreateDate)
+			if d.Hours() > 8 {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func vpcNameAndBuildURL(vpc *ec2.Vpc) (string, string) {
