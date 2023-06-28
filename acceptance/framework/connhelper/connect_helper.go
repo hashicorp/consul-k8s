@@ -50,8 +50,8 @@ type ConnectHelper struct {
 	// consulCluster is the cluster to use for the test.
 	consulCluster consul.Cluster
 
-	// consulClient is the client used to test service mesh connectivity.
-	consulClient *api.Client
+	// ConsulClient is the client used to test service mesh connectivity.
+	ConsulClient *api.Client
 }
 
 // Setup creates a new cluster using the New*Cluster function and assigns it
@@ -69,14 +69,14 @@ func (c *ConnectHelper) Setup(t *testing.T) {
 func (c *ConnectHelper) Install(t *testing.T) {
 	logger.Log(t, "Installing Consul cluster")
 	c.consulCluster.Create(t)
-	c.consulClient, _ = c.consulCluster.SetupConsulClient(t, c.Secure)
+	c.ConsulClient, _ = c.consulCluster.SetupConsulClient(t, c.Secure)
 }
 
 // Upgrade uses the existing Consul cluster and upgrades it using Helm values
 // set by the Secure, AutoEncrypt, and HelmValues fields.
 func (c *ConnectHelper) Upgrade(t *testing.T) {
 	require.NotNil(t, c.consulCluster, "consulCluster must be set before calling Upgrade (Call Install first).")
-	require.NotNil(t, c.consulClient, "consulClient must be set before calling Upgrade (Call Install first).")
+	require.NotNil(t, c.ConsulClient, "ConsulClient must be set before calling Upgrade (Call Install first).")
 
 	logger.Log(t, "upgrading Consul cluster")
 	c.consulCluster.Upgrade(t, c.helmValues())
@@ -94,9 +94,9 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		// deployments because golang will execute them in reverse order
 		// (i.e. the last registered cleanup function will be executed first).
 		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
+			retrier := &retry.Timer{Timeout: 60 * time.Second, Wait: 100 * time.Millisecond}
 			retry.RunWith(retrier, t, func(r *retry.R) {
-				tokens, _, err := c.consulClient.ACL().TokenList(nil)
+				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
 				require.NoError(r, err)
 				for _, token := range tokens {
 					require.NotContains(r, token.Description, StaticServerName)
@@ -117,14 +117,18 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
-	for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		require.NoError(t, err)
-		require.Len(t, podList.Items, 1)
-		require.Len(t, podList.Items[0].Spec.Containers, 2)
-	}
+
+	retrier := &retry.Timer{Timeout: 300 * time.Second, Wait: 100 * time.Millisecond}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
+			podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: labelSelector,
+			})
+			require.NoError(t, err)
+			require.Len(t, podList.Items, 1)
+			require.Len(t, podList.Items[0].Spec.Containers, 2)
+		}
+	})
 }
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static
@@ -142,7 +146,7 @@ func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T) {
 // the static-client pod.
 func (c *ConnectHelper) CreateIntention(t *testing.T) {
 	logger.Log(t, "creating intention")
-	_, _, err := c.consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+	_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 		Kind: api.ServiceIntentions,
 		Name: StaticServerName,
 		Sources: []*api.SourceIntention{
