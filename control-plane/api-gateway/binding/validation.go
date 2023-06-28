@@ -6,7 +6,6 @@ package binding
 import (
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -252,7 +251,7 @@ func validateKeyLength(privateKey string) error {
 func nonFipsLenCheck(keyLen int) error {
 	// ensure private key is of the correct length
 	if keyLen < MinKeyLength {
-		return errors.New("key length must be at least 2048 bits")
+		return errListenerInvalidCertificateRef_NonFIPSRSAKeyLen
 	}
 
 	return nil
@@ -260,7 +259,7 @@ func nonFipsLenCheck(keyLen int) error {
 
 func fipsLenCheck(keyLen int) error {
 	if keyLen != 2048 && keyLen != 3072 && keyLen != 4096 {
-		return errors.New("key length invalid: only RSA lengths of 2048, 3072, and 4096 are allowed in FIPS mode")
+		return errListenerInvalidCertificateRef_FIPSRSAKeyLen
 	}
 	return nil
 }
