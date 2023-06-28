@@ -48,6 +48,19 @@ func TestRemoteDevCloud(t *testing.T) {
 		t.FailNow()
 	}
 
+	apiHost := os.Getenv("HCP_AUTH_URL")
+	if apiHost == "" {
+		apiHost = "https://api.hcp.dev"
+	}
+	authURL := os.Getenv("HCP_API_HOST")
+	if authURL == "" {
+		authURL = "https://auth.idp.hcp.dev"
+	}
+	scadaAddr := os.Getenv("HCP_SCADA_ADDRESS")
+	if scadaAddr == "" {
+		scadaAddr = "scada.internal.hcp.dev:7224"
+	}
+
 	ctx := suite.Environment().DefaultContext(t)
 
 	kubectlOptions := ctx.KubectlOptions(t)
@@ -67,18 +80,17 @@ func TestRemoteDevCloud(t *testing.T) {
 		clientSecretKey      = "client-sec-key"
 		clientSecretKeyValue = os.Getenv("HCP_CLIENT_SECRET")
 
-		apiHostSecretName = "apihost-sec-name"
-		apiHostSecretKey  = "apihost-sec-key"
-		// helloworldsvc.test.svc.cluster.local:9111
-		apiHostSecretKeyValue = "https://api.hcp.dev" //TODO this will be the name of the test service
+		apiHostSecretName     = "apihost-sec-name"
+		apiHostSecretKey      = "apihost-sec-key"
+		apiHostSecretKeyValue = apiHost
 
 		authUrlSecretName     = "authurl-sec-name"
 		authUrlSecretKey      = "authurl-sec-key"
-		authUrlSecretKeyValue = "https://auth.idp.hcp.dev" //TODO this will be the name of the test service
+		authUrlSecretKeyValue = authURL
 
 		scadaAddressSecretName     = "scadaaddress-sec-name"
 		scadaAddressSecretKey      = "scadaaddress-sec-key"
-		scadaAddressSecretKeyValue = "scada.internal.hcp.dev:7224" //TODO this will be the name of the test service
+		scadaAddressSecretKeyValue = scadaAddr
 
 		bootstrapTokenSecretName = "bootstrap-token"
 		bootstrapTokenSecretKey  = "token"
@@ -155,7 +167,7 @@ func TestRemoteDevCloud(t *testing.T) {
 		helmValues["telemetryCollector.image"] = cfg.ConsulCollectorImage
 	}
 
-	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
+	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), cfg, releaseName)
 	consulCluster.Create(t)
 
 	logger.Log(t, "setting acl permissions for collector and services")
