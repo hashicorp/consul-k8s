@@ -78,6 +78,12 @@ func realMain(ctx context.Context) error {
 
 	// Find OIDC providers to delete.
 	oidcProvidersOutput, err := iamClient.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
+	if err != nil {
+		return err
+	} else if oidcProvidersOutput == nil {
+		return fmt.Errorf("nil output for OIDC Providers")
+	}
+
 	toDeleteOidcArns := []*oidc{}
 	for _, providerEntry := range oidcProvidersOutput.OpenIDConnectProviderList {
 		arnString := ""
