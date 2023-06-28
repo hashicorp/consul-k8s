@@ -1372,3 +1372,57 @@ func generateTestCertificate(t *testing.T, namespace, name string) corev1.Secret
 		},
 	}
 }
+
+func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
+	type fields struct {
+		EnableConsulNamespaces bool
+		ConsulDestNamespace    string
+		EnableK8sMirroring     bool
+		MirroringPrefix        string
+		ConsulPartition        string
+		Datacenter             string
+	}
+	type args struct {
+		filters []gwv1beta1.HTTPRouteFilter
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   api.HTTPFilters
+	}{
+		{
+			name:   "no httproutemodifier set",
+			fields: fields{},
+			args: args{
+				filters: []gwv1beta1.HTTPRouteFilter{
+					{
+						URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{},
+					},
+				},
+			},
+			want: api.HTTPFilters{
+				Headers: []api.HTTPHeaderFilter{
+					{
+						Add: map[string]string{},
+						Set: map[string]string{},
+					},
+				},
+				URLRewrite: nil,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t1.Run(tt.name, func(t1 *testing.T) {
+			t := ResourceTranslator{
+				EnableConsulNamespaces: tt.fields.EnableConsulNamespaces,
+				ConsulDestNamespace:    tt.fields.ConsulDestNamespace,
+				EnableK8sMirroring:     tt.fields.EnableK8sMirroring,
+				MirroringPrefix:        tt.fields.MirroringPrefix,
+				ConsulPartition:        tt.fields.ConsulPartition,
+				Datacenter:             tt.fields.Datacenter,
+			}
+			assert.Equalf(t1, tt.want, t.translateHTTPFilters(tt.args.filters), "translateHTTPFilters(%v)", tt.args.filters)
+		})
+	}
+}
