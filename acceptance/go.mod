@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/gruntwork-io/terratest v0.31.2
-	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230601034256-0c28b9b000cb
-	github.com/hashicorp/consul/api v1.10.1-0.20230530193107-04a0d0133ae4
-	github.com/hashicorp/consul/sdk v0.13.1
+	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230609143603-198c4433d892
+	github.com/hashicorp/consul/api v1.22.0-rc1
+	github.com/hashicorp/consul/sdk v0.14.0-rc1
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hcp-sdk-go v0.50.0
@@ -19,7 +19,7 @@ require (
 	k8s.io/client-go v0.26.3
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/controller-runtime v0.14.6
-	sigs.k8s.io/gateway-api v0.7.1
+	sigs.k8s.io/gateway-api v0.7.0
 )
 
 require (
