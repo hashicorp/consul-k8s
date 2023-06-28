@@ -1,3 +1,9 @@
+## 1.2.0 (June 28, 2023)
+
+SECURITY:
+
+* Update [Go-Discover](https://github.com/hashicorp/go-discover) in the container has been updated to address [CVE-2020-14040](https://github.com/advisories/GHSA-5rcv-m4m3-hfh7) [[GH-2390](https://github.com/hashicorp/consul-k8s/issues/2390)]
+
 ## 1.2.0-rc1 (June 12, 2023)
 
 SECURITY:
