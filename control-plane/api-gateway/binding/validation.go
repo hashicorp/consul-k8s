@@ -4,8 +4,6 @@
 package binding
 
 import (
-	"crypto/x509"
-	"encoding/pem"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -208,54 +206,21 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 	return nil, err
 }
 
-// Envoy will silently reject any keys that are less than 2048 bytes long
-// https://github.com/envoyproxy/envoy/blob/main/source/extensions/transport_sockets/tls/context_impl.cc#L238
-const MinKeyLength = 2048
-
 func validateCertificateData(secret corev1.Secret) error {
 	_, privateKey, err := common.ParseCertificateData(secret)
 	if err != nil {
 		return errListenerInvalidCertificateRef_InvalidData
 	}
 
-	return validateKeyLength(privateKey)
-}
-
-func validateKeyLength(privateKey string) error {
-	// we can assume this is non-nil as it would've caused an error from common.ParseCertificate if it was
-	privateKeyBlock, _ := pem.Decode([]byte(privateKey))
-
-	if privateKeyBlock.Type != "RSA PRIVATE KEY" {
-		return nil
-	}
-
-	key, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
+	err = common.ValidateKeyLength(privateKey)
 	if err != nil {
-		return err
-	}
+		if version.IsFIPS() {
+			return errListenerInvalidCertificateRef_FIPSRSAKeyLen
+		}
 
-	keyBitLen := key.N.BitLen()
-
-	if version.IsFIPS() {
-		return fipsLenCheck(keyBitLen)
-	}
-
-	return nonFipsLenCheck(keyBitLen)
-}
-
-func nonFipsLenCheck(keyLen int) error {
-	// ensure private key is of the correct length
-	if keyLen < MinKeyLength {
 		return errListenerInvalidCertificateRef_NonFIPSRSAKeyLen
 	}
 
-	return nil
-}
-
-func fipsLenCheck(keyLen int) error {
-	if keyLen != 2048 && keyLen != 3072 && keyLen != 4096 {
-		return errListenerInvalidCertificateRef_FIPSRSAKeyLen
-	}
 	return nil
 }
 
