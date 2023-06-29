@@ -1,4 +1,4 @@
-## 1.2.0 (June 28, 2023)
+## 1.2.0 (June 29, 2023)
 
 FEATURES:
 
@@ -7,6 +7,8 @@ FEATURES:
 * crd: Add `mutualTLSMode` to the ProxyDefaults and ServiceDefaults CRDs and `allowEnablingPermissiveMutualTLS` to the Mesh CRD to support configuring permissive mutual TLS. [[GH-2100](https://github.com/hashicorp/consul-k8s/issues/2100)]
 * helm: Add `JWTProvider` CRD for configuring the `jwt-provider` config entry. [[GH-2209](https://github.com/hashicorp/consul-k8s/issues/2209)]
 * helm: Update the ServiceIntentions CRD to support `JWT` fields. [[GH-2213](https://github.com/hashicorp/consul-k8s/issues/2213)]
+* helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.2.0` [[GH-2476](https://github.com/hashicorp/consul-k8s/issues/2476)]
+* helm: update `image` value to `hashicorp/consul:1.16.0` [[GH-2476](https://github.com/hashicorp/consul-k8s/issues/2476)]
 
 IMPROVEMENTS:
 
