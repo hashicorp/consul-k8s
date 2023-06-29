@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -28,20 +29,20 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 	}{
 		"default": {
 			webhookSetupFunc:     nil,
-			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with custom gRPC port": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.ConsulConfig.GRPCPort = 8602
 			},
-			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.AuthMethod = "test-auth-method"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -tls-disabled -telemetry-prom-scrape-path=/metrics",
+				"-login-meta=pod=k8snamespace/test-pod -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and namespace mirroring": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -50,7 +51,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
+				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and single destination namespace": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -59,7 +60,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulDestinationNamespace = "test-ns"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled -telemetry-prom-scrape-path=/metrics",
+				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -67,7 +68,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulPartition = "test-part"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled -telemetry-prom-scrape-path=/metrics",
+				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with TLS and CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -75,28 +76,28 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulTLSServerName = "server.dc1.consul"
 				w.ConsulCACert = "consul-ca-cert"
 			},
-			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -ca-certs=/consul/connect-inject/consul-ca.pem -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -ca-certs=/consul/connect-inject/consul-ca.pem -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with TLS and no CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.TLSEnabled = true
 				w.ConsulTLSServerName = "server.dc1.consul"
 			},
-			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with single destination namespace": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.EnableNamespaces = true
 				w.ConsulDestinationNamespace = "consul-namespace"
 			},
-			additionalExpCmdArgs: " -service-namespace=consul-namespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -service-namespace=consul-namespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with namespace mirroring": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.EnableNamespaces = true
 				w.EnableK8SNSMirroring = true
 			},
-			additionalExpCmdArgs: " -service-namespace=k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -service-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with namespace mirroring prefix": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -104,38 +105,38 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 				w.K8SNSMirroringPrefix = "foo-"
 			},
-			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.ConsulPartition = "partition-1"
 			},
-			additionalExpCmdArgs: " -service-partition=partition-1 -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -service-partition=partition-1 -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with different log level": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.LogLevel = "debug"
 			},
-			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with different log level and log json": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.LogLevel = "debug"
 				w.LogJSON = true
 			},
-			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"skip server watch enabled": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.SkipServerWatch = true
 			},
-			additionalExpCmdArgs: " -server-watch-disabled=true -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -server-watch-disabled=true -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"custom prometheus scrape path": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.MetricsConfig.DefaultPrometheusScrapePath = "/scrape-path" // Simulate what would be passed as a flag
 			},
-			additionalExpCmdArgs: " -tls-disabled -telemetry-prom-scrape-path=/scrape-path",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/scrape-path",
 		},
 	}
 
@@ -622,18 +623,18 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 			}
 			expArgs := []string{
 				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
-					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
+					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
 				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
-					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
+					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 			}
 			if aclsEnabled {
 				expArgs = []string{
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
-						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
+						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
-						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
+						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 				}
 			}
 			expSAVolumeMounts := []corev1.VolumeMount{
@@ -1294,6 +1295,156 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Contains(t, strings.Join(container.Args, " "), c.expCmdArgs)
+			}
+		})
+	}
+}
+
+func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
+	gracefulShutdownSeconds := 10
+	gracefulPort := "20307"
+	gracefulShutdownPath := "/exit"
+
+	cases := []struct {
+		name        string
+		webhook     MeshWebhook
+		annotations map[string]string
+		expCmdArgs  string
+		expErr      string
+	}{
+		{
+			name:        "no defaults, no annotations",
+			webhook:     MeshWebhook{},
+			annotations: nil,
+			expCmdArgs:  "",
+		},
+		{
+			name: "all defaults, no annotations",
+			webhook: MeshWebhook{
+				LifecycleConfig: lifecycle.Config{
+					DefaultEnableProxyLifecycle:         true,
+					DefaultEnableShutdownDrainListeners: true,
+					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultGracefulPort:                 gracefulPort,
+					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+				},
+			},
+			annotations: nil,
+			expCmdArgs:  "graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit",
+		},
+		{
+			name:    "no defaults, all annotations",
+			webhook: MeshWebhook{},
+			annotations: map[string]string{
+				constants.AnnotationEnableSidecarProxyLifecycle:                       "true",
+				constants.AnnotationEnableSidecarProxyLifecycleShutdownDrainListeners: "true",
+				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   fmt.Sprint(gracefulShutdownSeconds),
+				constants.AnnotationSidecarProxyLifecycleGracefulPort:                 gracefulPort,
+				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         gracefulShutdownPath,
+			},
+			expCmdArgs: "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit",
+		},
+		{
+			name: "annotations override defaults",
+			webhook: MeshWebhook{
+				LifecycleConfig: lifecycle.Config{
+					DefaultEnableProxyLifecycle:         false,
+					DefaultEnableShutdownDrainListeners: true,
+					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultGracefulPort:                 gracefulPort,
+					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+				},
+			},
+			annotations: map[string]string{
+				constants.AnnotationEnableSidecarProxyLifecycle:                       "true",
+				constants.AnnotationEnableSidecarProxyLifecycleShutdownDrainListeners: "false",
+				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   fmt.Sprint(gracefulShutdownSeconds + 5),
+				constants.AnnotationSidecarProxyLifecycleGracefulPort:                 "20317",
+				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         "/foo",
+			},
+			expCmdArgs: "-graceful-port=20317 -shutdown-grace-period-seconds=15 -graceful-shutdown-path=/foo",
+		},
+		{
+			name: "lifecycle disabled, no annotations",
+			webhook: MeshWebhook{
+				LifecycleConfig: lifecycle.Config{
+					DefaultEnableProxyLifecycle:         false,
+					DefaultEnableShutdownDrainListeners: true,
+					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultGracefulPort:                 gracefulPort,
+					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+				},
+			},
+			annotations: nil,
+			expCmdArgs:  "-graceful-port=20307",
+		},
+		{
+			name: "lifecycle enabled, defaults omited, no annotations",
+			webhook: MeshWebhook{
+				LifecycleConfig: lifecycle.Config{
+					DefaultEnableProxyLifecycle: true,
+				},
+			},
+			annotations: nil,
+			expCmdArgs:  "",
+		},
+		{
+			name: "annotations disable lifecycle default",
+			webhook: MeshWebhook{
+				LifecycleConfig: lifecycle.Config{
+					DefaultEnableProxyLifecycle:         true,
+					DefaultEnableShutdownDrainListeners: true,
+					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultGracefulPort:                 gracefulPort,
+					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+				},
+			},
+			annotations: map[string]string{
+				constants.AnnotationEnableSidecarProxyLifecycle: "false",
+			},
+			expCmdArgs: "-graceful-port=20307",
+		},
+		{
+			name: "annotations skip graceful shutdown",
+			webhook: MeshWebhook{
+				LifecycleConfig: lifecycle.Config{
+					DefaultEnableProxyLifecycle:         false,
+					DefaultEnableShutdownDrainListeners: true,
+					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+				},
+			},
+			annotations: map[string]string{
+				constants.AnnotationEnableSidecarProxyLifecycle:                       "false",
+				constants.AnnotationEnableSidecarProxyLifecycleShutdownDrainListeners: "false",
+				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   "0",
+			},
+			expCmdArgs: "",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			c.webhook.ConsulConfig = &consul.Config{HTTPPort: 8500, GRPCPort: 8502}
+			require := require.New(t)
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: c.annotations,
+				},
+
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+						},
+					},
+				},
+			}
+			container, err := c.webhook.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
+			if c.expErr != "" {
+				require.NotNil(err)
+				require.Contains(err.Error(), c.expErr)
+			} else {
+				require.NoError(err)
+				require.Contains(strings.Join(container.Args, " "), c.expCmdArgs)
 			}
 		})
 	}
