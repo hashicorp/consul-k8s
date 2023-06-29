@@ -319,6 +319,18 @@ spec:
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
       {{- end }}
       initContainers:
+      - name: fix-consul-data-owner
+        image: busybox
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+        command:
+          - "/bin/sh"
+          - "-cex"
+          - "install -v -d -o 100 -g 1000 -m 0755 /consul/data"
+        volumeMounts:
+          - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
+            mountPath: /consul/data
       - name: locality-init
         image: {{ .Values.global.imageK8S }}
         {{ template "consul.imagePullPolicy" . }}
@@ -466,7 +478,7 @@ spec:
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
             - "/bin/sh"
-            - "-ec"
+            - "-cex"
             - |
               {{- if .Values.global.trustedCAs }}
               {{- range $i, $cert := .Values.global.trustedCAs }}
