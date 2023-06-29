@@ -6,9 +6,6 @@ package binding
 import (
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -17,6 +14,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul/api"
 )
 
 var (
@@ -205,10 +207,20 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 }
 
 func validateCertificateData(secret corev1.Secret) error {
-	_, _, err := common.ParseCertificateData(secret)
+	_, privateKey, err := common.ParseCertificateData(secret)
 	if err != nil {
 		return errListenerInvalidCertificateRef_InvalidData
 	}
+
+	err = common.ValidateKeyLength(privateKey)
+	if err != nil {
+		if version.IsFIPS() {
+			return errListenerInvalidCertificateRef_FIPSRSAKeyLen
+		}
+
+		return errListenerInvalidCertificateRef_NonFIPSRSAKeyLen
+	}
+
 	return nil
 }
 
@@ -235,7 +247,7 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 			_, supported := supportedKindsForProtocol[listener.Protocol]
 			if !supported {
 				result.acceptedErr = errListenerUnsupportedProtocol
-			} else if listener.Port == 20000 { //admin port
+			} else if listener.Port == 20000 { // admin port
 				result.acceptedErr = errListenerPortUnavailable
 			}
 
