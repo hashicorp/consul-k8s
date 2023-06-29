@@ -652,7 +652,7 @@ func createCert(t *testing.T, ctx context.Context, k8sClient client.WithWatch, c
 	// listener one tls config
 	certName := "one-cert"
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
 	usage := x509.KeyUsageCertSign
