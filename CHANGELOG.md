@@ -1,4 +1,4 @@
-## 1.2.0 (June 28, 2023)
+## 1.2.0 (June 29, 2023)
 
 FEATURES:
 
@@ -23,7 +23,8 @@ IMPROVEMENTS:
 * helm: add samenessGroup field to exported services CRD [[GH-2075](https://github.com/hashicorp/consul-k8s/issues/2075)]
 * helm: add samenessGroup field to service resolver CRD [[GH-2086](https://github.com/hashicorp/consul-k8s/issues/2086)]
 * helm: add samenessGroup field to source intention CRD [[GH-2097](https://github.com/hashicorp/consul-k8s/issues/2097)]
-* helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.1.0`. [[GH-1953](https://github.com/hashicorp/consul-k8s/issues/1953)]
+* helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.2.0` [[GH-2476](https://github.com/hashicorp/consul-k8s/issues/2476)]
+* helm: update `image` value to `hashicorp/consul:1.16.0` [[GH-2476](https://github.com/hashicorp/consul-k8s/issues/2476)]
 
 SECURITY:
 
