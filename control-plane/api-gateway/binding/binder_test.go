@@ -2330,16 +2330,8 @@ func controlledBinder(config BinderConfig) BinderConfig {
 	return config
 }
 
-func generateInvalidTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
-	return generateTestCertificateByKeyLen(t, namespace, name, common.MinKeyLength-1)
-}
-
 func generateTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
-	return generateTestCertificateByKeyLen(t, namespace, name, common.MinKeyLength)
-}
-
-func generateTestCertificateByKeyLen(t *testing.T, namespace, name string, keyLen int) (*api.InlineCertificateConfigEntry, corev1.Secret) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, keyLen)
+	privateKey, err := rsa.GenerateKey(rand.Reader, common.MinKeyLength)
 	require.NoError(t, err)
 
 	usage := x509.KeyUsageCertSign

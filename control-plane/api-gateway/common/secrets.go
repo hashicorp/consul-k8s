@@ -16,7 +16,11 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/version"
 )
 
-var errFailedToParsePrivateKeyPem = errors.New("failed to parse private key PEM")
+var (
+	errFailedToParsePrivateKeyPem = errors.New("failed to parse private key PEM")
+	errKeyLengthTooShort          = errors.New("RSA key length must be at least 2048-bit")
+	errKeyLengthTooShortFIPS      = errors.New("RSA key length must be at either 2048-bit, 3072-bit, or 4096-bit in FIPS mode")
+)
 
 func ParseCertificateData(secret corev1.Secret) (cert string, privateKey string, err error) {
 	decodedPrivateKey := secret.Data[corev1.TLSPrivateKeyKey]
@@ -76,7 +80,7 @@ func validateCertificateHosts(certificate *x509.Certificate) error {
 const MinKeyLength = 2048
 
 // ValidateKeyLength ensures that the key length for a certificate is of a valid length
-// for envoy dependent on if consul is running in FIPS mode or not
+// for envoy dependent on if consul is running in FIPS mode or not.
 func ValidateKeyLength(privateKey string) error {
 	privateKeyBlock, _ := pem.Decode([]byte(privateKey))
 
@@ -105,7 +109,7 @@ func ValidateKeyLength(privateKey string) error {
 func nonFipsLenCheck(keyLen int) error {
 	// ensure private key is of the correct length
 	if keyLen < MinKeyLength {
-		return errors.New("RSA key length must be at least 2048-bit")
+		return errKeyLengthTooShort
 	}
 
 	return nil
@@ -113,7 +117,7 @@ func nonFipsLenCheck(keyLen int) error {
 
 func fipsLenCheck(keyLen int) error {
 	if keyLen != 2048 && keyLen != 3072 && keyLen != 4096 {
-		return errors.New("RSA key length must be at either 2048-bit, 3072-bit, or 4096-bit in FIPS mode")
+		return errKeyLengthTooShortFIPS
 	}
 	return nil
 }
