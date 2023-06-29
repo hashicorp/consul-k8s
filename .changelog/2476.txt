@@ -1,0 +1,4 @@
+```release-note:feature
+helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.2.0`
+helm: update `image` value to `hashicorp/consul:1.16.0`
+```
