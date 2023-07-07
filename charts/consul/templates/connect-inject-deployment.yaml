@@ -275,7 +275,7 @@ spec:
                 -default-consul-sidecar-cpu-request={{ $consulSidecarResources.requests.cpu }} \
                 {{- end }}
                 {{- end }}
-          {{- if .Values.global.acls.manageSystemACLs }}
+          {{- if and .Values.global.acls.manageSystemACLs (not .Values.connectInject.prepareDataplanesUpgrade) }}
           lifecycle:
             preStop:
               exec:

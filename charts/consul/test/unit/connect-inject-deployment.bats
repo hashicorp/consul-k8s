@@ -965,6 +965,19 @@ EOF
   [ "${object}" = "true" ]
 }
 
+@test "connectInject/Deployment: consul-logout preStop hook is disabled added when ACLs are enabled but prepareDataplanesUpgrade=true" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.prepareDataplanesUpgrade=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].lifecycle' | tee /dev/stderr)
+
+  [ "${object}" = "null" ]
+}
+
 @test "connectInject/Deployment: CONSUL_HTTP_TOKEN_FILE is not set when acls are disabled" {
   cd `chart_dir`
   local actual=$(helm template \
