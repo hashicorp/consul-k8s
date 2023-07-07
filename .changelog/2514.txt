@@ -1,0 +1,1 @@
+improvement: Add `connectInject.prepareDataplanesUpgrade` setting for help upgrading to dataplanes. This setting is required if upgrading from non-dataplanes to dataplanes when ACLs are enabled. See https://developer.hashicorp.com/consul/docs/k8s/upgrade#upgrading-to-consul-dataplane for more information.

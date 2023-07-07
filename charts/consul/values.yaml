@@ -2436,6 +2436,13 @@ connectInject:
         # @type: string
         cpu: null
 
+  # Set to true when upgrading to Consul dataplanes. This will ensure that the injector ACL tokens won't be deleted
+  # during the upgrade to dataplanes. This is required because after an upgrade, non-dataplane enabled services won't
+  # get re-registered by the new dataplane-capable injector, and so if the ACL token used to register them is deleted,
+  # they won't be able to resolve new upstream services.
+  # See https://developer.hashicorp.com/consul/docs/k8s/upgrade#upgrading-to-consul-dataplane for more information.
+  prepareDataplanesUpgrade: false
+
 # Controller handles config entry custom resources.
 # Requires consul >= 1.8.4.
 # ServiceIntentions require consul 1.9+.
