@@ -18,6 +18,28 @@ target=templates/gateway-cleanup-job.yaml
     assert_empty helm template \
         -s $target \
         --set 'connectInject.enabled=false' \
-        . 
+        .
 }
 
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "gatewaycleanup/Job: no annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+        -s $target \
+        . | tee /dev/stderr |
+        yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
+    [ "${actual}" = "{}" ]
+}
+
+@test "gatewaycleanup/Job: annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+        -s $target \
+        --set 'global.acls.annotations=foo: bar' \
+        . | tee /dev/stderr |
+        yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+    [ "${actual}" = "bar" ]
+}
