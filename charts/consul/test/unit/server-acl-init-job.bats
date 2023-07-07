@@ -2249,7 +2249,7 @@ load _helpers
 @test "serverACLInit/Job: no annotations defined by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/server-acl-init-cleanup-job.yaml \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
@@ -2259,7 +2259,7 @@ load _helpers
 @test "serverACLInit/Job: annotations can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/server-acl-init-cleanup-job.yaml \
+      -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.acls.annotations=foo: bar' \
       . | tee /dev/stderr |
