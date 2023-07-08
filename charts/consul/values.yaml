@@ -2294,7 +2294,7 @@ connectInject:
   # annotated. Use `["*"]` to automatically allow all k8s namespaces.
   #
   # For example, `["namespace1", "namespace2"]` will only allow pods in the k8s
-  # namespaces `namespace1` and `namespace2` to have Connect sidecars injected
+  # namespaces `namespace1` and `namespace2` to have Consul service mesh sidecars injected
   # and registered with Consul. All other k8s namespaces will be ignored.
   #
   # To deny all namespaces, set this to `[]`.
