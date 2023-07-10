@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package webhook
 
 import (
@@ -52,7 +55,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		// If using the proxy health check for a service, configure an HTTP handler
 		// that queries the '/ready' endpoint of the proxy.
 		probe = &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(constants.ProxyDefaultHealthPort + mpi.serviceIndex),
 					Path: "/ready",
@@ -62,7 +65,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		}
 	} else {
 		probe = &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
 					Port: intstr.FromInt(constants.ProxyDefaultInboundPort + mpi.serviceIndex),
 				},
@@ -340,7 +343,11 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 
 	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
 	// for Consul DNS in the pod.
-	if w.EnableConsulDNS {
+	dnsEnabled, err := consulDNSEnabled(namespace, pod, w.EnableConsulDNS, w.EnableTransparentProxy)
+	if err != nil {
+		return nil, err
+	}
+	if dnsEnabled {
 		args = append(args, "-consul-dns-bind-port="+strconv.Itoa(consulDataplaneDNSBindPort))
 	}
 

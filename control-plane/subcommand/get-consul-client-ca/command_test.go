@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package getconsulclientca
 
 import (
@@ -48,7 +51,7 @@ func TestRun_FlagsValidation(t *testing.T) {
 			flags: []string{
 				"-output-file=output.pem",
 				"-server-addr=foo.com",
-				"-consul-api-timeout=5s",
+				"-consul-api-timeout=10s",
 				"-log-level=invalid-log-level",
 			},
 			expErr: "unknown log level: invalid-log-level",
@@ -103,7 +106,7 @@ func TestRun(t *testing.T) {
 		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
 		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 
@@ -186,7 +189,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		"-server-port", fmt.Sprintf("%d", randomPorts[2]),
 		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter)
 
@@ -200,9 +203,10 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 1 * time.Second}
 	// get the actual ca cert from consul
 	var expectedCARoot string
-	retry.Run(t, func(r *retry.R) {
+	retry.RunWith(retrier, t, func(r *retry.R) {
 		roots, _, err := client.Agent().ConnectCARoots(nil)
 		require.NoError(r, err)
 		require.NotNil(r, roots)
@@ -277,7 +281,7 @@ func TestRun_GetsOnlyActiveRoot(t *testing.T) {
 		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
 		"-ca-file", caFile,
 		"-output-file", outputFile.Name(),
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, exitCode)
 
@@ -345,7 +349,7 @@ func TestRun_WithProvider(t *testing.T) {
 		"-server-port", strings.Split(a.HTTPSAddr, ":")[1],
 		"-output-file", outputFile.Name(),
 		"-ca-file", caFile,
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, exitCode, ui.ErrorWriter.String())
 

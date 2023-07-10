@@ -1,9 +1,12 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package endpoints
 
 import (
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
@@ -238,7 +241,7 @@ func TestUpdateHealthCheckOnConsulClient(t *testing.T) {
 
 			ctrl := Controller{
 				ConsulClientConfig: testClient.Cfg,
-				Log:                logrtest.TestLogger{T: t},
+				Log:                logrtest.New(t),
 			}
 
 			err := ctrl.updateHealthCheckOnConsulClient(testClient.Cfg.APIClientConfig, pod, endpoints, c.updateToStatus)

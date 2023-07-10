@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package common
 
 import (
@@ -6,7 +9,7 @@ import (
 	"errors"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
@@ -112,7 +115,7 @@ func TestValidateConfigEntry(t *testing.T) {
 					},
 				},
 			},
-				logrtest.TestLogger{T: t},
+				logrtest.New(t),
 				lister,
 				c.newResource,
 				ConsulMeta{

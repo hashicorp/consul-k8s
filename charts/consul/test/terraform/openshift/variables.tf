@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 variable "location" {
   default     = "westus2"
   description = "The Azure Region to create all resources in."

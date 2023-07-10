@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
+    controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
   name: exportedservices.consul.hashicorp.com
   labels:
@@ -76,8 +76,12 @@ spec:
                               the service to.
                             type: string
                           peer:
-                            description: '[Experimental] Peer is the name of the peer
-                              to export the service to.'
+                            description: Peer is the name of the peer to export the
+                              service to.
+                            type: string
+                          samenessGroup:
+                            description: SamenessGroup is the name of the sameness
+                              group to export the service to.
                             type: string
                         type: object
                       type: array
@@ -134,10 +138,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

@@ -1,0 +1,3 @@
+```release-note:bug
+crd: fix bug on service intentions CRD causing some updates to be ignored.
+```

@@ -77,7 +77,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[3]' | tee /dev/stderr)
+      yq -r '.rules[4]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[| index("pods")' | tee /dev/stderr)
   [ "${actual}" != null ]
@@ -106,7 +106,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[4]' | tee /dev/stderr)
+      yq -r '.rules[5]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[| index("leases")' | tee /dev/stderr)
   [ "${actual}" != null ]
@@ -154,7 +154,7 @@ load _helpers
 #--------------------------------------------------------------------
 # global.enablePodSecurityPolicies
 
-@test "connectInject/ClusterRole: no podsecuritypolicies access with global.enablePodSecurityPolicies=false" {
+@test "connectInject/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=false" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
@@ -162,7 +162,7 @@ load _helpers
       --set 'global.enablePodSecurityPolicies=false' \
       . | tee /dev/stderr |
       yq -r '.rules | map(select(.resources[0] == "podsecuritypolicies")) | length' | tee /dev/stderr)
-  [ "${actual}" = "0" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "connectInject/ClusterRole: allows podsecuritypolicies access with global.enablePodSecurityPolicies=true" {
@@ -197,7 +197,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       . | tee /dev/stderr |
-      yq -r '.rules[5]' | tee /dev/stderr)
+      yq -r '.rules[6]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[0]' | tee /dev/stderr)
   [ "${actual}" = "mutatingwebhookconfigurations" ]

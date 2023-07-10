@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 SCRIPT_NAME="$(basename ${BASH_SOURCE[0]})"
 pushd $(dirname ${BASH_SOURCE[0]}) > /dev/null
 SCRIPT_DIR=$(pwd)
@@ -31,6 +34,8 @@ Options:
 
    -a | --arch       ARCH        Space separated string of
                                  architectures to build.
+
+   --fips            FIPS        Whether to use FIPS cryptography.
 
    -h | --help                   Print this help text.
 EOF
@@ -90,6 +95,11 @@ function main {
 
             build_arch="$2"
             shift 2
+            ;;
+         --fips )
+            GOTAGS="fips"
+            GOEXPERIMENT="boringcrypto"
+            shift 1
             ;;
          * )
             err_usage "ERROR: Unknown argument: '$1'"

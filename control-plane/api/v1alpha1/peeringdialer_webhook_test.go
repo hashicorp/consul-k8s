@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package v1alpha1
 
 import (
@@ -5,7 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -135,7 +138,7 @@ func TestValidatePeeringDialer(t *testing.T) {
 
 			validator := &PeeringDialerWebhook{
 				Client:  client,
-				Logger:  logrtest.TestLogger{T: t},
+				Logger:  logrtest.New(t),
 				decoder: decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{

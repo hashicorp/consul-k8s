@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package cli
 
 import (
@@ -71,7 +74,7 @@ func TestInstall(t *testing.T) {
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
 					out, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "read", podName)
-					require.NoError(t, err)
+					require.NoError(r, err)
 
 					output := string(out)
 					logger.Log(t, output)
@@ -109,7 +112,7 @@ func TestInstall(t *testing.T) {
 
 				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
 				require.NoError(t, err)
-				require.Regexp(t, "upstream resources are valid", string(proxyOut))
+				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
 				logger.Log(t, string(proxyOut))
 			} else {
 				// With tproxy disabled and explicit upstreams we need the envoy-id of the server
@@ -117,7 +120,7 @@ func TestInstall(t *testing.T) {
 
 				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-envoy-id", "static-server")
 				require.NoError(t, err)
-				require.Regexp(t, "upstream resources are valid", string(proxyOut))
+				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
 				logger.Log(t, string(proxyOut))
 			}
 

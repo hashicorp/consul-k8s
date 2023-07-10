@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: ServiceDefaults
 metadata:
@@ -18,7 +21,9 @@ spec:
       passiveHealthCheck:
         interval: 1s
         maxFailures: 10
-        enforcing_consecutive_5xx: 60
+        enforcingConsecutive5xx: 60
+        maxEjectionPercent: 100
+        baseEjectionTime: 20s
     - name: "bar"
       limits:
         maxConnections: 5

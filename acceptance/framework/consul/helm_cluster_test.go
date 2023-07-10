@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consul
 
 import (
@@ -8,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	runtimefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 // Test that if TestConfig has values that need to be provided
@@ -77,4 +82,7 @@ func (c *ctx) KubectlOptions(_ *testing.T) *k8s.KubectlOptions {
 }
 func (c *ctx) KubernetesClient(_ *testing.T) kubernetes.Interface {
 	return fake.NewSimpleClientset()
+}
+func (c *ctx) ControllerRuntimeClient(_ *testing.T) client.Client {
+	return runtimefake.NewClientBuilder().Build()
 }

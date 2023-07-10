@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
+    controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
   name: servicedefaults.consul.hashicorp.com
   labels:
@@ -171,6 +171,18 @@ spec:
                   CRD and should be set using annotations on the services that are
                   part of the mesh.'
                 type: string
+              mutualTLSMode:
+                description: 'MutualTLSMode controls whether mutual TLS is required
+                  for all incoming connections when transparent proxy is enabled.
+                  This can be set to "permissive" or "strict". "strict" is the default
+                  which requires mutual TLS for incoming connections. In the insecure
+                  "permissive" mode, connections to the sidecar proxy public listener
+                  port require mutual TLS, but connections to the service port do
+                  not require mutual TLS and are proxied to the application unmodified.
+                  Note: Intentions are not enforced for non-mTLS connections. To keep
+                  your services secure, we recommend using "strict" mode whenever
+                  possible and enabling "permissive" mode only when necessary.'
+                type: string
               protocol:
                 description: Protocol sets the protocol of the service. This is used
                   by Connect proxies for things like observability features and to
@@ -274,7 +286,14 @@ spec:
                           upstream proxy instances will be monitored for removal from
                           the load balancing pool.
                         properties:
-                          enforcing_consecutive_5xx:
+                          baseEjectionTime:
+                            description: The base time that a host is ejected for.
+                              The real time is equal to the base time multiplied by
+                              the number of times the host has been ejected and is
+                              capped by max_ejection_time (Default 300s). Defaults
+                              to 30000ms or 30s.
+                            type: string
+                          enforcingConsecutive5xx:
                             description: EnforcingConsecutive5xx is the % chance that
                               a host will be actually ejected when an outlier status
                               is detected through consecutive 5xx. This setting can
@@ -285,6 +304,13 @@ spec:
                             description: Interval between health check analysis sweeps.
                               Each sweep may remove hosts or return hosts to the pool.
                             type: string
+                          maxEjectionPercent:
+                            description: The maximum % of an upstream cluster that
+                              can be ejected due to outlier detection. Defaults to
+                              10% but will eject at least one host regardless of the
+                              value.
+                            format: int32
+                            type: integer
                           maxFailures:
                             description: MaxFailures is the count of consecutive failures
                               that results in a host being removed from the pool.
@@ -377,7 +403,14 @@ spec:
                             how upstream proxy instances will be monitored for removal
                             from the load balancing pool.
                           properties:
-                            enforcing_consecutive_5xx:
+                            baseEjectionTime:
+                              description: The base time that a host is ejected for.
+                                The real time is equal to the base time multiplied
+                                by the number of times the host has been ejected and
+                                is capped by max_ejection_time (Default 300s). Defaults
+                                to 30000ms or 30s.
+                              type: string
+                            enforcingConsecutive5xx:
                               description: EnforcingConsecutive5xx is the % chance
                                 that a host will be actually ejected when an outlier
                                 status is detected through consecutive 5xx. This setting
@@ -389,6 +422,13 @@ spec:
                                 sweeps. Each sweep may remove hosts or return hosts
                                 to the pool.
                               type: string
+                            maxEjectionPercent:
+                              description: The maximum % of an upstream cluster that
+                                can be ejected due to outlier detection. Defaults
+                                to 10% but will eject at least one host regardless
+                                of the value.
+                              format: int32
+                              type: integer
                             maxFailures:
                               description: MaxFailures is the count of consecutive
                                 failures that results in a host being removed from
@@ -454,10 +494,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

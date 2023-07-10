@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consuldns
 
 import (
@@ -59,7 +62,7 @@ func TestConsulDNS(t *testing.T) {
 
 			dnsPodName := fmt.Sprintf("%s-dns-pod", releaseName)
 			dnsTestPodArgs := []string{
-				"run", "-i", dnsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
+				"run", "-it", dnsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
 			}
 
 			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, func() {

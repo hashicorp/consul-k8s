@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 # This Dockerfile contains multiple targets.
 # Use 'docker build --target=<name> .' to build one.
 #
@@ -14,12 +17,12 @@
 # go-discover builds the discover binary (which we don't currently publish
 # either).
 FROM golang:1.19.2-alpine as go-discover
-RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@49f60c093101c9c5f6b04d5b1c80164251a761a6
+RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@214571b6a5309addf3db7775f4ee8cf4d264fd5f
 
 # dev copies the binary from a local build
 # -----------------------------------
 # BIN_NAME is a requirement in the hashicorp docker github action 
-FROM alpine:3.16 AS dev
+FROM alpine:3.18 AS dev
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
@@ -71,7 +74,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM alpine:3.16 AS release-default
+FROM alpine:3.18 AS release-default
 
 ARG BIN_NAME=consul-k8s-control-plane
 ARG CNI_BIN_NAME=consul-cni
@@ -89,7 +92,11 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
-RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
+
+# for FIPS CGO glibc compatibility in alpine
+# see https://github.com/golang/go/issues/59305
+RUN ln -s /lib/libc.so.6 /usr/lib/libresolv.so.2
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS
@@ -106,6 +113,9 @@ COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 USER 100
 CMD /bin/${BIN_NAME}
 
+# Duplicate target for FIPS builds
+FROM release-default AS release-default-fips
+
 # -----------------------------------
 # Dockerfile target for consul-k8s with UBI as its base image. Used for running on
 # OpenShift.
@@ -117,7 +127,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM registry.access.redhat.com/ubi9-minimal:9.1.0 as ubi
+FROM registry.access.redhat.com/ubi9-minimal:9.2 as ubi
 
 ARG PRODUCT_NAME
 ARG PRODUCT_VERSION
@@ -168,6 +178,8 @@ COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 USER 100
 CMD /bin/${BIN_NAME}
 
+# Duplicate target for FIPS builds
+FROM ubi AS ubi-fips
 # ===================================
 # 
 #   Set default target to 'dev'.

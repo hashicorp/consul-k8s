@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package v1alpha1
 
 import (
@@ -137,6 +140,9 @@ type ServiceRouteDestination struct {
 	// This requires that either match.http.pathPrefix or match.http.pathExact
 	// be configured on this route.
 	PrefixRewrite string `json:"prefixRewrite,omitempty"`
+	// IdleTimeout is total amount of time permitted
+	// for the request stream to be idle.
+	IdleTimeout metav1.Duration `json:"idleTimeout,omitempty"`
 	// RequestTimeout is the total amount of time permitted for the entire
 	// downstream request (and retries) to be processed.
 	RequestTimeout metav1.Duration `json:"requestTimeout,omitempty"`
@@ -334,6 +340,7 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 		Namespace:             in.Namespace,
 		Partition:             in.Partition,
 		PrefixRewrite:         in.PrefixRewrite,
+		IdleTimeout:           in.IdleTimeout.Duration,
 		RequestTimeout:        in.RequestTimeout.Duration,
 		NumRetries:            in.NumRetries,
 		RetryOnConnectFailure: in.RetryOnConnectFailure,

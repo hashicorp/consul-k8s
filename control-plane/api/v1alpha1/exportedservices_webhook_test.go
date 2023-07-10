@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package v1alpha1
 
 import (
@@ -5,7 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -120,7 +123,7 @@ func TestValidateExportedServices(t *testing.T) {
 				Partition:         "",
 			},
 			expAllow:      false,
-			expErrMessage: "exportedservices.consul.hashicorp.com \"default\" is invalid: spec.services[0].consumers[0].partitions: Invalid value: \"other\": Consul Admin Partitions need to be enabled to specify partition.",
+			expErrMessage: "exportedservices.consul.hashicorp.com \"default\" is invalid: spec.services[0].consumers[0].partition: Invalid value: \"other\": Consul Admin Partitions need to be enabled to specify partition.",
 		},
 		"no services": {
 			existingResources: []runtime.Object{},
@@ -177,7 +180,7 @@ func TestValidateExportedServices(t *testing.T) {
 
 			validator := &ExportedServicesWebhook{
 				Client:     client,
-				Logger:     logrtest.TestLogger{T: t},
+				Logger:     logrtest.New(t),
 				decoder:    decoder,
 				ConsulMeta: c.consulMeta,
 			}

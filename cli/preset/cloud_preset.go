@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package preset
 
 import (
@@ -198,6 +201,8 @@ global:
     bootstrapToken:
       secretName: %s
       secretKey: %s
+  metrics:
+    enableTelemetryCollector: true
   cloud:
     enabled: true
     resourceId:
@@ -212,6 +217,15 @@ global:
     %s
     %s
     %s
+telemetryCollector:
+  enabled: true
+  cloud:
+    clientId:
+      secretName: %s
+      secretKey: %s
+    clientSecret:
+      secretName: %s
+      secretKey: %s
 server:
   replicas: %d
   affinity: null
@@ -228,6 +242,8 @@ controller:
 		secretNameHCPClientID, secretKeyHCPClientID,
 		secretNameHCPClientSecret, secretKeyHCPClientSecret,
 		apiHostCfg, authURLCfg, scadaAddressCfg,
+		secretNameHCPClientID, secretKeyHCPClientID,
+		secretNameHCPClientSecret, secretKeyHCPClientSecret,
 		cfg.BootstrapResponse.Cluster.BootstrapExpect, secretNameServerCert)
 	valuesMap := config.ConvertToMap(values)
 	return valuesMap

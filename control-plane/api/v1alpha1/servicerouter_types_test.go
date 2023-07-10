@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package v1alpha1
 
 import (
@@ -79,6 +82,7 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 								ServiceSubset:         "serviceSubset",
 								Namespace:             "namespace",
 								PrefixRewrite:         "prefixRewrite",
+								IdleTimeout:           metav1.Duration{Duration: 1 * time.Second},
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
@@ -155,6 +159,7 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 							ServiceSubset:         "serviceSubset",
 							Namespace:             "namespace",
 							PrefixRewrite:         "prefixRewrite",
+							IdleTimeout:           1 * time.Second,
 							RequestTimeout:        1 * time.Second,
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
@@ -280,6 +285,7 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 								ServiceSubset:         "serviceSubset",
 								Namespace:             "namespace",
 								PrefixRewrite:         "prefixRewrite",
+								IdleTimeout:           metav1.Duration{Duration: 1 * time.Second},
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
@@ -356,6 +362,7 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 							ServiceSubset:         "serviceSubset",
 							Namespace:             "namespace",
 							PrefixRewrite:         "prefixRewrite",
+							IdleTimeout:           1 * time.Second,
 							RequestTimeout:        1 * time.Second,
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
@@ -714,7 +721,7 @@ func TestServiceRouter_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`servicerouter.consul.hashicorp.com "foo" is invalid: spec.routes[0]: Invalid value: "{\"match\":{\"http\":{}},\"destination\":{\"prefixRewrite\":\"prefixRewrite\",\"requestTimeout\":\"0s\"}}": destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route`,
+				`servicerouter.consul.hashicorp.com "foo" is invalid: spec.routes[0]: Invalid value: "{\"match\":{\"http\":{}},\"destination\":{\"prefixRewrite\":\"prefixRewrite\",\"idleTimeout\":\"0s\",\"requestTimeout\":\"0s\"}}": destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route`,
 			},
 		},
 		"namespaces disabled: single destination namespace specified": {

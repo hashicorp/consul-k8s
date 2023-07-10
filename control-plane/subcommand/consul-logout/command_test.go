@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consullogout
 
 import (
@@ -51,7 +54,7 @@ func TestRun_InvalidSinkFile(t *testing.T) {
 	}
 	code := cmd.Run([]string{
 		"-token-file", randFileName,
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, code)
 }
@@ -104,7 +107,7 @@ func Test_UnableToLogoutDueToInvalidToken(t *testing.T) {
 	code := cmd.Run([]string{
 		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 		"-token-file", tokenFile,
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 1, code, ui.ErrorWriter.String())
 	require.Contains(t, "Unexpected response code: 403 (ACL not found)", ui.ErrorWriter.String())
@@ -169,7 +172,7 @@ func Test_RunUsingLogin(t *testing.T) {
 	code := cmd.Run([]string{
 		"-http-addr", fmt.Sprintf("%s://%s", cfg.Scheme, cfg.Address),
 		"-token-file", tokenFile,
-		"-consul-api-timeout", "5s",
+		"-consul-api-timeout", "10s",
 	})
 	require.Equal(t, 0, code, ui.ErrorWriter.String())
 

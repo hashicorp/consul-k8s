@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package helm
 
 import (
@@ -62,7 +65,7 @@ func readChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile
 	// filepath.* functions, then Go on Windows will try to use `\` delimiters to access
 	// the embedded filesystem, which will then fail.
 
-	// Load Chart.yaml and values.yaml first.
+	// Load Chart.yaml and values.yaml.
 	for _, f := range []string{chartFileName, valuesFileName} {
 		file, err := readFile(chart, path.Join(chartDirName, f), chartDirName)
 		if err != nil {
@@ -71,7 +74,7 @@ func readChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile
 		chartFiles = append(chartFiles, file)
 	}
 
-	// Now load everything under templates/.
+	// Load everything under templates/.
 	dirs, err := chart.ReadDir(path.Join(chartDirName, templatesDirName))
 	if err != nil {
 		return nil, err

@@ -1,0 +1,24 @@
+# Dispatch to the consul-k8s-workflows when a PR is created and on merges to main/release*
+name: pr
+on:
+  pull_request:
+
+# these should be the only settings that you will ever need to change
+env:
+  BRANCH: ${{ github.head_ref || github.ref_name }}
+  CONTEXT: "pr"
+  SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+      name: test
+      with:
+        workflow: test.yml
+        repo: hashicorp/consul-k8s-workflows
+        ref: main
+        token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'

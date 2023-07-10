@@ -75,136 +75,142 @@ spec:
       {{- end }}
       {{- end }}
       containers:
-        - name: sync-catalog
-          image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
-          env:
-            {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 12 }}
-            {{- if .Values.global.acls.manageSystemACLs }}
-            - name: CONSUL_LOGIN_AUTH_METHOD
-              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
-              value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
-              {{- else }}
-              value: {{ template "consul.fullname" . }}-k8s-component-auth-method
-              {{- end }}
-            - name: CONSUL_LOGIN_DATACENTER
-              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
-              value: {{ .Values.global.federation.primaryDatacenter }}
-              {{- else }}
-              value: {{ .Values.global.datacenter }}
-              {{- end }}
-            - name: CONSUL_LOGIN_META
-              value: "component=sync-catalog,pod=$(NAMESPACE)/$(POD_NAME)"
-            {{- end }}
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            {{- if (and .Values.syncCatalog.aclSyncToken.secretName .Values.syncCatalog.aclSyncToken.secretKey) }}
-            - name: CONSUL_HTTP_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.syncCatalog.aclSyncToken.secretName }}
-                  key: {{ .Values.syncCatalog.aclSyncToken.secretKey }}
-            {{- end }}
-          volumeMounts:
-            {{- if .Values.global.tls.enabled }}
-            {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
-            - name: consul-ca-cert
-              mountPath: /consul/tls/ca
-              readOnly: true
-            {{- end }}
-            {{- end }}
-          command:
-            - "/bin/sh"
-            - "-ec"
-            - |
-              consul-k8s-control-plane sync-catalog \
-                -log-level={{ default .Values.global.logLevel .Values.syncCatalog.logLevel }} \
-                -log-json={{ .Values.global.logJSON }} \
-                -k8s-default-sync={{ .Values.syncCatalog.default }} \
-                {{- if (not .Values.syncCatalog.toConsul) }}
-                -to-consul=false \
-                {{- end }}
-                {{- if (not .Values.syncCatalog.toK8S) }}
-                -to-k8s=false \
-                {{- end }}
-                -consul-domain={{ .Values.global.domain }} \
-                {{- if .Values.syncCatalog.k8sPrefix }}
-                -k8s-service-prefix="{{ .Values.syncCatalog.k8sPrefix}}" \
-                {{- end }}
-                {{- if .Values.syncCatalog.k8sSourceNamespace }}
-                -k8s-source-namespace="{{ .Values.syncCatalog.k8sSourceNamespace}}" \
-                {{- end }}
-                {{- range $value := .Values.syncCatalog.k8sAllowNamespaces }}
-                -allow-k8s-namespace="{{ $value }}" \
-                {{- end }}
-                {{- range $value := .Values.syncCatalog.k8sDenyNamespaces }}
-                -deny-k8s-namespace="{{ $value }}" \
-                {{- end }}
-                -k8s-write-namespace=${NAMESPACE} \
-                {{- if (not .Values.syncCatalog.syncClusterIPServices) }}
-                -sync-clusterip-services=false \
-                {{- end }}
-                {{- if .Values.syncCatalog.nodePortSyncType }}
-                -node-port-sync-type={{ .Values.syncCatalog.nodePortSyncType }} \
-                {{- end }}
-                {{- if .Values.syncCatalog.consulWriteInterval }}
-                -consul-write-interval={{ .Values.syncCatalog.consulWriteInterval }} \
-                {{- end }}
-                {{- if .Values.syncCatalog.k8sTag }}
-                -consul-k8s-tag={{ .Values.syncCatalog.k8sTag }} \
-                {{- end }}
-                {{- if .Values.syncCatalog.consulNodeName }}
-                -consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
-                {{- end }}
-                {{- if .Values.global.adminPartitions.enabled }}
-                -partition={{ .Values.global.adminPartitions.name }} \
-                {{- end }}
-                {{- if .Values.syncCatalog.consulPrefix}}
-                -consul-service-prefix="{{ .Values.syncCatalog.consulPrefix}}" \
-                {{- end}}
-                {{- if .Values.syncCatalog.addK8SNamespaceSuffix}}
-                -add-k8s-namespace-suffix \
-                {{- end}}
-                {{- if .Values.global.enableConsulNamespaces }}
-                -enable-namespaces=true \
-                {{- if .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
-                -consul-destination-namespace={{ .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }} \
-                {{- end }}
-                {{- if .Values.syncCatalog.consulNamespaces.mirroringK8S }}
-                -enable-k8s-namespace-mirroring=true \
-                {{- if .Values.syncCatalog.consulNamespaces.mirroringK8SPrefix }}
-                -k8s-namespace-mirroring-prefix={{ .Values.syncCatalog.consulNamespaces.mirroringK8SPrefix }} \
-                {{- end }}
-                {{- end }}
-                {{- if .Values.global.acls.manageSystemACLs }}
-                -consul-cross-namespace-acl-policy=cross-namespace-policy \
-                {{- end }}
-                {{- end }}
-          livenessProbe:
-            httpGet:
-              path: /health/ready
-              port: 8080
-              scheme: HTTP
-            failureThreshold: 3
-            initialDelaySeconds: 30
-            periodSeconds: 5
-            successThreshold: 1
-            timeoutSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /health/ready
-              port: 8080
-              scheme: HTTP
-            failureThreshold: 5
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            successThreshold: 1
-            timeoutSeconds: 5
-          {{- with .Values.syncCatalog.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
+      - name: sync-catalog
+        image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
+        env:
+        {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: CONSUL_LOGIN_AUTH_METHOD
+          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
+          value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+          {{- else }}
+          value: {{ template "consul.fullname" . }}-k8s-component-auth-method
           {{- end }}
+        - name: CONSUL_LOGIN_DATACENTER
+          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
+          value: {{ .Values.global.federation.primaryDatacenter }}
+          {{- else }}
+          value: {{ .Values.global.datacenter }}
+          {{- end }}
+        - name: CONSUL_LOGIN_META
+          value: "component=sync-catalog,pod=$(NAMESPACE)/$(POD_NAME)"
+        {{- end }}
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        {{- if (and .Values.syncCatalog.aclSyncToken.secretName .Values.syncCatalog.aclSyncToken.secretKey) }}
+        - name: CONSUL_ACL_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.syncCatalog.aclSyncToken.secretName }}
+              key: {{ .Values.syncCatalog.aclSyncToken.secretKey }}
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.global.tls.enabled }}
+        {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+        - name: consul-ca-cert
+          mountPath: /consul/tls/ca
+          readOnly: true
+        {{- end }}
+        {{- end }}
+        command:
+        - "/bin/sh"
+        - "-ec"
+        - |
+          consul-k8s-control-plane sync-catalog \
+            -log-level={{ default .Values.global.logLevel .Values.syncCatalog.logLevel }} \
+            -log-json={{ .Values.global.logJSON }} \
+            -k8s-default-sync={{ .Values.syncCatalog.default }} \
+            {{- if (not .Values.syncCatalog.toConsul) }}
+            -to-consul=false \
+            {{- end }}
+            {{- if (not .Values.syncCatalog.toK8S) }}
+            -to-k8s=false \
+            {{- end }}
+            -consul-domain={{ .Values.global.domain }} \
+            {{- if .Values.syncCatalog.k8sPrefix }}
+            -k8s-service-prefix="{{ .Values.syncCatalog.k8sPrefix}}" \
+            {{- end }}
+            {{- if .Values.syncCatalog.k8sSourceNamespace }}
+            -k8s-source-namespace="{{ .Values.syncCatalog.k8sSourceNamespace}}" \
+            {{- end }}
+            {{- range $value := .Values.syncCatalog.k8sAllowNamespaces }}
+            -allow-k8s-namespace="{{ $value }}" \
+            {{- end }}
+            {{- range $value := .Values.syncCatalog.k8sDenyNamespaces }}
+            -deny-k8s-namespace="{{ $value }}" \
+            {{- end }}
+            -k8s-write-namespace=${NAMESPACE} \
+            {{- if (not .Values.syncCatalog.syncClusterIPServices) }}
+            -sync-clusterip-services=false \
+            {{- end }}
+            {{- if .Values.syncCatalog.nodePortSyncType }}
+            -node-port-sync-type={{ .Values.syncCatalog.nodePortSyncType }} \
+            {{- end }}
+            {{- if .Values.syncCatalog.consulWriteInterval }}
+            -consul-write-interval={{ .Values.syncCatalog.consulWriteInterval }} \
+            {{- end }}
+            {{- if .Values.syncCatalog.k8sTag }}
+            -consul-k8s-tag={{ .Values.syncCatalog.k8sTag }} \
+            {{- end }}
+            {{- if .Values.syncCatalog.consulNodeName }}
+            -consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
+            {{- end }}
+            {{- if .Values.global.adminPartitions.enabled }}
+            -partition={{ .Values.global.adminPartitions.name }} \
+            {{- end }}
+            {{- if .Values.syncCatalog.consulPrefix}}
+            -consul-service-prefix="{{ .Values.syncCatalog.consulPrefix}}" \
+            {{- end}}
+            {{- if .Values.syncCatalog.addK8SNamespaceSuffix}}
+            -add-k8s-namespace-suffix \
+            {{- end}}
+            {{- if .Values.global.enableConsulNamespaces }}
+            -enable-namespaces=true \
+            {{- if .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
+            -consul-destination-namespace={{ .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }} \
+            {{- end }}
+            {{- if .Values.syncCatalog.consulNamespaces.mirroringK8S }}
+            -enable-k8s-namespace-mirroring=true \
+            {{- if .Values.syncCatalog.consulNamespaces.mirroringK8SPrefix }}
+            -k8s-namespace-mirroring-prefix={{ .Values.syncCatalog.consulNamespaces.mirroringK8SPrefix }} \
+            {{- end }}
+            {{- end }}
+            {{- if .Values.global.acls.manageSystemACLs }}
+            -consul-cross-namespace-acl-policy=cross-namespace-policy \
+            {{- end }}
+            {{- end }}
+            {{- if .Values.syncCatalog.ingress.enabled }}
+            -enable-ingress=true \
+            {{- if .Values.syncCatalog.ingress.loadBalancerIPs }}
+            -loadBalancer-ips=true \
+            {{- end }}
+            {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          failureThreshold: 3
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          failureThreshold: 5
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 5
+        {{- with .Values.syncCatalog.resources }}
+        resources:
+        {{- toYaml . | nindent 10 }}
+        {{- end }}
       {{- if .Values.syncCatalog.priorityClassName }}
       priorityClassName: {{ .Values.syncCatalog.priorityClassName | quote }}
       {{- end }}

@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package webhook
 
 import (
@@ -208,7 +211,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			}
 
 			expectedProbe := &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					TCPSocket: &corev1.TCPSocketAction{
 						Port: intstr.FromInt(constants.ProxyDefaultInboundPort),
 					},
@@ -289,24 +292,120 @@ func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
 	}
 }
 
+// Test that we pass the dns proxy flag to dataplane correctly.
 func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
-	h := MeshWebhook{
-		ConsulConfig:    &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
-		EnableConsulDNS: true,
-	}
-	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "web",
-				},
-			},
+
+	// We only want the flag passed when DNS and tproxy are both enabled. DNS/tproxy can
+	// both be enabled/disabled with annotations/labels on the pod and namespace and then globally
+	// through the helm chart. To test this we use an outer loop with the possible DNS settings and then
+	// and inner loop with possible tproxy settings.
+	dnsCases := []struct {
+		GlobalConsulDNS bool
+		NamespaceDNS    *bool
+		PodDNS          *bool
+		ExpEnabled      bool
+	}{
+		{
+			GlobalConsulDNS: false,
+			ExpEnabled:      false,
+		},
+		{
+			GlobalConsulDNS: true,
+			ExpEnabled:      true,
+		},
+		{
+			GlobalConsulDNS: false,
+			NamespaceDNS:    boolPtr(true),
+			ExpEnabled:      true,
+		},
+		{
+			GlobalConsulDNS: false,
+			PodDNS:          boolPtr(true),
+			ExpEnabled:      true,
 		},
 	}
-	container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
-	require.NoError(t, err)
-	require.Contains(t, container.Args, "-consul-dns-bind-port=8600")
+	tproxyCases := []struct {
+		GlobalTProxy    bool
+		NamespaceTProxy *bool
+		PodTProxy       *bool
+		ExpEnabled      bool
+	}{
+		{
+			GlobalTProxy: false,
+			ExpEnabled:   false,
+		},
+		{
+			GlobalTProxy: true,
+			ExpEnabled:   true,
+		},
+		{
+			GlobalTProxy:    false,
+			NamespaceTProxy: boolPtr(true),
+			ExpEnabled:      true,
+		},
+		{
+			GlobalTProxy: false,
+			PodTProxy:    boolPtr(true),
+			ExpEnabled:   true,
+		},
+	}
+
+	// Outer loop is permutations of dns being enabled. Inner loop is permutations of tproxy being enabled.
+	// Both must be enabled for dns to be enabled.
+	for i, dnsCase := range dnsCases {
+		for j, tproxyCase := range tproxyCases {
+			t.Run(fmt.Sprintf("dns=%d,tproxy=%d", i, j), func(t *testing.T) {
+
+				// Test setup.
+				h := MeshWebhook{
+					ConsulConfig:           &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+					EnableTransparentProxy: tproxyCase.GlobalTProxy,
+					EnableConsulDNS:        dnsCase.GlobalConsulDNS,
+				}
+				pod := corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "web",
+							},
+						},
+					},
+				}
+				if dnsCase.PodDNS != nil {
+					pod.Annotations[constants.KeyConsulDNS] = strconv.FormatBool(*dnsCase.PodDNS)
+				}
+				if tproxyCase.PodTProxy != nil {
+					pod.Annotations[constants.KeyTransparentProxy] = strconv.FormatBool(*tproxyCase.PodTProxy)
+				}
+
+				ns := corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   k8sNamespace,
+						Labels: map[string]string{},
+					},
+				}
+				if dnsCase.NamespaceDNS != nil {
+					ns.Labels[constants.KeyConsulDNS] = strconv.FormatBool(*dnsCase.NamespaceDNS)
+				}
+				if tproxyCase.NamespaceTProxy != nil {
+					ns.Labels[constants.KeyTransparentProxy] = strconv.FormatBool(*tproxyCase.NamespaceTProxy)
+				}
+
+				// Actual test here.
+				container, err := h.consulDataplaneSidecar(ns, pod, multiPortInfo{})
+				require.NoError(t, err)
+				// Flag should only be passed if both tproxy and dns are enabled.
+				if tproxyCase.ExpEnabled && dnsCase.ExpEnabled {
+					require.Contains(t, container.Args, "-consul-dns-bind-port=8600")
+				} else {
+					require.NotContains(t, container.Args, "-consul-dns-bind-port=8600")
+				}
+			})
+		}
+	}
 }
 
 func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
@@ -331,7 +430,7 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
 	}
 	container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 	expectedProbe := &corev1.Probe{
-		Handler: corev1.Handler{
+		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Port: intstr.FromInt(21000),
 				Path: "/ready",
@@ -417,7 +516,7 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) 
 	}
 	expectedProbe := []*corev1.Probe{
 		{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(21000),
 					Path: "/ready",
@@ -426,7 +525,7 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) 
 			InitialDelaySeconds: 1,
 		},
 		{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(21001),
 					Path: "/ready",
@@ -575,7 +674,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 
 				port := constants.ProxyDefaultInboundPort + i
 				expectedProbe := &corev1.Probe{
-					Handler: corev1.Handler{
+					ProbeHandler: corev1.ProbeHandler{
 						TCPSocket: &corev1.TCPSocketAction{
 							Port: intstr.FromInt(port),
 						},
@@ -1200,6 +1299,11 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 			}
 		})
 	}
+}
+
+// boolPtr returns pointer to b.
+func boolPtr(b bool) *bool {
+	return &b
 }
 
 func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {

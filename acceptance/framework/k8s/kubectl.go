@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package k8s
 
 import (
@@ -53,7 +56,7 @@ func RunKubectlAndGetOutputWithLoggerE(t *testing.T, options *k8s.KubectlOptions
 	}
 
 	counter := &retry.Counter{
-		Count: 3,
+		Count: 10,
 		Wait:  1 * time.Second,
 	}
 	var output string

@@ -338,7 +338,7 @@ load _helpers
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.aclSyncToken.secretKey=bar' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_ACL_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -349,7 +349,7 @@ load _helpers
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.aclSyncToken.secretName=foo' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_ACL_TOKEN"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -361,7 +361,55 @@ load _helpers
       --set 'syncCatalog.aclSyncToken.secretName=foo' \
       --set 'syncCatalog.aclSyncToken.secretKey=bar' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_HTTP_TOKEN"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_ACL_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# sync ingress
+
+@test "syncCatalog/Deployment: enable ingress sync flag not passed when disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.ingress.enabled=false' \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-ingress=true"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+@test "syncCatalog/Deployment: enable ingress sync flag passed when enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.ingress.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-ingress=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "syncCatalog/Deployment: enable loadbalancer IP sync flag not passed when  syncIngress disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.ingress.enabled=false' \
+      --set 'syncCatalog.ingress.loadBalancerIPs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-loadBalancer-ips=true"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "syncCatalog/Deployment: enable loadbalancer IP sync flag passed when enabled with ingress sync" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.ingress.enabled=true' \
+      --set 'syncCatalog.ingress.loadBalancerIPs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-loadBalancer-ips=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

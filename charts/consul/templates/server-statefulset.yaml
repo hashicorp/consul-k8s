@@ -198,6 +198,11 @@ spec:
             medium: "Memory"
         {{- end }}
         {{- end }}
+        {{- if .Values.global.trustedCAs }}
+        - name: trusted-cas
+          emptyDir:
+            medium: "Memory"
+        {{- end }}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -217,6 +222,23 @@ spec:
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
       {{- end }}
+      initContainers:
+      - name: locality-init
+        image: {{ .Values.global.imageK8S }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            consul-k8s-control-plane fetch-server-region -node-name "$NODE_NAME" -output-file /consul/extra-config/locality.json
+        volumeMounts:
+          - name: extra-config
+            mountPath: /consul/extra-config
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image }}"
@@ -291,9 +313,9 @@ spec:
             {{- end }}
             {{- if .Values.global.cloud.enabled}}
             # These are mounted as secrets so that the consul server agent can use them.
-            # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, 
+            # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL,
             #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
-            # - HCP_RESOURCE_ID is created for use in the 
+            # - HCP_RESOURCE_ID is created for use in the
             #   `-hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"` logic in the command below.
             {{- if .Values.global.cloud.clientId.secretName }}
             - name: HCP_CLIENT_ID
@@ -328,7 +350,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.global.cloud.apiHost.secretName }}
-                  key: {{ .Values.global.cloud.apiHost.secretKey }}            
+                  key: {{ .Values.global.cloud.apiHost.secretKey }}
             {{- end}}
             {{- if .Values.global.cloud.scadaAddress.secretName }}
             - name: HCP_SCADA_ADDRESS
@@ -336,13 +358,25 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.global.cloud.scadaAddress.secretName }}
                   key: {{ .Values.global.cloud.scadaAddress.secretKey }}
-            {{- end}}          
+            {{- end}}
+            {{- end }}
+            {{- if .Values.global.trustedCAs }}
+            - name: SSL_CERT_DIR
+              value: "/etc/ssl/certs:/trusted-cas"
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
             - "/bin/sh"
             - "-ec"
             - |
+              {{- if .Values.global.trustedCAs }}
+              {{- range $i, $cert := .Values.global.trustedCAs }}
+              cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
+              {{- $cert | nindent 14 }}
+              EOF
+              {{- end }}
+              {{- end }}
+
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
@@ -375,7 +409,8 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
-                -config-file=/consul/extra-config/extra-from-values.json
+                -config-file=/consul/extra-config/extra-from-values.json \
+                -config-file=/consul/extra-config/locality.json
                 {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
                 -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
                 {{- end }}
@@ -408,6 +443,11 @@ spec:
             - name: vault-ca
               mountPath: /consul/vault-ca/
               readOnly: true
+            {{- end }}
+            {{- if .Values.global.trustedCAs }}
+            - name: trusted-cas
+              mountPath: /trusted-cas
+              readOnly: false
             {{- end }}
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}

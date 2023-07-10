@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
+    controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
   name: proxydefaults.consul.hashicorp.com
   labels:
@@ -143,6 +143,23 @@ spec:
                       type: object
                     type: array
                 type: object
+              failoverPolicy:
+                description: FailoverPolicy specifies the exact mechanism used for
+                  failover.
+                properties:
+                  mode:
+                    description: Mode specifies the type of failover that will be
+                      performed. Valid values are "sequential", "" (equivalent to
+                      "sequential") and "order-by-locality".
+                    type: string
+                  regions:
+                    description: Regions is the ordered list of the regions of the
+                      failover targets. Valid values can be "us-west-1", "us-west-2",
+                      and so on.
+                    items:
+                      type: string
+                    type: array
+                type: object
               meshGateway:
                 description: MeshGateway controls the default mesh gateway configuration
                   for this service.
@@ -162,6 +179,18 @@ spec:
                   application and other proxies. Note: This cannot be set using the
                   CRD and should be set using annotations on the services that are
                   part of the mesh.'
+                type: string
+              mutualTLSMode:
+                description: 'MutualTLSMode controls whether mutual TLS is required
+                  for all incoming connections when transparent proxy is enabled.
+                  This can be set to "permissive" or "strict". "strict" is the default
+                  which requires mutual TLS for incoming connections. In the insecure
+                  "permissive" mode, connections to the sidecar proxy public listener
+                  port require mutual TLS, but connections to the service port do
+                  not require mutual TLS and are proxied to the application unmodified.
+                  Note: Intentions are not enforced for non-mTLS connections. To keep
+                  your services secure, we recommend using "strict" mode whenever
+                  possible and enabling "permissive" mode only when necessary.'
                 type: string
               transparentProxy:
                 description: 'TransparentProxy controls configuration specific to
@@ -225,10 +254,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

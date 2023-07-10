@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
+    controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
   name: serviceresolvers.consul.hashicorp.com
   labels:
@@ -78,6 +78,26 @@ spec:
                       description: Namespace is the namespace to resolve the requested
                         service from to form the failover group of instances. If empty
                         the current namespace is used.
+                      type: string
+                    policy:
+                      description: Policy specifies the exact mechanism used for failover.
+                      properties:
+                        mode:
+                          description: Mode specifies the type of failover that will
+                            be performed. Valid values are "sequential", "" (equivalent
+                            to "sequential") and "order-by-locality".
+                          type: string
+                        regions:
+                          description: Regions is the ordered list of the regions
+                            of the failover targets. Valid values can be "us-west-1",
+                            "us-west-2", and so on.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    samenessGroup:
+                      description: SamenessGroup is the name of the sameness group
+                        to try during failover.
                       type: string
                     service:
                       description: Service is the service to resolve instead of the
@@ -207,6 +227,15 @@ spec:
                         type: integer
                     type: object
                 type: object
+              prioritizeByLocality:
+                description: PrioritizeByLocality contains the configuration for
+                  locality aware routing.
+                properties:
+                  mode:
+                    description: Mode specifies the behavior of PrioritizeByLocality
+                      routing. Valid values are "", "none", and "failover".
+                    type: string
+                type: object
               redirect:
                 description: Redirect when configured, all attempts to resolve the
                   service this resolver defines will be substituted for the supplied
@@ -231,6 +260,10 @@ spec:
                   peer:
                     description: Peer is the name of the cluster peer to resolve the
                       service from instead of the current one.
+                    type: string
+                  samenessGroup:
+                    description: SamenessGroup is the name of the sameness group to
+                      resolve the service from instead of the current one.
                     type: string
                   service:
                     description: Service is a service to resolve instead of the current
@@ -309,10 +342,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

@@ -1,4 +1,10 @@
 VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
+CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
+CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
+CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-dataplane-version.sh charts/consul/values.yaml)
+KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindVersion)
+KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
+KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
 
 # ===========> Helm Targets
 
@@ -7,6 +13,10 @@ gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consu
 
 copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make copy-crds-to-chart
 	@cd hack/copy-crds-to-chart; go run ./...
+
+generate-external-crds: ## Generate CRDs for externally defined CRDs and copy them to charts/consul. Usage: make generate-external-crds
+	@cd ./control-plane/config/crd/external; \
+		kustomize build | yq --split-exp '.metadata.name + ".yaml"' --no-doc
 
 bats-tests: ## Run Helm chart bats tests.
 	 bats --jobs 4 charts/consul/test/unit
@@ -43,6 +53,17 @@ control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-
        --push \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
+control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker image.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH) --fips
+	@docker build -t '$(DEV_IMAGE)' \
+       --target=dev \
+       --build-arg 'TARGETARCH=$(GOARCH)' \
+       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
+       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
+       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       --push \
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+
 control-plane-test: ## Run go test for the control plane.
 	cd control-plane; go test ./...
 
@@ -64,7 +85,7 @@ cni-plugin-lint:
 	cd control-plane/cni; golangci-lint run -c ../../.golangci.yml
 
 ctrl-generate: get-controller-gen ## Run CRD code generation.
-	cd control-plane; $(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
+	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
 
 # Helper target for doing local cni acceptance testing
 kind-cni:
@@ -87,11 +108,13 @@ terraform-fmt:
 
 
 # ===========> CLI Targets
-
 cli-dev:
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
 
+cli-fips-dev:
+	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
+	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
 
 cli-lint: ## Run linter in the control-plane directory.
 	cd cli; golangci-lint run -c ../.golangci.yml
@@ -123,6 +146,8 @@ lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance di
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	make copy-crds-to-chart
+	make generate-external-crds
+	make add-copyright-header
 
 get-controller-gen: ## Download controller-gen program needed for operator SDK.
 ifeq (, $(shell which controller-gen))
@@ -131,13 +156,20 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
+
+add-copyright-header: ## Add copyright header to all files in the project
+ifeq (, $(shell which copywrite))
+	@echo "Installing copywrite"
+	@go install github.com/hashicorp/copywrite@latest
+endif
+	@copywrite headers --spdx "MPL-2.0" 
 
 # ===========> CI Targets
 
@@ -146,6 +178,26 @@ ci.aws-acceptance-test-cleanup: ## Deletes AWS resources left behind after faile
 
 version:
 	@echo $(VERSION)
+
+consul-version:
+	@echo $(CONSUL_IMAGE_VERSION)
+
+consul-enterprise-version:
+	@echo $(CONSUL_ENTERPRISE_IMAGE_VERSION)
+
+consul-dataplane-version:
+	@echo $(CONSUL_DATAPLANE_IMAGE_VERSION)
+
+kind-version:
+	@echo $(KIND_VERSION)
+
+kind-node-image:
+	@echo $(KIND_NODE_IMAGE)
+
+kubectl-version:
+	@echo $(KUBECTL_VERSION)
+
+
 
 # ===========> Release Targets
 
@@ -156,7 +208,13 @@ endif
 ifndef RELEASE_DATE
 	$(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(PRERELEASE_VERSION)
+ifndef LAST_RELEASE_GIT_TAG 
+	$(error LAST_RELEASE_GIT_TAG is required)
+endif
+ifndef CONSUL_VERSION
+	$(error CONSUL_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(LAST_RELEASE_GIT_TAG) $(CONSUL_VERSION) $(PRERELEASE_VERSION)
 
 prepare-dev:
 ifndef RELEASE_VERSION
@@ -168,12 +226,15 @@ endif
 ifndef NEXT_RELEASE_VERSION
 	$(error NEXT_RELEASE_VERSION is required)
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(NEXT_RELEASE_VERSION) $(PRERELEASE_VERSION)
+ifndef NEXT_CONSUL_VERSION
+	$(error NEXT_CONSUL_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" "" $(NEXT_RELEASE_VERSION) $(NEXT_CONSUL_VERSION)
 
 # ===========> Makefile config
 
 .DEFAULT_GOAL := help
-.PHONY: gen-helm-docs copy-crds-to-chart bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
+.PHONY: gen-helm-docs copy-crds-to-chart generate-external-crds bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
 SHELL = bash
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)

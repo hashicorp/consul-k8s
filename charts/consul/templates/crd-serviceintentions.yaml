@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
+    controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
   name: serviceintentions.consul.hashicorp.com
   labels:
@@ -74,6 +74,43 @@ spec:
                       have intentions defined.
                     type: string
                 type: object
+              jwt:
+                description: JWT specifies the configuration to validate a JSON Web
+                  Token for all incoming requests.
+                properties:
+                  providers:
+                    description: Providers is a list of providers to consider when
+                      verifying a JWT.
+                    items:
+                      properties:
+                        name:
+                          description: Name is the name of the JWT provider. There
+                            MUST be a corresponding "jwt-provider" config entry with
+                            this name.
+                          type: string
+                        verifyClaims:
+                          description: VerifyClaims is a list of additional claims
+                            to verify in a JWT's payload.
+                          items:
+                            properties:
+                              path:
+                                description: Path is the path to the claim in the
+                                  token JSON.
+                                items:
+                                  type: string
+                                type: array
+                              value:
+                                description: Value is the expected value at the given
+                                  path. If the type at the path is a list then we
+                                  verify that this value is contained in the list.
+                                  If the type at the path is a string then we verify
+                                  that this value matches.
+                                type: string
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                type: object
               sources:
                 description: Sources is the list of all intention sources and the
                   authorization granted to those sources. The order of this list does
@@ -102,8 +139,7 @@ spec:
                       description: Partition is the Admin Partition for the Name parameter.
                       type: string
                     peer:
-                      description: '[Experimental] Peer is the peer name for the Name
-                        parameter.'
+                      description: Peer is the peer name for the Name parameter.
                       type: string
                     permissions:
                       description: Permissions is the list of all additional L7 attributes
@@ -184,8 +220,50 @@ spec:
                                   match on the HTTP request path.
                                 type: string
                             type: object
+                          jwt:
+                            description: JWT specifies configuration to validate a
+                              JSON Web Token for incoming requests.
+                            properties:
+                              providers:
+                                description: Providers is a list of providers to consider
+                                  when verifying a JWT.
+                                items:
+                                  properties:
+                                    name:
+                                      description: Name is the name of the JWT provider.
+                                        There MUST be a corresponding "jwt-provider"
+                                        config entry with this name.
+                                      type: string
+                                    verifyClaims:
+                                      description: VerifyClaims is a list of additional
+                                        claims to verify in a JWT's payload.
+                                      items:
+                                        properties:
+                                          path:
+                                            description: Path is the path to the claim
+                                              in the token JSON.
+                                            items:
+                                              type: string
+                                            type: array
+                                          value:
+                                            description: Value is the expected value
+                                              at the given path. If the type at the
+                                              path is a list then we verify that this
+                                              value is contained in the list. If the
+                                              type at the path is a string then we
+                                              verify that this value matches.
+                                            type: string
+                                        type: object
+                                      type: array
+                                  type: object
+                                type: array
+                            type: object
                         type: object
                       type: array
+                    samenessGroup:
+                      description: SamenessGroup is the name of the sameness group,
+                        if applicable.
+                      type: string
                   type: object
                 type: array
             type: object
@@ -232,10 +310,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

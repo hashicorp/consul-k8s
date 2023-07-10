@@ -1,6 +1,10 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package v1alpha1
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -36,6 +40,78 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 				},
 			},
 			Matches: true,
+		},
+		"namespaces and partitions equate `default` and empty strings": {
+			Ours: ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "svc-name",
+						Namespace: "ns1",
+					},
+					Sources: []*SourceIntention{
+						{
+							Name:      "svc1",
+							Namespace: "",
+							Partition: "default",
+							Action:    "allow",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceIntentionsConfigEntry{
+				Kind:      capi.ServiceIntentions,
+				Name:      "svc-name",
+				Namespace: "ns1",
+				Sources: []*capi.SourceIntention{
+					{
+						Name:       "svc1",
+						Namespace:  "default",
+						Partition:  "",
+						Action:     "allow",
+						Precedence: 0,
+					},
+				},
+			},
+			Matches: true,
+		},
+		"source namespaces and partitions are compared": {
+			Ours: ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "svc-name",
+						Namespace: "test",
+					},
+					Sources: []*SourceIntention{
+						{
+							Name:      "svc1",
+							Namespace: "test",
+							Partition: "test",
+							Action:    "allow",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceIntentionsConfigEntry{
+				Kind:      capi.ServiceIntentions,
+				Name:      "svc-name",
+				Namespace: "test",
+				Sources: []*capi.SourceIntention{
+					{
+						Name:       "svc1",
+						Namespace:  "not-test",
+						Partition:  "not-test",
+						Action:     "allow",
+						Precedence: 0,
+					},
+				},
+			},
+			Matches: false,
 		},
 		"all fields set matches": {
 			Ours: ServiceIntentions{
@@ -89,9 +165,35 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 											"PUT",
 										},
 									},
+									JWT: &IntentionJWTRequirement{
+										Providers: []*IntentionJWTProvider{
+											{
+												Name: "okta-nested",
+												VerifyClaims: []*IntentionJWTClaimVerification{
+													{
+														Path:  []string{"perms", "role"},
+														Value: "admin-nested",
+													},
+												},
+											},
+										},
+									},
 								},
 							},
 							Description: "an L7 config",
+						},
+					},
+					JWT: &IntentionJWTRequirement{
+						Providers: []*IntentionJWTProvider{
+							{
+								Name: "okta",
+								VerifyClaims: []*IntentionJWTClaimVerification{
+									{
+										Path:  []string{"perms", "role"},
+										Value: "admin",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -144,9 +246,35 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 										"PUT",
 									},
 								},
+								JWT: &capi.IntentionJWTRequirement{
+									Providers: []*capi.IntentionJWTProvider{
+										{
+											Name: "okta-nested",
+											VerifyClaims: []*capi.IntentionJWTClaimVerification{
+												{
+													Path:  []string{"perms", "role"},
+													Value: "admin-nested",
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 						Description: "an L7 config",
+					},
+				},
+				JWT: &capi.IntentionJWTRequirement{
+					Providers: []*capi.IntentionJWTProvider{
+						{
+							Name: "okta",
+							VerifyClaims: []*capi.IntentionJWTClaimVerification{
+								{
+									Path:  []string{"perms", "role"},
+									Value: "admin",
+								},
+							},
+						},
 					},
 				},
 				Meta: nil,
@@ -267,6 +395,13 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 							Description: "disallow access from namespace not-test",
 						},
 						{
+							Name:          "*",
+							Namespace:     "ns1",
+							SamenessGroup: "sg2",
+							Action:        "deny",
+							Description:   "disallow access from namespace ns1",
+						},
+						{
 							Name:      "svc-2",
 							Namespace: "bar",
 							Partition: "bar",
@@ -293,9 +428,35 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 											"PUT",
 										},
 									},
+									JWT: &IntentionJWTRequirement{
+										Providers: []*IntentionJWTProvider{
+											{
+												Name: "okta-nested",
+												VerifyClaims: []*IntentionJWTClaimVerification{
+													{
+														Path:  []string{"perms", "role"},
+														Value: "admin-nested",
+													},
+												},
+											},
+										},
+									},
 								},
 							},
 							Description: "an L7 config",
+						},
+					},
+					JWT: &IntentionJWTRequirement{
+						Providers: []*IntentionJWTProvider{
+							{
+								Name: "okta",
+								VerifyClaims: []*IntentionJWTClaimVerification{
+									{
+										Path:  []string{"perms", "role"},
+										Value: "admin",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -318,6 +479,13 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 						Partition:   "not-test",
 						Action:      "deny",
 						Description: "disallow access from namespace not-test",
+					},
+					{
+						Name:          "*",
+						Namespace:     "ns1",
+						SamenessGroup: "sg2",
+						Action:        "deny",
+						Description:   "disallow access from namespace ns1",
 					},
 					{
 						Name:      "svc-2",
@@ -346,9 +514,35 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 										"PUT",
 									},
 								},
+								JWT: &capi.IntentionJWTRequirement{
+									Providers: []*capi.IntentionJWTProvider{
+										{
+											Name: "okta-nested",
+											VerifyClaims: []*capi.IntentionJWTClaimVerification{
+												{
+													Path:  []string{"perms", "role"},
+													Value: "admin-nested",
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 						Description: "an L7 config",
+					},
+				},
+				JWT: &capi.IntentionJWTRequirement{
+					Providers: []*capi.IntentionJWTProvider{
+						{
+							Name: "okta",
+							VerifyClaims: []*capi.IntentionJWTClaimVerification{
+								{
+									Path:  []string{"perms", "role"},
+									Value: "admin",
+								},
+							},
+						},
 					},
 				},
 				Meta: map[string]string{
@@ -599,6 +793,8 @@ func TestServiceIntentions_DefaultNamespaceFields(t *testing.T) {
 }
 
 func TestServiceIntentions_Validate(t *testing.T) {
+	longDescription := strings.Repeat("x", metaValueMaxLength+1)
+
 	cases := map[string]struct {
 		input             *ServiceIntentions
 		namespacesEnabled bool
@@ -649,9 +845,35 @@ func TestServiceIntentions_Validate(t *testing.T) {
 											"PUT",
 										},
 									},
+									JWT: &IntentionJWTRequirement{
+										Providers: []*IntentionJWTProvider{
+											{
+												Name: "okta-nested",
+												VerifyClaims: []*IntentionJWTClaimVerification{
+													{
+														Path:  []string{"perms", "role"},
+														Value: "admin-nested",
+													},
+												},
+											},
+										},
+									},
 								},
 							},
 							Description: "an L7 config",
+						},
+					},
+					JWT: &IntentionJWTRequirement{
+						Providers: []*IntentionJWTProvider{
+							{
+								Name: "okta",
+								VerifyClaims: []*IntentionJWTClaimVerification{
+									{
+										Path:  []string{"perms", "role"},
+										Value: "admin",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -1121,6 +1343,54 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0]: Invalid value: "{\"name\":\"svc-2\",\"namespace\":\"bar\",\"action\":\"deny\",\"permissions\":[{\"action\":\"allow\",\"http\":{\"pathExact\":\"/bar\"}}]}": action and permissions are mutually exclusive and only one of them can be specified`,
 			},
 		},
+		"name not specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Namespace: "bar",
+							Action:    "deny",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].name: Required value: name is required.`,
+			},
+		},
+		"description is too long": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:        "foo",
+							Namespace:   "bar",
+							Action:      "deny",
+							Description: longDescription,
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			expectedErrMsgs: []string{
+				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0]: Invalid value: "": description exceeds maximum length 512`,
+			},
+		},
 		"namespaces disabled: destination namespace specified": {
 			input: &ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1340,7 +1610,71 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			namespacesEnabled: true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: Both source.peer and source.partition cannot be set.`,
+				`cannot set peer and partition at the same time.`,
+			},
+		},
+		"single source samenessgroup and partition specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:          "web",
+							Action:        "allow",
+							Namespace:     "namespace-b",
+							Partition:     "partition-other",
+							SamenessGroup: "sg2",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`cannot set samenessgroup and partition at the same time.`,
+			},
+		},
+		"single source samenessgroup and peer specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:          "web",
+							Action:        "allow",
+							Namespace:     "namespace-b",
+							Peer:          "p2",
+							SamenessGroup: "sg2",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`cannot set samenessgroup and peer at the same time.`,
 			},
 		},
 		"multiple source peer and partition specified": {
@@ -1374,8 +1708,108 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			namespacesEnabled: true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: Both source.peer and source.partition cannot be set.`,
-				`spec.sources[1]: Invalid value: v1alpha1.SourceIntention{Name:"db", Namespace:"namespace-c", Peer:"peer-2", Partition:"partition-2", Action:"deny", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: Both source.peer and source.partition cannot be set.`,
+				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", SamenessGroup:"", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: cannot set peer and partition at the same time.`,
+				`spec.sources[1]: Invalid value: v1alpha1.SourceIntention{Name:"db", Namespace:"namespace-c", Peer:"peer-2", Partition:"partition-2", SamenessGroup:"", Action:"deny", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: cannot set peer and partition at the same time.`,
+			},
+		},
+		"multiple errors: wildcard peer and partition and samenessgroup specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "*",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+							Peer:      "*",
+						},
+						{
+							Name:          "db2",
+							Action:        "deny",
+							Namespace:     "namespace-d",
+							SamenessGroup: "*",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`partition cannot use or contain wildcard '*'`,
+				`peer cannot use or contain wildcard '*'`,
+				`samenessgroup cannot use or contain wildcard '*'`,
+			},
+		},
+		"invalid empty jwt provider name at top-level": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name: "dest-service",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:   "bar",
+							Action: "allow",
+						},
+					},
+					JWT: &IntentionJWTRequirement{
+						Providers: []*IntentionJWTProvider{
+							{
+								Name: "",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.jwt.providers[0].name: Invalid value: "": JWT provider name is required`,
+			},
+		},
+		"invalid empty jwt provider name in permissions": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name: "dest-service",
+					},
+					Sources: SourceIntentions{
+						{
+							Name: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									JWT: &IntentionJWTRequirement{
+										Providers: []*IntentionJWTProvider{
+											{
+												Name: "",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.sources[0].permissions[0].jwt.providers[0].name: Invalid value: "": JWT provider name is required`,
 			},
 		},
 	}

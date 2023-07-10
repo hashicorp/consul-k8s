@@ -211,6 +211,19 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: metrics.enableTelemetryCollector can be configured" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enableTelemetryCollector=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-enable-telemetry-collector=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
 #--------------------------------------------------------------------
 # consul and consul-dataplane images
 
@@ -947,7 +960,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
+  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"200Mi"},"requests":{"cpu":"50m","memory":"200Mi"}}' ]
 }
 
 @test "connectInject/Deployment: can set resources" {
@@ -986,10 +999,7 @@ load _helpers
   local actual=$(echo "$cmd" |
     yq 'any(contains("-init-container-memory-limit=150Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-init-container-cpu-limit=50m"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
+  
 }
 
 @test "connectInject/Deployment: can set init container resources" {
@@ -2439,3 +2449,4 @@ reservedNameTest() {
     jq -r '. | select( .name == "CONSUL_TLS_SERVER_NAME").value' | tee /dev/stderr)
   [ "${actual}" = "server.dc1.consul" ]
 }
+

@@ -24,10 +24,15 @@ rules:
   - serviceintentions
   - ingressgateways
   - terminatinggateways
+  - gatewayclassconfigs
+  - meshservices
+  - samenessgroups
+  - controlplanerequestlimits
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers
   {{- end }}
+  - jwtproviders
   verbs:
   - create
   - delete
@@ -49,26 +54,35 @@ rules:
   - serviceintentions/status
   - ingressgateways/status
   - terminatinggateways/status
+  - samenessgroups/status
+  - controlplanerequestlimits/status
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors/status
   - peeringdialers/status
   {{- end }}
+  - jwtproviders/status
   verbs:
   - get
   - patch
   - update
-{{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [ "" ]
-  resources: [ "serviceaccounts", "secrets" ]
+  resources: [ "secrets", "serviceaccounts", "endpoints", "services", "namespaces", "nodes" ]
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+  - update
+- apiGroups: [ "rbac.authorization.k8s.io" ]
+  resources: [ "roles", "rolebindings" ]
   verbs:
   - get
-{{- end }}
-- apiGroups: [ "" ]
-  resources: [ "endpoints", "services", "namespaces", "nodes" ]
-  verbs:
-  - "get"
-  - "list"
-  - "watch"
+  - list
+  - watch
+  - delete
+  - create
+  - update
 - apiGroups: [ "" ]
   resources:
   - pods
@@ -108,12 +122,68 @@ rules:
   - "update"
   - "delete"
 {{- end }}
-{{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: [ "policy" ]
   resources: [ "podsecuritypolicies" ]
-  resourceNames:
-  - {{ template "consul.fullname" . }}-connect-injector
   verbs:
   - use
-{{- end }}
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - gatewayclasses
+  - gateways
+  - httproutes
+  - tcproutes
+  - referencegrants
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - gatewayclasses/finalizers
+  - gateways/finalizers
+  - httproutes/finalizers
+  - tcproutes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - gatewayclasses/status
+  - gateways/status
+  - httproutes/status
+  - tcproutes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+    - apps
+  resources:
+    - deployments
+  verbs:
+    - create
+    - get
+    - list
+    - update
+    - watch
+    - delete
+- apiGroups:
+    - core
+  resources:
+    - services
+  verbs:
+    - watch
+    - list
+- apiGroups: [ "" ]
+  resources: [ "secrets" ]
+  verbs:
+    - "get"
+    - "list"
+    - "watch"
 {{- end }}

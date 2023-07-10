@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package webhook
 
 import (
@@ -1473,7 +1476,8 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 
 var testNS = corev1.Namespace{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: k8sNamespace,
+		Name:   k8sNamespace,
+		Labels: map[string]string{},
 	},
 }
 

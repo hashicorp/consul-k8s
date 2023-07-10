@@ -99,7 +99,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = '{"limits":{"cpu":"100m","memory":"100Mi"},"requests":{"cpu":"100m","memory":"100Mi"}}' ]
+  [ "${actual}" = '{"limits":{"cpu":"100m","memory":"200Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}' ]
 }
 
 @test "server/StatefulSet: resources can be overridden" {
@@ -686,7 +686,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 251dd23c6cc44bf8362acddc24c78440b6a65c4618785d027fae526958af5dde ]
+  [ "${actual}" = 3714bf1fbca840dcd10b5aeb40c6ef35e349bd534727abe80b831c77f88da7da ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -696,7 +696,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 473d54d05b794be1526d42ef04fdc049f4f979a75d3394c897eef149d399207d ]
+  [ "${actual}" = 87126fac3c7704fba1d4265201ad0345f4d972d2123df6e6fb416b40c5823d80 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -706,7 +706,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 6acd3761c0981d4d6194b3375b0f7a291e3927602ce7857344c26010381d3a61 ]
+  [ "${actual}" = d98ff135c5dee661058f33e29970675761ecf235676db0d4d24f354908eee425 ]
 }
 
 #--------------------------------------------------------------------
@@ -2585,6 +2585,64 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "/etc/ssl/certs:/extra-ssl-certs" ]
 }
 
+
+#--------------------------------------------------------------------
+# global.trustedCAs
+
+@test "server/StatefulSet: trustedCAs: if trustedCAs is set command is modified correctly" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-0.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "server/StatefulSet: trustedCAs: if tustedCAs multiple are set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      --set 'global.trustedCAs[1]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0]'  | tee /dev/stderr)
+
+
+  local actual=$(echo $object | jq '.command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-0.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object | jq '.command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-1.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+# global.trustedCAs
+@test "server/StatefulSet: trustedCAs: if trustedCAs is set /trusted-cas volumeMount is added" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr | yq -r '.spec.template.spec' | tee /dev/stderr)
+  local actual=$(echo $object | jq -r '.volumes[] | select(.name == "trusted-cas") | .name' | tee /dev/stderr)
+  [ "${actual}" = "trusted-cas" ]
+}
+
+@test "server/StatefulSet: trustedCAs: if trustedCAs is set SSL_CERT_DIR env var is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr | yq -r '.spec.template.spec.containers[0].env[] | select(.name == "SSL_CERT_DIR")' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "SSL_CERT_DIR" ]
+  local actual=$(echo $object | jq -r '.value' | tee /dev/stderr)
+  [ "${actual}" = "/etc/ssl/certs:/trusted-cas" ]
+}
 
 #--------------------------------------------------------------------
 # snapshotAgent license-autoload
