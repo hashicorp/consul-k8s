@@ -44,7 +44,7 @@ func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.R
 		if k8serrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
-		r.Log.Error(err, "failed to get gateway class config")
+		log.Error(err, "failed to get gateway class config")
 		return ctrl.Result{}, err
 	}
 
@@ -52,33 +52,33 @@ func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.R
 		// We have a deletion, ensure we're not in use.
 		used, err := gatewayClassConfigInUse(ctx, r.Client, gcc)
 		if err != nil {
-			r.Log.Error(err, "failed to check if the gateway class config is still in use")
+			log.Error(err, "failed to check if the gateway class config is still in use")
 			return ctrl.Result{}, err
 		}
 		if used {
-			r.Log.Info("gateway class config still in use")
+			log.Info("gateway class config still in use")
 			// Requeue as to not block the reconciliation loop.
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 		// gcc is no longer in use.
 		if _, err := RemoveFinalizer(ctx, r.Client, gcc, gatewayClassConfigFinalizer); err != nil {
-			if isModifiedError(err) {
-				r.Log.V(1).Info("error removing gateway class config finalizer, will try to re-reconcile")
-				return ctrl.Result{}, nil
+			if k8serrors.IsConflict(err) {
+				log.V(1).Info("error removing gateway class config finalizer, will try to re-reconcile")
+				return ctrl.Result{Requeue: true}, nil
 			}
-			r.Log.Error(err, "error removing gateway class config finalizer")
+			log.Error(err, "error removing gateway class config finalizer")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 
 	if _, err := EnsureFinalizer(ctx, r.Client, gcc, gatewayClassConfigFinalizer); err != nil {
-		if isModifiedError(err) {
-			r.Log.V(1).Info("error adding gateway class config finalizer, will try to re-reconcile")
+		if k8serrors.IsConflict(err) {
+			log.V(1).Info("error adding gateway class config finalizer, will try to re-reconcile")
 
-			return ctrl.Result{}, nil
+			return ctrl.Result{Requeue: true}, nil
 		}
-		r.Log.Error(err, "error adding gateway class config finalizer")
+		log.Error(err, "error adding gateway class config finalizer")
 		return ctrl.Result{}, err
 	}
 
