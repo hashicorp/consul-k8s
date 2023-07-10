@@ -6,7 +6,6 @@ package connhelper
 import (
 	"context"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,9 +18,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 const (
@@ -141,13 +138,6 @@ func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
 	options := c.Ctx.KubectlOptions(t)
 	kustomizeDir := "../fixtures/cases/resolver-redirect-virtualip"
 	k8s.KubectlApplyK(t, options, kustomizeDir)
-
-	output, err := k8s.RunKubectlAndGetOutputE(t, options, "kustomize", kustomizeDir)
-	require.NoError(t, err)
-
-	deployment := v1.Deployment{}
-	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&deployment)
-	require.NoError(t, err)
 
 	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
 		k8s.KubectlDeleteK(t, options, kustomizeDir)
