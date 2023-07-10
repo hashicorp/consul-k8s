@@ -1551,7 +1551,7 @@ key2: value2' \
   [ "${actual}" = "true" ]
 }
 
-@test "terminatingGateways/Deployment: override global.logLevel when terminatingGateways.logLevel is set" {
+@test "terminatingGateways/Deployment: override global.logLevel when terminatingGateways.logLevel is set for dataplane container" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
