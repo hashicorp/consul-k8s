@@ -223,13 +223,14 @@ jobs:
           CGO_ENABLED: 0
         working-directory: ${{ matrix.component }}
         run: |
-          mkdir dist out
-          $env:GIT_COMMIT=$(git rev-parse --short HEAD)
-          $env:GIT_DIRTY=$(if (git status --porcelain) { echo "+CHANGES" })
-          $env:GIT_IMPORT=github.com/hashicorp/consul-k8s/${{ matrix.component }}/version
-          $env:GOLDFLAGS="-X ${GIT_IMPORT}.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X ${GIT_IMPORT}.GitDescribe=${{ needs.get-product-version.outputs.product-version }}"
-          CGO_ENABLED=0 go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" .
-          Compress-Archive -Path dist/ -DestinationPath out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          New-Item -ItemType Directory -Path dist, out -Force
+          $env:GIT_COMMIT = git rev-parse --short HEAD
+          $env:GIT_DIRTY = if (git status --porcelain) { "+CHANGES" } else { "" }
+          $env:GIT_IMPORT = "github.com/hashicorp/consul-k8s/${{ matrix.component }}/version"
+          $env:GOLDFLAGS = "-X ${env:GIT_IMPORT}.GitCommit=${env:GIT_COMMIT}${env:GIT_DIRTY} -X ${env:GIT_IMPORT}.GitDescribe=${{ needs.get-product-version.outputs.product-version }}"
+          go build -o dist/${{ matrix.bin_name }} -ldflags $env:GOLDFLAGS .
+          Compress-Archive -Path dist -DestinationPath out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+
       - name: Upload built binaries
         uses: actions/upload-artifact@v3
         with:
