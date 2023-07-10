@@ -18,7 +18,7 @@ target=templates/gateway-resources-job.yaml
     assert_empty helm template \
         -s $target \
         --set 'connectInject.enabled=false' \
-        . 
+        .
 }
 
 @test "gatewayresources/Job: imageK8S set properly" {
@@ -115,4 +115,27 @@ target=templates/gateway-resources-job.yaml
 
   local actual=$(echo "$spec" | jq '.[14]')
   [ "${actual}" = "\"-service-annotations=- bingo\"" ]
+}
+
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "gatewayresources/Job: no annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+        -s $target \
+        . | tee /dev/stderr |
+        yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
+    [ "${actual}" = "{}" ]
+}
+
+@test "gatewayresources/Job: annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+        -s $target \
+        --set 'global.acls.annotations=foo: bar' \
+        . | tee /dev/stderr |
+        yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+    [ "${actual}" = "bar" ]
 }

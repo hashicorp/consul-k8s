@@ -379,6 +379,18 @@ global:
       # @type: string
       secretKey: null
 
+    # This value defines additional annotations for
+    # tls init jobs. This should be formatted as a multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # [Enterprise Only] `enableConsulNamespaces` indicates that you are running
   # Consul Enterprise v1.7+ with a valid Consul Enterprise license and would
   # like to make use of configuration beyond registering everything into
@@ -488,6 +500,18 @@ global:
     #
     # @type: string
     nodeSelector: null
+
+    # This value defines additional annotations for
+    # acl init jobs. This should be formatted as a multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
 
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an
@@ -877,6 +901,14 @@ server:
     # @type: map
     # @recurse: false
     server: null
+    # The acl-init job
+    # @type: map
+    # @recurse: false
+    aclInit: null
+    # The tls-init job
+    # @type: map
+    # @recurse: false
+    tlsInit: null
 
   # This value is used to carefully
   # control a rolling update of Consul server agents. This value specifies the
