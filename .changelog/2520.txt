@@ -1,0 +1,4 @@
+```release-note:bug
+transparent-proxy: Fix issue where connect-inject lacked sufficient `mesh:write` privileges in some deployments,
+which prevented virtual IPs from persisting properly.
+```
