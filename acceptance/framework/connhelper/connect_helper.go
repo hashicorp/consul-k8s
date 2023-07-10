@@ -94,7 +94,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		// deployments because golang will execute them in reverse order
 		// (i.e. the last registered cleanup function will be executed first).
 		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
+			retrier := &retry.Timer{Timeout: 60 * time.Second, Wait: 100 * time.Millisecond}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
 				require.NoError(r, err)
@@ -130,19 +130,6 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 				require.Len(r, podList.Items[0].Spec.Containers, 2)
 			}
 		})
-}
-
-// CreateResolverRedirect creates a resolver that redirects to a static-server, a corresponding k8s service,
-// and intentions. This helper is primarly used to ensure that the virtual-ips are persisted to consul properly.
-func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
-	logger.Log(t, "creating resolver redirect")
-	options := c.Ctx.KubectlOptions(t)
-	kustomizeDir := "../fixtures/cases/resolver-redirect-virtualip"
-	k8s.KubectlApplyK(t, options, kustomizeDir)
-
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
-		k8s.KubectlDeleteK(t, options, kustomizeDir)
-	})
 }
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static
