@@ -1,0 +1,41 @@
+name: golangci-lint-windows
+
+on:
+  workflow_call:
+    inputs:
+      directory:
+        required: true
+        type: string
+      go-version:
+        required: true
+        type: string
+      args:
+        required: false
+        type: string
+
+jobs:
+  job:
+    runs-on: 'windows-2019'
+
+    steps:      
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ inputs.go-version }}
+          
+      - name: Set up environment
+        run: |
+          echo "GO111MODULE=on" >> $GITHUB_ENV
+          echo "CGO_ENABLED=0" >> $GITHUB_ENV
+          echo "PATH=$GITHUB_WORKSPACE/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Install golangci-lint
+        run: go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51
+
+      - name: golangci-lint-${{inputs.directory}}
+        run: |
+          cd ${{ inputs.directory }}
+          golangci-lint run ${{ inputs.args }}
