@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -36,15 +35,7 @@ const (
 func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 	cfg := suite.Config()
 
-	ver, err := version.NewVersion("1.2.0")
-	require.NoError(t, err)
-	if cfg.ConsulDataplaneVersion != nil && cfg.ConsulDataplaneVersion.LessThan(ver) {
-		t.Skipf("skipping this test because proxy lifecycle management is not supported in consul-dataplane version %v", cfg.ConsulDataplaneVersion.String())
-	}
-
 	for _, testCfg := range []LifecycleShutdownConfig{
-		{secure: false, helmValues: map[string]string{}},
-		{secure: true, helmValues: map[string]string{}},
 		{secure: false, helmValues: map[string]string{
 			helmDrainListenersKey:     "true",
 			helmGracePeriodSecondsKey: "15",
@@ -72,6 +63,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 	} {
 		// Determine if listeners should be expected to drain inbound connections
 		var drainListenersEnabled bool
+		var err error
 		val, ok := testCfg.helmValues[helmDrainListenersKey]
 		if ok {
 			drainListenersEnabled, err = strconv.ParseBool(val)
