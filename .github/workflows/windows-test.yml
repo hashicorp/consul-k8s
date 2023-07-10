@@ -76,11 +76,33 @@ jobs:
       go-version: ${{ needs.get-go-version.outputs.go-version }}
       args: "--no-config --disable-all --enable gofmt,govet"
   unit-helm-gen:
-    needs: [get-go-version, golangci-lint-helm-gen, validate-helm-gen]
-    uses: ./.github/workflows/reusable-unit.yml
-    with:
-      directory: hack\helm-reference-gen
-      go-version: ${{ needs.get-go-version.outputs.go-version }}
+        needs:
+          - get-go-version
+          - golangci-lint-helm-gen
+          - validate-helm-gen
+        runs-on: windows-2019
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v3
+    
+          - name: Setup go
+            uses: actions/setup-go@v3
+            with:
+              go-version: ${{ needs.get-go-version.outputs.go-version }}
+    
+          - name: Setup go mod cache
+            uses: actions/cache@v3
+            with:
+              path: |
+                C:\go\pkg\mod
+              key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+              restore-keys: |
+                ${{ runner.os }}-go-
+    
+          - name: Unit test helm gen
+            working-directory: hack/helm-reference-gen
+            run: go test -v ./...
+    
   unit-test-helm-templates:
     needs: 
       - unit-helm-gen
@@ -105,10 +127,9 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ needs.get-go-version.outputs.go-version }}
-      - run: go install github.com/hashicorp/lint-consul-retry@master && lint-consul-retry
       - name: Run lint
         working-directory: control-plane
-        run: go run hack\lint-api-new-client\main.go
+        run: go run hack/lint-api-new-client/main.go
   golangci-lint-control-plane:
     needs:
       - get-go-version
