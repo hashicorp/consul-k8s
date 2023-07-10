@@ -1,15 +1,19 @@
 name: test-windows
+
 on:
   push:
+
 env:
-  TEST_RESULTS: C:\temp\test-results
-  GOTESTSUM_VERSION: 1.8.2
-  CONSUL_OSS_DOCKER_IMAGE: hashicorppreview/consul:1.14-dev
-  CONSUL_ENT_DOCKER_IMAGE: hashicorppreview/consul-enterprise:1.14-dev
+  TEST_RESULTS: C:\tmp\test-results # path to where test results are saved
+  GOTESTSUM_VERSION: 1.8.2 # You cannot use environment variables with workflows. The gotestsum version is hardcoded in the reusable workflows too.
+  # We use docker images to copy the consul binary for unit tests.
+  CONSUL_OSS_DOCKER_IMAGE: hashicorppreview/consul:1.14-dev # Consul's OSS version to use in tests
+  CONSUL_ENT_DOCKER_IMAGE: hashicorppreview/consul-enterprise:1.14-dev # Consul's enterprise version to use in tests
+
 jobs:
   terraform-fmt-check:
     name: "Terraform format check"
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
       - name: Setup Terraform
@@ -20,9 +24,11 @@ jobs:
       - name: Run Terraform checks
         run: |
           make terraform-fmt-check TERRAFORM_DIR="${{ github.workspace }}"
+          # Use appropriate Windows commands to run the make command if required
+
   get-go-version:
     name: "Determine Go toolchain version"
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     outputs:
       go-version: ${{ steps.get-go-version.outputs.go-version }}
     steps:
@@ -32,8 +38,9 @@ jobs:
         run: |
           echo "Building with Go $(cat .go-version)"
           echo "::set-output name=go-version::$(cat .go-version)"
+
   get-product-version:
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     outputs:
       product-version: ${{ steps.get-product-version.outputs.product-version }}
     steps:
@@ -43,178 +50,215 @@ jobs:
         run: |
           make version
           echo "::set-output name=product-version::$(make version)"
+
   validate-helm-gen:
     needs:
       - get-go-version
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
       - name: Setup go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ needs.get-go-version.outputs.go-version }}
+
       - name: Setup go mod cache
         uses: actions/cache@v3
         with:
           path: |
-            C:\Users\runneradmin\AppData\Local\go-build
             C:\Users\runneradmin\go\pkg\mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+
       - name: Validate helm gen 
-        working-directory: hack\helm-reference-gen 
+        working-directory: hack/helm-reference-gen 
         run: |
-          go run .\... -validate
+          go run ./... -validate
+          # Use appropriate Windows commands to run the go command if required
+
   golangci-lint-helm-gen:
     needs:
       - get-go-version
-    uses: ./.github/workflows/windows-reusablegolangci-lint.yml
+    uses: ./.github/workflows/windows-reusable-golangci-lint.yml
     with:
-      directory: hack\helm-reference-gen
+      directory: hack/helm-reference-gen
       go-version: ${{ needs.get-go-version.outputs.go-version }}
+      #TODO: This is a workaround in order to get pipelines working. godot and staticcheck fail for helm-reference-gen
       args: "--no-config --disable-all --enable gofmt,govet"
+      # Use appropriate Windows commands to run the go command if required
+
   unit-helm-gen:
     needs: [get-go-version, golangci-lint-helm-gen, validate-helm-gen]
-    uses: ./.github/workflows/windows-reusableunit.yml
+    uses: ./.github/workflows/windows-reusable-unit.yml
     with:
-      directory: hack\helm-reference-gen
+      directory: hack/helm-reference-gen
       go-version: ${{ needs.get-go-version.outputs.go-version }}
+      # Use appropriate Windows commands to run the go command if required
+
   unit-test-helm-templates:
     needs: 
       - unit-helm-gen
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     container: 
       image: docker.mirror.hashicorp.services/hashicorpdev/consul-helm-test:0.15.0
       options: --user 1001
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+   
       - name: Run Unit Tests
-        working-directory: charts\consul
-        run:  bats --jobs 4 .\test\unit
+        working-directory: charts/consul
+        run:  bats --jobs 4 ./test/unit
+        # Use appropriate Windows commands to run the bats command if required
+
   lint-control-plane:
     needs:
       - get-go-version
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       - name: Setup go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ needs.get-go-version.outputs.go-version }}
+
+      - run: go install github.com/hashicorp/lint-consul-retry@master && lint-consul-retry
+        # Use appropriate Windows commands to run the go command if required
+
       - name: Run lint
         working-directory: control-plane
         run: go run hack/lint-api-new-client/main.go
+        # Use appropriate Windows commands to run the go command if required
+
   golangci-lint-control-plane:
     needs:
       - get-go-version
-    uses: ./.github/workflows/windows-reusablegolangci-lint.yml
+    uses: ./.github/workflows/windows-reusable-golangci-lint.yml
     with:
       directory: control-plane
       go-version: ${{ needs.get-go-version.outputs.go-version }}
+      # Use appropriate Windows commands to run the go command if required
+
   test-control-plane:
     needs: [get-go-version, lint-control-plane, golangci-lint-control-plane]
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
       - name: Setup go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ needs.get-go-version.outputs.go-version }}
+
       - name: Setup go mod cache
         uses: actions/cache@v3
         with:
           path: |
-            C:\Users\runneradmin\AppData\Local\go-build
             C:\Users\runneradmin\go\pkg\mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+
       - name: Install gotestsum
         run: |
           wget https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz
-          tar -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz
-          rm gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz
-          move gotestsum.exe C:\Windows\System32
-      - run:  mkdir $env:TEST_RESULTS
-      - run:  $env:HOME\bin >> $env:Path
+          Expand-Archive -Path "gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz" -DestinationPath $HOME
+          Remove-Item "gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz"
+
+      - run:  mkdir -p ${{env.TEST_RESULTS}}
+      - run:  echo "$HOME/bin" >> $env:PATH
+
       - name: Download consul
         working-directory: control-plane
         run: |
-          mkdir $env:HOME\bin
-          docker run -d --name consul-oss $env:CONSUL_OSS_DOCKER_IMAGE
-          docker cp consul-oss:/bin/consul $env:HOME\bin\consul
-          docker stop consul-oss
-          docker rm consul-oss
+          mkdir -p $HOME/bin
+          Invoke-WebRequest -Uri $env:CONSUL_OSS_DOCKER_IMAGE -OutFile $HOME/bin/consul
+          # Use appropriate Windows commands to download and extract the Consul binary
+
       - name: Run go tests
         working-directory: control-plane
         run: |
-          $PACKAGE_NAMES=(go list ./...)
-          gotestsum --format=testname --junitfile $env:TEST_RESULTS\gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
+          $PACKAGE_NAMES = go list ./...
+          gotestsum.exe --format=testname --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -p 4 $PACKAGE_NAMES
+          # Use appropriate Windows commands to run the gotestsum command
+
   test-enterprise-control-plane:
-    if: github.repository_owner == 'hashicorp'
+    if: github.repository_owner == 'hashicorp' # Do not run on forks as this requires secrets
     needs: [get-go-version, lint-control-plane, golangci-lint-control-plane]
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     env:
       CONSUL_LICENSE: ${{secrets.CONSUL_LICENSE}}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
       - name: Setup go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ needs.get-go-version.outputs.go-version }}
+
       - name: Setup go mod cache
         uses: actions/cache@v3
         with:
           path: |
-            C:\Users\runneradmin\AppData\Local\go-build
             C:\Users\runneradmin\go\pkg\mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+
       - name: Install gotestsum
         run: |
           wget https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz
-          tar -xzf gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz
-          rm gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz
-          move gotestsum.exe C:\Windows\System32
-      - run:  mkdir $env:TEST_RESULTS
-      - run:  $env:HOME\bin >> $env:Path
+          Expand-Archive -Path "gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz" -DestinationPath $HOME
+          Remove-Item "gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz"
+
+      - run:  mkdir -p ${{env.TEST_RESULTS}}
+      - run:  echo "$HOME/bin" >> $env:PATH
+
       - name: Download consul
         working-directory: control-plane
         run: |
-          mkdir $env:HOME\bin
-          docker run -d --name consul-ent $env:CONSUL_ENT_DOCKER_IMAGE
-          docker cp consul-ent:/bin/consul $env:HOME\bin\consul
-          docker stop consul-ent
-          docker rm consul-ent
+          mkdir -p $HOME/bin
+          Invoke-WebRequest -Uri $env:CONSUL_ENT_DOCKER_IMAGE -OutFile $HOME/bin/consul
+          # Use appropriate Windows commands to download and extract the Consul binary
+
       - name: Run go tests
         working-directory: control-plane
         run: |
-          $PACKAGE_NAMES=(go list ./...)
-          gotestsum --format=testname --junitfile $env:TEST_RESULTS\gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+          $PACKAGE_NAMES = go list ./...
+          gotestsum.exe --format=testname --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml -- -tags=enterprise -p 4 $PACKAGE_NAMES
+          # Use appropriate Windows commands to run the gotestsum command
+
   build-distros:
     needs: [get-go-version, get-product-version]
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     strategy:
       matrix:
         include:
+          # cli
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          # control-plane
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          # consul-cni
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+
       fail-fast: true
+
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build
     steps:
       - uses: actions/checkout@v3
+
       - name: Setup go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
+
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
@@ -222,49 +266,63 @@ jobs:
           CGO_ENABLED: 0
         working-directory: ${{ matrix.component }}
         run: |
-          New-Item -ItemType Directory -Path dist, out -Force
-          $env:GIT_COMMIT = git rev-parse --short HEAD
-          $env:GIT_DIRTY = if (git status --porcelain) { "+CHANGES" } else { "" }
-          $env:GIT_IMPORT = "github.com/hashicorp/consul-k8s/${{ matrix.component }}/version"
-          $env:GOLDFLAGS = "-X ${env:GIT_IMPORT}.GitCommit=${env:GIT_COMMIT}${env:GIT_DIRTY} -X ${env:GIT_IMPORT}.GitDescribe=${{ needs.get-product-version.outputs.product-version }}"
-          go build -o dist/${{ matrix.bin_name }} -ldflags $env:GOLDFLAGS .
-          Compress-Archive -Path dist -DestinationPath out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          mkdir -p dist out
+
+          $GIT_COMMIT = git rev-parse --short HEAD
+          $GIT_DIRTY = if ((git status --porcelain) -ne $null) { "+CHANGES" } else { "" }
+          $GIT_IMPORT = "github.com/hashicorp/consul-k8s/${{ matrix.component }}/version"
+          $GOLDFLAGS = "-X ${GIT_IMPORT}.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X ${GIT_IMPORT}.GitDescribe=${{ needs.get-product-version.outputs.product-version }}"
+
+          $ENV:CGO_ENABLED = "0"
+          go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" .
+          Compress-Archive -Path dist/ -DestinationPath out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{matrix.goarch }}.zip
+          # Use appropriate Windows commands to compress the built binary
 
       - name: Upload built binaries
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
           path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+
   golangci-lint-acceptance:
     needs:
       - get-go-version
-    uses: ./.github/workflows/windows-reusablegolangci-lint.yml
+    uses: ./.github/workflows/windows-reusable-golangci-lint.yml
     with:
       directory:  acceptance 
-      go-version: ${{ needs.get-go-version.outputs.go-version }} 
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
+      # Use appropriate Windows commands to run the go command if required
+
   unit-acceptance-framework:
     needs: [get-go-version, golangci-lint-acceptance]
-    uses: ./.github/workflows/windows-reusableunit.yml
+    uses: ./.github/workflows/windows-reusable-unit.yml
     with:
       directory: acceptance/framework
       go-version: ${{ needs.get-go-version.outputs.go-version }}
+      # Use appropriate Windows commands to run the go command if required
+
   golangci-lint-cli:
     needs:
       - get-go-version
-    uses: ./.github/workflows/windows-reusablegolangci-lint.yml
+    uses: ./.github/workflows/windows-reusable-golangci-lint.yml
     with:
       directory: cli 
       go-version: ${{ needs.get-go-version.outputs.go-version }}
+      # Use appropriate Windows commands to run the go command if required
+
   unit-cli:
     needs: [get-go-version, golangci-lint-cli]
-    uses: ./.github/workflows/windows-reusableunit.yml
+    uses: ./.github/workflows/windows-reusable-unit.yml
     with:
       directory: cli 
       go-version: ${{ needs.get-go-version.outputs.go-version }}
+      # Use appropriate Windows commands to run the go command if required
+
+  # upload dev docker image
   dev-upload-docker:
-    if: github.repository_owner == 'hashicorp'
+    if: github.repository_owner == 'hashicorp' # Do not run on forks as this requires secrets
     needs: [ get-product-version, build-distros ]
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
     strategy:
       matrix:
         arch: ["amd64"]
@@ -285,19 +343,27 @@ jobs:
         env:
           ZIP_LOCATION: control-plane/dist/cni/windows/${{ matrix.arch }}
         run: |
-          Expand-Archive -Path $env:ZIP_LOCATION\*.zip -DestinationPath $env:ZIP_LOCATION
+          cd "${ZIP_LOCATION}"
+          Expand-Archive -Path *.zip
+          # Use appropriate Windows commands to extract the zip file
+
       - name: extract control-plane zip
         env:
           ZIP_LOCATION: control-plane/dist/windows/${{ matrix.arch }}
         run: |
-          Expand-Archive -Path $env:ZIP_LOCATION\*.zip -DestinationPath $env:ZIP_LOCATION
+          cd "${ZIP_LOCATION}"
+          Expand-Archive -Path *.zip
+          # Use appropriate Windows commands to extract the zip file
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASS }}
+
       - name: Docker Build (Action)
         uses: docker/build-push-action@v3
         with:
@@ -306,3 +372,5 @@ jobs:
           platforms: ${{ matrix.arch }}
           target: release-default
           tags: docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-pr-${{ github.sha }}
+          # Use appropriate Windows commands to build and push the Docker image
+

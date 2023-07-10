@@ -1,4 +1,4 @@
-name: reusable-unit-windows
+name: windows-reusable-unit
 
 on:
   workflow_call:
@@ -12,17 +12,17 @@ on:
 
 # Environment variables can only be used at the step level
 env:
-  TEST_RESULTS: /tmp/test-results # path to where test results are saved
+  TEST_RESULTS: C:\tmp\test-results # path to where test results are saved
   GOTESTSUM_VERSION: 1.8.2
 
 jobs:
   job:
-    runs-on: 'windows-2019'
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      
+
       - name: Setup go
         uses: actions/setup-go@v2
         with:
@@ -32,27 +32,24 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            ${{ runner.userprofile }}\go\pkg\mod
+            C:\Users\runneradmin\go\pkg\mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
       - name: Install gotestsum
         run: |
-          Invoke-WebRequest -Uri https://github.com/gotestyourself/gotestsum/releases/download/v%GOTESTSUM_VERSION%/gotestsum_%GOTESTSUM_VERSION%_windows_amd64.tar.gz -OutFile gotestsum.tar.gz
-          tar -xf gotestsum.tar.gz
-          Remove-Item gotestsum.tar.gz
-          Add-Content -Path $env:GITHUB_PATH -Value "$PWD\gotestsum.exe"
+          Invoke-WebRequest -Uri "https://github.com/gotestyourself/gotestsum/releases/download/v${{env.GOTESTSUM_VERSION}}/gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz" -OutFile "gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz"
+          Expand-Archive -Path "gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz" -DestinationPath $HOME
+          Remove-Item "gotestsum_${{env.GOTESTSUM_VERSION}}_windows_amd64.tar.gz"
 
-      - name: Create test results directory
-        run: |
-          mkdir -p $env:TEST_RESULTS
+      - run: mkdir -p ${{env.TEST_RESULTS}}
 
-      - name: Go mod download
+      - name: go mod download
         working-directory: ${{inputs.directory}}
         run: go mod download
 
       - name: Run tests
         working-directory: ${{inputs.directory}}
         run: |
-          $PWD\gotestsum.exe --format=testname --junitfile $env:TEST_RESULTS/gotestsum-report.xml ./... -- -p 4
+          gotestsum.exe --format=testname --junitfile ${{env.TEST_RESULTS}}/gotestsum-report.xml ./... -- -p 4
