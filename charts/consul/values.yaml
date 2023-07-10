@@ -289,7 +289,7 @@ global:
     # The key within the Kubernetes secret or Vault secret key that holds the gossip
     # encryption key.
     secretKey: ""
-    # Override global log verbosity level for gossip-encryption-autogenerate-job pods. One of "debug", "info", "warn", or "error".
+    # Override global log verbosity level for gossip-encryption-autogenerate-job pods. One of "trace", "debug", "info", "warn", or "error".
     # @type: string
     logLevel: ""
 
@@ -553,7 +553,7 @@ global:
     # @type: string
     k8sAuthMethodHost: null
 
-    # Override global log verbosity level for the create-federation-secret-job pods. One of "debug", "info", "warn", or "error".
+    # Override global log verbosity level for the create-federation-secret-job pods. One of "trace", "debug", "info", "warn", or "error".
     # @type: string
     logLevel: ""
 
@@ -710,7 +710,7 @@ server:
   # @type: boolean
   enabled: "-"
 
-  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2615,7 +2615,7 @@ meshGateway:
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
-  # Override global log verbosity level for mesh-gateway-deployment pods. One of "debug", "info", "warn", or "error".
+  # Override global log verbosity level for mesh-gateway-deployment pods. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2831,7 +2831,7 @@ ingressGateways:
   # Enable ingress gateway deployment. Requires `connectInject.enabled=true`.
   enabled: false
 
-  # Override global log verbosity level for ingress-gateways-deployment pods. One of "debug", "info", "warn", or "error".
+  # Override global log verbosity level for ingress-gateways-deployment pods. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -3001,7 +3001,7 @@ terminatingGateways:
   # Enable terminating gateway deployment. Requires `connectInject.enabled=true`.
   enabled: false
 
-  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -3343,7 +3343,7 @@ telemetryCollector:
   # @type: boolean
   enabled: false
 
-  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 

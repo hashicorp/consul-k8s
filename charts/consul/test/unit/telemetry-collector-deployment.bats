@@ -1104,3 +1104,30 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
     yq 'any(contains("-log-level=warn"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "telemetryCollector/Deployment: use global.logLevel by default for dataplane container" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "telemetryCollector/Deployment: override global.logLevel when telemetryCollector.logLevel is set for dataplane container" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

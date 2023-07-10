@@ -1676,3 +1676,32 @@ key2: value2' \
     yq 'any(contains("-log-level=warn"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "meshGateway/Deployment: use global.logLevel by default for dataplane container" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "meshGateway/Deployment: override global.logLevel when meshGateway.logLevel is set for dataplane container" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'meshGateway.logLevel=warn' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=warn"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

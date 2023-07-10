@@ -1536,3 +1536,32 @@ key2: value2' \
     yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "terminatingGateways/Deployment: use global.logLevel by default for dataplane container" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: override global.logLevel when terminatingGateways.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.logLevel=debug' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
