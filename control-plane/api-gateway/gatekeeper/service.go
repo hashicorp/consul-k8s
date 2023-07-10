@@ -43,11 +43,11 @@ func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gatewa
 
 	switch result {
 	case controllerutil.OperationResultCreated:
-		g.Log.Info("Created Service")
+		g.Log.V(1).Info("Created Service")
 	case controllerutil.OperationResultUpdated:
-		g.Log.Info("Updated Service")
+		g.Log.V(1).Info("Updated Service")
 	case controllerutil.OperationResultNone:
-		g.Log.Info("No change to service")
+		g.Log.V(1).Info("No change to service")
 	}
 
 	return nil

@@ -37,7 +37,7 @@ type GatewayClassConfigController struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gatewayClassConfig", req.NamespacedName.Name)
-	log.Info("Reconciling GatewayClassConfig ")
+	log.V(1).Info("Reconciling GatewayClassConfig ")
 
 	gcc := &v1alpha1.GatewayClassConfig{}
 	if err := r.Client.Get(ctx, req.NamespacedName, gcc); err != nil {
@@ -62,6 +62,10 @@ func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.R
 		}
 		// gcc is no longer in use.
 		if _, err := RemoveFinalizer(ctx, r.Client, gcc, gatewayClassConfigFinalizer); err != nil {
+			if isModifiedError(err) {
+				r.Log.V(1).Info("error removing gateway class config finalizer, will try to re-reconcile")
+				return ctrl.Result{}, nil
+			}
 			r.Log.Error(err, "error removing gateway class config finalizer")
 			return ctrl.Result{}, err
 		}
@@ -69,6 +73,11 @@ func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if _, err := EnsureFinalizer(ctx, r.Client, gcc, gatewayClassConfigFinalizer); err != nil {
+		if isModifiedError(err) {
+			r.Log.V(1).Info("error adding gateway class config finalizer, will try to re-reconcile")
+
+			return ctrl.Result{}, nil
+		}
 		r.Log.Error(err, "error adding gateway class config finalizer")
 		return ctrl.Result{}, err
 	}
