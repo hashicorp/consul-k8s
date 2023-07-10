@@ -15,7 +15,6 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
 )
 
 func init() {
@@ -2331,7 +2331,7 @@ func controlledBinder(config BinderConfig) BinderConfig {
 }
 
 func generateTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	privateKey, err := rsa.GenerateKey(rand.Reader, common.MinKeyLength)
 	require.NoError(t, err)
 
 	usage := x509.KeyUsageCertSign

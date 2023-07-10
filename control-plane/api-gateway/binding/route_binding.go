@@ -457,7 +457,7 @@ func consulCondition(generation int64, status api.ConfigEntryStatus) *metav1.Con
 	for _, c := range status.Conditions {
 		// we only care about the top-level status that isn't in reference
 		// to a resource.
-		if c.Type == "Accepted" && c.Resource.Name == "" {
+		if c.Type == "Accepted" && (c.Resource == nil || c.Resource.Name == "") {
 			return &metav1.Condition{
 				Type:               "ConsulAccepted",
 				Reason:             c.Reason,
