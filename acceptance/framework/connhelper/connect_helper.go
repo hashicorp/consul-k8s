@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package connhelper
 
 import (
@@ -91,7 +94,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		// deployments because golang will execute them in reverse order
 		// (i.e. the last registered cleanup function will be executed first).
 		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 60 * time.Second, Wait: 100 * time.Millisecond}
+			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
 				require.NoError(r, err)
@@ -114,17 +117,31 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
+	retry.RunWith(
+		&retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}, t,
+		func(r *retry.R) {
+			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
+				podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+					LabelSelector: labelSelector,
+					FieldSelector: `status.phase=Running`,
+				})
+				require.NoError(r, err)
+				require.Len(r, podList.Items, 1)
+				require.Len(r, podList.Items[0].Spec.Containers, 2)
+			}
+		})
+}
 
-	retrier := &retry.Timer{Timeout: 300 * time.Second, Wait: 100 * time.Millisecond}
-	retry.RunWith(retrier, t, func(r *retry.R) {
-		for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-			podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: labelSelector,
-			})
-			require.NoError(t, err)
-			require.Len(t, podList.Items, 1)
-			require.Len(t, podList.Items[0].Spec.Containers, 2)
-		}
+// CreateResolverRedirect creates a resolver that redirects to a static-server, a corresponding k8s service,
+// and intentions. This helper is primarly used to ensure that the virtual-ips are persisted to consul properly.
+func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
+	logger.Log(t, "creating resolver redirect")
+	options := c.Ctx.KubectlOptions(t)
+	kustomizeDir := "../fixtures/cases/resolver-redirect-virtualip"
+	k8s.KubectlApplyK(t, options, kustomizeDir)
+
+	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
+		k8s.KubectlDeleteK(t, options, kustomizeDir)
 	})
 }
 
