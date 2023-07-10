@@ -8,8 +8,5 @@ import (
 )
 
 func isModifiedError(err error) bool {
-	if strings.Contains(err.Error(), "the object has been modified") {
-		return true
-	}
-	return false
+	return strings.Contains(err.Error(), "the object has been modified")
 }
