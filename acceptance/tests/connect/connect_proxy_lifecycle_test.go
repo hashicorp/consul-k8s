@@ -33,7 +33,6 @@ const (
 
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
-	t.Skipf("skiping this test, will be re-added in a future commit")
 	cfg := suite.Config()
 
 	for _, testCfg := range []LifecycleShutdownConfig{
