@@ -100,7 +100,7 @@ spec:
                 {{- range .Values.global.tls.serverAdditionalDNSSANs }}
                 -additional-dnsname={{ . }} \
                 {{- end }}
-                -dc={{ .Values.global.datacenter }}
+                -dc={{ lower .Values.global.datacenter }}
           {{- if (and .Values.global.tls.caCert.secretName .Values.global.tls.caKey.secretName) }}
           volumeMounts:
             - name: consul-ca-cert

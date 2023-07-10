@@ -84,7 +84,7 @@ spec:
           value: "/consul/login/acl-token"
           # CONSUL_LOGIN_DATACENTER is passed to the gateway that gets created. The controller does not use this to log in
         - name: CONSUL_LOGIN_DATACENTER
-          value: {{ .Values.global.datacenter }}
+          value: {{ (lower .Values.global.datacenter) }}
         {{- end }}
         - name: CONSUL_HTTP_ADDR
           {{- if .Values.client.enabled }}
@@ -154,7 +154,7 @@ spec:
             {{- end }}
             {{- end }}
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-            -primary-datacenter={{ .Values.global.federation.primaryDatacenter }} \
+            -primary-datacenter={{ (lower .Values.global.federation.primaryDatacenter) }} \
             {{- end }}
             -log-level {{ default .Values.global.logLevel .Values.apiGateway.logLevel }} \
             -log-json={{ .Values.global.logJSON }}
@@ -250,9 +250,9 @@ spec:
           value: "component=api-gateway-controller,pod=$(NAMESPACE)/$(POD_NAME)"
         - name: CONSUL_LOGIN_DATACENTER
         {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-          value: {{ .Values.global.federation.primaryDatacenter }}
+          value: {{ (lower .Values.global.federation.primaryDatacenter) }}
         {{- else }}
-          value: {{ .Values.global.datacenter }}
+          value: {{ (lower .Values.global.datacenter) }}
         {{- end}}
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         image: {{ .Values.global.imageK8S }}

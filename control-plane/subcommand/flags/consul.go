@@ -244,7 +244,7 @@ func (f *ConsulFlags) ConsulClientConfig() *consul.Config {
 	cfg := &api.Config{
 		Namespace:  f.Namespace,
 		Partition:  f.Partition,
-		Datacenter: f.Datacenter,
+		Datacenter: strings.ToLower(f.Datacenter),
 		Scheme:     "http",
 	}
 

@@ -197,7 +197,7 @@ spec:
         - name: CONSUL_LOGIN_AUTH_METHOD
           value: {{ template "consul.fullname" $root }}-k8s-component-auth-method
         - name: CONSUL_LOGIN_DATACENTER
-          value: {{ $root.Values.global.datacenter }}
+          value: {{ (lower $root.Values.global.datacenter) }}
         - name: CONSUL_LOGIN_META
           value: "component=ingress-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
        {{- end }}

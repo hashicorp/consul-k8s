@@ -366,7 +366,7 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
-                -datacenter={{ .Values.global.datacenter }} \
+                -datacenter={{ (lower .Values.global.datacenter) }} \
                 -data-dir=/consul/data \
                 {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
                 -encrypt="${GOSSIP_KEY}" \
@@ -511,9 +511,9 @@ spec:
         {{- end }}
         - name: CONSUL_LOGIN_DATACENTER
         {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-          value: {{ .Values.global.federation.primaryDatacenter }}
+          value: {{ lower .Values.global.federation.primaryDatacenter }}
         {{- else }}
-          value: {{ .Values.global.datacenter }}
+          value: {{ lower .Values.global.datacenter }}
         {{- end}}
         command:
           - "/bin/sh"

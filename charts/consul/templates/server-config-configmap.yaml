@@ -25,7 +25,7 @@ data:
       "connect": {
         "enabled": {{ .Values.server.connect }}
       },
-      "datacenter": "{{ .Values.global.datacenter }}",
+      "datacenter": "{{ lower .Values.global.datacenter }}",
       "data_dir": "/consul/data",
       "domain": "{{ .Values.global.domain }}",
       "limits": {
@@ -172,7 +172,7 @@ data:
   {{- if .Values.global.federation.enabled }}
   federation-config.json: |-
     {
-      "primary_datacenter": "{{ .Values.global.federation.primaryDatacenter }}",
+      "primary_datacenter": "{{ lower .Values.global.federation.primaryDatacenter }}",
       "primary_gateways": {{ .Values.global.federation.primaryGateways | toJson }},
       "connect": {
         "enable_mesh_gateway_wan_federation": true
