@@ -77,10 +77,10 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		// Remove our finalizer.
 		if _, err := RemoveFinalizer(ctx, r.Client, gc, gatewayClassFinalizer); err != nil {
-			if isModifiedError(err) {
-				r.Log.V(1).Info("error removing finalizer, will try to re-reconcile")
+			if k8serrors.IsConflict(err) {
+				log.V(1).Info("error removing finalizer for gatewayClass, will try to re-reconcile")
 
-				return ctrl.Result{}, nil
+				return ctrl.Result{Requeue: true}, nil
 			}
 			log.Error(err, "unable to remove finalizer")
 			return ctrl.Result{}, err
@@ -91,10 +91,10 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 	// We are creating or updating the GatewayClass.
 	didUpdate, err := EnsureFinalizer(ctx, r.Client, gc, gatewayClassFinalizer)
 	if err != nil {
-		if isModifiedError(err) {
-			r.Log.V(1).Info("error adding finalizer, will try to re-reconcile")
+		if k8serrors.IsConflict(err) {
+			log.V(1).Info("error adding finalizer for gatewayClass, will try to re-reconcile")
 
-			return ctrl.Result{}, nil
+			return ctrl.Result{Requeue: true}, nil
 		}
 		log.Error(err, "unable to add finalizer")
 		return ctrl.Result{}, err
@@ -107,10 +107,10 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 	didUpdate, err = r.validateParametersRef(ctx, gc, log)
 	if didUpdate {
 		if err := r.Client.Status().Update(ctx, gc); err != nil {
-			if isModifiedError(err) {
-				r.Log.V(1).Info("error updating status, will try to re-reconcile")
+			if k8serrors.IsConflict(err) {
+				log.V(1).Info("error updating status for gatewayClass, will try to re-reconcile")
 
-				return ctrl.Result{}, nil
+				return ctrl.Result{Requeue: true}, nil
 			}
 			log.Error(err, "unable to update status for GatewayClass")
 			return ctrl.Result{}, err
