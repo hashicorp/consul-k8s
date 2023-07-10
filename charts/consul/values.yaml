@@ -805,11 +805,11 @@ server:
   # @type: string
   storageClass: null
 
-  # This will enable/disable [Connect](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
+  # This will enable/disable [service mesh](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
   # _will not_ automatically secure pod communication, this
   # setting will only enable usage of the feature. Consul will automatically initialize
-  # a new CA and set of certificates. Additional Connect settings can be configured
-  # by setting the `server.extraConfig` value.
+  # a new CA and set of certificates. Additional service mesh settings can be configured
+  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries). 
   connect: true
 
   serviceAccount:
@@ -1611,7 +1611,7 @@ dns:
   # @type: boolean
   enabled: "-"
 
-  # If true, services using Consul Connect will use Consul DNS
+  # If true, services using Consul service mesh will use Consul DNS
   # for default DNS resolution. The DNS lookups fall back to the nameserver IPs
   # listed in /etc/resolv.conf if not found in Consul.
   # @type: boolean
@@ -2264,7 +2264,7 @@ connectInject:
     # @type: map
     meta: null
 
-  # Configures metrics for Consul Connect services. All values are overridable
+  # Configures metrics for Consul service mesh services. All values are overridable
   # via annotations on a per-pod basis.
   metrics:
     # If true, the connect-injector will automatically
@@ -2414,7 +2414,7 @@ connectInject:
   # annotated. Use `["*"]` to automatically allow all k8s namespaces.
   #
   # For example, `["namespace1", "namespace2"]` will only allow pods in the k8s
-  # namespaces `namespace1` and `namespace2` to have Connect sidecars injected
+  # namespaces `namespace1` and `namespace2` to have Consul service mesh sidecars injected
   # and registered with Consul. All other k8s namespaces will be ignored.
   #
   # To deny all namespaces, set this to `[]`.
@@ -2599,7 +2599,7 @@ connectInject:
 # [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
 meshGateway:
   # If [mesh gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
-  # gateways and Consul Connect will be configured to use gateways.
+  # gateways and Consul service mesh will be configured to use gateways.
   # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
