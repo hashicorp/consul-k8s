@@ -47,9 +47,16 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        {{- if .Values.global.acls.annotations }}
+          {{- tpl .Values.global.acls.annotations . | nindent 8 }}
+        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init-cleanup
+      {{- if .Values.server.containerSecurityContext.aclInit }}
+      securityContext:
+        {{- toYaml .Values.server.containerSecurityContext.aclInit | nindent 8 }}
+      {{- end }}
       containers:
         - name: server-acl-init-cleanup
           image: {{ .Values.global.imageK8S }}

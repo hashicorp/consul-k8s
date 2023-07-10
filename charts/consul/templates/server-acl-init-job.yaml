@@ -46,6 +46,9 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        {{- if .Values.global.acls.annotations }}
+          {{- tpl .Values.global.acls.annotations . | nindent 8 }}
+        {{- end }}
         {{- if .Values.global.secretsBackend.vault.enabled }}
 
         {{- /* Run the Vault agent as both an init container and sidecar.
@@ -94,6 +97,10 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init
+      {{- if .Values.server.containerSecurityContext.aclInit }}
+      securityContext:
+        {{- toYaml .Values.server.containerSecurityContext.aclInit | nindent 8 }}
+      {{- end }}
       {{- if (or .Values.global.tls.enabled .Values.global.acls.replicationToken.secretName .Values.global.acls.bootstrapToken.secretName) }}
       volumes:
       {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
