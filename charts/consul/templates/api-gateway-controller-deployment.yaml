@@ -57,7 +57,6 @@ spec:
       containers:
       - name: api-gateway-controller
         image: {{ .Values.apiGateway.image }}
-        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         ports:
         - containerPort: 9090
           name: sds
@@ -220,7 +219,6 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: copy-consul-bin
         image: {{ .Values.global.image | quote }}
-        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         command:
         - cp
         - /bin/consul
@@ -258,7 +256,6 @@ spec:
         {{- end}}
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         image: {{ .Values.global.imageK8S }}
-        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         volumeMounts:
         - mountPath: /consul/login
           name: consul-data

@@ -1,0 +1,9 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+- {runner: 0, test-packages: "partitions"}
+- {runner: 1, test-packages: "peering"}
+- {runner: 2, test-packages: "connect snapshot-agent wan-federation"}
+- {runner: 3, test-packages: "cli vault metrics"}
+- {runner: 4, test-packages: "api-gateway ingress-gateway sync example consul-dns"}
+- {runner: 5, test-packages: "config-entries terminating-gateway basic"}

@@ -999,7 +999,7 @@ load _helpers
   local actual=$(echo "$cmd" |
     yq 'any(contains("-init-container-memory-limit=150Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-  
+
 }
 
 @test "connectInject/Deployment: can set init container resources" {
@@ -1232,6 +1232,144 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# sidecarProxy.lifecycle
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-enable-sidecar-proxy-lifecycle"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management can be disabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultEnabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-enable-sidecar-proxy-lifecycle=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management shutdown listener draining is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management shutdown listener draining can be disabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultEnableShutdownDrainListeners=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management shutdown grace period is set to 30 seconds" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds=30"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management shutdown grace period can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=23' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds=23"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management port is set to 20600" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-port=20600"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management port can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultGracefulPort=20307' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-port=20307"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management graceful shutdown path is set to /graceful_shutdown" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-shutdown-path=\"/graceful_shutdown\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management graceful shutdown path can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultGracefulShutdownPath=/exit' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-shutdown-path=\"/exit\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # priorityClassName
 
 @test "connectInject/Deployment: no priorityClassName by default" {
@@ -1418,7 +1556,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# cni 
+# cni
 
 @test "connectInject/Deployment: cni is disabled by default" {
   cd `chart_dir`
@@ -2300,7 +2438,7 @@ reservedNameTest() {
       --set 'global.cloud.authUrl.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -2321,7 +2459,7 @@ reservedNameTest() {
       --set 'global.cloud.authUrl.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -2342,7 +2480,7 @@ reservedNameTest() {
       --set 'global.cloud.apiHost.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -2363,7 +2501,7 @@ reservedNameTest() {
       --set 'global.cloud.apiHost.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -2384,7 +2522,7 @@ reservedNameTest() {
       --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -2405,7 +2543,7 @@ reservedNameTest() {
       --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -2449,4 +2587,3 @@ reservedNameTest() {
     jq -r '. | select( .name == "CONSUL_TLS_SERVER_NAME").value' | tee /dev/stderr)
   [ "${actual}" = "server.dc1.consul" ]
 }
-
