@@ -282,7 +282,7 @@ jobs:
           name: consul-k8s-control-plane_${{ needs.get-product-version.outputs.product-version }}_windows_${{ matrix.arch }}.zip
           path: control-plane/dist/windows/${{ matrix.arch }}
       - name: extract consul-cni zip
-       env:
+        env:
           ZIP_LOCATION: control-plane/dist/cni/windows/${{ matrix.arch }}
         run: |
           Expand-Archive -Path $env:ZIP_LOCATION\*.zip -DestinationPath $env:ZIP_LOCATION
