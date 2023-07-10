@@ -73,7 +73,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var gateway gwv1beta1.Gateway
 
 	log := r.Log.WithValues("gateway", req.NamespacedName)
-	log.Info("Reconciling Gateway")
+	log.V(1).Info("Reconciling Gateway")
 
 	// get the gateway
 	if err := r.Client.Get(ctx, req.NamespacedName, &gateway); err != nil {
@@ -199,6 +199,11 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
+			if isModifiedError(err) {
+				r.Log.V(1).Info("error updating object, will try to re-reconcile")
+
+				return ctrl.Result{}, nil
+			}
 			log.Error(err, "unable to update gateway resources")
 			return ctrl.Result{}, err
 		}
@@ -206,11 +211,16 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	} else {
 		err := r.deleteGatekeeperResources(ctx, log, &gateway)
 		if err != nil {
+			if isModifiedError(err) {
+				r.Log.V(1).Info("error updating object, will try to re-reconcile")
+
+				return ctrl.Result{}, nil
+			}
 			log.Error(err, "unable to delete gateway resources")
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.RemoveSubscription(nonNormalizedConsulKey)
-		// make sure we have deregister all services even if they haven't
+		// make sure we have deregistered all services even if they haven't
 		// hit cache yet
 		if err := r.deregisterAllServices(ctx, nonNormalizedConsulKey); err != nil {
 			log.Error(err, "error deregistering services")
@@ -219,7 +229,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
-		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
+		log.V(1).Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
 		if err := r.cache.Delete(ctx, deletion); err != nil {
 			log.Error(err, "error deleting config entry")
 			return ctrl.Result{}, err
@@ -228,7 +238,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	for _, update := range updates.Consul.Updates {
 		entry := update.Entry
-		log.Info("updating in Consul", "kind", entry.GetKind(), "namespace", entry.GetNamespace(), "name", entry.GetName())
+		log.V(1).Info("updating in Consul", "kind", entry.GetKind(), "namespace", entry.GetNamespace(), "name", entry.GetName())
 		err := r.cache.Write(ctx, entry)
 		if update.OnUpdate != nil {
 			// swallow any potential error with our handler if one is provided
@@ -247,7 +257,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// otherwise, we've already deregistered everything related to the gateway, so
 		// no need to do any of the following.
 		for _, registration := range updates.Consul.Registrations {
-			log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
+			log.V(1).Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
 			if err := r.cache.Register(ctx, registration); err != nil {
 				log.Error(err, "error registering service")
 				return ctrl.Result{}, err
@@ -255,7 +265,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		for _, deregistration := range updates.Consul.Deregistrations {
-			log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
+			log.V(1).Info("deregistering service in Consul", "id", deregistration.ServiceID)
 			if err := r.cache.Deregister(ctx, deregistration); err != nil {
 				log.Error(err, "error deregistering service")
 				return ctrl.Result{}, err
@@ -264,7 +274,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	for _, update := range updates.Kubernetes.Updates.Operations() {
-		log.Info("update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
+		log.V(1).Info("update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.updateAndResetStatus(ctx, update); err != nil {
 			log.Error(err, "error updating object")
 			return ctrl.Result{}, err
@@ -272,8 +282,13 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	for _, update := range updates.Kubernetes.StatusUpdates.Operations() {
-		log.Info("update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
+		log.V(1).Info("update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.Client.Status().Update(ctx, update); err != nil {
+			if isModifiedError(err) {
+				r.Log.V(1).Info("error updating status, will try to re-reconcile")
+
+				return ctrl.Result{}, nil
+			}
 			log.Error(err, "error updating status")
 			return ctrl.Result{}, err
 		}
@@ -303,8 +318,14 @@ func (r *GatewayController) updateAndResetStatus(ctx context.Context, o client.O
 	// we create a copy so that we can re-update its status if need be
 	status := reflect.ValueOf(o.DeepCopyObject()).Elem().FieldByName("Status")
 	if err := r.Client.Update(ctx, o); err != nil {
+		if isModifiedError(err) {
+			r.Log.V(1).Info("error updating object, will try to re-reconcile")
+
+			return nil
+		}
 		return err
 	}
+
 	// reset the status in case it needs to be updated below
 	reflect.ValueOf(o).Elem().FieldByName("Status").Set(status)
 	return nil
