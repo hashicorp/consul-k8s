@@ -315,42 +315,37 @@ func (c *Command) createOrUpdateACLPolicy(policy api.ACLPolicy, consulClient *ap
 	// Allowing the Consul node name to be configurable also requires any sync
 	// policy to be updated in case the node name has changed.
 	if isPolicyExistsErr(err, policy.Name) {
-		if c.flagEnableNamespaces || c.flagSyncCatalog {
-			c.log.Info(fmt.Sprintf("Policy %q already exists, updating", policy.Name))
+		c.log.Info(fmt.Sprintf("Policy %q already exists, updating", policy.Name))
 
-			// The policy ID is required in any PolicyUpdate call, so first we need to
-			// get the existing policy to extract its ID.
-			existingPolicies, _, err := consulClient.ACL().PolicyList(&api.QueryOptions{})
-			if err != nil {
-				return err
-			}
-
-			// Find the policy that matches our name and description
-			// and that's the ID we need
-			for _, existingPolicy := range existingPolicies {
-				if existingPolicy.Name == policy.Name && existingPolicy.Description == policy.Description {
-					policy.ID = existingPolicy.ID
-				}
-			}
-
-			// This shouldn't happen, because we're looking for a policy
-			// only after we've hit a `Policy already exists` error.
-			// The only time it might happen is if a user has manually created a policy
-			// with this name but used a different description. In this case,
-			// we don't want to overwrite the policy so we just error.
-			if policy.ID == "" {
-				return fmt.Errorf("policy found with name %q but not with expected description %q; "+
-					"if this policy was created manually it must be renamed to something else because this name is reserved by consul-k8s",
-					policy.Name, policy.Description)
-			}
-
-			// Update the policy now that we've found its ID
-			_, _, err = consulClient.ACL().PolicyUpdate(&policy, &api.WriteOptions{})
+		// The policy ID is required in any PolicyUpdate call, so first we need to
+		// get the existing policy to extract its ID.
+		existingPolicies, _, err := consulClient.ACL().PolicyList(&api.QueryOptions{})
+		if err != nil {
 			return err
-		} else {
-			c.log.Info(fmt.Sprintf("Policy %q already exists, skipping update", policy.Name))
-			return nil
 		}
+
+		// Find the policy that matches our name and description
+		// and that's the ID we need
+		for _, existingPolicy := range existingPolicies {
+			if existingPolicy.Name == policy.Name && existingPolicy.Description == policy.Description {
+				policy.ID = existingPolicy.ID
+			}
+		}
+
+		// This shouldn't happen, because we're looking for a policy
+		// only after we've hit a `Policy already exists` error.
+		// The only time it might happen is if a user has manually created a policy
+		// with this name but used a different description. In this case,
+		// we don't want to overwrite the policy so we just error.
+		if policy.ID == "" {
+			return fmt.Errorf("policy found with name %q but not with expected description %q; "+
+				"if this policy was created manually it must be renamed to something else because this name is reserved by consul-k8s",
+				policy.Name, policy.Description)
+		}
+
+		// Update the policy now that we've found its ID
+		_, _, err = consulClient.ACL().PolicyUpdate(&policy, &api.WriteOptions{})
+		return err
 	}
 	return err
 }

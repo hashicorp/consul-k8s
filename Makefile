@@ -1,6 +1,10 @@
 VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
 CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
+CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
 CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-dataplane-version.sh charts/consul/values.yaml)
+KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindVersion)
+KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
+KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
 
 # ===========> Helm Targets
 
@@ -43,6 +47,17 @@ control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-
 	@docker buildx create --use && docker buildx build -t '$(REMOTE_DEV_IMAGE)' \
        --platform linux/amd64,linux/arm64 \
        --target=dev \
+       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
+       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
+       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       --push \
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+
+control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker image.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH) --fips
+	@docker build -t '$(DEV_IMAGE)' \
+       --target=dev \
+       --build-arg 'TARGETARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
@@ -93,11 +108,13 @@ terraform-fmt:
 
 
 # ===========> CLI Targets
-
 cli-dev:
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
 
+cli-fips-dev:
+	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
+	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
 
 cli-lint: ## Run linter in the control-plane directory.
 	cd cli; golangci-lint run -c ../.golangci.yml
@@ -165,8 +182,32 @@ version:
 consul-version:
 	@echo $(CONSUL_IMAGE_VERSION)
 
+consul-enterprise-version:
+	@echo $(CONSUL_ENTERPRISE_IMAGE_VERSION)
+
 consul-dataplane-version:
 	@echo $(CONSUL_DATAPLANE_IMAGE_VERSION)
+
+kind-version:
+	@echo $(KIND_VERSION)
+
+kind-node-image:
+	@echo $(KIND_NODE_IMAGE)
+
+kubectl-version:
+	@echo $(KUBECTL_VERSION)
+
+kind-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/kind_acceptance_test_packages.yaml"
+
+gke-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/gke_acceptance_test_packages.yaml"
+
+eks-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/eks_acceptance_test_packages.yaml"
+
+aks-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
 
 
 # ===========> Release Targets

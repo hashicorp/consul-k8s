@@ -234,6 +234,19 @@ spec:
                 -default-sidecar-proxy-cpu-request={{ $resources.requests.cpu }} \
                 {{- end }}
                 -default-envoy-proxy-concurrency={{ .Values.connectInject.sidecarProxy.concurrency }} \
+                {{- if .Values.connectInject.sidecarProxy.lifecycle.defaultEnabled }}
+                -default-enable-sidecar-proxy-lifecycle=true \
+                {{- else }}
+                -default-enable-sidecar-proxy-lifecycle=false \
+                {{- end }}
+                {{- if .Values.connectInject.sidecarProxy.lifecycle.defaultEnableShutdownDrainListeners }}
+                -default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners=true \
+                {{- else }}
+                -default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners=false \
+                {{- end }}
+                -default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds={{ .Values.connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds }} \
+                -default-sidecar-proxy-lifecycle-graceful-port={{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulPort }} \
+                -default-sidecar-proxy-lifecycle-graceful-shutdown-path="{{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulShutdownPath }}" \
 
                 {{- if .Values.connectInject.initContainer }}
                 {{- $initResources := .Values.connectInject.initContainer.resources }}

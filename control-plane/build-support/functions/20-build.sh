@@ -180,13 +180,21 @@ function build_consul_local {
    #   * - error
    #
    # Note:
-   #   The GOLDFLAGS and GOTAGS environment variables will be used if set
+   #   The GOLDFLAGS, GOEXPERIMENT, and GOTAGS environment variables will be used if set
    #   If the CONSUL_DEV environment var is truthy only the local platform/architecture is built.
    #   If the XC_OS or the XC_ARCH environment vars are present then only those platforms/architectures
    #   will be built. Otherwise all supported platform/architectures are built
    #   The NOGOX environment variable will be used if present. This will prevent using gox and instead
    #   build with go install.
    #   The GOXPARALLEL environment variable is used if set
+
+   if [ "${GOTAGS:-}" == "fips" ]; then
+     CGO_ENABLED=1
+   else
+     CGO_ENABLED=0
+   fi
+
+   echo "GOEXPERIMENT: $GOEXPERIMENT, GOTAGS: $GOTAGS CGO_ENABLED: $CGO_ENABLED" >> ~/debug.txt
 
    if ! test -d "$1"
    then
@@ -242,7 +250,7 @@ function build_consul_local {
    then
       status "Using gox for concurrent compilation"
 
-      CGO_ENABLED=0 gox \
+      CGO_ENABLED=${CGO_ENABLED} GOEXPERIMENT=${GOEXPERIMENT} gox \
          -os="${build_os}" \
          -arch="${build_arch}" \
          -ldflags="${GOLDFLAGS}" \
@@ -290,7 +298,7 @@ function build_consul_local {
             else
               OS_BIN_EXTENSION=""
             fi
-            CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go build -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" -o "${outdir}/${bin_name}"
+            CGO_ENABLED=${CGO_ENABLED} GOEXPERIMENT=${GOEXPERIMENT} GOOS=${os} GOARCH=${arch} go build -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" -o "${outdir}/${bin_name}"
             if test $? -ne 0
             then
                err "ERROR: Failed to build Consul for ${osarch}"

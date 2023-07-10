@@ -234,6 +234,11 @@ func TestBinder_Lifecycle(t *testing.T) {
 									Reason:  "Accepted",
 									Message: "listener accepted",
 								}, {
+									Type:    "Programmed",
+									Status:  metav1.ConditionTrue,
+									Reason:  "Programmed",
+									Message: "listener programmed",
+								}, {
 									Type:    "Conflicted",
 									Status:  metav1.ConditionFalse,
 									Reason:  "NoConflicts",
@@ -803,6 +808,29 @@ func TestBinder_Registrations(t *testing.T) {
 					{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
 					{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
 					{Node: "test", ServiceID: "pod3", Namespace: "namespace1"},
+				},
+				Pods: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod2"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod3"},
+						Status: corev1.PodStatus{
+							Phase:      corev1.PodRunning,
+							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
+						},
+					},
 				},
 			}),
 			expectedDeregistrations: []api.CatalogDeregistration{
@@ -2303,7 +2331,7 @@ func controlledBinder(config BinderConfig) BinderConfig {
 }
 
 func generateTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	privateKey, err := rsa.GenerateKey(rand.Reader, common.MinKeyLength)
 	require.NoError(t, err)
 
 	usage := x509.KeyUsageCertSign

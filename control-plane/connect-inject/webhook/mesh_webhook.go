@@ -17,6 +17,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -150,6 +151,10 @@ type MeshWebhook struct {
 	DefaultProxyCPULimit      resource.Quantity
 	DefaultProxyMemoryRequest resource.Quantity
 	DefaultProxyMemoryLimit   resource.Quantity
+
+	// LifecycleConfig contains proxy lifecycle management configuration from the inject-connect command and has methods to determine whether
+	// configuration should come from the default flags or annotations. The meshWebhook uses this to configure container sidecar proxy args.
+	LifecycleConfig lifecycle.Config
 
 	// Default Envoy concurrency flag, this is the number of worker threads to be used by the proxy.
 	DefaultEnvoyProxyConcurrency int
@@ -306,6 +311,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
+		// TODO: invert to start the Envoy sidecar before the application container
 		pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 	} else {
 		// For multi port pods, check for unsupported cases, mount all relevant service account tokens, and mount an init
@@ -376,6 +382,8 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 			}
+			// TODO: invert to start the Envoy sidecar container before the
+			// application container
 			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 		}
 	}

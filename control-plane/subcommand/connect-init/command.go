@@ -17,17 +17,19 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 )
 
 const (
@@ -160,6 +162,17 @@ func (c *Command) Run(args []string) int {
 		}
 		c.logger.Error("Unable to get client connection", "error", err)
 		return 1
+	}
+	if version.IsFIPS() {
+		// make sure we are also using FIPS Consul
+		var versionInfo map[string]interface{}
+		_, err := consulClient.Raw().Query("/v1/agent/version", versionInfo, nil)
+		if err != nil {
+			c.logger.Warn("This is a FIPS build of consul-k8s, which should be used with FIPS Consul. Unable to verify FIPS Consul while setting up Consul API client.")
+		}
+		if val, ok := versionInfo["FIPS"]; !ok || val == "" {
+			c.logger.Warn("This is a FIPS build of consul-k8s, which should be used with FIPS Consul. A non-FIPS version of Consul was detected.")
+		}
 	}
 	proxyService := &api.AgentService{}
 	if c.flagGatewayKind != "" {

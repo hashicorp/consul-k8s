@@ -70,3 +70,71 @@ func TestCreateOrUpdateACLPolicy_ErrorsIfDescriptionDoesNotMatch(t *testing.T) {
 	require.NoError(err)
 	require.Equal(policyDescription, rereadPolicy.Description)
 }
+
+func TestCreateOrUpdateACLPolicy(t *testing.T) {
+	require := require.New(t)
+	ui := cli.NewMockUi()
+	k8s := fake.NewSimpleClientset()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+		log:       hclog.NewNullLogger(),
+	}
+	cmd.init()
+	// Start Consul.
+	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		c.ACL.Enabled = true
+		c.ACL.Tokens.InitialManagement = bootToken
+	})
+	require.NoError(err)
+	defer svr.Stop()
+	svr.WaitForLeader(t)
+
+	// Get a Consul client.
+	consul, err := api.NewClient(&api.Config{
+		Address: svr.HTTPAddr,
+		Token:   bootToken,
+	})
+	require.NoError(err)
+	connectInjectRule, err := cmd.injectRules()
+	require.NoError(err)
+	aclReplRule, err := cmd.aclReplicationRules()
+	require.NoError(err)
+	policyDescription := "policy-description"
+	policyName := "policy-name"
+	cases := []struct {
+		Name              string
+		PolicyDescription string
+		PolicyName        string
+		Rules             string
+	}{
+		{
+			Name:              "create",
+			PolicyDescription: policyDescription,
+			PolicyName:        policyName,
+			Rules:             connectInjectRule,
+		},
+		{
+			Name:              "update",
+			PolicyDescription: policyDescription,
+			PolicyName:        policyName,
+			Rules:             aclReplRule,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			err = cmd.createOrUpdateACLPolicy(api.ACLPolicy{
+				Name:        tt.PolicyName,
+				Description: tt.PolicyDescription,
+				Rules:       tt.Rules,
+			}, consul)
+			require.Nil(err)
+			policy, _, err := consul.ACL().PolicyReadByName(tt.PolicyName, nil)
+			require.Nil(err)
+			require.Equal(tt.Rules, policy.Rules)
+			require.Equal(tt.PolicyName, policy.Name)
+			require.Equal(tt.PolicyDescription, policy.Description)
+		})
+	}
+}

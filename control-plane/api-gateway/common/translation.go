@@ -6,14 +6,15 @@ package common
 import (
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul/api"
 )
 
 // ResourceTranslator handles translating K8s resources into Consul config entries.
@@ -23,6 +24,7 @@ type ResourceTranslator struct {
 	EnableK8sMirroring     bool
 	MirroringPrefix        string
 	ConsulPartition        string
+	Datacenter             string
 }
 
 func (t ResourceTranslator) NonNormalizedConfigEntryReference(kind string, id types.NamespacedName) api.ResourceReference {
@@ -49,7 +51,7 @@ func (t ResourceTranslator) NormalizedResourceReference(kind, namespace string, 
 }
 
 func (t ResourceTranslator) Namespace(namespace string) string {
-	return namespaces.ConsulNamespace(namespace, t.EnableK8sMirroring, t.ConsulDestNamespace, t.EnableK8sMirroring, t.MirroringPrefix)
+	return namespaces.ConsulNamespace(namespace, t.EnableConsulNamespaces, t.ConsulDestNamespace, t.EnableK8sMirroring, t.MirroringPrefix)
 }
 
 // ToAPIGateway translates a kuberenetes API gateway into a Consul APIGateway Config Entry.
@@ -65,10 +67,10 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *R
 		Name:      gateway.Name,
 		Namespace: namespace,
 		Partition: t.ConsulPartition,
-		Meta: map[string]string{
+		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   gateway.Namespace,
 			constants.MetaKeyKubeName: gateway.Name,
-		},
+		}),
 		Listeners: listeners,
 	}
 }
@@ -128,10 +130,10 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 		Name:      route.Name,
 		Namespace: namespace,
 		Partition: t.ConsulPartition,
-		Meta: map[string]string{
+		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   route.Namespace,
 			constants.MetaKeyKubeName: route.Name,
-		},
+		}),
 		Hostnames: hostnames,
 		Rules:     rules,
 	}
@@ -253,14 +255,16 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 	}
 
 	for _, filter := range filters {
-		consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
+		if filter.RequestHeaderModifier != nil {
+			consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
 
-		for _, toAdd := range filter.RequestHeaderModifier.Add {
-			consulFilter.Add[string(toAdd.Name)] = toAdd.Value
-		}
+			for _, toAdd := range filter.RequestHeaderModifier.Add {
+				consulFilter.Add[string(toAdd.Name)] = toAdd.Value
+			}
 
-		for _, toSet := range filter.RequestHeaderModifier.Set {
-			consulFilter.Set[string(toSet.Name)] = toSet.Value
+			for _, toSet := range filter.RequestHeaderModifier.Set {
+				consulFilter.Set[string(toSet.Name)] = toSet.Value
+			}
 		}
 
 		// we drop any path rewrites that are not prefix matches as we don't support those
@@ -292,10 +296,10 @@ func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *Res
 		Name:      route.Name,
 		Namespace: namespace,
 		Partition: t.ConsulPartition,
-		Meta: map[string]string{
+		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   route.Namespace,
 			constants.MetaKeyKubeName: route.Name,
-		},
+		}),
 		Services: services,
 	}
 }
@@ -337,6 +341,11 @@ func (t ResourceTranslator) ToInlineCertificate(secret corev1.Secret) (*api.Inli
 		return nil, err
 	}
 
+	err = ValidateKeyLength(privateKey)
+	if err != nil {
+		return nil, err
+	}
+
 	namespace := t.Namespace(secret.Namespace)
 
 	return &api.InlineCertificateConfigEntry{
@@ -346,10 +355,10 @@ func (t ResourceTranslator) ToInlineCertificate(secret corev1.Secret) (*api.Inli
 		Partition:   t.ConsulPartition,
 		Certificate: strings.TrimSpace(certificate),
 		PrivateKey:  strings.TrimSpace(privateKey),
-		Meta: map[string]string{
+		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   secret.Namespace,
 			constants.MetaKeyKubeName: secret.Name,
-		},
+		}),
 	}, nil
 }
 
@@ -360,4 +369,12 @@ func EntryToNamespacedName(entry api.ConfigEntry) types.NamespacedName {
 		Namespace: meta[constants.MetaKeyKubeNS],
 		Name:      meta[constants.MetaKeyKubeName],
 	}
+}
+
+func (t ResourceTranslator) addDatacenterToMeta(meta map[string]string) map[string]string {
+	if t.Datacenter == "" {
+		return meta
+	}
+	meta[constants.MetaKeyDatacenter] = t.Datacenter
+	return meta
 }

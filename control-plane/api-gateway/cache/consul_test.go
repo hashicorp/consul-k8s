@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
@@ -119,8 +120,10 @@ func Test_resourceCache_diff(t *testing.T) {
 						},
 					},
 					Hostnames: []string{"hostname.com"},
-					Meta:      map[string]string{},
-					Status:    api.ConfigEntryStatus{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
+					Status: api.ConfigEntryStatus{},
 				},
 			})[api.HTTPRoute],
 			args: args{
@@ -203,8 +206,10 @@ func Test_resourceCache_diff(t *testing.T) {
 							},
 						},
 						Hostnames: []string{"hostname.com"},
-						Meta:      map[string]string{},
-						Status:    api.ConfigEntryStatus{},
+						Meta: map[string]string{
+							constants.MetaKeyKubeName: "name",
+						},
+						Status: api.ConfigEntryStatus{},
 					},
 				})[api.HTTPRoute],
 			},
@@ -291,8 +296,10 @@ func Test_resourceCache_diff(t *testing.T) {
 						},
 					},
 					Hostnames: []string{"hostname.com"},
-					Meta:      map[string]string{},
-					Status:    api.ConfigEntryStatus{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
+					Status: api.ConfigEntryStatus{},
 				},
 				&api.HTTPRouteConfigEntry{
 					Kind: api.HTTPRoute,
@@ -372,8 +379,10 @@ func Test_resourceCache_diff(t *testing.T) {
 						},
 					},
 					Hostnames: []string{"hostname.com"},
-					Meta:      map[string]string{},
-					Status:    api.ConfigEntryStatus{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
+					Status: api.ConfigEntryStatus{},
 				},
 			})[api.HTTPRoute],
 			args: args{
@@ -456,8 +465,10 @@ func Test_resourceCache_diff(t *testing.T) {
 							},
 						},
 						Hostnames: []string{"hostname.com"},
-						Meta:      map[string]string{},
-						Status:    api.ConfigEntryStatus{},
+						Meta: map[string]string{
+							constants.MetaKeyKubeName: "name",
+						},
+						Status: api.ConfigEntryStatus{},
 					},
 				})[api.HTTPRoute],
 			},
@@ -540,8 +551,10 @@ func Test_resourceCache_diff(t *testing.T) {
 						},
 					},
 					Hostnames: []string{"hostname.com"},
-					Meta:      map[string]string{},
-					Status:    api.ConfigEntryStatus{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
+					Status: api.ConfigEntryStatus{},
 				},
 			},
 		},
@@ -626,8 +639,10 @@ func Test_resourceCache_diff(t *testing.T) {
 						},
 					},
 					Hostnames: []string{"hostname.com"},
-					Meta:      map[string]string{},
-					Status:    api.ConfigEntryStatus{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
+					Status: api.ConfigEntryStatus{},
 				},
 			})[api.HTTPRoute],
 			args: args{
@@ -710,8 +725,10 @@ func Test_resourceCache_diff(t *testing.T) {
 							},
 						},
 						Hostnames: []string{"hostname.com"},
-						Meta:      map[string]string{},
-						Status:    api.ConfigEntryStatus{},
+						Meta: map[string]string{
+							constants.MetaKeyKubeName: "name",
+						},
+						Status: api.ConfigEntryStatus{},
 					},
 					&api.HTTPRouteConfigEntry{
 						Kind: api.HTTPRoute,
@@ -791,8 +808,10 @@ func Test_resourceCache_diff(t *testing.T) {
 							},
 						},
 						Hostnames: []string{"hostname.com"},
-						Meta:      map[string]string{},
-						Status:    api.ConfigEntryStatus{},
+						Meta: map[string]string{
+							constants.MetaKeyKubeName: "name",
+						},
+						Status: api.ConfigEntryStatus{},
 					},
 				})[api.HTTPRoute],
 			},
@@ -875,8 +894,10 @@ func Test_resourceCache_diff(t *testing.T) {
 						},
 					},
 					Hostnames: []string{"hostname.com"},
-					Meta:      map[string]string{},
-					Status:    api.ConfigEntryStatus{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
+					Status: api.ConfigEntryStatus{},
 				},
 			},
 		},
@@ -962,8 +983,10 @@ func Test_resourceCache_diff(t *testing.T) {
 						},
 					},
 					Hostnames: []string{"hostname.com"},
-					Meta:      map[string]string{},
-					Status:    api.ConfigEntryStatus{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
+					Status: api.ConfigEntryStatus{},
 				},
 			})[api.HTTPRoute],
 			args: args{
@@ -1047,8 +1070,10 @@ func Test_resourceCache_diff(t *testing.T) {
 							},
 						},
 						Hostnames: []string{"hostname.com"},
-						Meta:      map[string]string{},
-						Status:    api.ConfigEntryStatus{},
+						Meta: map[string]string{
+							constants.MetaKeyKubeName: "name",
+						},
+						Status: api.ConfigEntryStatus{},
 					},
 				})[api.HTTPRoute],
 			},
@@ -1132,8 +1157,10 @@ func Test_resourceCache_diff(t *testing.T) {
 						},
 					},
 					Hostnames: []string{"hostname.com"},
-					Meta:      map[string]string{},
-					Status:    api.ConfigEntryStatus{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
+					Status: api.ConfigEntryStatus{},
 				},
 			},
 		},
@@ -1378,8 +1405,10 @@ func TestCache_Write(t *testing.T) {
 					},
 				},
 				Hostnames: []string{"hostname.com"},
-				Meta:      map[string]string{},
-				Status:    api.ConfigEntryStatus{},
+				Meta: map[string]string{
+					constants.MetaKeyKubeName: "name",
+				},
+				Status: api.ConfigEntryStatus{},
 			}
 
 			err = c.Write(context.Background(), entry)
@@ -1410,18 +1439,24 @@ func TestCache_Get(t *testing.T) {
 			want: &api.APIGatewayConfigEntry{
 				Kind: api.APIGateway,
 				Name: "api-gw",
-				Meta: map[string]string{},
+				Meta: map[string]string{
+					constants.MetaKeyKubeName: "name",
+				},
 			},
 			cache: loadedReferenceMaps([]api.ConfigEntry{
 				&api.APIGatewayConfigEntry{
 					Kind: api.APIGateway,
 					Name: "api-gw",
-					Meta: map[string]string{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
 				},
 				&api.APIGatewayConfigEntry{
 					Kind: api.APIGateway,
 					Name: "api-gw-2",
-					Meta: map[string]string{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
 				},
 			}),
 		},
@@ -1438,12 +1473,16 @@ func TestCache_Get(t *testing.T) {
 				&api.APIGatewayConfigEntry{
 					Kind: api.APIGateway,
 					Name: "api-gw",
-					Meta: map[string]string{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
 				},
 				&api.APIGatewayConfigEntry{
 					Kind: api.APIGateway,
 					Name: "api-gw-2",
-					Meta: map[string]string{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
 				},
 			}),
 		},
@@ -1460,7 +1499,9 @@ func TestCache_Get(t *testing.T) {
 				&api.HTTPRouteConfigEntry{
 					Kind: api.HTTPRoute,
 					Name: "route",
-					Meta: map[string]string{},
+					Meta: map[string]string{
+						constants.MetaKeyKubeName: "name",
+					},
 				},
 			}),
 		},
@@ -1766,7 +1807,8 @@ func setupHTTPRoutes() (*api.HTTPRouteConfigEntry, *api.HTTPRouteConfigEntry) {
 		},
 		Hostnames: []string{"hostname.com"},
 		Meta: map[string]string{
-			"metaKey": "metaVal",
+			"metaKey":                 "metaVal",
+			constants.MetaKeyKubeName: "name",
 		},
 		Status: api.ConfigEntryStatus{},
 	}
@@ -1849,7 +1891,8 @@ func setupHTTPRoutes() (*api.HTTPRouteConfigEntry, *api.HTTPRouteConfigEntry) {
 		},
 		Hostnames: []string{"hostname.com"},
 		Meta: map[string]string{
-			"metakey": "meta val",
+			"metakey":                 "meta val",
+			constants.MetaKeyKubeName: "name",
 		},
 	}
 	return routeOne, routeTwo
@@ -1860,7 +1903,8 @@ func setupGateway() *api.APIGatewayConfigEntry {
 		Kind: api.APIGateway,
 		Name: "api-gw",
 		Meta: map[string]string{
-			"metakey": "meta val",
+			"metakey":                 "meta val",
+			constants.MetaKeyKubeName: "name",
 		},
 		Listeners: []api.APIGatewayListener{
 			{
@@ -1891,7 +1935,8 @@ func setupTCPRoute() *api.TCPRouteConfigEntry {
 			},
 		},
 		Meta: map[string]string{
-			"metakey": "meta val",
+			"metakey":                 "meta val",
+			constants.MetaKeyKubeName: "name",
 		},
 		Status: api.ConfigEntryStatus{},
 	}
@@ -1904,7 +1949,8 @@ func setupInlineCertificate() *api.InlineCertificateConfigEntry {
 		Certificate: "cert",
 		PrivateKey:  "super secret",
 		Meta: map[string]string{
-			"metaKey": "meta val",
+			"metaKey":                 "meta val",
+			constants.MetaKeyKubeName: "name",
 		},
 	}
 }

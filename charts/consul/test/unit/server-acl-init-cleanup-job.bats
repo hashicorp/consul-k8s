@@ -189,3 +189,25 @@ load _helpers
     yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+# resources
+
+@test "serverACLInitCleanup/Job: resources defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
+}
+
+@test "serverACLInitCleanup/Job: resources can be overridden" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.resources.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}

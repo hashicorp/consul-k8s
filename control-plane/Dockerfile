@@ -17,7 +17,7 @@
 # go-discover builds the discover binary (which we don't currently publish
 # either).
 FROM golang:1.19.2-alpine as go-discover
-RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@49f60c093101c9c5f6b04d5b1c80164251a761a6
+RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@214571b6a5309addf3db7775f4ee8cf4d264fd5f
 
 # dev copies the binary from a local build
 # -----------------------------------
@@ -92,7 +92,11 @@ LABEL name=${BIN_NAME} \
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
-RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
+
+# for FIPS CGO glibc compatibility in alpine
+# see https://github.com/golang/go/issues/59305
+RUN ln -s /lib/libc.so.6 /usr/lib/libresolv.so.2
 
 # TARGETOS and TARGETARCH are set automatically when --platform is provided.
 ARG TARGETOS
@@ -108,6 +112,9 @@ COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 
 USER 100
 CMD /bin/${BIN_NAME}
+
+# Duplicate target for FIPS builds
+FROM release-default AS release-default-fips
 
 # -----------------------------------
 # Dockerfile target for consul-k8s with UBI as its base image. Used for running on
@@ -171,6 +178,8 @@ COPY dist/cni/${TARGETOS}/${TARGETARCH}/${CNI_BIN_NAME} /bin/
 USER 100
 CMD /bin/${BIN_NAME}
 
+# Duplicate target for FIPS builds
+FROM ubi AS ubi-fips
 # ===================================
 # 
 #   Set default target to 'dev'.

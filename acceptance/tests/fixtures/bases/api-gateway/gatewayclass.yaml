@@ -6,7 +6,7 @@ kind: GatewayClass
 metadata:
   name: gateway-class
 spec:
-  controllerName: "hashicorp.com/consul-api-gateway-controller"
+  controllerName: "consul.hashicorp.com/gateway-controller"
   parametersRef:
     group: consul.hashicorp.com
     kind: GatewayClassConfig

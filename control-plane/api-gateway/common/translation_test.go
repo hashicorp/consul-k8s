@@ -9,11 +9,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +42,77 @@ func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1
 
 func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool {
 	return true
+}
+
+func TestTranslator_Namespace(t *testing.T) {
+	testCases := []struct {
+		EnableConsulNamespaces bool
+		ConsulDestNamespace    string
+		EnableK8sMirroring     bool
+		MirroringPrefix        string
+		Input, ExpectedOutput  string
+	}{
+		{
+			EnableConsulNamespaces: false,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     false,
+			MirroringPrefix:        "",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "",
+		},
+		{
+			EnableConsulNamespaces: false,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     true,
+			MirroringPrefix:        "",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "",
+		},
+		{
+			EnableConsulNamespaces: false,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     true,
+			MirroringPrefix:        "pre-",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "",
+		},
+		{
+			EnableConsulNamespaces: true,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     false,
+			MirroringPrefix:        "",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "default",
+		},
+		{
+			EnableConsulNamespaces: true,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     true,
+			MirroringPrefix:        "",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "namespace-1",
+		},
+		{
+			EnableConsulNamespaces: true,
+			ConsulDestNamespace:    "default",
+			EnableK8sMirroring:     true,
+			MirroringPrefix:        "pre-",
+			Input:                  "namespace-1",
+			ExpectedOutput:         "pre-namespace-1",
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%s_%d", t.Name(), i), func(t *testing.T) {
+			translator := ResourceTranslator{
+				EnableConsulNamespaces: tc.EnableConsulNamespaces,
+				ConsulDestNamespace:    tc.ConsulDestNamespace,
+				EnableK8sMirroring:     tc.EnableK8sMirroring,
+				MirroringPrefix:        tc.MirroringPrefix,
+			}
+			assert.Equal(t, tc.ExpectedOutput, translator.Namespace(tc.Input))
+		})
+	}
 }
 
 func TestTranslator_ToAPIGateway(t *testing.T) {
@@ -1297,5 +1370,59 @@ func generateTestCertificate(t *testing.T, namespace, name string) corev1.Secret
 			corev1.TLSCertKey:       certBytes,
 			corev1.TLSPrivateKeyKey: privateKeyBytes,
 		},
+	}
+}
+
+func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
+	type fields struct {
+		EnableConsulNamespaces bool
+		ConsulDestNamespace    string
+		EnableK8sMirroring     bool
+		MirroringPrefix        string
+		ConsulPartition        string
+		Datacenter             string
+	}
+	type args struct {
+		filters []gwv1beta1.HTTPRouteFilter
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   api.HTTPFilters
+	}{
+		{
+			name:   "no httproutemodifier set",
+			fields: fields{},
+			args: args{
+				filters: []gwv1beta1.HTTPRouteFilter{
+					{
+						URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{},
+					},
+				},
+			},
+			want: api.HTTPFilters{
+				Headers: []api.HTTPHeaderFilter{
+					{
+						Add: map[string]string{},
+						Set: map[string]string{},
+					},
+				},
+				URLRewrite: nil,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t1.Run(tt.name, func(t1 *testing.T) {
+			t := ResourceTranslator{
+				EnableConsulNamespaces: tt.fields.EnableConsulNamespaces,
+				ConsulDestNamespace:    tt.fields.ConsulDestNamespace,
+				EnableK8sMirroring:     tt.fields.EnableK8sMirroring,
+				MirroringPrefix:        tt.fields.MirroringPrefix,
+				ConsulPartition:        tt.fields.ConsulPartition,
+				Datacenter:             tt.fields.Datacenter,
+			}
+			assert.Equalf(t1, tt.want, t.translateHTTPFilters(tt.args.filters), "translateHTTPFilters(%v)", tt.args.filters)
+		})
 	}
 }

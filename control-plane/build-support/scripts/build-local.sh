@@ -35,6 +35,8 @@ Options:
    -a | --arch       ARCH        Space separated string of
                                  architectures to build.
 
+   --fips            FIPS        Whether to use FIPS cryptography.
+
    -h | --help                   Print this help text.
 EOF
 }
@@ -93,6 +95,11 @@ function main {
 
             build_arch="$2"
             shift 2
+            ;;
+         --fips )
+            GOTAGS="fips"
+            GOEXPERIMENT="boringcrypto"
+            shift 1
             ;;
          * )
             err_usage "ERROR: Unknown argument: '$1'"
