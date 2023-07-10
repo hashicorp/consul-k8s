@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-
+      
       - name: Setup go
         uses: actions/setup-go@v2
         with:
@@ -32,14 +32,14 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            ${{env.USERPROFILE}}\go\pkg\mod
+            ${{ runner.userprofile }}\go\pkg\mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
       - name: Install gotestsum
         run: |
-          Invoke-WebRequest -Uri https://github.com/gotestyourself/gotestsum/releases/download/v${{env:GOTESTSUM_VERSION}}/gotestsum_${{env:GOTESTSUM_VERSION}}_windows_amd64.tar.gz -OutFile gotestsum.tar.gz
+          Invoke-WebRequest -Uri https://github.com/gotestyourself/gotestsum/releases/download/v%GOTESTSUM_VERSION%/gotestsum_%GOTESTSUM_VERSION%_windows_amd64.tar.gz -OutFile gotestsum.tar.gz
           tar -xf gotestsum.tar.gz
           Remove-Item gotestsum.tar.gz
           Add-Content -Path $env:GITHUB_PATH -Value "$PWD\gotestsum.exe"
