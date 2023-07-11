@@ -16,7 +16,7 @@ var suite testsuite.Suite
 func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
 
-	if suite.Config().EnableMultiCluster {
+	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(2) {
 		os.Exit(suite.Run())
 	} else {
 		fmt.Println("Skipping partitions tests because -enable-multi-cluster is not set")
