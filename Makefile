@@ -87,15 +87,6 @@ cni-plugin-lint:
 ctrl-generate: get-controller-gen ## Run CRD code generation.
 	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
 
-# Helper target for doing local cni acceptance testing
-kind-cni:
-	kind delete cluster --name dc1
-	kind delete cluster --name dc2
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image kindest/node:v1.23.6
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image kindest/node:v1.23.6
-	make kind-cni-calico
-
 # Perform a terraform fmt check but don't change anything
 terraform-fmt-check:
 	@$(CURDIR)/control-plane/build-support/scripts/terraformfmtcheck.sh $(TERRAFORM_DIR)
@@ -133,7 +124,24 @@ kind-cni-calico:
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
 	@sleep 30
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
-	@sleep 20 
+	@sleep 20
+
+# Helper target for doing local cni acceptance testing
+kind-cni:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
+	make kind-cni-calico
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
+	make kind-cni-calico
+
+# Helper target for doing local acceptance testing
+kind:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
+	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
+	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
+
 
 # ===========> Shared Targets
 
@@ -247,7 +255,6 @@ endif
 	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" "" $(CONSUL_K8S_NEXT_RELEASE_VERSION) $(CONSUL_K8S_NEXT_CONSUL_VERSION) $(CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION)
 
 # ===========> Makefile config
-
 .DEFAULT_GOAL := help
 .PHONY: gen-helm-docs copy-crds-to-chart generate-external-crds bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
 SHELL = bash
