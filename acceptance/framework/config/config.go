@@ -82,14 +82,16 @@ type TestConfig struct {
 
 	DisablePeering bool
 
-	HelmChartVersion       string
-	ConsulImage            string
-	ConsulK8SImage         string
-	ConsulDataplaneImage   string
-	ConsulVersion          *version.Version
-	ConsulDataplaneVersion *version.Version
-	EnvoyImage             string
-	ConsulCollectorImage   string
+	HelmChartVersion            string
+	ConsulImage                 string
+	ConsulK8SImage              string
+	ConsulDataplaneImage        string
+	ConsulWindowsK8SImage       string
+	ConsulWindowsDataplaneImage string
+	ConsulVersion               *version.Version
+	ConsulDataplaneVersion      *version.Version
+	EnvoyImage                  string
+	ConsulCollectorImage        string
 
 	HCPResourceID string
 
@@ -132,18 +134,21 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
 	}
 
-	// if t.EnableWindows {
-	// 	setIfNotEmpty(helmValues, "global.apiGateway.controller.nodeSelector.kubernetes.io/os", "windows")
-	// 	setIfNotEmpty(helmValues, "global.apiGateway.managedGatewayClass.nodeSelector.kubernetes.io/os", "windows")
-	// 	setIfNotEmpty(helmValues, "global.connectInject.nodeSelector.kubernetes.io/os", "linux")
-	// 	setIfNotEmpty(helmValues, "global.client.nodeSelector.kubernetes.io/os", "windows")
-	// 	setIfNotEmpty(helmValues, "global.acls.nodeSelector.kubernetes.io/os", "linux")
-	// 	setIfNotEmpty(helmValues, "global.meshGateway.nodeSelector.kubernetes.io/os", "windows")
-	// 	setIfNotEmpty(helmValues, "global.server.nodeSelector.kubernetes.io/os", "linux")
-	// 	setIfNotEmpty(helmValues, "global.syncCatalog.nodeSelector.kubernetes.io/os", "linux")
-	// 	setIfNotEmpty(helmValues, "global.telemetryCollector.nodeSelector.kubernetes.io/os", "windows")
-	// 	setIfNotEmpty(helmValues, "global.webhookCertManager.nodeSelector.kubernetes.io/os", "linux")
-	// }
+	if t.EnableWindows {
+		// setIfNotEmpty(helmValues, "global.apiGateway.controller.nodeSelector.kubernetes.io/os", "windows")
+		// setIfNotEmpty(helmValues, "global.apiGateway.managedGatewayClass.nodeSelector.kubernetes.io/os", "windows")
+		// setIfNotEmpty(helmValues, "global.connectInject.nodeSelector.kubernetes.io/os", "linux")
+		// setIfNotEmpty(helmValues, "global.client.nodeSelector.kubernetes.io/os", "windows")
+		// setIfNotEmpty(helmValues, "global.acls.nodeSelector.kubernetes.io/os", "linux")
+		// setIfNotEmpty(helmValues, "global.meshGateway.nodeSelector.kubernetes.io/os", "windows")
+		// setIfNotEmpty(helmValues, "global.server.nodeSelector.kubernetes.io/os", "linux")
+		// setIfNotEmpty(helmValues, "global.syncCatalog.nodeSelector.kubernetes.io/os", "linux")
+		// setIfNotEmpty(helmValues, "global.telemetryCollector.nodeSelector.kubernetes.io/os", "windows")
+		// setIfNotEmpty(helmValues, "global.webhookCertManager.nodeSelector.kubernetes.io/os", "linux")
+
+		setIfNotEmpty(helmValues, "global.imageK8SWindows", "absolutelightning/consul-k8s-control-plane-windows-2019:v7")
+		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", "absolutelightning/windows-consul-dataplane")
+	}
 
 	if t.EnablePodSecurityPolicies {
 		setIfNotEmpty(helmValues, "global.enablePodSecurityPolicies", "true")
@@ -172,7 +177,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "connectInject.transparentProxy.defaultEnabled", strconv.FormatBool(t.EnableTransparentProxy))
 
 	setIfNotEmpty(helmValues, "global.image", t.ConsulImage)
-	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
+	setIfNotEmpty(helmValues, "global.imageK8S", "aahel/linux-fixed:v1")
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
 	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
 
