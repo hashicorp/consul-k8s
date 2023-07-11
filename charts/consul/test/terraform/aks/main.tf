@@ -49,6 +49,9 @@ resource "azurerm_virtual_network_peering" "default" {
   remote_virtual_network_id = azurerm_virtual_network.default[count.index == 0 ? 1 : 0].id
 }
 
+resource "random_password" "winnode" {
+  length = 16
+}
 resource "azurerm_kubernetes_cluster" "default" {
   count                             = var.cluster_count
   name                              = "consul-k8s-${random_id.suffix[count.index].dec}"
@@ -81,6 +84,11 @@ resource "azurerm_kubernetes_cluster" "default" {
     vm_size         = "Standard_D3_v2"
     os_disk_size_gb = 30
     vnet_subnet_id  = azurerm_virtual_network.default[count.index].subnet.*.id[0]
+  }
+
+  windows_profile {
+    admin_username = "azadmin"
+    admin_password = random_password.winnode.result
   }
 
   service_principal {
