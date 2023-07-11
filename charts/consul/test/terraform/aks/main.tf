@@ -97,3 +97,13 @@ resource "local_file" "kubeconfigs" {
   filename        = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
   file_permission = "0600"
 }
+
+resource "azurerm_kubernetes_cluster_node_pool" "windows"  {
+  count = var.windows ? 1 : 0
+  name                  = "windows"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.default[count.index].id
+  vm_size               = "Standard_DS2_v2"
+  node_count            = 1
+  os_type               = "Windows"
+  os_sku                = "Windows2019"
+}
