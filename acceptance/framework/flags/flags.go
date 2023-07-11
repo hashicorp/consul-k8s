@@ -27,6 +27,7 @@ type TestFlags struct {
 	flagEnterpriseLicense string
 
 	flagEnableOpenshift bool
+	flagEnableWindows   bool
 
 	flagEnablePodSecurityPolicies bool
 
@@ -106,6 +107,9 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagEnableOpenshift, "enable-openshift", false,
 		"If true, the tests will automatically add Openshift Helm value for each Helm install.")
 
+	flag.BoolVar(&t.flagEnableWindows, "enable-windows", false,
+		"If true, the tests will automatically add nodeselector Windows Helm value for each Helm install.")
+
 	flag.BoolVar(&t.flagEnablePodSecurityPolicies, "enable-pod-security-policies", false,
 		"If true, the test suite will run tests with pod security policies enabled.")
 
@@ -176,6 +180,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		EnterpriseLicense: t.flagEnterpriseLicense,
 
 		EnableOpenshift: t.flagEnableOpenshift,
+		EnableWindows:   t.flagEnableWindows,
 
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
 
