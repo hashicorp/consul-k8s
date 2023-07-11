@@ -4,6 +4,7 @@
 package vault
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -14,5 +15,11 @@ var suite testsuite.Suite
 
 func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
-	os.Exit(suite.Run())
+
+	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(2) {
+		os.Exit(suite.Run())
+	} else {
+		fmt.Println("Skipping vault tests because either -enable-multi-cluster is not set or -disable-peering is set")
+		os.Exit(0)
+	}
 }
