@@ -200,7 +200,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with upstreams specified for windows",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
