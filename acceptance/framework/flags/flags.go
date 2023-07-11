@@ -112,7 +112,7 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagEnableOpenshift, "enable-openshift", false,
 		"If true, the tests will automatically add Openshift Helm value for each Helm install.")
 
-	flag.BoolVar(&t.flagEnableWindows, "enable-windows", false,
+	flag.BoolVar(&t.flagEnableWindows, "enable-windows", true,
 		"If true, the tests will automatically add nodeselector Windows Helm value for each Helm install.")
 
 	flag.BoolVar(&t.flagEnablePodSecurityPolicies, "enable-pod-security-policies", false,
