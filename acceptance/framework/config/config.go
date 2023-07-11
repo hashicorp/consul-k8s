@@ -136,12 +136,12 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		setIfNotEmpty(helmValues, "global.apiGateway.controller.nodeSelector.kubernetes.io/os", "windows")
 		setIfNotEmpty(helmValues, "global.apiGateway.managedGatewayClass.nodeSelector.kubernetes.io/os", "windows")
 		setIfNotEmpty(helmValues, "global.connectInject.nodeSelector.kubernetes.io/os", "linux")
-		setIfNotEmpty(helmValues, "global.client.nodeSelector.kubernetes.io/os", "linux")
+		setIfNotEmpty(helmValues, "global.client.nodeSelector.kubernetes.io/os", "windows")
 		setIfNotEmpty(helmValues, "global.acls.nodeSelector.kubernetes.io/os", "linux")
 		setIfNotEmpty(helmValues, "global.meshGateway.nodeSelector.kubernetes.io/os", "windows")
 		setIfNotEmpty(helmValues, "global.server.nodeSelector.kubernetes.io/os", "linux")
 		setIfNotEmpty(helmValues, "global.syncCatalog.nodeSelector.kubernetes.io/os", "linux")
-		setIfNotEmpty(helmValues, "global.telemetryCollector.nodeSelector.kubernetes.io/os", "linux")
+		setIfNotEmpty(helmValues, "global.telemetryCollector.nodeSelector.kubernetes.io/os", "windows")
 		setIfNotEmpty(helmValues, "global.webhookCertManager.nodeSelector.kubernetes.io/os", "linux")
 	}
 
