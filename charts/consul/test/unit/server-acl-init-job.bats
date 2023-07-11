@@ -2247,6 +2247,9 @@ load _helpers
   local actual=$(echo "$cmd" |
     yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # resources
 
 @test "serverACLInit/Job: resources defined by default" {

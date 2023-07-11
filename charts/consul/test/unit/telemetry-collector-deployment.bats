@@ -1111,7 +1111,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       -s templates/telemetry-collector-deployment.yaml \
       --set 'telemetryCollector.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[1].args' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
     yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
@@ -1125,7 +1125,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.logLevel=debug' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[1].args' | tee /dev/stderr)
 
   local actual=$(echo "$cmd" |
     yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
