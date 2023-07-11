@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
@@ -232,7 +233,7 @@ connectInject:
   enabled: true
 controller:
   enabled: true
-`, cfg.BootstrapResponse.Cluster.ID, secretNameServerCA, corev1.TLSCertKey,
+`, strings.ToLower(cfg.BootstrapResponse.Cluster.ID), secretNameServerCA, corev1.TLSCertKey,
 		secretNameGossipKey, secretKeyGossipKey, secretNameBootstrapToken,
 		secretKeyBootstrapToken,
 		secretNameHCPResourceID, secretKeyHCPResourceID,
