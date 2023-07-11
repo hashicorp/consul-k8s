@@ -22,16 +22,67 @@ const (
 	LicenseSecretKey  = "key"
 )
 
-// TestConfig holds configuration for the test suite.
-type TestConfig struct {
-	Kubeconfig    string
+type KubeEnv struct {
+	KubeConfig    string
 	KubeContext   string
 	KubeNamespace string
+}
 
-	EnableMultiCluster     bool
-	SecondaryKubeconfig    string
-	SecondaryKubeContext   string
-	SecondaryKubeNamespace string
+func KubeEnvListFromStringList(kubeConfigs, kubeContexts, kubeNamespaces []string) []KubeEnv {
+	// Determine the longest list length
+	maxLen := 0
+	lenConf := len(kubeConfigs)
+	if maxLen < lenConf {
+		maxLen = lenConf
+	}
+
+	lenCtx := len(kubeContexts)
+	if maxLen < lenCtx {
+		maxLen = lenCtx
+	}
+
+	lenNs := len(kubeNamespaces)
+	if maxLen < lenNs {
+		maxLen = lenNs
+	}
+
+	// If all are empty, then return a single empty entry
+	out := make([]KubeEnv, 0)
+	if maxLen == 0 {
+		out = append(out, KubeEnv{})
+		return out
+	}
+
+	// Pad lists if required, all list should be made the same length
+	for i := lenConf; i < maxLen; i++ {
+		kubeConfigs = append(kubeConfigs, "")
+	}
+
+	for i := lenCtx; i < maxLen; i++ {
+		kubeContexts = append(kubeContexts, "")
+	}
+
+	for i := lenNs; i < maxLen; i++ {
+		kubeNamespaces = append(kubeNamespaces, "")
+	}
+
+	// Construct the kubeEnv
+	for k, v := range kubeConfigs {
+		kenv := KubeEnv{
+			KubeConfig:    v,
+			KubeContext:   kubeContexts[k],
+			KubeNamespace: kubeNamespaces[k],
+		}
+		out = append(out, kenv)
+	}
+
+	return out
+}
+
+// TestConfig holds configuration for the test suite.
+type TestConfig struct {
+	KubeEnvs           []KubeEnv
+	EnableMultiCluster bool
 
 	EnableEnterprise  bool
 	EnterpriseLicense string
@@ -115,6 +166,23 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
 
 	return helmValues, nil
+}
+
+// IsExpectedClusterCount check that we have at least the required number of clusters to
+// run a test.
+func (t *TestConfig) IsExpectedClusterCount(count int) bool {
+	return len(t.KubeEnvs) >= count
+}
+
+// GetPrimaryKubeEnv returns the primary Kubernetes environment.
+func (t *TestConfig) GetPrimaryKubeEnv() KubeEnv {
+	// Return the first in the list as this is always the primary
+	// kube environment. If empty return an empty kubeEnv
+	if len(t.KubeEnvs) < 1 {
+		return KubeEnv{}
+	} else {
+		return t.KubeEnvs[0]
+	}
 }
 
 type values struct {

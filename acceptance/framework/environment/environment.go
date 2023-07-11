@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	DefaultContextName   = "default"
-	SecondaryContextName = "secondary"
+	DefaultContextName         = "default"
+	SecondaryContextNamePrefix = "secondary"
 )
 
 // TestEnvironment represents the infrastructure environment of the test,
@@ -30,6 +30,8 @@ const (
 type TestEnvironment interface {
 	DefaultContext(t *testing.T) TestContext
 	Context(t *testing.T, name string) TestContext
+	GetSecondaryContextKey(t *testing.T) string
+	GetContextKeys(t *testing.T) []string
 }
 
 // TestContext represents a specific context a test needs,
@@ -41,22 +43,29 @@ type TestContext interface {
 }
 
 type KubernetesEnvironment struct {
-	contexts map[string]*kubernetesContext
+	contexts    map[string]*kubernetesContext
+	contextKeys []string
 }
 
 func NewKubernetesEnvironmentFromConfig(config *config.TestConfig) *KubernetesEnvironment {
-	defaultContext := NewContext(config.KubeNamespace, config.Kubeconfig, config.KubeContext)
+	// First kubeEnv is the default
+	defaultContext := NewContext(config.GetPrimaryKubeEnv().KubeNamespace, config.GetPrimaryKubeEnv().KubeConfig, config.GetPrimaryKubeEnv().KubeContext)
 
 	// Create a kubernetes environment with default context.
 	kenv := &KubernetesEnvironment{
 		contexts: map[string]*kubernetesContext{
 			DefaultContextName: defaultContext,
 		},
+		contextKeys: []string{DefaultContextName},
 	}
 
-	// Add secondary context if multi cluster tests are enabled.
+	// Add additional contexts if multi cluster tests are enabled.
 	if config.EnableMultiCluster {
-		kenv.contexts[SecondaryContextName] = NewContext(config.SecondaryKubeNamespace, config.SecondaryKubeconfig, config.SecondaryKubeContext)
+		for i, v := range config.KubeEnvs[1:] {
+			ctxName := fmt.Sprintf("%s-%d", SecondaryContextNamePrefix, i)
+			kenv.contexts[ctxName] = NewContext(v.KubeNamespace, v.KubeConfig, v.KubeContext)
+			kenv.contextKeys = append(kenv.contextKeys, ctxName)
+		}
 	}
 
 	return kenv
@@ -71,6 +80,17 @@ func NewKubernetesEnvironmentFromContext(context *kubernetesContext) *Kubernetes
 	}
 
 	return kenv
+}
+
+func (k *KubernetesEnvironment) GetSecondaryContextKey(t *testing.T) string {
+	require.Equal(t, 2, len(k.contextKeys), "a secondary context does not exist")
+	ctxKeys := k.GetContextKeys(t)
+	return ctxKeys[1]
+}
+
+func (k *KubernetesEnvironment) GetContextKeys(t *testing.T) []string {
+	require.GreaterOrEqual(t, len(k.contextKeys), 1)
+	return k.contextKeys
 }
 
 func (k *KubernetesEnvironment) Context(t *testing.T, name string) TestContext {
