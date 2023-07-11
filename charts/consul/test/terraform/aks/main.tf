@@ -49,6 +49,10 @@ resource "azurerm_virtual_network_peering" "default" {
   remote_virtual_network_id = azurerm_virtual_network.default[count.index == 0 ? 1 : 0].id
 }
 
+resource "random_password" "winnode" {
+  length = 16
+}
+
 resource "azurerm_kubernetes_cluster" "default" {
   count                             = var.cluster_count
   name                              = "consul-k8s-${random_id.suffix[count.index].dec}"
@@ -67,12 +71,12 @@ resource "azurerm_kubernetes_cluster" "default" {
   // and that gives us more confidence that in any tests where cross-cluster
   // communication is tested, the connections goes through the appropriate gateway
   // rather than directly from pod to pod.
-  network_profile {
-    network_plugin     = "kubenet"
-    service_cidr       = "10.0.0.0/16"
-    dns_service_ip     = "10.0.0.10"
-    pod_cidr           = "10.244.0.0/16"
-    docker_bridge_cidr = "172.17.0.1/16"
+network_profile {
+    network_plugin     = "azure"
+    # service_cidr       = "10.0.0.0/16"
+    # dns_service_ip     = "10.0.0.10"
+    # pod_cidr           = "10.244.0.0/16"
+    # docker_bridge_cidr = "172.17.0.1/16"
   }
 
   default_node_pool {
@@ -81,6 +85,11 @@ resource "azurerm_kubernetes_cluster" "default" {
     vm_size         = "Standard_D3_v2"
     os_disk_size_gb = 30
     vnet_subnet_id  = azurerm_virtual_network.default[count.index].subnet.*.id[0]
+  }
+
+  windows_profile {
+    admin_username = "azadmin"
+    admin_password = random_password.winnode.result
   }
 
   service_principal {
@@ -96,4 +105,14 @@ resource "local_file" "kubeconfigs" {
   content         = azurerm_kubernetes_cluster.default[count.index].kube_config_raw
   filename        = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
   file_permission = "0600"
+}
+
+resource "azurerm_kubernetes_cluster_node_pool" "win"  {
+  count = var.windows ? 1 : 0
+  name                  = "win"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.default[count.index].id
+  vm_size               = "Standard_DS2_v2"
+  node_count            = 1
+  os_type               = "Windows"
+  os_sku                = "Windows2019"
 }
