@@ -97,16 +97,17 @@ func NewCLICluster(
 	cli, err := cli.NewCLI()
 	require.NoError(t, err)
 
+	require.Greater(t, len(cfg.KubeEnvs), 0)
 	return &CLICluster{
 		ctx:                ctx,
 		helmOptions:        hopts,
 		kubectlOptions:     kopts,
-		namespace:          cfg.KubeNamespace,
+		namespace:          cfg.GetPrimaryKubeEnv().KubeNamespace,
 		values:             values,
 		releaseName:        releaseName,
 		kubernetesClient:   ctx.KubernetesClient(t),
-		kubeConfig:         cfg.Kubeconfig,
-		kubeContext:        cfg.KubeContext,
+		kubeConfig:         cfg.GetPrimaryKubeEnv().KubeConfig,
+		kubeContext:        cfg.GetPrimaryKubeEnv().KubeContext,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
