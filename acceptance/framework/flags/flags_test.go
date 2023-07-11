@@ -11,9 +11,9 @@ import (
 
 func TestFlags_validate(t *testing.T) {
 	type fields struct {
-		flagEnableMultiCluster   bool
-		flagSecondaryKubeconfig  string
-		flagSecondaryKubecontext string
+		flagEnableMultiCluster bool
+		flagKubeConfigs        listFlag
+		flagKubeContexts       listFlag
 
 		flagEnableEnt  bool
 		flagEntLicense string
@@ -26,20 +26,16 @@ func TestFlags_validate(t *testing.T) {
 	}{
 		{
 			"no error by default",
-			fields{
-				flagEnableMultiCluster:   false,
-				flagSecondaryKubeconfig:  "",
-				flagSecondaryKubecontext: "",
-			},
+			fields{},
 			false,
 			"",
 		},
 		{
 			"enable multi cluster: no error when multi cluster is disabled",
 			fields{
-				flagEnableMultiCluster:   false,
-				flagSecondaryKubeconfig:  "",
-				flagSecondaryKubecontext: "",
+				flagEnableMultiCluster: false,
+				flagKubeConfigs:        listFlag{},
+				flagKubeContexts:       listFlag{},
 			},
 			false,
 			"",
@@ -47,19 +43,19 @@ func TestFlags_validate(t *testing.T) {
 		{
 			"enable multi cluster: errors when both secondary kubeconfig and kubecontext are empty",
 			fields{
-				flagEnableMultiCluster:   true,
-				flagSecondaryKubeconfig:  "",
-				flagSecondaryKubecontext: "",
+				flagEnableMultiCluster: true,
+				flagKubeConfigs:        listFlag{},
+				flagKubeContexts:       listFlag{},
 			},
 			true,
-			"at least one of -secondary-kubecontext or -secondary-kubeconfig flags must be provided if -enable-multi-cluster is set",
+			"at least two contexts must be included in -kubecontexts or -kubeconfigs if -enable-multi-cluster is set",
 		},
 		{
 			"enable multi cluster: no error when secondary kubeconfig but not kubecontext is provided",
 			fields{
-				flagEnableMultiCluster:   true,
-				flagSecondaryKubeconfig:  "foo",
-				flagSecondaryKubecontext: "",
+				flagEnableMultiCluster: true,
+				flagKubeConfigs:        listFlag{"foo", "bar"},
+				flagKubeContexts:       listFlag{},
 			},
 			false,
 			"",
@@ -67,9 +63,9 @@ func TestFlags_validate(t *testing.T) {
 		{
 			"enable multi cluster: no error when secondary kubecontext but not kubeconfig is provided",
 			fields{
-				flagEnableMultiCluster:   true,
-				flagSecondaryKubeconfig:  "",
-				flagSecondaryKubecontext: "foo",
+				flagEnableMultiCluster: true,
+				flagKubeConfigs:        listFlag{},
+				flagKubeContexts:       listFlag{"foo", "bar"},
 			},
 			false,
 			"",
@@ -77,9 +73,9 @@ func TestFlags_validate(t *testing.T) {
 		{
 			"enable multi cluster: no error when both secondary kubecontext and kubeconfig are provided",
 			fields{
-				flagEnableMultiCluster:   true,
-				flagSecondaryKubeconfig:  "foo",
-				flagSecondaryKubecontext: "bar",
+				flagEnableMultiCluster: true,
+				flagKubeConfigs:        listFlag{"foo", "bar"},
+				flagKubeContexts:       listFlag{"foo", "bar"},
 			},
 			false,
 			"",
@@ -105,11 +101,11 @@ func TestFlags_validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tf := &TestFlags{
-				flagEnableMultiCluster:   tt.fields.flagEnableMultiCluster,
-				flagSecondaryKubeconfig:  tt.fields.flagSecondaryKubeconfig,
-				flagSecondaryKubecontext: tt.fields.flagSecondaryKubecontext,
-				flagEnableEnterprise:     tt.fields.flagEnableEnt,
-				flagEnterpriseLicense:    tt.fields.flagEntLicense,
+				flagEnableMultiCluster: tt.fields.flagEnableMultiCluster,
+				flagKubeconfigs:        tt.fields.flagKubeConfigs,
+				flagKubecontexts:       tt.fields.flagKubeContexts,
+				flagEnableEnterprise:   tt.fields.flagEnableEnt,
+				flagEnterpriseLicense:  tt.fields.flagEntLicense,
 			}
 			err := tf.Validate()
 			if tt.wantErr {
