@@ -150,6 +150,7 @@ func TestBasicCloud(t *testing.T) {
 	releaseName := helpers.RandomName()
 
 	helmValues := map[string]string{
+		"global.imagePullPolicy":             "IfNotPresent",
 		"global.cloud.enabled":               "true",
 		"global.cloud.resourceId.secretName": resourceSecretName,
 		"global.cloud.resourceId.secretKey":  resourceSecretKey,
