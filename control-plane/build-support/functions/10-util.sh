@@ -720,14 +720,14 @@ function set_changelog {
 		return 1
 	fi
 
-	if [ -z "$LAST_RELEASE_GIT_TAG" ]; then
-		echo "Error: LAST_RELEASE_GIT_TAG not specified."
+	if [ -z "$CONSUL_K8S_LAST_RELEASE_GIT_TAG" ]; then
+		echo "Error: CONSUL_K8S_LAST_RELEASE_GIT_TAG not specified."
 		exit 1
 	fi
 
 	cat <<EOT | cat - "${curdir}"/CHANGELOG.MD >tmp && mv tmp "${curdir}"/CHANGELOG.MD
 ## ${version} (${rel_date})
-$(changelog-build -last-release ${LAST_RELEASE_GIT_TAG} \
+$(changelog-build -last-release ${CONSUL_K8S_LAST_RELEASE_GIT_TAG} \
 		-entries-dir .changelog/ \
 		-changelog-template .changelog/changelog.tmpl \
 		-note-template .changelog/note.tmpl \
@@ -896,7 +896,7 @@ function ui_version {
 		return 1
 	fi
 
-	local ui_version=$(sed -n ${SED_EXT} -e 's/.*CONSUL_VERSION%22%3A%22([^%]*)%22%2C%22.*/\1/p' <"$1") || return 1
+	local ui_version=$(sed -n ${SED_EXT} -e 's/.*CONSUL_K8S_CONSUL_VERSION%22%3A%22([^%]*)%22%2C%22.*/\1/p' <"$1") || return 1
 	echo "$ui_version"
 	return 0
 }
