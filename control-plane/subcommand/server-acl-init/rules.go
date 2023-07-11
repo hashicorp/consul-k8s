@@ -330,6 +330,7 @@ partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"
 {{- else }}
+  mesh = "write"
   operator = "write"
   acl = "write"
 {{- end }}
