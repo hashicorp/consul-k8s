@@ -34,6 +34,7 @@ var (
 	errRouteNoMatchingListenerHostname      = errors.New("listener cannot bind route with a non-aligned hostname")
 	errRouteInvalidKind                     = errors.New("invalid backend kind")
 	errRouteBackendNotFound                 = errors.New("backend not found")
+	errRouteNoMatchingParent                = errors.New("no matching parent")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
@@ -128,13 +129,17 @@ type bindResult struct {
 type bindResults []bindResult
 
 // Error constructs a human readable error for bindResults, containing any errors that a route
-// had in binding to a gateway, note that this is only used if a route failed to bind to every
+// had in binding to a gateway. Note that this is only used if a route failed to bind to every
 // listener it attempted to bind to.
 func (b bindResults) Error() string {
 	messages := []string{}
 	for _, result := range b {
 		if result.err != nil {
-			messages = append(messages, fmt.Sprintf("%s: %s", result.section, result.err.Error()))
+			message := result.err.Error()
+			if result.section != "" {
+				message = fmt.Sprintf("%s: %s", result.section, result.err.Error())
+			}
+			messages = append(messages, message)
 		}
 	}
 
@@ -171,13 +176,16 @@ func (b bindResults) Condition() metav1.Condition {
 	// if we only have a single binding error, we can get more specific
 	if len(b) == 1 {
 		for _, result := range b {
-			// if we have a hostname mismatch error, then use the more specific reason
-			if result.err == errRouteNoMatchingListenerHostname {
+			switch result.err {
+			case errRouteNoMatchingListenerHostname:
+				// if we have a hostname mismatch error, then use the more specific reason
 				reason = "NoMatchingListenerHostname"
-			}
-			// or if we have a ref not permitted, then use that
-			if result.err == errRefNotPermitted {
+			case errRefNotPermitted:
+				// or if we have a ref not permitted, then use that
 				reason = "RefNotPermitted"
+			case errRouteNoMatchingParent:
+				// or if the route declares a parent that we can't find
+				reason = "NoMatchingParent"
 			}
 		}
 	}
