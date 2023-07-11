@@ -70,13 +70,13 @@ resource "azurerm_kubernetes_cluster" "default" {
   // and that gives us more confidence that in any tests where cross-cluster
   // communication is tested, the connections goes through the appropriate gateway
   // rather than directly from pod to pod.
-  # network_profile {
-  #   network_plugin     = "azure"
-  #   service_cidr       = "10.0.0.0/16"
-  #   dns_service_ip     = "10.0.0.10"
-  #   pod_cidr           = "10.244.0.0/16"
-  #   docker_bridge_cidr = "172.17.0.1/16"
-  # }
+  network_profile {
+    network_plugin     = "azure"
+    # service_cidr       = "10.0.0.0/16"
+    # dns_service_ip     = "10.0.0.10"
+    # pod_cidr           = "10.244.0.0/16"
+    # docker_bridge_cidr = "172.17.0.1/16"
+  }
 
   default_node_pool {
     name            = "default"
