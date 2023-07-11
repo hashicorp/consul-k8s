@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package connhelper
 
 import (
@@ -114,18 +117,19 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
-
-	retrier := &retry.Timer{Timeout: 300 * time.Second, Wait: 100 * time.Millisecond}
-	retry.RunWith(retrier, t, func(r *retry.R) {
-		for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-			podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: labelSelector,
-			})
-			require.NoError(t, err)
-			require.Len(t, podList.Items, 1)
-			require.Len(t, podList.Items[0].Spec.Containers, 2)
-		}
-	})
+	retry.RunWith(
+		&retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}, t,
+		func(r *retry.R) {
+			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
+				podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+					LabelSelector: labelSelector,
+					FieldSelector: `status.phase=Running`,
+				})
+				require.NoError(r, err)
+				require.Len(r, podList.Items, 1)
+				require.Len(r, podList.Items[0].Spec.Containers, 2)
+			}
+		})
 }
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static
