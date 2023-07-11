@@ -98,9 +98,9 @@ resource "local_file" "kubeconfigs" {
   file_permission = "0600"
 }
 
-resource "azurerm_kubernetes_cluster_node_pool" "windows"  {
+resource "azurerm_kubernetes_cluster_node_pool" "win"  {
   count = var.windows ? 1 : 0
-  name                  = "windows"
+  name                  = "win"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.default[count.index].id
   vm_size               = "Standard_DS2_v2"
   node_count            = 1
