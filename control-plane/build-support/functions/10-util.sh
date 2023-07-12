@@ -626,10 +626,10 @@ function update_version_helm {
 	local consul_dataplane_base_path="$8"
 	if ! test -z "$3" && test "$3" != "dev"; then
 		full_version="$2-$3"
-    full_consul_version="$5-$3"
-    full_consul_dataplane_version="$7-$3"
+		full_consul_version="$5-$3"
+		full_consul_dataplane_version="$7-$3"
 	elif test "$3" == "dev"; then
-    full_version="$2-$3"
+		full_version="$2-$3"
 		# strip off the last minor patch version so that the consul image can be set to something like 1.16-dev. The image
 		# is produced by Consul every night
 		full_consul_version="${5%.*}-$3"
@@ -641,13 +641,13 @@ function update_version_helm {
 	sed_i ${SED_EXT} -e "s/(appVersion:[[:space:]]*)[^\"]*/\1${full_consul_version}/g" "${cfile}"
 	sed_i ${SED_EXT} -e "s/(image:.*\/consul-k8s-control-plane:)[^\"]*/image: $4${full_version}/g" "${cfile}"
 
-  sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul:)[^\"]*\$,\1 $6:${full_consul_version},g" ${cfile}
-  sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul:)[^\"]*\$,\1 $6:${full_consul_version},g" ${vfile}
-  sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul-enterprise:)[^\"]*\$,\1 $6:${full_consul_version},g" ${cfile}
-  sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul-enterprise:)[^\"]*\$,\1 $6:${full_consul_version},g" ${vfile}
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul:)[^\"]*\$,\1 $6:${full_consul_version},g" ${cfile}
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul:)[^\"]*\$,\1 $6:${full_consul_version},g" ${vfile}
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul-enterprise:)[^\"]*\$,\1 $6:${full_consul_version},g" ${cfile}
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul-enterprise:)[^\"]*\$,\1 $6:${full_consul_version},g" ${vfile}
 
-  sed_i ${SED_EXT} -e "s/(imageConsulDataplane:.*\/consul-dataplane:)[^\"]*/imageConsulDataplane: ${consul_dataplane_base_path}:${full_consul_dataplane_version}/g" "${vfile}"
-  sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul-dataplane:)[^\"]*\$,\1 ${consul_dataplane_base_path}:${full_consul_dataplane_version},g" ${cfile}
+	sed_i ${SED_EXT} -e "s/(imageConsulDataplane:.*\/consul-dataplane:)[^\"]*/imageConsulDataplane: ${consul_dataplane_base_path}:${full_consul_dataplane_version}/g" "${vfile}"
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul-dataplane:)[^\"]*\$,\1 ${consul_dataplane_base_path}:${full_consul_dataplane_version},g" ${cfile}
 
 	if test -z "$3"; then
 		sed_i ${SED_EXT} -e "s/(artifacthub.io\/prerelease:[[:space:]]*)[^\"]*/\1false/g" "${cfile}"
@@ -713,7 +713,7 @@ function set_changelog {
 	#   $2 - Version
 	#   $3 - Release Date
 	#   $4 - The last git release tag
-  #   $5 - Pre-release version
+	#   $5 - Pre-release version
 	#
 	#
 	# Returns:
@@ -733,7 +733,7 @@ function set_changelog {
 		rel_date="$3"
 	fi
 	local last_release_date_git_tag=$4
-  local preReleaseVersion="-$5"
+        local preReleaseVersion="-$5"
 
 	if test -z "${version}"; then
 		err "ERROR: Must specify a version to put into the changelog"
@@ -792,7 +792,7 @@ function prepare_dev {
 	#   $4 - The last release git tag for this branch (eg. v1.1.0) (Unused)
 	#   $5 - The version of the next release
 	#   $6 - The version of the next consul release
-  #   $7 - The next consul-dataplane version
+        #   $7 - The next consul-dataplane version
 	#
 	# Returns:
 	#   0 - success
