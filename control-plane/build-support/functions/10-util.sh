@@ -599,6 +599,8 @@ function update_version_helm {
 	#   $4 - Image base path
 	#   $5 - Consul version string
 	#   $6 - Consul image base path
+	#   $7 - Consul-Dataplane version string
+	#   $8 - Consul-Dataplane base path
 	#
 	# Returns:
 	#   0 - success
@@ -620,19 +622,32 @@ function update_version_helm {
 	local prerelease="$3"
 	local full_version="$2"
 	local full_consul_version="$5"
-	if ! test -z "$3"; then
+	local full_consul_dataplane_version="$7"
+	local consul_dataplane_base_path="$8"
+	if ! test -z "$3" && test "$3" != "dev"; then
+		full_version="$2-$3"
+		full_consul_version="$5-$3"
+		full_consul_dataplane_version="$7-$3"
+	elif test "$3" == "dev"; then
 		full_version="$2-$3"
 		# strip off the last minor patch version so that the consul image can be set to something like 1.16-dev. The image
 		# is produced by Consul every night
 		full_consul_version="${5%.*}-$3"
+		full_consul_dataplane_version="${7%.*}-$3"
 	fi
 
 	sed_i ${SED_EXT} -e "s/(imageK8S:.*\/consul-k8s-control-plane:)[^\"]*/imageK8S: $4${full_version}/g" "${vfile}"
 	sed_i ${SED_EXT} -e "s/(version:[[:space:]]*)[^\"]*/\1${full_version}/g" "${cfile}"
 	sed_i ${SED_EXT} -e "s/(appVersion:[[:space:]]*)[^\"]*/\1${full_consul_version}/g" "${cfile}"
 	sed_i ${SED_EXT} -e "s/(image:.*\/consul-k8s-control-plane:)[^\"]*/image: $4${full_version}/g" "${cfile}"
-	sed_i ${SED_EXT} -e "s/(image:.*\/consul:)[^\"]*/image: $6:${full_consul_version}/g" "${cfile}"
-	sed_i ${SED_EXT} -e "s/(image:.*\/consul:)[^\"]*/image: $6:${full_consul_version}/g" "${vfile}"
+
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul:)[^\"]*\$,\1 $6:${full_consul_version},g" ${cfile}
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul:)[^\"]*\$,\1 $6:${full_consul_version},g" ${vfile}
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul-enterprise:)[^\"]*\$,\1 $6:${full_consul_version},g" ${cfile}
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul-enterprise:)[^\"]*\$,\1 $6:${full_consul_version},g" ${vfile}
+
+	sed_i ${SED_EXT} -e "s/(imageConsulDataplane:.*\/consul-dataplane:)[^\"]*/imageConsulDataplane: ${consul_dataplane_base_path}:${full_consul_dataplane_version}/g" "${vfile}"
+	sed_i ${SED_EXT} -e "s,^( *image:)(.*/consul-dataplane:)[^\"]*\$,\1 ${consul_dataplane_base_path}:${full_consul_dataplane_version},g" ${cfile}
 
 	if test -z "$3"; then
 		sed_i ${SED_EXT} -e "s/(artifacthub.io\/prerelease:[[:space:]]*)[^\"]*/\1false/g" "${cfile}"
@@ -651,6 +666,8 @@ function set_version {
 	#   $5 - The consul-k8s helm docker image base path
 	#   $6 - The consul version
 	#   $7 - The consul helm docker image base path
+	#   $8 - The consul dataplane version
+	#   $9 - The consul-dataplane helm docker image base path
 	#
 	#
 	# Returns:
@@ -670,6 +687,7 @@ function set_version {
 	local sdir="$1"
 	local vers="$2"
 	local consul_vers="$6"
+	local consul_dataplane_vers="$8"
 
 	status_stage "==> Updating control-plane version/version.go with version info: ${vers} "$4""
 	if ! update_version "${sdir}/control-plane/version/version.go" "${vers}" "$4"; then
@@ -681,8 +699,8 @@ function set_version {
 		return 1
 	fi
 
-	status_stage "==> Updating Helm chart version, consul-k8s: ${vers} "$4" consul: ${consul_vers} "$4""
-	if ! update_version_helm "${sdir}/charts/consul" "${vers}" "$4" "$5" "${consul_vers}" "$7"; then
+	status_stage "==> Updating Helm chart version, consul-k8s: ${vers} "$4" consul: ${consul_vers} "$4" consul-dataplane: ${consul_dataplane_vers} "$4""
+	if ! update_version_helm "${sdir}/charts/consul" "${vers}" "$4" "$5" "${consul_vers}" "$7" "${consul_dataplane_vers}" "$9"; then
 		return 1
 	fi
 
@@ -695,6 +713,7 @@ function set_changelog {
 	#   $2 - Version
 	#   $3 - Release Date
 	#   $4 - The last git release tag
+	#   $5 - Pre-release version
 	#
 	#
 	# Returns:
@@ -714,20 +733,21 @@ function set_changelog {
 		rel_date="$3"
 	fi
 	local last_release_date_git_tag=$4
+        local preReleaseVersion="-$5"
 
 	if test -z "${version}"; then
 		err "ERROR: Must specify a version to put into the changelog"
 		return 1
 	fi
 
-	if [ -z "$LAST_RELEASE_GIT_TAG" ]; then
-		echo "Error: LAST_RELEASE_GIT_TAG not specified."
+	if [ -z "$CONSUL_K8S_LAST_RELEASE_GIT_TAG" ]; then
+		echo "Error: CONSUL_K8S_LAST_RELEASE_GIT_TAG not specified."
 		exit 1
 	fi
 
 	cat <<EOT | cat - "${curdir}"/CHANGELOG.MD >tmp && mv tmp "${curdir}"/CHANGELOG.MD
-## ${version} (${rel_date})
-$(changelog-build -last-release ${LAST_RELEASE_GIT_TAG} \
+## ${version}${preReleaseVersion} (${rel_date})
+$(changelog-build -last-release ${CONSUL_K8S_LAST_RELEASE_GIT_TAG} \
 		-entries-dir .changelog/ \
 		-changelog-template .changelog/changelog.tmpl \
 		-note-template .changelog/note.tmpl \
@@ -742,17 +762,26 @@ function prepare_release {
 	#   $2 - The version of the release
 	#   $3 - The release date
 	#   $4 - The last release git tag for this branch (eg. v1.1.0)
-	#   $5 - The pre-release version
-	#   $6 - The consul version
+  #   $5 - The consul version
+	#   $6 - The consul-dataplane version
+  #   $7 - The pre-release version
 	#
 	#
 	# Returns:
 	#   0 - success
 	#   * - error
 
-	echo "prepare_release: dir:$1 consul-k8s:$2 consul:$5 date:"$3" git tag:$4"
-	set_version "$1" "$2" "$3" "$6" "hashicorp\/consul-k8s-control-plane:" "$5" "hashicorp\/consul"
-	set_changelog "$1" "$2" "$3" "$4"
+  local curDir=$1
+  local version=$2
+  local releaseDate=$3
+  local lastGitTag=$4
+  local consulVersion=$5
+  local consulDataplaneVersion=$6
+  local prereleaseVersion=$7
+
+	echo "prepare_release: dir:${curDir} consul-k8s:${version} consul:${consulVersion} consul-dataplane:${consulDataplaneVersion} date:"${releaseDate}" git tag:${lastGitTag}"
+	set_version "${curDir}" "${version}" "${releaseDate}" "${prereleaseVersion}" "hashicorp\/consul-k8s-control-plane:" "${consulVersion}" "hashicorp\/consul" "${consulDataplaneVersion}" "hashicorp\/consul-dataplane"
+	set_changelog "${curDir}" "${version}" "${releaseDate}" "${lastGitTag}" "${prereleaseVersion}"
 }
 
 function prepare_dev {
@@ -763,13 +792,21 @@ function prepare_dev {
 	#   $4 - The last release git tag for this branch (eg. v1.1.0) (Unused)
 	#   $5 - The version of the next release
 	#   $6 - The version of the next consul release
+        #   $7 - The next consul-dataplane version
 	#
 	# Returns:
 	#   0 - success
 	#   * - error
 
-	echo "prepare_dev: dir:$1 consul-k8s:$5 consul:$6 date:"$3" mode:dev"
-	set_version "$1" "$5" "$3" "dev" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-k8s-control-plane:" "$6" "docker.mirror.hashicorp.services\/hashicorppreview\/consul"
+  local curDir=$1
+  local version=$2
+  local releaseDate=$3
+  local nextReleaseVersion=$5
+  local nextConsulVersion=$6
+  local nextConsulDataplaneVersion=$7
+
+	echo "prepare_dev: dir:${curDir} consul-k8s:${nextReleaseVersion} consul:${nextConsulVersion} date:"${releaseDate}" mode:dev"
+	set_version "${curDir}" "${nextReleaseVersion}" "${releaseDate}" "dev" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-k8s-control-plane:" "${nextConsulVersion}" "docker.mirror.hashicorp.services\/hashicorppreview\/consul" "${nextConsulDataplaneVersion}" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-dataplane"
 
 	return 0
 }
@@ -896,7 +933,7 @@ function ui_version {
 		return 1
 	fi
 
-	local ui_version=$(sed -n ${SED_EXT} -e 's/.*CONSUL_VERSION%22%3A%22([^%]*)%22%2C%22.*/\1/p' <"$1") || return 1
+	local ui_version=$(sed -n ${SED_EXT} -e 's/.*CONSUL_K8S_CONSUL_VERSION%22%3A%22([^%]*)%22%2C%22.*/\1/p' <"$1") || return 1
 	echo "$ui_version"
 	return 0
 }
