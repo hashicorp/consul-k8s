@@ -2235,12 +2235,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: override global.logLevel when server.logLevel is set" {
+@test "serverACLInit/Job: override global.logLevel when global.acls.logLevel is set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/server-acl-init-job.yaml \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'server.logLevel=debug' \
+      --set 'global.acls.logLevel=debug' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 

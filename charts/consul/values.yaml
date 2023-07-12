@@ -310,6 +310,10 @@ global:
     # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
     enabled: false
 
+    # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+    # @type: string
+    logLevel: ""
+
     # If true, turns on the auto-encrypt feature on clients and servers.
     # It also switches consul-k8s-control-plane components to retrieve the CA from the servers
     # via the API. Requires Consul 1.7.1+.
@@ -408,6 +412,10 @@ global:
     # for all Consul and consul-k8s-control-plane components.
     # This requires Consul >= 1.4.
     manageSystemACLs: false
+
+    # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+    # @type: string
+    logLevel: ""
 
     # A Kubernetes or Vault secret containing the bootstrap token to use for creating policies and
     # tokens for all Consul and consul-k8s-control-plane components. If `secretName` and `secretKey`
@@ -733,10 +741,6 @@ server:
   # @default: global.enabled
   # @type: boolean
   enabled: "-"
-
-  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
-  # @type: string
-  logLevel: ""
 
   # The name of the Docker image (including any tag) for the containers running
   # Consul server agents.

@@ -224,12 +224,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "tlsInit/Job: override global.logLevel when server.logLevel is set" {
+@test "tlsInit/Job: override global.logLevel when global.tls.logLevel is set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/tls-init-job.yaml  \
       --set 'global.tls.enabled=true' \
-      --set 'server.logLevel=error' \
+      --set 'global.tls.logLevel=error' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
