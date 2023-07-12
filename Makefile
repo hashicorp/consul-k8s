@@ -209,38 +209,42 @@ eks-test-packages:
 aks-test-packages:
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
 
-
 # ===========> Release Targets
+check-env:
+	@printenv | grep "CONSUL_K8S"
 
 prepare-release: ## Sets the versions, updates changelog to prepare this repository to release
-ifndef RELEASE_VERSION
-	$(error RELEASE_VERSION is required)
+ifndef CONSUL_K8S_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
-ifndef RELEASE_DATE
-	$(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+ifndef CONSUL_K8S_RELEASE_DATE
+	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
-ifndef LAST_RELEASE_GIT_TAG 
-	$(error LAST_RELEASE_GIT_TAG is required)
+ifndef CONSUL_K8S_LAST_RELEASE_GIT_TAG
+	$(error CONSUL_K8S_LAST_RELEASE_GIT_TAG is required)
 endif
-ifndef CONSUL_VERSION
-	$(error CONSUL_VERSION is required)
+ifndef CONSUL_K8S_CONSUL_VERSION
+	$(error CONSUL_K8S_CONSUL_VERSION is required)
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(LAST_RELEASE_GIT_TAG) $(CONSUL_VERSION) $(PRERELEASE_VERSION)
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION)
 
 prepare-dev:
-ifndef RELEASE_VERSION
-	$(error RELEASE_VERSION is required)
+ifndef CONSUL_K8S_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
-ifndef RELEASE_DATE
-	$(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+ifndef CONSUL_K8S_RELEASE_DATE
+	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
-ifndef NEXT_RELEASE_VERSION
-	$(error NEXT_RELEASE_VERSION is required)
+ifndef CONSUL_K8S_NEXT_RELEASE_VERSION
+	$(error CONSUL_K8S_NEXT_RELEASE_VERSION is required)
 endif
-ifndef NEXT_CONSUL_VERSION
-	$(error NEXT_CONSUL_VERSION is required)
+ifndef CONSUL_K8S_NEXT_CONSUL_VERSION
+	$(error CONSUL_K8S_NEXT_CONSUL_VERSION is required)
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" "" $(NEXT_RELEASE_VERSION) $(NEXT_CONSUL_VERSION)
+ifndef CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION
+	$(error CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" "" $(CONSUL_K8S_NEXT_RELEASE_VERSION) $(CONSUL_K8S_NEXT_CONSUL_VERSION) $(CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION)
 
 # ===========> Makefile config
 
