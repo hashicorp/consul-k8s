@@ -1,3 +1,9 @@
+## 0.49.8 (July 12, 2023)
+
+IMPROVEMENTS:
+
+* helm: Add `connectInject.prepareDataplanesUpgrade` setting for help upgrading to dataplanes. This setting is required if upgrading from non-dataplanes to dataplanes when ACLs are enabled. See https://developer.hashicorp.com/consul/docs/k8s/upgrade#upgrading-to-consul-dataplane for more information. [[GH-2514](https://github.com/hashicorp/consul-k8s/issues/2514)]
+
 ## 1.2.0 (June 28, 2023)
 
 FEATURES:
