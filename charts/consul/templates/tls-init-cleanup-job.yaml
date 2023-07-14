@@ -48,6 +48,7 @@ spec:
       containers:
         - name: tls-init-cleanup
           image: "{{ .Values.global.image }}"
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           env:
             - name: NAMESPACE
               valueFrom:
