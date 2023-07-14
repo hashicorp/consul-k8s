@@ -642,8 +642,7 @@ you may use the following command:
 
     go test ./... -p 1 -timeout 20m \
         -enable-multi-cluster \
-        -kubecontext=<name of the primary Kubernetes context> \
-        -secondary-kubecontext=<name of the secondary Kubernetes context>
+        -kube-contexts="<name of the primary Kubernetes context>,<name of the secondary Kubernetes context>, etc.>"
 
 Below is the list of available flags:
 
@@ -667,20 +666,14 @@ Below is the list of available flags:
     This applies only to tests that enable connectInject.
 -enterprise-license
     The enterprise license for Consul.
--kubeconfig string
-    The path to a kubeconfig file. If this is blank, the default kubeconfig path (~/.kube/config) will be used.
--kubecontext string
-    The name of the Kubernetes context to use. If this is blank, the context set as the current context will be used by default.
--namespace string
-    The Kubernetes namespace to use for tests. (default "default")
+-kubeconfigs string
+    The comma separated list of Kubernetes configs to use (eg. "~/.kube/config,~/.kube/config2"). The first in the list will be treated as the primary config, followed by the secondary, etc. If the list is empty, or items are blank, then the default kubeconfig path (~/.kube/config) will be used.
+-kube-contexts string
+    The comma separated list of Kubernetes contexts to use (eg. "kind-dc1,kind-dc2"). The first in the list will be treated as the primary context, followed by the secondary, etc. If the list is empty, or items are blank, then the current context will be used.
+-kube-namespaces string
+    The comma separated list of Kubernetes namespaces to use (eg. "consul,consul-secondary"). The first in the list will be treated as the primary namespace, followed by the secondary, etc. If the list is empty, or fields are blank, then the current namespace will be used.
 -no-cleanup-on-failure
     If true, the tests will not cleanup Kubernetes resources they create when they finish running.Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.
--secondary-kubeconfig string
-    The path to a kubeconfig file of the secondary k8s cluster. If this is blank, the default kubeconfig path (~/.kube/config) will be used.
--secondary-kubecontext string
-    The name of the Kubernetes context for the secondary cluster to use. If this is blank, the context set as the current context will be used by default.
--secondary-namespace string
-    The Kubernetes namespace to use in the secondary k8s cluster. (default "default")
 ```
 
 **Note:** There is a Terraform configuration in the
