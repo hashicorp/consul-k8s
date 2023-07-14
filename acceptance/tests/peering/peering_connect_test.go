@@ -52,7 +52,7 @@ func TestPeering_Connect(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			staticServerPeerClusterContext := env.DefaultContext(t)
-			staticClientPeerClusterContext := env.Context(t, env.GetSecondaryContextKey(t))
+			staticClientPeerClusterContext := env.Context(t, 1)
 
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
