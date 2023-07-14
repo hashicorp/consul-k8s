@@ -9,7 +9,6 @@ import (
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -81,7 +80,7 @@ func TestPartitions_Sync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			primaryClusterContext := env.DefaultContext(t)
-			secondaryClusterContext := env.Context(t, environment.SecondaryContextName)
+			secondaryClusterContext := env.Context(t, 1)
 
 			ctx := context.Background()
 

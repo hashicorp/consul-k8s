@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package peering
 
 import (
@@ -16,12 +19,12 @@ func TestMain(m *testing.M) {
 	fmt.Println("Skipping peering tests because this is a beta feature and not fully supported")
 	os.Exit(0)
 
-	//suite = testsuite.NewSuite(m)
-	//
-	//if suite.Config().EnableMultiCluster && !suite.Config().DisablePeering {
+	//expectedNumberOfClusters := 2
+	//if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) && !suite.Config().DisablePeering {
 	//	os.Exit(suite.Run())
 	//} else {
-	//	fmt.Println("Skipping peering tests because either -enable-multi-cluster is not set or -disable-peering is set")
+	//	fmt.Println(fmt.Sprintf("Skipping peerings tests because either -enable-multi-cluster is "+
+	//		"not set, -disable-peering is set, or the number of clusters did not match the expected count of %d", expectedNumberOfClusters))
 	//	os.Exit(0)
 	//}
 }

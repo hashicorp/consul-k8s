@@ -9,7 +9,6 @@ import (
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -50,7 +49,7 @@ func TestPeering_Connect(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			staticServerPeerClusterContext := env.DefaultContext(t)
-			staticClientPeerClusterContext := env.Context(t, environment.SecondaryContextName)
+			staticClientPeerClusterContext := env.Context(t, 1)
 
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",

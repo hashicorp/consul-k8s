@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package partitions
 
 import (
@@ -8,7 +11,6 @@ import (
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -82,7 +84,7 @@ func TestPartitions_Connect(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			serverClusterContext := env.DefaultContext(t)
-			clientClusterContext := env.Context(t, environment.SecondaryContextName)
+			clientClusterContext := env.Context(t, 1)
 
 			ctx := context.Background()
 
