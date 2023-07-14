@@ -100,7 +100,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			routeNamespace, routeK8SOptions := createNamespace(t, ctx, cfg)
 
 			logger.Logf(t, "creating target server in %s namespace", serviceNamespace)
-			k8s.DeployKustomize(t, serviceK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, serviceK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			logger.Logf(t, "creating certificate resources in %s namespace", certificateNamespace)
 			applyFixture(t, cfg, certificateK8SOptions, "cases/api-gateways/certificate")
@@ -255,7 +255,7 @@ func applyFixture(t *testing.T, cfg *config.TestConfig, k8sOptions *terratestk8s
 
 	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "apply", "-k", path.Join("../fixtures", fixture))
 	require.NoError(t, err, out)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectlAndGetOutputE(t, k8sOptions, "delete", "-k", path.Join("../fixtures", fixture))
 	})
 }
@@ -267,7 +267,7 @@ func createNamespace(t *testing.T, ctx environment.TestContext, cfg *config.Test
 
 	logger.Logf(t, "creating Kubernetes namespace %s", namespace)
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", namespace)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", namespace)
 	})
 

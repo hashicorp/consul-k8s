@@ -46,7 +46,7 @@ type TestFlags struct {
 	flagHCPResourceID string
 
 	flagNoCleanupOnFailure bool
-	flagNoCleanupWanFed    bool
+	flagNoCleanup          bool
 	flagTestDuration       string
 
 	flagDebugDirectory string
@@ -118,8 +118,8 @@ func (t *TestFlags) init() {
 		"If true, the tests will not cleanup Kubernetes resources they create when they finish running."+
 			"Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.")
 
-	flag.BoolVar(&t.flagNoCleanupWanFed, "no-cleanup-wan-fed", false,
-		"If true, the tests will not cleanup Kubernetes resources for Vault Wan Fed test")
+	flag.BoolVar(&t.flagNoCleanup, "no-cleanup", false,
+		"If true, the tests will not cleanup Kubernetes resources for Vault test")
 
 	flag.StringVar(&t.flagTestDuration, "test-duration", " ", "The time you need to work on the test.")
 
@@ -186,7 +186,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		VaultHelmChartVersion:     t.flagVaultHelmChartVersion,
 		VaultServerVersion:        t.flagVaultServerVersion,
 		NoCleanupOnFailure:        t.flagNoCleanupOnFailure,
-		NoCleanupWanFed:           t.flagNoCleanupWanFed,
+		NoCleanup:                 t.flagNoCleanup,
 		TestDuration:              t.flagTestDuration,
 		DebugDirectory:            tempDir,
 		UseAKS:                    t.flagUseAKS,

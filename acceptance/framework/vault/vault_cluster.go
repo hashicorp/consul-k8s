@@ -47,6 +47,7 @@ type VaultCluster struct {
 	kubernetesClient kubernetes.Interface
 
 	noCleanupOnFailure bool
+	noCleanup          bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 }
@@ -76,7 +77,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 
 		if strings.Contains(cfg.VaultServerVersion, entstr) {
 
-			//logger.Log(t, "Creating secret for Vault license")
+			logger.Logf(t, "Creating secret for Vault license")
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
 
 			values["server.image.repository"] = "docker.mirror.hashicorp.services/hashicorp/vault-enterprise"
@@ -112,6 +113,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 		kubectlOptions:     kopts,
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
+		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		releaseName:        releaseName,
@@ -247,7 +249,7 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext, vaultNa
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
-	helpers.Cleanup(t, v.noCleanupOnFailure, func() {
+	helpers.Cleanup(t, v.noCleanupOnFailure, v.noCleanup, func() {
 		v.Destroy(t)
 	})
 
@@ -369,7 +371,7 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		if !v.noCleanupOnFailure {
+		if !(v.noCleanupOnFailure || v.noCleanup) {
 			// We're ignoring error here because secret deletion is best-effort.
 			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), certSecretName(v.releaseName), metav1.DeleteOptions{})
 			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), CASecretName(v.releaseName), metav1.DeleteOptions{})
@@ -442,7 +444,7 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 	rootTokenSecret := fmt.Sprintf("%s-vault-root-token", v.releaseName)
 	v.logger.Logf(t, "saving Vault root token to %q Kubernetes secret", rootTokenSecret)
 
-	helpers.Cleanup(t, v.noCleanupOnFailure, func() {
+	helpers.Cleanup(t, v.noCleanupOnFailure, v.noCleanup, func() {
 		_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), rootTokenSecret, metav1.DeleteOptions{})
 	})
 	_, err := v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{

@@ -6,9 +6,7 @@ package vault
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -494,17 +492,17 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	kustomizeDir := "../fixtures/bases/mesh-gateway"
 	k8s.KubectlApplyK(t, primaryCtx.KubectlOptions(t), kustomizeDir)
 
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, primaryCtx.KubectlOptions(t), kustomizeDir)
 	})
 
 	// Check that we can connect services over the mesh gateways.
 
 	logger.Log(t, "creating static-server in dc2")
-	k8s.DeployKustomize(t, secondaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployKustomize(t, secondaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 	logger.Log(t, "creating static-client in dc1")
-	k8s.DeployKustomize(t, primaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+	k8s.DeployKustomize(t, primaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 	logger.Log(t, "creating intention")
 	_, _, err = primaryClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -522,18 +520,17 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, primaryCtx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 
-	if cfg.NoCleanupWanFed {
-		//time.Sleep(1800 * time.Second)
-		intVar, err := strconv.Atoi(cfg.TestDuration)
+	//if cfg.NoCleanupWanFed {
+	//time.Sleep(1800 * time.Second)
+	//intVar, err := strconv.Atoi(cfg.TestDuration)
 
-		if err != nil {
-			logger.Log(t, "Couldn't convert string to int")
+	//	if err != nil {
+	//		logger.Log(t, "Couldn't convert string to int")
 
-		}
-		time.Sleep(time.Duration(intVar) * time.Hour)
+	//	}
+	//	time.Sleep(time.Duration(intVar) * time.Hour)
 
-	}
-
+	//}
 }
 
 // vaultAddress returns Vault's server URL depending on test configuration.

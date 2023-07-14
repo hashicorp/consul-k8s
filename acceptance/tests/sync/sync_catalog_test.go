@@ -50,7 +50,7 @@ func TestSyncCatalog(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating a static-server with a service")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
