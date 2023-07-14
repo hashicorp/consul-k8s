@@ -17,7 +17,7 @@ import (
 type TestFlags struct {
 	flagKubeconfigs        listFlag
 	flagKubecontexts       listFlag
-	flagNamespaces         listFlag
+	flagKubeNamespaces     listFlag
 	flagEnableMultiCluster bool
 
 	flagEnableEnterprise  bool
@@ -91,14 +91,14 @@ func (t *TestFlags) init() {
 
 	flag.Var(&t.flagKubeconfigs, "kubeconfigs", "The list of paths to a kubeconfig files. If this is blank, "+
 		"the default kubeconfig path (~/.kube/config) will be used.")
-	flag.Var(&t.flagKubecontexts, "kubecontexts", "The list of names of the Kubernetes contexts to use. If this is blank, "+
+	flag.Var(&t.flagKubecontexts, "kube-contexts", "The list of names of the Kubernetes contexts to use. If this is blank, "+
 		"the context set as the current context will be used by default.")
-	flag.Var(&t.flagNamespaces, "namespaces", "The list Kubernetes namespace to use for tests.")
+	flag.Var(&t.flagKubeNamespaces, "kube-namespaces", "The list of Kubernetes namespaces to use for tests.")
 	flag.StringVar(&t.flagHCPResourceID, "hcp-resource-id", "", "The hcp resource id to use for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
-			"At least one of -secondary-kubeconfig or -secondary-kubecontext is required when this flag is used.")
+			"The lists -kubeconfig or -kube-context must contain more than one entry when this flag is used.")
 
 	flag.BoolVar(&t.flagEnableEnterprise, "enable-enterprise", false,
 		"If true, the test suite will run tests for enterprise features. "+
@@ -147,7 +147,25 @@ func (t *TestFlags) init() {
 func (t *TestFlags) Validate() error {
 	if t.flagEnableMultiCluster {
 		if len(t.flagKubecontexts) <= 1 && len(t.flagKubeconfigs) <= 1 {
-			return errors.New("at least two contexts must be included in -kubecontexts or -kubeconfigs if -enable-multi-cluster is set")
+			return errors.New("at least two contexts must be included in -kube-contexts or -kubeconfigs if -enable-multi-cluster is set")
+		}
+	}
+
+	if len(t.flagKubecontexts) != 0 && len(t.flagKubeconfigs) != 0 {
+		if len(t.flagKubecontexts) != len(t.flagKubeconfigs) {
+			return errors.New("-kube-contexts and -kubeconfigs are both set but are not of equal length")
+		}
+	}
+
+	if len(t.flagKubecontexts) != 0 && len(t.flagKubeNamespaces) != 0 {
+		if len(t.flagKubecontexts) != len(t.flagKubeNamespaces) {
+			return errors.New("-kube-contexts and -kube-namespaces are both set but are not of equal length")
+		}
+	}
+
+	if len(t.flagKubeNamespaces) != 0 && len(t.flagKubeconfigs) != 0 {
+		if len(t.flagKubeNamespaces) != len(t.flagKubeconfigs) {
+			return errors.New("-kube-namespaces and -kubeconfigs are both set but are not of equal length")
 		}
 	}
 
@@ -164,7 +182,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	consulVersion, _ := version.NewVersion(t.flagConsulVersion)
 	consulDataplaneVersion, _ := version.NewVersion(t.flagConsulDataplaneVersion)
 	//vaultserverVersion, _ := version.NewVersion(t.flagVaultServerVersion)
-	kubeEnvs := config.KubeEnvListFromStringList(t.flagKubeconfigs, t.flagKubecontexts, t.flagNamespaces)
+	kubeEnvs := config.NewKubeTestConfigList(t.flagKubeconfigs, t.flagKubecontexts, t.flagKubeNamespaces)
 
 	c := &config.TestConfig{
 		EnableEnterprise:  t.flagEnableEnterprise,

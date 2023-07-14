@@ -642,7 +642,7 @@ you may use the following command:
 
     go test ./... -p 1 -timeout 20m \
         -enable-multi-cluster \
-        -kubecontexts="<name of the primary Kubernetes context>,<name of the secondary Kubernetes context>, etc.>"
+        -kube-contexts="<name of the primary Kubernetes context>,<name of the secondary Kubernetes context>, etc.>"
 
 Below is the list of available flags:
 
@@ -666,15 +666,14 @@ Below is the list of available flags:
     This applies only to tests that enable connectInject.
 -enterprise-license
     The enterprise license for Consul.
--kubeconfigs string
-    The comma separate list of Kubernetes configs to use (eg. "~/.kube/config,~/.kube/config2"). The first in the list will be treated as the primary config, followed by the secondary, etc. If this is empty, or fields are blank, then the context set as the current context will be used by default.
--kubecontexts string
-    The comma separate list of Kubernetes contexts to use (eg. "kind-dc1,kind-dc2"). The first in the list will be treated as the primary context, followed by the secondary, etc. If this is empty, or fields are blank then the default kubeconfig path (~/.kube/config) will be used.
--kubenamespaces string
-    The comma separate list of Kubernetes namespaces to use (eg. "consul,consul-secondary"). The first in the list will be treated as the primary namespace, followed by the secondary, etc. If the list is empty, or fields are blank, then the "default" namespace will be used.
+-kube-configs string
+    The comma separated list of Kubernetes configs to use (eg. "~/.kube/config,~/.kube/config2"). The first in the list will be treated as the primary config, followed by the secondary, etc. If the list is empty, or items are blank, then the default kubeconfig path (~/.kube/config) will be used.
+-kube-contexts string
+    The comma separated list of Kubernetes contexts to use (eg. "kind-dc1,kind-dc2"). The first in the list will be treated as the primary context, followed by the secondary, etc. If the list is empty, or items are blank, then the current context will be used.
+-kube-namespaces string
+    The comma separated list of Kubernetes namespaces to use (eg. "consul,consul-secondary"). The first in the list will be treated as the primary namespace, followed by the secondary, etc. If the list is empty, or fields are blank, then the current namespace will be used.
 -no-cleanup-on-failure
     If true, the tests will not cleanup Kubernetes resources they create when they finish running.Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.
-
 ```
 
 **Note:** There is a Terraform configuration in the
