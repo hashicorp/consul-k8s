@@ -25,7 +25,7 @@ func TestVault_Partitions(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 	serverClusterCtx := env.DefaultContext(t)
-	clientClusterCtx := env.Context(t, env.GetSecondaryContextKey(t))
+	clientClusterCtx := env.Context(t, 1)
 	ns := serverClusterCtx.KubectlOptions(t).Namespace
 
 	const secondaryPartition = "secondary"

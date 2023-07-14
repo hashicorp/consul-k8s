@@ -41,7 +41,7 @@ func TestPeering_Gateway(t *testing.T) {
 	const staticClientPeer = "client"
 
 	staticServerPeerClusterContext := env.DefaultContext(t)
-	staticClientPeerClusterContext := env.Context(t, env.GetSecondaryContextKey(t))
+	staticClientPeerClusterContext := env.Context(t, 1)
 
 	commonHelmValues := map[string]string{
 		"global.peering.enabled":        "true",

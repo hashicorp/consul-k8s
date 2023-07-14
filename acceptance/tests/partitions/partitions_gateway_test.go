@@ -36,7 +36,7 @@ func TestPartitions_Gateway(t *testing.T) {
 	const secondaryPartition = "secondary"
 
 	defaultPartitionClusterContext := env.DefaultContext(t)
-	secondaryPartitionClusterContext := env.Context(t, env.GetSecondaryContextKey(t))
+	secondaryPartitionClusterContext := env.Context(t, 1)
 
 	commonHelmValues := map[string]string{
 		"global.adminPartitions.enabled": "true",

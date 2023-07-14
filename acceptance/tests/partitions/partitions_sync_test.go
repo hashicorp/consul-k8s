@@ -81,7 +81,7 @@ func TestPartitions_Sync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			primaryClusterContext := env.DefaultContext(t)
-			secondaryClusterContext := env.Context(t, env.GetSecondaryContextKey(t))
+			secondaryClusterContext := env.Context(t, 1)
 
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
