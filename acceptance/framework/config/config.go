@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,66 +23,47 @@ const (
 	LicenseSecretKey  = "key"
 )
 
-type KubeEnv struct {
+type KubeTestConfig struct {
 	KubeConfig    string
 	KubeContext   string
 	KubeNamespace string
 }
 
-func KubeEnvListFromStringList(kubeConfigs, kubeContexts, kubeNamespaces []string) []KubeEnv {
-	// Determine the longest list length
-	maxLen := 0
-	lenConf := len(kubeConfigs)
-	if maxLen < lenConf {
-		maxLen = lenConf
-	}
-
-	lenCtx := len(kubeContexts)
-	if maxLen < lenCtx {
-		maxLen = lenCtx
-	}
-
-	lenNs := len(kubeNamespaces)
-	if maxLen < lenNs {
-		maxLen = lenNs
-	}
+// NewKubeTestConfigList takes lists of kubernetes configs, contexts and namespaces and constructs KubeTestConfig
+// We validate ahead of time that the lists are either 0 or the same length as we expect that if the length of a list
+// is greater than 0, then the indexes should match. For example: []kubeContexts{"ctx1", "ctx2"} indexes 0, 1 match with []kubeNamespaces{"ns1", "ns2"}
+func NewKubeTestConfigList(kubeConfigs, kubeContexts, kubeNamespaces []string) []KubeTestConfig {
+	// Grab the longest length.
+	l := math.Max(float64(len(kubeConfigs)),
+		math.Max(float64(len(kubeContexts)), float64(len(kubeNamespaces))))
 
 	// If all are empty, then return a single empty entry
-	out := make([]KubeEnv, 0)
-	if maxLen == 0 {
-		out = append(out, KubeEnv{})
-		return out
+	if l == 0 {
+		return []KubeTestConfig{{}}
 	}
 
-	// Pad lists if required, all list should be made the same length
-	for i := lenConf; i < maxLen; i++ {
-		kubeConfigs = append(kubeConfigs, "")
-	}
-
-	for i := lenCtx; i < maxLen; i++ {
-		kubeContexts = append(kubeContexts, "")
-	}
-
-	for i := lenNs; i < maxLen; i++ {
-		kubeNamespaces = append(kubeNamespaces, "")
-	}
-
-	// Construct the kubeEnv
-	for k, v := range kubeConfigs {
-		kenv := KubeEnv{
-			KubeConfig:    v,
-			KubeContext:   kubeContexts[k],
-			KubeNamespace: kubeNamespaces[k],
+	// Add each non-zero length list to the new structs, we should have
+	// n structs where n == l.
+	out := make([]KubeTestConfig, int(l))
+	for i := range out {
+		kenv := KubeTestConfig{}
+		if len(kubeConfigs) != 0 {
+			kenv.KubeConfig = kubeConfigs[i]
 		}
-		out = append(out, kenv)
+		if len(kubeContexts) != 0 {
+			kenv.KubeContext = kubeContexts[i]
+		}
+		if len(kubeNamespaces) != 0 {
+			kenv.KubeNamespace = kubeNamespaces[i]
+		}
+		out[i] = kenv
 	}
-
 	return out
 }
 
 // TestConfig holds configuration for the test suite.
 type TestConfig struct {
-	KubeEnvs           []KubeEnv
+	KubeEnvs           []KubeTestConfig
 	EnableMultiCluster bool
 
 	EnableEnterprise  bool
@@ -175,11 +157,11 @@ func (t *TestConfig) IsExpectedClusterCount(count int) bool {
 }
 
 // GetPrimaryKubeEnv returns the primary Kubernetes environment.
-func (t *TestConfig) GetPrimaryKubeEnv() KubeEnv {
+func (t *TestConfig) GetPrimaryKubeEnv() KubeTestConfig {
 	// Return the first in the list as this is always the primary
 	// kube environment. If empty return an empty kubeEnv
 	if len(t.KubeEnvs) < 1 {
-		return KubeEnv{}
+		return KubeTestConfig{}
 	} else {
 		return t.KubeEnvs[0]
 	}

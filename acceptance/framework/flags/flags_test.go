@@ -14,6 +14,7 @@ func TestFlags_validate(t *testing.T) {
 		flagEnableMultiCluster bool
 		flagKubeConfigs        listFlag
 		flagKubeContexts       listFlag
+		flagNamespaces         listFlag
 
 		flagEnableEnt  bool
 		flagEntLicense string
@@ -48,7 +49,7 @@ func TestFlags_validate(t *testing.T) {
 				flagKubeContexts:       listFlag{},
 			},
 			true,
-			"at least two contexts must be included in -kubecontexts or -kubeconfigs if -enable-multi-cluster is set",
+			"at least two contexts must be included in -kube-contexts or -kubeconfigs if -enable-multi-cluster is set",
 		},
 		{
 			"enable multi cluster: no error when secondary kubeconfig but not kubecontext is provided",
@@ -81,6 +82,47 @@ func TestFlags_validate(t *testing.T) {
 			"",
 		},
 		{
+			"enable multi cluster: no error when all of secondary kubecontext, kubeconfigs and namespaces are provided",
+			fields{
+				flagEnableMultiCluster: true,
+				flagKubeConfigs:        listFlag{"foo", "bar"},
+				flagKubeContexts:       listFlag{"foo", "bar"},
+				flagNamespaces:         listFlag{"foo", "bar"},
+			},
+			false,
+			"",
+		},
+		{
+			"enable multi cluster: error when the list of kubeconfigs and kubecontexts do not match",
+			fields{
+				flagEnableMultiCluster: true,
+				flagKubeConfigs:        listFlag{"foo", "bar"},
+				flagKubeContexts:       listFlag{"foo"},
+			},
+			true,
+			"-kube-contexts and -kubeconfigs are both set but are not of equal length",
+		},
+		{
+			"enable multi cluster: error when the list of kubeconfigs and namespaces do not match",
+			fields{
+				flagEnableMultiCluster: true,
+				flagKubeConfigs:        listFlag{"foo", "bar"},
+				flagNamespaces:         listFlag{"foo"},
+			},
+			true,
+			"-kube-namespaces and -kubeconfigs are both set but are not of equal length",
+		},
+		{
+			"enable multi cluster: error when the list of kubecontexts and namespaces do not match",
+			fields{
+				flagEnableMultiCluster: true,
+				flagKubeContexts:       listFlag{"foo", "bar"},
+				flagNamespaces:         listFlag{"foo"},
+			},
+			true,
+			"-kube-contexts and -kube-namespaces are both set but are not of equal length",
+		},
+		{
 			"enterprise license: error when only -enable-enterprise is true but env CONSUL_ENT_LICENSE is not provided",
 			fields{
 				flagEnableEnt: true,
@@ -104,6 +146,7 @@ func TestFlags_validate(t *testing.T) {
 				flagEnableMultiCluster: tt.fields.flagEnableMultiCluster,
 				flagKubeconfigs:        tt.fields.flagKubeConfigs,
 				flagKubecontexts:       tt.fields.flagKubeContexts,
+				flagKubeNamespaces:     tt.fields.flagNamespaces,
 				flagEnableEnterprise:   tt.fields.flagEnableEnt,
 				flagEnterpriseLicense:  tt.fields.flagEntLicense,
 			}
