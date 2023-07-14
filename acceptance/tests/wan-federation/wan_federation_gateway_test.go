@@ -33,7 +33,7 @@ func TestWANFederation_Gateway(t *testing.T) {
 	}
 
 	primaryContext := env.DefaultContext(t)
-	secondaryContext := env.Context(t, environment.SecondaryContextName)
+	secondaryContext := env.Context(t, 1)
 
 	primaryHelmValues := map[string]string{
 		"global.datacenter": "dc1",
