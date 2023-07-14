@@ -21,15 +21,14 @@ import (
 )
 
 const (
-	DefaultContextName   = "default"
-	SecondaryContextName = "secondary"
+	DefaultContextIndex = 0
 )
 
 // TestEnvironment represents the infrastructure environment of the test,
 // such as the kubernetes cluster(s) the test is running against.
 type TestEnvironment interface {
 	DefaultContext(t *testing.T) TestContext
-	Context(t *testing.T, name string) TestContext
+	Context(t *testing.T, index int) TestContext
 }
 
 // TestContext represents a specific context a test needs,
@@ -41,50 +40,40 @@ type TestContext interface {
 }
 
 type KubernetesEnvironment struct {
-	contexts map[string]*kubernetesContext
+	contexts []*kubernetesContext
 }
 
 func NewKubernetesEnvironmentFromConfig(config *config.TestConfig) *KubernetesEnvironment {
-	defaultContext := NewContext(config.KubeNamespace, config.Kubeconfig, config.KubeContext)
+	// First kubeEnv is the default
+	defaultContext := NewContext(config.GetPrimaryKubeEnv().KubeNamespace, config.GetPrimaryKubeEnv().KubeConfig, config.GetPrimaryKubeEnv().KubeContext)
 
 	// Create a kubernetes environment with default context.
 	kenv := &KubernetesEnvironment{
-		contexts: map[string]*kubernetesContext{
-			DefaultContextName: defaultContext,
+		contexts: []*kubernetesContext{
+			defaultContext,
 		},
 	}
 
-	// Add secondary context if multi cluster tests are enabled.
+	// Add additional contexts if multi cluster tests are enabled.
 	if config.EnableMultiCluster {
-		kenv.contexts[SecondaryContextName] = NewContext(config.SecondaryKubeNamespace, config.SecondaryKubeconfig, config.SecondaryKubeContext)
+		for _, v := range config.KubeEnvs[1:] {
+			kenv.contexts = append(kenv.contexts, NewContext(v.KubeNamespace, v.KubeConfig, v.KubeContext))
+		}
 	}
 
 	return kenv
 }
 
-func NewKubernetesEnvironmentFromContext(context *kubernetesContext) *KubernetesEnvironment {
-	// Create a kubernetes environment with default context.
-	kenv := &KubernetesEnvironment{
-		contexts: map[string]*kubernetesContext{
-			DefaultContextName: context,
-		},
-	}
-
-	return kenv
-}
-
-func (k *KubernetesEnvironment) Context(t *testing.T, name string) TestContext {
-	ctx, ok := k.contexts[name]
-	require.Truef(t, ok, fmt.Sprintf("requested context %s not found", name))
-
-	return ctx
+func (k *KubernetesEnvironment) Context(t *testing.T, index int) TestContext {
+	lenContexts := len(k.contexts)
+	require.Greater(t, lenContexts, index, fmt.Sprintf("context list does not contain an index %d, length is %d", index, lenContexts))
+	return k.contexts[index]
 }
 
 func (k *KubernetesEnvironment) DefaultContext(t *testing.T) TestContext {
-	ctx, ok := k.contexts[DefaultContextName]
-	require.Truef(t, ok, "default context not found")
-
-	return ctx
+	lenContexts := len(k.contexts)
+	require.Greater(t, lenContexts, DefaultContextIndex, fmt.Sprintf("context list does not contain an index %d, length is %d", DefaultContextIndex, lenContexts))
+	return k.contexts[DefaultContextIndex]
 }
 
 type kubernetesContext struct {
