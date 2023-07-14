@@ -23,6 +23,9 @@ type TestFlags struct {
 	flagSecondaryKubecontext string
 	flagSecondaryNamespace   string
 
+	flagAppNamespace          string
+	flagSecondaryAppNamespace string
+
 	flagEnableEnterprise  bool
 	flagEnterpriseLicense string
 
@@ -30,7 +33,8 @@ type TestFlags struct {
 
 	flagEnablePodSecurityPolicies bool
 
-	flagEnableCNI bool
+	flagEnableCNI    bool
+	flagCNINamespace string
 
 	flagEnableTransparentProxy bool
 
@@ -75,6 +79,9 @@ func (t *TestFlags) init() {
 		"the context set as the current context will be used by default.")
 	flag.StringVar(&t.flagNamespace, "namespace", "", "The Kubernetes namespace to use for tests.")
 
+	flag.StringVar(&t.flagAppNamespace, "app-namespace", "", "The Kubernetes namespace where mesh services should be deployed.")
+	flag.StringVar(&t.flagSecondaryAppNamespace, "secondary-app-namespace", "", "The secondary Kubernetes namespace where mesh services should be deployed [multi-cluster only].")
+
 	flag.StringVar(&t.flagConsulImage, "consul-image", "", "The Consul image to use for all tests.")
 	flag.StringVar(&t.flagConsulK8sImage, "consul-k8s-image", "", "The consul-k8s image to use for all tests.")
 	flag.StringVar(&t.flagConsulDataplaneImage, "consul-dataplane-image", "", "The consul-dataplane image to use for all tests.")
@@ -112,6 +119,8 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagEnableCNI, "enable-cni", false,
 		"If true, the test suite will run tests with consul-cni plugin enabled. "+
 			"In general, this will only run against tests that are mesh related (connect, mesh-gateway, peering, etc")
+	flag.StringVar(&t.flagCNINamespace, "cni-namespace", "",
+		"If configured, the CNI will be deployed in this namespace.")
 
 	flag.BoolVar(&t.flagEnableTransparentProxy, "enable-transparent-proxy", false,
 		"If true, the test suite will run tests with transparent proxy enabled. "+
@@ -172,6 +181,9 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		SecondaryKubeContext:   t.flagSecondaryKubecontext,
 		SecondaryKubeNamespace: t.flagSecondaryNamespace,
 
+		AppNamespace:          t.flagAppNamespace,
+		SecondaryAppNamespace: t.flagSecondaryAppNamespace,
+
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
 
@@ -179,7 +191,8 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
 
-		EnableCNI: t.flagEnableCNI,
+		EnableCNI:    t.flagEnableCNI,
+		CNINamespace: t.flagCNINamespace,
 
 		EnableTransparentProxy: t.flagEnableTransparentProxy,
 

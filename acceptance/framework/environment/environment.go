@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	DefaultContextName   = "default"
-	SecondaryContextName = "secondary"
+	DefaultContextName      = "default"
+	SecondaryContextName    = "secondary"
+	AppContextName          = "app-default"
+	SecondaryAppContextName = "app-secondary"
 )
 
 // TestEnvironment represents the infrastructure environment of the test,
@@ -57,6 +59,20 @@ func NewKubernetesEnvironmentFromConfig(config *config.TestConfig) *KubernetesEn
 	// Add secondary context if multi cluster tests are enabled.
 	if config.EnableMultiCluster {
 		kenv.contexts[SecondaryContextName] = NewContext(config.SecondaryKubeNamespace, config.SecondaryKubeconfig, config.SecondaryKubeContext)
+	}
+
+	// Optionally, deploy apps into a separate namespace.
+	// Maybe not the right place for this?
+	if config.AppNamespace != "" {
+		kenv.contexts[AppContextName] = NewContext(config.AppNamespace, config.Kubeconfig, config.KubeContext)
+		if config.EnableMultiCluster {
+			kenv.contexts[SecondaryAppContextName] = NewContext(config.SecondaryAppNamespace, config.SecondaryKubeconfig, config.SecondaryKubeContext)
+		}
+	} else {
+		kenv.contexts[AppContextName] = defaultContext
+		if config.EnableMultiCluster {
+			kenv.contexts[SecondaryAppContextName] = kenv.contexts[SecondaryContextName]
+		}
 	}
 
 	return kenv

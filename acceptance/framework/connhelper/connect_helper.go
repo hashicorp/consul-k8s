@@ -44,8 +44,11 @@ type ConnectHelper struct {
 	// ReleaseName is the name of the Consul cluster.
 	ReleaseName string
 
+	// Ctx is used to deploy Consul
 	Ctx environment.TestContext
-	Cfg *config.TestConfig
+	// AppCtx is used to deploy applications. If nil, then Ctx is used.
+	AppCtx environment.TestContext
+	Cfg    *config.TestConfig
 
 	// consulCluster is the cluster to use for the test.
 	consulCluster consul.Cluster
@@ -82,6 +85,14 @@ func (c *ConnectHelper) Upgrade(t *testing.T) {
 	c.consulCluster.Upgrade(t, c.helmValues())
 }
 
+// appCtx returns the context where apps are deployed.
+func (c *ConnectHelper) appCtx() environment.TestContext {
+	if c.AppCtx != nil {
+		return c.AppCtx
+	}
+	return c.Ctx
+}
+
 // DeployClientAndServer deploys a client and server pod to the Kubernetes
 // cluster which will be used to test service mesh connectivity. If the Secure
 // flag is true, a pre-check is done to ensure that the ACL tokens for the test
@@ -108,23 +119,47 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 	logger.Log(t, "creating static-server and static-client deployments")
 
-	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-	if c.Cfg.EnableTransparentProxy {
-		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
-	} else {
-		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
-	}
+	ctx := c.appCtx()
+	opts := ctx.KubectlOptions(t)
 
+	if c.Cfg.EnableCNI && c.Cfg.EnableOpenshift {
+		// On OpenShift with the CNI, we need to create a network attachment definition in the namespace
+		// where the applications are running, and the app deployment configs need to reference that network
+		// attachment definition.
+
+		// TODO: A base fixture is the wrong place for these files
+		k8s.KubectlApply(t, opts, "../fixtures/bases/openshift/")
+		helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
+			k8s.KubectlDelete(t, opts, "../fixtures/bases/openshift/")
+		})
+
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
+		if c.Cfg.EnableTransparentProxy {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
+		} else {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
+		}
+	} else {
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		if c.Cfg.EnableTransparentProxy {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+		} else {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+		}
+
+	}
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
 	retry.RunWith(
 		&retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}, t,
 		func(r *retry.R) {
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-				podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-					LabelSelector: labelSelector,
-					FieldSelector: `status.phase=Running`,
-				})
+				podList, err := ctx.KubernetesClient(t).CoreV1().
+					Pods(opts.Namespace).
+					List(context.Background(), metav1.ListOptions{
+						LabelSelector: labelSelector,
+						FieldSelector: `status.phase=Running`,
+					})
 				require.NoError(r, err)
 				require.Len(r, podList.Items, 1)
 				require.Len(r, podList.Items[0].Spec.Containers, 2)
@@ -136,7 +171,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 // and intentions. This helper is primarly used to ensure that the virtual-ips are persisted to consul properly.
 func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
 	logger.Log(t, "creating resolver redirect")
-	options := c.Ctx.KubectlOptions(t)
+	options := c.appCtx().KubectlOptions(t)
 	kustomizeDir := "../fixtures/cases/resolver-redirect-virtualip"
 	k8s.KubectlApplyK(t, options, kustomizeDir)
 
@@ -149,10 +184,12 @@ func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
 // server fails when no intentions are configured.
 func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T) {
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
+	ctx := c.appCtx()
+	opts := ctx.KubectlOptions(t)
 	if c.Cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://static-server")
+		k8s.CheckStaticServerConnectionFailing(t, opts, StaticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionFailing(t, opts, StaticClientName, "http://localhost:1234")
 	}
 }
 
@@ -177,11 +214,13 @@ func (c *ConnectHelper) CreateIntention(t *testing.T) {
 // static-client pod once the intention is set.
 func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
 	logger.Log(t, "checking that connection is successful")
+	ctx := c.appCtx()
+	opts := ctx.KubectlOptions(t)
 	if c.Cfg.EnableTransparentProxy {
 		// todo: add an assertion that the traffic is going through the proxy
-		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, opts, StaticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, opts, StaticClientName, "http://localhost:1234")
 	}
 }
 
@@ -192,8 +231,11 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	// Test that kubernetes readiness status is synced to Consul.
 	// Create a file called "unhealthy" at "/tmp/" so that the readiness probe
 	// of the static-server pod fails.
+	ctx := c.appCtx()
+	opts := ctx.KubectlOptions(t)
+
 	logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-	k8s.RunKubectl(t, c.Ctx.KubectlOptions(t), "exec", "deploy/"+StaticServerName, "--", "touch", "/tmp/unhealthy")
+	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "touch", "/tmp/unhealthy")
 
 	// The readiness probe should take a moment to be reflected in Consul,
 	// CheckStaticServerConnection will retry until Consul marks the service
@@ -205,20 +247,20 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	// other tests.
 	logger.Log(t, "checking that connection is unsuccessful")
 	if c.Cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), StaticClientName, false, []string{
+		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, opts, StaticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
 			"curl: (52) Empty reply from server",
 			"curl: (7) Failed to connect to static-server port 80: Connection refused",
 		}, "", "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), StaticClientName, false, []string{
+		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, opts, StaticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
 			"curl: (52) Empty reply from server",
 		}, "", "http://localhost:1234")
 	}
 
 	// Return the static-server to a "healthy state".
-	k8s.RunKubectl(t, c.Ctx.KubectlOptions(t), "exec", "deploy/"+StaticServerName, "--", "rm", "/tmp/unhealthy")
+	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "rm", "/tmp/unhealthy")
 }
 
 // helmValues uses the Secure and AutoEncrypt fields to set values for the Helm

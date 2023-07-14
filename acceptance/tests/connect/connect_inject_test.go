@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -34,7 +35,10 @@ func TestConnectInject(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
-			ctx := suite.Environment().DefaultContext(t)
+			env := suite.Environment()
+			ctx := env.DefaultContext(t)
+			appCtx := env.Context(t, environment.AppContextName)
+			t.Logf("appCtx = %#v", appCtx)
 
 			releaseName := helpers.RandomName()
 			connHelper := connhelper.ConnectHelper{
@@ -42,6 +46,7 @@ func TestConnectInject(t *testing.T) {
 				Secure:      c.secure,
 				ReleaseName: releaseName,
 				Ctx:         ctx,
+				AppCtx:      appCtx,
 				Cfg:         cfg,
 			}
 
@@ -67,7 +72,9 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 		// This can only be tested in transparent proxy mode.
 		t.SkipNow()
 	}
-	ctx := suite.Environment().DefaultContext(t)
+	env := suite.Environment()
+	ctx := env.DefaultContext(t)
+	appCtx := env.Context(t, environment.AppContextName)
 
 	releaseName := helpers.RandomName()
 	connHelper := connhelper.ConnectHelper{
@@ -75,6 +82,7 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 		Secure:      true,
 		ReleaseName: releaseName,
 		Ctx:         ctx,
+		AppCtx:      appCtx,
 		Cfg:         cfg,
 	}
 
@@ -84,7 +92,7 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 	connHelper.CreateResolverRedirect(t)
 	connHelper.DeployClientAndServer(t)
 
-	k8s.CheckStaticServerConnectionSuccessful(t, connHelper.Ctx.KubectlOptions(t), "static-client", "http://resolver-redirect")
+	k8s.CheckStaticServerConnectionSuccessful(t, appCtx.KubectlOptions(t), "static-client", "http://resolver-redirect")
 }
 
 // Test the endpoints controller cleans up force-killed pods.
@@ -93,6 +101,9 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
+
+			cfg.SkipWhenOpenshiftAndCNI(t)
+
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
@@ -161,6 +172,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
+			cfg.SkipWhenOpenshiftAndCNI(t)
+
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{

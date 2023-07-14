@@ -23,6 +23,7 @@ func TestConnectInject_PermissiveMTLS(t *testing.T) {
 	if !cfg.EnableTransparentProxy {
 		t.Skipf("skipping this because -enable-transparent-proxy is not set")
 	}
+	cfg.SkipWhenOpenshiftAndCNI(t)
 
 	ctx := suite.Environment().DefaultContext(t)
 

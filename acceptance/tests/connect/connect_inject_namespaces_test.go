@@ -34,6 +34,7 @@ func TestConnectInjectNamespaces(t *testing.T) {
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
+	cfg.SkipWhenOpenshiftAndCNI(t)
 
 	cases := []struct {
 		name                 string
@@ -246,6 +247,7 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
+	cfg.SkipWhenOpenshiftAndCNI(t)
 
 	consulDestNS := "consul-dest"
 	cases := []struct {
