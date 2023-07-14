@@ -46,6 +46,7 @@ type TestFlags struct {
 	flagHCPResourceID string
 
 	flagNoCleanupOnFailure bool
+	flagNoCleanup          bool
 
 	flagDebugDirectory string
 
@@ -131,6 +132,9 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagNoCleanupOnFailure, "no-cleanup-on-failure", false,
 		"If true, the tests will not cleanup Kubernetes resources they create when they finish running."+
 			"Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.")
+
+	flag.BoolVar(&t.flagNoCleanup, "no-cleanup", false,
+		"If true, the tests will not cleanup Kubernetes resources for Vault test")
 
 	flag.StringVar(&t.flagDebugDirectory, "debug-directory", "", "The directory where to write debug information about failed test runs, "+
 		"such as logs and pod definitions. If not provided, a temporary directory will be created by the tests.")
@@ -224,6 +228,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		HCPResourceID:          t.flagHCPResourceID,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
+		NoCleanup:          t.flagNoCleanup,
 		DebugDirectory:     tempDir,
 		UseAKS:             t.flagUseAKS,
 		UseEKS:             t.flagUseEKS,

@@ -195,13 +195,13 @@ func TestPartitions_Sync(t *testing.T) {
 
 			logger.Logf(t, "creating namespaces %s in servers cluster", staticServerNamespace)
 			k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
 			logger.Logf(t, "creating namespaces %s in clients cluster", staticServerNamespace)
 			k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
@@ -241,9 +241,9 @@ func TestPartitions_Sync(t *testing.T) {
 
 			logger.Log(t, "creating a static-server with a service")
 			// create service in default partition.
-			k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 			// create service in secondary partition.
-			k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			logger.Log(t, "checking that the service has been synced to Consul")
 			var services map[string][]string

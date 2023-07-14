@@ -21,7 +21,7 @@ import (
 
 // Deploy creates a Kubernetes deployment by applying configuration stored at filepath,
 // sets up a cleanup function and waits for the deployment to become available.
-func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, debugDirectory string, filepath string) {
+func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, filepath string) {
 	t.Helper()
 
 	KubectlApply(t, options, filepath)
@@ -33,7 +33,7 @@ func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, 
 	err = yaml.NewYAMLOrJSONDecoder(file, 1024).Decode(&deployment)
 	require.NoError(t, err)
 
-	helpers.Cleanup(t, noCleanupOnFailure, func() {
+	helpers.Cleanup(t, noCleanupOnFailure, noCleanup, func() {
 		// Note: this delete command won't wait for pods to be fully terminated.
 		// This shouldn't cause any test pollution because the underlying
 		// objects are deployments, and so when other tests create these
@@ -47,7 +47,7 @@ func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, 
 
 // DeployKustomize creates a Kubernetes deployment by applying the kustomize directory stored at kustomizeDir,
 // sets up a cleanup function and waits for the deployment to become available.
-func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, debugDirectory string, kustomizeDir string) {
+func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string) {
 	t.Helper()
 
 	KubectlApplyK(t, options, kustomizeDir)
@@ -59,7 +59,7 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&deployment)
 	require.NoError(t, err)
 
-	helpers.Cleanup(t, noCleanupOnFailure, func() {
+	helpers.Cleanup(t, noCleanupOnFailure, noCleanup, func() {
 		// Note: this delete command won't wait for pods to be fully terminated.
 		// This shouldn't cause any test pollution because the underlying
 		// objects are deployments, and so when other tests create these

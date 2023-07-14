@@ -113,12 +113,12 @@ func TestPeering_Gateway(t *testing.T) {
 	kustomizeMeshDir := "../fixtures/bases/mesh-peering"
 
 	k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 	})
 
 	k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 	})
 
@@ -145,7 +145,7 @@ func TestPeering_Gateway(t *testing.T) {
 
 	// Create the peering acceptor on the client peer.
 	k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 	})
 
@@ -161,7 +161,7 @@ func TestPeering_Gateway(t *testing.T) {
 
 	// Create the peering dialer on the server peer.
 	k8s.KubectlApply(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
 		k8s.KubectlDelete(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 	})
@@ -179,13 +179,13 @@ func TestPeering_Gateway(t *testing.T) {
 
 	logger.Logf(t, "creating namespaces %s in server peer", staticServerNamespace)
 	k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 	})
 
 	logger.Logf(t, "creating namespaces %s in client peer", staticClientNamespace)
 	k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "create", "ns", staticClientNamespace)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 	})
 
@@ -195,12 +195,12 @@ func TestPeering_Gateway(t *testing.T) {
 	kustomizeDir := "../fixtures/cases/api-gateways/mesh"
 
 	k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeDir)
 	})
 
 	k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
 	})
 
@@ -209,21 +209,21 @@ func TestPeering_Gateway(t *testing.T) {
 	// Since we're deploying the gateway in the secondary cluster, we create the static client
 	// in the secondary as well.
 	logger.Log(t, "creating static-client pod in client peer")
-	k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/non-default-namespace")
+	k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/non-default-namespace")
 
 	logger.Log(t, "creating static-server in server peer")
-	k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 	logger.Log(t, "creating exported services")
 	k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
 	})
 
 	logger.Log(t, "creating api-gateway resources in client peer")
 	out, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-k", "../fixtures/bases/api-gateway")
 	require.NoError(t, err, out)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-k", "../fixtures/bases/api-gateway")
@@ -253,7 +253,7 @@ func TestPeering_Gateway(t *testing.T) {
 
 	logger.Log(t, "creating local service resolver")
 	k8s.KubectlApplyK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
 	})
 
@@ -280,7 +280,7 @@ func TestPeering_Gateway(t *testing.T) {
 	logger.Log(t, "creating intention")
 	_, _, err = staticServerPeerClient.ConfigEntries().Set(intention, &api.WriteOptions{})
 	require.NoError(t, err)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		_, err = staticServerPeerClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{})
 		require.NoError(t, err)
 	})
