@@ -31,7 +31,7 @@ type KubeTestConfig struct {
 
 // NewKubeTestConfigList takes lists of kubernetes configs, contexts and namespaces and constructs KubeTestConfig
 // We validate ahead of time that the lists are either 0 or the same length as we expect that if the length of a list
-// is greater than 0, then the indexes should match. For example: []kubeContexts{"ctx1", "ctx2"} indexes 0, 1 match with []kubeNamespaces{"ns1", "ns2"}
+// is greater than 0, then the indexes should match. For example: []kubeContexts{"ctx1", "ctx2"} indexes 0, 1 match with []kubeNamespaces{"ns1", "ns2"}.
 func NewKubeTestConfigList(kubeConfigs, kubeContexts, kubeNamespaces []string) []KubeTestConfig {
 	// Grab the longest length.
 	l := math.Max(float64(len(kubeConfigs)),
