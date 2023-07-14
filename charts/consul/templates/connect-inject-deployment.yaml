@@ -94,14 +94,7 @@ spec:
             - containerPort: 8080
               name: webhook-server
               protocol: TCP
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            runAsNonRoot: true
-            seccompProfile:
-              type: RuntimeDefault
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           env:
             - name: NAMESPACE
               valueFrom:
