@@ -666,7 +666,7 @@ Below is the list of available flags:
     This applies only to tests that enable connectInject.
 -enterprise-license
     The enterprise license for Consul.
--kube-configs string
+-kubeconfigs string
     The comma separated list of Kubernetes configs to use (eg. "~/.kube/config,~/.kube/config2"). The first in the list will be treated as the primary config, followed by the secondary, etc. If the list is empty, or items are blank, then the default kubeconfig path (~/.kube/config) will be used.
 -kube-contexts string
     The comma separated list of Kubernetes contexts to use (eg. "kind-dc1,kind-dc2"). The first in the list will be treated as the primary context, followed by the secondary, etc. If the list is empty, or items are blank, then the current context will be used.
