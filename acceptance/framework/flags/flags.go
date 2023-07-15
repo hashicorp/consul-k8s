@@ -1,9 +1,13 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package flags
 
 import (
 	"errors"
 	"flag"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -11,14 +15,10 @@ import (
 )
 
 type TestFlags struct {
-	flagKubeconfig  string
-	flagKubecontext string
-	flagNamespace   string
-
-	flagEnableMultiCluster   bool
-	flagSecondaryKubeconfig  string
-	flagSecondaryKubecontext string
-	flagSecondaryNamespace   string
+	flagKubeconfigs        listFlag
+	flagKubecontexts       listFlag
+	flagKubeNamespaces     listFlag
+	flagEnableMultiCluster bool
 
 	flagEnableEnterprise  bool
 	flagEnterpriseLicense string
@@ -56,27 +56,34 @@ func NewTestFlags() *TestFlags {
 	return t
 }
 
-func (t *TestFlags) init() {
-	flag.StringVar(&t.flagKubeconfig, "kubeconfig", "", "The path to a kubeconfig file. If this is blank, "+
-		"the default kubeconfig path (~/.kube/config) will be used.")
-	flag.StringVar(&t.flagKubecontext, "kubecontext", "", "The name of the Kubernetes context to use. If this is blank, "+
-		"the context set as the current context will be used by default.")
-	flag.StringVar(&t.flagNamespace, "namespace", "", "The Kubernetes namespace to use for tests.")
+type listFlag []string
 
+// String() returns a comma separated list in the form "var1,var2,var3".
+func (f *listFlag) String() string {
+	return strings.Join(*f, ",")
+}
+
+func (f *listFlag) Set(value string) error {
+	*f = strings.Split(value, ",")
+	return nil
+}
+
+func (t *TestFlags) init() {
 	flag.StringVar(&t.flagConsulImage, "consul-image", "", "The Consul image to use for all tests.")
 	flag.StringVar(&t.flagConsulK8sImage, "consul-k8s-image", "", "The consul-k8s image to use for all tests.")
 	flag.StringVar(&t.flagConsulVersion, "consul-version", "", "The consul version used for all tests.")
 	flag.StringVar(&t.flagHelmChartVersion, "helm-chart-version", config.HelmChartPath, "The helm chart used for all tests.")
 	flag.StringVar(&t.flagEnvoyImage, "envoy-image", "", "The Envoy image to use for all tests.")
 
+	flag.Var(&t.flagKubeconfigs, "kubeconfigs", "The list of paths to a kubeconfig files. If this is blank, "+
+		"the default kubeconfig path (~/.kube/config) will be used.")
+	flag.Var(&t.flagKubecontexts, "kube-contexts", "The list of names of the Kubernetes contexts to use. If this is blank, "+
+		"the context set as the current context will be used by default.")
+	flag.Var(&t.flagKubeNamespaces, "kube-namespaces", "The list of Kubernetes namespaces to use for tests.")
+
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
-			"At least one of -secondary-kubeconfig or -secondary-kubecontext is required when this flag is used.")
-	flag.StringVar(&t.flagSecondaryKubeconfig, "secondary-kubeconfig", "", "The path to a kubeconfig file of the secondary k8s cluster. "+
-		"If this is blank, the default kubeconfig path (~/.kube/config) will be used.")
-	flag.StringVar(&t.flagSecondaryKubecontext, "secondary-kubecontext", "", "The name of the Kubernetes context for the secondary cluster to use. "+
-		"If this is blank, the context set as the current context will be used by default.")
-	flag.StringVar(&t.flagSecondaryNamespace, "secondary-namespace", "", "The Kubernetes namespace to use in the secondary k8s cluster.")
+			"The lists -kubeconfig or -kube-context must contain more than one entry when this flag is used.")
 
 	flag.BoolVar(&t.flagEnableEnterprise, "enable-enterprise", false,
 		"If true, the test suite will run tests for enterprise features. "+
@@ -120,8 +127,26 @@ func (t *TestFlags) init() {
 
 func (t *TestFlags) Validate() error {
 	if t.flagEnableMultiCluster {
-		if t.flagSecondaryKubecontext == "" && t.flagSecondaryKubeconfig == "" {
-			return errors.New("at least one of -secondary-kubecontext or -secondary-kubeconfig flags must be provided if -enable-multi-cluster is set")
+		if len(t.flagKubecontexts) <= 1 && len(t.flagKubeconfigs) <= 1 {
+			return errors.New("at least two contexts must be included in -kube-contexts or -kubeconfigs if -enable-multi-cluster is set")
+		}
+	}
+
+	if len(t.flagKubecontexts) != 0 && len(t.flagKubeconfigs) != 0 {
+		if len(t.flagKubecontexts) != len(t.flagKubeconfigs) {
+			return errors.New("-kube-contexts and -kubeconfigs are both set but are not of equal length")
+		}
+	}
+
+	if len(t.flagKubecontexts) != 0 && len(t.flagKubeNamespaces) != 0 {
+		if len(t.flagKubecontexts) != len(t.flagKubeNamespaces) {
+			return errors.New("-kube-contexts and -kube-namespaces are both set but are not of equal length")
+		}
+	}
+
+	if len(t.flagKubeNamespaces) != 0 && len(t.flagKubeconfigs) != 0 {
+		if len(t.flagKubeNamespaces) != len(t.flagKubeconfigs) {
+			return errors.New("-kube-namespaces and -kubeconfigs are both set but are not of equal length")
 		}
 	}
 
@@ -136,19 +161,14 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 	// if the Version is empty consulVersion will be nil
 	consulVersion, _ := version.NewVersion(t.flagConsulVersion)
+	kubeEnvs := config.NewKubeTestConfigList(t.flagKubeconfigs, t.flagKubecontexts, t.flagKubeNamespaces)
 
-	return &config.TestConfig{
-		Kubeconfig:    t.flagKubeconfig,
-		KubeContext:   t.flagKubecontext,
-		KubeNamespace: t.flagNamespace,
-
-		EnableMultiCluster:     t.flagEnableMultiCluster,
-		SecondaryKubeconfig:    t.flagSecondaryKubeconfig,
-		SecondaryKubeContext:   t.flagSecondaryKubecontext,
-		SecondaryKubeNamespace: t.flagSecondaryNamespace,
-
+	c := &config.TestConfig{
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
+
+		KubeEnvs:           kubeEnvs,
+		EnableMultiCluster: t.flagEnableMultiCluster,
 
 		EnableOpenshift: t.flagEnableOpenshift,
 
@@ -171,4 +191,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		UseKind:            t.flagUseKind,
 		UseGKE:             t.flagUseGKE,
 	}
+
+	return c
 }
