@@ -129,7 +129,7 @@ func TestBasicCloud(t *testing.T) {
 		localPort,
 		443,
 		logger.TestLogger{})
-
+	defer tunnel.Close()
 	// Retry creating the port forward since it can fail occasionally.
 	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
 		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
@@ -144,7 +144,7 @@ func TestBasicCloud(t *testing.T) {
 		logger.Log(t, "error finding consul token")
 		return
 	}
-	tunnel.Close()
+
 	logger.Log(t, "consul test token :"+consulToken)
 
 	releaseName := helpers.RandomName()
@@ -229,6 +229,57 @@ func TestBasicCloud(t *testing.T) {
 
 	logger.Log(t, "creating static-server deployment")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
-	// time.Sleep(1 * time.Hour)
-	// TODO: add in test assertions here
+	t.Log("Finished deployment. Validating expected conditions now")
+	// Give some time for collector send metrics
+	time.Sleep(5 * time.Second)
+	err = validate(tunnel.Endpoint())
+	logger.Log(t, fmt.Sprintf("result: %v", err))
+	require.NoError(t, err)
+
+}
+
+func validate(endpoint string) error {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{Transport: tr}
+	url := fmt.Sprintf("https://%s/validation", endpoint)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Println("Error creating request:", err)
+		return errors.New("error creating validation request")
+	}
+
+	// Perform the request
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error sending request:", err)
+		return errors.New("error making  validation request")
+	}
+	if resp.StatusCode == http.StatusExpectationFailed {
+		// Read the response body
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Println("Error reading response:", err)
+			return errors.New("error reading body")
+		}
+		var message errMsg
+		err = json.Unmarshal(body, &message)
+		if err != nil {
+			fmt.Println("Error parsing response:", err)
+			return errors.New("error parsing body")
+		}
+
+		return fmt.Errorf("Failed validation: %s", message)
+	} else if resp.StatusCode != http.StatusOK {
+		return errors.New("unexpected status code response from failure")
+	}
+
+	return nil
+
+}
+
+type errMsg struct {
+	Error string `json:"error"`
 }
