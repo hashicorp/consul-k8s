@@ -8,7 +8,7 @@ on:
 
 # these should be the only settings that you will ever need to change
 env:
-  CONSUL_IMAGE: hashicorppreview/consul-enterprise:1.16-dev # Consul's enterprise version to use in tests
+  CONSUL_IMAGE: hashicorppreview/consul-enterprise:1.17-dev # Consul's enterprise version to use in tests
   BRANCH: ${{ github.ref_name }}
   CONTEXT: "nightly"
 

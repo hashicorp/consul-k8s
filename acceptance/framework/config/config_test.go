@@ -181,3 +181,106 @@ func TestConfig_HelmValuesFromConfig_EntImage(t *testing.T) {
 		})
 	}
 }
+
+func Test_KubeEnvListFromStringList(t *testing.T) {
+	tests := []struct {
+		name           string
+		kubeContexts   []string
+		KubeConfigs    []string
+		kubeNamespaces []string
+		expKubeEnvList []KubeTestConfig
+	}{
+		{
+			name:           "empty-lists",
+			kubeContexts:   []string{},
+			KubeConfigs:    []string{},
+			kubeNamespaces: []string{},
+			expKubeEnvList: []KubeTestConfig{{}},
+		},
+		{
+			name:           "kubeContext set",
+			kubeContexts:   []string{"ctx1", "ctx2"},
+			KubeConfigs:    []string{},
+			kubeNamespaces: []string{},
+			expKubeEnvList: []KubeTestConfig{{KubeContext: "ctx1"}, {KubeContext: "ctx2"}},
+		},
+		{
+			name:           "kubeNamespace set",
+			kubeContexts:   []string{},
+			KubeConfigs:    []string{"/path/config1", "/path/config2"},
+			kubeNamespaces: []string{},
+			expKubeEnvList: []KubeTestConfig{{KubeConfig: "/path/config1"}, {KubeConfig: "/path/config2"}},
+		},
+		{
+			name:           "kubeConfigs set",
+			kubeContexts:   []string{},
+			KubeConfigs:    []string{},
+			kubeNamespaces: []string{"ns1", "ns2"},
+			expKubeEnvList: []KubeTestConfig{{KubeNamespace: "ns1"}, {KubeNamespace: "ns2"}},
+		},
+		{
+			name:           "multiple everything",
+			kubeContexts:   []string{"ctx1", "ctx2"},
+			KubeConfigs:    []string{"/path/config1", "/path/config2"},
+			kubeNamespaces: []string{"ns1", "ns2"},
+			expKubeEnvList: []KubeTestConfig{{KubeContext: "ctx1", KubeNamespace: "ns1", KubeConfig: "/path/config1"}, {KubeContext: "ctx2", KubeNamespace: "ns2", KubeConfig: "/path/config2"}},
+		},
+		{
+			name:           "multiple context and configs",
+			kubeContexts:   []string{"ctx1", "ctx2"},
+			KubeConfigs:    []string{"/path/config1", "/path/config2"},
+			kubeNamespaces: []string{},
+			expKubeEnvList: []KubeTestConfig{{KubeContext: "ctx1", KubeConfig: "/path/config1"}, {KubeContext: "ctx2", KubeConfig: "/path/config2"}},
+		},
+		{
+			name:           "multiple namespace and configs",
+			kubeContexts:   []string{},
+			KubeConfigs:    []string{"/path/config1", "/path/config2"},
+			kubeNamespaces: []string{"ns1", "ns2"},
+			expKubeEnvList: []KubeTestConfig{{KubeNamespace: "ns1", KubeConfig: "/path/config1"}, {KubeNamespace: "ns2", KubeConfig: "/path/config2"}},
+		},
+		{
+			name:           "multiple context and namespace",
+			kubeContexts:   []string{"ctx1", "ctx2"},
+			KubeConfigs:    []string{},
+			kubeNamespaces: []string{"ns1", "ns2"},
+			expKubeEnvList: []KubeTestConfig{{KubeContext: "ctx1", KubeNamespace: "ns1"}, {KubeContext: "ctx2", KubeNamespace: "ns2"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := NewKubeTestConfigList(tt.KubeConfigs, tt.kubeContexts, tt.kubeNamespaces)
+			require.Equal(t, tt.expKubeEnvList, actual)
+		})
+	}
+}
+
+func Test_GetPrimaryKubeEnv(t *testing.T) {
+	tests := []struct {
+		name              string
+		kubeEnvList       []KubeTestConfig
+		expPrimaryKubeEnv KubeTestConfig
+	}{
+		{
+			name:              "context config multiple namespace single",
+			kubeEnvList:       []KubeTestConfig{{KubeContext: "ctx1", KubeNamespace: "ns1", KubeConfig: "/path/config1"}, {KubeContext: "ctx2", KubeConfig: "/path/config2"}},
+			expPrimaryKubeEnv: KubeTestConfig{KubeContext: "ctx1", KubeNamespace: "ns1", KubeConfig: "/path/config1"},
+		},
+		{
+			name:              "context config multiple namespace single",
+			kubeEnvList:       []KubeTestConfig{},
+			expPrimaryKubeEnv: KubeTestConfig{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := TestConfig{
+				KubeEnvs: tt.kubeEnvList,
+			}
+			actual := cfg.GetPrimaryKubeEnv()
+			require.Equal(t, tt.expPrimaryKubeEnv, actual)
+		})
+	}
+}

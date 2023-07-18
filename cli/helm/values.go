@@ -411,7 +411,7 @@ type TransparentProxy struct {
 }
 
 type Metrics struct {
-	DefaultEnabled              string `yaml:"defaultEnabled"`
+	DefaultEnabled              bool   `yaml:"defaultEnabled"`
 	DefaultEnableMerging        bool   `yaml:"defaultEnableMerging"`
 	DefaultMergedMetricsPort    int    `yaml:"defaultMergedMetricsPort"`
 	DefaultPrometheusScrapePort int    `yaml:"defaultPrometheusScrapePort"`
@@ -425,10 +425,19 @@ type ACLInjectToken struct {
 
 type SidecarProxy struct {
 	Resources Resources `yaml:"resources"`
+	Lifecycle Lifecycle `yaml:"lifecycle"`
 }
 
 type InitContainer struct {
 	Resources Resources `yaml:"resources"`
+}
+
+type Lifecycle struct {
+	DefaultEnabled                      bool   `yaml:"defaultEnabled"`
+	DefaultEnableShutdownDrainListeners bool   `yaml:"defaultEnableShutdownDrainListeners"`
+	DefaultShutdownGracePeriodSeconds   int    `yaml:"defaultShutdownGracePeriodSeconds"`
+	DefaultGracefulPort                 int    `yaml:"defaultGracefulPort"`
+	DefaultGracefulShutdownPath         string `yaml:"defaultGracefulShutdownPath"`
 }
 
 type ConnectInject struct {

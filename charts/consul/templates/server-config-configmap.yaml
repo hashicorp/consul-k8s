@@ -191,7 +191,7 @@ data:
   audit-logging.json: |-
     {
       "audit": {
-        "enabled": "true",
+        "enabled": true,
         "sink": {
           {{- range $index, $element := .Values.server.auditLogs.sinks }}
           {{- if ne $index 0 }},{{end}}

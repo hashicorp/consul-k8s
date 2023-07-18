@@ -493,7 +493,6 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: client-acl-init
         image: {{ .Values.global.imageK8S }}
-        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         env:
         - name: NAMESPACE
           valueFrom:

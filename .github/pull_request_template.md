@@ -9,7 +9,6 @@ How I expect reviewers to test this PR:
 
 Checklist:
 - [ ] Tests added
-- [ ] CHANGELOG entry added 
-  > HashiCorp engineers only, community PRs should not add a changelog entry.
-  > Entries should use present tense (e.g. Add support for...)
+- [ ] [CHANGELOG entry added](https://github.com/hashicorp/consul-k8s/blob/main/CONTRIBUTING.md#adding-a-changelog-entry) 
+
 

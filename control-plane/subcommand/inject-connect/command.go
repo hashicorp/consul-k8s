@@ -19,8 +19,10 @@ import (
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	"github.com/hashicorp/consul-k8s/control-plane/controllers"
@@ -85,6 +87,13 @@ type Command struct {
 	flagDefaultSidecarProxyMemoryLimit   string
 	flagDefaultSidecarProxyMemoryRequest string
 	flagDefaultEnvoyProxyConcurrency     int
+
+	// Proxy lifecycle settings.
+	flagDefaultEnableSidecarProxyLifecycle                       bool
+	flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners bool
+	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
+	flagDefaultSidecarProxyLifecycleGracefulPort                 string
+	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
 
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
@@ -219,6 +228,13 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryRequest, "default-sidecar-proxy-memory-request", "", "Default sidecar proxy memory request.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryLimit, "default-sidecar-proxy-memory-limit", "", "Default sidecar proxy memory limit.")
+
+	// Proxy lifecycle setting flags.
+	c.flagSet.BoolVar(&c.flagDefaultEnableSidecarProxyLifecycle, "default-enable-sidecar-proxy-lifecycle", false, "Default for enabling sidecar proxy lifecycle management.")
+	c.flagSet.BoolVar(&c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners, "default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners", false, "Default for enabling sidecar proxy listener draining of inbound connections during shutdown.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds, "default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds", 0, "Default sidecar proxy shutdown grace period in seconds.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulPort, "default-sidecar-proxy-lifecycle-graceful-port", strconv.Itoa(constants.DefaultGracefulPort), "Default port for sidecar proxy lifecycle management HTTP endpoints.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath, "default-sidecar-proxy-lifecycle-graceful-shutdown-path", "/graceful_shutdown", "Default sidecar proxy lifecycle management graceful shutdown path.")
 
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
@@ -420,6 +436,14 @@ func (c *Command) Run(args []string) int {
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		return 1
+	}
+
+	lifecycleConfig := lifecycle.Config{
+		DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
+		DefaultEnableShutdownDrainListeners: c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
+		DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
+		DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
+		DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
 	}
 
 	metricsConfig := metrics.Config{
@@ -725,6 +749,7 @@ func (c *Command) Run(args []string) int {
 			DefaultProxyMemoryRequest:    sidecarProxyMemoryRequest,
 			DefaultProxyMemoryLimit:      sidecarProxyMemoryLimit,
 			DefaultEnvoyProxyConcurrency: c.flagDefaultEnvoyProxyConcurrency,
+			LifecycleConfig:              lifecycleConfig,
 			MetricsConfig:                metricsConfig,
 			InitContainerResources:       initResources,
 			ConsulPartition:              c.consul.Partition,

@@ -34,6 +34,7 @@ var (
 	errRouteNoMatchingListenerHostname      = errors.New("listener cannot bind route with a non-aligned hostname")
 	errRouteInvalidKind                     = errors.New("invalid backend kind")
 	errRouteBackendNotFound                 = errors.New("backend not found")
+	errRouteNoMatchingParent                = errors.New("no matching parent")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
@@ -128,13 +129,17 @@ type bindResult struct {
 type bindResults []bindResult
 
 // Error constructs a human readable error for bindResults, containing any errors that a route
-// had in binding to a gateway, note that this is only used if a route failed to bind to every
+// had in binding to a gateway. Note that this is only used if a route failed to bind to every
 // listener it attempted to bind to.
 func (b bindResults) Error() string {
 	messages := []string{}
 	for _, result := range b {
 		if result.err != nil {
-			messages = append(messages, fmt.Sprintf("%s: %s", result.section, result.err.Error()))
+			message := result.err.Error()
+			if result.section != "" {
+				message = fmt.Sprintf("%s: %s", result.section, result.err.Error())
+			}
+			messages = append(messages, message)
 		}
 	}
 
@@ -171,13 +176,16 @@ func (b bindResults) Condition() metav1.Condition {
 	// if we only have a single binding error, we can get more specific
 	if len(b) == 1 {
 		for _, result := range b {
-			// if we have a hostname mismatch error, then use the more specific reason
-			if result.err == errRouteNoMatchingListenerHostname {
+			switch result.err {
+			case errRouteNoMatchingListenerHostname:
+				// if we have a hostname mismatch error, then use the more specific reason
 				reason = "NoMatchingListenerHostname"
-			}
-			// or if we have a ref not permitted, then use that
-			if result.err == errRefNotPermitted {
+			case errRefNotPermitted:
+				// or if we have a ref not permitted, then use that
 				reason = "RefNotPermitted"
+			case errRouteNoMatchingParent:
+				// or if the route declares a parent that we can't find
+				reason = "NoMatchingParent"
 			}
 		}
 	}
@@ -218,15 +226,17 @@ var (
 	// to the ListenerConditionReason given in the spec. If a reason is overloaded and can
 	// be used with two different types of things (i.e. something is not found or it's not supported)
 	// then we distinguish those two usages with errListener*_Usage.
-	errListenerUnsupportedProtocol                = errors.New("listener protocol is unsupported")
-	errListenerPortUnavailable                    = errors.New("listener port is unavailable")
-	errListenerHostnameConflict                   = errors.New("listener hostname conflicts with another listener")
-	errListenerProtocolConflict                   = errors.New("listener protocol conflicts with another listener")
-	errListenerInvalidCertificateRef_NotFound     = errors.New("certificate not found")
-	errListenerInvalidCertificateRef_NotSupported = errors.New("certificate type is not supported")
-	errListenerInvalidCertificateRef_InvalidData  = errors.New("certificate is invalid or does not contain a supported server name")
-	errListenerInvalidRouteKinds                  = errors.New("allowed route kind is invalid")
-	errListenerProgrammed_Invalid                 = errors.New("listener cannot be programmed because it is invalid")
+	errListenerUnsupportedProtocol                    = errors.New("listener protocol is unsupported")
+	errListenerPortUnavailable                        = errors.New("listener port is unavailable")
+	errListenerHostnameConflict                       = errors.New("listener hostname conflicts with another listener")
+	errListenerProtocolConflict                       = errors.New("listener protocol conflicts with another listener")
+	errListenerInvalidCertificateRef_NotFound         = errors.New("certificate not found")
+	errListenerInvalidCertificateRef_NotSupported     = errors.New("certificate type is not supported")
+	errListenerInvalidCertificateRef_InvalidData      = errors.New("certificate is invalid or does not contain a supported server name")
+	errListenerInvalidCertificateRef_NonFIPSRSAKeyLen = errors.New("certificate has an invalid length: RSA Keys must be at least 2048-bit")
+	errListenerInvalidCertificateRef_FIPSRSAKeyLen    = errors.New("certificate has an invalid length: RSA keys must be either 2048-bit, 3072-bit, or 4096-bit in FIPS mode")
+	errListenerInvalidRouteKinds                      = errors.New("allowed route kind is invalid")
+	errListenerProgrammed_Invalid                     = errors.New("listener cannot be programmed because it is invalid")
 
 	// Below is where any custom generic listener validation errors should go.
 	// We map anything under here to a custom ListenerConditionReason of Invalid on
@@ -372,7 +382,7 @@ func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1
 	}
 
 	switch l.refErr {
-	case errListenerInvalidCertificateRef_NotFound, errListenerInvalidCertificateRef_NotSupported, errListenerInvalidCertificateRef_InvalidData:
+	case errListenerInvalidCertificateRef_NotFound, errListenerInvalidCertificateRef_NotSupported, errListenerInvalidCertificateRef_InvalidData, errListenerInvalidCertificateRef_NonFIPSRSAKeyLen, errListenerInvalidCertificateRef_FIPSRSAKeyLen:
 		return metav1.Condition{
 			Type:               "ResolvedRefs",
 			Status:             metav1.ConditionFalse,

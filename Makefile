@@ -2,6 +2,9 @@ VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane
 CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
 CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
 CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-dataplane-version.sh charts/consul/values.yaml)
+KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindVersion)
+KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
+KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
 
 # ===========> Helm Targets
 
@@ -84,15 +87,6 @@ cni-plugin-lint:
 ctrl-generate: get-controller-gen ## Run CRD code generation.
 	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
 
-# Helper target for doing local cni acceptance testing
-kind-cni:
-	kind delete cluster --name dc1
-	kind delete cluster --name dc2
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image kindest/node:v1.23.6
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image kindest/node:v1.23.6
-	make kind-cni-calico
-
 # Perform a terraform fmt check but don't change anything
 terraform-fmt-check:
 	@$(CURDIR)/control-plane/build-support/scripts/terraformfmtcheck.sh $(TERRAFORM_DIR)
@@ -105,7 +99,6 @@ terraform-fmt:
 
 
 # ===========> CLI Targets
-
 cli-dev:
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
@@ -113,7 +106,6 @@ cli-dev:
 cli-fips-dev:
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
-
 
 cli-lint: ## Run linter in the control-plane directory.
 	cd cli; golangci-lint run -c ../.golangci.yml
@@ -132,7 +124,24 @@ kind-cni-calico:
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
 	@sleep 30
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
-	@sleep 20 
+	@sleep 20
+
+# Helper target for doing local cni acceptance testing
+kind-cni:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
+	make kind-cni-calico
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
+	make kind-cni-calico
+
+# Helper target for doing local acceptance testing
+kind:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
+	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
+	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
+
 
 # ===========> Shared Targets
 
@@ -187,41 +196,65 @@ consul-enterprise-version:
 consul-dataplane-version:
 	@echo $(CONSUL_DATAPLANE_IMAGE_VERSION)
 
+kind-version:
+	@echo $(KIND_VERSION)
+
+kind-node-image:
+	@echo $(KIND_NODE_IMAGE)
+
+kubectl-version:
+	@echo $(KUBECTL_VERSION)
+
+kind-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/kind_acceptance_test_packages.yaml"
+
+gke-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/gke_acceptance_test_packages.yaml"
+
+eks-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/eks_acceptance_test_packages.yaml"
+
+aks-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
 
 # ===========> Release Targets
+check-env:
+	@printenv | grep "CONSUL_K8S"
 
 prepare-release: ## Sets the versions, updates changelog to prepare this repository to release
-ifndef RELEASE_VERSION
-	$(error RELEASE_VERSION is required)
+ifndef CONSUL_K8S_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
-ifndef RELEASE_DATE
-	$(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+ifndef CONSUL_K8S_RELEASE_DATE
+	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
-ifndef LAST_RELEASE_GIT_TAG 
-	$(error LAST_RELEASE_GIT_TAG is required)
+ifndef CONSUL_K8S_LAST_RELEASE_GIT_TAG
+	$(error CONSUL_K8S_LAST_RELEASE_GIT_TAG is required)
 endif
-ifndef CONSUL_VERSION
-	$(error CONSUL_VERSION is required)
+ifndef CONSUL_K8S_CONSUL_VERSION
+	$(error CONSUL_K8S_CONSUL_VERSION is required)
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" $(LAST_RELEASE_GIT_TAG) $(CONSUL_VERSION) $(PRERELEASE_VERSION)
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION)
 
 prepare-dev:
-ifndef RELEASE_VERSION
-	$(error RELEASE_VERSION is required)
+ifndef CONSUL_K8S_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
-ifndef RELEASE_DATE
-	$(error RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+ifndef CONSUL_K8S_RELEASE_DATE
+	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
-ifndef NEXT_RELEASE_VERSION
-	$(error NEXT_RELEASE_VERSION is required)
+ifndef CONSUL_K8S_NEXT_RELEASE_VERSION
+	$(error CONSUL_K8S_NEXT_RELEASE_VERSION is required)
 endif
-ifndef NEXT_CONSUL_VERSION
-	$(error NEXT_CONSUL_VERSION is required)
+ifndef CONSUL_K8S_NEXT_CONSUL_VERSION
+	$(error CONSUL_K8S_NEXT_CONSUL_VERSION is required)
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(RELEASE_VERSION) "$(RELEASE_DATE)" "" $(NEXT_RELEASE_VERSION) $(NEXT_CONSUL_VERSION)
+ifndef CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION
+	$(error CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" "" $(CONSUL_K8S_NEXT_RELEASE_VERSION) $(CONSUL_K8S_NEXT_CONSUL_VERSION) $(CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION)
 
 # ===========> Makefile config
-
 .DEFAULT_GOAL := help
 .PHONY: gen-helm-docs copy-crds-to-chart generate-external-crds bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
 SHELL = bash

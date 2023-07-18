@@ -44,7 +44,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 
 	primaryCtx := suite.Environment().DefaultContext(t)
-	secondaryCtx := suite.Environment().Context(t, environment.SecondaryContextName)
+	secondaryCtx := suite.Environment().Context(t, 1)
 
 	ns := primaryCtx.KubectlOptions(t).Namespace
 

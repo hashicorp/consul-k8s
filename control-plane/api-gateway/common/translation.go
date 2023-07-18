@@ -6,14 +6,15 @@ package common
 import (
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul/api"
 )
 
 // ResourceTranslator handles translating K8s resources into Consul config entries.
@@ -254,14 +255,16 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 	}
 
 	for _, filter := range filters {
-		consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
+		if filter.RequestHeaderModifier != nil {
+			consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
 
-		for _, toAdd := range filter.RequestHeaderModifier.Add {
-			consulFilter.Add[string(toAdd.Name)] = toAdd.Value
-		}
+			for _, toAdd := range filter.RequestHeaderModifier.Add {
+				consulFilter.Add[string(toAdd.Name)] = toAdd.Value
+			}
 
-		for _, toSet := range filter.RequestHeaderModifier.Set {
-			consulFilter.Set[string(toSet.Name)] = toSet.Value
+			for _, toSet := range filter.RequestHeaderModifier.Set {
+				consulFilter.Set[string(toSet.Name)] = toSet.Value
+			}
 		}
 
 		// we drop any path rewrites that are not prefix matches as we don't support those
@@ -334,6 +337,11 @@ func (t ResourceTranslator) translateTCPRouteRule(route gwv1alpha2.TCPRoute, ref
 
 func (t ResourceTranslator) ToInlineCertificate(secret corev1.Secret) (*api.InlineCertificateConfigEntry, error) {
 	certificate, privateKey, err := ParseCertificateData(secret)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ValidateKeyLength(privateKey)
 	if err != nil {
 		return nil, err
 	}

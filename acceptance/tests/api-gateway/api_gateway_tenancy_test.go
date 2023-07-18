@@ -347,9 +347,13 @@ func generateCertificate(t *testing.T, ca *certificateInfo, commonName string) *
 }
 
 func retryCheck(t *testing.T, count int, fn func(r *retry.R)) {
+	retryCheckWithWait(t, count, 2*time.Second, fn)
+}
+
+func retryCheckWithWait(t *testing.T, count int, wait time.Duration, fn func(r *retry.R)) {
 	t.Helper()
 
-	counter := &retry.Counter{Count: count, Wait: 2 * time.Second}
+	counter := &retry.Counter{Count: count, Wait: wait}
 	retry.RunWith(counter, t, fn)
 }
 

@@ -52,12 +52,6 @@ global:
     # Changing the partition name would require an un-install and a re-install with the updated name.
     # Must be "default" in the server cluster ie the Kubernetes cluster that the Consul server pods are deployed onto.
     name: "default"
-  
-  # Set imagePullPolicy for all images used. This is applies to all the images being used.
-  # One of "IfNotPresent", "Always", "Never"
-  # Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
-  # @type: string
-  imagePullPolicy: ""
 
   # The name (and tag) of the Consul Docker image for clients and servers.
   # This can be overridden per component. This should be pinned to a specific
@@ -72,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.16-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.17-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -92,7 +86,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.2.0-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.3.0-dev
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -385,6 +379,18 @@ global:
       # @type: string
       secretKey: null
 
+    # This value defines additional annotations for
+    # tls init jobs. This should be formatted as a multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # [Enterprise Only] `enableConsulNamespaces` indicates that you are running
   # Consul Enterprise v1.7+ with a valid Consul Enterprise license and would
   # like to make use of configuration beyond registering everything into
@@ -436,6 +442,33 @@ global:
       # @type: string
       secretKey: null
 
+    # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods. 
+    # This should be a YAML map corresponding to a Kubernetes
+    # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+    # object.
+    #
+    # Example:
+    #
+    # ```yaml
+    # resources:
+    #   requests:
+    #     memory: '200Mi'
+    #     cpu: '100m'
+    #   limits:
+    #     memory: '200Mi'
+    #     cpu: '100m'
+    # ```
+    #
+    # @recurse: false
+    # @type: map
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "50Mi"
+        cpu: "50m"
+
     # partitionToken references a Vault secret containing the ACL token to be used in non-default partitions.
     # This value should only be provided in the default partition and only when setting
     # the `global.secretsBackend.vault.enabled` value to true.
@@ -467,6 +500,18 @@ global:
     #
     # @type: string
     nodeSelector: null
+
+    # This value defines additional annotations for
+    # acl init jobs. This should be formatted as a multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
 
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an
@@ -563,7 +608,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: "hashicorppreview/consul-dataplane:1.1-dev"
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.3-dev
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -784,11 +829,11 @@ server:
   # @type: string
   storageClass: null
 
-  # This will enable/disable [Connect](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
+  # This will enable/disable [service mesh](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
   # _will not_ automatically secure pod communication, this
   # setting will only enable usage of the feature. Consul will automatically initialize
-  # a new CA and set of certificates. Additional Connect settings can be configured
-  # by setting the `server.extraConfig` value.
+  # a new CA and set of certificates. Additional service mesh settings can be configured
+  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries). 
   connect: true
 
   serviceAccount:
@@ -856,6 +901,14 @@ server:
     # @type: map
     # @recurse: false
     server: null
+    # The acl-init job
+    # @type: map
+    # @recurse: false
+    aclInit: null
+    # The tls-init job
+    # @type: map
+    # @recurse: false
+    tlsInit: null
 
   # This value is used to carefully
   # control a rolling update of Consul server agents. This value specifies the
@@ -1590,7 +1643,7 @@ dns:
   # @type: boolean
   enabled: "-"
 
-  # If true, services using Consul Connect will use Consul DNS
+  # If true, services using Consul service mesh will use Consul DNS
   # for default DNS resolution. The DNS lookups fall back to the nameserver IPs
   # listed in /etc/resolv.conf if not found in Consul.
   # @type: boolean
@@ -2087,7 +2140,7 @@ connectInject:
       # @type: string
       nodeSelector: null
 
-      # Toleration settings for gateway pods created with the managed gateway class. 
+      # Toleration settings for gateway pods created with the managed gateway class.
       # This should be a multi-line string matching the
       # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
       #
@@ -2113,7 +2166,7 @@ connectInject:
         service: null
 
       # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
-      deployment: 
+      deployment:
         defaultInstances: 1
         maxInstances: 1
         minInstances: 1
@@ -2243,7 +2296,7 @@ connectInject:
     # @type: map
     meta: null
 
-  # Configures metrics for Consul Connect services. All values are overridable
+  # Configures metrics for Consul service mesh services. All values are overridable
   # via annotations on a per-pod basis.
   metrics:
     # If true, the connect-injector will automatically
@@ -2393,7 +2446,7 @@ connectInject:
   # annotated. Use `["*"]` to automatically allow all k8s namespaces.
   #
   # For example, `["namespace1", "namespace2"]` will only allow pods in the k8s
-  # namespaces `namespace1` and `namespace2` to have Connect sidecars injected
+  # namespaces `namespace1` and `namespace2` to have Consul service mesh sidecars injected
   # and registered with Consul. All other k8s namespaces will be ignored.
   #
   # To deny all namespaces, set this to `[]`.
@@ -2533,6 +2586,26 @@ connectInject:
         # Recommended production default: 100m
         # @type: string
         cpu: null
+    # Set default lifecycle management configuration for sidecar proxy.
+    # These settings can be overridden on a per-pod basis via these annotations:
+    #
+    # - `consul.hashicorp.com/enable-sidecar-proxy-lifecycle`
+    # - `consul.hashicorp.com/enable-sidecar-proxy-shutdown-drain-listeners`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-port`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-shutdown-path`
+    # @type: map
+    lifecycle:
+        # @type: boolean
+        defaultEnabled: true
+        # @type: boolean
+        defaultEnableShutdownDrainListeners: true
+        # @type: integer
+        defaultShutdownGracePeriodSeconds: 30
+        # @type: integer
+        defaultGracefulPort: 20600
+        # @type: string
+        defaultGracefulShutdownPath: "/graceful_shutdown"
 
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of
@@ -2558,7 +2631,7 @@ connectInject:
 # [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
 meshGateway:
   # If [mesh gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
-  # gateways and Consul Connect will be configured to use gateways.
+  # gateways and Consul service mesh will be configured to use gateways.
   # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false

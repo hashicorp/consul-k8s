@@ -26,4 +26,10 @@ const (
 	// annotationServiceMetaPrefix is the prefix for setting meta key/value
 	// for a service. The remainder of the key is the meta key.
 	annotationServiceMetaPrefix = "consul.hashicorp.com/service-meta-"
+
+	// annotationServiceWeight is the key of the annotation that determines
+	// the traffic weight of the service which is spanned over multiple k8s cluster.
+	// e.g. Service `backend` in k8s cluster `A` receives 25% of the traffic
+	// compared to same `backend` service in k8s cluster `B`.
+	annotationServiceWeight = "consul.hashicorp.com/service-weight"
 )
