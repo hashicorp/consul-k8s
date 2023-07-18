@@ -227,7 +227,11 @@ func TestBasicCloud(t *testing.T) {
 	consulCluster.Create(t)
 
 	logger.Log(t, "creating static-server deployment")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+	if cfg.EnableWindows {
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server-windows")
+	} else {
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+	}
 	// time.Sleep(1 * time.Hour)
 	// TODO: add in test assertions here
 }

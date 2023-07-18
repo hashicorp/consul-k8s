@@ -26,5 +26,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: status.hostIP
+      nodeSelector:
+        kubernetes.io/os: linux
       serviceAccountName: static-client
       terminationGracePeriodSeconds: 0 # so deletion is quick
