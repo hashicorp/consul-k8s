@@ -88,7 +88,8 @@ spec:
             {{- end}}
             {{- end}}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
-            - -node-selector={{ .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
+            - -node-selector
+            - {{- .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector | toYaml | nindent 14 }}
             {{- end }}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
             - -tolerations={{ .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
