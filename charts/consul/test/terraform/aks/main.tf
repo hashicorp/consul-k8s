@@ -11,6 +11,10 @@ terraform {
 
 provider "azurerm" {
   features {}
+  client_id       = var.client_id
+  client_secret   = var.client_secret
+  tenant_id       = ""
+  subscription_id = ""
 }
 
 provider "local" {}
@@ -77,7 +81,7 @@ network_profile {
     # dns_service_ip     = "10.0.0.10"
     # pod_cidr           = "10.244.0.0/16"
     # docker_bridge_cidr = "172.17.0.1/16"
-  }
+}
 
   default_node_pool {
     name            = "default"
@@ -108,7 +112,7 @@ resource "local_file" "kubeconfigs" {
 }
 
 resource "azurerm_kubernetes_cluster_node_pool" "win"  {
-  count = var.windows ? 1 : 0
+  count = var.windows ? var.cluster_count : 0
   name                  = "win"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.default[count.index].id
   vm_size               = "Standard_DS2_v2"

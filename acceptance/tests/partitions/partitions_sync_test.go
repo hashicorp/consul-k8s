@@ -240,10 +240,17 @@ func TestPartitions_Sync(t *testing.T) {
 			}
 
 			logger.Log(t, "creating a static-server with a service")
-			// create service in default partition.
-			k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
-			// create service in secondary partition.
-			k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			if cfg.EnableWindows {
+				// create service in default partition.
+				k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-windows")
+				// create service in secondary partition.
+				k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-windows")
+			} else {
+				// create service in default partition.
+				k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+				// create service in secondary partition.
+				k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			}
 
 			logger.Log(t, "checking that the service has been synced to Consul")
 			var services map[string][]string

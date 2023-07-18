@@ -216,7 +216,11 @@ func TestPartitions_Gateway(t *testing.T) {
 	// Since we're deploying the gateway in the secondary cluster, we create the static client
 	// in the secondary as well.
 	logger.Log(t, "creating static-client pod in secondary partition cluster")
-	k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+	if cfg.EnableWindows {
+		k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client-windows")
+	} else {
+		k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+	}
 
 	logger.Log(t, "creating api-gateway resources")
 	out, err := k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-k", "../fixtures/bases/api-gateway")
@@ -253,7 +257,11 @@ func TestPartitions_Gateway(t *testing.T) {
 	t.Run("in-partition", func(t *testing.T) {
 		logger.Log(t, "test in-partition networking")
 		logger.Log(t, "creating target server in secondary partition cluster")
-		k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		if cfg.EnableWindows {
+			k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+		} else {
+			k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		}
 
 		logger.Log(t, "patching route to target server")
 		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
@@ -291,7 +299,11 @@ func TestPartitions_Gateway(t *testing.T) {
 		logger.Log(t, "test cross-partition networking")
 
 		logger.Log(t, "creating target server in default partition cluster")
-		k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		if cfg.EnableWindows {
+			k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+		} else {
+			k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		}
 
 		logger.Log(t, "creating exported services")
 		k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-ns1")

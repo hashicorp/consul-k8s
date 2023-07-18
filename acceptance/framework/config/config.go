@@ -133,20 +133,26 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	if t.EnableOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
 	}
-
+	// ask about client
 	if t.EnableWindows {
-		// setIfNotEmpty(helmValues, "global.apiGateway.controller.nodeSelector.kubernetes.io/os", "windows")
-		// setIfNotEmpty(helmValues, "global.apiGateway.managedGatewayClass.nodeSelector.kubernetes.io/os", "windows")
-		// setIfNotEmpty(helmValues, "global.connectInject.nodeSelector.kubernetes.io/os", "linux")
-		// setIfNotEmpty(helmValues, "global.client.nodeSelector.kubernetes.io/os", "windows")
-		// setIfNotEmpty(helmValues, "global.acls.nodeSelector.kubernetes.io/os", "linux")
-		// setIfNotEmpty(helmValues, "global.meshGateway.nodeSelector.kubernetes.io/os", "windows")
-		// setIfNotEmpty(helmValues, "global.server.nodeSelector.kubernetes.io/os", "linux")
-		// setIfNotEmpty(helmValues, "global.syncCatalog.nodeSelector.kubernetes.io/os", "linux")
-		// setIfNotEmpty(helmValues, "global.telemetryCollector.nodeSelector.kubernetes.io/os", "windows")
-		// setIfNotEmpty(helmValues, "global.webhookCertManager.nodeSelector.kubernetes.io/os", "linux")
+		fmt.Println("hi")
+		setIfNotEmpty(helmValues, "apiGateway.controller.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "connectInject.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "connectInject.apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "client.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "acls.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "global.acls.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "global.tls.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "meshGateway.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "server.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "syncCatalog.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "telemetryCollector.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "webhookCertManager.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "ingressGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "terminatingGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
 
-		setIfNotEmpty(helmValues, "global.imageK8SWindows", "absolutelightning/consul-k8s-control-plane-windows-2019:v7")
+		setIfNotEmpty(helmValues, "global.imageK8SWindows", "absolutelightning/windows-consul-k8s-control-plane:latest")
 		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", "absolutelightning/windows-consul-dataplane")
 	}
 
@@ -177,10 +183,10 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "connectInject.transparentProxy.defaultEnabled", strconv.FormatBool(t.EnableTransparentProxy))
 
 	setIfNotEmpty(helmValues, "global.image", t.ConsulImage)
-	setIfNotEmpty(helmValues, "global.imageK8S", "aahel/linux-fixed:v1")
+	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
 	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
-
+	fmt.Println("helmval", helmValues)
 	return helmValues, nil
 }
 
