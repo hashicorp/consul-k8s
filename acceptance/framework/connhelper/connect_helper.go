@@ -24,6 +24,7 @@ import (
 const (
 	StaticClientName = "static-client"
 	StaticServerName = "static-server"
+	JobName          = "test-job"
 )
 
 // ConnectHelper configures a Consul cluster for connect injection tests.
@@ -118,6 +119,42 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
 	for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
+		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		require.NoError(t, err)
+		require.Len(t, podList.Items, 1)
+		require.Len(t, podList.Items[0].Spec.Containers, 2)
+	}
+}
+
+func (c *ConnectHelper) DeployJobAndServer(t *testing.T) {
+
+	if c.Secure {
+		// We need to register the cleanup function before we create the
+		// deployments because golang will execute them in reverse order
+		// (i.e. the last registered cleanup function will be executed first).
+		t.Cleanup(func() {
+			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
+			retry.RunWith(retrier, t, func(r *retry.R) {
+				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
+				require.NoError(r, err)
+				for _, token := range tokens {
+					require.NotContains(r, token.Description, StaticServerName)
+					require.NotContains(r, token.Description, JobName)
+				}
+			})
+		})
+	}
+
+	logger.Log(t, "creating static-server and test-job deployments")
+
+	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/bases/jobs/job")
+
+	// Check that both static-server and test-job have been injected and
+	// now have 2 containers.
+	for _, labelSelector := range []string{"app=static-server", "app=test-job"} {
 		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
