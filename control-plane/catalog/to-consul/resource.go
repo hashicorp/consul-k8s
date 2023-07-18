@@ -511,6 +511,19 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			r.Service = &rs
 			r.Service.ID = serviceID(r.Service.Service, ip)
 			r.Service.Address = ip
+			// Adding information about service weight.
+			// Overrides the existing weight if present.
+			if weight, ok := svc.Annotations[annotationServiceWeight]; ok && weight != "" {
+				weightI, err := getServiceWeight(weight)
+				if err == nil {
+					r.Service.Weights = consulapi.AgentWeights{
+						Passing: weightI,
+					}
+				} else {
+					t.Log.Debug("[generateRegistrations] service weight err: ", err)
+				}
+			}
+
 			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 
@@ -546,6 +559,19 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				r.Service = &rs
 				r.Service.ID = serviceID(r.Service.Service, addr)
 				r.Service.Address = addr
+
+				// Adding information about service weight.
+				// Overrides the existing weight if present.
+				if weight, ok := svc.Annotations[annotationServiceWeight]; ok && weight != "" {
+					weightI, err := getServiceWeight(weight)
+					if err == nil {
+						r.Service.Weights = consulapi.AgentWeights{
+							Passing: weightI,
+						}
+					} else {
+						t.Log.Debug("[generateRegistrations] service weight err: ", err)
+					}
+				}
 
 				t.consulMap[key] = append(t.consulMap[key], &r)
 			}
@@ -998,4 +1024,19 @@ func (t *ServiceResource) isIngressService(key string) bool {
 // consulHealthCheckID deterministically generates a health check ID based on service ID and Kubernetes namespace.
 func consulHealthCheckID(k8sNS string, serviceID string) string {
 	return fmt.Sprintf("%s/%s", k8sNS, serviceID)
+}
+
+// Calculates the passing service weight.
+func getServiceWeight(weight string) (int, error) {
+	// error validation if the input param is a number.
+	weightI, err := strconv.Atoi(weight)
+	if err != nil {
+		return -1, err
+	}
+
+	if weightI <= 1 {
+		return -1, fmt.Errorf("expecting the service annotation %s value to be greater than 1", annotationServiceWeight)
+	}
+
+	return weightI, nil
 }

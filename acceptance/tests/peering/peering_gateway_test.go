@@ -11,7 +11,6 @@ import (
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -42,7 +41,7 @@ func TestPeering_Gateway(t *testing.T) {
 	const staticClientPeer = "client"
 
 	staticServerPeerClusterContext := env.DefaultContext(t)
-	staticClientPeerClusterContext := env.Context(t, environment.SecondaryContextName)
+	staticClientPeerClusterContext := env.Context(t, 1)
 
 	commonHelmValues := map[string]string{
 		"global.peering.enabled":        "true",

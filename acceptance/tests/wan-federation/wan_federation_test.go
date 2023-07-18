@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -49,7 +48,7 @@ func TestWANFederation(t *testing.T) {
 			}
 
 			primaryContext := env.DefaultContext(t)
-			secondaryContext := env.Context(t, environment.SecondaryContextName)
+			secondaryContext := env.Context(t, 1)
 
 			primaryHelmValues := map[string]string{
 				"global.datacenter": "dc1",
