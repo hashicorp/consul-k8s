@@ -143,7 +143,11 @@ func TestWANFederation_Gateway(t *testing.T) {
 
 	t.Run("from primary to secondary", func(t *testing.T) {
 		logger.Log(t, "creating static-server in dc2")
-		k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		if cfg.EnableWindows {
+			k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+		} else {
+			k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		}
 
 		logger.Log(t, "creating api-gateway resources in dc1")
 		out, err := k8s.RunKubectlAndGetOutputE(t, primaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
@@ -170,7 +174,11 @@ func TestWANFederation_Gateway(t *testing.T) {
 	t.Run("from secondary to primary", func(t *testing.T) {
 		// Check that we can connect services over the mesh gateways
 		logger.Log(t, "creating static-server in dc1")
-		k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		if cfg.EnableWindows {
+			k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+		} else {
+			k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		}
 
 		logger.Log(t, "creating api-gateway resources in dc2")
 		out, err := k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")

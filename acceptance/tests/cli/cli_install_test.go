@@ -40,6 +40,9 @@ func TestInstall(t *testing.T) {
 
 			cfg := suite.Config()
 			cfg.EnableTransparentProxy = c.tproxy
+			if cfg.EnableWindows && cfg.EnableTransparentProxy {
+				t.Skipf("skipping this because transparent proxy is not supported on windows")
+			}
 			ctx := suite.Environment().DefaultContext(t)
 
 			connHelper := connhelper.ConnectHelper{

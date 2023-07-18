@@ -102,7 +102,11 @@ func TestSyncCatalogNamespaces(t *testing.T) {
 			})
 
 			logger.Log(t, "creating a static-server with a service")
-			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-windows")
+			} else {
+				k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			}
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
