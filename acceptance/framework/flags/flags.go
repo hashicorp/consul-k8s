@@ -77,7 +77,7 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagNamespace, "namespace", "", "The Kubernetes namespace to use for tests.")
 
 	flag.StringVar(&t.flagConsulImage, "consul-image", "", "The Consul image to use for all tests.")
-	flag.StringVar(&t.flagConsulK8sImage, "consul-k8s-image", "", "The consul-k8s image to use for all tests.")
+	flag.StringVar(&t.flagConsulK8sImage, "consul-k8s-image", "aahel/linux-cp:latest", "The consul-k8s image to use for all tests.")
 	flag.StringVar(&t.flagConsulDataplaneImage, "consul-dataplane-image", "", "The consul-dataplane image to use for all tests.")
 	flag.StringVar(&t.flagConsulVersion, "consul-version", "", "The consul version used for all tests.")
 	flag.StringVar(&t.flagConsulDataplaneVersion, "consul-dataplane-version", "", "The consul-dataplane version used for all tests.")

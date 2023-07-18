@@ -7,12 +7,12 @@ variable "location" {
 }
 
 variable "client_id" {
-  default     = ""
+  default     = "c477fe36-2737-4130-ac7e-d31172032d54"
   description = "The client ID of the service principal to be used by Kubernetes when creating Azure resources like load balancers."
 }
 
 variable "client_secret" {
-  default     = ""
+  default     = "JvO8Q~3WeINyJuHhFVgZH3d8uS5vg3OOazHcDam7"
   description = "The client secret of the service principal to be used by Kubernetes when creating Azure resources like load balancers."
 }
 
