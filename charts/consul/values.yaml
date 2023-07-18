@@ -535,8 +535,9 @@ global:
     # If enabled, this datacenter will be federation-capable. Only federation
     # via mesh gateways is supported.
     # Mesh gateways and servers will be configured to allow federation.
-    # Requires `global.tls.enabled`, `meshGateway.enabled` and `connectInject.enabled`
-    # to be true. Requires Consul 1.8+.
+    # Requires `global.tls.enabled`, `connectInject.enabled`, and one of 
+    # `meshGateway.enabled` or `externalServers.enabled` to be true.
+    # Requires Consul 1.8+.
     enabled: false
 
     # If true, the chart will create a Kubernetes secret that can be imported
@@ -552,8 +553,8 @@ global:
     # @type: string
     primaryDatacenter: null
 
-    # A list of addresses of the primary mesh gateways in the form `<ip>:<port>`.
-    # (e.g. ["1.1.1.1:443", "2.3.4.5:443"]
+    # A list of addresses of the primary mesh gateways in the form `<ip>:<port>`
+    # (e.g. `["1.1.1.1:443", "2.3.4.5:443"]`).
     # @type: array<string>
     primaryGateways: []
 
@@ -563,6 +564,9 @@ global:
     # This auth method will be used to provision ACL tokens for Consul components and is different
     # from the one used by the Consul Service Mesh.
     # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
+    #
+    # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and 
+    # `externalServers.k8sAuthMethodHost` should be set to the same value.
     #
     # You can retrieve this value from your `kubeconfig` by running:
     #
@@ -1338,6 +1342,9 @@ externalServers:
   # `connectInject.enabled` to true, set `k8sAuthMethodHost` to the address of the Kubernetes API server.
   # This address must be reachable from the Consul servers.
   # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
+  #
+  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and 
+  # `externalServers.k8sAuthMethodHost` should be set to the same value.
   #
   # You could retrieve this value from your `kubeconfig` by running:
   #
