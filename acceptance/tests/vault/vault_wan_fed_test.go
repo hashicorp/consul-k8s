@@ -31,9 +31,9 @@ import (
 // in the secondary that will treat the Vault server in the primary as an external server.
 func TestVault_WANFederationViaGateways(t *testing.T) {
 	cfg := suite.Config()
-	//if cfg.UseKind {
-	//	t.Skipf("Skipping this test because it's currently flaky on kind")
-	//}
+	if cfg.UseKind {
+		t.Skipf("Skipping this test because it's currently flaky on kind")
+	}
 	if !cfg.EnableMultiCluster {
 		t.Skipf("skipping this test because -enable-multi-cluster is not set")
 	}
@@ -520,17 +520,6 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, primaryCtx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
 
-	//if cfg.NoCleanupWanFed {
-	//time.Sleep(1800 * time.Second)
-	//intVar, err := strconv.Atoi(cfg.TestDuration)
-
-	//	if err != nil {
-	//		logger.Log(t, "Couldn't convert string to int")
-
-	//	}
-	//	time.Sleep(time.Duration(intVar) * time.Hour)
-
-	//}
 }
 
 // vaultAddress returns Vault's server URL depending on test configuration.
