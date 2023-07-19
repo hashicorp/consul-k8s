@@ -938,7 +938,7 @@ func (t *serviceIngressResource) Upsert(key string, raw interface{}) error {
 			continue
 		}
 		if t.SyncLoadBalancerIPs {
-			if ingress.Status.LoadBalancer.Ingress[0].IP == "" {
+			if len(ingress.Status.LoadBalancer.Ingress) > 0 && ingress.Status.LoadBalancer.Ingress[0].IP == "" {
 				continue
 			}
 			hostName = ingress.Status.LoadBalancer.Ingress[0].IP
