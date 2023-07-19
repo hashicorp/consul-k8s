@@ -256,6 +256,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 
 			if len(instances) != 1 {
 				r.Errorf("expected 1 instance of %s", name)
+
 			}
 		}
 	})

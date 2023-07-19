@@ -4,5 +4,9 @@
 resources:
   - ../../bases/job-client
 
+<<<<<<< HEAD:acceptance/tests/fixtures/cases/job-client-inject/kustomization.yaml
 patchesStrategicMerge:
   - patch.yaml
+=======
+    # TODO: Split this up and put into cases. 
+>>>>>>> accbf544 (Fix small issues in test and remove connhelper_job):acceptance/tests/fixtures/bases/jobs/kustomization.yaml
