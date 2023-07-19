@@ -89,14 +89,14 @@ spec:
             {{- end}}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
             - -node-selector
-            - {{- .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector | toYaml | nindent 14 }}
+            - {{- toYaml .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector | nindent 14 -}}
             {{- end }}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
             - -tolerations={{ .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
             {{- end }}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
             - -service-annotations
-            - {{- .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations | toYaml | nindent 14 }}
+            - {{- toYaml .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations | nindent 14 -}}
             {{- end }}
             - -service-type={{ .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
             {{- end}}
