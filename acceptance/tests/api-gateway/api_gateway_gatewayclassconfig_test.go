@@ -79,10 +79,6 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		})
 	})
 
-	defaultInstances := pointer.Int32(2)
-	maxInstances := pointer.Int32(8)
-	minInstances := pointer.Int32(1)
-  
 	// create a GatewayClassConfig with configuration set
 	gatewayClassConfigName := "gateway-class-config"
 	gatewayClassConfig := &v1alpha1.GatewayClassConfig{
@@ -147,7 +143,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	gatewayName := "gcctestgateway" + namespace
 	logger.Log(t, "creating controlled gateway")
 	gateway := createGateway(t, k8sClient, gatewayName, namespace, gatewayClassName, certificateName)
-  
+
 	// make sure it exists
 	logger.Log(t, "checking that gateway one is synchronized to Consul")
 	checkConsulExists(t, consulClient, api.APIGateway, gatewayName)
