@@ -28,7 +28,6 @@ type TestFlags struct {
 	flagEnablePodSecurityPolicies bool
 
 	flagEnableCNI                       bool
-	flagCNINamespace                    string
 	flagRestrictedPSAEnforcementEnabled bool
 
 	flagEnableTransparentProxy bool
@@ -117,15 +116,13 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagEnableCNI, "enable-cni", false,
 		"If true, the test suite will run tests with consul-cni plugin enabled. "+
 			"In general, this will only run against tests that are mesh related (connect, mesh-gateway, peering, etc")
-	flag.StringVar(&t.flagCNINamespace, "cni-namespace", "",
-		"If configured, the CNI will be deployed in this namespace.")
 	flag.BoolVar(&t.flagRestrictedPSAEnforcementEnabled, "restricted-psa-enforcement-enabled", false,
-		"If true, this indicates that Consul is being run in a namespace with restricted PSA enforcement. "+
-			"The tests do not configure Consul's namespace with PSA enforcement enabled. "+
-			"The CNI and test applications need more privilege than allowed in a restricted namespace, so "+
-			"this flag requires that CNINamespace is set and you must create that namespace with privilegd PSA enforcement. "+
-			"When set, test applications will, By default, run a different namespace called <consul-namespace>-apps "+
-			"instead of being deployed into the Consul namespace.")
+		"If true, this indicates that Consul is being run in a namespace with restricted PSA enforcement enabled. "+
+			"The tests do not configure Consul's namespace with PSA enforcement enabled. This must configured before tests are run. "+
+			"The CNI and test applications need more privilege than is allowed in a restricted namespace. "+
+			"When set, the CNI will be deployed into the kube-system namespace, and in supported test cases, applications "+
+			"are deployed, by default, into a namespace named '<consul-namespace>-apps' instead of being deployed into the "+
+			"Consul namespace.")
 
 	flag.BoolVar(&t.flagEnableTransparentProxy, "enable-transparent-proxy", false,
 		"If true, the test suite will run tests with transparent proxy enabled. "+
@@ -184,9 +181,6 @@ func (t *TestFlags) Validate() error {
 		return errors.New("-enable-enterprise provided without setting env var CONSUL_ENT_LICENSE with consul license")
 	}
 
-	if t.flagRestrictedPSAEnforcementEnabled && t.flagCNINamespace == "" {
-		return errors.New("-cni-namespace must be provided with -restricted-psa-enforcement-enabled, and the CNI namespace must be configured with PSA enforcement disabled or with privileged PSA enforcement.")
-	}
 	return nil
 }
 
@@ -211,7 +205,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
 
 		EnableCNI:                       t.flagEnableCNI,
-		CNINamespace:                    t.flagCNINamespace,
 		RestrictedPSAEnforcementEnabled: t.flagRestrictedPSAEnforcementEnabled,
 
 		EnableTransparentProxy: t.flagEnableTransparentProxy,
