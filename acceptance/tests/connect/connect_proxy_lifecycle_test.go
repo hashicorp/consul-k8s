@@ -242,7 +242,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 				Ctx:         ctx,
 				Cfg:         cfg,
 				HelmValues: map[string]string{
-					"connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds": strconv.FormatInt(tc.gracePeriod, 64),
+					"connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds": strconv.FormatInt(tc.gracePeriod, 10),
 					"connectInject.sidecarProxy.lifecycle.defaultEnabled":                    strconv.FormatBool(tc.gracePeriod > 0),
 				},
 			}
