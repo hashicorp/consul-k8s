@@ -95,7 +95,6 @@ type TestConfig struct {
 
 	NoCleanupOnFailure bool
 	NoCleanup          bool
-	TestDuration       string
 	DebugDirectory     string
 
 	UseAKS  bool
