@@ -107,6 +107,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		// setIfNotEmpty(helmValues, "client.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "acls.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "global.acls.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "global.tls.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "meshGateway.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "server.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "syncCatalog.nodeSelector", "kubernetes.io/os: linux")
