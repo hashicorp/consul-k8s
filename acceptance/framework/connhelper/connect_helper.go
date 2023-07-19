@@ -140,7 +140,7 @@ func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
 	kustomizeDir := "../fixtures/cases/resolver-redirect-virtualip"
 	k8s.KubectlApplyK(t, options, kustomizeDir)
 
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, options, kustomizeDir)
 	})
 }
