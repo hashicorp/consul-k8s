@@ -11,9 +11,10 @@ import (
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
 func CreateTunnelToResourcePort(t *testing.T, resourceName string, remotePort int, options *terratestk8s.KubectlOptions, logger terratestLogger.TestLogger) string {
@@ -27,7 +28,7 @@ func CreateTunnelToResourcePort(t *testing.T, resourceName string, remotePort in
 		logger)
 
 	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 15 * time.Second, Count: 60}, t, func(r *retry.R) {
 		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
 		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
 		// get used to fail the test, just for logging.
