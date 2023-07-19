@@ -215,32 +215,36 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 	cfg := suite.Config()
-	defaultShutdownGracePeriodSeconds := 30
+	//defaultShutdownGracePeriodSeconds := 30
 	ver, err := version.NewVersion("1.2.0")
 	require.NoError(t, err)
 	if cfg.ConsulDataplaneVersion != nil && cfg.ConsulDataplaneVersion.LessThan(ver) {
 		t.Skipf("skipping this test because proxy lifecycle management is not supported in consul-dataplane version %v", cfg.ConsulDataplaneVersion.String())
 	}
 
-	//TODO: Create 2 helm configurations. 1 secure and 1 not secure
+	cases := map[string]struct {
+		secure      bool
+		gracePeriod int64
+	}{
+		"Insecure with grace period": {false, 30},
+		// TODO create more of these "install" cases.
+	}
 
-	// Two installations of Consul, 1 secure and 1 not secure ^^. Each of the configurations will run different job versions.
-	secureConfig := []bool{true, false}
-	//Figure out which helm values to use
-	var testCfg LifecycleShutdownConfig = LifecycleShutdownConfig{secure: false, helmValues: map[string]string{}}
-	for _, config := range secureConfig {
-
-		t.Run(fmt.Sprintf("job test, secure: %b", config), func(t *testing.T) {
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			releaseName := helpers.RandomName()
 
 			connHelper := connhelper.ConnectHelper{
 				ClusterKind: consul.Helm,
-				Secure:      config,
+				Secure:      tc.secure,
 				ReleaseName: releaseName,
 				Ctx:         ctx,
 				Cfg:         cfg,
-				HelmValues:  testCfg.helmValues,
+				HelmValues: map[string]string{
+					"connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds": strconv.FormatInt(tc.gracePeriod, 64),
+					"connectInject.sidecarProxy.lifecycle.defaultEnabled":                    strconv.FormatBool(tc.gracePeriod > 0),
+				},
 			}
 
 			connHelper.Setup(t)
@@ -265,13 +269,10 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 				}
 			})
 
-			//DONE: Modify connhelper to test the connection between job and server, create intention between job and server
-
-			if config {
+			if tc.secure {
 				connHelper.TestConnectionFailureWithoutIntentionJob(t)
 				connHelper.CreateIntentionJob(t)
 			}
-			//DONE :test connection success b/w job and server
 			connHelper.TestConnectionSuccessJob(t)
 
 			// Get test-job pod name
@@ -286,16 +287,12 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			require.Len(t, pods.Items, 1)
 			jobName := pods.Items[0].Name
 
-			//DONE: Exec into job container and kill the proxy
-
-			//curl --max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
+			// curl --max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
 			sendProxyShutdownArgs := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "--max-time", "2", "-s", "-f", "-XPOST", "http://127.0.0.1:20600/graceful_shutdown"}
-			output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), sendProxyShutdownArgs...)
-			fmt.Print(output)
-			logger.Log(t, "Proxy killed...")
+			_, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), sendProxyShutdownArgs...)
+			require.NoError(t, err)
 
-			//jobRuntimeStr, _ := pods.Items[0].GetAnnotations()["job_runtime"]
-			//jobRuntime, _ := strconv.Atoi(jobRuntimeStr)
+			logger.Log(t, "Proxy killed...")
 
 			args := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "-vvvsSf"}
 
@@ -304,39 +301,34 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			} else {
 				args = append(args, "http://localhost:1234")
 			}
-			//Only try to send requests from the pod as long as you expect the job to be alive.
-			retry.RunWith(&retry.Timer{Timeout: time.Duration(jobShutdownDuration) * time.Second, Wait: 1 * time.Second}, t, func(r *retry.R) {
-
-				// Ensure outbound requests are still successful during grace
-				// period.
-				retry.RunWith(&retry.Timer{Timeout: time.Duration(jobShutdownDuration) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
+			if tc.gracePeriod > 0 {
+				retry.RunWith(&retry.Timer{Timeout: time.Duration(tc.gracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
 					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
 					require.NoError(r, err)
-					require.Condition(r, func() bool {
-						exists := false
-						if strings.Contains(output, "curl: (7) Failed to connect") {
-							exists = true
-						}
-						return !exists
-					})
+					require.True(r, !strings.Contains(output, "curl: (7) Failed to connect"))
 				})
+				//wait for the grace period to end after successful request
+				time.Sleep(time.Duration(tc.gracePeriod) * time.Second)
 
-				// Ensure outbound requests fail because proxy has terminated
-				retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
-					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
-					require.Error(r, err)
-					require.Condition(r, func() bool {
-						exists := false
-						if strings.Contains(output, "curl: (7) Failed to connect") {
-							exists = true
-						}
-						return exists
-					})
-				})
-
+			}
+			retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+				output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
+				require.Error(r, err)
+				require.True(r, strings.Contains(output, "curl: (7) Failed to connect"))
 			})
 
-			logger.Log(t, "ensuring pod is deregistered after termination")
+			retry.RunWith(&retry.Timer{Timeout: 4 * time.Minute, Wait: 30 * time.Second}, t, func(r *retry.R) {
+				pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(
+					context.Background(),
+					metav1.ListOptions{
+						LabelSelector: "app=test-job",
+					},
+				)
+				require.NoError(t, err)
+				require.True(t, pods.Items[0].Status.String() == "Completed")
+			})
+
+			logger.Log(t, "ensuring job is deregistered after termination")
 			retry.Run(t, func(r *retry.R) {
 				for _, name := range []string{
 					"test-job",

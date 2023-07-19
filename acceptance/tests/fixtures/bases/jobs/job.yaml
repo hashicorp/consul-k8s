@@ -31,7 +31,6 @@ spec:
         "consul.hashicorp.com/transparent-proxy": "false"
         "consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds": "30"
         "consul.hashicorp.com/connect-service-upstreams": "static-server:1234"
-        "job_runtime" : "120"
       labels:
         app: test-job
     spec:
