@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix helm install when setting copyAnnotations or nodeSelector
+```
