@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package controllers
 
 import (
@@ -40,8 +37,6 @@ import (
 )
 
 func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
-	//TODO @apigatewayteam test is consistently failing on main after merge, fix in a follow up PR
-	t.Skip()
 	s := runtime.NewScheme()
 	require.NoError(t, clientgoscheme.AddToScheme(s))
 	require.NoError(t, gwv1alpha2.Install(s))

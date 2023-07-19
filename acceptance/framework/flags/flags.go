@@ -35,18 +35,17 @@ type TestFlags struct {
 	flagHelmChartVersion       string
 	flagConsulImage            string
 	flagConsulK8sImage         string
-	flagConsulDataplaneImage   string
 	flagConsulVersion          string
-	flagConsulDataplaneVersion string
 	flagEnvoyImage             string
 	flagConsulCollectorImage   string
 	flagVaultHelmChartVersion  string
 	flagVaultServerVersion     string
+	flagConsulDataplaneImage   string
+	flagConsulDataplaneVersion string
 
 	flagHCPResourceID string
 
 	flagNoCleanupOnFailure bool
-	flagNoCleanup          bool
 
 	flagDebugDirectory string
 
@@ -133,9 +132,6 @@ func (t *TestFlags) init() {
 		"If true, the tests will not cleanup Kubernetes resources they create when they finish running."+
 			"Note this flag must be run with -failfast flag, otherwise subsequent tests will fail.")
 
-	flag.BoolVar(&t.flagNoCleanup, "no-cleanup", false,
-		"If true, the tests will not cleanup Kubernetes resources for Vault test")
-
 	flag.StringVar(&t.flagDebugDirectory, "debug-directory", "", "The directory where to write debug information about failed test runs, "+
 		"such as logs and pod definitions. If not provided, a temporary directory will be created by the tests.")
 
@@ -198,7 +194,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	kubeEnvs := config.NewKubeTestConfigList(t.flagKubeconfigs, t.flagKubecontexts, t.flagKubeNamespaces)
 
 	c := &config.TestConfig{
-
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
 
@@ -219,18 +214,16 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		HelmChartVersion:       t.flagHelmChartVersion,
 		ConsulImage:            t.flagConsulImage,
 		ConsulK8SImage:         t.flagConsulK8sImage,
-		ConsulDataplaneImage:   t.flagConsulDataplaneImage,
 		ConsulVersion:          consulVersion,
-		ConsulDataplaneVersion: consulDataplaneVersion,
 		EnvoyImage:             t.flagEnvoyImage,
 		ConsulCollectorImage:   t.flagConsulCollectorImage,
 		VaultHelmChartVersion:  t.flagVaultHelmChartVersion,
 		VaultServerVersion:     t.flagVaultServerVersion,
-
-		HCPResourceID: t.flagHCPResourceID,
+		ConsulDataplaneImage:   t.flagConsulDataplaneImage,
+		ConsulDataplaneVersion: consulDataplaneVersion,
+		HCPResourceID:          t.flagHCPResourceID,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
-		NoCleanup:          t.flagNoCleanup,
 		DebugDirectory:     tempDir,
 		UseAKS:             t.flagUseAKS,
 		UseEKS:             t.flagUseEKS,
