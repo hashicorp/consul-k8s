@@ -12,6 +12,40 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// DetermineAndValidatePort behaves as follows:
+// If the annotation exists, validate the port and return it.
+// If the annotation does not exist, return the default port.
+// If the privileged flag is true, it will allow the port to be in the
+// privileged port range of 1-1023. Otherwise, it will only allow ports in the
+// unprivileged range of 1024-65535.
+func DetermineAndValidatePort(pod corev1.Pod, annotation string, defaultPort string, privileged bool) (string, error) {
+	if raw, ok := pod.Annotations[annotation]; ok && raw != "" {
+		port, err := PortValue(pod, raw)
+		if err != nil {
+			return "", fmt.Errorf("%s annotation value of %s is not a valid integer", annotation, raw)
+		}
+
+		if privileged && (port < 1 || port > 65535) {
+			return "", fmt.Errorf("%s annotation value of %d is not in the valid port range 1-65535", annotation, port)
+		} else if !privileged && (port < 1024 || port > 65535) {
+			return "", fmt.Errorf("%s annotation value of %d is not in the unprivileged port range 1024-65535", annotation, port)
+		}
+
+		// If the annotation exists, return the validated port.
+		return fmt.Sprint(port), nil
+	}
+
+	// If the annotation does not exist, return the default.
+	if defaultPort != "" {
+		port, err := PortValue(pod, defaultPort)
+		if err != nil {
+			return "", fmt.Errorf("%s is not a valid port on the pod %s", defaultPort, pod.Name)
+		}
+		return fmt.Sprint(port), nil
+	}
+	return "", nil
+}
+
 // PortValue returns the port of the container for the string value passed
 // in as an argument on the provided pod.
 func PortValue(pod corev1.Pod, value string) (int32, error) {

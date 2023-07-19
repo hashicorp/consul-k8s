@@ -1,0 +1,15 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: resolver-redirect
+spec:
+  selector:
+    # Nothing needs to be selected. We only utilize this service so that KubeDNS has a ClusterIP to resolve.
+    app: idonotexist
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

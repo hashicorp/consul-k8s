@@ -27,4 +27,10 @@ const (
 
 	// MetaKeyPodName is the meta key name for Kubernetes pod name used for the Consul services.
 	MetaKeyPodName = "pod-name"
+
+	// DefaultGracefulPort is the default port that consul-dataplane uses for graceful shutdown.
+	DefaultGracefulPort = 20600
+
+	// DefaultGracefulShutdownPath is the default path that consul-dataplane uses for graceful shutdown.
+	DefaultGracefulShutdownPath = "/graceful_shutdown"
 )
