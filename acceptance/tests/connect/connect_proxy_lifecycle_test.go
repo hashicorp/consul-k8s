@@ -215,7 +215,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 	cfg := suite.Config()
-
+	defaultShutdownGracePeriodSeconds := 30
 	ver, err := version.NewVersion("1.2.0")
 	require.NoError(t, err)
 	if cfg.ConsulDataplaneVersion != nil && cfg.ConsulDataplaneVersion.LessThan(ver) {
@@ -265,14 +265,14 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 				}
 			})
 
-			//TODO: Modify connhelper to test the connection between job and server, create intention between job and server
+			//DONE: Modify connhelper to test the connection between job and server, create intention between job and server
 
-			/*if testCfg.secure {
-				connHelper.TestConnectionFailureWithoutIntention(t)
-				connHelper.CreateIntention(t)
-			}*/
-			//TODO :test connection success b/w job and server
-			connHelper.TestConnectionSuccess(t)
+			if config {
+				connHelper.TestConnectionFailureWithoutIntentionJob(t)
+				connHelper.CreateIntentionJob(t)
+			}
+			//DONE :test connection success b/w job and server
+			connHelper.TestConnectionSuccessJob(t)
 
 			// Get test-job pod name
 			ns := ctx.KubectlOptions(t).Namespace
@@ -286,33 +286,16 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			require.Len(t, pods.Items, 1)
 			jobName := pods.Items[0].Name
 
-			/*getOutputArgs := []string{"logs", "pods/" + clientPodName}
-			//continue retrying until job is finished/ proxy has been killed
-			retry.Run(t, func(r *retry.R) {
-				output, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), getOutputArgs...)
-				r.Check(err)
-				if !strings.Contains(output, "Proxy Killed") {
-					r.Errorf("Proxy has not been killed yet...")
-				}
-			}) */
+			//DONE: Exec into job container and kill the proxy
 
-			//TODO: Exec into job container and kill the proxy
-
-			//--max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
+			//curl --max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
 			sendProxyShutdownArgs := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "--max-time", "2", "-s", "-f", "-XPOST", "http://127.0.0.1:20600/graceful_shutdown"}
 			output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), sendProxyShutdownArgs...)
 			fmt.Print(output)
 			logger.Log(t, "Proxy killed...")
-			//jobShutdownTime := time.Now()
-			jobShutdownDurationStr, _ := pods.Items[0].GetAnnotations()["time_after_proxy_death"]
-			jobShutdownDuration, _ := strconv.Atoi(jobShutdownDurationStr)
 
-			var terminationGracePeriod int64 = 60
-			/*logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
-			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
-			require.NoError(t, err)
-			*/
-			// Exec into terminating pod, not just any test-job pod
+			//jobRuntimeStr, _ := pods.Items[0].GetAnnotations()["job_runtime"]
+			//jobRuntime, _ := strconv.Atoi(jobRuntimeStr)
 
 			args := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "-vvvsSf"}
 

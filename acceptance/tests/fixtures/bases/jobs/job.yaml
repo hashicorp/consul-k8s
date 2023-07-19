@@ -31,7 +31,7 @@ spec:
         "consul.hashicorp.com/transparent-proxy": "false"
         "consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds": "30"
         "consul.hashicorp.com/connect-service-upstreams": "static-server:1234"
-        "time_after_proxy_death" : "120"
+        "job_runtime" : "120"
       labels:
         app: test-job
     spec:
@@ -45,10 +45,6 @@ spec:
           - -c
           - |
             echo "Started test job"
-            sleep 10
-            echo "Killing proxy"
-            curl --max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
-            echo "Proxy Killed"
             sleep 120
             echo "Ended test job"
       serviceAccountName: test-job

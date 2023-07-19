@@ -175,6 +175,15 @@ func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T) {
 	}
 }
 
+func (c *ConnectHelper) TestConnectionFailureWithoutIntentionJob(t *testing.T) {
+	logger.Log(t, "checking that the connection is not successful because there's no intention")
+	if c.Cfg.EnableTransparentProxy {
+		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), JobName, "http://static-server")
+	} else {
+		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), JobName, "http://localhost:1234")
+	}
+}
+
 // CreateIntention creates an intention for the static-server pod to connect to
 // the static-client pod.
 func (c *ConnectHelper) CreateIntention(t *testing.T) {
@@ -192,6 +201,22 @@ func (c *ConnectHelper) CreateIntention(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func (c *ConnectHelper) CreateIntentionJob(t *testing.T) {
+	logger.Log(t, "creating intention, test job and server")
+	_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+		Kind: api.ServiceIntentions,
+		Name: StaticServerName,
+		Sources: []*api.SourceIntention{
+			{
+				Name:   JobName,
+				Action: api.IntentionActionAllow,
+			},
+		},
+	}, nil)
+	require.NoError(t, err)
+
+}
+
 // TestConnectionSuccess ensures the static-server pod can connect to the
 // static-client pod once the intention is set.
 func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
@@ -201,6 +226,16 @@ func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
 		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://static-server")
 	} else {
 		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+	}
+}
+
+func (c *ConnectHelper) TestConnectionSuccessJob(t *testing.T) {
+	logger.Log(t, "checking that connection is successful")
+	if c.Cfg.EnableTransparentProxy {
+		// todo: add an assertion that the traffic is going through the proxy
+		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), JobName, "http://static-server")
+	} else {
+		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), JobName, "http://localhost:1234")
 	}
 }
 
