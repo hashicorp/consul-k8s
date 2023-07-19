@@ -13,7 +13,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -35,19 +34,16 @@ func TestConnectInject(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
-			env := suite.Environment()
-			ctx := env.DefaultContext(t)
-			appCtx := env.Context(t, environment.AppContextName)
-			t.Logf("appCtx = %#v", appCtx)
+			ctx := suite.Environment().DefaultContext(t)
 
 			releaseName := helpers.RandomName()
 			connHelper := connhelper.ConnectHelper{
-				ClusterKind: consul.Helm,
-				Secure:      c.secure,
-				ReleaseName: releaseName,
-				Ctx:         ctx,
-				AppCtx:      appCtx,
-				Cfg:         cfg,
+				ClusterKind:     consul.Helm,
+				Secure:          c.secure,
+				ReleaseName:     releaseName,
+				Ctx:             ctx,
+				UseAppNamespace: cfg.RestrictedPSAEnforcementEnabled,
+				Cfg:             cfg,
 			}
 
 			connHelper.Setup(t)
@@ -72,18 +68,16 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 		// This can only be tested in transparent proxy mode.
 		t.SkipNow()
 	}
-	env := suite.Environment()
-	ctx := env.DefaultContext(t)
-	appCtx := env.Context(t, environment.AppContextName)
+	ctx := suite.Environment().DefaultContext(t)
 
 	releaseName := helpers.RandomName()
 	connHelper := connhelper.ConnectHelper{
-		ClusterKind: consul.Helm,
-		Secure:      true,
-		ReleaseName: releaseName,
-		Ctx:         ctx,
-		AppCtx:      appCtx,
-		Cfg:         cfg,
+		ClusterKind:     consul.Helm,
+		Secure:          true,
+		ReleaseName:     releaseName,
+		Ctx:             ctx,
+		UseAppNamespace: cfg.RestrictedPSAEnforcementEnabled,
+		Cfg:             cfg,
 	}
 
 	connHelper.Setup(t)
@@ -92,7 +86,8 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 	connHelper.CreateResolverRedirect(t)
 	connHelper.DeployClientAndServer(t)
 
-	k8s.CheckStaticServerConnectionSuccessful(t, appCtx.KubectlOptions(t), "static-client", "http://resolver-redirect")
+	opts := connHelper.KubectlOptsForApp(t)
+	k8s.CheckStaticServerConnectionSuccessful(t, opts, "static-client", "http://resolver-redirect")
 }
 
 // Test the endpoints controller cleans up force-killed pods.

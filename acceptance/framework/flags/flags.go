@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -14,17 +15,10 @@ import (
 )
 
 type TestFlags struct {
-	flagKubeconfig  string
-	flagKubecontext string
-	flagNamespace   string
-
-	flagEnableMultiCluster   bool
-	flagSecondaryKubeconfig  string
-	flagSecondaryKubecontext string
-	flagSecondaryNamespace   string
-
-	flagAppNamespace          string
-	flagSecondaryAppNamespace string
+	flagKubeconfigs        listFlag
+	flagKubecontexts       listFlag
+	flagKubeNamespaces     listFlag
+	flagEnableMultiCluster bool
 
 	flagEnableEnterprise  bool
 	flagEnterpriseLicense string
@@ -33,8 +27,9 @@ type TestFlags struct {
 
 	flagEnablePodSecurityPolicies bool
 
-	flagEnableCNI    bool
-	flagCNINamespace string
+	flagEnableCNI                       bool
+	flagCNINamespace                    string
+	flagRestrictedPSAEnforcementEnabled bool
 
 	flagEnableTransparentProxy bool
 
@@ -72,16 +67,19 @@ func NewTestFlags() *TestFlags {
 	return t
 }
 
+type listFlag []string
+
+// String() returns a comma separated list in the form "var1,var2,var3".
+func (f *listFlag) String() string {
+	return strings.Join(*f, ",")
+}
+
+func (f *listFlag) Set(value string) error {
+	*f = strings.Split(value, ",")
+	return nil
+}
+
 func (t *TestFlags) init() {
-	flag.StringVar(&t.flagKubeconfig, "kubeconfig", "", "The path to a kubeconfig file. If this is blank, "+
-		"the default kubeconfig path (~/.kube/config) will be used.")
-	flag.StringVar(&t.flagKubecontext, "kubecontext", "", "The name of the Kubernetes context to use. If this is blank, "+
-		"the context set as the current context will be used by default.")
-	flag.StringVar(&t.flagNamespace, "namespace", "", "The Kubernetes namespace to use for tests.")
-
-	flag.StringVar(&t.flagAppNamespace, "app-namespace", "", "The Kubernetes namespace where mesh services should be deployed.")
-	flag.StringVar(&t.flagSecondaryAppNamespace, "secondary-app-namespace", "", "The secondary Kubernetes namespace where mesh services should be deployed [multi-cluster only].")
-
 	flag.StringVar(&t.flagConsulImage, "consul-image", "", "The Consul image to use for all tests.")
 	flag.StringVar(&t.flagConsulK8sImage, "consul-k8s-image", "", "The consul-k8s image to use for all tests.")
 	flag.StringVar(&t.flagConsulDataplaneImage, "consul-dataplane-image", "", "The consul-dataplane image to use for all tests.")
@@ -93,16 +91,16 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagVaultServerVersion, "vault-server-version", "", "The vault serverversion used for all tests.")
 	flag.StringVar(&t.flagVaultHelmChartVersion, "vault-helm-chart-version", "", "The Vault helm chart used for all tests.")
 
+	flag.Var(&t.flagKubeconfigs, "kubeconfigs", "The list of paths to a kubeconfig files. If this is blank, "+
+		"the default kubeconfig path (~/.kube/config) will be used.")
+	flag.Var(&t.flagKubecontexts, "kube-contexts", "The list of names of the Kubernetes contexts to use. If this is blank, "+
+		"the context set as the current context will be used by default.")
+	flag.Var(&t.flagKubeNamespaces, "kube-namespaces", "The list of Kubernetes namespaces to use for tests.")
 	flag.StringVar(&t.flagHCPResourceID, "hcp-resource-id", "", "The hcp resource id to use for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
-			"At least one of -secondary-kubeconfig or -secondary-kubecontext is required when this flag is used.")
-	flag.StringVar(&t.flagSecondaryKubeconfig, "secondary-kubeconfig", "", "The path to a kubeconfig file of the secondary k8s cluster. "+
-		"If this is blank, the default kubeconfig path (~/.kube/config) will be used.")
-	flag.StringVar(&t.flagSecondaryKubecontext, "secondary-kubecontext", "", "The name of the Kubernetes context for the secondary cluster to use. "+
-		"If this is blank, the context set as the current context will be used by default.")
-	flag.StringVar(&t.flagSecondaryNamespace, "secondary-namespace", "", "The Kubernetes namespace to use in the secondary k8s cluster.")
+			"The lists -kubeconfig or -kube-context must contain more than one entry when this flag is used.")
 
 	flag.BoolVar(&t.flagEnableEnterprise, "enable-enterprise", false,
 		"If true, the test suite will run tests for enterprise features. "+
@@ -121,6 +119,13 @@ func (t *TestFlags) init() {
 			"In general, this will only run against tests that are mesh related (connect, mesh-gateway, peering, etc")
 	flag.StringVar(&t.flagCNINamespace, "cni-namespace", "",
 		"If configured, the CNI will be deployed in this namespace.")
+	flag.BoolVar(&t.flagRestrictedPSAEnforcementEnabled, "restricted-psa-enforcement-enabled", false,
+		"If true, this indicates that Consul is being run in a namespace with restricted PSA enforcement. "+
+			"The tests do not configure Consul's namespace with PSA enforcement enabled. "+
+			"The CNI and test applications need more privilege than allowed in a restricted namespace, so "+
+			"this flag requires that CNINamespace is set and you must create that namespace with privilegd PSA enforcement. "+
+			"When set, test applications will, By default, run a different namespace called <consul-namespace>-apps "+
+			"instead of being deployed into the Consul namespace.")
 
 	flag.BoolVar(&t.flagEnableTransparentProxy, "enable-transparent-proxy", false,
 		"If true, the test suite will run tests with transparent proxy enabled. "+
@@ -152,13 +157,35 @@ func (t *TestFlags) init() {
 
 func (t *TestFlags) Validate() error {
 	if t.flagEnableMultiCluster {
-		if t.flagSecondaryKubecontext == "" && t.flagSecondaryKubeconfig == "" {
-			return errors.New("at least one of -secondary-kubecontext or -secondary-kubeconfig flags must be provided if -enable-multi-cluster is set")
+		if len(t.flagKubecontexts) <= 1 && len(t.flagKubeconfigs) <= 1 {
+			return errors.New("at least two contexts must be included in -kube-contexts or -kubeconfigs if -enable-multi-cluster is set")
+		}
+	}
+
+	if len(t.flagKubecontexts) != 0 && len(t.flagKubeconfigs) != 0 {
+		if len(t.flagKubecontexts) != len(t.flagKubeconfigs) {
+			return errors.New("-kube-contexts and -kubeconfigs are both set but are not of equal length")
+		}
+	}
+
+	if len(t.flagKubecontexts) != 0 && len(t.flagKubeNamespaces) != 0 {
+		if len(t.flagKubecontexts) != len(t.flagKubeNamespaces) {
+			return errors.New("-kube-contexts and -kube-namespaces are both set but are not of equal length")
+		}
+	}
+
+	if len(t.flagKubeNamespaces) != 0 && len(t.flagKubeconfigs) != 0 {
+		if len(t.flagKubeNamespaces) != len(t.flagKubeconfigs) {
+			return errors.New("-kube-namespaces and -kubeconfigs are both set but are not of equal length")
 		}
 	}
 
 	if t.flagEnableEnterprise && t.flagEnterpriseLicense == "" {
 		return errors.New("-enable-enterprise provided without setting env var CONSUL_ENT_LICENSE with consul license")
+	}
+
+	if t.flagRestrictedPSAEnforcementEnabled && t.flagCNINamespace == "" {
+		return errors.New("-cni-namespace must be provided with -restricted-psa-enforcement-enabled, and the CNI namespace must be configured with PSA enforcement disabled or with privileged PSA enforcement.")
 	}
 	return nil
 }
@@ -170,29 +197,22 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	consulVersion, _ := version.NewVersion(t.flagConsulVersion)
 	consulDataplaneVersion, _ := version.NewVersion(t.flagConsulDataplaneVersion)
 	//vaultserverVersion, _ := version.NewVersion(t.flagVaultServerVersion)
+	kubeEnvs := config.NewKubeTestConfigList(t.flagKubeconfigs, t.flagKubecontexts, t.flagKubeNamespaces)
 
-	return &config.TestConfig{
-		Kubeconfig:    t.flagKubeconfig,
-		KubeContext:   t.flagKubecontext,
-		KubeNamespace: t.flagNamespace,
-
-		EnableMultiCluster:     t.flagEnableMultiCluster,
-		SecondaryKubeconfig:    t.flagSecondaryKubeconfig,
-		SecondaryKubeContext:   t.flagSecondaryKubecontext,
-		SecondaryKubeNamespace: t.flagSecondaryNamespace,
-
-		AppNamespace:          t.flagAppNamespace,
-		SecondaryAppNamespace: t.flagSecondaryAppNamespace,
-
+	c := &config.TestConfig{
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
+
+		KubeEnvs:           kubeEnvs,
+		EnableMultiCluster: t.flagEnableMultiCluster,
 
 		EnableOpenshift: t.flagEnableOpenshift,
 
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
 
-		EnableCNI:    t.flagEnableCNI,
-		CNINamespace: t.flagCNINamespace,
+		EnableCNI:                       t.flagEnableCNI,
+		CNINamespace:                    t.flagCNINamespace,
+		RestrictedPSAEnforcementEnabled: t.flagRestrictedPSAEnforcementEnabled,
 
 		EnableTransparentProxy: t.flagEnableTransparentProxy,
 
@@ -218,4 +238,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		UseGKE:             t.flagUseGKE,
 		UseKind:            t.flagUseKind,
 	}
+
+	return c
 }
