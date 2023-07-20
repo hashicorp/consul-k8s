@@ -147,14 +147,14 @@ func TestPartitions_Gateway(t *testing.T) {
 	logger.Logf(t, "creating namespaces %s and %s in servers cluster", staticServerNamespace, StaticClientNamespace)
 	k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 	k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, StaticClientNamespace)
 	})
 
 	logger.Logf(t, "creating namespaces %s and %s in clients cluster", staticServerNamespace, StaticClientNamespace)
 	k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 	k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, StaticClientNamespace)
 	})
 
@@ -202,12 +202,12 @@ func TestPartitions_Gateway(t *testing.T) {
 	kustomizeDir := "../fixtures/cases/api-gateways/mesh"
 
 	k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), kustomizeDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), kustomizeDir)
 	})
 
 	k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), kustomizeDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), kustomizeDir)
 	})
 
@@ -216,12 +216,12 @@ func TestPartitions_Gateway(t *testing.T) {
 	// Since we're deploying the gateway in the secondary cluster, we create the static client
 	// in the secondary as well.
 	logger.Log(t, "creating static-client pod in secondary partition cluster")
-	k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-client")
+	k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 	logger.Log(t, "creating api-gateway resources")
 	out, err := k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-k", "../fixtures/bases/api-gateway")
 	require.NoError(t, err, out)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "delete", "-k", "../fixtures/bases/api-gateway")
@@ -253,7 +253,7 @@ func TestPartitions_Gateway(t *testing.T) {
 	t.Run("in-partition", func(t *testing.T) {
 		logger.Log(t, "test in-partition networking")
 		logger.Log(t, "creating target server in secondary partition cluster")
-		k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 		logger.Log(t, "patching route to target server")
 		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
@@ -277,7 +277,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		logger.Log(t, "creating intention")
 		_, _, err = consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: secondaryPartition})
 		require.NoError(t, err)
-		helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			_, err = consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: secondaryPartition})
 			require.NoError(t, err)
 		})
@@ -291,17 +291,17 @@ func TestPartitions_Gateway(t *testing.T) {
 		logger.Log(t, "test cross-partition networking")
 
 		logger.Log(t, "creating target server in default partition cluster")
-		k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 		logger.Log(t, "creating exported services")
 		k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-ns1")
-		helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-ns1")
 		})
 
 		logger.Log(t, "creating local service resolver")
 		k8s.KubectlApplyK(t, secondaryPartitionClusterStaticServerOpts, "../fixtures/cases/api-gateways/resolver")
-		helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			k8s.KubectlDeleteK(t, secondaryPartitionClusterStaticServerOpts, "../fixtures/cases/api-gateways/resolver")
 		})
 
@@ -328,7 +328,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		logger.Log(t, "creating intention")
 		_, _, err = consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: defaultPartition})
 		require.NoError(t, err)
-		helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			_, err = consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: defaultPartition})
 			require.NoError(t, err)
 		})

@@ -107,7 +107,7 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating static-client deployment")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 			logger.Log(t, "waiting for static-client to be registered with Consul")
 			consulClient, _ := consulCluster.SetupConsulClient(t, secure)
@@ -200,8 +200,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			logger.Log(t, "creating multiport static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
 
 			// Check that static-client has been injected and now has 2 containers.
 			podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
@@ -260,7 +260,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			// pod to static-server.
 
 			// Deploy static-server.
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			// For outbound connections from the multi port pod, only intentions from the first service in the multiport
 			// pod need to be created, since all upstream connections are made through the first service's envoy proxy.

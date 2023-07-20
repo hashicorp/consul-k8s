@@ -100,12 +100,12 @@ func TestConnectInjectNamespaces(t *testing.T) {
 
 			logger.Logf(t, "creating namespaces %s and %s", staticServerNamespace, StaticClientNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				// Note: this deletion will take longer in cases when the static-client deployment
 				// hasn't yet fully terminated.
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", StaticClientNamespace)
@@ -146,11 +146,11 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			}
 
 			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 			} else {
-				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 			}
 
 			// Check that both static-server and static-client have been injected and now have 2 containers.
@@ -303,7 +303,7 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 
 			logger.Logf(t, "creating namespace %s", StaticClientNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", StaticClientNamespace)
 			})
 
@@ -313,7 +313,7 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   StaticClientNamespace,
 			}
-			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 
 			logger.Log(t, "waiting for static-client to be registered with Consul")
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)

@@ -62,7 +62,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
 
@@ -74,7 +74,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service.
 			logger.Log(t, "creating static-server deployment")
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			// Register the external service.
 			registerExternalService(t, consulClient, testNamespace)
@@ -91,7 +91,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			// Deploy the static client.
 			logger.Log(t, "deploying static client")
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -159,14 +159,14 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
 
 			StaticClientNamespace := "ns2"
 			logger.Logf(t, "creating Kubernetes namespace %s", StaticClientNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", StaticClientNamespace)
 			})
 
@@ -183,7 +183,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service.
 			logger.Log(t, "creating static-server deployment")
-			k8s.DeployKustomize(t, ns1K8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, ns1K8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			// Register the external service
 			registerExternalService(t, consulClient, testNamespace)
@@ -200,7 +200,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
-			k8s.DeployKustomize(t, ns2K8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+			k8s.DeployKustomize(t, ns2K8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
