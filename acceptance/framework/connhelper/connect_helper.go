@@ -151,6 +151,11 @@ func (c *ConnectHelper) DeployJobAndServer(t *testing.T) {
 
 	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/bases/jobs")
+<<<<<<< HEAD
+=======
+
+	time.Sleep(20 * time.Second)
+>>>>>>> accbf544c635384fbc29239313199dd2fd8a693b
 
 	// Check that both static-server and test-job have been injected and
 	// now have 2 containers.
