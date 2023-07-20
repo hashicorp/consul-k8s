@@ -226,8 +226,10 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 		secure      bool
 		gracePeriod int64
 	}{
-		"Insecure with grace period": {false, 30},
-		// TODO create more of these "install" cases.
+		"Insecure with grace period":    {false, 30},
+		"Secure with grace period":      {true, 30},
+		"Insecure without grace period": {false, 0},
+		"Secure without grace period":   {true, 0},
 	}
 
 	for name, tc := range cases {
@@ -242,7 +244,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 				Ctx:         ctx,
 				Cfg:         cfg,
 				HelmValues: map[string]string{
-					"connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds": strconv.FormatInt(tc.gracePeriod, 64),
+					"connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds": strconv.FormatInt(tc.gracePeriod, 10),
 					"connectInject.sidecarProxy.lifecycle.defaultEnabled":                    strconv.FormatBool(tc.gracePeriod > 0),
 				},
 			}
@@ -287,6 +289,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			require.Len(t, pods.Items, 1)
 			jobName := pods.Items[0].Name
 
+			//Exec into job and send shutdown request to running proxy
 			// curl --max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
 			sendProxyShutdownArgs := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "--max-time", "2", "-s", "-f", "-XPOST", "http://127.0.0.1:20600/graceful_shutdown"}
 			_, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), sendProxyShutdownArgs...)
@@ -311,12 +314,13 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 				time.Sleep(time.Duration(tc.gracePeriod) * time.Second)
 
 			}
+			//test that requests fail once grace period has ended, or there was no grace period set.
 			retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
 				output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
 				require.Error(r, err)
 				require.True(r, strings.Contains(output, "curl: (7) Failed to connect"))
 			})
-
+			//wait for the job to complete
 			retry.RunWith(&retry.Timer{Timeout: 4 * time.Minute, Wait: 30 * time.Second}, t, func(r *retry.R) {
 				pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(
 					context.Background(),
