@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -72,6 +73,37 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
+func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, debugDirectory, kustomizeDir string) {
+	t.Helper()
+
+	KubectlApplyK(t, options, kustomizeDir)
+
+	output, err := RunKubectlAndGetOutputE(t, options, "kustomize", kustomizeDir)
+	require.NoError(t, err)
+
+	/*
+		deployment := v1.Deployment{}
+		err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&deployment)
+		require.NoError(t, err)
+	*/
+	job := batchv1.Job{}
+	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&job)
+	require.NoError(t, err)
+
+	helpers.Cleanup(t, noCleanupOnFailure, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		WritePodsDebugInfoIfFailed(t, options, debugDirectory, labelMapToString(job.GetLabels()))
+		KubectlDeleteK(t, options, kustomizeDir)
+	})
+
+	// The timeout to allow for connect-init to wait for services to be registered by the endpoints controller.
+	//RunKubectl(t, options, "wait", "--for=condition=", "--timeout=5m", fmt.Sprintf("job/%s", job.Name))
+	time.Sleep(30 * time.Second)
+}
+
 // CheckStaticServerConnection execs into a pod of sourceApp
 // and runs a curl command with the provided curlArgs.
 // This function assumes that the connection is made to the static-server and expects the output
@@ -82,6 +114,11 @@ func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, sour
 	t.Helper()
 
 	CheckStaticServerConnectionMultipleFailureMessages(t, options, sourceApp, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
+}
+func CheckStaticServerConnectionJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
+	t.Helper()
+
+	CheckStaticServerConnectionMultipleFailureMessagesJob(t, options, sourceApp, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
 }
 
 // CheckStaticServerConnectionMultipleFailureMessages execs into a pod of sourceApp
@@ -123,6 +160,38 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 		}
 	})
 }
+func CheckStaticServerConnectionMultipleFailureMessagesJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
+	t.Helper()
+
+	expectedOutput := "hello world"
+	if expectedSuccessOutput != "" {
+		expectedOutput = expectedSuccessOutput
+	}
+
+	retrier := &retry.Timer{Timeout: 320 * time.Second, Wait: 2 * time.Second}
+
+	args := []string{"exec", "jobs/" + sourceApp, "-c", sourceApp, "--", "curl", "-vvvsSf"}
+	args = append(args, curlArgs...)
+
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		output, err := RunKubectlAndGetOutputE(t, options, args...)
+		if expectSuccess {
+			require.NoError(r, err)
+			require.Contains(r, output, expectedOutput)
+		} else {
+			require.Error(r, err)
+			require.Condition(r, func() bool {
+				exists := false
+				for _, msg := range failureMessages {
+					if strings.Contains(output, msg) {
+						exists = true
+					}
+				}
+				return exists
+			})
+		}
+	})
+}
 
 // CheckStaticServerConnectionSuccessfulWithMessage is just like CheckStaticServerConnectionSuccessful
 // but it asserts on a non-default expected message.
@@ -139,6 +208,13 @@ func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOpt
 	t.Helper()
 	start := time.Now()
 	CheckStaticServerConnection(t, options, sourceApp, true, nil, "", curlArgs...)
+	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
+}
+
+func CheckStaticServerConnectionSuccessfulJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, curlArgs ...string) {
+	t.Helper()
+	start := time.Now()
+	CheckStaticServerConnectionJob(t, options, sourceApp, true, nil, "", curlArgs...)
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 

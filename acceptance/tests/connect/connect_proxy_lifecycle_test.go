@@ -288,7 +288,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, pods.Items, 1)
 			jobName := pods.Items[0].Name
-
+			fmt.Printf("Job Name: %s", jobName)
 			//Exec into job and send shutdown request to running proxy
 			// curl --max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
 			sendProxyShutdownArgs := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "--max-time", "2", "-s", "-f", "-XPOST", "http://127.0.0.1:20600/graceful_shutdown"}
@@ -298,7 +298,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			logger.Log(t, "Proxy killed...")
 
 			args := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "-vvvsSf"}
-
+			time.Sleep(2 * time.Hour)
 			if cfg.EnableTransparentProxy {
 				args = append(args, "http://static-server")
 			} else {
