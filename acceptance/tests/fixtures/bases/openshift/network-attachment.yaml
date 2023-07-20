@@ -9,7 +9,7 @@ spec:
             "cni_bin_dir": "/var/lib/cni/bin",
             "cni_net_dir": "/etc/kubernetes/cni/net.d",
             "kubeconfig": "ZZZ-consul-cni-kubeconfig",
-            "log_level": "info",
+            "log_level": "debug",
             "multus": true,
             "name": "consul-cni",
             "type": "consul-cni"
