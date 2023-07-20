@@ -25,6 +25,16 @@ securityContext:
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
+{{- if not .Values.global.openshift.enabled -}}
+{{/*
+We must set runAsUser or else the root user will be used in some cases and
+containers will fail to start due to runAsNonRoot above (e.g.
+tls-init-cleanup). On OpenShift, runAsUser is automatically. We pick user 100
+because it is a non-root user id that exists in the consul, consul-dataplane,
+and consul-k8s-control-plane images.
+*/}}
+  runAsUser: 100
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
