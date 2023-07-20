@@ -1,3 +1,0 @@
-```release-note:feature
-Add support for configuring Consul server-side rate limiting
-```

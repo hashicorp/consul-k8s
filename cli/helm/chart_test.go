@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package helm
 
 import (
@@ -38,10 +35,10 @@ func TestLoadChart(t *testing.T) {
 func TestReadChartFiles(t *testing.T) {
 	directory := "test_fixtures/consul"
 	expectedFiles := map[string]string{
-		"Chart.yaml":             "# Copyright (c) HashiCorp, Inc.\n# SPDX-License-Identifier: MPL-2.0\n\n# This is a mock Helm Chart.yaml file used for testing.\napiVersion: v2\nname: Foo\nversion: 0.1.0\ndescription: Mock Helm Chart for testing.",
-		"values.yaml":            "# Copyright (c) HashiCorp, Inc.\n# SPDX-License-Identifier: MPL-2.0\n\n# This is a mock Helm values.yaml file used for testing.\nkey: value",
+		"Chart.yaml":             "# This is a mock Helm Chart.yaml file used for testing.\napiVersion: v2\nname: Foo\nversion: 0.1.0\ndescription: Mock Helm Chart for testing.",
+		"values.yaml":            "# This is a mock Helm values.yaml file used for testing.\nkey: value",
 		"templates/_helpers.tpl": "helpers",
-		"templates/foo.yaml":     "# Copyright (c) HashiCorp, Inc.\n# SPDX-License-Identifier: MPL-2.0\n\nfoo: bar\n",
+		"templates/foo.yaml":     "foo: bar\n",
 	}
 
 	files, err := readChartFiles(testChartFiles, directory)

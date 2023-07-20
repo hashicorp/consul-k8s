@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package connect
 
 import (
@@ -58,33 +55,6 @@ func TestConnectInject(t *testing.T) {
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
 	}
-}
-
-// TestConnectInject_VirtualIPFailover ensures that KubeDNS entries are saved to the virtual IP address table in Consul.
-func TestConnectInject_VirtualIPFailover(t *testing.T) {
-	cfg := suite.Config()
-	if !cfg.EnableTransparentProxy {
-		// This can only be tested in transparent proxy mode.
-		t.SkipNow()
-	}
-	ctx := suite.Environment().DefaultContext(t)
-
-	releaseName := helpers.RandomName()
-	connHelper := connhelper.ConnectHelper{
-		ClusterKind: consul.Helm,
-		Secure:      true,
-		ReleaseName: releaseName,
-		Ctx:         ctx,
-		Cfg:         cfg,
-	}
-
-	connHelper.Setup(t)
-
-	connHelper.Install(t)
-	connHelper.CreateResolverRedirect(t)
-	connHelper.DeployClientAndServer(t)
-
-	k8s.CheckStaticServerConnectionSuccessful(t, connHelper.Ctx.KubectlOptions(t), "static-client", "http://resolver-redirect")
 }
 
 // Test the endpoints controller cleans up force-killed pods.

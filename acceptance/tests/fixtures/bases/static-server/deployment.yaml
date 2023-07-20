@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,9 +15,7 @@ spec:
     spec:
       containers:
         - name: static-server
-          # Using alpine vs latest as there is a build issue with M1s. Also other tests in multiport-app reference
-          # alpine so standardizing this.
-          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:latest
           args:
             - -text="hello world"
             - -listen=:8080

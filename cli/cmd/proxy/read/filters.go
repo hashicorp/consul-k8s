@@ -1,13 +1,8 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package read
 
 import (
 	"strconv"
 	"strings"
-
-	"github.com/hashicorp/consul-k8s/cli/common/envoy"
 )
 
 // FilterClusters takes a slice of clusters along with parameters for filtering
@@ -22,7 +17,7 @@ import (
 //
 // The filters are applied in combination such that a cluster must adhere to
 // all of the filtering values which are passed in.
-func FilterClusters(clusters []envoy.Cluster, fqdn, address string, port int) []envoy.Cluster {
+func FilterClusters(clusters []Cluster, fqdn, address string, port int) []Cluster {
 	// No filtering no-op.
 	if fqdn == "" && address == "" && port == -1 {
 		return clusters
@@ -30,7 +25,7 @@ func FilterClusters(clusters []envoy.Cluster, fqdn, address string, port int) []
 
 	portStr := ":" + strconv.Itoa(port)
 
-	filtered := make([]envoy.Cluster, 0)
+	filtered := make([]Cluster, 0)
 	for _, cluster := range clusters {
 		if !strings.Contains(cluster.FullyQualifiedDomainName, fqdn) {
 			continue
@@ -63,14 +58,14 @@ func FilterClusters(clusters []envoy.Cluster, fqdn, address string, port int) []
 //
 // The filters are applied in combination such that an endpoint must adhere to
 // all of the filtering values which are passed in.
-func FilterEndpoints(endpoints []envoy.Endpoint, address string, port int) []envoy.Endpoint {
+func FilterEndpoints(endpoints []Endpoint, address string, port int) []Endpoint {
 	if address == "" && port == -1 {
 		return endpoints
 	}
 
 	portStr := ":" + strconv.Itoa(port)
 
-	filtered := make([]envoy.Endpoint, 0)
+	filtered := make([]Endpoint, 0)
 	for _, endpoint := range endpoints {
 		if strings.Contains(endpoint.Address, address) && (port == -1 || strings.Contains(endpoint.Address, portStr)) {
 			filtered = append(filtered, endpoint)
@@ -90,14 +85,14 @@ func FilterEndpoints(endpoints []envoy.Endpoint, address string, port int) []env
 //
 // The filters are applied in combination such that an listener must adhere to
 // all of the filtering values which are passed in.
-func FilterListeners(listeners []envoy.Listener, address string, port int) []envoy.Listener {
+func FilterListeners(listeners []Listener, address string, port int) []Listener {
 	if address == "" && port == -1 {
 		return listeners
 	}
 
 	portStr := ":" + strconv.Itoa(port)
 
-	filtered := make([]envoy.Listener, 0)
+	filtered := make([]Listener, 0)
 	for _, listener := range listeners {
 		if strings.Contains(listener.Address, address) && (port == -1 || strings.Contains(listener.Address, portStr)) {
 			filtered = append(filtered, listener)

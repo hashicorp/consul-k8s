@@ -2,4 +2,3 @@
 .terraform/
 bin/
 test/
-crds/kustomization.yaml

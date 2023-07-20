@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package vault
 
 import (
@@ -17,7 +14,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
@@ -35,29 +31,6 @@ const (
 // TestVault installs Vault, bootstraps it with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works.
 func TestVault(t *testing.T) {
-	cases := map[string]struct {
-		autoBootstrap bool
-	}{
-		"manual ACL bootstrap": {},
-		"automatic ACL bootstrap": {
-			autoBootstrap: true,
-		},
-	}
-	for name, c := range cases {
-		c := c
-		t.Run(name, func(t *testing.T) {
-			testVault(t, c.autoBootstrap)
-		})
-	}
-}
-
-// testVault is the implementation for TestVault:
-//
-//   - testAutoBootstrap = false. Test when ACL bootstrapping has already occurred.
-//     The test pre-populates a Vault secret with the bootstrap token.
-//   - testAutoBootstrap = true. Test that server-acl-init automatically ACL bootstraps
-//     consul and writes the bootstrap token to Vault.
-func testVault(t *testing.T, testAutoBootstrap bool) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	kubectlOptions := ctx.KubectlOptions(t)
@@ -111,6 +84,20 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
+	// Configure controller webhook PKI
+	controllerWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "controller",
+		PolicyName:          "controller-ca-policy",
+		RoleName:            "controller-ca-role",
+		KubernetesNamespace: ns,
+		DataCenter:          "dc1",
+		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller"),
+		AllowedSubdomain:    fmt.Sprintf("%s-consul-%s", consulReleaseName, "controller-webhook"),
+		MaxTTL:              fmt.Sprintf("%ds", expirationInSeconds),
+		AuthMethodPath:      KubernetesAuthMethodPath,
+	}
+	controllerWebhookPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
+
 	// Configure connect injector webhook PKI
 	connectInjectorWebhookPKIConfig := &vault.PKIAndAuthRoleConfiguration{
 		BaseURL:             "connect",
@@ -150,22 +137,16 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 		licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 	}
 
+	// Bootstrap Token
+	bootstrapToken, err := uuid.GenerateUUID()
+	require.NoError(t, err)
 	bootstrapTokenSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/bootstrap",
 		Key:        "token",
-		Value:      "",
+		Value:      bootstrapToken,
 		PolicyName: "bootstrap",
 	}
-	if testAutoBootstrap {
-		bootstrapTokenSecret.SaveSecretAndAddUpdatePolicy(t, vaultClient)
-	} else {
-		id, err := uuid.GenerateUUID()
-		require.NoError(t, err)
-		bootstrapTokenSecret.Value = id
-		bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
-	}
-
-	bootstrapToken := bootstrapTokenSecret.Value
+	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
 	// -------------------------
 	// Additional Auth Roles
@@ -231,12 +212,15 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 		"connectInject.replicas": "1",
 		"global.secretsBackend.vault.connectInject.tlsCert.secretName": connectInjectorWebhookPKIConfig.CertPath,
 		"global.secretsBackend.vault.connectInject.caCert.secretName":  connectInjectorWebhookPKIConfig.CAPath,
+		"global.secretsBackend.vault.controller.tlsCert.secretName":    controllerWebhookPKIConfig.CertPath,
+		"global.secretsBackend.vault.controller.caCert.secretName":     controllerWebhookPKIConfig.CAPath,
 
 		"global.secretsBackend.vault.enabled":              "true",
 		"global.secretsBackend.vault.consulServerRole":     consulServerRole,
 		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
 		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
 		"global.secretsBackend.vault.connectInjectRole":    connectInjectorWebhookPKIConfig.RoleName,
+		"global.secretsBackend.vault.controllerRole":       controllerWebhookPKIConfig.RoleName,
 		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
@@ -297,26 +281,6 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 
 	logger.Logf(t, "Wait %d seconds for certificates to rotate....", expirationInSeconds)
 	time.Sleep(time.Duration(expirationInSeconds) * time.Second)
-
-	if testAutoBootstrap {
-		logger.Logf(t, "Validating the ACL bootstrap token was stored in Vault.")
-		timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}
-		retry.RunWith(timer, t, func(r *retry.R) {
-			secret, err := vaultClient.Logical().Read("consul/data/secret/bootstrap")
-			require.NoError(r, err)
-
-			data, ok := secret.Data["data"].(map[string]interface{})
-			require.True(r, ok)
-			require.NotNil(r, data)
-
-			tok, ok := data["token"].(string)
-			require.True(r, ok)
-			require.NotEmpty(r, tok)
-
-			// Set bootstrapToken for subsequent validations.
-			bootstrapToken = tok
-		})
-	}
 
 	// Validate that the gossip encryption key is set correctly.
 	logger.Log(t, "Validating the gossip key has been set correctly.")

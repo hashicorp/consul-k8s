@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 // Package namespaces handles interaction with Consul namespaces needed across
 // commands.
 package namespaces

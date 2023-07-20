@@ -1,0 +1,4 @@
+```release-note:improvement
+helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.0.2`, `image` value to `hashicorp/consul:1.14.7`, 
+and `imageEnvoy` to `envoyproxy/envoy:v1.24.7`.
+```

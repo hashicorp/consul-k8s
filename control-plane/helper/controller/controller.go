@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 // Package controller contains a reusable abstraction for efficiently
 // watching for changes in resources in a Kubernetes cluster.
 package controller

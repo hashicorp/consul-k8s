@@ -38,11 +38,6 @@ type TestFlags struct {
 	flagConsulVersion          string
 	flagConsulDataplaneVersion string
 	flagEnvoyImage             string
-	flagConsulCollectorImage   string
-	flagVaultHelmChartVersion  string
-	flagVaultServerVersion     string
-
-	flagHCPResourceID string
 
 	flagNoCleanupOnFailure bool
 
@@ -85,16 +80,12 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagConsulDataplaneVersion, "consul-dataplane-version", "", "The consul-dataplane version used for all tests.")
 	flag.StringVar(&t.flagHelmChartVersion, "helm-chart-version", config.HelmChartPath, "The helm chart used for all tests.")
 	flag.StringVar(&t.flagEnvoyImage, "envoy-image", "", "The Envoy image to use for all tests.")
-	flag.StringVar(&t.flagConsulCollectorImage, "consul-collector-image", "", "The consul collector image to use for all tests.")
-	flag.StringVar(&t.flagVaultServerVersion, "vault-server-version", "", "The vault serverversion used for all tests.")
-	flag.StringVar(&t.flagVaultHelmChartVersion, "vault-helm-chart-version", "", "The Vault helm chart used for all tests.")
 
 	flag.Var(&t.flagKubeconfigs, "kubeconfigs", "The list of paths to a kubeconfig files. If this is blank, "+
 		"the default kubeconfig path (~/.kube/config) will be used.")
 	flag.Var(&t.flagKubecontexts, "kube-contexts", "The list of names of the Kubernetes contexts to use. If this is blank, "+
 		"the context set as the current context will be used by default.")
 	flag.Var(&t.flagKubeNamespaces, "kube-namespaces", "The list of Kubernetes namespaces to use for tests.")
-	flag.StringVar(&t.flagHCPResourceID, "hcp-resource-id", "", "The hcp resource id to use for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
@@ -208,11 +199,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		ConsulVersion:          consulVersion,
 		ConsulDataplaneVersion: consulDataplaneVersion,
 		EnvoyImage:             t.flagEnvoyImage,
-		ConsulCollectorImage:   t.flagConsulCollectorImage,
-		VaultHelmChartVersion:  t.flagVaultHelmChartVersion,
-		VaultServerVersion:     t.flagVaultServerVersion,
-
-		HCPResourceID: t.flagHCPResourceID,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		DebugDirectory:     tempDir,

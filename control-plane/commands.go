@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package main
 
 import (
@@ -11,9 +8,6 @@ import (
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
-	cmdFetchServerRegion "github.com/hashicorp/consul-k8s/control-plane/subcommand/fetch-server-region"
-	cmdGatewayCleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup"
-	cmdGatewayResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
@@ -49,14 +43,6 @@ func init() {
 
 		"consul-logout": func() (cli.Command, error) {
 			return &cmdConsulLogout.Command{UI: ui}, nil
-		},
-
-		"gateway-cleanup": func() (cli.Command, error) {
-			return &cmdGatewayCleanup.Command{UI: ui}, nil
-		},
-
-		"gateway-resources": func() (cli.Command, error) {
-			return &cmdGatewayResources.Command{UI: ui}, nil
 		},
 
 		"server-acl-init": func() (cli.Command, error) {
@@ -100,9 +86,6 @@ func init() {
 		},
 		"install-cni": func() (cli.Command, error) {
 			return &cmdInstallCNI.Command{UI: ui}, nil
-		},
-		"fetch-server-region": func() (cli.Command, error) {
-			return &cmdFetchServerRegion.Command{UI: ui}, nil
 		},
 	}
 }

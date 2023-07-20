@@ -1,3 +1,0 @@
-```release-note:feature
-api-gateway: Add API Gateway for Consul on Kubernetes leveraging Consul native API Gateway configuration.
-```

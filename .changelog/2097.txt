@@ -1,3 +1,0 @@
-```release-note:improvement
-helm: add samenessGroup field to source intention CRD
-```

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package preset
 
 import "github.com/hashicorp/consul-k8s/cli/config"
@@ -32,6 +29,8 @@ connectInject:
      enableGatewayMetrics: true
 server:
   replicas: 1
+controller:
+  enabled: true
 ui:
   enabled: true
   service:

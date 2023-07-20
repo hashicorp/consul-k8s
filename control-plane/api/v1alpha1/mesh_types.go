@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -51,9 +48,6 @@ type MeshList struct {
 type MeshSpec struct {
 	// TransparentProxy controls the configuration specific to proxies in "transparent" mode. Added in v1.10.0.
 	TransparentProxy TransparentProxyMeshConfig `json:"transparentProxy,omitempty"`
-	// AllowEnablingPermissiveMutualTLS must be true in order to allow setting
-	// MutualTLSMode=permissive in either service-defaults or proxy-defaults.
-	AllowEnablingPermissiveMutualTLS bool `json:"allowEnablingPermissiveMutualTLS,omitempty"`
 	// TLS defines the TLS configuration for the service mesh.
 	TLS *MeshTLSConfig `json:"tls,omitempty"`
 	// HTTP defines the HTTP configuration for the service mesh.
@@ -195,12 +189,11 @@ func (in *Mesh) SetLastSyncedTime(time *metav1.Time) {
 
 func (in *Mesh) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.MeshConfigEntry{
-		TransparentProxy:                 in.Spec.TransparentProxy.toConsul(),
-		AllowEnablingPermissiveMutualTLS: in.Spec.AllowEnablingPermissiveMutualTLS,
-		TLS:                              in.Spec.TLS.toConsul(),
-		HTTP:                             in.Spec.HTTP.toConsul(),
-		Peering:                          in.Spec.Peering.toConsul(),
-		Meta:                             meta(datacenter),
+		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
+		TLS:              in.Spec.TLS.toConsul(),
+		HTTP:             in.Spec.HTTP.toConsul(),
+		Peering:          in.Spec.Peering.toConsul(),
+		Meta:             meta(datacenter),
 	}
 }
 

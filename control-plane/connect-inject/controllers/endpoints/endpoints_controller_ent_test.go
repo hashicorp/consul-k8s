@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 //go:build enterprise
 
 package endpoints
@@ -11,7 +8,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -226,7 +223,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                     fakeClient,
-				Log:                        logrtest.NewTestLogger(t),
+				Log:                        logrtest.New(t),
 				ConsulClientConfig:         testClient.Cfg,
 				ConsulServerConnMgr:        testClient.Watcher,
 				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
@@ -487,7 +484,7 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                 fakeClient,
-				Log:                    logrtest.NewTestLogger(t),
+				Log:                    logrtest.New(t),
 				ConsulClientConfig:     testClient.Cfg,
 				ConsulServerConnMgr:    testClient.Watcher,
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
@@ -1494,7 +1491,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				// Create the endpoints controller.
 				ep := &Controller{
 					Client:                     fakeClient,
-					Log:                        logrtest.NewTestLogger(t),
+					Log:                        logrtest.New(t),
 					ConsulClientConfig:         testClient.Cfg,
 					ConsulServerConnMgr:        testClient.Watcher,
 					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
@@ -1564,7 +1561,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						// Read the token from Consul.
 						token, _, err := consulClient.ACL().TokenRead(tokenID, nil)
 						if deregisteredServices.Contains(serviceID) {
-							require.Contains(t, err.Error(), "ACL not found")
+							require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
 						} else {
 							require.NoError(t, err, "token should exist for service instance: "+serviceID)
 							require.NotNil(t, token)
@@ -1780,7 +1777,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				// Create the endpoints controller.
 				ep := &Controller{
 					Client:                     fakeClient,
-					Log:                        logrtest.NewTestLogger(t),
+					Log:                        logrtest.New(t),
 					ConsulClientConfig:         testClient.Cfg,
 					ConsulServerConnMgr:        testClient.Watcher,
 					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
@@ -1822,7 +1819,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
-					require.Contains(t, err.Error(), "ACL not found")
+					require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
 				}
 			})
 		}
@@ -2074,7 +2071,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				// Create the endpoints controller.
 				ep := &Controller{
 					Client:                 fakeClient,
-					Log:                    logrtest.NewTestLogger(t),
+					Log:                    logrtest.New(t),
 					ConsulClientConfig:     testClient.Cfg,
 					ConsulServerConnMgr:    testClient.Watcher,
 					AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
@@ -2107,7 +2104,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
-					require.Contains(t, err.Error(), "ACL not found")
+					require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
 				}
 			})
 		}

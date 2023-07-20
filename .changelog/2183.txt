@@ -1,3 +1,0 @@
-```release-note:security
-Fix Prometheus CVEs by bumping controller-runtime.
-```

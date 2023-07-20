@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package k8s
 
 import (
@@ -150,15 +147,6 @@ func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOption
 		"curl: (52) Empty reply from server",
 		"curl: (7) Failed to connect",
 		"curl: (56) Recv failure: Connection reset by peer",
-	}, "", curlArgs...)
-}
-
-// CheckStaticServerHTTPConnectionFailing is just like CheckStaticServerConnectionFailing
-// except with HTTP-based intentions.
-func CheckStaticServerHTTPConnectionFailing(t *testing.T, options *k8s.KubectlOptions, sourceApp string, curlArgs ...string) {
-	t.Helper()
-	CheckStaticServerConnection(t, options, sourceApp, false, []string{
-		"curl: (22) The requested URL returned error: 403",
 	}, "", curlArgs...)
 }
 

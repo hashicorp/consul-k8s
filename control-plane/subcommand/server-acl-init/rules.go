@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package serveraclinit
 
 import (
@@ -154,10 +151,8 @@ partition "{{ .PartitionName }}" {
 operator = "write"
 acl = "write"
 {{- end }}
-
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
-  policy = "write"
 {{- end }}
   service_prefix "" {
     policy = "write"
@@ -172,7 +167,7 @@ namespace_prefix "" {
 {{- if .EnablePartitions }}
 }
 {{- end }}
-`
+  `
 
 	return c.renderRules(apiGatewayRulesTpl)
 }
@@ -330,7 +325,6 @@ partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"
 {{- else }}
-  mesh = "write"
   operator = "write"
   acl = "write"
 {{- end }}

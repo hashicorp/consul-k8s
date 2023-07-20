@@ -1,15 +1,11 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package main
 
 import (
 	"log"
 	"os"
 
-	"github.com/mitchellh/cli"
-
 	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/mitchellh/cli"
 )
 
 func main() {

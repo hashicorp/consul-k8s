@@ -1,18 +1,13 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package read
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/hashicorp/consul-k8s/cli/common/envoy"
 )
 
 func TestFilterClusters(t *testing.T) {
-	given := []envoy.Cluster{
+	given := []Cluster{
 		{
 			FullyQualifiedDomainName: "local_agent",
 			Endpoints:                []string{"192.168.79.187:8502"},
@@ -47,13 +42,13 @@ func TestFilterClusters(t *testing.T) {
 		fqdn     string
 		address  string
 		port     int
-		expected []envoy.Cluster
+		expected []Cluster
 	}{
 		"No filter": {
 			fqdn:    "",
 			address: "",
 			port:    -1,
-			expected: []envoy.Cluster{
+			expected: []Cluster{
 				{
 					FullyQualifiedDomainName: "local_agent",
 					Endpoints:                []string{"192.168.79.187:8502"},
@@ -88,7 +83,7 @@ func TestFilterClusters(t *testing.T) {
 			fqdn:    "default",
 			address: "",
 			port:    -1,
-			expected: []envoy.Cluster{
+			expected: []Cluster{
 				{
 					FullyQualifiedDomainName: "client.default.dc1.internal.bc3815c2-1a0f-f3ff-a2e9-20d791f08d00.consul",
 					Endpoints:                []string{},
@@ -107,7 +102,7 @@ func TestFilterClusters(t *testing.T) {
 			fqdn:    "",
 			address: "127.0.",
 			port:    -1,
-			expected: []envoy.Cluster{
+			expected: []Cluster{
 				{
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
@@ -122,7 +117,7 @@ func TestFilterClusters(t *testing.T) {
 			fqdn:    "",
 			address: "",
 			port:    8080,
-			expected: []envoy.Cluster{
+			expected: []Cluster{
 				{
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
@@ -137,7 +132,7 @@ func TestFilterClusters(t *testing.T) {
 			fqdn:    "local",
 			address: "127.0.0.1",
 			port:    -1,
-			expected: []envoy.Cluster{
+			expected: []Cluster{
 				{
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
@@ -152,7 +147,7 @@ func TestFilterClusters(t *testing.T) {
 			fqdn:    "local",
 			address: "",
 			port:    8080,
-			expected: []envoy.Cluster{
+			expected: []Cluster{
 				{
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
@@ -163,7 +158,7 @@ func TestFilterClusters(t *testing.T) {
 			fqdn:    "",
 			address: "127.0.0.1",
 			port:    8080,
-			expected: []envoy.Cluster{
+			expected: []Cluster{
 				{
 					FullyQualifiedDomainName: "local_app",
 					Endpoints:                []string{"127.0.0.1:8080"},
@@ -174,7 +169,7 @@ func TestFilterClusters(t *testing.T) {
 			fqdn:    "local",
 			address: "192.168.79.187",
 			port:    8502,
-			expected: []envoy.Cluster{
+			expected: []Cluster{
 				{
 					FullyQualifiedDomainName: "local_agent",
 					Endpoints:                []string{"192.168.79.187:8502"},
@@ -192,7 +187,7 @@ func TestFilterClusters(t *testing.T) {
 }
 
 func TestFilterEndpoints(t *testing.T) {
-	given := []envoy.Endpoint{
+	given := []Endpoint{
 		{
 			Address: "192.168.79.187:8502",
 		},
@@ -213,12 +208,12 @@ func TestFilterEndpoints(t *testing.T) {
 	cases := map[string]struct {
 		address  string
 		port     int
-		expected []envoy.Endpoint
+		expected []Endpoint
 	}{
 		"No filter": {
 			address: "",
 			port:    -1,
-			expected: []envoy.Endpoint{
+			expected: []Endpoint{
 				{
 					Address: "192.168.79.187:8502",
 				},
@@ -239,7 +234,7 @@ func TestFilterEndpoints(t *testing.T) {
 		"Filter address": {
 			address: "127.0.0.1",
 			port:    -1,
-			expected: []envoy.Endpoint{
+			expected: []Endpoint{
 				{
 					Address: "127.0.0.1:8080",
 				},
@@ -248,7 +243,7 @@ func TestFilterEndpoints(t *testing.T) {
 		"Filter port": {
 			address: "",
 			port:    20000,
-			expected: []envoy.Endpoint{
+			expected: []Endpoint{
 				{
 					Address: "192.168.31.201:20000",
 				},
@@ -263,7 +258,7 @@ func TestFilterEndpoints(t *testing.T) {
 		"Filter address and port": {
 			address: "235",
 			port:    20000,
-			expected: []envoy.Endpoint{
+			expected: []Endpoint{
 				{
 					Address: "192.168.47.235:20000",
 				},
@@ -280,7 +275,7 @@ func TestFilterEndpoints(t *testing.T) {
 }
 
 func TestFilterListeners(t *testing.T) {
-	given := []envoy.Listener{
+	given := []Listener{
 		{
 			Address: "192.168.69.179:20000",
 		},
@@ -292,12 +287,12 @@ func TestFilterListeners(t *testing.T) {
 	cases := map[string]struct {
 		address  string
 		port     int
-		expected []envoy.Listener
+		expected []Listener
 	}{
 		"No filter": {
 			address: "",
 			port:    -1,
-			expected: []envoy.Listener{
+			expected: []Listener{
 				{
 					Address: "192.168.69.179:20000",
 				},
@@ -309,7 +304,7 @@ func TestFilterListeners(t *testing.T) {
 		"Filter address": {
 			address: "127.0.0.1",
 			port:    -1,
-			expected: []envoy.Listener{
+			expected: []Listener{
 				{
 					Address: "127.0.0.1:15001",
 				},
@@ -318,7 +313,7 @@ func TestFilterListeners(t *testing.T) {
 		"Filter port": {
 			address: "",
 			port:    20000,
-			expected: []envoy.Listener{
+			expected: []Listener{
 				{
 					Address: "192.168.69.179:20000",
 				},
@@ -327,7 +322,7 @@ func TestFilterListeners(t *testing.T) {
 		"Filter address and port": {
 			address: "192.168.69.179",
 			port:    20000,
-			expected: []envoy.Listener{
+			expected: []Listener{
 				{
 					Address: "192.168.69.179:20000",
 				},

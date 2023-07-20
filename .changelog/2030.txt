@@ -1,3 +1,0 @@
-```release-note:improvement
-helm: add failover policy field to service resolver and proxy default CRDs
-```
