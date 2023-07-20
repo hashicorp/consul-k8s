@@ -97,6 +97,10 @@ terraform-fmt:
 	@terraform fmt -recursive
 .PHONY: terraform-fmt
 
+# Check for hashicorppreview containers
+check-preview-containers:
+	@source $(CURDIR)/control-plane/build-support/scripts/check-hashicorppreview.sh
+
 
 # ===========> CLI Targets
 cli-dev:
