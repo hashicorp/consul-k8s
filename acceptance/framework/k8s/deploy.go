@@ -112,6 +112,11 @@ func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, sour
 
 	CheckStaticServerConnectionMultipleFailureMessages(t, options, sourceApp, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
 }
+func CheckStaticServerConnectionJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
+	t.Helper()
+
+	CheckStaticServerConnectionMultipleFailureMessagesJob(t, options, sourceApp, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
+}
 
 // CheckStaticServerConnectionMultipleFailureMessages execs into a pod of sourceApp
 // and runs a curl command with the provided curlArgs.
@@ -135,6 +140,38 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 	retrier := &retry.Timer{Timeout: 320 * time.Second, Wait: 2 * time.Second}
 
 	args := []string{"exec", resourceType + sourceApp, "-c", sourceApp, "--", "curl", "-vvvsSf"}
+	args = append(args, curlArgs...)
+
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		output, err := RunKubectlAndGetOutputE(t, options, args...)
+		if expectSuccess {
+			require.NoError(r, err)
+			require.Contains(r, output, expectedOutput)
+		} else {
+			require.Error(r, err)
+			require.Condition(r, func() bool {
+				exists := false
+				for _, msg := range failureMessages {
+					if strings.Contains(output, msg) {
+						exists = true
+					}
+				}
+				return exists
+			})
+		}
+	})
+}
+func CheckStaticServerConnectionMultipleFailureMessagesJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
+	t.Helper()
+
+	expectedOutput := "hello world"
+	if expectedSuccessOutput != "" {
+		expectedOutput = expectedSuccessOutput
+	}
+
+	retrier := &retry.Timer{Timeout: 320 * time.Second, Wait: 2 * time.Second}
+
+	args := []string{"exec", "jobs/" + sourceApp, "-c", sourceApp, "--", "curl", "-vvvsSf"}
 	args = append(args, curlArgs...)
 
 	retry.RunWith(retrier, t, func(r *retry.R) {
