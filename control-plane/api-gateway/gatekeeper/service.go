@@ -31,6 +31,8 @@ func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gatewa
 		return g.deleteService(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
+	g.Log.Info("UpsertService")
+
 	service := g.service(gateway, gcc)
 
 	mutated := service.DeepCopy()

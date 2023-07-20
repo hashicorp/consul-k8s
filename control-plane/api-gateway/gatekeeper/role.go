@@ -23,11 +23,14 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 		return g.deleteRole(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
+	g.Log.Info("UpsertRole")
+
 	role := &rbac.Role{}
 
 	// If the Role already exists, ensure that we own the Role
 	err := g.Client.Get(ctx, g.namespacedName(gateway), role)
 	if err != nil && !k8serrors.IsNotFound(err) {
+		g.Log.Info("UpsertRole Failed")
 		return err
 	} else if !k8serrors.IsNotFound(err) {
 		// Ensure we own the Role.
@@ -80,6 +83,7 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 			Verbs:         []string{"use"},
 		})
 	}
+	g.Log.Info("------------------------------------------Is Openshift Enabled?")
 
 	if config.EnableOpenShift {
 		g.Log.Info("------------------------------------------Openshift Enabled")
@@ -88,7 +92,8 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 			Resources: []string{"securitycontextconstraints"},
 			// TODO(nathancoleman) Consider accepting an explicit SCC name. This will make the code
 			//   here less brittle and allow for the user to provide their own SCC if they wish.
-			ResourceNames: []string{config.ReleaseName + "-api-gateway", "gateway-*"},
+			//ResourceNames: []string{config.ReleaseName + "-api-gateway"},
+			ResourceNames: []string{"privileged"},
 			Verbs:         []string{"use"},
 		})
 	}
