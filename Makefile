@@ -82,6 +82,10 @@ terraform-fmt:
 	@terraform fmt -recursive
 .PHONY: terraform-fmt
 
+# Check for hashicorppreview containers
+check-preview-containers:
+	@source $(CURDIR)/control-plane/build-support/scripts/check-hashicorppreview.sh
+
 
 # ===========> CLI Targets
 cli-dev:
@@ -193,7 +197,7 @@ aks-test-packages:
 check-env:
 	@printenv | grep "CONSUL_K8S"
 
-prepare-release: ## Sets the versions, updates changelog to prepare this repository to release
+prepare-release-script: ## Sets the versions, updates changelog to prepare this repository to release
 ifndef CONSUL_K8S_RELEASE_VERSION
 	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
@@ -206,7 +210,9 @@ endif
 ifndef CONSUL_K8S_CONSUL_VERSION
 	$(error CONSUL_K8S_CONSUL_VERSION is required)
 endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION)
+	@source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION); \
+
+prepare-release: prepare-release-script check-preview-containers
 
 prepare-dev:
 ifndef CONSUL_K8S_RELEASE_VERSION
