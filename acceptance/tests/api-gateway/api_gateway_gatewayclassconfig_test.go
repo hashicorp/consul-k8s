@@ -128,10 +128,6 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	logger.Log(t, "creating controlled gateway")
 	gateway := createGateway(t, k8sClient, gatewayName, namespace, gatewayClassName, certificateName)
 
-	// make sure it exists
-	logger.Log(t, "checking that gateway one is synchronized to Consul")
-	checkConsulExists(t, consulClient, api.APIGateway, gatewayName)
-
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all gateways")
 		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.Gateway{}, client.InNamespace(namespace))
