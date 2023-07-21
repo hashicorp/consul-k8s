@@ -169,7 +169,7 @@ rules:
   resources:
   - securitycontextconstraints
   resourceNames:
-  - {{ template "consul.fullname" . }}-api-gateway
+  - privileged
   verbs:
   - use
 {{- end }}

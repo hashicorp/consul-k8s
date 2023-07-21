@@ -34,6 +34,11 @@ func New(log logr.Logger, client client.Client) *Gatekeeper {
 func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	g.Log.V(1).Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", gateway.Namespace, gateway.Name))
 
+	g.Log.Info("Gatekeeper Upsert OpenshiftRole")
+	if config.EnableOpenShift {
+		g.upsertOpenshiftRole(ctx, gateway)
+	}
+
 	if err := g.upsertRole(ctx, gateway, gcc, config); err != nil {
 		return err
 	}
@@ -59,8 +64,16 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 
 // Delete removes the resources for handling routing of network traffic.
 // This is done in the reverse order of Upsert due to dependencies between resources.
-func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedName) error {
+func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedName, enableOpenshift bool) error {
 	g.Log.V(1).Info(fmt.Sprintf("Delete Gateway Deployment %s/%s", gatewayName.Namespace, gatewayName.Name))
+
+	if enableOpenshift {
+		g.Log.Info("Deleting Openshift Role")
+		g.deleteRole(ctx, types.NamespacedName{
+			Namespace: gatewayName.Namespace,
+			Name:      gatewayName.Name + "-openshift",
+		})
+	}
 
 	if err := g.deleteDeployment(ctx, gatewayName); err != nil {
 		return err

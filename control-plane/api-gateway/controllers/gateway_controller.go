@@ -344,7 +344,7 @@ func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log l
 	err := gk.Delete(ctx, types.NamespacedName{
 		Namespace: gw.Namespace,
 		Name:      gw.Name,
-	})
+	}, r.HelmConfig.EnableOpenShift)
 	if err != nil {
 		return err
 	}
