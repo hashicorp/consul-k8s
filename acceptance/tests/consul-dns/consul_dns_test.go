@@ -65,7 +65,7 @@ func TestConsulDNS(t *testing.T) {
 				"run", "-it", dnsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
 			}
 
-			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
 				// Note: this delete command won't wait for pods to be fully terminated.
 				// This shouldn't cause any test pollution because the underlying
 				// objects are deployments, and so when other tests create these

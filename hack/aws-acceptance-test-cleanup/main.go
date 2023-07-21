@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -37,6 +38,11 @@ var (
 	flagAutoApprove bool
 	errNotDestroyed = errors.New("not yet destroyed")
 )
+
+type oidc struct {
+	arn      string
+	buildUrl string
+}
 
 func main() {
 	flag.BoolVar(&flagAutoApprove, "auto-approve", false, "Skip interactive approval before destroying.")
@@ -68,6 +74,106 @@ func realMain(ctx context.Context) error {
 	eksClient := eks.New(clientSession, awsCfg)
 	ec2Client := ec2.New(clientSession, awsCfg)
 	elbClient := elb.New(clientSession, awsCfg)
+	iamClient := iam.New(clientSession, awsCfg)
+
+	// Find OIDC providers to delete.
+	oidcProvidersOutput, err := iamClient.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
+	if err != nil {
+		return err
+	} else if oidcProvidersOutput == nil {
+		return fmt.Errorf("nil output for OIDC Providers")
+	}
+
+	toDeleteOidcArns := []*oidc{}
+	for _, providerEntry := range oidcProvidersOutput.OpenIDConnectProviderList {
+		arnString := ""
+		if providerEntry.Arn != nil {
+			arnString = *providerEntry.Arn
+		}
+		// Check if it's older than 8 hours.
+		older, err := oidcOlderThanEightHours(ctx, iamClient, providerEntry.Arn)
+		if err != nil {
+			return err
+		}
+		// Only add to delete list if it's older than 8 hours and has a buildURL tag.
+		if older {
+			output, err := iamClient.ListOpenIDConnectProviderTags(&iam.ListOpenIDConnectProviderTagsInput{OpenIDConnectProviderArn: providerEntry.Arn})
+			if err != nil {
+				return err
+			}
+			for _, tag := range output.Tags {
+				if tag.Key != nil && *tag.Key == buildURLTag {
+					var buildUrl string
+					if tag.Value != nil {
+						buildUrl = *tag.Value
+					}
+					toDeleteOidcArns = append(toDeleteOidcArns, &oidc{arn: arnString, buildUrl: buildUrl})
+				}
+			}
+		} else {
+			fmt.Printf("Skipping OIDC provider: %s because it's not over 8 hours old\n", arnString)
+		}
+	}
+
+	oidcProvidersExist := true
+	if len(toDeleteOidcArns) == 0 {
+		fmt.Println("Found no OIDC Providers to clean up")
+		oidcProvidersExist = false
+	} else {
+		// Print out the OIDC Provider arns and the build tags.
+		var oidcPrint string
+		for _, oidcProvider := range toDeleteOidcArns {
+			oidcPrint += fmt.Sprintf("- %s (%s)\n", oidcProvider.arn, oidcProvider.buildUrl)
+		}
+
+		fmt.Printf("Found OIDC Providers:\n%s", oidcPrint)
+	}
+
+	// Check for approval.
+	if !flagAutoApprove && oidcProvidersExist {
+		type input struct {
+			text string
+			err  error
+		}
+		inputCh := make(chan input)
+
+		// Read input in a goroutine so we can also exit if we get a Ctrl-C
+		// (see select{} below).
+		go func() {
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Println("\nDo you want to delete these OIDC Providers (y/n)?")
+			inputStr, err := reader.ReadString('\n')
+			if err != nil {
+				inputCh <- input{err: err}
+				return
+			}
+			inputCh <- input{text: inputStr}
+		}()
+
+		select {
+		case in := <-inputCh:
+			if in.err != nil {
+				return in.err
+			}
+			inputTrimmed := strings.TrimSpace(in.text)
+			if inputTrimmed != "y" && inputTrimmed != "yes" {
+				return errors.New("exiting after negative")
+			}
+		case <-ctx.Done():
+			return errors.New("context cancelled")
+		}
+	}
+
+	// Actually delete the OIDC providers.
+	for _, oidcArn := range toDeleteOidcArns {
+		fmt.Printf("Deleting OIDC provider: %s\n", oidcArn.arn)
+		_, err := iamClient.DeleteOpenIDConnectProviderWithContext(ctx, &iam.DeleteOpenIDConnectProviderInput{
+			OpenIDConnectProviderArn: &oidcArn.arn,
+		})
+		if err != nil {
+			return err
+		}
+	}
 
 	// Find VPCs to delete. Most resources we create belong to a VPC, except
 	// for IAM resources, and so if there are no VPCs, that means all leftover resources have been deleted.
@@ -535,6 +641,25 @@ func realMain(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// oidcOlderThanEightHours checks if the oidc provider is older than 8 hours.
+func oidcOlderThanEightHours(ctx context.Context, iamClient *iam.IAM, oidcArn *string) (bool, error) {
+	fullOidc, err := iamClient.GetOpenIDConnectProviderWithContext(ctx, &iam.GetOpenIDConnectProviderInput{
+		OpenIDConnectProviderArn: oidcArn,
+	})
+	if err != nil {
+		return false, err
+	}
+	if fullOidc != nil {
+		if fullOidc.CreateDate != nil {
+			d := time.Since(*fullOidc.CreateDate)
+			if d.Hours() > 8 {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func vpcNameAndBuildURL(vpc *ec2.Vpc) (string, string) {

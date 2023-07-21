@@ -102,7 +102,7 @@ func TestControllerNamespaces(t *testing.T) {
 			if err != nil && !strings.Contains(out, "(AlreadyExists)") {
 				require.NoError(t, err)
 			}
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", KubeNS)
 			})
 
