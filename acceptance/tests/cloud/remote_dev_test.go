@@ -173,12 +173,12 @@ func TestRemoteDevCloud(t *testing.T) {
 	logger.Log(t, "setting acl permissions for collector and services")
 	aclDir := "../fixtures/bases/cloud/service-intentions"
 	k8s.KubectlApplyK(t, ctx.KubectlOptions(t), aclDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), aclDir)
 	})
 
 	logger.Log(t, "creating static-server deployment")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 	time.Sleep(1 * time.Hour)
 
 	// TODO: add in test assertions here

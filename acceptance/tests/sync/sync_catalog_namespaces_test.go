@@ -97,12 +97,12 @@ func TestSyncCatalogNamespaces(t *testing.T) {
 
 			logger.Logf(t, "creating namespace %s", staticServerNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
 			logger.Log(t, "creating a static-server with a service")
-			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
