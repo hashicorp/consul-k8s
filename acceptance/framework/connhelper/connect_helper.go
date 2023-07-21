@@ -133,15 +133,15 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 		// TODO: A base fixture is the wrong place for these files
 		k8s.KubectlApply(t, opts, "../fixtures/bases/openshift/")
-		helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
+		helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
 			k8s.KubectlDelete(t, opts, "../fixtures/bases/openshift/")
 		})
 
-		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
 		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
 		} else {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
 		}
 	} else {
 		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
@@ -185,7 +185,7 @@ func (c *ConnectHelper) setupAppNamespace(t *testing.T) {
 		return
 	}
 	require.NoError(t, err)
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, opts, "delete", "ns", opts.Namespace)
 	})
 
