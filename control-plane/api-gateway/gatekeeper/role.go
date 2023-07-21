@@ -6,7 +6,6 @@ package gatekeeper
 import (
 	"context"
 	"errors"
-
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -114,6 +113,9 @@ func (g *Gatekeeper) upsertOpenshiftRole(ctx context.Context, gateway gwv1beta1.
 	} else if !k8serrors.IsNotFound(err) {
 		// Ensure we own the Role.
 		for _, ref := range role.GetOwnerReferences() {
+			g.Log.Info("Are we owner?")
+			g.Log.Info("ref.UID: " + string(ref.UID) + " gateway.GetUID(): " + string(gateway.GetUID()))
+			g.Log.Info("ref.Name: " + ref.Name + " openshiftRoleName: " + openshiftRoleName)
 			if ref.UID == gateway.GetUID() && ref.Name == openshiftRoleName {
 				// We found ourselves!
 				g.Log.Info("We own the role")
