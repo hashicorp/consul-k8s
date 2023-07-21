@@ -101,7 +101,7 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 func (g *Gatekeeper) upsertOpenshiftRole(ctx context.Context, gateway gwv1beta1.Gateway) error {
 	role := &rbac.Role{}
 
-	openshiftRoleName := gateway.Name + "-openshift"
+	openshiftRoleName := getOpenshiftName(gateway)
 
 	g.Log.Info("UpsertOpenshiftRole")
 	// If the Role already exists, ensure that we own the Role

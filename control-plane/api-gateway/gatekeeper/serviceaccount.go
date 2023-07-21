@@ -18,10 +18,10 @@ import (
 )
 
 func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, config common.HelmConfig) error {
-	if config.AuthMethod == "" {
+	if config.AuthMethod == "" && !config.EnableOpenShift {
 		return g.deleteServiceAccount(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
-
+	g.Log.Info("UpsertServiceAccount")
 	serviceAccount := &corev1.ServiceAccount{}
 	exists := false
 

@@ -33,18 +33,24 @@ func New(log logr.Logger, client client.Client) *Gatekeeper {
 // This is done in order based on dependencies between resources.
 func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	g.Log.V(1).Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", gateway.Namespace, gateway.Name))
-
-	g.Log.Info("Gatekeeper Upsert OpenshiftRole")
-	if config.EnableOpenShift {
-		g.upsertOpenshiftRole(ctx, gateway)
-	}
-
 	if err := g.upsertRole(ctx, gateway, gcc, config); err != nil {
 		return err
 	}
 
 	if err := g.upsertServiceAccount(ctx, gateway, config); err != nil {
 		return err
+	}
+
+	if config.EnableOpenShift {
+		g.Log.Info("Gatekeeper Upsert OpenshiftRole")
+
+		if err := g.upsertOpenshiftRole(ctx, gateway); err != nil {
+			return err
+		}
+
+		if err := g.upsertOpenshiftRoleBinding(ctx, gateway, gcc, config); err != nil {
+			return err
+		}
 	}
 
 	if err := g.upsertRoleBinding(ctx, gateway, gcc, config); err != nil {
@@ -69,10 +75,12 @@ func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedNam
 
 	if enableOpenshift {
 		g.Log.Info("Deleting Openshift Role")
-		g.deleteRole(ctx, types.NamespacedName{
+		if err := g.deleteRole(ctx, types.NamespacedName{
 			Namespace: gatewayName.Namespace,
 			Name:      gatewayName.Name + "-openshift",
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
 	if err := g.deleteDeployment(ctx, gatewayName); err != nil {
@@ -113,4 +121,8 @@ func (g *Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config common
 		return ""
 	}
 	return gateway.Name
+}
+
+func getOpenshiftName(gateway gwv1beta1.Gateway) string {
+	return gateway.Name + "-openshift"
 }

@@ -813,6 +813,71 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestUpsertOpenshift(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]testCase{
+		"create a new gateway deployment with managed Service": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+				},
+			},
+			helmConfig: common.HelmConfig{
+				EnableOpenShift: true,
+			},
+			initialResources: resources{},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, v1alpha1.AddToScheme(s))
+			require.NoError(t, rbac.AddToScheme(s))
+			require.NoError(t, corev1.AddToScheme(s))
+			require.NoError(t, appsv1.AddToScheme(s))
+
+			log := logrtest.New(t)
+
+			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
+			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
+
+			gatekeeper := New(log, client)
+
+			err := gatekeeper.Upsert(context.Background(), tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
+			require.NoError(t, err)
+			require.NoError(t, validateResourcesExist(t, client, tc.finalResources))
+		})
+	}
+}
+
 func joinResources(resources resources) (objs []client.Object) {
 	for _, deployment := range resources.deployments {
 		objs = append(objs, deployment)
