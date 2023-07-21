@@ -92,8 +92,6 @@ func (g *Gatekeeper) roleBinding(gateway gwv1beta1.Gateway, gcc v1alpha1.Gateway
 func (g *Gatekeeper) upsertOpenshiftRoleBinding(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	roleBinding := &rbac.RoleBinding{}
 
-	openshiftRoleName := getOpenshiftName(gateway)
-
 	// If the RoleBinding already exists, ensure that we own the RoleBinding
 	err := g.Client.Get(ctx, g.namespacedName(gateway), roleBinding)
 	if err != nil && !k8serrors.IsNotFound(err) {
@@ -101,7 +99,7 @@ func (g *Gatekeeper) upsertOpenshiftRoleBinding(ctx context.Context, gateway gwv
 	} else if !k8serrors.IsNotFound(err) {
 		// Ensure we own the Role.
 		for _, ref := range roleBinding.GetOwnerReferences() {
-			if ref.UID == gateway.GetUID() && ref.Name == openshiftRoleName {
+			if ref.UID == gateway.GetUID() && ref.Name == gateway.Name {
 				// We found ourselves!
 				return nil
 			}
@@ -110,7 +108,7 @@ func (g *Gatekeeper) upsertOpenshiftRoleBinding(ctx context.Context, gateway gwv
 	}
 
 	// Create or update the RoleBinding
-	roleBinding = g.roleBindingOpenshift(gateway, openshiftRoleName)
+	roleBinding = g.roleBindingOpenshift(gateway, getOpenshiftName(gateway))
 	if err := ctrl.SetControllerReference(&gateway, roleBinding, g.Client.Scheme()); err != nil {
 		return err
 	}

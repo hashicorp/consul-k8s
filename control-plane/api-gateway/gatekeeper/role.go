@@ -116,7 +116,7 @@ func (g *Gatekeeper) upsertOpenshiftRole(ctx context.Context, gateway gwv1beta1.
 			g.Log.Info("Are we owner?")
 			g.Log.Info("ref.UID: " + string(ref.UID) + " gateway.GetUID(): " + string(gateway.GetUID()))
 			g.Log.Info("ref.Name: " + ref.Name + " openshiftRoleName: " + openshiftRoleName)
-			if ref.UID == gateway.GetUID() && ref.Name == openshiftRoleName {
+			if ref.UID == gateway.GetUID() && ref.Name == gateway.Name {
 				// We found ourselves!
 				g.Log.Info("We own the role")
 
