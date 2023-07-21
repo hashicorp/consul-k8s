@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type LifecycleShutdownConfig struct {
@@ -288,7 +289,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, pods.Items, 1)
 			jobName := pods.Items[0].Name
-			fmt.Printf("Job Name: %s", jobName)
+
 			//Exec into job and send shutdown request to running proxy
 			// curl --max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
 			sendProxyShutdownArgs := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "--max-time", "2", "-s", "-f", "-XPOST", "http://127.0.0.1:20600/graceful_shutdown"}
@@ -296,9 +297,9 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			require.NoError(t, err)
 
 			logger.Log(t, "Proxy killed...")
+			logger.Log(t, "Checking if connection fails with proxy killed...")
 
 			args := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "-vvvsSf"}
-			time.Sleep(2 * time.Hour)
 			if cfg.EnableTransparentProxy {
 				args = append(args, "http://static-server")
 			} else {
@@ -322,14 +323,15 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			})
 			//wait for the job to complete
 			retry.RunWith(&retry.Timer{Timeout: 4 * time.Minute, Wait: 30 * time.Second}, t, func(r *retry.R) {
-				pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(
+				log.Log.Info("Checking if job completed...")
+				jobs, err := ctx.KubernetesClient(t).BatchV1().Jobs(ns).List(
 					context.Background(),
 					metav1.ListOptions{
 						LabelSelector: "app=test-job",
 					},
 				)
-				require.NoError(t, err)
-				require.True(t, pods.Items[0].Status.String() == "Completed")
+				require.NoError(r, err)
+				require.True(r, jobs.Items[0].Status.Succeeded == 1)
 			})
 
 			logger.Log(t, "ensuring job is deregistered after termination")
