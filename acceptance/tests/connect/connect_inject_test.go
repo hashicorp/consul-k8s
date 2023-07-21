@@ -42,7 +42,7 @@ func TestConnectInject(t *testing.T) {
 				Secure:          c.secure,
 				ReleaseName:     releaseName,
 				Ctx:             ctx,
-				UseAppNamespace: cfg.RestrictedPSAEnforcementEnabled,
+				UseAppNamespace: cfg.EnableRestrictedPSAEnforcement,
 				Cfg:             cfg,
 			}
 
@@ -76,7 +76,7 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 		Secure:          true,
 		ReleaseName:     releaseName,
 		Ctx:             ctx,
-		UseAppNamespace: cfg.RestrictedPSAEnforcementEnabled,
+		UseAppNamespace: cfg.EnableRestrictedPSAEnforcement,
 		Cfg:             cfg,
 	}
 

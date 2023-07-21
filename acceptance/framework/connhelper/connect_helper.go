@@ -189,7 +189,7 @@ func (c *ConnectHelper) setupAppNamespace(t *testing.T) {
 		k8s.RunKubectl(t, opts, "delete", "ns", opts.Namespace)
 	})
 
-	if c.Cfg.RestrictedPSAEnforcementEnabled {
+	if c.Cfg.EnableRestrictedPSAEnforcement {
 		// Allow anything to run in the app namespace.
 		k8s.RunKubectl(t, opts, "label", "--overwrite", "ns", opts.Namespace,
 			"pod-security.kubernetes.io/enforce=privileged",

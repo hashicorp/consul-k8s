@@ -27,8 +27,8 @@ type TestFlags struct {
 
 	flagEnablePodSecurityPolicies bool
 
-	flagEnableCNI                       bool
-	flagRestrictedPSAEnforcementEnabled bool
+	flagEnableCNI                      bool
+	flagEnableRestrictedPSAEnforcement bool
 
 	flagEnableTransparentProxy bool
 
@@ -117,7 +117,7 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagEnableCNI, "enable-cni", false,
 		"If true, the test suite will run tests with consul-cni plugin enabled. "+
 			"In general, this will only run against tests that are mesh related (connect, mesh-gateway, peering, etc")
-	flag.BoolVar(&t.flagRestrictedPSAEnforcementEnabled, "restricted-psa-enforcement-enabled", false,
+	flag.BoolVar(&t.flagEnableRestrictedPSAEnforcement, "enable-restricted-psa-enforcement", false,
 		"If true, this indicates that Consul is being run in a namespace with restricted PSA enforcement enabled. "+
 			"The tests do not configure Consul's namespace with PSA enforcement enabled. This must configured before tests are run. "+
 			"The CNI and test applications need more privilege than is allowed in a restricted namespace. "+
@@ -209,8 +209,8 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
 
-		EnableCNI:                       t.flagEnableCNI,
-		RestrictedPSAEnforcementEnabled: t.flagRestrictedPSAEnforcementEnabled,
+		EnableCNI:                      t.flagEnableCNI,
+		EnableRestrictedPSAEnforcement: t.flagEnableRestrictedPSAEnforcement,
 
 		EnableTransparentProxy: t.flagEnableTransparentProxy,
 

@@ -74,8 +74,8 @@ type TestConfig struct {
 
 	EnablePodSecurityPolicies bool
 
-	EnableCNI                       bool
-	RestrictedPSAEnforcementEnabled bool
+	EnableCNI                      bool
+	EnableRestrictedPSAEnforcement bool
 
 	EnableTransparentProxy bool
 
@@ -148,7 +148,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 			setIfNotEmpty(helmValues, "connectInject.cni.cniNetDir", "/etc/kubernetes/cni/net.d")
 		}
 
-		if t.RestrictedPSAEnforcementEnabled {
+		if t.EnableRestrictedPSAEnforcement {
 			// The CNI requires privilege, so when restricted PSA enforcement is enabled on the Consul
 			// namespace it must be run in a different privileged namespace.
 			setIfNotEmpty(helmValues, "connectInject.cni.namespace", "kube-system")
