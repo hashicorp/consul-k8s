@@ -30,6 +30,8 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 		caseName := fmt.Sprintf("secure: %t", secure)
 		t.Run(caseName, func(t *testing.T) {
 			cfg := suite.Config()
+			cfg.SkipWhenOpenshiftAndCNI(t)
+
 			ctx := suite.Environment().DefaultContext(t)
 
 			serverHelmValues := map[string]string{

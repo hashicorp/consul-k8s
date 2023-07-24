@@ -34,6 +34,7 @@ const (
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 	cfg := suite.Config()
+	cfg.SkipWhenOpenshiftAndCNI(t)
 
 	for _, testCfg := range []LifecycleShutdownConfig{
 		{secure: false, helmValues: map[string]string{

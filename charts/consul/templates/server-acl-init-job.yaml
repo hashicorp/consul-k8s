@@ -129,6 +129,9 @@ spec:
       containers:
       - name: server-acl-init-job
         image: {{ .Values.global.imageK8S }}
+        {{- if not .Values.server.containerSecurityContext.aclInit }}
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+        {{- end }}
         env:
         - name: NAMESPACE
           valueFrom:

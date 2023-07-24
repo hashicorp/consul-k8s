@@ -60,6 +60,9 @@ spec:
       containers:
         - name: server-acl-init-cleanup
           image: {{ .Values.global.imageK8S }}
+          {{- if not .Values.server.containerSecurityContext.aclInit }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          {{- end }}
           command:
             - consul-k8s-control-plane
           args:

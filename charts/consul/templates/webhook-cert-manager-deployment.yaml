@@ -51,6 +51,7 @@ spec:
             -deployment-namespace={{ .Release.Namespace }}
         image: {{ .Values.global.imageK8S }}
         name: webhook-cert-manager
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
         resources:
           limits:
             cpu: 100m

@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: set container securityContexts to match the `restricted` Pod Security Standards policy to support running Consul in a namespace with restricted PSA enforcement enabled
+```
