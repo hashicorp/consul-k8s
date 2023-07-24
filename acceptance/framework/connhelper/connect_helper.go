@@ -24,7 +24,7 @@ import (
 const (
 	StaticClientName = "static-client"
 	StaticServerName = "static-server"
-	JobName          = "test-job"
+	JobName          = "job-client"
 )
 
 // ConnectHelper configures a Consul cluster for connect injection tests.
@@ -128,6 +128,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	}
 }
 
+// Same as DeployClientAndServer, but deploy job-client instead of static-client.
 func (c *ConnectHelper) DeployJobAndServer(t *testing.T) {
 
 	if c.Secure {
@@ -147,14 +148,14 @@ func (c *ConnectHelper) DeployJobAndServer(t *testing.T) {
 		})
 	}
 
-	logger.Log(t, "creating static-server and test-job deployments")
+	logger.Log(t, "creating static-server and job-client deployments")
 
 	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-	k8s.DeployJob(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/bases/jobs")
+	k8s.DeployJob(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/job-client-inject")
 
-	// Check that both static-server and test-job have been injected and
+	// Check that both static-server and job-client have been injected and
 	// now have 2 containers.
-	for _, labelSelector := range []string{"app=static-server", "app=test-job"} {
+	for _, labelSelector := range []string{"app=static-server", "app=job-client"} {
 		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
@@ -229,6 +230,7 @@ func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
 	}
 }
 
+// Same as TestConnectionSuccess for job-client instead of static-client
 func (c *ConnectHelper) TestConnectionSuccessJob(t *testing.T) {
 	logger.Log(t, "checking that connection is successful")
 	if c.Cfg.EnableTransparentProxy {
