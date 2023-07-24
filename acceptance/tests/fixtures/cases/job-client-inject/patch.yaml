@@ -8,4 +8,8 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
         "consul.hashicorp.com/transparent-proxy": "false"
+<<<<<<< HEAD
+=======
+        "consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds": "30"
+>>>>>>> 14095046 (code cleaning, split job files into bases/cases)
         "consul.hashicorp.com/connect-service-upstreams": "static-server:1234"
