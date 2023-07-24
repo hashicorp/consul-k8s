@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 resources:
-  - ./job.yaml
+  - ../../bases/job-client
 
-#TODO: Split this up and put into cases. 
+patchesStrategicMerge:
+  - patch.yaml
