@@ -829,9 +829,9 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.openshift.enabled & client.containerSecurityContext
+# global.openshift.enabled && server.containerSecurityContext
 
-@test "server/StatefulSet: container level securityContexts are not set when global.openshift.enabled=true" {
+@test "server/StatefulSet: Can set container level securityContexts when global.openshift.enabled=true" {
   cd `chart_dir`
   local manifest=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -839,8 +839,72 @@ load _helpers
       --set 'server.containerSecurityContext.server.privileged=false' \
       . | tee /dev/stderr)
 
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext.privileged')
+  [ "${actual}" = "false" ]
+}
+
+#--------------------------------------------------------------------
+# global.openshift.enabled
+
+@test "server/StatefulSet: restricted container securityContexts are set when global.openshift.enabled=true" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  local expected=$(echo '{
+    "allowPrivilegeEscalation": false,
+    "capabilities": {
+      "drop": ["ALL"]
+    },
+    "runAsNonRoot": true,
+    "seccompProfile": {
+      "type": "RuntimeDefault"
+    }
+  }')
+
+  # Check consul container
   local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
-  [ "${actual}" = "null" ]
+  local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
+  [ "$equal" == "true" ]
+
+  # Check locality-init container
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "locality-init")) | .[0].securityContext')
+  local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
+  [ "$equal" == "true" ]
+}
+
+#--------------------------------------------------------------------
+# global.openshift.enabled = false
+
+@test "server/StatefulSet: restricted container securityContexts are set by default" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr)
+
+  local expected=$(echo '{
+    "allowPrivilegeEscalation": false,
+    "capabilities": {
+      "drop": ["ALL"]
+    },
+    "runAsNonRoot": true,
+    "seccompProfile": {
+      "type": "RuntimeDefault"
+    },
+    "runAsUser": 100
+  }')
+
+  # Check consul container
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
+  local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
+  [ "$equal" == "true" ]
+
+  # Check locality-init container
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "locality-init")) | .[0].securityContext')
+  local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
+  [ "$equal" == "true" ]
 }
 
 #--------------------------------------------------------------------
