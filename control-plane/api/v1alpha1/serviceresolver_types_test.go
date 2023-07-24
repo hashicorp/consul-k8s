@@ -82,6 +82,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						},
 					},
 					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
+					RequestTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -149,6 +150,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 					},
 				},
 				ConnectTimeout: 1 * time.Second,
+				RequestTimeout: 1 * time.Second,
 				LoadBalancer: &capi.LoadBalancer{
 					Policy: "policy",
 					RingHashConfig: &capi.RingHashConfig{
@@ -265,6 +267,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						},
 					},
 					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
+					RequestTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -332,6 +335,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 					},
 				},
 				ConnectTimeout: 1 * time.Second,
+				RequestTimeout: 1 * time.Second,
 				LoadBalancer: &capi.LoadBalancer{
 					Policy: "policy",
 					RingHashConfig: &capi.RingHashConfig{

@@ -7,7 +7,7 @@ package v1alpha1
 
 import (
 	"encoding/json"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -1723,6 +1723,7 @@ func (in *ServiceResolverSpec) DeepCopyInto(out *ServiceResolverSpec) {
 		}
 	}
 	out.ConnectTimeout = in.ConnectTimeout
+	out.RequestTimeout = in.RequestTimeout
 	if in.LoadBalancer != nil {
 		in, out := &in.LoadBalancer, &out.LoadBalancer
 		*out = new(LoadBalancer)
