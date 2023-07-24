@@ -79,20 +79,6 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 			Verbs:         []string{"use"},
 		})
 	}
-	g.Log.Info("------------------------------------------Is Openshift Enabled?")
-
-	if config.EnableOpenShift {
-		g.Log.Info("------------------------------------------Openshift Enabled")
-		role.Rules = append(role.Rules, rbac.PolicyRule{
-			APIGroups: []string{"security.openshift.io"},
-			Resources: []string{"securitycontextconstraints"},
-			// TODO(nathancoleman) Consider accepting an explicit SCC name. This will make the code
-			//   here less brittle and allow for the user to provide their own SCC if they wish.
-			//ResourceNames: []string{config.ReleaseName + "-api-gateway"},
-			ResourceNames: []string{"privileged"},
-			Verbs:         []string{"use"},
-		})
-	}
 
 	return role
 }

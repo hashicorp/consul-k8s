@@ -93,7 +93,14 @@ func (g *Gatekeeper) upsertOpenshiftRoleBinding(ctx context.Context, gateway gwv
 	roleBinding := &rbac.RoleBinding{}
 
 	// If the RoleBinding already exists, ensure that we own the RoleBinding
-	err := g.Client.Get(ctx, g.namespacedName(gateway), roleBinding)
+	openshiftRoleName := getOpenshiftName(gateway)
+
+	g.Log.Info("UpsertOpenshiftRoleBinding")
+	// If the Role already exists, ensure that we own the Role
+	err := g.Client.Get(ctx, types.NamespacedName{
+		Namespace: gateway.Namespace,
+		Name:      openshiftRoleName,
+	}, roleBinding)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	} else if !k8serrors.IsNotFound(err) {
