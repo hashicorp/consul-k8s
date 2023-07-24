@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"testing"
 
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v2"
@@ -73,7 +74,8 @@ type TestConfig struct {
 
 	EnablePodSecurityPolicies bool
 
-	EnableCNI bool
+	EnableCNI                      bool
+	EnableRestrictedPSAEnforcement bool
 
 	EnableTransparentProxy bool
 
@@ -135,9 +137,21 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 
 	if t.EnableCNI {
 		setIfNotEmpty(helmValues, "connectInject.cni.enabled", "true")
+		setIfNotEmpty(helmValues, "connectInject.cni.logLevel", "debug")
 		// GKE is currently the only cloud provider that uses a different CNI bin dir.
 		if t.UseGKE {
 			setIfNotEmpty(helmValues, "connectInject.cni.cniBinDir", "/home/kubernetes/bin")
+		}
+		if t.EnableOpenshift {
+			setIfNotEmpty(helmValues, "connectInject.cni.multus", "true")
+			setIfNotEmpty(helmValues, "connectInject.cni.cniBinDir", "/var/lib/cni/bin")
+			setIfNotEmpty(helmValues, "connectInject.cni.cniNetDir", "/etc/kubernetes/cni/net.d")
+		}
+
+		if t.EnableRestrictedPSAEnforcement {
+			// The CNI requires privilege, so when restricted PSA enforcement is enabled on the Consul
+			// namespace it must be run in a different privileged namespace.
+			setIfNotEmpty(helmValues, "connectInject.cni.namespace", "kube-system")
 		}
 	}
 
@@ -218,6 +232,12 @@ func (t *TestConfig) entImage() (string, error) {
 	}
 
 	return fmt.Sprintf("hashicorp/consul-enterprise:%s%s-ent", consulImageVersion, preRelease), nil
+}
+
+func (c *TestConfig) SkipWhenOpenshiftAndCNI(t *testing.T) {
+	if c.EnableOpenshift && c.EnableCNI {
+		t.Skip("skipping because -enable-cni and -enable-openshift are set and this test doesn't deploy apps correctly")
+	}
 }
 
 // setIfNotEmpty sets key to val in map m if value is not empty.
