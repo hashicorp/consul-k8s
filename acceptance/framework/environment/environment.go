@@ -35,6 +35,8 @@ type TestEnvironment interface {
 // for example, information about a specific Kubernetes cluster.
 type TestContext interface {
 	KubectlOptions(t *testing.T) *k8s.KubectlOptions
+	// TODO: I don't love this.
+	KubectlOptionsForNamespace(ns string) *k8s.KubectlOptions
 	KubernetesClient(t *testing.T) kubernetes.Interface
 	ControllerRuntimeClient(t *testing.T) client.Client
 }
@@ -136,6 +138,14 @@ func (k kubernetesContext) KubectlOptions(t *testing.T) *k8s.KubectlOptions {
 		}
 	}
 	return k.options
+}
+
+func (k kubernetesContext) KubectlOptionsForNamespace(ns string) *k8s.KubectlOptions {
+	return &k8s.KubectlOptions{
+		ContextName: k.kubeContextName,
+		ConfigPath:  k.pathToKubeConfig,
+		Namespace:   ns,
+	}
 }
 
 // KubernetesClientFromOptions takes KubectlOptions and returns Kubernetes API client.
