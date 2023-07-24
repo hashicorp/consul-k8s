@@ -44,7 +44,7 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 	if config.EnableOpenShift {
 		g.Log.Info("Gatekeeper Upsert OpenshiftRole")
 
-		if err := g.upsertOpenshiftRole(ctx, gateway); err != nil {
+		if err := g.upsertOpenshiftRole(ctx, gateway, config); err != nil {
 			return err
 		}
 

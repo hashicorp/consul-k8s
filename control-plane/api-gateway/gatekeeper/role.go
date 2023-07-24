@@ -39,7 +39,7 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 		return errors.New("role not owned by controller")
 	}
 
-	role = g.role(gateway, gcc, config)
+	role = g.role(gateway, gcc)
 	if err := ctrl.SetControllerReference(&gateway, role, g.Client.Scheme()); err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (g *Gatekeeper) deleteRole(ctx context.Context, gwName types.NamespacedName
 	return nil
 }
 
-func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) *rbac.Role {
+func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) *rbac.Role {
 	role := &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      gateway.Name,
@@ -83,12 +83,11 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 	return role
 }
 
-func (g *Gatekeeper) upsertOpenshiftRole(ctx context.Context, gateway gwv1beta1.Gateway) error {
+func (g *Gatekeeper) upsertOpenshiftRole(ctx context.Context, gateway gwv1beta1.Gateway, config common.HelmConfig) error {
 	role := &rbac.Role{}
 
 	openshiftRoleName := getOpenshiftName(gateway)
 
-	g.Log.Info("UpsertOpenshiftRole")
 	// If the Role already exists, ensure that we own the Role
 	err := g.Client.Get(ctx, types.NamespacedName{
 		Namespace: gateway.Namespace,
@@ -99,9 +98,6 @@ func (g *Gatekeeper) upsertOpenshiftRole(ctx context.Context, gateway gwv1beta1.
 	} else if !k8serrors.IsNotFound(err) {
 		// Ensure we own the Role.
 		for _, ref := range role.GetOwnerReferences() {
-			g.Log.Info("Are we owner?")
-			g.Log.Info("ref.UID: " + string(ref.UID) + " gateway.GetUID(): " + string(gateway.GetUID()))
-			g.Log.Info("ref.Name: " + ref.Name + " openshiftRoleName: " + openshiftRoleName)
 			if ref.UID == gateway.GetUID() && ref.Name == gateway.Name {
 				// We found ourselves!
 				g.Log.Info("We own the role")
@@ -113,7 +109,7 @@ func (g *Gatekeeper) upsertOpenshiftRole(ctx context.Context, gateway gwv1beta1.
 		return errors.New("role not owned by controller")
 	}
 
-	role = g.openshiftRole(gateway, openshiftRoleName)
+	role = g.openshiftRole(gateway, openshiftRoleName, config)
 	if err := ctrl.SetControllerReference(&gateway, role, g.Client.Scheme()); err != nil {
 		return err
 	}
@@ -124,7 +120,7 @@ func (g *Gatekeeper) upsertOpenshiftRole(ctx context.Context, gateway gwv1beta1.
 	return nil
 }
 
-func (g *Gatekeeper) openshiftRole(gateway gwv1beta1.Gateway, roleName string) *rbac.Role {
+func (g *Gatekeeper) openshiftRole(gateway gwv1beta1.Gateway, roleName string, config common.HelmConfig) *rbac.Role {
 	role := &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleName,
@@ -137,8 +133,7 @@ func (g *Gatekeeper) openshiftRole(gateway gwv1beta1.Gateway, roleName string) *
 				Resources: []string{"securitycontextconstraints"},
 				// TODO(nathancoleman) Consider accepting an explicit SCC name. This will make the code
 				//   here less brittle and allow for the user to provide their own SCC if they wish.
-				//ResourceNames: []string{config.ReleaseName + "-api-gateway"},
-				ResourceNames: []string{"privileged"},
+				ResourceNames: []string{config.ReleaseName + "-api-gateway"},
 				Verbs:         []string{"use"},
 			},
 		},

@@ -193,7 +193,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels, "1"),
+					configureRole(name, namespace, labels, "1", false),
 				},
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
@@ -319,7 +319,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels, "1"),
+					configureRole(name, namespace, labels, "1", false),
 				},
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
@@ -342,7 +342,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "2"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels, "1"),
+					configureRole(name, namespace, labels, "1", false),
 				},
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
@@ -400,7 +400,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels, "1"),
+					configureRole(name, namespace, labels, "1", false),
 				},
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
@@ -428,7 +428,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "2"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels, "1"),
+					configureRole(name, namespace, labels, "1", false),
 				},
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
@@ -754,7 +754,7 @@ func TestDelete(t *testing.T) {
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{
-					configureRole(name, namespace, labels, "1"),
+					configureRole(name, namespace, labels, "1", false),
 				},
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
@@ -817,7 +817,7 @@ func TestUpsertOpenshift(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]testCase{
-		"create a new gateway deployment with managed Service": {
+		"create a new gateway with openshift enabled": {
 			gateway: gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -848,7 +848,9 @@ func TestUpsertOpenshift(t *testing.T) {
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
-				roles:           []*rbac.Role{},
+				roles: []*rbac.Role{
+					configureRole(name, namespace, labels, "1", true),
+				},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -1122,14 +1124,27 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 	}
 }
 
-func configureRole(name, namespace string, labels map[string]string, resourceVersion string) *rbac.Role {
+func configureRole(name, namespace string, labels map[string]string, resourceVersion string, openshiftEnabled bool) *rbac.Role {
+	rules := []rbac.PolicyRule{}
+	roleName := name
+	if openshiftEnabled {
+		rules = []rbac.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{name + "-api-gateway"},
+				Verbs:         []string{"use"},
+			},
+		}
+		roleName = name + "-openshift"
+	}
 	return &rbac.Role{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "rbac.authorization.k8s.io/v1",
 			Kind:       "Role",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
+			Name:            roleName,
 			Namespace:       namespace,
 			Labels:          labels,
 			ResourceVersion: resourceVersion,
@@ -1143,7 +1158,7 @@ func configureRole(name, namespace string, labels map[string]string, resourceVer
 				},
 			},
 		},
-		Rules: []rbac.PolicyRule{},
+		Rules: rules,
 	}
 }
 
