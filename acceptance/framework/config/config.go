@@ -100,11 +100,11 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	// ask about client
 	if t.EnableWindows {
 		fmt.Println("hi")
-		// setIfNotEmpty(helmValues, "apiGateway.controller.nodeSelector", "kubernetes.io/os: linux")
-		// setIfNotEmpty(helmValues, "apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "apiGateway.controller.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "connectInject.nodeSelector", "kubernetes.io/os: linux")
-		// setIfNotEmpty(helmValues, "connectInject.apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
-		// setIfNotEmpty(helmValues, "client.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "connectInject.apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "client.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "acls.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "global.acls.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "global.tls.nodeSelector", "kubernetes.io/os: linux")
@@ -113,6 +113,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		setIfNotEmpty(helmValues, "syncCatalog.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "telemetryCollector.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "webhookCertManager.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "ingressGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
+		setIfNotEmpty(helmValues, "terminatingGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
 
 		setIfNotEmpty(helmValues, "global.imageK8SWindows", "absolutelightning/windows-consul-k8s-control-plane:latest")
 		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", "absolutelightning/windows-consul-dataplane")

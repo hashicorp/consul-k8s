@@ -1,0 +1,33 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static-server
+  template:
+    metadata:
+      name: static-server
+      labels:
+        app: static-server
+    spec:
+      containers:
+        - name: static-server
+          # Using alpine vs latest as there is a build issue with M1s. Also other tests in multiport-app reference
+          # alpine so standardizing this.
+          image: absolutelightning/http-echo:latest
+          args:
+            - -text="hello world"
+            - -listen=:8080
+          ports:
+            - containerPort: 8080
+              name: http
+      nodeSelector:
+        kubernetes.io/os: windows
+      serviceAccountName: static-server
+      terminationGracePeriodSeconds: 0 # so deletion is quick

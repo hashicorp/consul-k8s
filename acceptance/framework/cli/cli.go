@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	cliBinaryName = "/Users/asheshvidyut/consul-k8s/cli/bin/consul-k8s"
+	cliBinaryName = "consul-k8s"
 )
 
 // CLI provides access to compile and execute commands with the `consul-k8s` CLI.

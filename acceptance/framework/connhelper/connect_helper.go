@@ -207,6 +207,7 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	if c.Cfg.EnableTransparentProxy {
 		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), StaticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
+			"curl: (56) Recv failure: Connection was reset",
 			"curl: (56) Recv failure: Connection was aborted",
 			"curl: (52) Empty reply from server",
 			"curl: (7) Failed to connect to static-server port 80: Connection refused",
@@ -214,6 +215,7 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	} else {
 		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, c.Ctx.KubectlOptions(t), StaticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
+			"curl: (56) Recv failure: Connection was reset",
 			"curl: (56) Recv failure: Connection was aborted",
 			"curl: (52) Empty reply from server",
 		}, "", "http://localhost:1234")
