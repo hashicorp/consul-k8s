@@ -230,11 +230,11 @@ func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
 	}
 }
 
-// Same as TestConnectionSuccess for job-client instead of static-client
+// Same as TestConnectionSuccess for job-client instead of static-client.
 func (c *ConnectHelper) TestConnectionSuccessJob(t *testing.T) {
 	logger.Log(t, "checking that connection is successful")
 	if c.Cfg.EnableTransparentProxy {
-		// todo: add an assertion that the traffic is going through the proxy
+		// todo: add an assertion that the traffic is going through the proxy.
 		k8s.CheckStaticServerConnectionSuccessfulJob(t, c.Ctx.KubectlOptions(t), JobName, "http://static-server")
 	} else {
 		k8s.CheckStaticServerConnectionSuccessfulJob(t, c.Ctx.KubectlOptions(t), JobName, "http://localhost:1234")
