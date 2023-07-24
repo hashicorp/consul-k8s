@@ -61,6 +61,10 @@ spec:
                 description: ConnectTimeout is the timeout for establishing new network
                   connections to this service.
                 type: string
+              requestTimeout:
+                description: RequestTimeout is the timeout for receiving an HTTP response from
+                  this service before the connection is terminated.
+                type: string
               defaultSubset:
                 description: DefaultSubset is the subset to use when no explicit subset
                   is requested. If empty the unnamed subset is used.
