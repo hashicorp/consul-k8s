@@ -216,21 +216,17 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 	cfg := suite.Config()
-	//defaultShutdownGracePeriodSeconds := 30
 	ver, err := version.NewVersion("1.2.0")
 	require.NoError(t, err)
 	if cfg.ConsulDataplaneVersion != nil && cfg.ConsulDataplaneVersion.LessThan(ver) {
 		t.Skipf("skipping this test because proxy lifecycle management is not supported in consul-dataplane version %v", cfg.ConsulDataplaneVersion.String())
 	}
-
 	cases := map[string]struct {
 		secure      bool
 		gracePeriod int64
 	}{
-		"Insecure with grace period": {false, 30},
-		//"Secure with grace period":      {true, 30},
+		"Insecure with grace period":    {false, 30},
 		"Insecure without grace period": {false, 0},
-		//"Secure without grace period":   {true, 0},
 	}
 
 	for name, tc := range cases {
