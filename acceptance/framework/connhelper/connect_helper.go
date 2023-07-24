@@ -5,6 +5,7 @@ package connhelper
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -128,7 +129,11 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	}
 }
 
-// Same as DeployClientAndServer, but deploy job-client instead of static-client.
+// DeployJobAndServer deploys a job and server pod to the Kubernetes
+// cluster which will be used to test service mesh connectivity. If the Secure
+// flag is true, a pre-check is done to ensure that the ACL tokens for the test
+// are deleted. The status of the deployment and injection is checked after the
+// deployment is complete to ensure success.
 func (c *ConnectHelper) DeployJobAndServer(t *testing.T) {
 
 	if c.Secure {
@@ -167,78 +172,56 @@ func (c *ConnectHelper) DeployJobAndServer(t *testing.T) {
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static
 // server fails when no intentions are configured.
-func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T) {
+func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clientType ...string) {
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
-	if c.Cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://static-server")
-	} else {
-		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+	client := StaticClientName
+	if len(clientType) > 0 {
+		client = clientType[0]
 	}
-}
+	if c.Cfg.EnableTransparentProxy {
+		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), client, "http://static-server")
+	} else {
+		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), client, "http://localhost:1234")
+	}
 
-func (c *ConnectHelper) TestConnectionFailureWithoutIntentionJob(t *testing.T) {
-	logger.Log(t, "checking that the connection is not successful because there's no intention")
-	if c.Cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), JobName, "http://static-server")
-	} else {
-		k8s.CheckStaticServerConnectionFailing(t, c.Ctx.KubectlOptions(t), JobName, "http://localhost:1234")
-	}
 }
 
 // CreateIntention creates an intention for the static-server pod to connect to
-// the static-client pod.
-func (c *ConnectHelper) CreateIntention(t *testing.T) {
-	logger.Log(t, "creating intention")
+// the client pod.
+func (c *ConnectHelper) CreateIntention(t *testing.T, clientType ...string) {
+	client := StaticClientName
+	if len(clientType) > 0 {
+		client = clientType[0]
+	}
+	logger.Log(t, fmt.Sprintf("creating intention between %s and server", client))
 	_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 		Kind: api.ServiceIntentions,
 		Name: StaticServerName,
 		Sources: []*api.SourceIntention{
 			{
-				Name:   StaticClientName,
+				Name:   client,
 				Action: api.IntentionActionAllow,
 			},
 		},
 	}, nil)
 	require.NoError(t, err)
-}
-
-func (c *ConnectHelper) CreateIntentionJob(t *testing.T) {
-	logger.Log(t, "creating intention, test job and server")
-	_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
-		Kind: api.ServiceIntentions,
-		Name: StaticServerName,
-		Sources: []*api.SourceIntention{
-			{
-				Name:   JobName,
-				Action: api.IntentionActionAllow,
-			},
-		},
-	}, nil)
-	require.NoError(t, err)
-
 }
 
 // TestConnectionSuccess ensures the static-server pod can connect to the
-// static-client pod once the intention is set.
-func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
+// client pod once the intention is set.
+func (c *ConnectHelper) TestConnectionSuccess(t *testing.T, clientType ...string) {
 	logger.Log(t, "checking that connection is successful")
+	client := StaticClientName
+	if len(clientType) > 0 {
+		client = clientType[0]
+	}
 	if c.Cfg.EnableTransparentProxy {
 		// todo: add an assertion that the traffic is going through the proxy
-		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), client, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, c.Ctx.KubectlOptions(t), client, "http://localhost:1234")
 	}
-}
 
-// Same as TestConnectionSuccess for job-client instead of static-client.
-func (c *ConnectHelper) TestConnectionSuccessJob(t *testing.T) {
-	logger.Log(t, "checking that connection is successful")
-	if c.Cfg.EnableTransparentProxy {
-		// todo: add an assertion that the traffic is going through the proxy.
-		k8s.CheckStaticServerConnectionSuccessfulJob(t, c.Ctx.KubectlOptions(t), JobName, "http://static-server")
-	} else {
-		k8s.CheckStaticServerConnectionSuccessfulJob(t, c.Ctx.KubectlOptions(t), JobName, "http://localhost:1234")
-	}
 }
 
 // TestConnectionFailureWhenUnhealthy sets the static-server pod to be unhealthy

@@ -269,10 +269,10 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			})
 
 			if tc.secure {
-				connHelper.TestConnectionFailureWithoutIntentionJob(t)
-				connHelper.CreateIntentionJob(t)
+				connHelper.TestConnectionFailureWithoutIntention(t, connhelper.JobName)
+				connHelper.CreateIntention(t, connhelper.JobName)
 			}
-			connHelper.TestConnectionSuccessJob(t)
+			connHelper.TestConnectionSuccess(t, connhelper.JobName)
 
 			// Get job-client pod name
 			ns := ctx.KubectlOptions(t).Namespace
