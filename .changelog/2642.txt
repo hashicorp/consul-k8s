@@ -1,0 +1,4 @@
+```release-note:security
+Upgrade to use Go 1.20.6 and `x/net/http` 0.12.0.
+This resolves [CVE-2023-29406](https://github.com/advisories/GHSA-f8f7-69v5-w4vx)(`net/http`).
+```
