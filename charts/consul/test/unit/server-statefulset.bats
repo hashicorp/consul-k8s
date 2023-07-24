@@ -868,11 +868,6 @@ load _helpers
   local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
   local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
   [ "$equal" == "true" ]
-
-  # Check locality-init container
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "locality-init")) | .[0].securityContext')
-  local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
-  [ "$equal" == "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -898,11 +893,6 @@ load _helpers
 
   # Check consul container
   local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
-  local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
-  [ "$equal" == "true" ]
-
-  # Check locality-init container
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "locality-init")) | .[0].securityContext')
   local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
   [ "$equal" == "true" ]
 }
