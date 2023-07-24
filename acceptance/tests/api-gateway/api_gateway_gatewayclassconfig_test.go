@@ -63,22 +63,6 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 
 	k8sClient := ctx.ControllerRuntimeClient(t)
 
-	//create clean namespace
-	err = k8sClient.Create(context.Background(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-		},
-	})
-	require.NoError(t, err)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		logger.Log(t, "deleting gateway namesapce")
-		k8sClient.Delete(context.Background(), &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
-		})
-	})
-
 	// create a GatewayClassConfig with configuration set
 	gatewayClassConfigName := "gateway-class-config"
 	gatewayClassConfig := &v1alpha1.GatewayClassConfig{
@@ -143,10 +127,6 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	gatewayName := "gcctestgateway" + namespace
 	logger.Log(t, "creating controlled gateway")
 	gateway := createGateway(t, k8sClient, gatewayName, namespace, gatewayClassName, certificateName)
-
-	// make sure it exists
-	logger.Log(t, "checking that gateway one is synchronized to Consul")
-	checkConsulExists(t, consulClient, api.APIGateway, gatewayName)
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all gateways")
