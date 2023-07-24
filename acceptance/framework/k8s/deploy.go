@@ -73,6 +73,8 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
+// DeployJob creates a Kubernetes job by applying the kustomize directory stored at kustomizeDir,
+// sets up a cleanup function and waits for the deployment to become available.
 func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, debugDirectory, kustomizeDir string) {
 	t.Helper()
 
@@ -81,11 +83,6 @@ func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure boo
 	output, err := RunKubectlAndGetOutputE(t, options, "kustomize", kustomizeDir)
 	require.NoError(t, err)
 
-	/*
-		deployment := v1.Deployment{}
-		err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&deployment)
-		require.NoError(t, err)
-	*/
 	job := batchv1.Job{}
 	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&job)
 	require.NoError(t, err)
@@ -115,11 +112,6 @@ func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, sour
 
 	CheckStaticServerConnectionMultipleFailureMessages(t, options, sourceApp, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
 }
-func CheckStaticServerConnectionJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
-	t.Helper()
-
-	CheckStaticServerConnectionMultipleFailureMessagesJob(t, options, sourceApp, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
-}
 
 // CheckStaticServerConnectionMultipleFailureMessages execs into a pod of sourceApp
 // and runs a curl command with the provided curlArgs.
@@ -130,6 +122,10 @@ func CheckStaticServerConnectionJob(t *testing.T, options *k8s.KubectlOptions, s
 // on the existence of any of them.
 func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
 	t.Helper()
+	resourceType := "deploy/"
+	if sourceApp == "job-client" {
+		resourceType = "jobs/"
+	}
 
 	expectedOutput := "hello world"
 	if expectedSuccessOutput != "" {
@@ -138,7 +134,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 
 	retrier := &retry.Timer{Timeout: 320 * time.Second, Wait: 2 * time.Second}
 
-	args := []string{"exec", "deploy/" + sourceApp, "-c", sourceApp, "--", "curl", "-vvvsSf"}
+	args := []string{"exec", resourceType + sourceApp, "-c", sourceApp, "--", "curl", "-vvvsSf"}
 	args = append(args, curlArgs...)
 
 	retry.RunWith(retrier, t, func(r *retry.R) {
@@ -160,7 +156,8 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 		}
 	})
 }
-func CheckStaticServerConnectionMultipleFailureMessagesJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
+
+/*func CheckStaticServerConnectionMultipleFailureMessagesJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
 	t.Helper()
 
 	expectedOutput := "hello world"
@@ -191,7 +188,7 @@ func CheckStaticServerConnectionMultipleFailureMessagesJob(t *testing.T, options
 			})
 		}
 	})
-}
+} */
 
 // CheckStaticServerConnectionSuccessfulWithMessage is just like CheckStaticServerConnectionSuccessful
 // but it asserts on a non-default expected message.
@@ -211,13 +208,14 @@ func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOpt
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 
+/*
 func CheckStaticServerConnectionSuccessfulJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, curlArgs ...string) {
 	t.Helper()
 	start := time.Now()
-	CheckStaticServerConnectionJob(t, options, sourceApp, true, nil, "", curlArgs...)
+	CheckStaticServerConnection(t, options, sourceApp, true, nil, "", curlArgs...)
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
-
+*/
 // CheckStaticServerConnectionFailing is just like CheckStaticServerConnection
 // but it always expects a failing connection with various errors.
 func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOptions, sourceApp string, curlArgs ...string) {
