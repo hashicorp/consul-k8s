@@ -230,7 +230,7 @@ func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
 	}
 }
 
-// Same as TestConnectionSuccess for job-client instead of static-client
+// Same as TestConnectionSuccess for job-client instead of static-client.
 func (c *ConnectHelper) TestConnectionSuccessJob(t *testing.T) {
 	logger.Log(t, "checking that connection is successful")
 	if c.Cfg.EnableTransparentProxy {
