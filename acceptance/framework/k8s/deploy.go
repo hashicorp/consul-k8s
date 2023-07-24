@@ -112,11 +112,6 @@ func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, sour
 
 	CheckStaticServerConnectionMultipleFailureMessages(t, options, sourceApp, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
 }
-func CheckStaticServerConnectionJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
-	t.Helper()
-
-	CheckStaticServerConnectionMultipleFailureMessagesJob(t, options, sourceApp, expectSuccess, failureMessages, expectedSuccessOutput, curlArgs...)
-}
 
 // CheckStaticServerConnectionMultipleFailureMessages execs into a pod of sourceApp
 // and runs a curl command with the provided curlArgs.
@@ -161,7 +156,8 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 		}
 	})
 }
-func CheckStaticServerConnectionMultipleFailureMessagesJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
+
+/*func CheckStaticServerConnectionMultipleFailureMessagesJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
 	t.Helper()
 
 	expectedOutput := "hello world"
@@ -192,7 +188,7 @@ func CheckStaticServerConnectionMultipleFailureMessagesJob(t *testing.T, options
 			})
 		}
 	})
-}
+} */
 
 /*func CheckStaticServerConnectionMultipleFailureMessagesJob(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
 	t.Helper()
