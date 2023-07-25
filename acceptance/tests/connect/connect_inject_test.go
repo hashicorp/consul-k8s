@@ -35,11 +35,12 @@ func TestConnectInject(t *testing.T) {
 
 			releaseName := helpers.RandomName()
 			connHelper := connhelper.ConnectHelper{
-				ClusterKind: consul.Helm,
-				Secure:      c.secure,
-				ReleaseName: releaseName,
-				Ctx:         ctx,
-				Cfg:         cfg,
+				ClusterKind:     consul.Helm,
+				Secure:          c.secure,
+				ReleaseName:     releaseName,
+				Ctx:             ctx,
+				UseAppNamespace: cfg.EnableRestrictedPSAEnforcement,
+				Cfg:             cfg,
 			}
 
 			connHelper.Setup(t)
@@ -63,6 +64,9 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
+
+			cfg.SkipWhenOpenshiftAndCNI(t)
+
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
@@ -131,6 +135,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
+			cfg.SkipWhenOpenshiftAndCNI(t)
+
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
