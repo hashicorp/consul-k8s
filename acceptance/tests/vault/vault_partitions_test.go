@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -26,7 +25,7 @@ func TestVault_Partitions(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 	serverClusterCtx := env.DefaultContext(t)
-	clientClusterCtx := env.Context(t, environment.SecondaryContextName)
+	clientClusterCtx := env.Context(t, 1)
 	ns := serverClusterCtx.KubectlOptions(t).Namespace
 
 	const secondaryPartition = "secondary"

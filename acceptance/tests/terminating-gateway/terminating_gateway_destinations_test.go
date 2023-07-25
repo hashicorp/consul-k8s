@@ -73,7 +73,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service.
 			logger.Log(t, "creating static-server deployment")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server-https")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-https")
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
@@ -91,7 +91,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 
 			staticServerIP, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "po", "-l", "app=static-server", `-o=jsonpath={.items[0].status.podIP}`)
 			require.NoError(t, err)

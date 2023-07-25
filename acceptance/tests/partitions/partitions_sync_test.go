@@ -11,7 +11,6 @@ import (
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -82,7 +81,7 @@ func TestPartitions_Sync(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			primaryClusterContext := env.DefaultContext(t)
-			secondaryClusterContext := env.Context(t, environment.SecondaryContextName)
+			secondaryClusterContext := env.Context(t, 1)
 
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
@@ -196,13 +195,13 @@ func TestPartitions_Sync(t *testing.T) {
 
 			logger.Logf(t, "creating namespaces %s in servers cluster", staticServerNamespace)
 			k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
 			logger.Logf(t, "creating namespaces %s in clients cluster", staticServerNamespace)
 			k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
@@ -242,9 +241,9 @@ func TestPartitions_Sync(t *testing.T) {
 
 			logger.Log(t, "creating a static-server with a service")
 			// create service in default partition.
-			k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 			// create service in secondary partition.
-			k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			logger.Log(t, "checking that the service has been synced to Consul")
 			var services map[string][]string

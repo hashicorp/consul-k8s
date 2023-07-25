@@ -38,11 +38,12 @@ func TestConnectInject(t *testing.T) {
 
 			releaseName := helpers.RandomName()
 			connHelper := connhelper.ConnectHelper{
-				ClusterKind: consul.Helm,
-				Secure:      c.secure,
-				ReleaseName: releaseName,
-				Ctx:         ctx,
-				Cfg:         cfg,
+				ClusterKind:     consul.Helm,
+				Secure:          c.secure,
+				ReleaseName:     releaseName,
+				Ctx:             ctx,
+				UseAppNamespace: cfg.EnableRestrictedPSAEnforcement,
+				Cfg:             cfg,
 			}
 
 			connHelper.Setup(t)
@@ -71,11 +72,12 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 
 	releaseName := helpers.RandomName()
 	connHelper := connhelper.ConnectHelper{
-		ClusterKind: consul.Helm,
-		Secure:      true,
-		ReleaseName: releaseName,
-		Ctx:         ctx,
-		Cfg:         cfg,
+		ClusterKind:     consul.Helm,
+		Secure:          true,
+		ReleaseName:     releaseName,
+		Ctx:             ctx,
+		UseAppNamespace: cfg.EnableRestrictedPSAEnforcement,
+		Cfg:             cfg,
 	}
 
 	connHelper.Setup(t)
@@ -84,7 +86,8 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 	connHelper.CreateResolverRedirect(t)
 	connHelper.DeployClientAndServer(t)
 
-	k8s.CheckStaticServerConnectionSuccessful(t, connHelper.Ctx.KubectlOptions(t), "static-client", "http://resolver-redirect")
+	opts := connHelper.KubectlOptsForApp(t)
+	k8s.CheckStaticServerConnectionSuccessful(t, opts, "static-client", "http://resolver-redirect")
 }
 
 // Test the endpoints controller cleans up force-killed pods.
@@ -93,6 +96,9 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
+
+			cfg.SkipWhenOpenshiftAndCNI(t)
+
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
@@ -107,7 +113,7 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating static-client deployment")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 			logger.Log(t, "waiting for static-client to be registered with Consul")
 			consulClient, _ := consulCluster.SetupConsulClient(t, secure)
@@ -161,6 +167,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
+			cfg.SkipWhenOpenshiftAndCNI(t)
+
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
@@ -200,8 +208,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			logger.Log(t, "creating multiport static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
 
 			// Check that static-client has been injected and now has 2 containers.
 			podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
@@ -260,7 +268,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			// pod to static-server.
 
 			// Deploy static-server.
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			// For outbound connections from the multi port pod, only intentions from the first service in the multiport
 			// pod need to be created, since all upstream connections are made through the first service's envoy proxy.
