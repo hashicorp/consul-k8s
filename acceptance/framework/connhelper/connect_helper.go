@@ -134,7 +134,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 // flag is true, a pre-check is done to ensure that the ACL tokens for the test
 // are deleted. The status of the deployment and injection is checked after the
 // deployment is complete to ensure success.
-func (c *ConnectHelper) DeployJob(t *testing.T) {
+func (c *ConnectHelper) DeployJob(t *testing.T, path string) {
 	if c.Secure {
 		// We need to register the cleanup function before we create the
 		// deployments because golang will execute them in reverse order
@@ -149,19 +149,19 @@ func (c *ConnectHelper) DeployJob(t *testing.T) {
 				}
 			})
 		})
-		logger.Log(t, "creating job-client deployment")
-		k8s.DeployJob(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/job-client-inject")
+	}
+	logger.Log(t, "creating job-client deployment")
+	k8s.DeployJob(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, path)
 
-		// Check that both static-server and job-client have been injected and
-		// now have 2 containers.
-		for _, labelSelector := range []string{"app=job-client"} {
-			podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: labelSelector,
-			})
-			require.NoError(t, err)
-			require.Len(t, podList.Items, 1)
-			require.Len(t, podList.Items[0].Spec.Containers, 2)
-		}
+	// Check that job-client has been injected and
+	// now have 2 containers.
+	for _, labelSelector := range []string{"app=job-client"} {
+		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		require.NoError(t, err)
+		require.Len(t, podList.Items, 1)
+		require.Len(t, podList.Items[0].Spec.Containers, 2)
 	}
 }
 
@@ -186,21 +186,20 @@ func (c *ConnectHelper) DeployServer(t *testing.T) {
 				}
 			})
 		})
-		logger.Log(t, "creating static-server deployment")
-		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-
-		// Check that both static-server and job-client have been injected and
-		// now have 2 containers.
-		for _, labelSelector := range []string{"app=static-server"} {
-			podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: labelSelector,
-			})
-			require.NoError(t, err)
-			require.Len(t, podList.Items, 1)
-			require.Len(t, podList.Items[0].Spec.Containers, 2)
-		}
 	}
+	logger.Log(t, "creating static-server deployment")
+	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
+	// Check that  static-server has been injected and
+	// now have 2 containers.
+	for _, labelSelector := range []string{"app=static-server"} {
+		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		require.NoError(t, err)
+		require.Len(t, podList.Items, 1)
+		require.Len(t, podList.Items[0].Spec.Containers, 2)
+	}
 }
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static
