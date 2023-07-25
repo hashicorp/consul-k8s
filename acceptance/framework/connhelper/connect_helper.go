@@ -186,6 +186,19 @@ func (c *ConnectHelper) DeployServer(t *testing.T) {
 				}
 			})
 		})
+		logger.Log(t, "creating static-server deployment")
+		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+
+		// Check that both static-server and job-client have been injected and
+		// now have 2 containers.
+		for _, labelSelector := range []string{"app=static-server"} {
+			podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: labelSelector,
+			})
+			require.NoError(t, err)
+			require.Len(t, podList.Items, 1)
+			require.Len(t, podList.Items[0].Spec.Containers, 2)
+		}
 	}
 	logger.Log(t, "creating static-server deployment")
 	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
