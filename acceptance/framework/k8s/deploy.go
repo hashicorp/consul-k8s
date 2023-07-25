@@ -150,6 +150,8 @@ func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOption
 		"curl: (52) Empty reply from server",
 		"curl: (7) Failed to connect",
 		"curl: (56) Recv failure: Connection reset by peer",
+		"curl: (56) Recv failure: Connection was reset",
+		"curl: (56) Recv failure: Connection was aborted",
 	}, "", curlArgs...)
 }
 
