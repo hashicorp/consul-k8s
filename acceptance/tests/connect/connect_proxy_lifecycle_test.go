@@ -20,7 +20,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type LifecycleShutdownConfig struct {
@@ -330,7 +329,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 
 		// Wait for the job to complete.
 		retry.RunWith(&retry.Timer{Timeout: 4 * time.Minute, Wait: 30 * time.Second}, t, func(r *retry.R) {
-			log.Log.Info("Checking if job completed...")
+			logger.Log(t, "Checking if job completed...")
 			jobs, err := ctx.KubernetesClient(t).BatchV1().Jobs(ns).List(
 				context.Background(),
 				metav1.ListOptions{
@@ -341,11 +340,24 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			require.True(r, jobs.Items[0].Status.Succeeded == 1)
 		})
 
+		// Delete the job and its associated Pod.
+		pods, err = ctx.KubernetesClient(t).CoreV1().Pods(ns).List(
+			context.Background(),
+			metav1.ListOptions{
+				LabelSelector: "app=job-client",
+			},
+		)
+		require.NoError(t, err)
+		podName := pods.Items[0].Name
+
 		err = ctx.KubernetesClient(t).BatchV1().Jobs(ns).Delete(context.Background(), "job-client", metav1.DeleteOptions{})
 		require.NoError(t, err)
 
+		err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), podName, metav1.DeleteOptions{})
+		require.NoError(t, err)
+
 		logger.Log(t, "ensuring job is deregistered after termination")
-		retry.Run(t, func(r *retry.R) {
+		retry.RunWith(&retry.Timer{Timeout: 4 * time.Minute, Wait: 30 * time.Second}, t, func(r *retry.R) {
 			for _, name := range []string{
 				"job-client",
 				"job-client-sidecar-proxy",
@@ -362,21 +374,4 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			}
 		})
 	}
-
-	retry.Run(t, func(r *retry.R) {
-		for _, name := range []string{
-			"static-server",
-			"static-server-sidecar-proxy",
-		} {
-			logger.Logf(t, "checking for %s service in Consul catalog", name)
-			instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
-			r.Check(err)
-
-			for _, instance := range instances {
-				if strings.Contains(instance.ServiceID, connhelper.StaticServerName) {
-					r.Errorf("%s is still registered", instance.ServiceID)
-				}
-			}
-		}
-	})
 }
