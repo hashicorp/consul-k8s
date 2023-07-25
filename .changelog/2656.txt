@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: increase timeout after login for ACL replication to 60 seconds
+```
