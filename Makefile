@@ -130,22 +130,26 @@ kind-cni-calico:
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
 	@sleep 20
 
-# Helper target for doing local cni acceptance testing
-kind-cni:
+kind-delete:
 	kind delete cluster --name dc1
 	kind delete cluster --name dc2
+	kind delete cluster --name dc3
+	kind delete cluster --name dc4
+
+
+# Helper target for doing local cni acceptance testing
+kind-cni: kind-delete
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 
 # Helper target for doing local acceptance testing
-kind:
-	kind delete cluster --name dc1
-	kind delete cluster --name dc2
+kind: kind-delete
 	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
-
+	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
+	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
 
 # ===========> Shared Targets
 
