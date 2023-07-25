@@ -510,11 +510,7 @@ spec:
           value: "component=client,pod=$(NAMESPACE)/$(POD_NAME)"
         {{- end }}
         - name: CONSUL_LOGIN_DATACENTER
-        {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-          value: {{ .Values.global.federation.primaryDatacenter }}
-        {{- else }}
           value: {{ .Values.global.datacenter }}
-        {{- end}}
         command:
           - "/bin/sh"
           - "-ec"
