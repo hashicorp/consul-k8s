@@ -5,6 +5,7 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -75,6 +76,11 @@ func (c *ctx) Name() string {
 func (c *ctx) KubectlOptions(_ *testing.T) *k8s.KubectlOptions {
 	return &k8s.KubectlOptions{}
 }
+func (c *ctx) KubectlOptionsForNamespace(ns string) *k8s.KubectlOptions {
+	return &k8s.KubectlOptions{}
+}
 func (c *ctx) KubernetesClient(_ *testing.T) kubernetes.Interface {
 	return fake.NewSimpleClientset()
 }
+
+var _ environment.TestContext = (*ctx)(nil)
