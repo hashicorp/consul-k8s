@@ -22,7 +22,7 @@ jobs:
     - uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
       name: cloud
       with:
-        workflow: cloud.yml
+        workflow: cloud-windows.yml
         repo: hashicorp/consul-k8s-workflows
         ref: windows-beta
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
