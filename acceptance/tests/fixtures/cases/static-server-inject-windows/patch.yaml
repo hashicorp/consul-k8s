@@ -34,7 +34,7 @@ spec:
             periodSeconds: 1
           readinessProbe:
             exec:
-              command: ['cmd', '/c', 'if not exist "C:\tmp\unhealthy" ( exit 0 ) else ( exit 1 )']
+              command: ['cmd', '/c', 'type C:\tmp\unhealthy && exit 1 || exit 0']
             initialDelaySeconds: 1
             failureThreshold: 1
             periodSeconds: 1
