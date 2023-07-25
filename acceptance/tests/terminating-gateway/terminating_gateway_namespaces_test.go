@@ -95,7 +95,11 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			// Deploy the static client.
 			logger.Log(t, "deploying static client")
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces-windows")
+			} else {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+			}
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {

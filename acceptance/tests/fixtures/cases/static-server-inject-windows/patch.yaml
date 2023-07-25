@@ -37,7 +37,6 @@ spec:
               command: ['cmd', '/c', 'if not exist "C:\tmp\unhealthy" ( exit 0 ) else ( exit 1 )']
             initialDelaySeconds: 1
             failureThreshold: 1
-            timeoutSeconds: 1
             periodSeconds: 1
       nodeSelector:
           kubernetes.io/os: windows
