@@ -742,6 +742,10 @@ server:
   # @type: boolean
   enabled: "-"
 
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
+
   # The name of the Docker image (including any tag) for the containers running
   # Consul server agents.
   # @type: string
@@ -1375,6 +1379,10 @@ client:
   # `server.enabled`, since the agents can be configured to join an external cluster.
   # @type: boolean
   enabled: false
+
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   # The name of the Docker image (including any tag) for the containers
   # running Consul client agents.

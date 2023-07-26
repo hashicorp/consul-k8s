@@ -95,3 +95,27 @@ load _helpers
 
   [ "${actual}" = null ]
 }
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "client/ConfigMap: client.logLevel is empty" {
+  cd `chart_dir`
+  local configmap=$(helm template \
+      -s templates/client-config-configmap.yaml \
+      . | tee /dev/stderr |
+      yq -r '.data["log-level.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${actual}" = "null" ]
+}
+
+@test "client/ConfigMap: client.logLevel is non empty" {
+  cd `chart_dir`
+  local configmap=$(helm template \
+      -s templates/client-config-configmap.yaml \
+      --set 'server.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq -r '.data["log-level.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${actual}" = "DEBUG" ]
+}
