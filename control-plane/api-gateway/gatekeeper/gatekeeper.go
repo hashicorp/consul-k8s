@@ -41,18 +41,6 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 		return err
 	}
 
-	if config.EnableOpenShift {
-		g.Log.Info("Gatekeeper Upsert OpenshiftRole")
-
-		if err := g.upsertOpenshiftRole(ctx, gateway, config); err != nil {
-			return err
-		}
-
-		if err := g.upsertOpenshiftRoleBinding(ctx, gateway, gcc, config); err != nil {
-			return err
-		}
-	}
-
 	if err := g.upsertRoleBinding(ctx, gateway, gcc, config); err != nil {
 		return err
 	}
@@ -70,18 +58,8 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 
 // Delete removes the resources for handling routing of network traffic.
 // This is done in the reverse order of Upsert due to dependencies between resources.
-func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedName, enableOpenshift bool) error {
+func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedName, config common.HelmConfig) error {
 	g.Log.V(1).Info(fmt.Sprintf("Delete Gateway Deployment %s/%s", gatewayName.Namespace, gatewayName.Name))
-
-	if enableOpenshift {
-		g.Log.Info("Deleting Openshift Role")
-		if err := g.deleteRole(ctx, types.NamespacedName{
-			Namespace: gatewayName.Namespace,
-			Name:      gatewayName.Name + "-openshift",
-		}); err != nil {
-			return err
-		}
-	}
 
 	if err := g.deleteDeployment(ctx, gatewayName); err != nil {
 		return err
@@ -121,8 +99,4 @@ func (g *Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config common
 		return ""
 	}
 	return gateway.Name
-}
-
-func getOpenshiftName(gateway gwv1beta1.Gateway) string {
-	return gateway.Name + "-openshift"
 }
