@@ -348,7 +348,7 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 		}
 
 		// Write the proxy ID to the shared volume so the consul-dataplane can use it for bootstrapping.
-		if err = common.WriteFileWithPerms(fmt.Sprintf("/consul/connect-inject/proxy-id-%s", c.flagServiceName), proxyID, os.FileMode(0444)); err != nil {
+		if err = common.WriteFileWithPerms(fmt.Sprintf("C:\\consul\\connect-inject\\proxy-id-%s", c.flagServiceName), proxyID, os.FileMode(0444)); err != nil {
 			// Save an error but return nil so that we don't retry this step.
 			c.UI.Error(err.Error())
 			c.nonRetryableError = err
