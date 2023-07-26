@@ -404,6 +404,7 @@ BREAKING CHANGES:
   * `client.enabled` now defaults to `false`. Setting it to `true` will deploy client agents, however, none of the consul-k8s components will use clients for their operation.
   * `global.imageEnvoy` is no longer used for sidecar proxies, as well as mesh, terminating, and ingress gateways.
   * `externalServers.grpcPort` default is now `8502` instead of `8503`.
+  * `externalServers.hosts` no longer supports [cloud auto-join](https://developer.hashicorp.com/consul/docs/install/cloud-auto-join) strings directly. Instead, include an [`exec=`](https://github.com/hashicorp/go-netaddrs#command-line-tool-usage) string in the `externalServers.hosts` list to invoke the `discover` CLI. For example, the following string invokes the `discover` CLI with a cloud auto-join string: `exec=discover -q addrs provider=aws region=us-west-2 tag_key=consul-server tag_value=true`. The `discover` CLI is included in the official `hashicorp/consul-dataplane` images by default.
   * `meshGateway.service.enabled` value is removed. Mesh gateways now will always have a Kubernetes service as this is required to register them as a service with Consul.
   * `meshGateway.initCopyConsulContainer`, `ingressGateways.initCopyConsulContainer`, `terminatingGateways.initCopyConsulContainer` values are removed.
   * `connectInject.enabled` now defaults to `true`. [[GH-1551](https://github.com/hashicorp/consul-k8s/pull/1551)]
