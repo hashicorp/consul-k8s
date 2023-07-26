@@ -107,14 +107,20 @@ target=templates/gateway-resources-job.yaml
   local actual=$(echo "$spec" | jq 'any(index("-service-type=Foo"))')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$spec" | jq '.[12] | ."-node-selector=foo"')
+  local actual=$(echo "$spec" | jq '.[12]')
+  [ "${actual}" = "\"-node-selector\"" ]
+
+  local actual=$(echo "$spec" | jq '.[13]')
+  [ "${actual}" = "\"foo: bar\"" ]
+
+  local actual=$(echo "$spec" | jq '.[14] | ."-tolerations=- key"')
   [ "${actual}" = "\"bar\"" ]
 
-  local actual=$(echo "$spec" | jq '.[13] | ."-tolerations=- key"')
-  [ "${actual}" = "\"bar\"" ]
+  local actual=$(echo "$spec" | jq '.[15]')
+  [ "${actual}" = "\"-service-annotations\"" ]
 
-  local actual=$(echo "$spec" | jq '.[14]')
-  [ "${actual}" = "\"-service-annotations=- bingo\"" ]
+  local actual=$(echo "$spec" | jq '.[16]')
+  [ "${actual}" = "\"- bingo\"" ]
 }
 
 
