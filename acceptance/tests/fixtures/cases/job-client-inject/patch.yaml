@@ -1,0 +1,18 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-client
+spec:
+  template:
+    metadata:
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/transparent-proxy": "false"
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+        "consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds": "30"
+>>>>>>> 14095046 (code cleaning, split job files into bases/cases)
+=======
+>>>>>>> b811bd96 (not working, changing grace period to be set on a per job basis rather than helm install)
+        "consul.hashicorp.com/connect-service-upstreams": "static-server:1234"
