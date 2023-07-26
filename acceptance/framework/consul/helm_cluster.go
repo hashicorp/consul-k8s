@@ -52,7 +52,6 @@ type HelmCluster struct {
 	runtimeClient      client.Client
 	kubernetesClient   kubernetes.Interface
 	noCleanupOnFailure bool
-	noCleanup          bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 }
@@ -108,7 +107,6 @@ func NewHelmCluster(
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
-		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 	}
@@ -119,7 +117,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
-	helpers.Cleanup(t, h.noCleanupOnFailure, h.noCleanup, func() {
+	helpers.Cleanup(t, h.noCleanupOnFailure, func() {
 		h.Destroy(t)
 	})
 
@@ -510,7 +508,7 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 		}
 	}
 
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		_ = client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
 		_ = client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
 		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
@@ -561,7 +559,7 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 		}
 	}
 
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), anyuidRoleBinding, metav1.DeleteOptions{})
 		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), privilegedRoleBinding, metav1.DeleteOptions{})
 	})
@@ -603,7 +601,7 @@ func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.Test
 		}
 	})
 
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
 	})
 }
