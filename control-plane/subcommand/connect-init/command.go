@@ -218,7 +218,6 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
-	time.Sleep(5 * time.Minute)
 	c.logger.Info("Connect initialization completed")
 	return 0
 }
@@ -348,9 +347,8 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 		}
 
 		// Write the proxy ID to the shared volume so the consul-dataplane can use it for bootstrapping.
-		if err = common.WriteFileWithPerms(fmt.Sprintf("C:\\consul\\connect-inject\\proxy-id-%s", c.flagServiceName), proxyID, os.FileMode(0444)); err != nil {
+		if err := common.WriteFileWithPerms(c.flagProxyIDFile, proxyID, os.FileMode(0444)); err != nil {
 			// Save an error but return nil so that we don't retry this step.
-			c.UI.Error(err.Error())
 			c.nonRetryableError = err
 			return nil
 		}
