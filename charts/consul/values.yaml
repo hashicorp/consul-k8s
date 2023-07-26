@@ -92,7 +92,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: aahel/linux-cp:latest
+  imageK8S: aahel/new-linux-cp:latest
   imageK8SWindows: ""
 
   # The name of the datacenter that the agents should

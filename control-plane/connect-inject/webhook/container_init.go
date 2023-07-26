@@ -358,7 +358,7 @@ consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=$
   {{- end }}
   {{- if .MultiPort }}
   -multiport=true \
-  -proxy-id-file=C:\\consul\\connect-inject\\proxyid-{{ .ServiceName }} \
+  -proxy-id-file=/consul/connect-inject/proxyid-{{ .ServiceName }} \
   {{- if not .AuthMethod }}
   -service-name="{{ .ServiceName }}" \
   {{- end }}
