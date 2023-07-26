@@ -1205,7 +1205,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
 
-  [ "${actual}" = "null" ]
+  [ "${actual}" = null ]
 }
 
 @test "server/ConfigMap: server.logLevel is non empty" {
@@ -1216,5 +1216,5 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
 
-  [ "${actual}" = "DEBUG" ]
+  [ "${actual}" = DEBUG ]
 }

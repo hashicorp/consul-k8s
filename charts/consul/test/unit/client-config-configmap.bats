@@ -106,7 +106,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.data["log-level.json"]' | jq -r .log_level | tee /dev/stderr)
 
-  [ "${actual}" = "null" ]
+  [ "${actual}" = null ]
 }
 
 @test "client/ConfigMap: client.logLevel is non empty" {
@@ -117,5 +117,5 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.data["log-level.json"]' | jq -r .log_level | tee /dev/stderr)
 
-  [ "${actual}" = "DEBUG" ]
+  [ "${actual}" = DEBUG ]
 }
