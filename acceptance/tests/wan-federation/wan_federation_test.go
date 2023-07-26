@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -49,7 +48,7 @@ func TestWANFederation(t *testing.T) {
 			}
 
 			primaryContext := env.DefaultContext(t)
-			secondaryContext := env.Context(t, environment.SecondaryContextName)
+			secondaryContext := env.Context(t, 1)
 
 			primaryHelmValues := map[string]string{
 				"global.datacenter": "dc1",
@@ -158,16 +157,16 @@ func TestWANFederation(t *testing.T) {
 			logger.Log(t, "creating proxy-defaults config")
 			kustomizeDir := "../fixtures/bases/mesh-gateway"
 			k8s.KubectlApplyK(t, secondaryContext.KubectlOptions(t), kustomizeDir)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), kustomizeDir)
 			})
 
 			// Check that we can connect services over the mesh gateways
 			logger.Log(t, "creating static-server in dc2")
-			k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			logger.Log(t, "creating static-client in dc1")
-			k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+			k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 			if c.secure {
 				logger.Log(t, "creating intention")

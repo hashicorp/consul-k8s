@@ -76,6 +76,9 @@ type ServiceResolverSpec struct {
 	// ConnectTimeout is the timeout for establishing new network connections
 	// to this service.
 	ConnectTimeout metav1.Duration `json:"connectTimeout,omitempty"`
+	// RequestTimeout is the timeout for receiving an HTTP response from this
+	// service before the connection is terminated.
+	RequestTimeout metav1.Duration `json:"requestTimeout,omitempty"`
 	// LoadBalancer determines the load balancing policy and configuration for services
 	// issuing requests to this upstream service.
 	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
@@ -317,6 +320,7 @@ func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 		Redirect:             in.Spec.Redirect.toConsul(),
 		Failover:             in.Spec.Failover.toConsul(),
 		ConnectTimeout:       in.Spec.ConnectTimeout.Duration,
+		RequestTimeout:       in.Spec.RequestTimeout.Duration,
 		LoadBalancer:         in.Spec.LoadBalancer.toConsul(),
 		PrioritizeByLocality: in.Spec.PrioritizeByLocality.toConsul(),
 		Meta:                 meta(datacenter),

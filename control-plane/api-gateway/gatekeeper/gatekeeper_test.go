@@ -40,11 +40,18 @@ var (
 			Name:     "Listener 1",
 			Port:     8080,
 			Protocol: "TCP",
+			Hostname: common.PointerTo(gwv1beta1.Hostname("example.com")),
 		},
 		{
 			Name:     "Listener 2",
 			Port:     8081,
 			Protocol: "TCP",
+		},
+		{
+			Name:     "Listener 3",
+			Port:     8080,
+			Protocol: "TCP",
+			Hostname: common.PointerTo(gwv1beta1.Hostname("example.net")),
 		},
 	}
 )

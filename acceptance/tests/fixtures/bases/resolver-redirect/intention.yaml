@@ -1,0 +1,24 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: client-to-server
+spec:
+  destination:
+    name: static-server
+  sources:
+    - name: static-client
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: client-to-redirect
+spec:
+  destination:
+    name: resolver-redirect
+  sources:
+    - name: static-client
+      action: allow

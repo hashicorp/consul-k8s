@@ -893,6 +893,9 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 				catalogRegistration := &api.CatalogRegistration{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: svc,
 				}
 				_, err := consulClient.Catalog().Register(catalogRegistration, nil)
@@ -2339,6 +2342,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2358,6 +2364,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-service-updated-sidecar-proxy",
@@ -2444,6 +2453,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2463,6 +2475,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: "127.0.0.1",
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-service-updated-sidecar-proxy",
@@ -2549,6 +2564,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2566,6 +2584,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-service-updated-sidecar-proxy",
@@ -2631,6 +2652,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -2648,6 +2672,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-different-consul-svc-name-sidecar-proxy",
@@ -2721,6 +2748,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2732,6 +2762,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-service-updated-sidecar-proxy",
@@ -2835,6 +2868,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -2846,6 +2882,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-service-updated-sidecar-proxy",
@@ -2862,6 +2901,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod2-service-updated",
 						Service: "service-updated",
@@ -2873,6 +2915,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod2-service-updated-sidecar-proxy",
@@ -2932,6 +2977,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -2943,6 +2991,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-different-consul-svc-name-sidecar-proxy",
@@ -2959,6 +3010,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod2-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -2970,6 +3024,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod2-different-consul-svc-name-sidecar-proxy",
@@ -3015,6 +3072,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -3026,6 +3086,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-service-updated-sidecar-proxy",
@@ -3042,6 +3105,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod2-service-updated",
 						Service: "service-updated",
@@ -3053,6 +3119,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod2-service-updated-sidecar-proxy",
@@ -3088,6 +3157,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -3099,6 +3171,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-different-consul-svc-name-sidecar-proxy",
@@ -3115,6 +3190,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod2-different-consul-svc-name",
 						Service: "different-consul-svc-name",
@@ -3126,6 +3204,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod2-different-consul-svc-name-sidecar-proxy",
@@ -3174,6 +3255,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -3191,6 +3275,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-service-updated-sidecar-proxy",
@@ -3270,6 +3357,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -3287,6 +3377,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-service-updated-sidecar-proxy",
@@ -3309,6 +3402,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod2-service-updated",
 						Service: "service-updated",
@@ -3326,6 +3422,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod2-service-updated-sidecar-proxy",
@@ -3409,6 +3508,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-service-updated",
 						Service: "service-updated",
@@ -3426,6 +3528,9 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						Kind:    api.ServiceKindConnectProxy,
 						ID:      "pod1-service-updated-sidecar-proxy",
@@ -4116,6 +4221,9 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				serviceRegistration := &api.CatalogRegistration{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: svc,
 				}
 				_, err := consulClient.Catalog().Register(serviceRegistration, nil)
@@ -4262,6 +4370,9 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 				serviceRegistration := &api.CatalogRegistration{
 					Node:    consulNodeName,
 					Address: consulNodeAddress,
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: &api.AgentService{
 						ID:      "pod1-" + svcName,
 						Service: svcName,
@@ -4385,6 +4496,9 @@ func TestReconcile_podSpecifiesExplicitService(t *testing.T) {
 	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
 		Node:    consulNodeName,
 		Address: consulNodeAddress,
+		NodeMeta: map[string]string{
+			metaKeySyntheticNode: "true",
+		},
 		Service: &api.AgentService{
 			ID:      "pod1-" + svcName,
 			Service: svcName,
@@ -4542,6 +4656,9 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 				catalogRegistration := &api.CatalogRegistration{
 					Node:    consulNodeName,
 					Address: "127.0.0.1",
+					NodeMeta: map[string]string{
+						metaKeySyntheticNode: "true",
+					},
 					Service: svc,
 				}
 				_, err = consulClient.Catalog().Register(catalogRegistration, nil)
