@@ -45,7 +45,6 @@ type CLICluster struct {
 	kubeConfig         string
 	kubeContext        string
 	noCleanupOnFailure bool
-	noCleanup          bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 	cli                cli.CLI
@@ -98,19 +97,17 @@ func NewCLICluster(
 	cli, err := cli.NewCLI()
 	require.NoError(t, err)
 
-	require.Greater(t, len(cfg.KubeEnvs), 0)
 	return &CLICluster{
 		ctx:                ctx,
 		helmOptions:        hopts,
 		kubectlOptions:     kopts,
-		namespace:          cfg.GetPrimaryKubeEnv().KubeNamespace,
+		namespace:          cfg.KubeNamespace,
 		values:             values,
 		releaseName:        releaseName,
 		kubernetesClient:   ctx.KubernetesClient(t),
-		kubeConfig:         cfg.GetPrimaryKubeEnv().KubeConfig,
-		kubeContext:        cfg.GetPrimaryKubeEnv().KubeContext,
+		kubeConfig:         cfg.Kubeconfig,
+		kubeContext:        cfg.KubeContext,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
-		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		cli:                *cli,
@@ -124,7 +121,7 @@ func (c *CLICluster) Create(t *testing.T) {
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
-	helpers.Cleanup(t, c.noCleanupOnFailure, c.noCleanup, func() {
+	helpers.Cleanup(t, c.noCleanupOnFailure, func() {
 		c.Destroy(t)
 	})
 

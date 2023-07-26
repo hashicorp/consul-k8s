@@ -30,8 +30,6 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 		caseName := fmt.Sprintf("secure: %t", secure)
 		t.Run(caseName, func(t *testing.T) {
 			cfg := suite.Config()
-			cfg.SkipWhenOpenshiftAndCNI(t)
-
 			ctx := suite.Environment().DefaultContext(t)
 
 			serverHelmValues := map[string]string{
@@ -75,11 +73,11 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 			} else {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 			}
 
 			// Check that both static-server and static-client have been injected and now have 2 containers.

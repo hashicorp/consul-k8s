@@ -48,7 +48,6 @@ spec:
       containers:
         - name: gossip-encryption-autogen
           image: "{{ .Values.global.imageK8S }}"
-          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           command:
             - "/bin/sh"
             - "-ec"

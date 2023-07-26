@@ -4,7 +4,6 @@
 package vault
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -15,13 +14,5 @@ var suite testsuite.Suite
 
 func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
-
-	expectedNumberOfClusters := 2
-	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) {
-		os.Exit(suite.Run())
-	} else {
-		fmt.Println(fmt.Sprintf("Skipping vault tests because either -enable-multi-cluster is "+
-			"not set or the number of clusters did not match the expected count of %d", expectedNumberOfClusters))
-		os.Exit(0)
-	}
+	os.Exit(suite.Run())
 }

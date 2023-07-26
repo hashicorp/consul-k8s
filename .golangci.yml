@@ -34,4 +34,4 @@ linters-settings:
     simplify: true
 
 run:
-  timeout: 10m
+  timeout: 5m

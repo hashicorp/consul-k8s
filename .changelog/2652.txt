@@ -1,3 +1,0 @@
-```release-note:bug
-helm: fix CONSUL_LOGIN_DATACENTER for consul client-daemonset.
-```

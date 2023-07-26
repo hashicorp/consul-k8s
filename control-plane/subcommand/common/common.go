@@ -39,8 +39,8 @@ const (
 	// The number of times to attempt ACL Login.
 	numLoginRetries = 100
 
-	raftReplicationTimeout   = 60 * time.Second
-	tokenReadPollingInterval = 500 * time.Millisecond
+	raftReplicationTimeout   = 2 * time.Second
+	tokenReadPollingInterval = 100 * time.Millisecond
 )
 
 // Logger returns an hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.

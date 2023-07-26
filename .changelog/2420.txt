@@ -1,3 +1,0 @@
-```release-note:bug
-api-gateway: set route condition appropriately when parent ref includes non-existent section name
-```

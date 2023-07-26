@@ -23,7 +23,6 @@ func TestConnectInject_PermissiveMTLS(t *testing.T) {
 	if !cfg.EnableTransparentProxy {
 		t.Skipf("skipping this because -enable-transparent-proxy is not set")
 	}
-	cfg.SkipWhenOpenshiftAndCNI(t)
 
 	ctx := suite.Environment().DefaultContext(t)
 
@@ -59,7 +58,7 @@ func deployNonMeshClient(t *testing.T, ch connhelper.ConnectHelper) {
 	t.Helper()
 
 	logger.Log(t, "Creating static-client deployment with connect-inject=false")
-	k8s.DeployKustomize(t, ch.Ctx.KubectlOptions(t), ch.Cfg.NoCleanupOnFailure, ch.Cfg.NoCleanup, ch.Cfg.DebugDirectory, "../fixtures/bases/static-client")
+	k8s.DeployKustomize(t, ch.Ctx.KubectlOptions(t), ch.Cfg.NoCleanupOnFailure, ch.Cfg.DebugDirectory, "../fixtures/bases/static-client")
 	requirePodContainers(t, ch, "app=static-client", 1)
 }
 
@@ -67,7 +66,7 @@ func deployStaticServer(t *testing.T, cfg *config.TestConfig, ch connhelper.Conn
 	t.Helper()
 
 	logger.Log(t, "Creating static-server deployment with connect-inject=true")
-	k8s.DeployKustomize(t, ch.Ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployKustomize(t, ch.Ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 	requirePodContainers(t, ch, "app=static-server", 2)
 }
 

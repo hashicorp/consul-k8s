@@ -591,22 +591,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# server.containerSecurityContext.aclInit
-
-@test "serverACLInit/Job: securityContext is set when server.containerSecurityContext.aclInit is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'server.containerSecurityContext.aclInit.runAsUser=100' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.securityContext.runAsUser' | tee /dev/stderr)
-
-  [ "${actual}" = "100" ]
-
-}
-
-#--------------------------------------------------------------------
 # Vault
 
 @test "serverACLInit/Job: fails when vault is enabled but neither bootstrap nor replication token is provided" {
@@ -2046,7 +2030,7 @@ load _helpers
       --set 'global.cloud.authUrl.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-
+  
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -2066,7 +2050,7 @@ load _helpers
       --set 'global.cloud.authUrl.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-
+  
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -2086,7 +2070,7 @@ load _helpers
       --set 'global.cloud.apiHost.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-
+  
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -2106,7 +2090,7 @@ load _helpers
       --set 'global.cloud.apiHost.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-
+  
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -2126,7 +2110,7 @@ load _helpers
       --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
       .
   [ "$status" -eq 1 ]
-
+  
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -2146,7 +2130,7 @@ load _helpers
       --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
       .
   [ "$status" -eq 1 ]
-
+  
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -2240,29 +2224,5 @@ load _helpers
       --set 'global.acls.resources.foo=bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
-  [ "${actual}" = "bar" ]
-}
-
-#--------------------------------------------------------------------
-# annotations
-
-@test "serverACLInit/Job: no annotations defined by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
-  [ "${actual}" = "{}" ]
-}
-
-@test "serverACLInit/Job: annotations can be set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-acl-init-job.yaml  \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.acls.annotations=foo: bar' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
 }

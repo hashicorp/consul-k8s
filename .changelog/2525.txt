@@ -1,3 +1,0 @@
-```release-note:improvement
-helm: adds values for `securityContext` and `annotations` on TLS and ACL init/cleanup jobs.
-```
