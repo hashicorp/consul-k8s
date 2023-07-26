@@ -212,8 +212,13 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			logger.Log(t, "creating multiport static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app-windows")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport-windows")
+			} else {
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
+			}
 
 			// Check that static-client has been injected and now has 2 containers.
 			podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
@@ -307,9 +312,9 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			// Create the files so that the readiness probes of the multi port pod fails.
 			if cfg.EnableWindows {
 				logger.Log(t, "testing k8s -> consul health checks sync by making the multiport unhealthy")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy-multiport")
 				logger.Log(t, "testing k8s -> consul health checks sync by making the multiport-admin unhealthy")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy-multiport-admin")
 			} else {
 				logger.Log(t, "testing k8s -> consul health checks sync by making the multiport unhealthy")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "--", "touch", "/tmp/unhealthy-multiport")

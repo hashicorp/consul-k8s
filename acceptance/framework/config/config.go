@@ -136,8 +136,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	// ask about client
 	if t.EnableWindows {
 		fmt.Println("hi")
-		setIfNotEmpty(helmValues, "apiGateway.controller.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
+		// setIfNotEmpty(helmValues, "apiGateway.controller.nodeSelector", "kubernetes.io/os: linux")
+		// setIfNotEmpty(helmValues, "apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "connectInject.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "connectInject.apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
 		setIfNotEmpty(helmValues, "client.nodeSelector", "kubernetes.io/os: linux")
