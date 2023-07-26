@@ -4,8 +4,10 @@ Add support to provide the logLevel flag via helm for multiple low level compone
 2. `global.tls.logLevel`
 3. `global.federation.logLevel`
 4. `global.gossipEncryption.logLevel`
-5. `meshGateway.logLevel`
-6. `ingressGateways.logLevel`
-7. `terminatingGateways.logLevel`
-8. `telemetryCollector.logLevel`
+5. `server.logLevel`
+6. `client.logLevel`
+7. `meshGateway.logLevel`
+8. `ingressGateways.logLevel`
+9. `terminatingGateways.logLevel`
+10. `telemetryCollector.logLevel`
 ```
