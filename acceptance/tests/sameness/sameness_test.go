@@ -273,7 +273,7 @@ func TestFailover_Connect(t *testing.T) {
 
 				// Sameness Defaults need to be applied first so that the sameness group exists.
 				applyResources(t, cfg, "../fixtures/bases/mesh-gateway", members[k].context.KubectlOptions(t))
-				applyResources(t, cfg, "../fixtures/bases/sameness/defaults-ns", members[k].context.KubectlOptions(t))
+				applyResources(t, cfg, "../fixtures/bases/sameness/default-ns", members[k].context.KubectlOptions(t))
 				applyResources(t, cfg, "../fixtures/bases/sameness/override-ns", members[k].serverOpts)
 
 				// Only assign a client if the cluster is running a Consul server.
