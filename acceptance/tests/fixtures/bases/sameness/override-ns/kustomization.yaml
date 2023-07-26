@@ -3,5 +3,5 @@
 
 resources:
   - intentions.yaml
-  - payments-service-resolver.yaml
+  - payment-service-resolver.yaml
   - service-defaults.yaml
