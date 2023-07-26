@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -123,7 +124,7 @@ func TestFailover_Connect(t *testing.T) {
 
 			// Setup Namespaces.
 			for _, v := range members {
-				createNamespaces(t, cfg.NoCleanupOnFailure, v.context)
+				createNamespaces(t, cfg, v.context)
 			}
 
 			// Create the Default Cluster.
@@ -189,7 +190,8 @@ func TestFailover_Connect(t *testing.T) {
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, members[keyPartition].context)
 
 			secondaryPartitionHelmValues := map[string]string{
-				"global.enabled": "false",
+				"global.enabled":    "false",
+				"global.datacenter": primaryServerDatacenter,
 
 				"global.adminPartitions.name": primaryDatacenterPartition,
 
@@ -198,7 +200,7 @@ func TestFailover_Connect(t *testing.T) {
 
 				"externalServers.enabled":       "true",
 				"externalServers.hosts[0]":      partitionSvcAddress,
-				"externalServers.tlsServerName": "server.dc1.consul",
+				"externalServers.tlsServerName": fmt.Sprintf("server.%s.consul", primaryServerDatacenter),
 				"global.server.enabled":         "false",
 			}
 
@@ -270,9 +272,9 @@ func TestFailover_Connect(t *testing.T) {
 				}
 
 				// Sameness Defaults need to be applied first so that the sameness group exists.
-				applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/bases/mesh-gateway", members[k].context.KubectlOptions(t))
-				applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/bases/sameness/defaults-ns", members[k].context.KubectlOptions(t))
-				applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/bases/sameness/override-ns", members[k].serverOpts)
+				applyResources(t, cfg, "../fixtures/bases/mesh-gateway", members[k].context.KubectlOptions(t))
+				applyResources(t, cfg, "../fixtures/bases/sameness/defaults-ns", members[k].context.KubectlOptions(t))
+				applyResources(t, cfg, "../fixtures/bases/sameness/override-ns", members[k].serverOpts)
 
 				// Only assign a client if the cluster is running a Consul server.
 				if v.hasServer {
@@ -283,15 +285,15 @@ func TestFailover_Connect(t *testing.T) {
 			// TODO: Add further setup for peering, right now the rest of this test will only cover Partitions
 			// Create static server deployments.
 			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, members[keyPrimaryServer].serverOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory,
+			k8s.DeployKustomize(t, members[keyPrimaryServer].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
 				"../fixtures/cases/sameness/static-server/default")
-			k8s.DeployKustomize(t, members[keyPartition].serverOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory,
+			k8s.DeployKustomize(t, members[keyPartition].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
 				"../fixtures/cases/sameness/static-server/partition")
 
 			// Create static client deployments.
-			k8s.DeployKustomize(t, members[keyPrimaryServer].clientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory,
+			k8s.DeployKustomize(t, members[keyPrimaryServer].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
 				"../fixtures/cases/sameness/static-client/default")
-			k8s.DeployKustomize(t, members[keyPartition].clientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory,
+			k8s.DeployKustomize(t, members[keyPartition].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
 				"../fixtures/cases/sameness/static-client/partition")
 
 			// Verify that both static-server and static-client have been injected and now have 2 containers in server cluster.
@@ -323,8 +325,8 @@ func TestFailover_Connect(t *testing.T) {
 			}
 
 			logger.Log(t, "creating exported services")
-			applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/cases/sameness/exported-services/default-partition", members[keyPrimaryServer].context.KubectlOptions(t))
-			applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/cases/sameness/exported-services/ap1-partition", members[keyPartition].context.KubectlOptions(t))
+			applyResources(t, cfg, "../fixtures/cases/sameness/exported-services/default-partition", members[keyPrimaryServer].context.KubectlOptions(t))
+			applyResources(t, cfg, "../fixtures/cases/sameness/exported-services/ap1-partition", members[keyPartition].context.KubectlOptions(t))
 
 			// Setup DNS.
 			dnsService, err := members[keyPrimaryServer].context.KubernetesClient(t).CoreV1().Services("default").Get(context.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
@@ -388,18 +390,18 @@ type member struct {
 	staticServerIP *string
 }
 
-func createNamespaces(t *testing.T, isCleanupOnFailure bool, context environment.TestContext) {
+func createNamespaces(t *testing.T, cfg *config.TestConfig, context environment.TestContext) {
 	logger.Logf(t, "creating namespaces in %s", context.KubectlOptions(t).ContextName)
 	k8s.RunKubectl(t, context.KubectlOptions(t), "create", "ns", staticServerNamespace)
 	k8s.RunKubectl(t, context.KubectlOptions(t), "create", "ns", staticClientNamespace)
-	helpers.Cleanup(t, isCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, context.KubectlOptions(t), "delete", "ns", staticClientNamespace, staticServerNamespace)
 	})
 }
 
-func applyResources(t *testing.T, isCleanupOnFailure bool, kustomizeDir string, opts *terratestk8s.KubectlOptions) {
+func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, opts *terratestk8s.KubectlOptions) {
 	k8s.KubectlApplyK(t, opts, kustomizeDir)
-	helpers.Cleanup(t, isCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, opts, kustomizeDir)
 	})
 }
