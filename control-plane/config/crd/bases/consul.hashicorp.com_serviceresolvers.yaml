@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.0
   name: serviceresolvers.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
@@ -235,6 +234,10 @@ spec:
                       If empty the default subset is used.
                     type: string
                 type: object
+              requestTimeout:
+                description: RequestTimeout is the timeout for receiving an HTTP response
+                  from this service before the connection is terminated.
+                type: string
               subsets:
                 additionalProperties:
                   properties:
@@ -302,9 +305,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

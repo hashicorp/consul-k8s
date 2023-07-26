@@ -1,8 +1,10 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package v1alpha1
 
 import (
 	"encoding/json"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -70,6 +72,9 @@ type ServiceResolverSpec struct {
 	// ConnectTimeout is the timeout for establishing new network connections
 	// to this service.
 	ConnectTimeout metav1.Duration `json:"connectTimeout,omitempty"`
+	// RequestTimeout is the timeout for receiving an HTTP response from this
+	// service before the connection is terminated.
+	RequestTimeout metav1.Duration `json:"requestTimeout,omitempty"`
 	// LoadBalancer determines the load balancing policy and configuration for services
 	// issuing requests to this upstream service.
 	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
@@ -295,6 +300,7 @@ func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 		Redirect:       in.Spec.Redirect.toConsul(),
 		Failover:       in.Spec.Failover.toConsul(),
 		ConnectTimeout: in.Spec.ConnectTimeout.Duration,
+		RequestTimeout: in.Spec.RequestTimeout.Duration,
 		LoadBalancer:   in.Spec.LoadBalancer.toConsul(),
 		Meta:           meta(datacenter),
 	}
@@ -324,7 +330,6 @@ func (in *ServiceResolver) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	errs = append(errs, in.Spec.LoadBalancer.validate(path.Child("loadBalancer"))...)
-
 	errs = append(errs, in.validateEnterprise(consulMeta)...)
 
 	if len(errs) > 0 {
