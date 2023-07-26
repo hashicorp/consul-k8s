@@ -271,8 +271,8 @@ func TestFailover_Connect(t *testing.T) {
 
 				// Sameness Defaults need to be applied first so that the sameness group exists.
 				applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/bases/mesh-gateway", members[k].context.KubectlOptions(t))
-				applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/bases/sameness-defaults", members[k].context.KubectlOptions(t))
-				applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/bases/sameness", members[k].serverOpts)
+				applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/bases/sameness/defaults-ns", members[k].context.KubectlOptions(t))
+				applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/bases/sameness/override-ns", members[k].serverOpts)
 
 				// Only assign a client if the cluster is running a Consul server.
 				if v.hasServer {
@@ -284,15 +284,15 @@ func TestFailover_Connect(t *testing.T) {
 			// Create static server deployments.
 			logger.Log(t, "creating static-server and static-client deployments")
 			k8s.DeployKustomize(t, members[keyPrimaryServer].serverOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory,
-				"../fixtures/cases/static-server-sameness/default")
+				"../fixtures/cases/sameness/static-server/default")
 			k8s.DeployKustomize(t, members[keyPartition].serverOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory,
-				"../fixtures/cases/static-server-sameness/partition")
+				"../fixtures/cases/sameness/static-server/partition")
 
 			// Create static client deployments.
 			k8s.DeployKustomize(t, members[keyPrimaryServer].clientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory,
-				"../fixtures/cases/static-client-sameness/default")
+				"../fixtures/cases/sameness/static-client/default")
 			k8s.DeployKustomize(t, members[keyPartition].clientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory,
-				"../fixtures/cases/static-client-sameness/partition")
+				"../fixtures/cases/sameness/static-client/partition")
 
 			// Verify that both static-server and static-client have been injected and now have 2 containers in server cluster.
 			// Also get the server IP
@@ -323,8 +323,8 @@ func TestFailover_Connect(t *testing.T) {
 			}
 
 			logger.Log(t, "creating exported services")
-			applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/cases/sameness-exported-services/default-partition", members[keyPrimaryServer].context.KubectlOptions(t))
-			applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/cases/sameness-exported-services/ap1-partition", members[keyPartition].context.KubectlOptions(t))
+			applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/cases/sameness/exported-services/default-partition", members[keyPrimaryServer].context.KubectlOptions(t))
+			applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/cases/sameness/exported-services/ap1-partition", members[keyPartition].context.KubectlOptions(t))
 
 			// Setup DNS.
 			dnsService, err := members[keyPrimaryServer].context.KubernetesClient(t).CoreV1().Services("default").Get(context.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 resources:
-  - ../../../bases/static-client
+  - ../../../../bases/exportedservices-ap1
 
 patchesStrategicMerge:
-  - patch.yaml
+- patch.yaml
