@@ -239,7 +239,7 @@ func (c *ConnectHelper) DeployJob(t *testing.T, path string) {
 	}
 
 	logger.Log(t, "creating job-client deployment")
-	k8s.DeployJob(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, path)
+	k8s.DeployJob(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, path)
 
 	// Check that job-client has been injected and
 	// now have 2 containers.
@@ -277,7 +277,7 @@ func (c *ConnectHelper) DeployServer(t *testing.T) {
 	}
 
 	logger.Log(t, "creating static-server deployment")
-	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 	// Check that  static-server has been injected and
 	// now have 2 containers.
@@ -295,7 +295,7 @@ func (c *ConnectHelper) DeployServer(t *testing.T) {
 // server fails when no intentions are configured.
 func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clientType ...string) {
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
-  opts := c.KubectlOptsForApp(t)
+	opts := c.KubectlOptsForApp(t)
 	client := StaticClientName
 	if len(clientType) > 0 {
 		client = clientType[0]
@@ -333,7 +333,7 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, clientType ...string) {
 // client pod once the intention is set.
 func (c *ConnectHelper) TestConnectionSuccess(t *testing.T, clientType ...string) {
 	logger.Log(t, "checking that connection is successful")
-  opts := c.KubectlOptsForApp(t)
+	opts := c.KubectlOptsForApp(t)
 	client := StaticClientName
 	if len(clientType) > 0 {
 		client = clientType[0]
