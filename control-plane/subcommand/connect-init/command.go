@@ -218,7 +218,7 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
-
+	time.Sleep(5 * time.Minute)
 	c.logger.Info("Connect initialization completed")
 	return 0
 }
