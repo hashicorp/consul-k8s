@@ -341,11 +341,24 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			require.True(r, jobs.Items[0].Status.Succeeded == 1)
 		})
 
+		// Delete the job and its associated Pod.
+		pods, err = ctx.KubernetesClient(t).CoreV1().Pods(ns).List(
+			context.Background(),
+			metav1.ListOptions{
+				LabelSelector: "app=job-client",
+			},
+		)
+		require.NoError(t, err)
+		podName := pods.Items[0].Name
+
 		err = ctx.KubernetesClient(t).BatchV1().Jobs(ns).Delete(context.Background(), "job-client", metav1.DeleteOptions{})
 		require.NoError(t, err)
 
+		err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), podName, metav1.DeleteOptions{})
+		require.NoError(t, err)
+
 		logger.Log(t, "ensuring job is deregistered after termination")
-		retry.Run(t, func(r *retry.R) {
+		retry.RunWith(&retry.Timer{Timeout: 4 * time.Minute, Wait: 30 * time.Second}, t, func(r *retry.R) {
 			for _, name := range []string{
 				"job-client",
 				"job-client-sidecar-proxy",

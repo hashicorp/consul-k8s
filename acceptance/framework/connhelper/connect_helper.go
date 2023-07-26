@@ -135,6 +135,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 // are deleted. The status of the deployment and injection is checked after the
 // deployment is complete to ensure success.
 func (c *ConnectHelper) DeployJob(t *testing.T, path string) {
+	// Check that the ACL token is deleted.
 	if c.Secure {
 		// We need to register the cleanup function before we create the
 		// deployments because golang will execute them in reverse order
@@ -171,7 +172,7 @@ func (c *ConnectHelper) DeployJob(t *testing.T, path string) {
 // are deleted. The status of the deployment and injection is checked after the
 // deployment is complete to ensure success.
 func (c *ConnectHelper) DeployServer(t *testing.T) {
-
+	// Check that the ACL token is deleted.
 	if c.Secure {
 		// We need to register the cleanup function before we create the
 		// deployments because golang will execute them in reverse order
