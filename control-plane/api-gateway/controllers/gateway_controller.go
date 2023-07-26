@@ -72,7 +72,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var gateway gwv1beta1.Gateway
 
-	log := r.Log.WithValues("gateway", req.NamespacedName)
+	log := r.Log.V(1).WithValues("gateway", req.NamespacedName)
 	log.Info("Reconciling Gateway")
 
 	// get the gateway
@@ -199,6 +199,11 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
+			if k8serrors.IsConflict(err) {
+				log.Info("error updating object when updating gateway resources, will try to re-reconcile")
+
+				return ctrl.Result{Requeue: true}, nil
+			}
 			log.Error(err, "unable to update gateway resources")
 			return ctrl.Result{}, err
 		}
@@ -206,11 +211,16 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	} else {
 		err := r.deleteGatekeeperResources(ctx, log, &gateway)
 		if err != nil {
+			if k8serrors.IsConflict(err) {
+				log.Info("error updating object when deleting gateway resources, will try to re-reconcile")
+
+				return ctrl.Result{Requeue: true}, nil
+			}
 			log.Error(err, "unable to delete gateway resources")
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.RemoveSubscription(nonNormalizedConsulKey)
-		// make sure we have deregister all services even if they haven't
+		// make sure we have deregistered all services even if they haven't
 		// hit cache yet
 		if err := r.deregisterAllServices(ctx, nonNormalizedConsulKey); err != nil {
 			log.Error(err, "error deregistering services")
@@ -266,6 +276,11 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	for _, update := range updates.Kubernetes.Updates.Operations() {
 		log.Info("update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.updateAndResetStatus(ctx, update); err != nil {
+			if k8serrors.IsConflict(err) {
+				log.Info("error updating object for gateway, will try to re-reconcile")
+
+				return ctrl.Result{Requeue: true}, nil
+			}
 			log.Error(err, "error updating object")
 			return ctrl.Result{}, err
 		}
@@ -274,6 +289,11 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	for _, update := range updates.Kubernetes.StatusUpdates.Operations() {
 		log.Info("update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.Client.Status().Update(ctx, update); err != nil {
+			if k8serrors.IsConflict(err) {
+				log.Info("error updating status for gateway, will try to re-reconcile")
+
+				return ctrl.Result{Requeue: true}, nil
+			}
 			log.Error(err, "error updating status")
 			return ctrl.Result{}, err
 		}
@@ -305,6 +325,7 @@ func (r *GatewayController) updateAndResetStatus(ctx context.Context, o client.O
 	if err := r.Client.Update(ctx, o); err != nil {
 		return err
 	}
+
 	// reset the status in case it needs to be updated below
 	reflect.ValueOf(o).Elem().FieldByName("Status").Set(status)
 	return nil

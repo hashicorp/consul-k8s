@@ -86,7 +86,7 @@ func TestController(t *testing.T) {
 					// endpoint fails initially.
 					out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/crds-oss")
 					require.NoError(r, err, out)
-					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+					helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 						// Ignore errors here because if the test ran as expected
 						// the custom resources will have been deleted.
 						k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/crds-oss")

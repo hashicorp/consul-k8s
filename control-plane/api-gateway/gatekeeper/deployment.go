@@ -49,7 +49,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	}
 
 	if exists {
-		g.Log.Info("Existing Gateway Deployment found.")
+		g.Log.V(1).Info("Existing Gateway Deployment found.")
 
 		// If the user has set the number of replicas, let's respect that.
 		deployment.Spec.Replicas = existingDeployment.Spec.Replicas
@@ -65,11 +65,11 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 
 	switch result {
 	case controllerutil.OperationResultCreated:
-		g.Log.Info("Created Deployment")
+		g.Log.V(1).Info("Created Deployment")
 	case controllerutil.OperationResultUpdated:
-		g.Log.Info("Updated Deployment")
+		g.Log.V(1).Info("Updated Deployment")
 	case controllerutil.OperationResultNone:
-		g.Log.Info("No change to deployment")
+		g.Log.V(1).Info("No change to deployment")
 	}
 
 	return nil

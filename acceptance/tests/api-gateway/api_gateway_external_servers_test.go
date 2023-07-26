@@ -60,8 +60,8 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	consulCluster.Create(t)
 
 	logger.Log(t, "creating static-server and static-client deployments")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 	// Override the default proxy config settings for this test
 	consulClient, _ := consulCluster.SetupConsulClient(t, true, serverReleaseName)
@@ -79,7 +79,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	logger.Log(t, "creating api-gateway resources")
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
 	require.NoError(t, err, out)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
