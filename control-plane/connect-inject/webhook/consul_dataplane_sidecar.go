@@ -198,7 +198,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 
 	if mpi.serviceName != "" {
 		if isWindows(pod) {
-			proxyIDFileName = fmt.Sprintf("C:\\consul\\connect-inject\\proxyid-%s", mpi.serviceName)
+			proxyIDFileName = fmt.Sprintf("C:\\\\consul\\\\connect-inject\\\\proxyid-%s", mpi.serviceName)
 		} else {
 			proxyIDFileName = fmt.Sprintf("/consul/connect-inject/proxyid-%s", mpi.serviceName)
 		}

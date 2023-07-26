@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: multiport
-          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          image: absolutelightning/http-echo:latest
           args:
             - -text="hello world"
             - -listen=:8080
@@ -47,12 +47,12 @@ spec:
             periodSeconds: 1
           readinessProbe:
             exec:
-              command: ['sh', '-c', 'test ! -f /tmp/unhealthy-multiport']
+              command: ['cmd', '/c', 'type C:\tmp\unhealthy-multiport && exit 1 || exit 0']
             initialDelaySeconds: 1
             failureThreshold: 1
             periodSeconds: 1
         - name: multiport-admin
-          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          image: absolutelightning/http-echo:latest
           args:
             - -text="hello world from 9090 admin"
             - -listen=:9090
@@ -73,11 +73,11 @@ spec:
             periodSeconds: 1
           readinessProbe:
             exec:
-              command: ['sh', '-c', 'test ! -f /tmp/unhealthy-multiport-admin']
+              command: ['cmd', '/c', 'type C:\tmp\unhealthy-multiport-admin && exit 1 || exit 0']
             initialDelaySeconds: 1
             failureThreshold: 1
             periodSeconds: 1
       nodeSelector: 
-        kubernetes.io/os: linux
+        kubernetes.io/os: windows
       serviceAccountName: multiport
       terminationGracePeriodSeconds: 0 # so deletion is quick
