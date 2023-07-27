@@ -291,7 +291,7 @@ jobs:
           export GOLDFLAGS="-X ${GIT_IMPORT}.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X ${GIT_IMPORT}.GitDescribe=${{ needs.get-product-version.outputs.product-version }}"
 
           ${{ matrix.env }} go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" -tags=${{ matrix.gotags }} .
-          zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
+          7z a out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
 
       - name: Upload built binaries
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
