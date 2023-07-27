@@ -108,6 +108,7 @@ func TestPartitions_Connect(t *testing.T) {
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
+			// Setup the default partition
 			defaultPartitionHelmValues := make(map[string]string)
 
 			// On Kind, there are no load balancers but since all clusters
@@ -129,6 +130,7 @@ func TestPartitions_Connect(t *testing.T) {
 			serverConsulCluster := consul.NewHelmCluster(t, defaultPartitionHelmValues, defaultPartitionClusterContext, cfg, releaseName)
 			serverConsulCluster.Create(t)
 
+			// Copy secrets from the default partition to the secondary partition
 			// Get the TLS CA certificate and key secret from the server cluster and apply it to the client cluster.
 			caCertSecretName := fmt.Sprintf("%s-consul-ca-cert", releaseName)
 
@@ -146,7 +148,7 @@ func TestPartitions_Connect(t *testing.T) {
 
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryPartitionClusterContext)
 
-			// Create client cluster.
+			// Create secondary partition cluster.
 			secondaryPartitionHelmValues := map[string]string{
 				"global.enabled": "false",
 
