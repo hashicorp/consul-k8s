@@ -87,7 +87,7 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 			// TODO(nathancoleman) Consider accepting an explicit SCC name. This will make the code
 			//   here less brittle and allow for the user to provide their own SCC if they wish.
 			//ResourceNames: []string{config.ReleaseName + "-api-gateway"},
-			ResourceNames: []string{"privileged"},
+			ResourceNames: []string{config.OpenshiftSCCName},
 			Verbs:         []string{"use"},
 		})
 	}
