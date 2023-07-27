@@ -20,12 +20,12 @@ import (
 )
 
 const (
-	secondaryPartition    = "ap1"
-	primaryServer         = "dc1"
-	peer1                 = "dc2"
-	peer2                 = "dc2"
-	staticClientNamespace = "ns1"
-	staticServerNamespace = "ns2"
+	primaryDatacenterPartition = "ap1"
+	primaryServerDatacenter    = "dc1"
+	peer1Datacenter            = "dc2"
+	peer2Datacenter            = "dc2"
+	staticClientNamespace      = "ns1"
+	staticServerNamespace      = "ns2"
 
 	keyPrimaryServer = "server"
 	keyPartition     = "partition"
@@ -34,9 +34,6 @@ const (
 
 	staticServerDeployment = "deploy/static-server"
 	staticClientDeployment = "deploy/static-client"
-
-	dnsLookup   = "static-server.service.ns2.ns.mine.sg.consul"
-	dnsPQLookup = "my-query.query.consul"
 
 	primaryServerClusterName = "cluster-01-a"
 	partitionClusterName     = "cluster-01-b"
@@ -66,6 +63,57 @@ func TestFailover_Connect(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			/*
+				Architecture:
+					Primary Datacenter (DC1)
+						Partitions:
+							Default Partition
+							AP1 Partition
+						Peer -> DC2
+						Peer -> DC3
+					Datacenter 2 (DC2)
+						Peer -> DC1
+					Datacenter 3 (DC3)
+						Peer -> DC1
+
+				+-------------------------------------------+
+				|                                           |
+				|        DC1                                |
+				|                                           |
+				|    +-----------------------------+        |                 +-----------------------------------+
+				|    |                             |        |                 |        DC2                        |
+				|    |  +------------------+       |        |    Failover 2   |       +------------------+        |
+				|    |  |                  +-------+--------+-----------------+------>|                  |        |
+				|    |  |  Static-Server   |       |        |                 |       |  Static-Server   |        |
+				|    |  |                  +-------+---+    |                 |       |                  |        |
+				|    |  |                  |       |   |    |                 |       |                  |        |
+				|    |  |                  |       |   |    |                 |       |                  |        |
+				|    |  |                  +-------+---+----+-------------+   |       |                  |        |
+				|    |  +------------------+       |   |    |             |   |       +------------------+        |
+				|    |  Admin Partitions: Default  |   |    |             |   |                                   |
+				|    |  Name: cluster-01-a         |   |    |             |   |     Admin Partitions: Default     |
+				|    |                             |   |    |             |   |     Name: cluster-03-a            |
+				|    +-----------------------------+   |    |             |   |                                   |
+				|                                      |    |             |   +-----------------------------------+
+				|                            Failover 1|    |  Failover 3 |
+				|   +-------------------------------+  |    |             |   +-----------------------------------+
+				|   |                               |  |    |             |   |        DC3                        |
+				|   |    +------------------+       |  |    |             |   |       +------------------+        |
+				|   |    |                  |       |  |    |             |   |       |  Static-Server   |        |
+				|   |    |  Static-Server   |       |  |    |             |   |       |                  |        |
+				|   |    |                  |       |  |    |             |   |       |                  |        |
+				|   |    |                  |       |  |    |             +---+------>|                  |        |
+				|   |    |                  |<------+--+    |                 |       |                  |        |
+				|   |    |                  |       |       |                 |       +------------------+        |
+				|   |    +------------------+       |       |                 |                                   |
+				|   |    Admin Partitions: ap1      |       |                 |     Admin Partitions: Default     |
+				|   |    Name: cluster-01-b         |       |                 |     Name: cluster-02-a            |
+				|   |                               |       |                 |                                   |
+				|   +-------------------------------+       |                 |                                   |
+				|                                           |                 +-----------------------------------+
+				+-------------------------------------------+
+			*/
+
 			members := map[string]*member{
 				keyPrimaryServer: {context: env.DefaultContext(t), hasServer: true},
 				keyPartition:     {context: env.Context(t, 1), hasServer: false},
@@ -103,7 +151,7 @@ func TestFailover_Connect(t *testing.T) {
 			}
 
 			defaultPartitionHelmValues := map[string]string{
-				"global.datacenter": primaryServer,
+				"global.datacenter": primaryServerDatacenter,
 			}
 
 			// On Kind, there are no load balancers but since all clusters
@@ -128,7 +176,7 @@ func TestFailover_Connect(t *testing.T) {
 			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
 			k8s.CopySecret(t, members[keyPrimaryServer].context, members[keyPartition].context, caCertSecretName)
 
-			// Create Partition Cluster.
+			// Create Secondary Partition Cluster which will apply the primary datacenter.
 			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
 			if c.ACLsEnabled {
 				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
@@ -143,7 +191,7 @@ func TestFailover_Connect(t *testing.T) {
 			secondaryPartitionHelmValues := map[string]string{
 				"global.enabled": "false",
 
-				"global.adminPartitions.name": secondaryPartition,
+				"global.adminPartitions.name": primaryDatacenterPartition,
 
 				"global.tls.caCert.secretName": caCertSecretName,
 				"global.tls.caCert.secretKey":  "tls.crt",
@@ -174,7 +222,7 @@ func TestFailover_Connect(t *testing.T) {
 
 			// Create Peer 1 Cluster.
 			PeerOneHelmValues := map[string]string{
-				"global.datacenter": peer1,
+				"global.datacenter": peer1Datacenter,
 			}
 
 			if cfg.UseKind {
@@ -189,7 +237,7 @@ func TestFailover_Connect(t *testing.T) {
 
 			// Create Peer 2 Cluster.
 			PeerTwoHelmValues := map[string]string{
-				"global.datacenter": peer2,
+				"global.datacenter": peer2Datacenter,
 			}
 
 			if cfg.UseKind {
@@ -275,12 +323,8 @@ func TestFailover_Connect(t *testing.T) {
 			}
 
 			logger.Log(t, "creating exported services")
-			k8s.KubectlApplyK(t, members[keyPrimaryServer].context.KubectlOptions(t), "../fixtures/cases/sameness-exported-services/default-partition")
-			k8s.KubectlApplyK(t, members[keyPartition].context.KubectlOptions(t), "../fixtures/cases/sameness-exported-services/ap1-partition")
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-				k8s.KubectlDeleteK(t, members[keyPrimaryServer].context.KubectlOptions(t), "../fixtures/cases/sameness-exported-services/default-partition")
-				k8s.KubectlDeleteK(t, members[keyPartition].context.KubectlOptions(t), "../fixtures/cases/sameness-exported-services/ap1-partition")
-			})
+			applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/cases/sameness-exported-services/default-partition", members[keyPrimaryServer].context.KubectlOptions(t))
+			applyResources(t, cfg.NoCleanupOnFailure, "../fixtures/cases/sameness-exported-services/ap1-partition", members[keyPartition].context.KubectlOptions(t))
 
 			// Setup DNS.
 			dnsService, err := members[keyPrimaryServer].context.KubernetesClient(t).CoreV1().Services("default").Get(context.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
@@ -304,6 +348,9 @@ func TestFailover_Connect(t *testing.T) {
 
 			logger.Log(t, "all infrastructure up and running")
 			logger.Log(t, "verifying failover scenarios")
+
+			const dnsLookup = "static-server.service.ns2.ns.mine.sg.consul"
+			const dnsPQLookup = "my-query.query.consul"
 
 			// Verify initial server.
 			serviceFailoverCheck(t, primaryServerClusterName, members[keyPrimaryServer])
@@ -357,6 +404,9 @@ func applyResources(t *testing.T, isCleanupOnFailure bool, kustomizeDir string, 
 	})
 }
 
+// serviceFailoverCheck verifies that the server failed over as expected by checking that curling the `static-server`
+// using the `static-client` responds with the expected cluster name. Each static-server responds with a uniquue
+// name so that we can verify failover occured as expected.
 func serviceFailoverCheck(t *testing.T, expectedClusterName string, server *member) {
 	retry.Run(t, func(r *retry.R) {
 		resp, err := k8s.RunKubectlAndGetOutputE(t, server.clientOpts, "exec", "-i",
