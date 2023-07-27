@@ -39,4 +39,5 @@ seLinuxContext:
 supplementalGroups:
   type: MustRunAs
 users: []
+volumes: []
 {{- end }}
