@@ -340,7 +340,7 @@ jobs:
           arch: ${{ matrix.goarch }}
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane
-          dockerfile: Dockerfile-dev.windows
+          dockerfile: ../Dockerfile-dev.windows
           workdir: control-plane
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-windows
