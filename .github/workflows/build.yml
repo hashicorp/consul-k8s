@@ -340,12 +340,13 @@ jobs:
           arch: ${{ matrix.goarch }}
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane
+          dockerfile: Dockerfile-dev.windows
           workdir: control-plane
           tags: |
-            docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
+            docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-windows
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
+            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-windows
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-windows-${{ github.sha }}
 
   build-docker:
     name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build
