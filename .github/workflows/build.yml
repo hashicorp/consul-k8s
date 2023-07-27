@@ -275,20 +275,6 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
-      - name: Replace Go for Windows FIPS with Microsoft Go
-        shell: bash
-        run: |
-          # Uninstall standard Go and use microsoft/go instead
-          rm -rf /home/runner/actions-runner/_work/_tool/go
-          curl https://aka.ms/golang/release/latest/go${{ matrix.go }}-1.linux-amd64.tar.gz -Lo go${{ matrix.go }}.linux-amd64.tar.gz
-          tar -C $HOME -xf go${{ matrix.go }}.linux-amd64.tar.gz
-          chmod +x $HOME/go/bin
-          export PATH=$HOME/go/bin:$PATH
-          if [ $(which go) != "$HOME/go/bin/go" ]; then
-            echo "Unable to verify microsoft/go toolchain"
-            exit 1
-          fi
-
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
