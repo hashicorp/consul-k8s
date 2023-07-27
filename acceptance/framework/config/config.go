@@ -96,7 +96,6 @@ type TestConfig struct {
 	VaultServerVersion    string
 
 	NoCleanupOnFailure bool
-	NoCleanup          bool
 	DebugDirectory     string
 
 	UseAKS  bool

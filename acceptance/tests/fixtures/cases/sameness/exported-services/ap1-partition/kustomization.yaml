@@ -1,8 +1,0 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
-resources:
-  - ../../../../bases/sameness/exportedservices-ap1
-
-patchesStrategicMerge:
-- patch.yaml

@@ -130,26 +130,22 @@ kind-cni-calico:
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
 	@sleep 20
 
-kind-delete:
+# Helper target for doing local cni acceptance testing
+kind-cni:
 	kind delete cluster --name dc1
 	kind delete cluster --name dc2
-	kind delete cluster --name dc3
-	kind delete cluster --name dc4
-
-
-# Helper target for doing local cni acceptance testing
-kind-cni: kind-delete
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 
 # Helper target for doing local acceptance testing
-kind: kind-delete
+kind:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
 	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
+
 
 # Helper target for loading local dev images (run with `DEV_IMAGE=...` to load non-k8s images)
 kind-load:
@@ -179,7 +175,7 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen

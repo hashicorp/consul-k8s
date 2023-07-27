@@ -43,7 +43,7 @@ const (
 {
 	"cluster": 
 	{
-		"id": "Dc1",
+		"id": "dc1",
 		"bootstrap_expect" : 3
 	},
 	"bootstrap": 
@@ -63,7 +63,7 @@ const (
 
 var validBootstrapReponse *models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse = &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
 	Bootstrap: &models.HashicorpCloudGlobalNetworkManager20220215ClusterBootstrap{
-		ID:              "Dc1",
+		ID:              "dc1",
 		GossipKey:       "Wa6/XFAnYy0f9iqVH2iiG+yore3CqHSemUy4AIVTa/w=",
 		BootstrapExpect: 3,
 		ServerTLS: &models.HashicorpCloudGlobalNetworkManager20220215ServerTLS{
@@ -558,30 +558,12 @@ telemetryCollector:
 
 	cloudPreset := &CloudPreset{}
 
-	testCases := map[string]struct {
+	testCases := []struct {
+		description  string
 		config       *CloudBootstrapConfig
 		expectedYaml string
 	}{
-		"Config_including_optional_parameters_with_mixedcase_DC": {
-			&CloudBootstrapConfig{
-				BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
-					Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
-						BootstrapExpect: 3,
-						ID:              "Dc1",
-					},
-				},
-				HCPConfig: HCPConfig{
-					ResourceID:   "consul-hcp-resource-id",
-					ClientID:     "consul-hcp-client-id",
-					ClientSecret: "consul-hcp-client-secret",
-					AuthURL:      "consul-hcp-auth-url",
-					APIHostname:  "consul-hcp-api-host",
-					ScadaAddress: "consul-hcp-scada-address",
-				},
-			},
-			expectedFull,
-		},
-		"Config_including_optional_parameters": {
+		{"Config including optional parameters",
 			&CloudBootstrapConfig{
 				BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
 					Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
@@ -600,7 +582,7 @@ telemetryCollector:
 			},
 			expectedFull,
 		},
-		"Config_without_optional_parameters": {
+		{"Config without optional parameters",
 			&CloudBootstrapConfig{
 				BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
 					Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
@@ -617,8 +599,8 @@ telemetryCollector:
 			expectedWithoutOptional,
 		},
 	}
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
 			cloudHelmValues := cloudPreset.getHelmConfigWithMapSecretNames(tc.config)
 			require.NotNil(t, cloudHelmValues)
 			valuesYaml, err := yaml.Marshal(cloudHelmValues)
