@@ -300,6 +300,12 @@ jobs:
           path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
 
   build-docker-windows:
+    strategy:
+      matrix:
+        include:
+          - { goos: "windows", goarch: "386" }
+          - { goos: "windows", goarch: "arm64" }
+          - { goos: "windows", goarch: "arm64", fips: ".fips1402" }
     name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build
     needs: [get-product-version, build-windows]
     runs-on: windows-2019
