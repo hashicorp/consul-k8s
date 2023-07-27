@@ -1,6 +1,7 @@
+{{- if and .Values.connectInject.enabled .Values.connectInject.apiGateway.manageExternalCRDs }}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
-{{- if and .Values.connectInject.enabled .Values.connectInject.apiGateway.manageExternalCRDs }}
+
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
