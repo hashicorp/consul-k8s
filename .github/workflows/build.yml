@@ -304,8 +304,8 @@ jobs:
       matrix:
         include:
           - { goos: "windows", goarch: "386" }
-          - { goos: "windows", goarch: "arm64" }
-          - { goos: "windows", goarch: "arm64", fips: ".fips1402" }
+          - { goos: "windows", goarch: "amd64" }
+          - { goos: "windows", goarch: "amd64", fips: ".fips1402" }
     name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build
     needs: [get-product-version, build-windows]
     runs-on: windows-2019
