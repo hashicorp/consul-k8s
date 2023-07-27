@@ -320,7 +320,7 @@ jobs:
           path: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
       - name: extract consul-cni zip
         env:
-          ZIP_LOCATION: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
+          ZIP_LOCATION:  D:\a\consul-k8s\consul-k8s\control-plane\dist\cni\${{ matrix.goos}}\${{ matrix.goarch }}
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
