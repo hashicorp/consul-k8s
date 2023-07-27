@@ -251,17 +251,17 @@ jobs:
           # cli
           - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" }
           - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" }
-          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe", gotags: "fips", env: "CGO_ENABLED=1", fips: ".fips1402" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: ".fips1402" }
 
           # control-plane
           - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
           - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
-          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", gotags: "fips", env: "CGO_ENABLED=1", fips: ".fips1402" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: ".fips1402" }
 
           # consul-cni
           - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
           - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
-          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe", gotags: "fips", env: "CGO_ENABLED=1", fips: ".fips1402" }
+          - { go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: ".fips1402" }
 
 
       fail-fast: true
