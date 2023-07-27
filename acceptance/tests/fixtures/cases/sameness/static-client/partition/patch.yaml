@@ -10,7 +10,7 @@ spec:
     metadata:
       annotations:
         'consul.hashicorp.com/connect-inject': 'true'
-        consul.hashicorp.com/connect-service-upstreams: "static-server.ns2.ap1:8080"
+        'consul.hashicorp.com/connect-service-upstreams': 'static-server.ns2.ap1:8080'
     spec:
       containers:
         - name: static-client
