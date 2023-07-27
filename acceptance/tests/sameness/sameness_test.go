@@ -24,7 +24,7 @@ const (
 	primaryDatacenterPartition = "ap1"
 	primaryServerDatacenter    = "dc1"
 	peer1Datacenter            = "dc2"
-	peer2Datacenter            = "dc2"
+	peer2Datacenter            = "dc3"
 	staticClientNamespace      = "ns1"
 	staticServerNamespace      = "ns2"
 
@@ -65,18 +65,27 @@ func TestFailover_Connect(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			/*
-				Architecture:
+				Architecture Overview:
 					Primary Datacenter (DC1)
-						Partitions:
-							Default Partition
-							AP1 Partition
-						Peer -> DC2
-						Peer -> DC3
+						Default Partition
+							Peer -> DC2 (cluster-02-a)
+							Peer -> DC3 (cluster-03-a)
+						AP1 Partition
+							Peer -> DC2 (cluster-02-a)
+							Peer -> DC3 (cluster-03-a)
 					Datacenter 2 (DC2)
-						Peer -> DC1
+						Default Partition
+							Peer -> DC1 (cluster-01-a)
+							Peer -> DC1 (cluster-01-b)
+							Peer -> DC3 (cluster-03-a)
 					Datacenter 3 (DC3)
-						Peer -> DC1
+						Default Partition
+							Peer -> DC1 (cluster-01-a)
+							Peer -> DC1 (cluster-01-b)
+							Peer -> DC2 (cluster-02-a)
 
+
+				Architecture Diagram + failover scenarios from perspective of DC1 Default Partition Static-Server
 				+-------------------------------------------+
 				|                                           |
 				|        DC1                                |
@@ -93,7 +102,7 @@ func TestFailover_Connect(t *testing.T) {
 				|    |  +------------------+       |   |    |             |   |       +------------------+        |
 				|    |  Admin Partitions: Default  |   |    |             |   |                                   |
 				|    |  Name: cluster-01-a         |   |    |             |   |     Admin Partitions: Default     |
-				|    |                             |   |    |             |   |     Name: cluster-03-a            |
+				|    |                             |   |    |             |   |     Name: cluster-02-a            |
 				|    +-----------------------------+   |    |             |   |                                   |
 				|                                      |    |             |   +-----------------------------------+
 				|                            Failover 1|    |  Failover 3 |
@@ -108,7 +117,7 @@ func TestFailover_Connect(t *testing.T) {
 				|   |    |                  |       |       |                 |       +------------------+        |
 				|   |    +------------------+       |       |                 |                                   |
 				|   |    Admin Partitions: ap1      |       |                 |     Admin Partitions: Default     |
-				|   |    Name: cluster-01-b         |       |                 |     Name: cluster-02-a            |
+				|   |    Name: cluster-01-b         |       |                 |     Name: cluster-03-a            |
 				|   |                               |       |                 |                                   |
 				|   +-------------------------------+       |                 |                                   |
 				|                                           |                 +-----------------------------------+
@@ -307,7 +316,7 @@ func TestFailover_Connect(t *testing.T) {
 				if labelSelector == "app=static-server" {
 					ip := &podList.Items[0].Status.PodIP
 					require.NotNil(t, ip)
-					logger.Logf(t, "partition-static-server-ip: %s", *ip)
+					logger.Logf(t, "default-static-server-ip: %s", *ip)
 					members[keyPrimaryServer].staticServerIP = ip
 				}
 
@@ -319,7 +328,7 @@ func TestFailover_Connect(t *testing.T) {
 				if labelSelector == "app=static-server" {
 					ip := &podList.Items[0].Status.PodIP
 					require.NotNil(t, ip)
-					logger.Logf(t, "default-static-server-ip: %s", *ip)
+					logger.Logf(t, "partition-static-server-ip: %s", *ip)
 					members[keyPartition].staticServerIP = ip
 				}
 			}
