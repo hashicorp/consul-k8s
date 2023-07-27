@@ -6,7 +6,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +41,7 @@ type GatewayClassController struct {
 // Reconcile handles the reconciliation loop for GatewayClass objects.
 func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gatewayClass", req.NamespacedName.Name)
-	log.Info("Reconciling GatewayClass")
+	log.V(1).Info("Reconciling GatewayClass")
 
 	gc := &gwv1beta1.GatewayClass{}
 
@@ -78,6 +77,11 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		// Remove our finalizer.
 		if _, err := RemoveFinalizer(ctx, r.Client, gc, gatewayClassFinalizer); err != nil {
+			if k8serrors.IsConflict(err) {
+				log.V(1).Info("error removing finalizer for gatewayClass, will try to re-reconcile")
+
+				return ctrl.Result{Requeue: true}, nil
+			}
 			log.Error(err, "unable to remove finalizer")
 			return ctrl.Result{}, err
 		}
@@ -87,6 +91,11 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 	// We are creating or updating the GatewayClass.
 	didUpdate, err := EnsureFinalizer(ctx, r.Client, gc, gatewayClassFinalizer)
 	if err != nil {
+		if k8serrors.IsConflict(err) {
+			log.V(1).Info("error adding finalizer for gatewayClass, will try to re-reconcile")
+
+			return ctrl.Result{Requeue: true}, nil
+		}
 		log.Error(err, "unable to add finalizer")
 		return ctrl.Result{}, err
 	}
@@ -98,7 +107,12 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 	didUpdate, err = r.validateParametersRef(ctx, gc, log)
 	if didUpdate {
 		if err := r.Client.Status().Update(ctx, gc); err != nil {
-			log.Error(err, "unable to update GatewayClass")
+			if k8serrors.IsConflict(err) {
+				log.V(1).Info("error updating status for gatewayClass, will try to re-reconcile")
+
+				return ctrl.Result{Requeue: true}, nil
+			}
+			log.Error(err, "unable to update status for GatewayClass")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil

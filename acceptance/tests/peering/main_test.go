@@ -16,10 +16,12 @@ var suite testsuite.Suite
 func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
 
-	if suite.Config().EnableMultiCluster && !suite.Config().DisablePeering {
+	expectedNumberOfClusters := 2
+	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) && !suite.Config().DisablePeering {
 		os.Exit(suite.Run())
 	} else {
-		fmt.Println("Skipping peering tests because either -enable-multi-cluster is not set or -disable-peering is set")
+		fmt.Println(fmt.Sprintf("Skipping peerings tests because either -enable-multi-cluster is "+
+			"not set, -disable-peering is set, or the number of clusters did not match the expected count of %d", expectedNumberOfClusters))
 		os.Exit(0)
 	}
 }
