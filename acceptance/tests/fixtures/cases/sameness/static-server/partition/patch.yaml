@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: static-server
-          image: hashicorp/http-echo:latest
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
           args:
             - -text="cluster-01-b"
             - -listen=:8080
