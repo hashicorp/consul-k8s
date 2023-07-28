@@ -1,0 +1,23 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-server
+spec:
+  template:
+    metadata:
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+    spec:
+      containers:
+        - name: static-server
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          args:
+            - -text="cluster-01-b"
+            - -listen=:8080
+          ports:
+            - containerPort: 8080
+              name: http
+      serviceAccountName: static-server
