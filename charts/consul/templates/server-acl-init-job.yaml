@@ -171,7 +171,7 @@ spec:
           CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
           consul-k8s-control-plane server-acl-init \
-            -log-level={{ .Values.global.logLevel }} \
+            -log-level={{ default .Values.global.logLevel .Values.global.acls.logLevel}} \
             -log-json={{ .Values.global.logJSON }} \
             -resource-prefix=${CONSUL_FULLNAME} \
             -k8s-namespace={{ .Release.Namespace }} \

@@ -27,6 +27,9 @@ data:
       },
       "datacenter": "{{ .Values.global.datacenter }}",
       "data_dir": "/consul/data",
+      {{- if .Values.server.logLevel }}
+      "log_level": "{{ .Values.server.logLevel | upper }}",
+      {{- end }}
       "domain": "{{ .Values.global.domain }}",
       "limits": {
         "request_limits": {

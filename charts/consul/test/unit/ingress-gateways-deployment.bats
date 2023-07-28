@@ -1504,3 +1504,64 @@ key2: value2' \
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
 }
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "ingressGateways/Deployment: use global.logLevel by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+  
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: override global.logLevel when ingressGateways.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'ingressGateways.logLevel=warn' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+  
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=warn"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: use global.logLevel by default for dataplane container" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+  
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "ingressGateways/Deployment: override global.logLevel when ingressGateways.logLevel is set for dataplane container" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'ingressGateways.logLevel=trace' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+  
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=trace"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
