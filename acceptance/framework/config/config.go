@@ -133,24 +133,25 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	if t.EnableOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
 	}
-	// ask about client
+
+	setIfNotEmpty(helmValues, "connectInject.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "connectInject.apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "client.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "acls.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "global.acls.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "global.tls.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "meshGateway.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "server.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "syncCatalog.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "telemetryCollector.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "webhookCertManager.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "ingressGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
+	setIfNotEmpty(helmValues, "terminatingGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
+
 	if t.EnableWindows {
 		fmt.Println("hi")
 		// setIfNotEmpty(helmValues, "apiGateway.controller.nodeSelector", "kubernetes.io/os: linux")
 		// setIfNotEmpty(helmValues, "apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "connectInject.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "connectInject.apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "client.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "acls.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "global.acls.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "global.tls.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "meshGateway.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "server.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "syncCatalog.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "telemetryCollector.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "webhookCertManager.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "ingressGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
-		setIfNotEmpty(helmValues, "terminatingGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
 
 		setIfNotEmpty(helmValues, "global.imageK8SWindows", "absolutelightning/windows-consul-k8s-control-plane:latest")
 		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", "absolutelightning/windows-consul-dataplane")
