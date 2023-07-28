@@ -209,6 +209,36 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# logLevel
+
+@test "tlsInit/Job: use global.logLevel by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "tlsInit/Job: override global.logLevel when global.tls.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.logLevel=error' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=error"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # server.containerSecurityContext.tlsInit
 
 @test "tlsInit/Job: securityContext is set when server.containerSecurityContext.tlsInit is set" {

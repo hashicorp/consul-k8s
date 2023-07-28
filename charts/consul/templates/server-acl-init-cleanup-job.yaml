@@ -67,7 +67,7 @@ spec:
             - consul-k8s-control-plane
           args:
             - delete-completed-job
-            - -log-level={{ .Values.global.logLevel }}
+            - -log-level={{ default .Values.global.logLevel .Values.global.acls.logLevel }}
             - -log-json={{ .Values.global.logJSON }}
             - -k8s-namespace={{ .Release.Namespace }}
             - {{ template "consul.fullname" . }}-server-acl-init
