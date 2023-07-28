@@ -135,11 +135,19 @@ func TestWANFederation_Gateway(t *testing.T) {
 	})
 
 	// these clients are just there so we can exec in and curl on them.
-	logger.Log(t, "creating static-client in dc1")
-	k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+	if cfg.EnableWindows {
+		logger.Log(t, "creating static-client in dc1")
+		k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc-windows")
 
-	logger.Log(t, "creating static-client in dc2")
-	k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+		logger.Log(t, "creating static-client in dc2")
+		k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc-windows")
+	} else {
+		logger.Log(t, "creating static-client in dc1")
+		k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+
+		logger.Log(t, "creating static-client in dc2")
+		k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+	}
 
 	t.Run("from primary to secondary", func(t *testing.T) {
 		logger.Log(t, "creating static-server in dc2")
