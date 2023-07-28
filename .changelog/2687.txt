@@ -1,0 +1,3 @@
+```release-note:bug
+helm: fix ui ingress manifest formatting, and exclude `ingressClass` when not defined.
+```
