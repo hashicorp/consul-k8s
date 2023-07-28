@@ -115,7 +115,7 @@ spec:
           - -ec
           - |-
             consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-              -log-level={{ default .Values.global.logLevel }} \
+              -log-level={{ default .Values.global.logLevel .Values.telemetryCollector.logLevel }} \
               -log-json={{ .Values.global.logJSON }} \
               -service-account-name="consul-telemetry-collector" \
               -service-name="" \
@@ -303,7 +303,7 @@ spec:
           {{- if .Values.global.metrics.enabled }}
           - -telemetry-prom-scrape-path=/metrics
           {{- end }}
-          - -log-level={{ default .Values.global.logLevel }}
+          - -log-level={{ default .Values.global.logLevel .Values.telemetryCollector.logLevel }}
           - -log-json={{ .Values.global.logJSON }}
           - -envoy-concurrency=2
           {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
