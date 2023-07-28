@@ -6,6 +6,7 @@ package gatekeeper
 import (
 	"context"
 	"errors"
+
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -82,11 +83,8 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 
 	if config.EnableOpenShift {
 		role.Rules = append(role.Rules, rbac.PolicyRule{
-			APIGroups: []string{"security.openshift.io"},
-			Resources: []string{"securitycontextconstraints"},
-			// TODO(nathancoleman) Consider accepting an explicit SCC name. This will make the code
-			//   here less brittle and allow for the user to provide their own SCC if they wish.
-			//ResourceNames: []string{config.ReleaseName + "-api-gateway"},
+			APIGroups:     []string{"security.openshift.io"},
+			Resources:     []string{"securitycontextconstraints"},
 			ResourceNames: []string{config.OpenshiftSCCName},
 			Verbs:         []string{"use"},
 		})

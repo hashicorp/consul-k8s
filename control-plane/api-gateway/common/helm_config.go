@@ -36,7 +36,7 @@ type HelmConfig struct {
 	EnableOpenShift bool
 
 	// OpenshiftSCCName allows the user to specify which security context they
-	// would like to run their gateways with. This defaults to
+	// would like to run their gateways with.
 	OpenshiftSCCName string
 
 	// ReleaseName indicates the name of the release for the Helm installation. This value is used

@@ -28,7 +28,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	// Get Deployment if it exists.
 	existingDeployment := &appsv1.Deployment{}
 	exists := false
-	g.Log.Info("UpsertDeployment")
+
 	err := g.Client.Get(ctx, g.namespacedName(gateway), existingDeployment)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
