@@ -106,6 +106,8 @@ const (
 	AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds   = "consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds"
 	AnnotationSidecarProxyLifecycleGracefulPort                 = "consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-port"
 	AnnotationSidecarProxyLifecycleGracefulShutdownPath         = "consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-shutdown-path"
+	AnnotationSidecarProxyLifecycleGracefulStartupPath          = "consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-startup-path"
+	AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds    = "consul.hashicorp.com/sidecar-proxy-lifecycle-startup-grace-period-seconds"
 
 	// annotations for sidecar volumes.
 	AnnotationConsulSidecarUserVolume      = "consul.hashicorp.com/consul-sidecar-user-volume"

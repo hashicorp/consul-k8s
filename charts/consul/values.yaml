@@ -2684,6 +2684,8 @@ connectInject:
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds`
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-port`
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-shutdown-path`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-startup-grace-period-seconds`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-startup-path`
     # @type: map
     lifecycle:
       # @type: boolean
@@ -2696,6 +2698,10 @@ connectInject:
       defaultGracefulPort: 20600
       # @type: string
       defaultGracefulShutdownPath: "/graceful_shutdown"
+      # @type: integer
+      defaultStartupGracePeriodSeconds: 0
+      # @type: string
+      defaultGracefulStartupPath: "/graceful_startup"
 
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of

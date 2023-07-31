@@ -87,6 +87,8 @@ type Command struct {
 	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
 	flagDefaultSidecarProxyLifecycleGracefulPort                 string
 	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
+	flagDefaultSidecarProxyLifecycleGracefulStartupPath          string
+	flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds    int
 
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
@@ -248,7 +250,8 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds, "default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds", 0, "Default sidecar proxy shutdown grace period in seconds.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulPort, "default-sidecar-proxy-lifecycle-graceful-port", strconv.Itoa(constants.DefaultGracefulPort), "Default port for sidecar proxy lifecycle management HTTP endpoints.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath, "default-sidecar-proxy-lifecycle-graceful-shutdown-path", "/graceful_shutdown", "Default sidecar proxy lifecycle management graceful shutdown path.")
-
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulStartupPath, "default-sidecar-proxy-lifecycle-graceful-startup-path", "/graceful_startup", "Default sidecar proxy lifecycle management graceful startup path.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds, "default-sidecar-proxy-lifecycle-startup-grace-period-seconds", 0, "Default sidecar proxy startup grace period in seconds.")
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
 	c.flagSet.BoolVar(&c.flagEnableGatewayMetrics, "enable-gateway-metrics", false, "Allows enabling Consul gateway metrics.")

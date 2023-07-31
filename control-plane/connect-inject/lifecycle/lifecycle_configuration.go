@@ -19,6 +19,8 @@ type Config struct {
 	DefaultShutdownGracePeriodSeconds   int
 	DefaultGracefulPort                 string
 	DefaultGracefulShutdownPath         string
+	DefaultGracefulStartupPath          string
+	DefaultStartupGracePeriodSeconds    int
 }
 
 // EnableProxyLifecycle returns whether proxy lifecycle management is enabled either via the default value in the meshWebhook, or if it's been
