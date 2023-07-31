@@ -163,16 +163,6 @@ rules:
   - get
   - patch
   - update
-{{- if .Values.global.openshift.enabled }}
-- apiGroups:
-  - security.openshift.io
-  resources:
-  - securitycontextconstraints
-  resourceNames:
-  - {{ template "consul.fullname" . }}-api-gateway
-  verbs:
-  - use
-{{- end }}
 - apiGroups:
     - apps
   resources:
@@ -197,4 +187,14 @@ rules:
     - "get"
     - "list"
     - "watch"
+{{- if .Values.global.openshift.enabled }}
+- apiGroups:
+    - security.openshift.io
+  resources:
+    - securitycontextconstraints
+  resourceNames:
+    - {{ .Values.connectInject.apiGateway.openshiftSccName }}
+  verbs:
+    - use
+  {{- end }}
 {{- end }}
