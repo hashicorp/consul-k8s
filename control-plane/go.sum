@@ -262,8 +262,8 @@ github.com/gophercloud/gophercloud v0.1.0/go.mod h1:vxM41WHh5uqHVBMZHzuwNOHh8XEo
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230511143918-bd16ab83383d h1:RJ1MZ8JKnfgKQ1kR3IBQAMpOpzXrdseZAYN/QR//MFM=
 github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230511143918-bd16ab83383d/go.mod h1:IHIHMzkoMwlv6rLsgwcoFBVYupR7/1pKEOHBMjD4L0k=
-github.com/hashicorp/consul-server-connection-manager v0.1.2 h1:tNVQHUPuMbd+cMdD8kd+qkZUYpmLmrHMAV/49f4L53I=
-github.com/hashicorp/consul-server-connection-manager v0.1.2/go.mod h1:NzQoVi1KcxGI2SangsDue8+ZPuXZWs+6BKAKrDNyg+w=
+github.com/hashicorp/consul-server-connection-manager v0.1.3 h1:fxsZ15XBNNWhV26yBVdCcnxHwSRgf9wqHGS2ZVCQIhc=
+github.com/hashicorp/consul-server-connection-manager v0.1.3/go.mod h1:Md2IGKaFJ4ek9GUA0pW1S2R60wpquMOUs27GiD9kZd0=
 github.com/hashicorp/consul/api v1.22.0-rc1 h1:ePmGqndeMgaI38KUbSA/CqTzeEAIogXyWnfNJzglo70=
 github.com/hashicorp/consul/api v1.22.0-rc1/go.mod h1:wtduXtbAqSGtBdi3tyA5SSAYGAG51rBejV9SEUBciMY=
 github.com/hashicorp/consul/proto-public v0.1.0 h1:O0LSmCqydZi363hsqc6n2v5sMz3usQMXZF6ziK3SzXU=

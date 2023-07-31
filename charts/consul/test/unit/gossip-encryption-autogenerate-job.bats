@@ -105,3 +105,33 @@ load _helpers
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
 }
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "gossipEncryptionAutogenerate/Job: uses the global.logLevel flag by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "gossipEncryptionAutogenerate/Job: overrides the global.logLevel flag when global.gossipEncryption.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      --set 'global.gossipEncryption.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

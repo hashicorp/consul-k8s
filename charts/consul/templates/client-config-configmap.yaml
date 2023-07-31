@@ -19,6 +19,12 @@ data:
       "auto_reload_config": true
       {{- end }}
     }
+  log-level.json: |-
+    {
+      {{- if .Values.client.logLevel }}
+      "log_level": "{{ .Values.client.logLevel | upper }}"
+      {{- end }}
+    }
   extra-from-values.json: |-
 {{ tpl .Values.client.extraConfig . | trimAll "\"" | indent 4 }}
   central-config.json: |-
