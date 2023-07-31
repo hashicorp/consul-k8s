@@ -137,24 +137,33 @@ func TestConfig_HelmValuesFromConfig_EntImage(t *testing.T) {
 		expErr      string
 	}{
 		{
-			consulImage: "hashicorp/consul:1.9.0",
-			expImage:    "hashicorp/consul-enterprise:1.9.0-ent",
+			consulImage: "hashicorp/consul:1.15.3",
+			expImage:    "hashicorp/consul-enterprise:1.15.3-ent",
 		},
 		{
-			consulImage: "hashicorp/consul:1.8.5-rc1",
-			expImage:    "hashicorp/consul-enterprise:1.8.5-rc1-ent",
+			consulImage: "hashicorp/consul:1.16.0-rc1",
+			expImage:    "hashicorp/consul-enterprise:1.16.0-rc1-ent",
 		},
 		{
-			consulImage: "hashicorp/consul:1.7.0-beta3",
-			expImage:    "hashicorp/consul-enterprise:1.7.0-beta3-ent",
-		},
-		{
-			consulImage: "invalid",
-			expErr:      "could not determine consul version from global.image: invalid",
+			consulImage: "hashicorp/consul:1.14.0-beta1",
+			expImage:    "hashicorp/consul-enterprise:1.14.0-beta1-ent",
 		},
 		{
 			consulImage: "hashicorp/consul@sha256:oioi2452345kjhlkh",
 			expImage:    "hashicorp/consul@sha256:oioi2452345kjhlkh",
+		},
+		// Nightly tags differ from release tags ('-ent' suffix is omitted)
+		{
+			consulImage: "docker.mirror.hashicorp.services/hashicorppreview/consul:1.17-dev",
+			expImage:    "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.17-dev",
+		},
+		{
+			consulImage: "docker.mirror.hashicorp.services/hashicorppreview/consul:1.17-dev-ubi",
+			expImage:    "docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.17-dev-ubi",
+		},
+		{
+			consulImage: "docker.mirror.hashicorp.services/hashicorppreview/consul@sha256:oioi2452345kjhlkh",
+			expImage:    "docker.mirror.hashicorp.services/hashicorppreview/consul@sha256:oioi2452345kjhlkh",
 		},
 	}
 	for _, tt := range tests {
