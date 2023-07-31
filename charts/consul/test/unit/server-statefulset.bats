@@ -846,9 +846,11 @@ load _helpers
 #--------------------------------------------------------------------
 # global.openshift.enabled
 
-@test "server/StatefulSet: restricted container securityContexts are set when global.openshift.enabled=true" {
+@test "server/StatefulSet: restricted container securityContexts are set when global.openshift.enabled=true on OpenShift >= 4.11" {
   cd `chart_dir`
+  # OpenShift 4.11 == Kube 1.24
   local manifest=$(helm template \
+      --kube-version '1.24' \
       -s templates/server-statefulset.yaml  \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr)
@@ -868,6 +870,20 @@ load _helpers
   local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
   local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
   [ "$equal" == "true" ]
+}
+
+@test "server/StatefulSet: restricted container securityContexts are not set when global.openshift.enabled=true on OpenShift < 4.11" {
+  cd `chart_dir`
+  # OpenShift 4.11 == Kube 1.24
+  local manifest=$(helm template \
+      --kube-version '1.23' \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  # Check consul container
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
+  [ "$actual" == "null" ]
 }
 
 #--------------------------------------------------------------------
