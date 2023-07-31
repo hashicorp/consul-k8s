@@ -107,12 +107,16 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 	return api.APIGatewayListener{
 		Name:     string(listener.Name),
 		Hostname: DerefStringOr(listener.Hostname, ""),
-		Port:     int(listener.Port),
+		Port:     ToContainerPort(listener.Port),
 		Protocol: listenerProtocolMap[strings.ToLower(string(listener.Protocol))],
 		TLS: api.APIGatewayTLSConfiguration{
 			Certificates: certificates,
 		},
 	}, true
+}
+
+func ToContainerPort(portNumber gwv1beta1.PortNumber) int {
+	return int(portNumber) + 2000
 }
 
 func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
