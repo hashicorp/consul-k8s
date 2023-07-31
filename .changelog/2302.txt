@@ -9,5 +9,4 @@ Add support to provide the logLevel flag via helm for multiple low level compone
 7. `meshGateway.logLevel`
 8. `ingressGateways.logLevel`
 9. `terminatingGateways.logLevel`
-10. `telemetryCollector.logLevel`
 ```
