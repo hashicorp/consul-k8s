@@ -151,6 +151,13 @@ kind: kind-delete
 	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
 
+# Helper target for loading local dev images (run with `DEV_IMAGE=...` to load non-k8s images)
+kind-load:
+	kind load docker-image --name dc1 $(DEV_IMAGE)
+	kind load docker-image --name dc2 $(DEV_IMAGE)
+	kind load docker-image --name dc3 $(DEV_IMAGE)
+	kind load docker-image --name dc4 $(DEV_IMAGE)
+
 # ===========> Shared Targets
 
 help: ## Show targets and their descriptions.
