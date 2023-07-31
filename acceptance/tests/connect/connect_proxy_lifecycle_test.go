@@ -209,12 +209,12 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 	cfg := suite.Config()
 
-	defaultGracePeriod := 10
+	defaultGracePeriod := 5
 
 	cases := map[string]int{
-		"../fixtures/cases/job-client-inject":                  defaultGracePeriod,
-		"../fixtures/cases/job-client-inject-grace-period-0s":  0,
-		"../fixtures/cases/job-client-inject-grace-period-30s": 30,
+		"../fixtures/cases/jobs/job-client-inject":                  defaultGracePeriod,
+		"../fixtures/cases/jobs/job-client-inject-grace-period-0s":  0,
+		"../fixtures/cases/jobs/job-client-inject-grace-period-10s": 10,
 	}
 
 	// Set up the installation and static-server once.

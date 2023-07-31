@@ -295,6 +295,7 @@ func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
 func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clientType ...string) {
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	opts := c.KubectlOptsForApp(t)
+	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
 	if len(clientType) > 0 {
 		client = clientType[0]
@@ -310,6 +311,7 @@ func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clie
 // the static-client pod.
 func (c *ConnectHelper) CreateIntention(t *testing.T, clientType ...string) {
 	logger.Log(t, "creating intention")
+	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
 	if len(clientType) > 0 {
 		client = clientType[0]
@@ -332,6 +334,7 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, clientType ...string) {
 func (c *ConnectHelper) TestConnectionSuccess(t *testing.T, clientType ...string) {
 	logger.Log(t, "checking that connection is successful")
 	opts := c.KubectlOptsForApp(t)
+	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
 	if len(clientType) > 0 {
 		client = clientType[0]
