@@ -149,10 +149,6 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "terminatingGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
 
 	if t.EnableWindows {
-		fmt.Println("hi")
-		// setIfNotEmpty(helmValues, "apiGateway.controller.nodeSelector", "kubernetes.io/os: linux")
-		// setIfNotEmpty(helmValues, "apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
-
 		setIfNotEmpty(helmValues, "global.imageK8SWindows", "absolutelightning/windows-consul-k8s-control-plane:latest")
 		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", "absolutelightning/windows-consul-dataplane")
 	}
@@ -187,7 +183,6 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
 	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
-	fmt.Println("helmval", helmValues)
 	return helmValues, nil
 }
 
