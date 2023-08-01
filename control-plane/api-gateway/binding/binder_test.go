@@ -271,6 +271,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 								Name: "secret-one",
 							}},
 						},
+						Port: 2000,
 					}},
 				},
 			},
