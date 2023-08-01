@@ -116,7 +116,12 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 }
 
 func ToContainerPort(portNumber gwv1beta1.PortNumber) int {
-	return int(portNumber) + 2000
+	// We don't want to use privileged ports, they require root access.
+	// Add 2000 to any port less than 2000. This is consistent with other gateways.
+	if portNumber < 1024 {
+		return int(portNumber) + 2000
+	}
+	return int(portNumber)
 }
 
 func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
