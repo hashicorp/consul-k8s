@@ -161,6 +161,8 @@ func CheckStaticServerHTTPConnectionFailing(t *testing.T, options *k8s.KubectlOp
 	t.Helper()
 	CheckStaticServerConnection(t, options, sourceApp, false, []string{
 		"curl: (22) The requested URL returned error: 403",
+		"curl: (7) Failed to connect",
+		"Couldn't connect to server",
 	}, "", curlArgs...)
 }
 

@@ -52,6 +52,8 @@ func TestVault_VaultNamespace(t *testing.T) {
 		"server.image.tag":                    "1.9.4-ent",
 		"server.enterpriseLicense.secretName": vaultLicenseSecretName,
 		"server.enterpriseLicense.secretKey":  vaultLicenseSecretKey,
+		"injector.nodeSelector":               "kubernetes.io/os: linux",
+		"server.nodeSelector":                 "kubernetes.io/os: linux",
 	}
 	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName, vaultHelmvalues)
 	vaultCluster.Create(t, ctx, vaultNamespacePath)
