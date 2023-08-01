@@ -1,0 +1,24 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ConsulGatewayPolicy
+metadata:
+  name: my-policy
+spec:
+  targetRef:
+    name: gateway
+    kind: Gateway
+    group: gateway.networking.kuberenetes.io
+    sectionName: http
+  override:
+    Providers:
+    - Provider: "local"
+      VerifyClaims:
+      - Path:
+        - "iss"
+        Value: "local"
+  default:
+    Providers:
+    - Provider: "local"
+      VerifyClaims:
+      - Path:
+        - "iss"
+        Value: "local"
