@@ -217,21 +217,16 @@ func (t *TestConfig) entImage() (string, error) {
 	}
 
 	// Otherwise, assume that we have an image tag with a version in it.
-	consulImageSplits := strings.Split(v.Global.Image, ":")
-	if len(consulImageSplits) != 2 {
-		return "", fmt.Errorf("could not determine consul version from global.image: %s", v.Global.Image)
-	}
-	consulImageVersion := consulImageSplits[1]
+	// Use the same Docker repository and tagging scheme, but replace 'consul' with 'consul-enterprise'.
+	imageTag := strings.Replace(v.Global.Image, "/consul:", "/consul-enterprise:", 1)
 
-	var preRelease string
-	// Handle versions like 1.9.0-rc1.
-	if strings.Contains(consulImageVersion, "-") {
-		split := strings.Split(consulImageVersion, "-")
-		consulImageVersion = split[0]
-		preRelease = fmt.Sprintf("-%s", split[1])
+	// We currently add an '-ent' suffix to release versions of enterprise images (nightly previews
+	// do not include this suffix).
+	if strings.HasPrefix(imageTag, "hashicorp/consul-enterprise:") {
+		imageTag = fmt.Sprintf("%s-ent", imageTag)
 	}
 
-	return fmt.Sprintf("hashicorp/consul-enterprise:%s%s-ent", consulImageVersion, preRelease), nil
+	return imageTag, nil
 }
 
 func (c *TestConfig) SkipWhenOpenshiftAndCNI(t *testing.T) {
