@@ -5,8 +5,6 @@ package gatekeeper
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
@@ -77,9 +75,8 @@ func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClas
 		ports = append(ports, corev1.ServicePort{
 			Name: string(listener.Name),
 			// only TCP-based services are supported for now
-			Protocol:   corev1.ProtocolTCP,
-			Port:       int32(listener.Port),
-			TargetPort: intstr.FromInt(common.ToContainerPort(listener.Port)),
+			Protocol: corev1.ProtocolTCP,
+			Port:     int32(listener.Port),
 		})
 
 		seenPorts[listener.Port] = struct{}{}
