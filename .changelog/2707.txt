@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: adds 2000 to any privileged port defined on gateway listeners
+```
