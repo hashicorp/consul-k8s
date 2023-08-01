@@ -324,7 +324,7 @@ func TestPartitions_Connect(t *testing.T) {
 						}
 					} else {
 						if cfg.EnableWindows {
-							k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespace-windows")
+							k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces-windows")
 						} else {
 							k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 						}
@@ -429,8 +429,13 @@ func TestPartitions_Connect(t *testing.T) {
 				// Test that kubernetes readiness status is synced to Consul.
 				// Create the file so that the readiness probe of the static-server pod fails.
 				logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
-				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				if cfg.EnableWindows {
+					k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+					k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+				} else {
+					k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+					k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				}
 
 				// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 				// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -610,8 +615,13 @@ func TestPartitions_Connect(t *testing.T) {
 				// Test that kubernetes readiness status is synced to Consul.
 				// Create the file so that the readiness probe of the static-server pod fails.
 				logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
-				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				if cfg.EnableWindows {
+					k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+					k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+				} else {
+					k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+					k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				}
 
 				// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 				// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.

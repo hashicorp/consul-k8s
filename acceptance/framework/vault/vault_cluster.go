@@ -419,7 +419,7 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		// Wait for vault server pod to be running so that we can create Vault client without errors.
 		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})
 		require.NoError(r, err)
-		require.Equal(r, serverPod.Status.Phase, corev1.PodRunning)
+		require.Equal(r, corev1.PodRunning, serverPod.Status.Phase)
 
 		// Set up the client so that we can make API calls to initialize and unseal.
 		v.vaultClient = v.SetupVaultClient(t)

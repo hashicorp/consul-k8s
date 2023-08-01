@@ -37,8 +37,11 @@ func TestVault_TLSAutoReload(t *testing.T) {
 
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()
-
-	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName, nil)
+	vaultHelmvalues := map[string]string{
+		"injector.nodeSelector": "kubernetes.io/os: linux",
+		"server.nodeSelector":   "kubernetes.io/os: linux",
+	}
+	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName, vaultHelmvalues)
 	vaultCluster.Create(t, ctx, "")
 	// Vault is now installed in the cluster.
 
