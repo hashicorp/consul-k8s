@@ -273,7 +273,11 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	opts := c.KubectlOptsForApp(t)
 
 	logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "touch", "/tmp/unhealthy")
+	if c.Cfg.EnableWindows {
+		k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+	} else {
+		k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "touch", "/tmp/unhealthy")
+	}
 
 	// The readiness probe should take a moment to be reflected in Consul,
 	// CheckStaticServerConnection will retry until Consul marks the service
@@ -300,9 +304,12 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 			"curl: (52) Empty reply from server",
 		}, "", "http://localhost:1234")
 	}
-
 	// Return the static-server to a "healthy state".
-	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "rm", "/tmp/unhealthy")
+	if c.Cfg.EnableWindows {
+		k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "cmd", "/C", "del", "C:\\tmp\\unhealthy")
+	} else {
+		k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "rm", "/tmp/unhealthy")
+	}
 }
 
 // helmValues uses the Secure and AutoEncrypt fields to set values for the Helm
