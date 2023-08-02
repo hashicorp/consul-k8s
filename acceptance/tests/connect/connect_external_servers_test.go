@@ -31,7 +31,7 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 		t.Run(caseName, func(t *testing.T) {
 			cfg := suite.Config()
 			cfg.SkipWhenOpenshiftAndCNI(t)
-
+			cfg.SkipWhenWindowsAndTproxy(t)
 			ctx := suite.Environment().DefaultContext(t)
 
 			serverHelmValues := map[string]string{

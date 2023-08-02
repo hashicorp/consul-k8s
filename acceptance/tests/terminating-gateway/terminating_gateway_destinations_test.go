@@ -24,7 +24,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 	if !cfg.EnableTransparentProxy {
 		t.Skipf("skipping this test because -enable-transparent-proxy is not set")
 	}
-
+	cfg.SkipWhenWindowsAndTproxy(t)
 	ver, err := version.NewVersion("1.13.0")
 	require.NoError(t, err)
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {

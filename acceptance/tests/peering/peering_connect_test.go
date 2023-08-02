@@ -32,7 +32,7 @@ func TestPeering_Connect(t *testing.T) {
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
 		t.Skipf("skipping this test because peering is not supported in version %v", cfg.ConsulVersion.String())
 	}
-
+	cfg.SkipWhenWindowsAndTproxy(t)
 	const staticServerPeer = "server"
 	const staticClientPeer = "client"
 	cases := []struct {

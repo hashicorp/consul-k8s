@@ -34,6 +34,7 @@ func TestConnectInjectNamespaces(t *testing.T) {
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
+	cfg.SkipWhenWindowsAndTproxy(t)
 	cfg.SkipWhenOpenshiftAndCNI(t)
 
 	cases := []struct {

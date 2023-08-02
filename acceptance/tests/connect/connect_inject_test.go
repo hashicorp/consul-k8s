@@ -35,7 +35,7 @@ func TestConnectInject(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			ctx := suite.Environment().DefaultContext(t)
-
+			cfg.SkipWhenWindowsAndTproxy(t)
 			releaseName := helpers.RandomName()
 			connHelper := connhelper.ConnectHelper{
 				ClusterKind:     consul.Helm,
@@ -68,6 +68,7 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 		// This can only be tested in transparent proxy mode.
 		t.SkipNow()
 	}
+	cfg.SkipWhenWindowsAndTproxy(t)
 	ctx := suite.Environment().DefaultContext(t)
 
 	releaseName := helpers.RandomName()

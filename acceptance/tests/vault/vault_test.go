@@ -59,6 +59,7 @@ func TestVault(t *testing.T) {
 //     consul and writes the bootstrap token to Vault.
 func testVault(t *testing.T, testAutoBootstrap bool) {
 	cfg := suite.Config()
+	cfg.SkipWhenWindowsAndTproxy(t)
 	ctx := suite.Environment().DefaultContext(t)
 	kubectlOptions := ctx.KubectlOptions(t)
 	ns := kubectlOptions.Namespace

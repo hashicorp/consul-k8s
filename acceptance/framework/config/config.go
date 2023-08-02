@@ -262,6 +262,12 @@ func (c *TestConfig) SkipWhenWindows(t *testing.T) {
 	}
 }
 
+func (c *TestConfig) SkipWhenWindowsAndTproxy(t *testing.T) {
+	if c.EnableWindows && c.EnableTransparentProxy {
+		t.Skip("skipping because windows dosent support transparent proxy")
+	}
+}
+
 // setIfNotEmpty sets key to val in map m if value is not empty.
 func setIfNotEmpty(m map[string]string, key, val string) {
 	if val != "" {

@@ -30,7 +30,7 @@ func TestPartitions_Sync(t *testing.T) {
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
-
+	cfg.SkipWhenWindowsAndTproxy(t)
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
