@@ -412,7 +412,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		require.NoError(r, err)
 
 		// check our finalizers
-		require.Len(t, httproute.Finalizers, 1)
+		require.Len(r, httproute.Finalizers, 1)
 		require.EqualValues(r, gatewayFinalizer, httproute.Finalizers[0])
 
 		// check parent status
