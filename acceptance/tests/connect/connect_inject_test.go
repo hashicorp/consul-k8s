@@ -172,7 +172,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			cfg.SkipWhenOpenshiftAndCNI(t)
-
+			cfg.SkipWhenWindows(t)
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{

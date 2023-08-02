@@ -50,6 +50,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
+			cfg.SkipWhenWindows(t)
 			helmValues := map[string]string{
 				"connectInject.enabled":        "true",
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),

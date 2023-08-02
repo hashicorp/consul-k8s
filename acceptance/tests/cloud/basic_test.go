@@ -102,7 +102,7 @@ func TestBasicCloud(t *testing.T) {
 	k8sClient := environment.KubernetesClientFromOptions(t, kubectlOptions)
 
 	cfg := suite.Config()
-
+	cfg.SkipWhenWindows(t)
 	if cfg.HCPResourceID != "" {
 		resourceSecretKeyValue = cfg.HCPResourceID
 	}

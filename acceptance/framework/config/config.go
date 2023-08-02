@@ -256,6 +256,12 @@ func (c *TestConfig) SkipWhenOpenshiftAndCNI(t *testing.T) {
 	}
 }
 
+func (c *TestConfig) SkipWhenWindows(t *testing.T) {
+	if c.EnableWindows {
+		t.Skip("skipping because -enable-windows is set")
+	}
+}
+
 // setIfNotEmpty sets key to val in map m if value is not empty.
 func setIfNotEmpty(m map[string]string, key, val string) {
 	if val != "" {

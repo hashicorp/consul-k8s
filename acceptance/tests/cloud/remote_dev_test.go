@@ -39,6 +39,7 @@ type hcp struct {
 }
 
 func TestRemoteDevCloud(t *testing.T) {
+	suite.Config().SkipWhenWindows(t)
 	_, rIDok := os.LookupEnv("HCP_RESOURCE_ID")
 	_, cIDok := os.LookupEnv("HCP_CLIENT_ID")
 	_, cSECok := os.LookupEnv("HCP_CLIENT_SECRET")
