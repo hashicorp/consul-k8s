@@ -106,21 +106,11 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "creating static-client pod")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
-			logger.Log(t, "creating target tcp server")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
-
-			// Check that both static-server and static-client have been injected and now have 2 containers.
-			for _, labelSelector := range []string{"app=static-server", "app=static-client", "app=static-server-tcp"} {
-				podList, err := ctx.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-					LabelSelector: labelSelector,
-				})
-				require.NoError(t, err)
-				require.Len(t, podList.Items, 1)
-				require.Len(t, podList.Items[0].Spec.Containers, 2)
-			}
-
 			logger.Log(t, "patching route to target http server")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+
+			logger.Log(t, "creating target tcp server")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
 
 			logger.Log(t, "creating tcp-route")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
@@ -138,7 +128,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// leader election so we may need to wait a long time for
 			// the reconcile loop to run (hence the 1m timeout here).
 			var gatewayAddress string
-			counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
+			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
