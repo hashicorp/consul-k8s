@@ -116,7 +116,7 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 }
 
 func ToContainerPort(portNumber gwv1beta1.PortNumber) int {
-	// We don't want to use privileged ports, they require root access.
+	// We don't want to use privileged ports, they require privileged access.
 	// Add 2000 to any port less than 1024. This is consistent with other gateways in the market.
 	if portNumber < 1024 {
 		return int(portNumber) + 2000
