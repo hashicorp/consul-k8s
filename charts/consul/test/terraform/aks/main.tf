@@ -11,10 +11,6 @@ terraform {
 
 provider "azurerm" {
   features {}
-  client_id       = var.client_id
-  client_secret   = var.client_secret
-  tenant_id       = ""
-  subscription_id = ""
 }
 
 provider "local" {}
