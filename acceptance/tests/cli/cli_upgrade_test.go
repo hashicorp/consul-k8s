@@ -17,6 +17,7 @@ import (
 // upgrade is performed on the cluster.
 func TestUpgrade(t *testing.T) {
 	cfg := suite.Config()
+	cfg.SkipWhenWindows(t)
 	ctx := suite.Environment().DefaultContext(t)
 
 	connHelper := connhelper.ConnectHelper{
