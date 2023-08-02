@@ -235,9 +235,16 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 			listener: listener,
 		})
 	}
+	seenListenerPorts := map[int]struct{}{}
 
 	for i, listener := range listeners {
 		var result listenerValidationResult
+
+		if _, seen := seenListenerPorts[common.ToContainerPort(listener.Port)]; seen {
+			result.acceptedErr = errListenerPortUnavailable
+			//result.conflictedErr = err
+		}
+		seenListenerPorts[common.ToContainerPort(listener.Port)] = struct{}{}
 
 		err, refErr := validateTLS(gateway, listener.TLS, resources)
 		result.refErr = refErr
