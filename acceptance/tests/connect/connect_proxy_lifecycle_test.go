@@ -237,7 +237,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 	connHelper.DeployServer(t)
 
 	logger.Log(t, "waiting for static-server to be registered with Consul")
-	retry.RunWith(&retry.Timer{Timeout: 300 * time.Second, Wait: 5 * time.Second}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
 		for _, name := range []string{
 			"static-server",
 			"static-server-sidecar-proxy",
