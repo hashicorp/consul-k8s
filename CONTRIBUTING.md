@@ -1134,12 +1134,12 @@ Certificate:
 ---
 
 ## Helm Reference Docs
- 
-The Helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
+
+The Helm reference docs (https://developer.hashicorp.com/consul/docs/k8s/helm) are automatically
 generated from our `values.yaml` file.
 
 ### Generating Helm Reference Docs
- 
+
 To generate the docs and update the `helm.mdx` file:
 
 1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub.
