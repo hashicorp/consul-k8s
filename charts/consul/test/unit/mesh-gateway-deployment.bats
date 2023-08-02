@@ -1133,7 +1133,7 @@ key2: value2' \
       --set 'connectInject.enabled=true' \
       --set 'meshGateway.globalMode=something' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" ]]
+  [[ "$output" =~ "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see https://developer.hashicorp.com/consul/docs/k8s/crds/upgrade-to-crds)" ]]
 }
 
 #--------------------------------------------------------------------

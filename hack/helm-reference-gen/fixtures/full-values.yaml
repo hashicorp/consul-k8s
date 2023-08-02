@@ -18,7 +18,7 @@ global:
   name: null
 
   # The domain Consul will answer DNS queries for
-  # (see `-domain` (https://consul.io/docs/agent/options#_domain)) and the domain services synced from
+  # (see `-domain` (https://developer.hashicorp.com/consul/docs/agent/config/config-files#_domain)) and the domain services synced from
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.
   domain: consul
 
@@ -121,7 +121,7 @@ global:
     # If true, `verify_outgoing`, `verify_server_hostname`,
     # and `verify_incoming_rpc` will be set to `true` for Consul servers and clients.
     # Set this to false to incrementally roll out TLS on an existing Consul cluster.
-    # Please see https://consul.io/docs/k8s/operations/tls-on-existing-cluster
+    # Please see https://developer.hashicorp.com/consul/docs/k8s/operations/tls-on-existing-cluster
     # for more details.
     verify: true
 
@@ -271,7 +271,7 @@ server:
   image: null
 
   # The number of server agents to run. This determines the fault tolerance of
-  # the cluster. Please see the deployment table (https://consul.io/docs/internals/consensus#deployment-table)
+  # the cluster. Please see the deployment table (https://developer.hashicorp.com/consul/docs/architecture/consensus#deployment-table)
   # for more information.
   replicas: 3
 
@@ -364,7 +364,7 @@ server:
     # @type: integer
     maxUnavailable: null
 
-  # A raw string of extra JSON configuration (https://consul.io/docs/agent/options) for Consul
+  # A raw string of extra JSON configuration (https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
   # servers. This will be saved as-is into a ConfigMap that is read by the Consul
   # server agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
@@ -573,7 +573,7 @@ client:
   # @type: string
   image: null
 
-  # A list of valid `-retry-join` values (https://consul.io/docs/agent/options#retry-join).
+  # A list of valid `-retry-join` values (https://developer.hashicorp.com/consul/docs/agent/config/config-files#retry_join).
   # If this is `null` (default), then the clients will attempt to automatically
   # join the server cluster running within Kubernetes.
   # This means that with `server.enabled` set to true, clients will automatically
@@ -615,7 +615,7 @@ client:
       memory: "100Mi"
       cpu: "100m"
 
-  # A raw string of extra JSON configuration (https://consul.io/docs/agent/options) for Consul
+  # A raw string of extra JSON configuration (https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
   # clients. This will be saved as-is into a ConfigMap that is read by the Consul
   # client agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
