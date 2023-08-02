@@ -37,6 +37,6 @@ variable "tags" {
 
 variable "windows" {
   type        = bool
-  default     = true
+  default     = false
   description = "enable windows nodepool"
 }

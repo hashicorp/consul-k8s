@@ -66,21 +66,9 @@ resource "azurerm_kubernetes_cluster" "default" {
   kubernetes_version                = "1.24.10"
   role_based_access_control_enabled = true
 
-  // We're setting the network plugin and other network properties explicitly
-  // here even though they are the same as defaults to ensure that none of these CIDRs
-  // overlap with our vnet and subnet. Please see
-  // https://docs.microsoft.com/en-us/azure/aks/configure-kubenet#create-an-aks-cluster-in-the-virtual-network.
-  // We want to use kubenet plugin rather than Azure CNI because pods
-  // using kubenet will not be routable when we peer VNets,
-  // and that gives us more confidence that in any tests where cross-cluster
-  // communication is tested, the connections goes through the appropriate gateway
-  // rather than directly from pod to pod.
+  // We're setting the network plugin to azure since it supports windows node pools
 network_profile {
     network_plugin     = "azure"
-    # service_cidr       = "10.0.0.0/16"
-    # dns_service_ip     = "10.0.0.10"
-    # pod_cidr           = "10.244.0.0/16"
-    # docker_bridge_cidr = "172.17.0.1/16"
 }
 
   default_node_pool {
