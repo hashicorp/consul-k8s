@@ -227,15 +227,15 @@ func TestAPIGateway_Basic(t *testing.T) {
 			var route *api.TCPRouteConfigEntry
 			retry.RunWith(counter, t, func(r *retry.R) {
 				entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
-				require.NoError(t, err)
+				require.NoError(r, err)
 				gateway = entry.(*api.APIGatewayConfigEntry)
 
 				entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "http-route", nil)
-				require.NoError(t, err)
+				require.NoError(r, err)
 				httpRoute = entry.(*api.HTTPRouteConfigEntry)
 
 				entry, _, err = consulClient.ConfigEntries().Get(api.TCPRoute, "tcp-route", nil)
-				require.NoError(t, err)
+				require.NoError(r, err)
 				route = entry.(*api.TCPRouteConfigEntry)
 			})
 
