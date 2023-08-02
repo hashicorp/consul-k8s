@@ -82,16 +82,14 @@ type TestConfig struct {
 
 	DisablePeering bool
 
-	HelmChartVersion            string
-	ConsulImage                 string
-	ConsulK8SImage              string
-	ConsulDataplaneImage        string
-	ConsulWindowsK8SImage       string
-	ConsulWindowsDataplaneImage string
-	ConsulVersion               *version.Version
-	ConsulDataplaneVersion      *version.Version
-	EnvoyImage                  string
-	ConsulCollectorImage        string
+	HelmChartVersion       string
+	ConsulImage            string
+	ConsulK8SImage         string
+	ConsulDataplaneImage   string
+	ConsulVersion          *version.Version
+	ConsulDataplaneVersion *version.Version
+	EnvoyImage             string
+	ConsulCollectorImage   string
 
 	HCPResourceID string
 
@@ -149,8 +147,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "terminatingGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
 
 	if t.EnableWindows {
-		setIfNotEmpty(helmValues, "global.imageK8SWindows", "absolutelightning/windows-consul-k8s-control-plane:latest")
-		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", "absolutelightning/windows-consul-dataplane")
+		setIfNotEmpty(helmValues, "global.imageK8SWindows", t.ConsulK8SImage+":windows")
+		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", t.ConsulDataplaneImage+":windows")
 	}
 
 	if t.EnablePodSecurityPolicies {
