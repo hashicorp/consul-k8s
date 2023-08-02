@@ -57,7 +57,7 @@ spec:
                 -namespace={{ .Release.Namespace }} \
                 -secret-name={{ template "consul.fullname" . }}-gossip-encryption-key \
                 -secret-key="key" \
-                -log-level={{ .Values.global.logLevel }} \
+                -log-level={{ default .Values.global.logLevel .Values.global.gossipEncryption.logLevel }} \
                 -log-json={{ .Values.global.logJSON }}
           resources:
             requests:
