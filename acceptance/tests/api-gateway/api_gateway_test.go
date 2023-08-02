@@ -101,11 +101,26 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "creating target http server")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
-			logger.Log(t, "patching route to target http server")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+			// We use the static-client pod so that we can make calls to the api gateway
+			// via kubectl exec without needing a route into the cluster from the test machine.
+			logger.Log(t, "creating static-client pod")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 			logger.Log(t, "creating target tcp server")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
+
+			// Check that both static-server and static-client have been injected and now have 2 containers.
+			for _, labelSelector := range []string{"app=static-server", "app=static-client", "app=static-server-tcp"} {
+				podList, err := ctx.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
+					LabelSelector: labelSelector,
+				})
+				require.NoError(t, err)
+				require.Len(t, podList.Items, 1)
+				require.Len(t, podList.Items[0].Spec.Containers, 2)
+			}
+
+			logger.Log(t, "patching route to target http server")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
 
 			logger.Log(t, "creating tcp-route")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
@@ -114,11 +129,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 				// the custom resources will have been deleted.
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
 			})
-
-			// We use the static-client pod so that we can make calls to the api gateway
-			// via kubectl exec without needing a route into the cluster from the test machine.
-			logger.Log(t, "creating static-client pod")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 			// Grab a kubernetes client so that we can verify binding
 			// behavior prior to issuing requests through the gateway.
@@ -209,17 +219,25 @@ func TestAPIGateway_Basic(t *testing.T) {
 			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 
 			// check that the Consul entries were created
-			entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
-			require.NoError(t, err)
-			gateway := entry.(*api.APIGatewayConfigEntry)
+			// On startup, the controller can take upwards of 1m to perform
+			// leader election so we may need to wait a long time for
+			// the reconcile loop to run (hence the 1m timeout here).
+			var gateway *api.APIGatewayConfigEntry
+			var httpRoute *api.HTTPRouteConfigEntry
+			var route *api.TCPRouteConfigEntry
+			retry.RunWith(counter, t, func(r *retry.R) {
+				entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
+				require.NoError(t, err)
+				gateway = entry.(*api.APIGatewayConfigEntry)
 
-			entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "http-route", nil)
-			require.NoError(t, err)
-			httpRoute := entry.(*api.HTTPRouteConfigEntry)
+				entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "http-route", nil)
+				require.NoError(t, err)
+				httpRoute = entry.(*api.HTTPRouteConfigEntry)
 
-			entry, _, err = consulClient.ConfigEntries().Get(api.TCPRoute, "tcp-route", nil)
-			require.NoError(t, err)
-			route := entry.(*api.TCPRouteConfigEntry)
+				entry, _, err = consulClient.ConfigEntries().Get(api.TCPRoute, "tcp-route", nil)
+				require.NoError(t, err)
+				route = entry.(*api.TCPRouteConfigEntry)
+			})
 
 			// now check the gateway status conditions
 			checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
