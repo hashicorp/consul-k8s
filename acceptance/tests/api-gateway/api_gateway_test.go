@@ -126,7 +126,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			// On startup, the controller can take upwards of 1m to perform
 			// leader election so we may need to wait a long time for
-			// the reconcile loop to run (hence the 1m timeout here).
+			// the reconcile loop to run (hence the 2m timeout here).
 			var gatewayAddress string
 			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
@@ -292,11 +292,17 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	t.Skip()
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
+
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+
 	helmValues := map[string]string{
-		"connectInject.enabled":        "true",
-		"global.acls.manageSystemACLs": "true", // acls must be enabled for JWT auth to take place
-		"global.tls.enabled":           "true",
-		"global.logLevel":              "trace",
+		"connectInject.enabled":                       "true",
+		"connectInject.consulNamespaces.mirroringK8S": "true",
+		"global.acls.manageSystemACLs":                "true", // acls must be enabled for JWT auth to take place
+		"global.tls.enabled":                          "true",
+		"global.logLevel":                             "trace",
 	}
 
 	releaseName := helpers.RandomName()
@@ -352,7 +358,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 
 	// On startup, the controller can take upwards of 1m to perform
 	// leader election so we may need to wait a long time for
-	// the reconcile loop to run (hence the 1m timeout here).
+	// the reconcile loop to run (hence the 2m timeout here).
 	var (
 		gatewayAddress string
 		gatewayClass   gwv1beta1.GatewayClass
