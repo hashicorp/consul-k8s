@@ -567,6 +567,14 @@ func TestValidateListeners(t *testing.T) {
 		"conflicted port": {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+			},
+			expectedAcceptedErr: errListenerPortUnavailable,
+			listenerIndexToTest: 1,
+		},
+		"conflicted mapped port": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 2080},
 			},
 			expectedAcceptedErr: errListenerMappedToPrivilegedPortMapping,
