@@ -569,7 +569,7 @@ func TestValidateListeners(t *testing.T) {
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 2080},
 			},
-			expectedAcceptedErr: errListenerPortUnavailable,
+			expectedAcceptedErr: errListenerMappedToPrivilegedPortMapping,
 			listenerIndexToTest: 1,
 		},
 	} {

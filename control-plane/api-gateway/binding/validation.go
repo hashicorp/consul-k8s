@@ -235,16 +235,14 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 			listener: listener,
 		})
 	}
+	// This list keeps track of port conflicts directly on gateways. i.e., two listeners on the same port as
+	// defined by the user.
 	seenListenerPorts := map[int]struct{}{}
+	// This list keeps track of port conflicts caused by privileged port mappings.
+	seenContainerPorts := map[int]struct{}{}
 
 	for i, listener := range listeners {
 		var result listenerValidationResult
-
-		if _, seen := seenListenerPorts[common.ToContainerPort(listener.Port)]; seen {
-			result.acceptedErr = errListenerPortUnavailable
-			//result.conflictedErr = err
-		}
-		seenListenerPorts[common.ToContainerPort(listener.Port)] = struct{}{}
 
 		err, refErr := validateTLS(gateway, listener.TLS, resources)
 		result.refErr = refErr
@@ -256,6 +254,10 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 				result.acceptedErr = errListenerUnsupportedProtocol
 			} else if listener.Port == 20000 { // admin port
 				result.acceptedErr = errListenerPortUnavailable
+			} else if _, ok := seenListenerPorts[int(listener.Port)]; ok {
+				result.acceptedErr = errListenerPortUnavailable
+			} else if _, ok := seenContainerPorts[common.ToContainerPort(listener.Port)]; ok {
+				result.acceptedErr = errListenerMappedToPrivilegedPortMapping
 			}
 
 			result.routeKindErr = validateListenerAllowedRouteKinds(listener.AllowedRoutes)
@@ -268,6 +270,9 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 		}
 
 		results = append(results, result)
+
+		seenListenerPorts[int(listener.Port)] = struct{}{}
+		seenContainerPorts[common.ToContainerPort(listener.Port)] = struct{}{}
 	}
 	return results
 }
