@@ -90,7 +90,7 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 		return nil, err
 	}
 
-	container, err := consulDataplaneContainer(config, gateway.Name, gateway.Namespace)
+	container, err := consulDataplaneContainer(config, gcc, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}
