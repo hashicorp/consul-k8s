@@ -70,6 +70,7 @@ type Command struct {
 	flagNodeSelector       string // this is a yaml multiline string map
 	flagTolerations        string // this is a multiline yaml string matching the tolerations array
 	flagServiceAnnotations string // this is a multiline yaml string array of annotations to allow
+	flagResources          string // this is a multiline yaml string map of resource requests and limits
 
 	flagOpenshiftSCCName string
 
@@ -83,6 +84,7 @@ type Command struct {
 	nodeSelector       map[string]string
 	tolerations        []corev1.Toleration
 	serviceAnnotations []string
+	resources          corev1.ResourceRequirements
 
 	ctx context.Context
 }
@@ -210,6 +212,7 @@ func (c *Command) Run(args []string) int {
 			},
 			OpenshiftSCCName:            c.flagOpenshiftSCCName,
 			MapPrivilegedContainerPorts: int32(c.flagMapPrivilegedContainerPorts),
+			Resources:                   &c.resources,
 		},
 	}
 
@@ -282,6 +285,11 @@ func (c *Command) validateFlags() error {
 	if c.flagServiceAnnotations != "" {
 		if err := yaml.Unmarshal([]byte(c.flagServiceAnnotations), &c.serviceAnnotations); err != nil {
 			return fmt.Errorf("error decoding service annotations: %w", err)
+		}
+	}
+	if c.flagResources != "" {
+		if err := yaml.Unmarshal([]byte(c.flagResources), &c.resources); err != nil {
+			return fmt.Errorf("error decoding resources: %w", err)
 		}
 	}
 
