@@ -93,11 +93,11 @@ resource "null_resource" "kubectl" {
 }
 
 resource "google_container_node_pool" "windows_pool" {
-  count = var.windows ? var.cluster_count : 0
-  name               = "windows-pool"
-  project            = google_container_cluster.cluster[count.index].project
-  cluster            = google_container_cluster.cluster[count.index].name
-  location           = google_container_cluster.cluster[count.index].location
+  count    = var.windows ? var.cluster_count : 0
+  name     = "windows-pool"
+  project  = google_container_cluster.cluster[count.index].project
+  cluster  = google_container_cluster.cluster[count.index].name
+  location = google_container_cluster.cluster[count.index].location
 
   node_config {
     machine_type = "e2-standard-4"

@@ -63,9 +63,9 @@ resource "azurerm_kubernetes_cluster" "default" {
   role_based_access_control_enabled = true
 
   // We're setting the network plugin to azure since it supports windows node pools
-network_profile {
-    network_plugin     = "azure"
-}
+  network_profile {
+    network_plugin = "azure"
+  }
 
   default_node_pool {
     name            = "default"
@@ -95,8 +95,8 @@ resource "local_file" "kubeconfigs" {
   file_permission = "0600"
 }
 
-resource "azurerm_kubernetes_cluster_node_pool" "win"  {
-  count = var.windows ? var.cluster_count : 0
+resource "azurerm_kubernetes_cluster_node_pool" "win" {
+  count                 = var.windows ? var.cluster_count : 0
   name                  = "win"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.default[count.index].id
   vm_size               = "Standard_DS2_v2"

@@ -34,9 +34,9 @@ resource "random_string" "suffix" {
 
 data "aws_ami" "win_ami" {
   most_recent = true
-  owners = ["amazon"]
+  owners      = ["amazon"]
   filter {
-    name = "name"
+    name   = "name"
     values = ["Windows_Server-2019-English-Core-EKS_Optimized-1.26-*"]
   }
 }
@@ -92,15 +92,15 @@ module "eks" {
       instance_type = "m5.xlarge"
     }
     windows = {
-      platform = "windows"
-      name = "windows"
-      public_ip    = false
+      platform      = "windows"
+      name          = "windows"
+      public_ip     = false
       instance_type = "m5.xlarge"
-      key_name = "windows"
-      desired_size = 1
-      max_size = 1
-      min_size = 1
-      ami_id = data.aws_ami.win_ami.id
+      key_name      = "windows"
+      desired_size  = 1
+      max_size      = 1
+      min_size      = 1
+      ami_id        = data.aws_ami.win_ami.id
     }
   }
 
