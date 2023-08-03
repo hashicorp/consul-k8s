@@ -113,7 +113,7 @@ func (t *TestFlags) init() {
 		"If true, the tests will automatically add Openshift Helm value for each Helm install.")
 
 	flag.BoolVar(&t.flagEnableWindows, "enable-windows", false,
-		"If true, the tests will automatically add nodeselector Windows Helm value for each Helm install.")
+		"If true, the tests will automatically add `kubernetes.io/os: windows` as the nodeSelector helm value for all the dataplane components for each Helm install. Note that Consul control plane specific components still run on Linux nodes")
 
 	flag.BoolVar(&t.flagEnablePodSecurityPolicies, "enable-pod-security-policies", false,
 		"If true, the test suite will run tests with pod security policies enabled.")
