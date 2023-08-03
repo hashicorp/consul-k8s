@@ -9,10 +9,26 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConfig_HelmValuesFromConfig(t *testing.T) {
+	nodeSelectors := map[string]string{
+		"connectInject.nodeSelector":                                "kubernetes.io/os: linux",
+		"connectInject.apiGateway.managedGatewayClass.nodeSelector": "kubernetes.io/os: linux",
+		"client.nodeSelector":                                       "kubernetes.io/os: linux",
+		"acls.nodeSelector":                                         "kubernetes.io/os: linux",
+		"global.acls.nodeSelector":                                  "kubernetes.io/os: linux",
+		"global.tls.nodeSelector":                                   "kubernetes.io/os: linux",
+		"meshGateway.nodeSelector":                                  "kubernetes.io/os: linux",
+		"server.nodeSelector":                                       "kubernetes.io/os: linux",
+		"syncCatalog.nodeSelector":                                  "kubernetes.io/os: linux",
+		"telemetryCollector.nodeSelector":                           "kubernetes.io/os: linux",
+		"webhookCertManager.nodeSelector":                           "kubernetes.io/os: linux",
+		"ingressGateways.defaults.nodeSelector":                     "kubernetes.io/os: linux",
+		"terminatingGateways.defaults.nodeSelector":                 "kubernetes.io/os: linux",
+	}
 	tests := []struct {
 		name       string
 		testConfig TestConfig
@@ -125,6 +141,7 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			values, err := tt.testConfig.HelmValuesFromConfig()
 			require.NoError(t, err)
+			helpers.MergeMaps(tt.want, nodeSelectors)
 			require.Equal(t, tt.want, values)
 		})
 	}
