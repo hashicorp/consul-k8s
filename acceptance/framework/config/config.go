@@ -151,8 +151,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	}
 
 	if t.EnableWindows {
-		setIfNotEmpty(helmValues, "global.imageK8SWindows", t.ConsulK8SImage+":windows")
-		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", t.ConsulDataplaneImage+":windows")
+		setIfNotEmpty(helmValues, "global.imageK8SWindows", fmt.Sprintf("%s-windows", t.ConsulK8SImage))
+		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", fmt.Sprintf("%s-windows", t.ConsulDataplaneImage))
 	}
 
 	if t.EnablePodSecurityPolicies {
