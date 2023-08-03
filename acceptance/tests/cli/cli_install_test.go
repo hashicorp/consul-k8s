@@ -39,10 +39,9 @@ func TestInstall(t *testing.T) {
 			require.NoError(t, err)
 
 			cfg := suite.Config()
-			cfg.SkipWhenWindows(t)
 			cfg.EnableTransparentProxy = c.tproxy
 			ctx := suite.Environment().DefaultContext(t)
-
+			cfg.SkipWhenWindowsAndTproxy(t)
 			connHelper := connhelper.ConnectHelper{
 				ClusterKind: consul.CLI,
 				Secure:      c.secure,
