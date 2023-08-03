@@ -131,20 +131,24 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	if t.EnableOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
 	}
-
-	setIfNotEmpty(helmValues, "connectInject.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "connectInject.apiGateway.managedGatewayClass.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "client.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "acls.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "global.acls.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "global.tls.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "meshGateway.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "server.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "syncCatalog.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "telemetryCollector.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "webhookCertManager.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "ingressGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
-	setIfNotEmpty(helmValues, "terminatingGateways.defaults.nodeSelector", "kubernetes.io/os: linux")
+	nodeSelectors := map[string]string{
+		"connectInject.nodeSelector":                                "kubernetes.io/os: linux",
+		"connectInject.apiGateway.managedGatewayClass.nodeSelector": "kubernetes.io/os: linux",
+		"client.nodeSelector":                                       "kubernetes.io/os: linux",
+		"acls.nodeSelector":                                         "kubernetes.io/os: linux",
+		"global.acls.nodeSelector":                                  "kubernetes.io/os: linux",
+		"global.tls.nodeSelector":                                   "kubernetes.io/os: linux",
+		"meshGateway.nodeSelector":                                  "kubernetes.io/os: linux",
+		"server.nodeSelector":                                       "kubernetes.io/os: linux",
+		"syncCatalog.nodeSelector":                                  "kubernetes.io/os: linux",
+		"telemetryCollector.nodeSelector":                           "kubernetes.io/os: linux",
+		"webhookCertManager.nodeSelector":                           "kubernetes.io/os: linux",
+		"ingressGateways.defaults.nodeSelector":                     "kubernetes.io/os: linux",
+		"terminatingGateways.defaults.nodeSelector":                 "kubernetes.io/os: linux",
+	}
+	for nodeSelectorKey, nodeSelectorVal := range nodeSelectors {
+		setIfNotEmpty(helmValues, nodeSelectorKey, nodeSelectorVal)
+	}
 
 	if t.EnableWindows {
 		setIfNotEmpty(helmValues, "global.imageK8SWindows", t.ConsulK8SImage+":windows")
