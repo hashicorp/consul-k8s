@@ -209,9 +209,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 
 			// check that the Consul entries were created
-			// On startup, the controller can take upwards of 1m to perform
-			// leader election so we may need to wait a long time for
-			// the reconcile loop to run (hence the 1m timeout here).
 			var gateway *api.APIGatewayConfigEntry
 			var httpRoute *api.HTTPRouteConfigEntry
 			var route *api.TCPRouteConfigEntry
