@@ -173,6 +173,7 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			cfg.SkipWhenOpenshiftAndCNI(t)
+			// TODO: skipping as multiport app is not starting on windows. this happens as proxy-id file not getting created in the shared volume when running multi-port app on windows
 			cfg.SkipWhenWindows(t)
 			ctx := suite.Environment().DefaultContext(t)
 
