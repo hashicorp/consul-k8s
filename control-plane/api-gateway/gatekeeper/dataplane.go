@@ -11,6 +11,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -26,7 +27,7 @@ const (
 	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -85,6 +86,7 @@ func consulDataplaneContainer(config common.HelmConfig, name, namespace string) 
 		},
 		Args:           args,
 		ReadinessProbe: probe,
+		Resources:      *gcc.Spec.Resources,
 	}
 
 	// Configure the Readiness Address for the proxy's health check to be the Pod IP.
