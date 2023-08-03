@@ -303,6 +303,7 @@ func TestPartitions_Gateway(t *testing.T) {
 
 		logger.Log(t, "creating target server in default partition cluster")
 		k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		
 		// Check that static-server injected 2 containers.
 		for _, labelSelector := range []string{"app=static-server"} {
 			podList, err := defaultPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
