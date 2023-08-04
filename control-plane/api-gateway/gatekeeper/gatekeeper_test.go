@@ -623,12 +623,12 @@ func TestUpsert(t *testing.T) {
 						MaxInstances:     common.PointerTo(int32(3)),
 						MinInstances:     common.PointerTo(int32(1)),
 					},
-					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					CopyAnnotations:  v1alpha1.CopyAnnotationsSpec{},
+					OpenshiftSCCName: "test-api-gateway",
 				},
 			},
 			helmConfig: common.HelmConfig{
-				EnableOpenShift:  true,
-				OpenshiftSCCName: "test-api-gateway",
+				EnableOpenShift: true,
 			},
 			initialResources: resources{},
 			finalResources: resources{
