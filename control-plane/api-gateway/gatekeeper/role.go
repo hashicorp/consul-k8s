@@ -85,7 +85,7 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 		role.Rules = append(role.Rules, rbac.PolicyRule{
 			APIGroups:     []string{"security.openshift.io"},
 			Resources:     []string{"securitycontextconstraints"},
-			ResourceNames: []string{config.OpenshiftSCCName},
+			ResourceNames: []string{gcc.Spec.OpenshiftSCCName},
 			Verbs:         []string{"use"},
 		})
 	}

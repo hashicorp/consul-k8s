@@ -161,7 +161,6 @@ spec:
                 {{- if .Values.global.openshift.enabled }}
                 -enable-openshift \
                 {{- end }}
-                -openshift-scc-name={{ .Values.connectInject.apiGateway.openshiftSccName }} \
                 {{- if .Values.connectInject.transparentProxy.defaultOverwriteProbes }}
                 -transparent-proxy-default-overwrite-probes=true \
                 {{- else }}

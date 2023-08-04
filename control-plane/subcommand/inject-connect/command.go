@@ -134,8 +134,7 @@ type Command struct {
 	flagEnableConsulDNS bool
 	flagResourcePrefix  string
 
-	flagEnableOpenShift  bool
-	flagOpenshiftSCCName string
+	flagEnableOpenShift bool
 
 	flagSet *flag.FlagSet
 	consul  *flags.ConsulFlags
@@ -212,8 +211,6 @@ func (c *Command) init() {
 		"Release prefix of the Consul installation used to determine Consul DNS Service name.")
 	c.flagSet.BoolVar(&c.flagEnableOpenShift, "enable-openshift", false,
 		"Indicates that the command runs in an OpenShift cluster.")
-	c.flagSet.StringVar(&c.flagOpenshiftSCCName, "openshift-scc-name", "",
-		"Name of security context constraint to use for gateways on Openshift")
 	c.flagSet.BoolVar(&c.flagEnableWebhookCAUpdate, "enable-webhook-ca-update", false,
 		"Enables updating the CABundle on the webhook within this controller rather than using the web cert manager.")
 	c.flagSet.BoolVar(&c.flagEnableAutoEncrypt, "enable-auto-encrypt", false,
@@ -535,7 +532,6 @@ func (c *Command) Run(args []string) int {
 			ConsulPartition:            c.consul.Partition,
 			ConsulCACert:               string(caCertPem),
 			ReleaseName:                c.flagReleaseName,
-			OpenshiftSCCName:           c.flagOpenshiftSCCName,
 		},
 		AllowK8sNamespacesSet:   allowK8sNamespaces,
 		DenyK8sNamespacesSet:    denyK8sNamespaces,
