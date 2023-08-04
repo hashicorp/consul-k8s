@@ -454,7 +454,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc.cluster.local"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -607,7 +607,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc"))' | tee /dev/stderr)
+      yq '.env[] | select(.name == "CONSUL_ADDRESSES") | [.value] | any(contains("release-name-consul-server.default.svc.cluster.local"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |

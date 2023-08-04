@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -64,14 +63,18 @@ type MeshWebhook struct {
 
 	// ImageConsul is the container image for Consul to use.
 	// ImageConsulDataplane is the container image for Envoy to use.
+	// ImageConsulDataplaneWindows is the Windows container image for Envoy to use.
 	//
 	// Both of these MUST be set.
-	ImageConsul          string
-	ImageConsulDataplane string
+	ImageConsul                 string
+	ImageConsulDataplane        string
+	ImageConsulDataplaneWindows string
 
 	// ImageConsulK8S is the container image for consul-k8s to use.
+	// ImageConsulK8SWindows is the Windows container image for consul-k8s to use.
 	// This image is used for the consul-sidecar container.
-	ImageConsulK8S string
+	ImageConsulK8S        string
+	ImageConsulK8SWindows string
 
 	// Optional: set when you need extra options to be set when running envoy
 	// See a list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
@@ -217,6 +220,12 @@ type multiPortInfo struct {
 	serviceName  string
 }
 
+func isWindows(pod corev1.Pod) bool {
+	podOS := pod.Spec.NodeSelector["kubernetes.io/os"]
+
+	return podOS == "windows"
+}
+
 // Handle is the admission.Webhook implementation that actually handles the
 // webhook request for admission control. This should be registered or
 // served via the controller runtime manager.
@@ -257,7 +266,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
-	pod.Spec.Volumes = append(pod.Spec.Volumes, w.containerVolume())
+	pod.Spec.Volumes = append(pod.Spec.Volumes, w.containerVolume(isWindows(pod)))
 
 	// Optionally mount data volume to other containers
 	w.injectVolumeMount(pod)
@@ -628,15 +637,27 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (cor
 	// In the case of a multiPort pod, there may be another service account
 	// token mounted as a different volume. Its name must be <svc>-serviceaccount.
 	// If not we'll fall back to the service account for the pod.
+
+	isWindowsPod := isWindows(pod)
+
+	mountPath := fmt.Sprintf("/consul/serviceaccount-%s", multiPortSvcName)
+	if isWindowsPod {
+		mountPath = fmt.Sprintf("C:\\consul\\serviceaccount-%s", multiPortSvcName)
+	}
+
 	if multiPortSvcName != "" {
 		for _, v := range pod.Spec.Volumes {
 			if v.Name == fmt.Sprintf("%s-service-account", multiPortSvcName) {
-				mountPath := fmt.Sprintf("/consul/serviceaccount-%s", multiPortSvcName)
-				return corev1.VolumeMount{
+				volumeMount := corev1.VolumeMount{
 					Name:      v.Name,
 					ReadOnly:  true,
 					MountPath: mountPath,
-				}, filepath.Join(mountPath, "token"), nil
+				}
+				tokenPath := mountPath + "/" + "token"
+				if isWindowsPod {
+					tokenPath = mountPath + "\\" + "token"
+				}
+				return volumeMount, tokenPath, nil
 			}
 		}
 	}
@@ -658,7 +679,13 @@ func findServiceAccountVolumeMount(pod corev1.Pod, multiPortSvcName string) (cor
 		return volumeMount, "", errors.New("unable to find service account token volumeMount")
 	}
 
-	return volumeMount, "/var/run/secrets/kubernetes.io/serviceaccount/token", nil
+	tokenPath := "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+	if isWindows(pod) {
+		tokenPath = "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token"
+	}
+
+	return volumeMount, tokenPath, nil
 }
 
 func (w *MeshWebhook) annotatedServiceNames(pod corev1.Pod) []string {

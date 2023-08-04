@@ -5,11 +5,13 @@ package webhook
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/stretchr/testify/require"
@@ -1453,4 +1455,410 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 // boolPtr returns pointer to b.
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
+	minimal := func() *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: "default",
+				Annotations: map[string]string{
+					constants.AnnotationService: "foo",
+				},
+			},
+
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name: "web",
+					},
+					{
+						Name: "web-side",
+					},
+					{
+						Name: "auth-method-secret",
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "service-account-secret",
+								MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+							},
+						},
+					},
+				},
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "windows",
+				},
+			},
+			Status: corev1.PodStatus{
+				HostIP: "1.1.1.1",
+				PodIP:  "2.2.2.2",
+			},
+		}
+	}
+
+	cases := []struct {
+		Name    string
+		Pod     func(*corev1.Pod) *corev1.Pod
+		Webhook MeshWebhook
+		ExpArgs string
+		ExpEnv  []corev1.EnvVar
+	}{
+		{
+			"windows default",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress: "consul-server.default.svc.cluster.local",
+				ConsulConfig:  &consul.Config{GRPCPort: 8502},
+				LogLevel:      "info",
+				LogJSON:       false,
+			},
+			" -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows custom gRPC port",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress: "consul-server.default.svc.cluster.local",
+				ConsulConfig:  &consul.Config{GRPCPort: 8602},
+				LogLevel:      "info",
+				LogJSON:       false,
+			},
+			" -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with ACLs",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress: "consul-server.default.svc.cluster.local",
+				ConsulConfig:  &consul.Config{GRPCPort: 8502},
+				LogLevel:      "info",
+				LogJSON:       false,
+				AuthMethod:    "test-auth-method",
+			},
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+				"-login-meta=pod=k8snamespace/test-pod -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with ACLs and namespace mirroring",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:        "consul-server.default.svc.cluster.local",
+				ConsulConfig:         &consul.Config{GRPCPort: 8502},
+				LogLevel:             "info",
+				LogJSON:              false,
+				AuthMethod:           "test-auth-method",
+				EnableNamespaces:     true,
+				EnableK8SNSMirroring: true,
+			},
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with ACLs and single destination namespace",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:              "consul-server.default.svc.cluster.local",
+				ConsulConfig:               &consul.Config{GRPCPort: 8502},
+				LogLevel:                   "info",
+				LogJSON:                    false,
+				AuthMethod:                 "test-auth-method",
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "test-ns",
+			},
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with ACLs and partitions",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:   "consul-server.default.svc.cluster.local",
+				ConsulConfig:    &consul.Config{GRPCPort: 8502},
+				LogLevel:        "info",
+				LogJSON:         false,
+				AuthMethod:      "test-auth-method",
+				ConsulPartition: "test-part",
+			},
+			" -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token " +
+				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with TLS and CA cert provided",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:       "consul-server.default.svc.cluster.local",
+				ConsulConfig:        &consul.Config{GRPCPort: 8502},
+				LogLevel:            "info",
+				LogJSON:             false,
+				TLSEnabled:          true,
+				ConsulTLSServerName: "server.dc1.consul",
+				ConsulCACert:        "consul-ca-cert",
+			},
+			" -tls-server-name=server.dc1.consul -ca-certs=C:\\consul\\connect-inject\\consul-ca.pem -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with TLS and no CA cert provided",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:       "consul-server.default.svc.cluster.local",
+				ConsulConfig:        &consul.Config{GRPCPort: 8502},
+				LogLevel:            "info",
+				LogJSON:             false,
+				TLSEnabled:          true,
+				ConsulTLSServerName: "server.dc1.consul",
+			},
+			" -tls-server-name=server.dc1.consul -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with single destination namespace",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:              "consul-server.default.svc.cluster.local",
+				ConsulConfig:               &consul.Config{GRPCPort: 8502},
+				LogLevel:                   "info",
+				LogJSON:                    false,
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "consul-namespace",
+			},
+			" -service-namespace=consul-namespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with namespace mirroring",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:        "consul-server.default.svc.cluster.local",
+				ConsulConfig:         &consul.Config{GRPCPort: 8502},
+				LogLevel:             "info",
+				LogJSON:              false,
+				EnableNamespaces:     true,
+				EnableK8SNSMirroring: true,
+			},
+			" -service-namespace=k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with namespace mirroring prefix",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:        "consul-server.default.svc.cluster.local",
+				ConsulConfig:         &consul.Config{GRPCPort: 8502},
+				LogLevel:             "info",
+				LogJSON:              false,
+				EnableNamespaces:     true,
+				EnableK8SNSMirroring: true,
+				K8SNSMirroringPrefix: "foo-",
+			},
+			" -service-namespace=foo-k8snamespace -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with partitions",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:   "consul-server.default.svc.cluster.local",
+				ConsulConfig:    &consul.Config{GRPCPort: 8502},
+				LogLevel:        "info",
+				LogJSON:         false,
+				ConsulPartition: "partition-1",
+			},
+			" -service-partition=partition-1 -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with different log level",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress: "consul-server.default.svc.cluster.local",
+				ConsulConfig:  &consul.Config{GRPCPort: 8502},
+				LogLevel:      "debug",
+				LogJSON:       false,
+			},
+			" -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows with different log level and log json",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress: "consul-server.default.svc.cluster.local",
+				ConsulConfig:  &consul.Config{GRPCPort: 8502},
+				LogLevel:      "debug",
+				LogJSON:       true,
+			},
+			" -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows skip server watch enabled",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress:   "consul-server.default.svc.cluster.local",
+				ConsulConfig:    &consul.Config{GRPCPort: 8502},
+				LogLevel:        "info",
+				LogJSON:         false,
+				SkipServerWatch: true,
+			},
+			" -server-watch-disabled=true -tls-disabled -telemetry-prom-scrape-path=/metrics",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+		{
+			"windows custom prometheus scrape path",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress: "consul-server.default.svc.cluster.local",
+				ConsulConfig:  &consul.Config{GRPCPort: 8502},
+				LogLevel:      "info",
+				LogJSON:       false,
+				MetricsConfig: metrics.Config{DefaultPrometheusScrapePath: "/scrape-path"},
+			},
+			" -tls-disabled -telemetry-prom-scrape-path=/scrape-path",
+			[]corev1.EnvVar{
+				{
+					Name:  "TMPDIR",
+					Value: "C:\\consul\\connect-inject",
+				},
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			filepath.Join()
+			w := tt.Webhook
+			pod := *tt.Pod(minimal())
+			container, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
+			require.NoError(t, err)
+			expCmd := "-addresses consul-server.default.svc.cluster.local -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
+				" -proxy-service-id-path=C:\\consul\\connect-inject\\proxyid " +
+				"-log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + tt.ExpArgs
+			require.Equal(t, expCmd, strings.Join(container.Args, " "))
+			if tt.ExpEnv != nil {
+				require.Equal(t, tt.ExpEnv, container.Env[0:1])
+			}
+		})
+	}
 }

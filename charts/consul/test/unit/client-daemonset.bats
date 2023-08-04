@@ -932,7 +932,7 @@ load _helpers
       yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_ADDRESSES") | .value' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-server.default.svc" ]
+  [ "${actual}" = "release-name-consul-server.default.svc.cluster.local" ]
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
   [ "${actual}" = "8501" ]
@@ -948,7 +948,7 @@ load _helpers
       yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_ADDRESSES") | .value' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-server.default.svc" ]
+  [ "${actual}" = "release-name-consul-server.default.svc.cluster.local" ]
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
   [ "${actual}" = "8500" ]
@@ -1307,7 +1307,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.env[2].value | contains("release-name-consul-server.default.svc")' | tee /dev/stderr)
+      yq -r '.env[2].value | contains("release-name-consul-server.default.svc.cluster.local")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -1364,7 +1364,7 @@ load _helpers
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq -r '.env[2].value | contains("release-name-consul-server.default.svc")' | tee /dev/stderr)
+      yq -r '.env[2].value | contains("release-name-consul-server.default.svc.cluster.local")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
@@ -2125,6 +2125,29 @@ rollingUpdate:
       .
   [ "$status" -eq 1 ]
   [[ "$output" =~ "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" ]]
+}
+
+@test "client/DaemonSet: consul login datacenter is set to primary when when federation enabled in non-primary datacenter" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.datacenter=dc1' \
+      --set 'global.federation.enabled=true' \
+      --set 'global.federation.primaryDatacenter=dc2' \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq '[.env[12].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+      yq '[.env[12].value] | any(contains("dc2"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------

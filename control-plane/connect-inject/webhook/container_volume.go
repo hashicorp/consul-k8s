@@ -13,11 +13,15 @@ const volumeName = "consul-connect-inject-data"
 
 // containerVolume returns the volume data to add to the pod. This volume
 // is used for shared data between containers.
-func (w *MeshWebhook) containerVolume() corev1.Volume {
+func (w *MeshWebhook) containerVolume(isWindowsPod bool) corev1.Volume {
+	storageMedium := corev1.StorageMediumMemory
+	if isWindowsPod {
+		storageMedium = corev1.StorageMediumDefault
+	}
 	return corev1.Volume{
 		Name: volumeName,
 		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
+			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: storageMedium},
 		},
 	}
 }
