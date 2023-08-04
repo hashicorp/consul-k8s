@@ -53,12 +53,6 @@ global:
     # Must be "default" in the server cluster ie the Kubernetes cluster that the Consul server pods are deployed onto.
     name: "default"
 
-  # Set imagePullPolicy for all images used. This is applies to all the images being used.
-  # One of "IfNotPresent", "Always", "Never"
-  # Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
-  # @type: string
-  imagePullPolicy: ""
-
   # The name (and tag) of the Consul Docker image for clients and servers.
   # This can be overridden per component. This should be pinned to a specific
   # version tag, otherwise you may inadvertently upgrade your Consul version.
