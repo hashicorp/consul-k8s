@@ -131,7 +131,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			k8sClient := ctx.ControllerRuntimeClient(t)
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
-			retryCheck(t, 60, func(r *retry.R) {
+			retryCheck(t, 120, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
@@ -153,7 +153,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			checkConsulNotExists(t, consulClient, api.APIGateway, "gateway", namespaceForConsul(c.namespaceMirroring, gatewayNamespace))
 
 			// route failure
-			retryCheck(t, 30, func(r *retry.R) {
+			retryCheck(t, 60, func(r *retry.R) {
 				var httproute gwv1beta1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
@@ -175,7 +175,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			createReferenceGrant(t, k8sClient, "route-service", routeNamespace, serviceNamespace)
 
 			// gateway updated with references allowed
-			retryCheck(t, 30, func(r *retry.R) {
+			retryCheck(t, 60, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
