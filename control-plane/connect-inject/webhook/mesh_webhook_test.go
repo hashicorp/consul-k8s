@@ -136,6 +136,31 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/spec/containers/1",
 				},
+
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
 			},
 		},
 
@@ -194,6 +219,26 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
 				},
 			},
 		},
@@ -276,6 +321,30 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
 			},
 		},
 
@@ -331,6 +400,30 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
 			},
 		},
 		{
@@ -379,10 +472,6 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/spec/containers/2/volumeMounts",
-				},
-				{
-					Operation: "add",
 					Path:      "/spec/initContainers",
 				},
 				{
@@ -404,6 +493,38 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/1/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1/volumeMounts",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/2/name",
 				},
 			},
 		},
@@ -464,6 +585,30 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
 				},
 			},
 		},
@@ -550,6 +695,30 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
 			},
 		},
 
@@ -600,6 +769,30 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels/" + escapeJSONPointer(constants.KeyManagedBy),
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
 				},
 			},
 		},
@@ -684,12 +877,40 @@ func TestHandlerHandle(t *testing.T) {
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
-					Operation: "replace",
-					Path:      "/spec/containers/0/livenessProbe/httpGet/port",
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
 				},
 				{
 					Operation: "replace",
-					Path:      "/spec/containers/0/readinessProbe/httpGet/port",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe/tcpSocket",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe/initialDelaySeconds",
+				},
+				{
+					Operation: "remove",
+					Path:      "/spec/containers/0/readinessProbe/httpGet",
+				},
+				{
+					Operation: "remove",
+					Path:      "/spec/containers/0/livenessProbe",
 				},
 			},
 		},
@@ -750,6 +971,30 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
 			},
 		},
 		{
@@ -808,6 +1053,30 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
 				},
 			},
 		},
@@ -883,6 +1152,30 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/spec/dnsConfig",
 				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
 			},
 		},
 		{
@@ -947,6 +1240,31 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+
 				// Note: no DNS policy/config additions.
 			},
 		},
