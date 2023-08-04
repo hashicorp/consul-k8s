@@ -35,10 +35,6 @@ type HelmConfig struct {
 	// and should create SecurityContextConstraints.
 	EnableOpenShift bool
 
-	// OpenshiftSCCName allows the user to specify which security context they
-	// would like to run their gateways with.
-	OpenshiftSCCName string
-
 	// ReleaseName indicates the name of the release for the Helm installation. This value is used
 	// as a prefix for some resources - SecurityContextConstraints, for example - so it must be known.
 	ReleaseName string

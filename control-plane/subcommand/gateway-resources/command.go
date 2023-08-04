@@ -126,7 +126,8 @@ func (c *Command) init() {
 		"The annotations to copy over from a gateway to its service.",
 	)
 	c.flags.StringVar(&c.flagOpenshiftSCCName, "openshift-scc-name", "",
-		"Name of security context constraint to use for gateways on Openshift")
+		"Name of security context constraint to use for gateways on Openshift.",
+	)
 
 	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
