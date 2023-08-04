@@ -416,7 +416,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		require.EqualValues(r, gatewayFinalizer, httproute.Finalizers[0])
 
 		// check parent status
-		require.Len(t, httproute.Status.Parents, 1)
+		require.Len(r, httproute.Status.Parents, 1)
 		require.EqualValues(r, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
 		require.EqualValues(r, "gateway", httproute.Status.Parents[0].ParentRef.Name)
 		checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
