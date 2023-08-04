@@ -156,12 +156,24 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 	// Because there could be multiple secrets attached to the service account,
 	// we need pick the first one of type "kubernetes.io/service-account-token".
 	var saSecret *apiv1.Secret
+	var secretNames []string
+	// In Kube 1.24+ there is no automatically generated long term JWT token for a ServiceAccount.
+	// Furthermore, there is no reference to a Secret in the ServiceAccount. Instead we have deployed
+	// a Secret in Helm which references the ServiceAccount and contains a permanent JWT token.
+	secretNames = append(secretNames, c.withPrefix("auth-method"))
+	// ServiceAccounts always have a SecretRef in Kubernetes < 1.24. The Secret contains the JWT token.
 	for _, secretRef := range authMethodServiceAccount.Secrets {
+		secretNames = append(secretNames, secretRef.Name)
+	}
+	// Because there could be multiple secrets attached to the service account,
+	// we need pick the first one of type corev1.SecretTypeServiceAccountToken.
+	// We will fetch the Secrets regardless of whether we created the Secret or Kubernetes did automatically.
+	for _, secretName := range secretNames {
 		var secret *apiv1.Secret
-		err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", secretRef.Name),
+		err = c.untilSucceeds(fmt.Sprintf("getting %s Secret", secretName),
 			func() error {
 				var err error
-				secret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretRef.Name, metav1.GetOptions{})
+				secret, err = c.clientset.CoreV1().Secrets(c.flagK8sNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 				return err
 			})
 		if secret != nil && secret.Type == apiv1.SecretTypeServiceAccountToken {
@@ -172,8 +184,8 @@ func (c *Command) createAuthMethodTmpl(authMethodName string) (api.ACLAuthMethod
 	if err != nil {
 		return api.ACLAuthMethod{}, err
 	}
-	// This is very unlikely to happen because Kubernetes ensure that there is always
-	// a secret of type ServiceAccountToken.
+	// This is unlikely to happen since we now deploy the secret through Helm, but should catch any corner-cases
+	// where the secret is not deployed for some reason.
 	if saSecret == nil {
 		return api.ACLAuthMethod{},
 			fmt.Errorf("found no secret of type 'kubernetes.io/service-account-token' associated with the %s service account", saName)
