@@ -78,6 +78,8 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
+      nodeSelector:
+        kubernetes.io/os: linux
 {{- end }}
 {{- end }}
 {{- end }}

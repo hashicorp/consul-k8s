@@ -29,7 +29,7 @@ func TestComponentMetrics(t *testing.T) {
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
-
+	cfg.SkipWhenWindows(t)
 	helmValues := map[string]string{
 		"global.datacenter":                 "dc1",
 		"global.metrics.enabled":            "true",
@@ -100,7 +100,7 @@ func TestAppMetrics(t *testing.T) {
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
-
+	cfg.SkipWhenWindows(t)
 	helmValues := map[string]string{
 		"global.datacenter":                          "dc1",
 		"global.metrics.enabled":                     "true",

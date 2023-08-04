@@ -35,7 +35,8 @@ const (
 func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 	cfg := suite.Config()
 	cfg.SkipWhenOpenshiftAndCNI(t)
-
+	// TODO: skipping as pod deleting with grace period does not work with the windows based images
+	cfg.SkipWhenWindows(t)
 	for _, testCfg := range []LifecycleShutdownConfig{
 		{secure: false, helmValues: map[string]string{
 			helmDrainListenersKey:     "true",

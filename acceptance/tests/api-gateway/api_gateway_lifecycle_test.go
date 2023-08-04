@@ -44,7 +44,11 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	// create a service to target
 	targetName := "static-server"
 	logger.Log(t, "creating target server")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	if cfg.EnableWindows {
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+	} else {
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	}
 
 	// create a basic GatewayClassConfig
 	gatewayClassConfigName := "controlled-gateway-class-config"

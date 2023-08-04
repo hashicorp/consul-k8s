@@ -26,7 +26,7 @@ func TestConsulDNS(t *testing.T) {
 	if cfg.UseAKS {
 		t.Skipf("skipping because -use-aks is set")
 	}
-
+	cfg.SkipWhenWindows(t)
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {

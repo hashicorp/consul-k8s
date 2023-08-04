@@ -24,7 +24,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 	if !cfg.EnableTransparentProxy {
 		t.Skipf("skipping this test because -enable-transparent-proxy is not set")
 	}
-
+	cfg.SkipWhenWindowsAndTproxy(t)
 	ver, err := version.NewVersion("1.13.0")
 	require.NoError(t, err)
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
@@ -73,7 +73,11 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service.
 			logger.Log(t, "creating static-server deployment")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-https")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-https-windows")
+			} else {
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-https")
+			}
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service

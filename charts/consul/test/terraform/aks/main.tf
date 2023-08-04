@@ -49,6 +49,10 @@ resource "azurerm_virtual_network_peering" "default" {
   remote_virtual_network_id = azurerm_virtual_network.default[count.index == 0 ? 1 : 0].id
 }
 
+resource "random_password" "winnode" {
+  length = 16
+}
+
 resource "azurerm_kubernetes_cluster" "default" {
   count                             = var.cluster_count
   name                              = "consul-k8s-${random_id.suffix[count.index].dec}"
@@ -58,21 +62,9 @@ resource "azurerm_kubernetes_cluster" "default" {
   kubernetes_version                = "1.24.10"
   role_based_access_control_enabled = true
 
-  // We're setting the network plugin and other network properties explicitly
-  // here even though they are the same as defaults to ensure that none of these CIDRs
-  // overlap with our vnet and subnet. Please see
-  // https://docs.microsoft.com/en-us/azure/aks/configure-kubenet#create-an-aks-cluster-in-the-virtual-network.
-  // We want to use kubenet plugin rather than Azure CNI because pods
-  // using kubenet will not be routable when we peer VNets,
-  // and that gives us more confidence that in any tests where cross-cluster
-  // communication is tested, the connections goes through the appropriate gateway
-  // rather than directly from pod to pod.
+  // We're setting the network plugin to azure since it supports windows node pools
   network_profile {
-    network_plugin     = "kubenet"
-    service_cidr       = "10.0.0.0/16"
-    dns_service_ip     = "10.0.0.10"
-    pod_cidr           = "10.244.0.0/16"
-    docker_bridge_cidr = "172.17.0.1/16"
+    network_plugin = "azure"
   }
 
   default_node_pool {
@@ -81,6 +73,11 @@ resource "azurerm_kubernetes_cluster" "default" {
     vm_size         = "Standard_D3_v2"
     os_disk_size_gb = 30
     vnet_subnet_id  = azurerm_virtual_network.default[count.index].subnet.*.id[0]
+  }
+
+  windows_profile {
+    admin_username = "azadmin"
+    admin_password = random_password.winnode.result
   }
 
   service_principal {
@@ -96,4 +93,14 @@ resource "local_file" "kubeconfigs" {
   content         = azurerm_kubernetes_cluster.default[count.index].kube_config_raw
   filename        = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
   file_permission = "0600"
+}
+
+resource "azurerm_kubernetes_cluster_node_pool" "win" {
+  count                 = var.windows ? var.cluster_count : 0
+  name                  = "win"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.default[count.index].id
+  vm_size               = "Standard_DS2_v2"
+  node_count            = 1
+  os_type               = "Windows"
+  os_sku                = "Windows2019"
 }

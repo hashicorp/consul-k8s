@@ -35,7 +35,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
-
+	cfg.SkipWhenWindowsAndTproxy(t)
 	ver, err := version.NewVersion("1.13.0")
 	require.NoError(t, err)
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
@@ -266,16 +266,28 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			})
 
 			logger.Log(t, "creating static-server in server peer")
-			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+			} else {
+				k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			}
 
 			logger.Log(t, "creating static-client deployments in client peer")
 			if cfg.EnableTransparentProxy {
 				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 			} else {
 				if c.destinationNamespace == defaultNamespace {
-					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default-namespace")
+					if cfg.EnableWindows {
+						k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers-windows/default-namespace")
+					} else {
+						k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default-namespace")
+					}
 				} else {
-					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/non-default-namespace")
+					if cfg.EnableWindows {
+						k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers-windows/non-default-namespace")
+					} else {
+						k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/non-default-namespace")
+					}
 				}
 			}
 			// Check that both static-server and static-client have been injected and now have 2 containers.

@@ -71,6 +71,7 @@ type TestConfig struct {
 	EnterpriseLicense string
 
 	EnableOpenshift bool
+	EnableWindows   bool
 
 	EnablePodSecurityPolicies bool
 
@@ -130,6 +131,29 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	if t.EnableOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
 	}
+	nodeSelectors := map[string]string{
+		"connectInject.nodeSelector":                                "kubernetes.io/os: linux",
+		"connectInject.apiGateway.managedGatewayClass.nodeSelector": "kubernetes.io/os: linux",
+		"client.nodeSelector":                                       "kubernetes.io/os: linux",
+		"acls.nodeSelector":                                         "kubernetes.io/os: linux",
+		"global.acls.nodeSelector":                                  "kubernetes.io/os: linux",
+		"global.tls.nodeSelector":                                   "kubernetes.io/os: linux",
+		"meshGateway.nodeSelector":                                  "kubernetes.io/os: linux",
+		"server.nodeSelector":                                       "kubernetes.io/os: linux",
+		"syncCatalog.nodeSelector":                                  "kubernetes.io/os: linux",
+		"telemetryCollector.nodeSelector":                           "kubernetes.io/os: linux",
+		"webhookCertManager.nodeSelector":                           "kubernetes.io/os: linux",
+		"ingressGateways.defaults.nodeSelector":                     "kubernetes.io/os: linux",
+		"terminatingGateways.defaults.nodeSelector":                 "kubernetes.io/os: linux",
+	}
+	for nodeSelectorKey, nodeSelectorVal := range nodeSelectors {
+		setIfNotEmpty(helmValues, nodeSelectorKey, nodeSelectorVal)
+	}
+
+	if t.EnableWindows {
+		setIfNotEmpty(helmValues, "global.imageK8SWindows", fmt.Sprintf("%s-windows", t.ConsulK8SImage))
+		setIfNotEmpty(helmValues, "global.imageConsulDataplaneWindows", fmt.Sprintf("%s-windows", t.ConsulDataplaneImage))
+	}
 
 	if t.EnablePodSecurityPolicies {
 		setIfNotEmpty(helmValues, "global.enablePodSecurityPolicies", "true")
@@ -161,7 +185,6 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
 	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
-
 	return helmValues, nil
 }
 
@@ -232,6 +255,18 @@ func (t *TestConfig) entImage() (string, error) {
 func (c *TestConfig) SkipWhenOpenshiftAndCNI(t *testing.T) {
 	if c.EnableOpenshift && c.EnableCNI {
 		t.Skip("skipping because -enable-cni and -enable-openshift are set and this test doesn't deploy apps correctly")
+	}
+}
+
+func (c *TestConfig) SkipWhenWindows(t *testing.T) {
+	if c.EnableWindows {
+		t.Skip("skipping because -enable-windows is set")
+	}
+}
+
+func (c *TestConfig) SkipWhenWindowsAndTproxy(t *testing.T) {
+	if c.EnableWindows && c.EnableTransparentProxy {
+		t.Skip("skipping because windows dosent support transparent proxy")
 	}
 }
 

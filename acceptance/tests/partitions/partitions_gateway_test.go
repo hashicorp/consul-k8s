@@ -32,7 +32,7 @@ func TestPartitions_Gateway(t *testing.T) {
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
-
+	cfg.SkipWhenWindowsAndTproxy(t)
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 
@@ -217,7 +217,11 @@ func TestPartitions_Gateway(t *testing.T) {
 	// Since we're deploying the gateway in the secondary cluster, we create the static client
 	// in the secondary as well.
 	logger.Log(t, "creating static-client pod in secondary partition cluster")
-	k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+	if cfg.EnableWindows {
+		k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client-windows")
+	} else {
+		k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+	}
 
 	logger.Log(t, "creating api-gateway resources")
 	out, err := k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-k", "../fixtures/bases/api-gateway")
@@ -254,7 +258,11 @@ func TestPartitions_Gateway(t *testing.T) {
 	t.Run("in-partition", func(t *testing.T) {
 		logger.Log(t, "test in-partition networking")
 		logger.Log(t, "creating target server in secondary partition cluster")
-		k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		if cfg.EnableWindows {
+			k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+		} else {
+			k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		}
 
 		// Check that static-server injected 2 containers.
 		for _, labelSelector := range []string{"app=static-server"} {
@@ -302,7 +310,11 @@ func TestPartitions_Gateway(t *testing.T) {
 		logger.Log(t, "test cross-partition networking")
 
 		logger.Log(t, "creating target server in default partition cluster")
-		k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		if cfg.EnableWindows {
+			k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+		} else {
+			k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		}
 
 		// Check that static-server injected 2 containers.
 		for _, labelSelector := range []string{"app=static-server"} {

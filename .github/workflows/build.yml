@@ -8,6 +8,7 @@ on:
     branches:
       # Push events on main branch
       - main
+      - aahel/new-test-fix
       # Push events to branches matching refs/heads/release/**
       - "release/**"
 
@@ -240,6 +241,55 @@ jobs:
         with:
           name: ${{ env.DEB_PACKAGE }}
           path: out/${{ env.DEB_PACKAGE }}
+
+  build-docker-windows:
+    strategy:
+      matrix:
+        include:
+          - { goos: "windows", goarch: "386" }
+          - { goos: "windows", goarch: "amd64" }
+          - { goos: "windows", goarch: "amd64", fips: ".fips1402" }
+    name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build
+    needs: [get-product-version, build-windows]
+    runs-on: windows-2019
+    env:
+      repo: ${{ github.event.repository.name }}
+      version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
+    steps:
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
+        with:
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos}}_${{ matrix.goarch }}.zip
+          path: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
+      - name: extract consul-cni zip
+        shell: bash
+        env:
+          ZIP_LOCATION: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
+        run: |
+          cd "${ZIP_LOCATION}"
+          unzip -j *.zip
+      - name: Docker Build (Action)
+        uses: hashicorp/actions-docker-build@v1
+        with:
+          smoke_test: |
+            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
+            if [ "${TEST_VERSION}" != "v${version}" ]; then
+              echo "Test FAILED"
+              exit 1
+            fi
+            echo "Test PASSED"
+          version: ${{ env.version }}
+          target: release-default
+          arch: ${{ matrix.goarch }}
+          pkg_name: consul-k8s-control-plane_${{ env.version }}
+          bin_name: consul-k8s-control-plane
+          dockerfile: ../Dockerfile-dev.windows
+          workdir: control-plane
+          tags: |
+            docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-windows
+          dev_tags: |
+            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-windows
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-windows-${{ github.sha }}
 
   build-docker:
     name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build

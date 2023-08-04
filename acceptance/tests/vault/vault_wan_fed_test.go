@@ -55,7 +55,9 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// In the primary cluster, we will expose Vault server as a Load balancer
 	// or a NodePort service so that the secondary can connect to it.
 	primaryVaultHelmValues := map[string]string{
-		"server.service.type": "LoadBalancer",
+		"server.service.type":   "LoadBalancer",
+		"injector.nodeSelector": "kubernetes.io/os: linux",
+		"server.nodeSelector":   "kubernetes.io/os: linux",
 	}
 	if cfg.UseKind {
 		primaryVaultHelmValues["server.service.type"] = "NodePort"
@@ -74,6 +76,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"server.enabled":             "false",
 		"injector.externalVaultAddr": externalVaultAddress,
 		"injector.authPath":          "auth/kubernetes-dc2",
+		"injector.nodeSelector":      "kubernetes.io/os: linux",
+		"server.nodeSelector":        "kubernetes.io/os: linux",
 	}
 
 	secondaryVaultCluster := vault.NewVaultCluster(t, secondaryCtx, cfg, vaultReleaseName, secondaryVaultHelmValues)
@@ -500,10 +504,18 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	// Check that we can connect services over the mesh gateways.
 
 	logger.Log(t, "creating static-server in dc2")
-	k8s.DeployKustomize(t, secondaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	if cfg.EnableWindows {
+		k8s.DeployKustomize(t, secondaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+	} else {
+		k8s.DeployKustomize(t, secondaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	}
 
 	logger.Log(t, "creating static-client in dc1")
-	k8s.DeployKustomize(t, primaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+	if cfg.EnableWindows {
+		k8s.DeployKustomize(t, primaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc-windows")
+	} else {
+		k8s.DeployKustomize(t, primaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+	}
 
 	logger.Log(t, "creating intention")
 	_, _, err = primaryClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
