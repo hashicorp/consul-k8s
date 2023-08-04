@@ -211,7 +211,7 @@ spec:
           -gateway-kind="ingress-gateway" \
           -proxy-id-file=/consul/service/proxy-id \
           -service-name={{ template "consul.fullname" $root }}-{{ .name }} \
-          -log-level={{ default $root.Values.global.logLevel }} \
+          -log-level={{ default $root.Values.global.logLevel $root.Values.ingressGateways.logLevel }} \
           -log-json={{ $root.Values.global.logJSON }}
         volumeMounts:
         - name: consul-service
@@ -319,7 +319,7 @@ spec:
         {{- if $root.Values.global.adminPartitions.enabled }}
         - -service-partition={{ $root.Values.global.adminPartitions.name }}
         {{- end }}
-        - -log-level={{ default $root.Values.global.logLevel }}
+        - -log-level={{ default $root.Values.global.logLevel $root.Values.ingressGateways.logLevel }}
         - -log-json={{ $root.Values.global.logJSON }}
         {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
         - -telemetry-prom-scrape-path=/metrics

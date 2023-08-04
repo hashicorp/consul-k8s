@@ -1197,3 +1197,24 @@ load _helpers
   local actual=$(echo $object |  jq -r .audit.sink.MySink3.type | tee /dev/stderr)
   [ "${actual}" = "file" ]
 }
+
+@test "server/ConfigMap: server.logLevel is empty" {
+  cd `chart_dir`
+  local configmap=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${configmap}" = "null" ]
+}
+
+@test "server/ConfigMap: server.logLevel is non empty" {
+  cd `chart_dir`
+  local configmap=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${configmap}" = "DEBUG" ]
+}
