@@ -5,6 +5,7 @@ package webhook
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -34,16 +35,37 @@ type initContainerCommandData struct {
 	MultiPort bool
 
 	// Log settings for the connect-init command.
-	LogLevel string
-	LogJSON  bool
+	LogLevel  string
+	LogJSON   bool
+	IsWindows bool
 }
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
 func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
+	var connectInjectDir, imageConsulK8s, initContainerCommandInterpreter, initContainerCommandTpl string
+
+	isWindows := isWindows(pod)
+
+	if isWindows {
+		connectInjectDir = "C:\\consul\\connect-inject"
+		imageConsulK8s = w.ImageConsulK8SWindows
+		initContainerCommandInterpreter = "sh"
+		initContainerCommandTpl = initContainerCommandTplWindows
+	} else {
+		connectInjectDir = "/consul/connect-inject"
+		imageConsulK8s = w.ImageConsulK8S
+		initContainerCommandInterpreter = "/bin/sh"
+		initContainerCommandTpl = initContainerCommandTplLinux
+	}
+
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
+		return corev1.Container{}, err
+	}
+	if tproxyEnabled && isWindows {
+		err = errors.New("transparent proxy is not supported on windows")
 		return corev1.Container{}, err
 	}
 
@@ -54,13 +76,14 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		MultiPort:  multiPort,
 		LogLevel:   w.LogLevel,
 		LogJSON:    w.LogJSON,
+		IsWindows:  isWindows,
 	}
 
 	// Create expected volume mounts
 	volMounts := []corev1.VolumeMount{
 		{
 			Name:      volumeName,
-			MountPath: "/consul/connect-inject",
+			MountPath: connectInjectDir,
 		},
 	}
 
@@ -102,9 +125,11 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if multiPort {
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
+	command := []string{initContainerCommandInterpreter, "-ec", buf.String()}
+
 	container := corev1.Container{
 		Name:  initContainerName,
-		Image: w.ImageConsulK8S,
+		Image: imageConsulK8s,
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAME",
@@ -149,7 +174,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		},
 		Resources:    w.InitContainerResources,
 		VolumeMounts: volMounts,
-		Command:      []string{"/bin/sh", "-ec", buf.String()},
+		Command:      command,
 	}
 
 	if w.TLSEnabled {
@@ -303,7 +328,7 @@ func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) [
 
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
-const initContainerCommandTpl = `
+const initContainerCommandTplLinux = `
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
@@ -314,6 +339,26 @@ consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD
   {{- if .MultiPort }}
   -multiport=true \
   -proxy-id-file=/consul/connect-inject/proxyid-{{ .ServiceName }} \
+  {{- if not .AuthMethod }}
+  -service-name="{{ .ServiceName }}" \
+  {{- end }}
+  {{- end }}
+`
+
+// initContainerCommandTplWindows is the template for the command executed by
+// the Windows init container.
+const initContainerCommandTplWindows = `
+consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level={{ .LogLevel }} \
+  -log-json={{ .LogJSON }} \
+  -is-windows=true \
+  {{- if .AuthMethod }}
+  -service-account-name="{{ .ServiceAccountName }}" \
+  -service-name="{{ .ServiceName }}" \
+  {{- end }}
+  {{- if .MultiPort }}
+  -multiport=true \
+  -proxy-id-file=C:\\consul\\connect-inject\\proxyid-{{ .ServiceName }} \
   {{- if not .AuthMethod }}
   -service-name="{{ .ServiceName }}" \
   {{- end }}

@@ -662,19 +662,19 @@ key2: value2' \
       yq '.spec.template.spec.initContainers[] | select(.name == "mesh-gateway-init")' | tee /dev/stderr)
 
   local actual=$(echo $object |
-      yq '[.env[10].name] | any(contains("CONSUL_LOGIN_AUTH_METHOD"))' | tee /dev/stderr)
+      yq '[.env[11].name] | any(contains("CONSUL_LOGIN_AUTH_METHOD"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[10].value] | any(contains("release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
+      yq '[.env[11].value] | any(contains("release-name-consul-k8s-component-auth-method-dc2"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[11].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
+      yq '[.env[12].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-      yq '[.env[11].value] | any(contains("dc1"))' | tee /dev/stderr)
+      yq '[.env[12].value] | any(contains("dc1"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

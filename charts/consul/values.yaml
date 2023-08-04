@@ -53,6 +53,12 @@ global:
     # Must be "default" in the server cluster ie the Kubernetes cluster that the Consul server pods are deployed onto.
     name: "default"
 
+  # Set imagePullPolicy for all images used. This is applies to all the images being used.
+  # One of "IfNotPresent", "Always", "Never"
+  # Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
+  # @type: string
+  imagePullPolicy: ""
+
   # The name (and tag) of the Consul Docker image for clients and servers.
   # This can be overridden per component. This should be pinned to a specific
   # version tag, otherwise you may inadvertently upgrade your Consul version.
@@ -87,6 +93,7 @@ global:
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
   imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.3.0-dev
+  imageK8SWindows: ""
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -386,6 +393,19 @@ global:
       # @type: string
       secretKey: null
 
+    # This value defines `nodeSelector` (https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for the tls-init and tls-init-cleanup jobs pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   beta.kubernetes.io/arch: amd64
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
+
     # This value defines additional annotations for
     # tls init jobs. This should be formatted as a multi-line string.
     #
@@ -546,7 +566,7 @@ global:
     # If enabled, this datacenter will be federation-capable. Only federation
     # via mesh gateways is supported.
     # Mesh gateways and servers will be configured to allow federation.
-    # Requires `global.tls.enabled`, `connectInject.enabled`, and one of 
+    # Requires `global.tls.enabled`, `connectInject.enabled`, and one of
     # `meshGateway.enabled` or `externalServers.enabled` to be true.
     # Requires Consul 1.8+.
     enabled: false
@@ -576,7 +596,7 @@ global:
     # from the one used by the Consul Service Mesh.
     # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
     #
-    # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and 
+    # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
     # `externalServers.k8sAuthMethodHost` should be set to the same value.
     #
     # You can retrieve this value from your `kubeconfig` by running:
@@ -628,6 +648,7 @@ global:
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.3-dev
+  imageConsulDataplaneWindows: ""
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -1226,7 +1247,7 @@ server:
     # @type: string
     caCert: null
 
-  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing 
+  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing
   # and configure a sink and filters for their audit logs. Please refer to
   # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
   # for further information.
@@ -1235,7 +1256,7 @@ server:
     # global.acls.manageSystemACLs must be enabled to use this feature.
     enabled: false
 
-    # A single entry of the sink object provides configuration for the destination to which Consul 
+    # A single entry of the sink object provides configuration for the destination to which Consul
     # will log auditing events.
     #
     # Example:
@@ -1250,7 +1271,7 @@ server:
     #     rotate_duration: 24h
     #     rotate_max_files: 15
     #     rotate_bytes: 25165824
-    #     
+    #
     # ```
     #
     # The sink object supports the following keys:
@@ -1362,7 +1383,7 @@ externalServers:
   # This address must be reachable from the Consul servers.
   # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
   #
-  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and 
+  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
   # `externalServers.k8sAuthMethodHost` should be set to the same value.
   #
   # You could retrieve this value from your `kubeconfig` by running:

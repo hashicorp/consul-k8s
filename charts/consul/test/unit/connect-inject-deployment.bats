@@ -50,7 +50,7 @@ load _helpers
 
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_ADDRESSES").value' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-server.default.svc" ]
+  [ "${actual}" = "release-name-consul-server.default.svc.cluster.local" ]
 
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_GRPC_PORT").value' | tee /dev/stderr)

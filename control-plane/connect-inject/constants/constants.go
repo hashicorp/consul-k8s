@@ -5,7 +5,8 @@ package constants
 
 const (
 	// ConsulCAFile is the location of the Consul CA file inside the injected pod.
-	ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
+	ConsulCAFile        = "/consul/connect-inject/consul-ca.pem"
+	ConsulCAFileWindows = "C:\\consul\\connect-inject\\consul-ca.pem"
 
 	// ProxyDefaultInboundPort is the default inbound port for the proxy.
 	ProxyDefaultInboundPort = 20000

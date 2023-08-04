@@ -197,7 +197,68 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
-
+		{
+			"pod with upstreams specified for windows",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationUpstreams: "echo:1234,db:1234",
+							},
+						},
+						Spec: func() corev1.PodSpec {
+							windowsSpec := basicSpec
+							windowsSpec.NodeSelector = map[string]string{"kubernetes.io/os": "windows"}
+							return windowsSpec
+						}(),
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+			},
+		},
 		{
 			"empty pod with injection disabled",
 			MeshWebhook{
@@ -1916,6 +1977,54 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 			err := w.checkUnsupportedMultiPortCases(corev1.Namespace{}, *pod)
 			require.Error(t, err)
 			require.Equal(t, tt.expErr, err.Error())
+		})
+	}
+}
+
+func TestIsWindows(t *testing.T) {
+
+	cases := []struct {
+		Name     string
+		Pod      func(*corev1.Pod) *corev1.Pod
+		expValue bool
+	}{
+		{
+			"Nodeselector not set",
+			func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			false,
+		},
+		{
+			"Nodeselector.kubernetes.io/os set to linux",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec = corev1.PodSpec{
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "linux",
+					},
+				}
+				return pod
+			},
+			false,
+		},
+		{
+			"Nodeselector.kubernetes.io/os set to windows",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec = corev1.PodSpec{
+					NodeSelector: map[string]string{
+						"kubernetes.io/os": "windows",
+					},
+				}
+				return pod
+			},
+			true,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			actual := isWindows(*tt.Pod(&corev1.Pod{}))
+			require.EqualValues(t, tt.expValue, actual)
 		})
 	}
 }
