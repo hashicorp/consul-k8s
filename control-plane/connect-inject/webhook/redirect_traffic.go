@@ -98,7 +98,7 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	// Add init container user ID to exclude from traffic redirection.
 	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(initContainersUserAndGroupID))
 
-	dnsEnabled, err := consulDNSEnabled(ns, pod, w.EnableConsulDNS)
+	dnsEnabled, err := consulDNSEnabled(ns, pod, w.EnableConsulDNS, w.EnableTransparentProxy)
 	if err != nil {
 		return "", err
 	}

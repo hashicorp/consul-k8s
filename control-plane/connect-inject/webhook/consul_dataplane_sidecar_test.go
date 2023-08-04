@@ -1857,6 +1857,8 @@ func TestHandlerConsulDataplaneSidecar_Windows(t *testing.T) {
 		})
 	}
 }
+
+
 // boolPtr returns pointer to b.
 func boolPtr(b bool) *bool {
 	return &b

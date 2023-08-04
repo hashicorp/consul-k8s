@@ -399,6 +399,7 @@ global:
     # @type: string
     nodeSelector: null
 
+
     # This value defines additional annotations for
     # tls init jobs. This should be formatted as a multi-line string.
     #
@@ -642,6 +643,7 @@ global:
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.3-dev
   imageConsulDataplaneWindows: ""
+
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
