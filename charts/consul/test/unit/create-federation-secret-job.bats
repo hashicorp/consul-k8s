@@ -418,3 +418,41 @@ load _helpers
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
 }
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "createFederationSecret/Job: logLevel is not set by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "createFederationSecret/Job: override the global.logLevel flag with global.federation.logLevel" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/create-federation-secret-job.yaml  \
+      --set 'global.federation.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.federation.createFederationSecret=true' \
+      --set 'global.federation.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}

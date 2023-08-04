@@ -161,7 +161,7 @@ spec:
            -gateway-kind="mesh-gateway" \
            -proxy-id-file=/consul/service/proxy-id \
            -service-name={{ .Values.meshGateway.consulServiceName }} \
-           -log-level={{ default .Values.global.logLevel }} \
+           -log-level={{ default .Values.global.logLevel .Values.meshGateway.logLevel }} \
            -log-json={{ .Values.global.logJSON }}
         volumeMounts:
         - name: consul-service
@@ -267,7 +267,7 @@ spec:
         {{- if .Values.global.adminPartitions.enabled }}
         - -service-partition={{ .Values.global.adminPartitions.name }}
         {{- end }}
-        - -log-level={{ default .Values.global.logLevel }}
+        - -log-level={{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
         - -log-json={{ .Values.global.logJSON }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
         - -telemetry-prom-scrape-path=/metrics

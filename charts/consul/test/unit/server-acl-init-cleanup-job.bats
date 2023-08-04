@@ -161,6 +161,34 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# logLevel
+
+@test "serverACLInitCleanup/Job: use global.logLevel by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInitCleanup/Job: override global.logLevel when global.acls.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
 # resources
 
 @test "serverACLInitCleanup/Job: resources defined by default" {
