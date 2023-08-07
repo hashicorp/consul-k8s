@@ -250,7 +250,7 @@ jobs:
           - { goos: "windows", goarch: "amd64" }
           - { goos: "windows", goarch: "amd64", fips: ".fips1402" }
     name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build
-    needs: [get-product-version, build-windows]
+    needs: [get-product-version]
     runs-on: windows-2019
     env:
       repo: ${{ github.event.repository.name }}
