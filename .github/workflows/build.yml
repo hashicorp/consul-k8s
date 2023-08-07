@@ -246,7 +246,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - { goos: "windows", goarch: "386" }
           - { goos: "windows", goarch: "amd64" }
     name: Docker ${{ matrix.goarch }} default release build
     needs: [get-product-version, build]
