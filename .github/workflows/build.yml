@@ -285,6 +285,7 @@ jobs:
           zip_artifact_name: consul-k8s-control-plane_${{ env.version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
           dockerfile: ../Dockerfile-dev.windows
           workdir: control-plane
+          os: windows
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-windows
           dev_tags: |
