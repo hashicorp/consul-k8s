@@ -227,10 +227,8 @@ load _helpers
       -s templates/connect-inject-clusterrole.yaml  \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[13]' | tee /dev/stderr | pbcopy)
-
-  local actual=$(echo $object | yq -r '.resourceNames[| index("restricted-v2")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+      yq '.rules[13].resourceNames | index("restricted-v2")' | tee /dev/stderr)
+  [ "${object}" == 0 ]
 }
 
 @test "connectInject/ClusterRole: adds permission to securitycontextconstraints for Openshift with global.openshift.enabled=true and sets apiGateway Openshift SCC Name" {
@@ -238,10 +236,8 @@ load _helpers
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
       --set 'global.openshift.enabled=true' \
-      --set '.Values.connectInject.apiGateway.openshiftSccName="fakescc"' \
+      --set 'connectInject.apiGateway.managedGatewayClass.openshiftSccName=fakescc' \
       . | tee /dev/stderr |
-      yq -r '.rules[13]' | tee /dev/stderr | pbcopy)
-
-  local actual=$(echo $object | yq -r '.resourceNames[| index("fakescc")' | tee /dev/stderr)
-  [ "${actual}" != null ]
+       yq '.rules[13].resourceNames | index("fakescc")' | tee /dev/stderr)
+   [ "${object}" == 0 ]
 }
