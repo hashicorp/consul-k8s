@@ -1,6 +1,6 @@
 # This dockerfile was not used to build images. It is here as a starting point.
 # We will need to use it later when we have build support for windows images.
-FROM mcr.microsoft.com/windows/servercore:ltsc2019 as windows
+FROM mcr.microsoft.com/windows/servercore:ltsc2019 as release-default
 
 ARG PRODUCT_NAME
 ARG PRODUCT_VERSION
@@ -12,6 +12,8 @@ ARG VERSION
 # and the version to download. Example: PRODUCT_NAME=consul PRODUCT_VERSION=1.2.3.
 ENV BIN_NAME=$BIN_NAME
 ENV PRODUCT_VERSION=$PRODUCT_VERSION
+
+ENV chocolateyVersion=1.4.0
 
 ARG PRODUCT_NAME=$BIN_NAME
 
