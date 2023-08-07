@@ -164,7 +164,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 ## Creating a new CRD
 
 ### The Structs
-1. Run the generate command (installation instructions for `operator-sdk` found [here](https://sdk.operatorframework.io/docs/installation/):
+1. Run the generate command from the `control-plane` directory: (installation instructions for `operator-sdk` found [here](https://sdk.operatorframework.io/docs/installation/):
     ```bash
     operator-sdk create api --group consul --version v1alpha1 --kind IngressGateway --controller --namespaced=true --make=false --resource=true
     ```

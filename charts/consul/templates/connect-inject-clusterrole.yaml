@@ -31,6 +31,7 @@ rules:
   - routeretryfilters
   - routetimeoutfilters
   - httprouteauthfilters
+  - gatewaypolicies
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers

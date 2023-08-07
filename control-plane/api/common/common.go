@@ -18,6 +18,7 @@ const (
 	JWTProvider              string = "jwtprovider"
 	ControlPlaneRequestLimit string = "controlplanerequestlimit"
 	HTTPRouteAuthFilter      string = "httprouteauthfilter"
+	GatewayPolicy            string = "gatewaypolicy"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"
