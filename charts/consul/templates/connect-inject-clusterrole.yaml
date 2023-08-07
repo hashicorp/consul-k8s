@@ -30,6 +30,7 @@ rules:
   - controlplanerequestlimits
   - routeretryfilters
   - routetimeoutfilters
+  - httprouteauthfilters
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers
