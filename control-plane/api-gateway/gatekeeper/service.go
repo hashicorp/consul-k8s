@@ -79,7 +79,7 @@ func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClas
 			// only TCP-based services are supported for now
 			Protocol:   corev1.ProtocolTCP,
 			Port:       int32(listener.Port),
-			TargetPort: intstr.FromInt(common.ToContainerPort(listener.Port)),
+			TargetPort: intstr.FromInt(common.ToContainerPort(listener.Port, gcc.Spec.MapPrivilegedContainerPorts)),
 		})
 
 		seenPorts[listener.Port] = struct{}{}

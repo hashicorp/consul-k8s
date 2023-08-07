@@ -34,6 +34,8 @@ type HelmConfig struct {
 	// EnableOpenShift indicates whether we're deploying into an OpenShift environment
 	// and should create SecurityContextConstraints.
 	EnableOpenShift bool
+
+	MapPrivilegedServicePorts int
 }
 
 type ConsulConfig struct {
