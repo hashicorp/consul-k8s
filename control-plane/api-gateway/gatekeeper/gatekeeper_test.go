@@ -146,6 +146,7 @@ func TestUpsert(t *testing.T) {
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+					MapPrivilegedContainerPorts: 2000,
 				},
 			},
 			helmConfig:       common.HelmConfig{},
