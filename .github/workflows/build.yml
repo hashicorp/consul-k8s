@@ -282,6 +282,7 @@ jobs:
           arch: ${{ matrix.goarch }}
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane.exe
+          zip_artifact_name: consul-k8s-control-plane_${{ env.version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
           dockerfile: ../Dockerfile-dev.windows
           workdir: control-plane
           tags: |
