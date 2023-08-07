@@ -10,8 +10,8 @@ on: pull_request
 
 # these should be the only settings that you will ever need to change
 env:
-  CONSUL_IMAGE: hashicorppreview/consul-enterprise:1.17-dev # Consul's enterprise version to use in tests
-  BRANCH: ${{ github.ref_name }}
+  BRANCH: ${{ github.head_ref || github.ref_name }}
+  SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   CONTEXT: "nightly"
 
 jobs:
@@ -26,4 +26,4 @@ jobs:
           repo: hashicorp/consul-k8s-workflows
           ref: main
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-          inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch": "${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "consul-image":"${{ env.CONSUL_IMAGE }}" }'
+          inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
