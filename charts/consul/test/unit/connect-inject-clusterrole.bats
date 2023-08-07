@@ -236,7 +236,7 @@ load _helpers
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
       --set 'global.openshift.enabled=true' \
-      --set 'connectInject.apiGateway.managedGatewayClass.openshiftSccName=fakescc' \
+      --set 'connectInject.apiGateway.managedGatewayClass.openshiftSCCName=fakescc' \
       . | tee /dev/stderr |
        yq '.rules[13].resourceNames | index("fakescc")' | tee /dev/stderr)
    [ "${object}" == 0 ]

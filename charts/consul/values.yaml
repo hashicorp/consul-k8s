@@ -2201,9 +2201,9 @@ connectInject:
         maxInstances: 1
         minInstances: 1
 
-      # The name of the Openshift SecurityContextConstraint to use for Gateways
+      # The name of the Openshift SecurityContextConstraints resource to use for Gateways
       # @type: string
-      openshiftSccName: "restricted-v2"
+      openshiftSCCName: "restricted-v2"
 
     # Configuration for the ServiceAccount created for the api-gateway component
     serviceAccount:

@@ -192,7 +192,7 @@ rules:
   resources:
     - securitycontextconstraints
   resourceNames:
-    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSccName }}
+    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
   verbs:
     - use
   {{- end }}

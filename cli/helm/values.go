@@ -581,7 +581,7 @@ type ManagedGatewayClass struct {
 	ServiceType      string          `yaml:"serviceType"`
 	UseHostPorts     bool            `yaml:"useHostPorts"`
 	CopyAnnotations  CopyAnnotations `yaml:"copyAnnotations"`
-	OpenshiftSCCName string          `yaml:"openshiftSccName"`
+	OpenshiftSCCName string          `yaml:"openshiftSCCName"`
 }
 
 type Service struct {

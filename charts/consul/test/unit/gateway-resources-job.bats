@@ -92,7 +92,7 @@ target=templates/gateway-resources-job.yaml
       --set 'connectInject.apiGateway.managedGatewayClass.tolerations=- key: bar' \
       --set 'connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations=- bingo' \
       --set 'connectInject.apiGateway.managedGatewayClass.serviceType=Foo' \
-      --set 'connectInject.apiGateway.managedGatewayClass.openshiftSccName=hello' \
+      --set 'connectInject.apiGateway.managedGatewayClass.openshiftSCCName=hello' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
