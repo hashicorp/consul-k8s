@@ -269,7 +269,7 @@ jobs:
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
       - name: Docker Build (Action)
-        uses: absolutelightning/actions-docker-build@v6
+        uses: absolutelightning/actions-docker-build@v7
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
