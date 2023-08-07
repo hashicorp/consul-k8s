@@ -582,7 +582,7 @@ type ManagedGatewayClass struct {
 	UseHostPorts              bool            `yaml:"useHostPorts"`
 	CopyAnnotations           CopyAnnotations `yaml:"copyAnnotations"`
 	OpenshiftSCCName          string          `yaml:"openshiftSCCName"`
-	mapPrivilegedServicePorts int             `yaml:"mapPrivilegedServicePorts"`
+	mapPrivilegedContainerPorts int             `yaml:"mapPrivilegedContainerPorts"`
 }
 
 type Service struct {
