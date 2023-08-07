@@ -245,8 +245,9 @@ var (
 
 	// This custom listener validation error is used to differentiate between an errListenerPortUnavailable because of
 	// direct port conflicts defined by the user (two listeners on the same port) vs a port conflict because we map
-	// privileged ports by adding 2000. (i.e. one listener on 80 and one on 2080 would conflict).
-	errListenerMappedToPrivilegedPortMapping = errors.New("listener conflicts with privileged port mapped by adding 2000")
+	// privileged ports by adding the value passed into the gatewayClassConfig.
+	// (i.e. one listener on 80 with a privileged port mapping of 2000, and one listener on 2080 would conflict).
+	errListenerMappedToPrivilegedPortMapping = errors.New("listener conflicts with privileged port mapped by Gateway Class Config privileged port mapping setting")
 )
 
 // listenerValidationResult contains the result of internally validating a single listener
