@@ -248,12 +248,13 @@ jobs:
         include:
           - { goos: "windows", goarch: "386" }
           - { goos: "windows", goarch: "amd64" }
+          - { goos: "windows", goarch: "amd64", fips: ".fips1402" }
     name: Docker ${{ matrix.goarch }} default release build
     needs: [get-product-version, build]
     runs-on: windows-2019
     env:
       repo: ${{ github.event.repository.name }}
-      version: ${{ needs.get-product-version.outputs.product-version }}
+      version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
     steps:
       - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
@@ -269,6 +270,7 @@ jobs:
           unzip -j *.zip
       - name: Docker Build (Action)
         uses: absolutelightning/actions-docker-build@v25
+        if: ${{ !matrix.fips }}
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
@@ -283,7 +285,7 @@ jobs:
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane.exe
           zip_artifact_name: consul-k8s-control-plane_${{ env.version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
-          dockerfile: ../Dockerfile-dev.windows
+          dockerfile: ../Dockerfile.windows
           workdir: control-plane
           os: windows
           tags: |
