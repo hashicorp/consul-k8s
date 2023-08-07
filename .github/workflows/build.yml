@@ -281,7 +281,7 @@ jobs:
           target: release-default
           arch: ${{ matrix.goarch }}
           pkg_name: consul-k8s-control-plane_${{ env.version }}
-          bin_name: consul-k8s-control-plane
+          bin_name: consul-k8s-control-plane.exe
           dockerfile: ../Dockerfile-dev.windows
           workdir: control-plane
           tags: |
