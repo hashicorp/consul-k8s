@@ -34,10 +34,6 @@ type HelmConfig struct {
 	// EnableOpenShift indicates whether we're deploying into an OpenShift environment
 	// and should create SecurityContextConstraints.
 	EnableOpenShift bool
-
-	// ReleaseName indicates the name of the release for the Helm installation. This value is used
-	// as a prefix for some resources - SecurityContextConstraints, for example - so it must be known.
-	ReleaseName string
 }
 
 type ConsulConfig struct {

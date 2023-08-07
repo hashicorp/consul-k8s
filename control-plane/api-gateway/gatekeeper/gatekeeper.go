@@ -59,7 +59,7 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 
 // Delete removes the resources for handling routing of network traffic.
 // This is done in the reverse order of Upsert due to dependencies between resources.
-func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedName, config common.HelmConfig) error {
+func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedName) error {
 	g.Log.V(1).Info(fmt.Sprintf("Delete Gateway Deployment %s/%s", gatewayName.Namespace, gatewayName.Name))
 
 	if err := g.deleteDeployment(ctx, gatewayName); err != nil {

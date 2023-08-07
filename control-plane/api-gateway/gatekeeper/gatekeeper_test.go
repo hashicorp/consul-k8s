@@ -849,7 +849,7 @@ func TestDelete(t *testing.T) {
 			err := gatekeeper.Delete(context.Background(), types.NamespacedName{
 				Namespace: tc.gateway.Namespace,
 				Name:      tc.gateway.Name,
-			}, tc.helmConfig)
+			})
 			require.NoError(t, err)
 			require.NoError(t, validateResourcesExist(t, client, tc.finalResources))
 			require.NoError(t, validateResourcesAreDeleted(t, client, tc.initialResources))
