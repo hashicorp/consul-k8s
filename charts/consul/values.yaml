@@ -2201,7 +2201,8 @@ connectInject:
         maxInstances: 1
         minInstances: 1
 
-      # The name of the Openshift SecurityContextConstraints resource to use for Gateways
+      # The name of the OpenShift SecurityContextConstraints resource to use for Gateways.
+      # Only applicable if `global.openshift.enabled` is true.
       # @type: string
       openshiftSCCName: "restricted-v2"
 
