@@ -123,10 +123,20 @@ target=templates/gateway-resources-job.yaml
   local actual=$(echo "$spec" | jq '.[16]')
   [ "${actual}" = "\"- bingo\"" ]
 
-    local actual=$(echo "$spec" | jq '.[17]')
-    [ "${actual}" = "\"-service-type=Foo\"" ]
+  local actual=$(echo "$spec" | jq '.[17]')
+  [ "${actual}" = "\"-service-type=Foo\"" ]
+}
 
-  local actual=$(echo "$spec" | jq '.[18]')
+@test "apiGateway/GatewayClassConfig: custom configuration openshift enabled" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s $target  \
+      --set 'global.openshift.enabled=true' \
+      --set 'connectInject.apiGateway.managedGatewayClass.openshiftSCCName=hello' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | jq '.[13]')
   [ "${actual}" = "\"-openshift-scc-name=hello\"" ]
 }
 
