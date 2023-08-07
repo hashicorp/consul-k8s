@@ -267,7 +267,7 @@ jobs:
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
       - name: Docker Build (Action)
-        uses: absolutelightning/actions-docker-build@v25
+        uses: absolutelightning/actions-docker-build@v26
         if: ${{ !matrix.fips }}
         with:
           smoke_test: |
