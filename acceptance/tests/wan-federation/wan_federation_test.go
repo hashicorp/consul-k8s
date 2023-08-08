@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -42,10 +42,6 @@ func TestWANFederation(t *testing.T) {
 
 			env := suite.Environment()
 			cfg := suite.Config()
-
-			if cfg.UseKind {
-				t.Skipf("skipping wan federation tests as they currently fail on Kind even though they work on other clouds.")
-			}
 
 			primaryContext := env.DefaultContext(t)
 			secondaryContext := env.Context(t, 1)
@@ -86,6 +82,7 @@ func TestWANFederation(t *testing.T) {
 			federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
 			require.NoError(t, err)
 			federationSecret.ResourceVersion = ""
+			federationSecret.Namespace = secondaryContext.KubectlOptions(t).Namespace
 			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 			require.NoError(t, err)
 
@@ -161,30 +158,43 @@ func TestWANFederation(t *testing.T) {
 				k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), kustomizeDir)
 			})
 
+			primaryHelper := connhelper.ConnectHelper{
+				Secure:          c.secure,
+				ReleaseName:     releaseName,
+				Ctx:             primaryContext,
+				UseAppNamespace: cfg.EnableRestrictedPSAEnforcement,
+				Cfg:             cfg,
+				ConsulClient:    primaryClient,
+			}
+			secondaryHelper := connhelper.ConnectHelper{
+				Secure:          c.secure,
+				ReleaseName:     releaseName,
+				Ctx:             secondaryContext,
+				UseAppNamespace: cfg.EnableRestrictedPSAEnforcement,
+				Cfg:             cfg,
+				ConsulClient:    secondaryClient,
+			}
+
+			// When restricted PSA enforcement is enabled on the Consul
+			// namespace, deploy the test apps to a different unrestricted
+			// namespace because they can't run in a restricted namespace.
+			// This creates the app namespace only if necessary.
+			primaryHelper.SetupAppNamespace(t)
+			secondaryHelper.SetupAppNamespace(t)
+
 			// Check that we can connect services over the mesh gateways
 			logger.Log(t, "creating static-server in dc2")
-			k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, secondaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			logger.Log(t, "creating static-client in dc1")
-			k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+			k8s.DeployKustomize(t, primaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 			if c.secure {
-				logger.Log(t, "creating intention")
-				_, _, err = primaryClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
-					Kind: api.ServiceIntentions,
-					Name: "static-server",
-					Sources: []*api.SourceIntention{
-						{
-							Name:   StaticClientName,
-							Action: api.IntentionActionAllow,
-						},
-					},
-				}, nil)
-				require.NoError(t, err)
+				primaryHelper.CreateIntention(t)
 			}
 
 			logger.Log(t, "checking that connection is successful")
-			k8s.CheckStaticServerConnectionSuccessful(t, primaryContext.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, primaryHelper.KubectlOptsForApp(t), StaticClientName, "http://localhost:1234")
 		})
 	}
 }
