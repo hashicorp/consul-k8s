@@ -123,7 +123,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 	logger.Log(t, "creating static-server and static-client deployments")
 
-	c.setupAppNamespace(t)
+	c.SetupAppNamespace(t)
 
 	opts := c.KubectlOptsForApp(t)
 	if c.Cfg.EnableCNI && c.Cfg.EnableOpenshift {
@@ -171,10 +171,10 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		})
 }
 
-// setupAppNamespace creates a namespace where applications are deployed. This
+// SetupAppNamespace creates a namespace where applications are deployed. This
 // does nothing if UseAppNamespace is not set. The app namespace is relevant
 // when testing with restricted PSA enforcement enabled.
-func (c *ConnectHelper) setupAppNamespace(t *testing.T) {
+func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 	if !c.UseAppNamespace {
 		return
 	}
