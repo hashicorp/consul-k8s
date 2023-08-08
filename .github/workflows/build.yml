@@ -8,7 +8,7 @@ on:
     branches:
       # Push events on main branch
       - main
-      # This is temporary
+      # This is temporary for development
       - aahel/acc-tes-fix-windows
       # Push events to branches matching refs/heads/release/**
       - "release/**"
