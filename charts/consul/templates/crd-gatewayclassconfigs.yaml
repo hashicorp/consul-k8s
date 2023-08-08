@@ -142,6 +142,15 @@ spec:
                 description: The name of an existing SecurityContextConstraints
                   resource to bind to the managed role when running on OpenShift.
                 type: string
+              mapPrivilegedContainerPorts:
+                type: integer
+                format: int32
+                minimum: 0
+                maximum: 64512
+                description: mapPrivilegedContainerPorts is the value which Consul will add to privileged container port
+                  values (ports < 1024) defined on a Gateway when the number is greater than 0. This cannot be more than
+                  64512 as the highest privileged port is 1023, which would then map to 65535, which is the highest 
+                  valid port number.
             type: object
         type: object
     served: true

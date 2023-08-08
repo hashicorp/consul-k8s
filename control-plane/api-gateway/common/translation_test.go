@@ -320,7 +320,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 			resources.ReferenceCountCertificate(listenerOneCert)
 			resources.ReferenceCountCertificate(listenerTwoCert)
 
-			actualConfigEntry := translator.ToAPIGateway(input, resources)
+			actualConfigEntry := translator.ToAPIGateway(input, resources, &v1alpha1.GatewayClassConfig{})
 
 			if diff := cmp.Diff(expectedConfigEntry, actualConfigEntry); diff != "" {
 				t.Errorf("Translator.GatewayToAPIGateway() mismatch (-want +got):\n%s", diff)

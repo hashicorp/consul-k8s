@@ -2206,6 +2206,12 @@ connectInject:
       # @type: string
       openshiftSCCName: "restricted-v2"
 
+      # This value defines the amount we will add to privileged container ports on gateways that use this class.
+      # This is useful if you don't want to give your containers extra permissions to run privileged ports.
+      # Example: The gateway listener is defined on port 80, but the underlying value of the port on the container
+      # will be the 80 + the number defined below.
+      mapPrivilegedContainerPorts: 0
+
     # Configuration for the ServiceAccount created for the api-gateway component
     serviceAccount:
       # This value defines additional annotations for the client service account. This should be formatted as a multi-line
