@@ -880,6 +880,91 @@ func TestHandlerHandle(t *testing.T) {
 			},
 		},
 		{
+			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref, lifecycle enabled",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             testClientWithServiceAccountAndSecretRefs(),
+				AuthMethod:            "k8s",
+				LifecycleConfig:       lifecycle.Config{DefaultEnableProxyLifecycle: true},
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationService: "web,web-admin",
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/2",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+			},
+		},
+		{
 			"dns redirection enabled",
 			MeshWebhook{
 				Log:                    logrtest.New(t),

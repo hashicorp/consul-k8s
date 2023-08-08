@@ -333,6 +333,13 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Error(err, "checking unsupported cases for multi port pods")
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
+		lifecycleEnabled, ok := w.LifecycleConfig.EnableProxyLifecycle(pod)
+		if ok != nil {
+			lifecycleEnabled = false
+		}
+		//List of sidecar containers for each service. Build list to preserve correct ordering in relation
+		//to services.
+		sidecarContainers := []corev1.Container{}
 		for i, svc := range annotatedSvcNames {
 			w.Log.Info(fmt.Sprintf("service: %s", svc))
 			if w.AuthMethod != "" {
@@ -388,13 +395,17 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 			}
-			//Append the Envoy sidecar before the application container only if lifecycle enabled.
-			lifecycleEnabled, ok := w.LifecycleConfig.EnableProxyLifecycle(pod)
-			if lifecycleEnabled && ok == nil {
-				pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
-			} else {
+			if !lifecycleEnabled {
 				pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+			} else {
+				sidecarContainers = append(sidecarContainers, envoySidecar)
 			}
+
+		}
+
+		//Add sidecar containers first iff lifecycle enabled.
+		if lifecycleEnabled {
+			pod.Spec.Containers = append(sidecarContainers, pod.Spec.Containers...)
 		}
 	}
 
