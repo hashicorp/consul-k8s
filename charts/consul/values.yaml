@@ -2226,6 +2226,8 @@ connectInject:
         memory: "100Mi"
         cpu: "100m"
 
+    openshiftSccName: ""
+
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
     # If true, then all traffic redirection setup uses the consul-cni plugin.

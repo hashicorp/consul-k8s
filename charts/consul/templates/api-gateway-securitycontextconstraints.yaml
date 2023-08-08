@@ -13,15 +13,14 @@ metadata:
   annotations:
     kubernetes.io/description: {{ template "consul.fullname" . }}-api-gateway are the security context constraints required
       to run api-gateways. All api-gateways will reference this single SecurityContextConstraints resource.
-allowHostPorts: true
 allowHostDirVolumePlugin: false
 allowHostIPC: false
+allowHostNetwork: {{ .Values.client.hostNetwork }}
 allowHostPID: false
-allowHostNetwork: false
+allowHostPorts: true
 allowPrivilegeEscalation: true
-allowPrivilegedContainer: true
-allowedCapabilities:
-  - '*'
+allowPrivilegedContainer: false
+allowedCapabilities: null
 defaultAddCapabilities: null
 fsGroup:
   type: MustRunAs
@@ -29,12 +28,15 @@ groups: []
 priority: null
 readOnlyRootFilesystem: false
 requiredDropCapabilities:
+  - KILL
+  - MKNOD
+  - SETUID
+  - SETGID
 runAsUser:
-  type: RunAsAny
+  type: MustRunAsRange
 seLinuxContext:
   type: MustRunAs
 supplementalGroups:
   type: MustRunAs
-users:
-  - system:serviceaccount:consul:consul-consul-gateway-resources
-{{- end -}}
+users: []
+{{- end }}
