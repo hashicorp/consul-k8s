@@ -530,8 +530,10 @@ func TestValidateListeners(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		listeners           []gwv1beta1.Listener
-		expectedAcceptedErr error
+		listeners                   []gwv1beta1.Listener
+		expectedAcceptedErr         error
+		listenerIndexToTest         int
+		mapPrivilegedContainerPorts int32
 	}{
 		"valid protocol HTTP": {
 			listeners: []gwv1beta1.Listener{
@@ -563,9 +565,32 @@ func TestValidateListeners(t *testing.T) {
 			},
 			expectedAcceptedErr: errListenerPortUnavailable,
 		},
+		"conflicted port": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+			},
+			expectedAcceptedErr: errListenerPortUnavailable,
+			listenerIndexToTest: 1,
+		},
+		"conflicted mapped port": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 2080},
+			},
+			expectedAcceptedErr:         errListenerMappedToPrivilegedPortMapping,
+			listenerIndexToTest:         1,
+			mapPrivilegedContainerPorts: 2000,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tt.expectedAcceptedErr, validateListeners(gatewayWithFinalizer(gwv1beta1.GatewaySpec{}), tt.listeners, nil)[0].acceptedErr)
+			gwcc := &v1alpha1.GatewayClassConfig{
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					MapPrivilegedContainerPorts: tt.mapPrivilegedContainerPorts,
+				},
+			}
+
+			require.Equal(t, tt.expectedAcceptedErr, validateListeners(gatewayWithFinalizer(gwv1beta1.GatewaySpec{}), tt.listeners, nil, gwcc)[tt.listenerIndexToTest].acceptedErr)
 		})
 	}
 }
