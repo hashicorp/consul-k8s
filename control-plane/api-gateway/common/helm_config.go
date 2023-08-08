@@ -22,14 +22,14 @@ type HelmConfig struct {
 	EnableNamespaceMirroring   bool
 	AuthMethod                 string
 	// LogLevel is the logging level of the deployed Consul Dataplanes.
-	LogLevel                    string
-	ConsulPartition             string
-	LogJSON                     bool
-	TLSEnabled                  bool
-	PeeringEnabled              bool
-	ConsulTLSServerName         string
-	ConsulCACert                string
-	ConsulConfig                ConsulConfig
+	LogLevel            string
+	ConsulPartition     string
+	LogJSON             bool
+	TLSEnabled          bool
+	PeeringEnabled      bool
+	ConsulTLSServerName string
+	ConsulCACert        string
+	ConsulConfig        ConsulConfig
 
 	// EnableOpenShift indicates whether we're deploying into an OpenShift environment
 	// and should create SecurityContextConstraints.
