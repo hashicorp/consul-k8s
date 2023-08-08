@@ -148,6 +148,7 @@ func TestPartitions_Connect(t *testing.T) {
 
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryPartitionClusterContext)
 
+			// Test commit
 			// Create secondary partition cluster.
 			secondaryPartitionHelmValues := map[string]string{
 				"global.enabled": "false",
