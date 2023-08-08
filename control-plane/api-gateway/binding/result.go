@@ -247,7 +247,7 @@ var (
 	// direct port conflicts defined by the user (two listeners on the same port) vs a port conflict because we map
 	// privileged ports by adding the value passed into the gatewayClassConfig.
 	// (i.e. one listener on 80 with a privileged port mapping of 2000, and one listener on 2080 would conflict).
-	errListenerMappedToPrivilegedPortMapping = errors.New("listener conflicts with privileged port mapped by Gateway Class Config privileged port mapping setting")
+	errListenerMappedToPrivilegedPortMapping = errors.New("listener conflicts with privileged port mapped by GatewayClassConfig privileged port mapping setting")
 )
 
 // listenerValidationResult contains the result of internally validating a single listener

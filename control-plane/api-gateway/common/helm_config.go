@@ -35,6 +35,8 @@ type HelmConfig struct {
 	// and should create SecurityContextConstraints.
 	EnableOpenShift bool
 
+	// MapPrivilegedServicePorts is the value which Consul will add to privileged container port values (ports < 1024)
+	// defined on a Gateway.
 	MapPrivilegedServicePorts int
 }
 
