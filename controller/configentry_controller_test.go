@@ -27,7 +27,7 @@ import (
 const datacenterName = "datacenter"
 
 type testReconciler interface {
-	Reconcile(req ctrl.Request) (ctrl.Result, error)
+	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 }
 
 func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
@@ -413,7 +413,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),
 			}
-			resp, err := r.Reconcile(ctrl.Request{
+			resp, err := r.Reconcile(ctx, ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 			req.NoError(err)
@@ -872,7 +872,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				err := client.Update(ctx, c.configEntryResource)
 				req.NoError(err)
 				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
-				resp, err := r.Reconcile(ctrl.Request{
+				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
 				req.NoError(err)
@@ -1234,7 +1234,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
 				}
 				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
-				resp, err := r.Reconcile(ctrl.Request{
+				resp, err := r.Reconcile(context.Background(), ctrl.Request{
 					NamespacedName: namespacedName,
 				})
 				req.NoError(err)
@@ -1468,7 +1468,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),
 			}
-			resp, err := r.Reconcile(ctrl.Request{
+			resp, err := r.Reconcile(ctx, ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 			req.Error(err)
@@ -1822,7 +1822,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 				Namespace: kubeNS,
 				Name:      c.configEntryResource.KubernetesName(),
 			}
-			resp, err := r.Reconcile(ctrl.Request{
+			resp, err := r.Reconcile(ctx, ctrl.Request{
 				NamespacedName: namespacedName,
 			})
 			req.NoError(err)
@@ -1911,7 +1911,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 						DatacenterName: datacenterName,
 					},
 				}
-				resp, err := reconciler.Reconcile(ctrl.Request{
+				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
 				req.EqualError(err, c.expErr)
@@ -2320,7 +2320,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
 				}
 				r := c.reconciler(client, consulClient, logrtest.TestLogger{T: t})
-				resp, err := r.Reconcile(ctrl.Request{
+				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
 				req.NoError(err)
@@ -2411,11 +2411,11 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	}
 
 	// Create config entries for service-defaults and service-splitter.
-	resp, err := svcDefaultsReconciler.Reconcile(ctrl.Request{NamespacedName: defaultsNamespacedName})
+	resp, err := svcDefaultsReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: defaultsNamespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
 
-	resp, err = svcSplitterReconciler.Reconcile(ctrl.Request{NamespacedName: splitterNamespacedName})
+	resp, err = svcSplitterReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: splitterNamespacedName})
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
 
@@ -2428,7 +2428,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	require.NoError(t, err)
 
 	// Reconcile should fail as the service-splitter still required the service-defaults causing the delete operation on Consul to fail.
-	resp, err = svcDefaultsReconciler.Reconcile(ctrl.Request{NamespacedName: defaultsNamespacedName})
+	resp, err = svcDefaultsReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: defaultsNamespacedName})
 	require.EqualError(t, err, "deleting config entry from consul: Unexpected response code: 500 (discovery chain \"service\" uses a protocol \"tcp\" that does not permit advanced routing or splitting behavior)")
 	require.False(t, resp.Requeue)
 
@@ -2539,7 +2539,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			}
 
 			// Trigger the reconciler.
-			resp, err := svcDefaultsReconciler.Reconcile(ctrl.Request{NamespacedName: defaultsNamespacedName})
+			resp, err := svcDefaultsReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: defaultsNamespacedName})
 			if c.ExpErr != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), c.ExpErr)

@@ -157,6 +157,10 @@ type mockConfigEntry struct {
 	MockName      string
 	MockNamespace string
 	Valid         bool
+	// ConfigEntryResource has to implement metav1.Object so that structs
+	// that implement it effectively implement client.Object which is
+	// the interface supported by controller-runtime reconcile-able resources.
+	metav1.Object
 }
 
 func (in *mockConfigEntry) KubernetesName() string {

@@ -60,4 +60,9 @@ type ConfigEntryResource interface {
 	// DefaultNamespaceFields sets Consul namespace fields on the config entry
 	// spec to their default values if namespaces are enabled.
 	DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string)
+
+	// ConfigEntryResource has to implement metav1.Object so that structs
+	// that implement it effectively implement client.Object which is
+	// the interface supported by controller-runtime reconcile-able resources.
+	metav1.Object
 }
