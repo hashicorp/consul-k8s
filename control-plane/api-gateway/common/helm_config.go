@@ -11,6 +11,7 @@ import (
 const componentAuthMethod = "k8s-component-auth-method"
 
 // HelmConfig is the configuration of gateways that comes in from the user's Helm values.
+// This is a combination of the apiGateway stanza and other settings that impact api-gateways.
 type HelmConfig struct {
 	// ImageDataplane is the Consul Dataplane image to use in gateway deployments.
 	ImageDataplane             string
@@ -18,7 +19,6 @@ type HelmConfig struct {
 	ConsulDestinationNamespace string
 	NamespaceMirroringPrefix   string
 	EnableNamespaces           bool
-	EnableOpenShift            bool
 	EnableNamespaceMirroring   bool
 	AuthMethod                 string
 	// LogLevel is the logging level of the deployed Consul Dataplanes.
@@ -30,6 +30,10 @@ type HelmConfig struct {
 	ConsulTLSServerName string
 	ConsulCACert        string
 	ConsulConfig        ConsulConfig
+
+	// EnableOpenShift indicates whether we're deploying into an OpenShift environment
+	// and should create SecurityContextConstraints.
+	EnableOpenShift bool
 }
 
 type ConsulConfig struct {

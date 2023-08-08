@@ -163,6 +163,7 @@ bar: 2`,
 				flagServiceAnnotations: `
 - foo
 - bar`,
+				flagOpenshiftSCCName: "restricted-v2",
 			},
 		},
 	} {
@@ -245,6 +246,7 @@ func TestRun(t *testing.T) {
 				"-release-name", "test",
 				"-component", "test",
 				"-controller-name", "test",
+				"-openshift-scc-name", "restricted-v2",
 			})
 
 			require.Equal(t, 0, code)

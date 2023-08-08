@@ -99,6 +99,9 @@ spec:
             - {{- toYaml .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations | nindent 14 -}}
             {{- end }}
             - -service-type={{ .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
+            {{- if .Values.global.openshift.enabled  }}
+            - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
+            {{- end }}
             {{- end}}
           resources:
             requests:
