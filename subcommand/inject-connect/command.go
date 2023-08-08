@@ -520,7 +520,7 @@ func (c *Command) certWatcher(ctx context.Context, ch <-chan cert.MetaBundle, cl
 			// The CA Bundle value must be base64 encoded
 			value := base64.StdEncoding.EncodeToString(bundle.CACert)
 
-			_, err := clientset.AdmissionregistrationV1beta1().
+			_, err := clientset.AdmissionregistrationV1().
 				MutatingWebhookConfigurations().
 				Patch(context.TODO(), c.flagAutoName, types.JSONPatchType, []byte(fmt.Sprintf(
 					`[{

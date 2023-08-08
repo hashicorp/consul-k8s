@@ -6,11 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/admission/v1beta1"
+	admissionV1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,7 +28,7 @@ func TestHandlerHandle(t *testing.T) {
 	cases := []struct {
 		Name    string
 		Handler Handler
-		Req     v1beta1.AdmissionRequest
+		Req     admissionV1.AdmissionRequest
 		Err     string // expected error string, not exact
 		Patches []jsonpatch.JsonPatchOperation
 	}{
@@ -39,7 +39,7 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Namespace: metav1.NamespaceSystem,
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
@@ -56,7 +56,7 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
@@ -78,7 +78,7 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -123,7 +123,7 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
@@ -190,7 +190,7 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
@@ -212,7 +212,7 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
@@ -263,7 +263,7 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 					ObjectMeta: metav1.ObjectMeta{
@@ -309,7 +309,7 @@ func TestHandlerHandle(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
@@ -387,7 +387,7 @@ func TestHandler_ErrorsOnProtocolAnnotations(t *testing.T) {
 		DenyK8sNamespacesSet:  mapset.NewSet(),
 	}
 
-	request := v1beta1.AdmissionRequest{
+	request := admissionV1.AdmissionRequest{
 		Namespace: "default",
 		Object: encodeRaw(t, &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{

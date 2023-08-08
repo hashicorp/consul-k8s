@@ -8,7 +8,7 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/admission/v1beta1"
+	admissionV1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -96,10 +96,10 @@ func TestValidateProxyDefault(t *testing.T) {
 				decoder:      decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{
-				AdmissionRequest: v1beta1.AdmissionRequest{
+				AdmissionRequest: admissionV1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
-					Operation: v1beta1.Create,
+					Operation: admissionV1.Create,
 					Object: runtime.RawExtension{
 						Raw: marshalledRequestObject,
 					},

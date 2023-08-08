@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
-	"k8s.io/api/admission/v1beta1"
+	admissionV1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -225,8 +225,8 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var admReq v1beta1.AdmissionReview
-	var admResp v1beta1.AdmissionReview
+	var admReq admissionV1.AdmissionReview
+	var admResp admissionV1.AdmissionReview
 	if _, _, err := deserializer.Decode(body, nil, &admReq); err != nil {
 		h.Log.Error("Could not decode admission request", "err", err)
 		admResp.Response = admissionError(err)
@@ -249,12 +249,12 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 // Mutate takes an admission request and performs mutation if necessary,
 // returning the final API response.
-func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionResponse {
+func (h *Handler) Mutate(req *admissionV1.AdmissionRequest) *admissionV1.AdmissionResponse {
 	// Decode the pod from the request
 	var pod corev1.Pod
 	if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
 		h.Log.Error("Could not unmarshal request to pod", "err", err)
-		return &v1beta1.AdmissionResponse{
+		return &admissionV1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: fmt.Sprintf("Could not unmarshal request to pod: %s", err),
 			},
@@ -262,7 +262,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	}
 
 	// Build the basic response
-	resp := &v1beta1.AdmissionResponse{
+	resp := &admissionV1.AdmissionResponse{
 		Allowed: true,
 		UID:     req.UID,
 	}
@@ -272,7 +272,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 
 	if err := h.validatePod(pod); err != nil {
 		h.Log.Error("Error validating pod", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
+		return &admissionV1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: fmt.Sprintf("Error validating pod: %s", err),
 			},
@@ -284,7 +284,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// uses these annotations.
 	if err := h.defaultAnnotations(&pod, &patches); err != nil {
 		h.Log.Error("Error creating default annotations", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
+		return &admissionV1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: fmt.Sprintf("Error creating default annotations: %s", err),
 			},
@@ -295,7 +295,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	// system namespaces.
 	if shouldInject, err := h.shouldInject(&pod, req.Namespace); err != nil {
 		h.Log.Error("Error checking if should inject", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
+		return &admissionV1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: fmt.Sprintf("Error checking if should inject: %s", err),
 			},
@@ -331,7 +331,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	container, err := h.containerInit(&pod, req.Namespace)
 	if err != nil {
 		h.Log.Error("Error configuring injection init container", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
+		return &admissionV1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: fmt.Sprintf("Error configuring injection init container: %s", err),
 			},
@@ -346,7 +346,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 	esContainer, err := h.envoySidecar(&pod, req.Namespace)
 	if err != nil {
 		h.Log.Error("Error configuring injection sidecar container", "err", err, "Request Name", req.Name)
-		return &v1beta1.AdmissionResponse{
+		return &admissionV1.AdmissionResponse{
 			Result: &metav1.Status{
 				Message: fmt.Sprintf("Error configuring injection sidecar container: %s", err),
 			},
@@ -388,7 +388,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		patch, err = json.Marshal(patches)
 		if err != nil {
 			h.Log.Error("Could not marshal patches", "err", err, "Request Name", req.Name)
-			return &v1beta1.AdmissionResponse{
+			return &admissionV1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: fmt.Sprintf("Could not marshal patches: %s", err),
 				},
@@ -396,7 +396,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		}
 
 		resp.Patch = patch
-		patchType := v1beta1.PatchTypeJSONPatch
+		patchType := admissionV1.PatchTypeJSONPatch
 		resp.PatchType = &patchType
 	}
 
@@ -407,7 +407,7 @@ func (h *Handler) Mutate(req *v1beta1.AdmissionRequest) *v1beta1.AdmissionRespon
 		if _, err := namespaces.EnsureExists(h.ConsulClient, h.consulNamespace(req.Namespace), h.CrossNamespaceACLPolicy); err != nil {
 			h.Log.Error("Error checking or creating namespace", "err", err,
 				"Namespace", h.consulNamespace(req.Namespace), "Request Name", req.Name)
-			return &v1beta1.AdmissionResponse{
+			return &admissionV1.AdmissionResponse{
 				Result: &metav1.Status{
 					Message: fmt.Sprintf("Error checking or creating namespace: %s", err),
 				},
@@ -534,8 +534,8 @@ func portValue(pod *corev1.Pod, value string) (int32, error) {
 	return int32(raw), err
 }
 
-func admissionError(err error) *v1beta1.AdmissionResponse {
-	return &v1beta1.AdmissionResponse{
+func admissionError(err error) *admissionV1.AdmissionResponse {
+	return &admissionV1.AdmissionResponse{
 		Result: &metav1.Status{
 			Message: err.Error(),
 		},

@@ -1,3 +1,4 @@
+//go:build enterprise
 // +build enterprise
 
 package connectinject
@@ -14,7 +15,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/mattbaird/jsonpatch"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/admission/v1beta1"
+	admissionV1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -36,7 +37,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 	cases := []struct {
 		Name               string
 		Handler            Handler
-		Req                v1beta1.AdmissionRequest
+		Req                admissionV1.AdmissionRequest
 		ExpectedNamespaces []string
 	}{
 		{
@@ -48,7 +49,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -66,7 +67,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "default",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -84,7 +85,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "dest",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -102,7 +103,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableNamespaces:           true,
 				ConsulDestinationNamespace: "dest",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -121,7 +122,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -140,7 +141,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				ConsulDestinationNamespace: "default", // will be overridden
 				EnableK8SNSMirroring:       true,
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -160,7 +161,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				K8SNSMirroringPrefix:       "k8s-",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -180,7 +181,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				K8SNSMirroringPrefix:       "k8s-",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -254,7 +255,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 	cases := []struct {
 		Name               string
 		Handler            Handler
-		Req                v1beta1.AdmissionRequest
+		Req                admissionV1.AdmissionRequest
 		ExpectedNamespaces []string
 	}{
 		{
@@ -267,7 +268,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "default",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -286,7 +287,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "default",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -305,7 +306,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "dest",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -324,7 +325,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				ConsulDestinationNamespace: "dest",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -344,7 +345,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -364,7 +365,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				EnableK8SNSMirroring:       true,
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -385,7 +386,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				K8SNSMirroringPrefix:       "k8s-",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -406,7 +407,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				K8SNSMirroringPrefix:       "k8s-",
 				CrossNamespaceACLPolicy:    "cross-namespace-policy",
 			},
-			v1beta1.AdmissionRequest{
+			admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: basicSpec,
 				}),
@@ -567,7 +568,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 				ConsulClient:               client,
 			}
 
-			resp := handler.Mutate(&v1beta1.AdmissionRequest{
+			resp := handler.Mutate(&admissionV1.AdmissionRequest{
 				Object: encodeRaw(t, &corev1.Pod{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{

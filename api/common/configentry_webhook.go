@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"gomodules.xyz/jsonpatch/v2"
-	"k8s.io/api/admission/v1beta1"
+	admissionV1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -44,7 +44,7 @@ func ValidateConfigEntry(
 	// mapping all kube resources to a single Consul namespace is when we
 	// are running Consul enterprise with namespace mirroring.
 	singleConsulDestNS := !(enableConsulNamespaces && nsMirroring)
-	if req.Operation == v1beta1.Create && singleConsulDestNS {
+	if req.Operation == admissionV1.Create && singleConsulDestNS {
 		logger.Info("validate create", "name", cfgEntry.KubernetesName())
 
 		list, err := configEntryLister.List(ctx)

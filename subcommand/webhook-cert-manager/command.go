@@ -275,7 +275,7 @@ func (c *Command) updateWebhookConfig(ctx context.Context, metaBundle cert.MetaB
 	}
 	value := base64.StdEncoding.EncodeToString(metaBundle.CACert)
 
-	webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, metaBundle.WebhookConfigName, metav1.GetOptions{})
+	webhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, metaBundle.WebhookConfigName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ func (c *Command) updateWebhookConfig(ctx context.Context, metaBundle cert.MetaB
 		return err
 	}
 
-	if _, err = clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Patch(ctx, metaBundle.WebhookConfigName, types.JSONPatchType, patchesJson, metav1.PatchOptions{}); err != nil {
+	if _, err = clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Patch(ctx, metaBundle.WebhookConfigName, types.JSONPatchType, patchesJson, metav1.PatchOptions{}); err != nil {
 		return err
 	}
 	return nil
@@ -301,7 +301,7 @@ func (c *Command) updateWebhookConfig(ctx context.Context, metaBundle cert.MetaB
 // webhookUpdated verifies if every caBundle on the specified webhook configuration matches the desired CA certificate.
 // It returns true if the CA is up-to date and false if it needs to be updated.
 func (c *Command) webhookUpdated(ctx context.Context, bundle cert.MetaBundle, clientset kubernetes.Interface) bool {
-	webhookCfg, err := clientset.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, bundle.WebhookConfigName, metav1.GetOptions{})
+	webhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, bundle.WebhookConfigName, metav1.GetOptions{})
 	if err != nil {
 		return false
 	}
@@ -325,7 +325,7 @@ func (c webhookConfig) validate(ctx context.Context, client kubernetes.Interface
 	if c.Name == "" {
 		err = multierror.Append(err, errors.New(`config.Name cannot be ""`))
 	} else {
-		if _, err2 := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{}); err2 != nil && k8serrors.IsNotFound(err2) {
+		if _, err2 := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{}); err2 != nil && k8serrors.IsNotFound(err2) {
 			err = multierror.Append(err, errors.New(fmt.Sprintf("MutatingWebhookConfiguration with name \"%s\" must exist in cluster", c.Name)))
 		}
 	}
