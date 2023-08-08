@@ -19,7 +19,7 @@ import (
 )
 
 func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
-	if config.AuthMethod == "" {
+	if config.AuthMethod == "" && !config.EnableOpenShift {
 		return g.deleteRole(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
@@ -40,7 +40,7 @@ func (g *Gatekeeper) upsertRole(ctx context.Context, gateway gwv1beta1.Gateway, 
 		return errors.New("role not owned by controller")
 	}
 
-	role = g.role(gateway, gcc)
+	role = g.role(gateway, gcc, config)
 	if err := ctrl.SetControllerReference(&gateway, role, g.Client.Scheme()); err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (g *Gatekeeper) deleteRole(ctx context.Context, gwName types.NamespacedName
 	return nil
 }
 
-func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) *rbac.Role {
+func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) *rbac.Role {
 	role := &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      gateway.Name,
@@ -77,6 +77,15 @@ func (g *Gatekeeper) role(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassCo
 			APIGroups:     []string{"policy"},
 			Resources:     []string{"podsecuritypolicies"},
 			ResourceNames: []string{gcc.Spec.PodSecurityPolicy},
+			Verbs:         []string{"use"},
+		})
+	}
+
+	if config.EnableOpenShift {
+		role.Rules = append(role.Rules, rbac.PolicyRule{
+			APIGroups:     []string{"security.openshift.io"},
+			Resources:     []string{"securitycontextconstraints"},
+			ResourceNames: []string{gcc.Spec.OpenshiftSCCName},
 			Verbs:         []string{"use"},
 		})
 	}

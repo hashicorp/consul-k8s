@@ -138,6 +138,10 @@ spec:
                       type: string
                   type: object
                 type: array
+              openshiftSCCName:
+                description: The name of an existing SecurityContextConstraints
+                  resource to bind to the managed role when running on OpenShift.
+                type: string
             type: object
         type: object
     served: true
