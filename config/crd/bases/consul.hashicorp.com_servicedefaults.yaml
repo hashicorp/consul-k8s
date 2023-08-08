@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: v0.6.0
   creationTimestamp: null
   name: servicedefaults.consul.hashicorp.com
 spec:
@@ -31,10 +31,14 @@ spec:
       description: ServiceDefaults is the Schema for the servicedefaults API
       properties:
         apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
-          description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
@@ -42,57 +46,75 @@ spec:
           description: ServiceDefaultsSpec defines the desired state of ServiceDefaults
           properties:
             expose:
-              description: Expose controls the default expose path configuration for Envoy.
+              description: Expose controls the default expose path configuration for
+                Envoy.
               properties:
                 checks:
-                  description: Checks defines whether paths associated with Consul checks will be exposed. This flag triggers exposing all HTTP and GRPC check paths registered for the service.
+                  description: Checks defines whether paths associated with Consul
+                    checks will be exposed. This flag triggers exposing all HTTP and
+                    GRPC check paths registered for the service.
                   type: boolean
                 paths:
                   description: Paths is the list of paths exposed through the proxy.
                   items:
                     properties:
                       listenerPort:
-                        description: ListenerPort defines the port of the proxy's listener for exposed paths.
+                        description: ListenerPort defines the port of the proxy's
+                          listener for exposed paths.
                         type: integer
                       localPathPort:
-                        description: LocalPathPort is the port that the service is listening on for the given path.
+                        description: LocalPathPort is the port that the service is
+                          listening on for the given path.
                         type: integer
                       path:
-                        description: Path is the path to expose through the proxy, ie. "/metrics".
+                        description: Path is the path to expose through the proxy,
+                          ie. "/metrics".
                         type: string
                       protocol:
-                        description: Protocol describes the upstream's service protocol. Valid values are "http" and "http2", defaults to "http".
+                        description: Protocol describes the upstream's service protocol.
+                          Valid values are "http" and "http2", defaults to "http".
                         type: string
                     type: object
                   type: array
               type: object
             externalSNI:
-              description: ExternalSNI is an optional setting that allows for the TLS SNI value to be changed to a non-connect value when federating with an external system.
+              description: ExternalSNI is an optional setting that allows for the
+                TLS SNI value to be changed to a non-connect value when federating
+                with an external system.
               type: string
             meshGateway:
-              description: MeshGateway controls the default mesh gateway configuration for this service.
+              description: MeshGateway controls the default mesh gateway configuration
+                for this service.
               properties:
                 mode:
-                  description: Mode is the mode that should be used for the upstream connection. One of none, local, or remote.
+                  description: Mode is the mode that should be used for the upstream
+                    connection. One of none, local, or remote.
                   type: string
               type: object
             protocol:
-              description: Protocol sets the protocol of the service. This is used by Connect proxies for things like observability features and to unlock usage of the service-splitter and service-router config entries for a service.
+              description: Protocol sets the protocol of the service. This is used
+                by Connect proxies for things like observability features and to unlock
+                usage of the service-splitter and service-router config entries for
+                a service.
               type: string
           type: object
         status:
           properties:
             conditions:
-              description: Conditions indicate the latest available observations of a resource's current state.
+              description: Conditions indicate the latest available observations of
+                a resource's current state.
               items:
-                description: 'Conditions define a readiness condition for a Consul resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                description: 'Conditions define a readiness condition for a Consul
+                  resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
                 properties:
                   lastTransitionTime:
-                    description: LastTransitionTime is the last time the condition transitioned from one status to another.
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
                     format: date-time
                     type: string
                   message:
-                    description: A human readable message indicating details about the transition.
+                    description: A human readable message indicating details about
+                      the transition.
                     type: string
                   reason:
                     description: The reason for the condition's last transition.
