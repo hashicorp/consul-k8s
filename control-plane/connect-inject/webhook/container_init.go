@@ -243,7 +243,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				RunAsGroup: pointer.Int64(rootUserAndGroupID),
 				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
 				RunAsNonRoot: pointer.Bool(false),
-				Privileged:   pointer.Bool(true),
+				Privileged:   pointer.Bool(false),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},

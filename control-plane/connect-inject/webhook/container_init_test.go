@@ -275,7 +275,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 					RunAsUser:    pointer.Int64(0),
 					RunAsGroup:   pointer.Int64(0),
 					RunAsNonRoot: pointer.Bool(false),
-					Privileged:   pointer.Bool(true),
+					Privileged:   pointer.Bool(false),
 					Capabilities: &corev1.Capabilities{
 						Add: []corev1.Capability{netAdminCapability},
 					},
