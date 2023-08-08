@@ -186,4 +186,14 @@ rules:
     - "get"
     - "list"
     - "watch"
+{{- if .Values.global.openshift.enabled }}
+- apiGroups:
+    - security.openshift.io
+  resources:
+    - securitycontextconstraints
+  resourceNames:
+    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
+  verbs:
+    - use
+  {{- end }}
 {{- end }}

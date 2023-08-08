@@ -71,6 +71,8 @@ type Command struct {
 	flagTolerations        string // this is a multiline yaml string matching the tolerations array
 	flagServiceAnnotations string // this is a multiline yaml string array of annotations to allow
 
+	flagOpenshiftSCCName string
+
 	k8sClient client.Client
 
 	once sync.Once
@@ -122,6 +124,9 @@ func (c *Command) init() {
 	)
 	c.flags.StringVar(&c.flagServiceAnnotations, "service-annotations", "",
 		"The annotations to copy over from a gateway to its service.",
+	)
+	c.flags.StringVar(&c.flagOpenshiftSCCName, "openshift-scc-name", "",
+		"Name of security context constraint to use for gateways on Openshift.",
 	)
 
 	c.k8s = &flags.K8SFlags{}
@@ -197,6 +202,7 @@ func (c *Command) Run(args []string) int {
 				MaxInstances:     nonZeroOrNil(c.flagDeploymentMaxInstances),
 				MinInstances:     nonZeroOrNil(c.flagDeploymentMinInstances),
 			},
+			OpenshiftSCCName: c.flagOpenshiftSCCName,
 		},
 	}
 
