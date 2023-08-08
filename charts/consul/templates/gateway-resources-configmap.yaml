@@ -1,0 +1,21 @@
+{{- if .Values.connectInject.enabled }}
+# Configuration of Gateway Resources Job which creates managed Gateway configuration.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: 
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: gateway-resources
+data:
+  {{- if .Values.connectInject.apiGateway.managedGatewayClass.resources }}
+  resources.json: |
+    {
+      "resources": {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
+    }
+  {{- end }}
+{{- end }}
