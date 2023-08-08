@@ -62,6 +62,9 @@ type GatewayClassConfigSpec struct {
 
 	// The name of the OpenShift SecurityContextConstraints resource for this gateway class to use.
 	OpenshiftSCCName string `json:"openshiftSCCName,omitempty"`
+
+	// The value to add to privileged ports ( ports < 1024) for gateway containers
+	MapPrivilegedContainerPorts int32 `json:"mapPrivilegedContainerPorts,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true

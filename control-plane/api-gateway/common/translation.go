@@ -55,11 +55,11 @@ func (t ResourceTranslator) Namespace(namespace string) string {
 }
 
 // ToAPIGateway translates a kuberenetes API gateway into a Consul APIGateway Config Entry.
-func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *ResourceMap) *api.APIGatewayConfigEntry {
+func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) *api.APIGatewayConfigEntry {
 	namespace := t.Namespace(gateway.Namespace)
 
 	listeners := ConvertSliceFuncIf(gateway.Spec.Listeners, func(listener gwv1beta1.Listener) (api.APIGatewayListener, bool) {
-		return t.toAPIGatewayListener(gateway, listener, resources)
+		return t.toAPIGatewayListener(gateway, listener, resources, gwcc)
 	})
 
 	return &api.APIGatewayConfigEntry{
@@ -81,7 +81,7 @@ var listenerProtocolMap = map[string]string{
 	"tcp":   "tcp",
 }
 
-func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *ResourceMap) (api.APIGatewayListener, bool) {
+func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) (api.APIGatewayListener, bool) {
 	namespace := gateway.Namespace
 
 	var certificates []api.ResourceReference
@@ -104,15 +104,29 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 		}
 	}
 
+	portMapping := int32(0)
+	if gwcc != nil {
+		portMapping = gwcc.Spec.MapPrivilegedContainerPorts
+	}
+
 	return api.APIGatewayListener{
 		Name:     string(listener.Name),
 		Hostname: DerefStringOr(listener.Hostname, ""),
-		Port:     int(listener.Port),
+		Port:     ToContainerPort(listener.Port, portMapping),
 		Protocol: listenerProtocolMap[strings.ToLower(string(listener.Protocol))],
 		TLS: api.APIGatewayTLSConfiguration{
 			Certificates: certificates,
 		},
 	}, true
+}
+
+func ToContainerPort(portNumber gwv1beta1.PortNumber, mapPrivilegedContainerPorts int32) int {
+	if portNumber >= 1024 {
+		// We don't care about privileged port-mapping, this is a non-privileged port
+		return int(portNumber)
+	}
+
+	return int(portNumber) + int(mapPrivilegedContainerPorts)
 }
 
 func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {

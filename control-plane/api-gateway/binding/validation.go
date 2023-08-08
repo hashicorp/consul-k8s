@@ -226,7 +226,7 @@ func validateCertificateData(secret corev1.Secret) error {
 
 // validateListeners validates the given listeners both internally and with respect to each
 // other for purposes of setting "Conflicted" status conditions.
-func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener, resources *common.ResourceMap) listenerValidationResults {
+func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener, resources *common.ResourceMap, gwcc *v1alpha1.GatewayClassConfig) listenerValidationResults {
 	var results listenerValidationResults
 	merged := make(map[gwv1beta1.PortNumber]mergedListeners)
 	for i, listener := range listeners {
@@ -235,7 +235,15 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 			listener: listener,
 		})
 	}
-
+	// This list keeps track of port conflicts directly on gateways. i.e., two listeners on the same port as
+	// defined by the user.
+	seenListenerPorts := map[int]struct{}{}
+	// This list keeps track of port conflicts caused by privileged port mappings.
+	seenContainerPorts := map[int]struct{}{}
+	portMapping := int32(0)
+	if gwcc != nil {
+		portMapping = gwcc.Spec.MapPrivilegedContainerPorts
+	}
 	for i, listener := range listeners {
 		var result listenerValidationResult
 
@@ -249,6 +257,10 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 				result.acceptedErr = errListenerUnsupportedProtocol
 			} else if listener.Port == 20000 { // admin port
 				result.acceptedErr = errListenerPortUnavailable
+			} else if _, ok := seenListenerPorts[int(listener.Port)]; ok {
+				result.acceptedErr = errListenerPortUnavailable
+			} else if _, ok := seenContainerPorts[common.ToContainerPort(listener.Port, portMapping)]; ok {
+				result.acceptedErr = errListenerMappedToPrivilegedPortMapping
 			}
 
 			result.routeKindErr = validateListenerAllowedRouteKinds(listener.AllowedRoutes)
@@ -261,6 +273,9 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 		}
 
 		results = append(results, result)
+
+		seenListenerPorts[int(listener.Port)] = struct{}{}
+		seenContainerPorts[common.ToContainerPort(listener.Port, portMapping)] = struct{}{}
 	}
 	return results
 }

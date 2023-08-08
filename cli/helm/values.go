@@ -576,12 +576,13 @@ type CopyAnnotations struct {
 }
 
 type ManagedGatewayClass struct {
-	Enabled          bool            `yaml:"enabled"`
-	NodeSelector     interface{}     `yaml:"nodeSelector"`
-	ServiceType      string          `yaml:"serviceType"`
-	UseHostPorts     bool            `yaml:"useHostPorts"`
-	CopyAnnotations  CopyAnnotations `yaml:"copyAnnotations"`
-	OpenshiftSCCName string          `yaml:"openshiftSCCName"`
+	Enabled                     bool            `yaml:"enabled"`
+	NodeSelector                interface{}     `yaml:"nodeSelector"`
+	ServiceType                 string          `yaml:"serviceType"`
+	UseHostPorts                bool            `yaml:"useHostPorts"`
+	CopyAnnotations             CopyAnnotations `yaml:"copyAnnotations"`
+	OpenshiftSCCName            string          `yaml:"openshiftSCCName"`
+	MapPrivilegedContainerPorts int             `yaml:"mapPrivilegedContainerPorts"`
 }
 
 type Service struct {

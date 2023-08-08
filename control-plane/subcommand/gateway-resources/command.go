@@ -73,6 +73,8 @@ type Command struct {
 
 	flagOpenshiftSCCName string
 
+	flagMapPrivilegedContainerPorts int
+
 	k8sClient client.Client
 
 	once sync.Once
@@ -127,6 +129,10 @@ func (c *Command) init() {
 	)
 	c.flags.StringVar(&c.flagOpenshiftSCCName, "openshift-scc-name", "",
 		"Name of security context constraint to use for gateways on Openshift.",
+	)
+	c.flags.IntVar(&c.flagMapPrivilegedContainerPorts, "map-privileged-container-ports", 0,
+		"The value to add to privileged container ports (< 1024) to avoid requiring addition privileges for the "+
+			"gateway container.",
 	)
 
 	c.k8s = &flags.K8SFlags{}
@@ -202,7 +208,8 @@ func (c *Command) Run(args []string) int {
 				MaxInstances:     nonZeroOrNil(c.flagDeploymentMaxInstances),
 				MinInstances:     nonZeroOrNil(c.flagDeploymentMinInstances),
 			},
-			OpenshiftSCCName: c.flagOpenshiftSCCName,
+			OpenshiftSCCName:            c.flagOpenshiftSCCName,
+			MapPrivilegedContainerPorts: int32(c.flagMapPrivilegedContainerPorts),
 		},
 	}
 

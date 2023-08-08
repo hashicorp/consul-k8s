@@ -102,6 +102,7 @@ spec:
             {{- if .Values.global.openshift.enabled  }}
             - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
             {{- end }}
+            - -map-privileged-container-ports={{ .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
             {{- end}}
           resources:
             requests:
