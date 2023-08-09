@@ -50,7 +50,7 @@ func TestSyncCatalog(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating a static-server with a service")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
@@ -120,7 +120,7 @@ func TestSyncCatalogWithIngress(t *testing.T) {
 				// endpoint fails initially.
 				out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/ingress")
 				require.NoError(r, err, out)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					// Ignore errors here because if the test ran as expected
 					// the custom resources will have been deleted.
 					k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/ingress")
@@ -130,7 +130,7 @@ func TestSyncCatalogWithIngress(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating a static-server with a service")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 

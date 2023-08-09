@@ -69,7 +69,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
 
@@ -80,12 +80,12 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			}
 
 			logger.Logf(t, "creating server in %s namespace", testNamespace)
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			// We use the static-client pod so that we can make calls to the ingress gateway
 			// via kubectl exec without needing a route into the cluster from the test machine.
 			logger.Logf(t, "creating static-client in %s namespace", testNamespace)
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-client")
+			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 			// With the cluster up, we can create our ingress-gateway config entry.
 			logger.Log(t, "creating config entry")
@@ -188,7 +188,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
 
@@ -199,12 +199,12 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			}
 
 			logger.Logf(t, "creating server in %s namespace", testNamespace)
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			// We use the static-client pod so that we can make calls to the ingress gateway
 			// via kubectl exec without needing a route into the cluster from the test machine.
 			logger.Logf(t, "creating static-client in %s namespace", testNamespace)
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-client")
+			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
