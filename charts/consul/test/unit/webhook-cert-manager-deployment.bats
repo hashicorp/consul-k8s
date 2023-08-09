@@ -49,7 +49,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "kubernetes.io/os: linux" ]
+  [ "${actual}" = {"kubernetes.io/os": "linux"} ]
 }
 
 @test "webhookCertManager/Deployment: nodeSelector can be set" {
