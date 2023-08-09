@@ -89,9 +89,9 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 	var maxVersion, minVersion string
 
 	if listener.TLS != nil {
-		cipherSuitsVal := string(listener.TLS.Options[TLSCipherSuitesAnnotationKey])
-		if cipherSuitsVal != "" {
-			cipherSuites = strings.Split(cipherSuitsVal, ",")
+		cipherSuitesVal := string(listener.TLS.Options[TLSCipherSuitesAnnotationKey])
+		if cipherSuitesVal != "" {
+			cipherSuites = strings.Split(cipherSuitesVal, ",")
 		}
 		maxVersion = string(listener.TLS.Options[TLSMaxVersionAnnotationKey])
 		minVersion = string(listener.TLS.Options[TLSMinVersionAnnotationKey])

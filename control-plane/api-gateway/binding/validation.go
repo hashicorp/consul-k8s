@@ -51,7 +51,7 @@ var (
 	}
 
 	allTLSVersionsWithConfigurableCipherSuites = map[string]struct{}{
-		// Remove these two if Envoy ever sets TLS 1.3 as default minimum
+		// Remove "" and "TLS_AUTO" if Envoy ever sets TLS 1.3 as default minimum
 		"":         {},
 		"TLS_AUTO": {},
 		"TLSv1_0":  {},
