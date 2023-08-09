@@ -764,7 +764,7 @@ key2: value2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
 
-  [ "${actual}" = "\"linux\""  ]
+  [ "${actual}" = "linux"  ]
 }
 
 @test "meshGateway/Deployment: can set a nodeSelector" {

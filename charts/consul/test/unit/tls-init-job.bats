@@ -154,7 +154,7 @@ load _helpers
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
-  [ "${actual}" = "\"linux\""  ]
+  [ "${actual}" = "linux"  ]
 }
 
 @test "tlsInit/Job: nodeSelector can be set" {
