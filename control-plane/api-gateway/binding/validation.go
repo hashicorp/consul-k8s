@@ -4,7 +4,6 @@
 package binding
 
 import (
-	"errors"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -264,14 +263,14 @@ func validateTLSOptions(options map[gwv1beta1.AnnotationKey]gwv1beta1.Annotation
 	tlsMinVersionValue := string(options[common.TLSMinVersionAnnotationKey])
 	if tlsMinVersionValue != "" {
 		if _, supported := allSupportedTLSVersions[tlsMinVersionValue]; !supported {
-			return errors.New("unsupported tls_min_version")
+			return errListenerUnsupportedTLSMinVersion
 		}
 	}
 
 	tlsMaxVersionValue := string(options[common.TLSMaxVersionAnnotationKey])
 	if tlsMaxVersionValue != "" {
 		if _, supported := allSupportedTLSVersions[tlsMaxVersionValue]; !supported {
-			return errors.New("unsupported tls_max_version")
+			return errListenerUnsupportedTLSMaxVersion
 		}
 	}
 
@@ -280,14 +279,14 @@ func validateTLSOptions(options map[gwv1beta1.AnnotationKey]gwv1beta1.Annotation
 		// If a minimum TLS version is configured, verify that it supports configuring cipher suites
 		if tlsMinVersionValue != "" {
 			if _, supported := allTLSVersionsWithConfigurableCipherSuites[tlsMinVersionValue]; !supported {
-				return errors.New("tls_min_version does not allow tls_cipher_suites configuration")
+				return errListenerTLSCipherSuiteNotConfigurable
 			}
 		}
 
 		for _, tlsCipherSuiteValue := range strings.Split(tlsCipherSuitesValue, ",") {
 			tlsCipherSuite := strings.TrimSpace(tlsCipherSuiteValue)
 			if _, supported := allSupportedTLSCipherSuites[tlsCipherSuite]; !supported {
-				return errors.New("unsupported cipher suite in tls_cipher_suites")
+				return errListenerUnsupportedTLSCipherSuite
 			}
 		}
 	}
