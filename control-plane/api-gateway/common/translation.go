@@ -85,8 +85,17 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 	namespace := gateway.Namespace
 
 	var certificates []api.ResourceReference
+	var cipherSuites []string
+	var maxVersion, minVersion string
 
 	if listener.TLS != nil {
+		cipherSuitesVal := string(listener.TLS.Options[TLSCipherSuitesAnnotationKey])
+		if cipherSuitesVal != "" {
+			cipherSuites = strings.Split(cipherSuitesVal, ",")
+		}
+		maxVersion = string(listener.TLS.Options[TLSMaxVersionAnnotationKey])
+		minVersion = string(listener.TLS.Options[TLSMinVersionAnnotationKey])
+
 		for _, ref := range listener.TLS.CertificateRefs {
 			if !resources.GatewayCanReferenceSecret(gateway, ref) {
 				return api.APIGatewayListener{}, false
@@ -116,6 +125,9 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 		Protocol: listenerProtocolMap[strings.ToLower(string(listener.Protocol))],
 		TLS: api.APIGatewayTLSConfiguration{
 			Certificates: certificates,
+			CipherSuites: cipherSuites,
+			MaxVersion:   maxVersion,
+			MinVersion:   minVersion,
 		},
 	}, true
 }
