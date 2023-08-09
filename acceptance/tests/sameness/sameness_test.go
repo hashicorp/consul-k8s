@@ -50,6 +50,8 @@ const (
 	peerName3a = keyCluster03a
 
 	samenessGroupName = "mine"
+
+	retryTimeout = 2 * time.Minute
 )
 
 func TestFailover_Connect(t *testing.T) {
@@ -170,6 +172,7 @@ func TestFailover_Connect(t *testing.T) {
 				"meshGateway.replicas": "1",
 
 				"dns.enabled": "true",
+				"connectInject.sidecarProxy.lifecycle.defaultEnabled": "false",
 			}
 
 			defaultPartitionHelmValues := map[string]string{
@@ -640,7 +643,7 @@ func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, o
 // using the `static-client` responds with the expected cluster name. Each static-server responds with a uniquue
 // name so that we can verify failover occured as expected.
 func serviceFailoverCheck(t *testing.T, server *cluster, expectedName string) {
-	timer := &retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	var resp string
 	var err error
 	retry.RunWith(timer, t, func(r *retry.R) {
@@ -655,7 +658,7 @@ func serviceFailoverCheck(t *testing.T, server *cluster, expectedName string) {
 // preparedQueryFailoverCheck verifies that failover occurs when executing the prepared query. It also assures that
 // executing the prepared query via DNS also provides expected results.
 func preparedQueryFailoverCheck(t *testing.T, releaseName string, dnsIP string, epq expectedPQ, server, failover *cluster) {
-	timer := &retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	resp, _, err := server.client.PreparedQuery().Execute(*server.pqID, &api.QueryOptions{Namespace: staticServerNamespace, Partition: server.partition})
 	require.NoError(t, err)
 	require.Len(t, resp.Nodes, 1)
@@ -679,7 +682,7 @@ func preparedQueryFailoverCheck(t *testing.T, releaseName string, dnsIP string, 
 
 // DNS failover check verifies that failover occurred when querying the DNS.
 func dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, dnsIP string, server, failover *cluster) {
-	timer := &retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	dnsLookup := []string{"static-server.service.ns2.ns.mine.sg.consul", "+tcp", "SRV"}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		logs := dnsQuery(t, releaseName, dnsLookup, server, failover)
@@ -703,7 +706,7 @@ func dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, 
 
 // dnsQuery performs a dns query with the provided query string.
 func dnsQuery(t *testing.T, releaseName string, dnsQuery []string, server, failover *cluster) string {
-	timer := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
 	var logs string
 	retry.RunWith(timer, t, func(r *retry.R) {
 		args := []string{"exec", "-i",
@@ -733,7 +736,7 @@ func isAcceptor(name string, acceptorList []string) bool {
 func getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig, server *cluster, acceptorName string) string {
 	// Ensure the secrets are created.
 	var acceptorSecretName string
-	timer := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		var err error
 		acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(t, server.context.KubectlOptions(t), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status.secret.name}")
