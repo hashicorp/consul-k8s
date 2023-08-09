@@ -289,7 +289,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 }
 
 func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
-	t.Skip()
+	t.Skip("skipping this test until GW JWT auth is complete")
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 

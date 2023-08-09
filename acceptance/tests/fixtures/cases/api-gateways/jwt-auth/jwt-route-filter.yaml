@@ -1,5 +1,5 @@
 apiVersion: consul.hashicorp.com/v1alpha1
-kind: HTTPAuthFilter
+kind: HTTPRouteAuthFilter
 metadata:
   name: example-route-jwt-filter
 spec:
