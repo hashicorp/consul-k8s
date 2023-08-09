@@ -404,36 +404,36 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		require.EqualValues(r, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httproute)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth", Namespace: "default"}, &httprouteAuth)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth", Namespace: "default"}, &httpRouteAuth)
 		require.NoError(r, err)
 
 		// check our finalizers
-		require.Len(r, httproute.Finalizers, 1)
-		require.EqualValues(r, gatewayFinalizer, httproute.Finalizers[0])
+		require.Len(r, httpRoute.Finalizers, 1)
+		require.EqualValues(r, gatewayFinalizer, httpRoute.Finalizers[0])
 
 		// check parent status
-		require.Len(r, httproute.Status.Parents, 1)
-		require.EqualValues(r, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
-		require.EqualValues(r, "gateway", httproute.Status.Parents[0].ParentRef.Name)
-		checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-		checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-		checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
+		require.Len(r, httpRoute.Status.Parents, 1)
+		require.EqualValues(r, gatewayClassControllerName, httpRoute.Status.Parents[0].ControllerName)
+		require.EqualValues(r, "gateway", httpRoute.Status.Parents[0].ParentRef.Name)
+		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 
 		// check our finalizers
-		require.Len(r, httprouteAuth.Finalizers, 1)
-		require.EqualValues(r, gatewayFinalizer, httprouteAuth.Finalizers[0])
+		require.Len(r, httpRouteAuth.Finalizers, 1)
+		require.EqualValues(r, gatewayFinalizer, httpRouteAuth.Finalizers[0])
 
 		// check parent status
-		require.Len(r, httprouteAuth.Status.Parents, 1)
-		require.EqualValues(r, gatewayClassControllerName, httprouteAuth.Status.Parents[0].ControllerName)
-		require.EqualValues(r, "gateway", httprouteAuth.Status.Parents[0].ParentRef.Name)
-		checkStatusCondition(r, httprouteAuth.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-		checkStatusCondition(r, httprouteAuth.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-		checkStatusCondition(r, httprouteAuth.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
+		require.Len(r, httpRouteAuth.Status.Parents, 1)
+		require.EqualValues(r, gatewayClassControllerName, httpRouteAuth.Status.Parents[0].ControllerName)
+		require.EqualValues(r, "gateway", httpRouteAuth.Status.Parents[0].ParentRef.Name)
+		checkStatusCondition(r, httpRouteAuth.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+		checkStatusCondition(r, httpRouteAuth.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+		checkStatusCondition(r, httpRouteAuth.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 	})
 
 	// check that the Consul entries were created
@@ -443,18 +443,18 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 
 	entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "http-route", nil)
 	require.NoError(t, err)
-	httpRoute := entry.(*api.HTTPRouteConfigEntry)
+	consulHTTPRoute := entry.(*api.HTTPRouteConfigEntry)
 
 	entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "http-route-auth", nil)
 	require.NoError(t, err)
-	httpRouteAuth := entry.(*api.HTTPRouteConfigEntry)
+	consulHTTPRouteAuth := entry.(*api.HTTPRouteConfigEntry)
 
 	// now check the gateway status conditions
 	checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
 
 	// and the route status conditions
-	checkConsulStatusCondition(t, httpRoute.Status.Conditions, trueConsulCondition("Bound", "Bound"))
-	checkConsulStatusCondition(t, httpRouteAuth.Status.Conditions, trueConsulCondition("Bound", "Bound"))
+	checkConsulStatusCondition(t, consulHTTPRoute.Status.Conditions, trueConsulCondition("Bound", "Bound"))
+	checkConsulStatusCondition(t, consulHTTPRouteAuth.Status.Conditions, trueConsulCondition("Bound", "Bound"))
 
 	// finally we check that we can actually route to the service(s) via the gateway
 	k8sOptions := ctx.KubectlOptions(t)
