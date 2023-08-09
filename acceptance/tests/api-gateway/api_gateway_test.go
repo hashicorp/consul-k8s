@@ -362,8 +362,8 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	var (
 		gatewayAddress string
 		gatewayClass   gwv1beta1.GatewayClass
-		httproute      gwv1beta1.HTTPRoute
-		httprouteAuth  gwv1beta1.HTTPRoute
+		httpRoute      gwv1beta1.HTTPRoute
+		httpRouteAuth  gwv1beta1.HTTPRoute
 	)
 
 	counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
