@@ -1649,7 +1649,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = {"kubernetes.io/os": "linux"} ]
+  [ "${actual}" = '{"kubernetes.io/os": "linux"}' ]
 }
 
 @test "serverACLInit/Job: nodeSelector can be set" {

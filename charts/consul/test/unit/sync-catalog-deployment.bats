@@ -447,7 +447,7 @@ load _helpers
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = {"kubernetes.io/os": "linux"} ]
+  [ "${actual}" = '{"kubernetes.io/os": "linux"}' ]
 }
 
 @test "syncCatalog/Deployment: nodeSelector is set by default with sync enabled" {
@@ -457,7 +457,7 @@ load _helpers
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = {"kubernetes.io/os": "linux"} ]
+  [ "${actual}" = '{"kubernetes.io/os": "linux"}' ]
 }
 
 @test "syncCatalog/Deployment: specified nodeSelector" {

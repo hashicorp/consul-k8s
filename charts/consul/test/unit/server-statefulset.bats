@@ -520,7 +520,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = {"kubernetes.io/os": "linux"} ]
+  [ "${actual}" = '{"kubernetes.io/os": "linux"}' ]
 }
 
 @test "server/StatefulSet: specified nodeSelector" {

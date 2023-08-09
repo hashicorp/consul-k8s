@@ -58,7 +58,7 @@ load _helpers
       --set 'telemetryCollector.image=bar' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = {"kubernetes.io/os": "linux"} ]
+  [ "${actual}" = '{"kubernetes.io/os": "linux"}' ]
 }
 
 @test "telemetryCollector/Deployment: specified nodeSelector" {
