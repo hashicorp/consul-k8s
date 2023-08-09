@@ -336,24 +336,24 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "connectInject/Deployment: nodeSelector is not set by default" {
+@test "connectInject/Deployment: nodeSelector is set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+  [ "${actual}" = "kubernetes.io/os: linux" ]
 }
 
-@test "connectInject/Deployment: nodeSelector is not set by default with sync enabled" {
+@test "connectInject/Deployment: nodeSelector is set by default with sync enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+  [ "${actual}" = "kubernetes.io/os: linux" ]
 }
 
 @test "connectInject/Deployment: specified nodeSelector" {

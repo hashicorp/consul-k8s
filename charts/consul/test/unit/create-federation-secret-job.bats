@@ -334,7 +334,7 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "createFederationSecret/Job: nodeSelector is not set by default" {
+@test "createFederationSecret/Job: nodeSelector is set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/create-federation-secret-job.yaml  \
@@ -345,7 +345,7 @@ load _helpers
       --set 'global.federation.createFederationSecret=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+  [ "${actual}" = "kubernetes.io/os: linux" ]
 }
 
 @test "createFederationSecret/Job: specified nodeSelector" {

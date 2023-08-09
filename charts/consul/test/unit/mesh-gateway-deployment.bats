@@ -755,7 +755,7 @@ key2: value2' \
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "meshGateway/Deployment: no nodeSelector by default" {
+@test "meshGateway/Deployment: nodeSelector by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/mesh-gateway-deployment.yaml  \
@@ -764,7 +764,7 @@ key2: value2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
 
-  [ "${actual}" = "null" ]
+  [ "${actual}" = "kubernetes.io/os: linux" ]
 }
 
 @test "meshGateway/Deployment: can set a nodeSelector" {

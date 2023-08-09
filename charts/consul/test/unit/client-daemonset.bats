@@ -383,14 +383,14 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "client/DaemonSet: nodeSelector is not set by default" {
+@test "client/DaemonSet: nodeSelector is set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+  [ "${actual}" = "kubernetes.io/os: linux" ]
 }
 
 @test "client/DaemonSet: specified nodeSelector" {

@@ -440,24 +440,24 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "syncCatalog/Deployment: nodeSelector is not set by default" {
+@test "syncCatalog/Deployment: nodeSelector is set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+  [ "${actual}" = "kubernetes.io/os: linux" ]
 }
 
-@test "syncCatalog/Deployment: nodeSelector is not set by default with sync enabled" {
+@test "syncCatalog/Deployment: nodeSelector is set by default with sync enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+  [ "${actual}" = "kubernetes.io/os: linux" ]
 }
 
 @test "syncCatalog/Deployment: specified nodeSelector" {

@@ -42,14 +42,14 @@ load _helpers
   [ "${actual}" = "value" ]
 }
 
-@test "webhookCertManager/Deployment: no nodeSelector by default" {
+@test "webhookCertManager/Deployment: nodeSelector by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/webhook-cert-manager-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+  [ "${actual}" = "kubernetes.io/os: linux" ]
 }
 
 @test "webhookCertManager/Deployment: nodeSelector can be set" {
