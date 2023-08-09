@@ -83,12 +83,6 @@ var (
 	}
 )
 
-const (
-	tlsCipherSuitesAnnotationKey = "api-gateway.consul.hashicorp.com/tls_cipher_suites"
-	tlsMaxVersionAnnotationKey = "api-gateway.consul.hashicorp.com/tls_max_version"
-	tlsMinVersionAnnotationKey = "api-gateway.consul.hashicorp.com/tls_min_version"
-)
-
 // validateRefs validates backend references for a route, determining whether or
 // not they were found in the list of known connect-injected services.
 func validateRefs(route client.Object, refs []gwv1beta1.BackendRef, resources *common.ResourceMap) routeValidationResults {
@@ -267,21 +261,21 @@ func validateTLSOptions(options map[gwv1beta1.AnnotationKey]gwv1beta1.Annotation
 		return nil
 	}
 
-	tlsMinVersionValue := string(options[tlsMinVersionAnnotationKey])
+	tlsMinVersionValue := string(options[common.TLSMinVersionAnnotationKey])
 	if tlsMinVersionValue != "" {
 		if _, supported := allSupportedTLSVersions[tlsMinVersionValue]; !supported {
 			return errors.New("unsupported tls_min_version")
 		}
 	}
 
-	tlsMaxVersionValue := string(options[tlsMaxVersionAnnotationKey])
+	tlsMaxVersionValue := string(options[common.TLSMaxVersionAnnotationKey])
 	if tlsMaxVersionValue != "" {
 		if _, supported := allSupportedTLSVersions[tlsMaxVersionValue]; !supported {
 			return errors.New("unsupported tls_max_version")
 		}
 	}
 
-	tlsCipherSuitesValue := string(options[tlsCipherSuitesAnnotationKey])
+	tlsCipherSuitesValue := string(options[common.TLSCipherSuitesAnnotationKey])
 	if tlsCipherSuitesValue != "" {
 		// If a minimum TLS version is configured, verify that it supports configuring cipher suites
 		if tlsMinVersionValue != "" {

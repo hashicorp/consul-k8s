@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,6 +135,9 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 	listenerOneCertK8sNamespace := "one-cert-ns"
 	listenerOneCertConsulNamespace := "one-cert-ns"
 	listenerOneCert := generateTestCertificate(t, "one-cert-ns", "one-cert")
+	listenerOneMaxVersion := "TLSv1_2"
+	listenerOneMinVersion := "TLSv1_3"
+	listenerOneCipherSuites := []string{"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"}
 
 	// listener one status
 	listenerOneLastTransmissionTime := time.Now()
@@ -157,6 +161,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 		annotations            map[string]string
 		expectedGWName         string
 		listenerOneK8sCertRefs []gwv1beta1.SecretObjectReference
+		listenerOneTLSOptions  map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue
 	}{
 		"gw name": {
 			annotations:    make(map[string]string),
@@ -166,6 +171,11 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 					Name:      gwv1beta1.ObjectName(listenerOneCertName),
 					Namespace: PointerTo(gwv1beta1.Namespace(listenerOneCertK8sNamespace)),
 				},
+			},
+			listenerOneTLSOptions: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+				TLSMaxVersionAnnotationKey:   gwv1beta1.AnnotationValue(listenerOneMaxVersion),
+				TLSMinVersionAnnotationKey:   gwv1beta1.AnnotationValue(listenerOneMinVersion),
+				TLSCipherSuitesAnnotationKey: gwv1beta1.AnnotationValue(strings.Join(listenerOneCipherSuites, ",")),
 			},
 		},
 		"when k8s has certs that are not referenced in consul": {
@@ -180,6 +190,11 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 					Name:      gwv1beta1.ObjectName("cert that won't exist in the translated type"),
 					Namespace: PointerTo(gwv1beta1.Namespace(listenerOneCertK8sNamespace)),
 				},
+			},
+			listenerOneTLSOptions: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+				TLSMaxVersionAnnotationKey:   gwv1beta1.AnnotationValue(listenerOneMaxVersion),
+				TLSMinVersionAnnotationKey:   gwv1beta1.AnnotationValue(listenerOneMinVersion),
+				TLSCipherSuitesAnnotationKey: gwv1beta1.AnnotationValue(strings.Join(listenerOneCipherSuites, ",")),
 			},
 		},
 	}
@@ -207,6 +222,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 							Protocol: gwv1beta1.ProtocolType(listenerOneProtocol),
 							TLS: &gwv1beta1.GatewayTLSConfig{
 								CertificateRefs: tc.listenerOneK8sCertRefs,
+								Options:         tc.listenerOneTLSOptions,
 							},
 						},
 						{
@@ -288,6 +304,9 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 									Namespace: listenerOneCertConsulNamespace,
 								},
 							},
+							CipherSuites: listenerOneCipherSuites,
+							MaxVersion:   listenerOneMaxVersion,
+							MinVersion:   listenerOneMinVersion,
 						},
 					},
 					{
@@ -303,6 +322,9 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 									Namespace: listenerTwoCertConsulNamespace,
 								},
 							},
+							CipherSuites: nil,
+							MaxVersion:   "",
+							MinVersion:   "",
 						},
 					},
 				},
