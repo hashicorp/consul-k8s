@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: Set locality on sidecar proxies in addition to services when registering with connect-inject.
+```
