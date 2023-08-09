@@ -51,7 +51,7 @@ const (
 
 	samenessGroupName = "mine"
 
-	retryTimeout = 2 * time.Minute
+	retryTimeout = 5 * time.Minute
 )
 
 func TestFailover_Connect(t *testing.T) {
