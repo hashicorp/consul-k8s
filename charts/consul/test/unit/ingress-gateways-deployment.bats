@@ -719,7 +719,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
-  [ "${actual}" = "\"linux\""  ]
+  [ "${actual}" = "linux"  ]
 }
 
 @test "ingressGateways/Deployment: can set a nodeSelector through defaults" {
