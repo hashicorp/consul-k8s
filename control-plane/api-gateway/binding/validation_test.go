@@ -510,6 +510,47 @@ func TestValidateTLS(t *testing.T) {
 			expectedResolvedRefsErr: nil,
 			expectedAcceptedErr:     nil,
 		},
+		"invalid cipher suite": {
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			tls: &gwv1beta1.GatewayTLSConfig{
+				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+					common.TLSCipherSuitesAnnotationKey: "invalid",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerUnsupportedTLSCipherSuite,
+		},
+		"cipher suite not configurable": {
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			tls: &gwv1beta1.GatewayTLSConfig{
+				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+					common.TLSMinVersionAnnotationKey:   "TLSv1_3",
+					common.TLSCipherSuitesAnnotationKey: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerTLSCipherSuiteNotConfigurable,
+		},
+		"invalid max version": {
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			tls: &gwv1beta1.GatewayTLSConfig{
+				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+					common.TLSMaxVersionAnnotationKey: "invalid",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerUnsupportedTLSMaxVersion,
+		},
+		"invalid min version": {
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			tls: &gwv1beta1.GatewayTLSConfig{
+				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+					common.TLSMinVersionAnnotationKey: "invalid",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerUnsupportedTLSMinVersion,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			resources := common.NewResourceMap(common.ResourceTranslator{}, NewReferenceValidator(tt.grants), logrtest.NewTestLogger(t))
