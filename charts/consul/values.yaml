@@ -398,7 +398,8 @@ global:
     # ```
     #
     # @type: string
-    nodeSelector: null
+    nodeSelector: |
+      kubernetes.io/os: linux
 
     # This value defines additional annotations for
     # tls init jobs. This should be formatted as a multi-line string.
@@ -524,7 +525,8 @@ global:
     # ```
     #
     # @type: string
-    nodeSelector: null
+    nodeSelector: |
+      kubernetes.io/os: linux
 
     # This value defines additional annotations for
     # acl init jobs. This should be formatted as a multi-line string.
@@ -1103,7 +1105,8 @@ server:
   # ```
   #
   # @type: string
-  nodeSelector: null
+  nodeSelector: |
+    kubernetes.io/os: linux
 
   # This value references an existing
   # Kubernetes [`priorityClassName`](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
@@ -1593,7 +1596,8 @@ client:
   #   beta.kubernetes.io/arch: amd64
   # ```
   # @type: string
-  nodeSelector: null
+  nodeSelector: |
+    kubernetes.io/os: linux
 
   # Affinity Settings for Client pods, formatted as a multi-line YAML string.
   # ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
@@ -2035,7 +2039,8 @@ syncCatalog:
   # ```
   #
   # @type: string
-  nodeSelector: null
+  nodeSelector: |
+    kubernetes.io/os: linux
 
   # Affinity Settings
   # This should be a multi-line string matching the affinity object
@@ -2183,7 +2188,8 @@ connectInject:
       # ```
       #
       # @type: string
-      nodeSelector: null
+      nodeSelector: |
+        kubernetes.io/os: linux
 
       # Toleration settings for gateway pods created with the managed gateway class.
       # This should be a multi-line string matching the
@@ -2560,7 +2566,8 @@ connectInject:
   #   beta.kubernetes.io/arch: amd64
   # ```
   # @type: string
-  nodeSelector: null
+  nodeSelector: |
+    kubernetes.io/os: linux
 
   # Affinity Settings
   # This should be a multi-line string matching the affinity object
@@ -2881,7 +2888,8 @@ meshGateway:
 
   # Optional YAML string to specify a nodeSelector config.
   # @type: string
-  nodeSelector: null
+  nodeSelector: |
+    kubernetes.io/os: linux
 
   # Optional priorityClassName.
   priorityClassName: ""
@@ -3032,7 +3040,8 @@ ingressGateways:
 
     # Optional YAML string to specify a nodeSelector config.
     # @type: string
-    nodeSelector: null
+    nodeSelector: |
+      kubernetes.io/os: linux
 
     # Optional priorityClassName.
     priorityClassName: ""
@@ -3166,7 +3175,8 @@ terminatingGateways:
 
     # Optional YAML string to specify a nodeSelector config.
     # @type: string
-    nodeSelector: null
+    nodeSelector: |
+      kubernetes.io/os: linux
 
     # Optional priorityClassName.
     # @type: string
@@ -3401,7 +3411,8 @@ webhookCertManager:
   # ```
   #
   # @type: string
-  nodeSelector: null
+  nodeSelector: |
+    kubernetes.io/os: linux
 
 # Configures a demo Prometheus installation.
 prometheus:
@@ -3496,7 +3507,8 @@ telemetryCollector:
 
   # Optional YAML string to specify a nodeSelector config.
   # @type: string
-  nodeSelector: null
+  nodeSelector: |
+    kubernetes.io/os: linux
 
   # Optional priorityClassName.
   # @type: string

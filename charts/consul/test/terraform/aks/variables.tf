@@ -34,3 +34,9 @@ variable "tags" {
   default     = {}
   description = "Tags to attach to the created resources."
 }
+
+variable "windows" {
+  type        = bool
+  default     = false
+  description = "enable windows nodepool"
+}

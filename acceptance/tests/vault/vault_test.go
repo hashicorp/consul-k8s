@@ -59,6 +59,7 @@ func TestVault(t *testing.T) {
 //     consul and writes the bootstrap token to Vault.
 func testVault(t *testing.T, testAutoBootstrap bool) {
 	cfg := suite.Config()
+	cfg.SkipWhenWindowsAndTproxy(t)
 	ctx := suite.Environment().DefaultContext(t)
 	kubectlOptions := ctx.KubectlOptions(t)
 	ns := kubectlOptions.Namespace
@@ -71,8 +72,11 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 
 	consulReleaseName := helpers.RandomName()
 	vaultReleaseName := helpers.RandomName()
-
-	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName, nil)
+	vaultHelmvalues := map[string]string{
+		"injector.nodeSelector": "kubernetes.io/os: linux",
+		"server.nodeSelector":   "kubernetes.io/os: linux",
+	}
+	vaultCluster := vault.NewVaultCluster(t, ctx, cfg, vaultReleaseName, vaultHelmvalues)
 	vaultCluster.Create(t, ctx, "")
 	// Vault is now installed in the cluster.
 
@@ -350,11 +354,16 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 
 	// Deploy two services and check that they can talk to each other.
 	logger.Log(t, "creating static-server and static-client deployments")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-	if cfg.EnableTransparentProxy {
-		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+	if cfg.EnableWindows {
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-windows")
 	} else {
-		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		if cfg.EnableTransparentProxy {
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+		} else {
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+		}
 	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/bases/intention")

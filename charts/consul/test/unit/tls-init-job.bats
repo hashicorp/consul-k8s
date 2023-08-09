@@ -147,14 +147,14 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "tlsInit/Job: nodeSelector not set by default" {
+@test "tlsInit/Job: nodeSelector set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/tls-init-job.yaml  \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq -r '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "linux"  ]
 }
 
 @test "tlsInit/Job: nodeSelector can be set" {

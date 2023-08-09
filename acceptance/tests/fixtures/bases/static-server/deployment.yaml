@@ -27,5 +27,7 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+      nodeSelector:
+        kubernetes.io/os: linux
       serviceAccountName: static-server
       terminationGracePeriodSeconds: 0 # so deletion is quick

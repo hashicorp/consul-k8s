@@ -144,11 +144,16 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
 		}
 	} else {
-		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+		if c.Cfg.EnableWindows {
+			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject-windows")
 		} else {
-			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			if c.Cfg.EnableTransparentProxy {
+				k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+			} else {
+				k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			}
 		}
 	}
 	// Check that both static-server and static-client have been injected and
@@ -265,7 +270,11 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	opts := c.KubectlOptsForApp(t)
 
 	logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "touch", "/tmp/unhealthy")
+	if c.Cfg.EnableWindows {
+		k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+	} else {
+		k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "touch", "/tmp/unhealthy")
+	}
 
 	// The readiness probe should take a moment to be reflected in Consul,
 	// CheckStaticServerConnection will retry until Consul marks the service
@@ -285,12 +294,17 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	} else {
 		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, opts, StaticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
+			"curl: (56) Recv failure: Connection was reset",
+			"curl: (56) Recv failure: Connection was aborted",
 			"curl: (52) Empty reply from server",
 		}, "", "http://localhost:1234")
 	}
-
 	// Return the static-server to a "healthy state".
-	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "rm", "/tmp/unhealthy")
+	if c.Cfg.EnableWindows {
+		k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "cmd", "/C", "del", "C:\\tmp\\unhealthy")
+	} else {
+		k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "rm", "/tmp/unhealthy")
+	}
 }
 
 // helmValues uses the Secure and AutoEncrypt fields to set values for the Helm

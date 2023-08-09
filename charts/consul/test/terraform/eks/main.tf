@@ -32,6 +32,15 @@ resource "random_string" "suffix" {
   special = false
 }
 
+data "aws_ami" "win_ami" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter {
+    name   = "name"
+    values = ["Windows_Server-2019-English-Core-EKS_Optimized-1.26-*"]
+  }
+}
+
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
@@ -81,6 +90,17 @@ module "eks" {
       min_capacity     = 3
 
       instance_type = "m5.xlarge"
+    }
+    windows = {
+      platform      = "windows"
+      name          = "windows"
+      public_ip     = false
+      instance_type = "m5.xlarge"
+      key_name      = "windows"
+      desired_size  = 1
+      max_size      = 1
+      min_size      = 1
+      ami_id        = data.aws_ami.win_ami.id
     }
   }
 

@@ -41,7 +41,7 @@ func TestInstall(t *testing.T) {
 			cfg := suite.Config()
 			cfg.EnableTransparentProxy = c.tproxy
 			ctx := suite.Environment().DefaultContext(t)
-
+			cfg.SkipWhenWindowsAndTproxy(t)
 			connHelper := connhelper.ConnectHelper{
 				ClusterKind: consul.CLI,
 				Secure:      c.secure,

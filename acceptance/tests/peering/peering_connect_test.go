@@ -32,7 +32,7 @@ func TestPeering_Connect(t *testing.T) {
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
 		t.Skipf("skipping this test because peering is not supported in version %v", cfg.ConsulVersion.String())
 	}
-
+	cfg.SkipWhenWindowsAndTproxy(t)
 	const staticServerPeer = "server"
 	const staticClientPeer = "client"
 	cases := []struct {
@@ -213,13 +213,21 @@ func TestPeering_Connect(t *testing.T) {
 			})
 
 			logger.Log(t, "creating static-server in server peer")
-			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+			} else {
+				k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			}
 
 			logger.Log(t, "creating static-client deployments in client peer")
 			if cfg.EnableTransparentProxy {
 				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 			} else {
-				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default")
+				if cfg.EnableWindows {
+					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers-windows/default")
+				} else {
+					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default")
+				}
 			}
 			// Check that both static-server and static-client have been injected and now have 2 containers.
 			podList, err := staticServerPeerClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{

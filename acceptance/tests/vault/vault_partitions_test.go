@@ -47,7 +47,9 @@ func TestVault_Partitions(t *testing.T) {
 	// In the primary cluster, we will expose Vault server as a Load balancer
 	// or a NodePort service so that the secondary can connect to it.
 	serverClusterVaultHelmValues := map[string]string{
-		"server.service.type": "LoadBalancer",
+		"server.service.type":   "LoadBalancer",
+		"injector.nodeSelector": "kubernetes.io/os: linux",
+		"server.nodeSelector":   "kubernetes.io/os: linux",
 	}
 	if cfg.UseKind {
 		serverClusterVaultHelmValues["server.service.type"] = "NodePort"

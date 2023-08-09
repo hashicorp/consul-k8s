@@ -33,7 +33,7 @@ func TestPartitions_Connect(t *testing.T) {
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
-
+	cfg.SkipWhenWindowsAndTproxy(t)
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 	const defaultNamespace = "default"
@@ -285,25 +285,43 @@ func TestPartitions_Connect(t *testing.T) {
 			t.Run("in-partition", func(t *testing.T) {
 				logger.Log(t, "test in-partition networking")
 				logger.Log(t, "creating static-server and static-client deployments in server cluster")
-				k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-				if cfg.EnableTransparentProxy {
-					k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
-				} else {
+				if cfg.EnableWindows {
+					k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
 					if c.destinationNamespace == defaultNamespace {
-						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-windows")
 					} else {
-						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces-windows")
+					}
+				} else {
+					k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+					if cfg.EnableTransparentProxy {
+						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+					} else {
+						if c.destinationNamespace == defaultNamespace {
+							k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+						} else {
+							k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+						}
 					}
 				}
 				logger.Log(t, "creating static-server and static-client deployments in client cluster")
-				k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-				if cfg.EnableTransparentProxy {
-					k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
-				} else {
+				if cfg.EnableWindows {
+					k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
 					if c.destinationNamespace == defaultNamespace {
-						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-windows")
 					} else {
-						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces-windows")
+					}
+				} else {
+					k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+					if cfg.EnableTransparentProxy {
+						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+					} else {
+						if c.destinationNamespace == defaultNamespace {
+							k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+						} else {
+							k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+						}
 					}
 				}
 				// Check that both static-server and static-client have been injected and now have 2 containers in server cluster.
@@ -405,8 +423,13 @@ func TestPartitions_Connect(t *testing.T) {
 				// Test that kubernetes readiness status is synced to Consul.
 				// Create the file so that the readiness probe of the static-server pod fails.
 				logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
-				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				if cfg.EnableWindows {
+					k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+					k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+				} else {
+					k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+					k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				}
 
 				// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 				// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -415,18 +438,22 @@ func TestPartitions_Connect(t *testing.T) {
 				// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 				logger.Log(t, "checking that connection is unsuccessful")
 				if cfg.EnableTransparentProxy {
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.%s", staticServerNamespace))
 				} else {
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 				}
 			})
 			// This section of the tests runs the cross-partition networking tests.
 			t.Run("cross-partition", func(t *testing.T) {
 				logger.Log(t, "test cross-partition networking")
 				logger.Log(t, "creating static-server and static-client deployments in server cluster")
-				k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+				if cfg.EnableWindows {
+					k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+				} else {
+					k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+				}
 				if cfg.EnableTransparentProxy {
 					k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 				} else {
@@ -437,7 +464,11 @@ func TestPartitions_Connect(t *testing.T) {
 					}
 				}
 				logger.Log(t, "creating static-server and static-client deployments in client cluster")
-				k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+				if cfg.EnableWindows {
+					k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+				} else {
+					k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+				}
 				if cfg.EnableTransparentProxy {
 					k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 				} else {
@@ -578,8 +609,13 @@ func TestPartitions_Connect(t *testing.T) {
 				// Test that kubernetes readiness status is synced to Consul.
 				// Create the file so that the readiness probe of the static-server pod fails.
 				logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
-				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				if cfg.EnableWindows {
+					k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+					k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "cmd", "/c", "mkdir", "tmp", "&&", "cd", "tmp", "&&", "echo.", ">", "unhealthy")
+				} else {
+					k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+					k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				}
 
 				// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 				// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -589,15 +625,15 @@ func TestPartitions_Connect(t *testing.T) {
 				logger.Log(t, "checking that connection is unsuccessful")
 				if cfg.EnableTransparentProxy {
 					if !c.mirrorK8S {
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", c.destinationNamespace, secondaryPartition))
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", c.destinationNamespace, defaultPartition))
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", c.destinationNamespace, secondaryPartition))
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", c.destinationNamespace, defaultPartition))
 					} else {
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, secondaryPartition))
-						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, defaultPartition))
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, secondaryPartition))
+						k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server.ns1 port 80: Connection refused"}, "", fmt.Sprintf("http://static-server.virtual.%s.ns.%s.ap.dc1.dc.consul", staticServerNamespace, defaultPartition))
 					}
 				} else {
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, defaultPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (56) Recv failure: Connection was reset", "curl: (56) Recv failure: Connection was aborted", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 				}
 			})
 		})
