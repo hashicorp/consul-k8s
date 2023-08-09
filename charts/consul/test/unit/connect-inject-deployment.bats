@@ -342,8 +342,8 @@ load _helpers
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = '{"kubernetes.io/os": "linux"}' ]
+      yq '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "\"linux\""  ]
 }
 
 @test "connectInject/Deployment: nodeSelector is set by default with sync enabled" {
@@ -352,8 +352,8 @@ load _helpers
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = '{"kubernetes.io/os": "linux"}' ]
+      yq '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "\"linux\""  ]
 }
 
 @test "connectInject/Deployment: specified nodeSelector" {

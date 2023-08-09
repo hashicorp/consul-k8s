@@ -790,8 +790,8 @@ load _helpers
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = '{"kubernetes.io/os": "linux"}' ]
+      yq -s -r '.[0].spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "\"linux\""  ]
 }
 
 @test "terminatingGateways/Deployment: can set a nodeSelector through defaults" {

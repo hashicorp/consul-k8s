@@ -344,8 +344,8 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'global.federation.createFederationSecret=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = '{"kubernetes.io/os": "linux"}' ]
+      yq '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "\"linux\""  ]
 }
 
 @test "createFederationSecret/Job: specified nodeSelector" {

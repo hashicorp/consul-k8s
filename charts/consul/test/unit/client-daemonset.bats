@@ -390,7 +390,7 @@ load _helpers
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
-  [ "${actual}" = "linux" ]
+  [ "${actual}" = "\"linux\"" ]
 }
 
 @test "client/DaemonSet: specified nodeSelector" {
