@@ -5,9 +5,12 @@ package gatewayresources
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
@@ -19,7 +22,9 @@ import (
 	"github.com/mitchellh/cli"
 	yaml "gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -70,7 +75,6 @@ type Command struct {
 	flagNodeSelector       string // this is a yaml multiline string map
 	flagTolerations        string // this is a multiline yaml string matching the tolerations array
 	flagServiceAnnotations string // this is a multiline yaml string array of annotations to allow
-	flagResources          string // this is a multiline yaml string map of resource requests and limits
 
 	flagOpenshiftSCCName string
 
@@ -151,6 +155,12 @@ func (c *Command) Run(args []string) int {
 	// Validate flags
 	if err := c.validateFlags(); err != nil {
 		c.UI.Error(err.Error())
+		return 1
+	}
+
+	// Load config from the configmap.
+	if c.loadConfig(); err != nil {
+		c.UI.Error(fmt.Sprintf("Error loading config: %s", err))
 		return 1
 	}
 
@@ -287,10 +297,27 @@ func (c *Command) validateFlags() error {
 			return fmt.Errorf("error decoding service annotations: %w", err)
 		}
 	}
-	if c.flagResources != "" {
-		if err := yaml.Unmarshal([]byte(c.flagResources), &c.resources); err != nil {
-			return fmt.Errorf("error decoding resources: %w", err)
+
+	return nil
+}
+
+func (c *Command) loadConfig() error {
+	// Load resource.json
+	file, err := os.Open("/consul/config/resource.json")
+	defer file.Close()
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
 		}
+		c.UI.Info("No resource.json found, using defaults")
+		c.resources = defaultResourceRequirements()
+	}
+	b, err := ioutil.ReadAll(file)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(b, &c.resources); err != nil {
+		return err
 	}
 
 	return nil
@@ -310,7 +337,28 @@ Usage: consul-k8s-control-plane gateway-resources [options]
 	after a helm installation or upgrade in order to avoid the
 	dependencies of CRDs being in-place prior to resource creation.
 
+      resources:
+        requests:
+          memory: "100Mi"
+          cpu: "100m"
+        limits:
+          memory: "100Mi"
+          cpu: "100m"
 `
+
+func defaultResourceRequirements() v1.ResourceRequirements {
+	// This is a fallback. The resource.json file should be present unless explicitly removed.
+	return v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("100Mi"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("100m"),
+			v1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+	}
+}
 
 func forceClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha1.GatewayClassConfig) error {
 	return backoff.Retry(func() error {
