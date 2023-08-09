@@ -241,7 +241,11 @@ var (
 	// Below is where any custom generic listener validation errors should go.
 	// We map anything under here to a custom ListenerConditionReason of Invalid on
 	// an Accepted status type.
-	errListenerNoTLSPassthrough = errors.New("TLS passthrough is not supported")
+	errListenerNoTLSPassthrough              = errors.New("TLS passthrough is not supported")
+	errListenerTLSCipherSuiteNotConfigurable = errors.New("tls_min_version does not allow tls_cipher_suites configuration")
+	errListenerUnsupportedTLSCipherSuite     = errors.New("unsupported cipher suite in tls_cipher_suites")
+	errListenerUnsupportedTLSMaxVersion      = errors.New("unsupported tls_max_version")
+	errListenerUnsupportedTLSMinVersion      = errors.New("unsupported tls_min_version")
 
 	// This custom listener validation error is used to differentiate between an errListenerPortUnavailable because of
 	// direct port conflicts defined by the user (two listeners on the same port) vs a port conflict because we map

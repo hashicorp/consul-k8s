@@ -41,6 +41,45 @@ var (
 		gwv1beta1.Kind("HTTPRoute"): {},
 		gwv1beta1.Kind("TCPRoute"):  {},
 	}
+
+	allSupportedTLSVersions = map[string]struct{}{
+		"TLS_AUTO": {},
+		"TLSv1_0":  {},
+		"TLSv1_1":  {},
+		"TLSv1_2":  {},
+		"TLSv1_3":  {},
+	}
+
+	allTLSVersionsWithConfigurableCipherSuites = map[string]struct{}{
+		// Remove "" and "TLS_AUTO" if Envoy ever sets TLS 1.3 as default minimum
+		"":         {},
+		"TLS_AUTO": {},
+		"TLSv1_0":  {},
+		"TLSv1_1":  {},
+		"TLSv1_2":  {},
+	}
+
+	allSupportedTLSCipherSuites = map[string]struct{}{
+		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256":       {},
+		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256": {},
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":         {},
+		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256":   {},
+		"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384":       {},
+		"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384":         {},
+
+		// NOTE: the following cipher suites are currently supported by Envoy
+		// but have been identified as insecure and are pending removal
+		// https://github.com/envoyproxy/envoy/issues/5399
+		"TLS_RSA_WITH_AES_128_GCM_SHA256": {},
+		"TLS_RSA_WITH_AES_128_CBC_SHA":    {},
+		"TLS_RSA_WITH_AES_256_GCM_SHA384": {},
+		"TLS_RSA_WITH_AES_256_CBC_SHA":    {},
+		// https://github.com/envoyproxy/envoy/issues/5400
+		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA": {},
+		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":   {},
+		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA": {},
+		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":   {},
+	}
 )
 
 // validateRefs validates backend references for a route, determining whether or
@@ -167,43 +206,92 @@ func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener
 // validateTLS validates that the TLS configuration for a given listener is valid and that
 // the certificates that it references exist.
 func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, resources *common.ResourceMap) (error, error) {
-	namespace := gateway.Namespace
-
+	// If there's no TLS, there's nothing to validate
 	if tls == nil {
 		return nil, nil
 	}
 
-	var err error
-
-	for _, cert := range tls.CertificateRefs {
-		// break on the first error
-		if !common.NilOrEqual(cert.Group, "") || !common.NilOrEqual(cert.Kind, common.KindSecret) {
-			err = errListenerInvalidCertificateRef_NotSupported
-			break
-		}
-
-		if !resources.GatewayCanReferenceSecret(gateway, cert) {
-			err = errRefNotPermitted
-			break
-		}
-
-		key := common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, namespace)
-		secret := resources.Certificate(key)
-
-		if secret == nil {
-			err = errListenerInvalidCertificateRef_NotFound
-			break
-		}
-
-		err = validateCertificateData(*secret)
-	}
+	// Validate the certificate references and then return any error
+	// alongside any TLS configuration error that we find below.
+	refsErr := validateCertificateRefs(gateway, tls.CertificateRefs, resources)
 
 	if tls.Mode != nil && *tls.Mode == gwv1beta1.TLSModePassthrough {
-		return errListenerNoTLSPassthrough, err
+		return errListenerNoTLSPassthrough, refsErr
 	}
 
-	// TODO: validate tls options
-	return nil, err
+	if err := validateTLSOptions(tls.Options); err != nil {
+		return err, refsErr
+	}
+
+	return nil, refsErr
+}
+
+func validateCertificateRefs(gateway gwv1beta1.Gateway, refs []gwv1beta1.SecretObjectReference, resources *common.ResourceMap) error {
+	for _, cert := range refs {
+		// Verify that the reference has a group and kind that we support
+		if !common.NilOrEqual(cert.Group, "") || !common.NilOrEqual(cert.Kind, common.KindSecret) {
+			return errListenerInvalidCertificateRef_NotSupported
+		}
+
+		// Verify that the reference is within the namespace or,
+		// if cross-namespace, that it's allowed by a ReferenceGrant
+		if !resources.GatewayCanReferenceSecret(gateway, cert) {
+			return errRefNotPermitted
+		}
+
+		// Verify that the referenced resource actually exists
+		key := common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace)
+		secret := resources.Certificate(key)
+		if secret == nil {
+			return errListenerInvalidCertificateRef_NotFound
+		}
+
+		// Verify that the referenced resource contains the data shape that we expect
+		if err := validateCertificateData(*secret); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateTLSOptions(options map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue) error {
+	if options == nil {
+		return nil
+	}
+
+	tlsMinVersionValue := string(options[common.TLSMinVersionAnnotationKey])
+	if tlsMinVersionValue != "" {
+		if _, supported := allSupportedTLSVersions[tlsMinVersionValue]; !supported {
+			return errListenerUnsupportedTLSMinVersion
+		}
+	}
+
+	tlsMaxVersionValue := string(options[common.TLSMaxVersionAnnotationKey])
+	if tlsMaxVersionValue != "" {
+		if _, supported := allSupportedTLSVersions[tlsMaxVersionValue]; !supported {
+			return errListenerUnsupportedTLSMaxVersion
+		}
+	}
+
+	tlsCipherSuitesValue := string(options[common.TLSCipherSuitesAnnotationKey])
+	if tlsCipherSuitesValue != "" {
+		// If a minimum TLS version is configured, verify that it supports configuring cipher suites
+		if tlsMinVersionValue != "" {
+			if _, supported := allTLSVersionsWithConfigurableCipherSuites[tlsMinVersionValue]; !supported {
+				return errListenerTLSCipherSuiteNotConfigurable
+			}
+		}
+
+		for _, tlsCipherSuiteValue := range strings.Split(tlsCipherSuitesValue, ",") {
+			tlsCipherSuite := strings.TrimSpace(tlsCipherSuiteValue)
+			if _, supported := allSupportedTLSCipherSuites[tlsCipherSuite]; !supported {
+				return errListenerUnsupportedTLSCipherSuite
+			}
+		}
+	}
+
+	return nil
 }
 
 func validateCertificateData(secret corev1.Secret) error {
