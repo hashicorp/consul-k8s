@@ -9,7 +9,6 @@ import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -21,21 +20,6 @@ import (
 // to a helm install, it will respect the helmValues over
 // the values from TestConfig.
 func TestNewHelmCluster(t *testing.T) {
-	nodeSelectors := map[string]string{
-		"connectInject.nodeSelector":                                "kubernetes.io/os: linux",
-		"connectInject.apiGateway.managedGatewayClass.nodeSelector": "kubernetes.io/os: linux",
-		"client.nodeSelector":                                       "kubernetes.io/os: linux",
-		"acls.nodeSelector":                                         "kubernetes.io/os: linux",
-		"global.acls.nodeSelector":                                  "kubernetes.io/os: linux",
-		"global.tls.nodeSelector":                                   "kubernetes.io/os: linux",
-		"meshGateway.nodeSelector":                                  "kubernetes.io/os: linux",
-		"server.nodeSelector":                                       "kubernetes.io/os: linux",
-		"syncCatalog.nodeSelector":                                  "kubernetes.io/os: linux",
-		"telemetryCollector.nodeSelector":                           "kubernetes.io/os: linux",
-		"webhookCertManager.nodeSelector":                           "kubernetes.io/os: linux",
-		"ingressGateways.defaults.nodeSelector":                     "kubernetes.io/os: linux",
-		"terminatingGateways.defaults.nodeSelector":                 "kubernetes.io/os: linux",
-	}
 	tests := []struct {
 		name       string
 		helmValues map[string]string
@@ -83,7 +67,6 @@ func TestNewHelmCluster(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cluster := NewHelmCluster(t, tt.helmValues, &ctx{}, &config.TestConfig{ConsulImage: "test-config-image"}, "test")
-			helpers.MergeMaps(tt.want, nodeSelectors)
 			require.Equal(t, cluster.helmOptions.SetValues, tt.want)
 		})
 	}
