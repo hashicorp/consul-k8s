@@ -372,31 +372,6 @@ func TestFailover_Connect(t *testing.T) {
 				}
 			}
 
-			// Create static server deployments.
-			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, testClusters[keyCluster01a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc1-default")
-			k8s.DeployKustomize(t, testClusters[keyCluster01b].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc1-partition")
-			k8s.DeployKustomize(t, testClusters[keyCluster02a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc2")
-			k8s.DeployKustomize(t, testClusters[keyCluster03a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc3")
-
-			// Create static client deployments.
-			k8s.DeployKustomize(t, testClusters[keyCluster01a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-client/default-partition")
-			k8s.DeployKustomize(t, testClusters[keyCluster02a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-client/default-partition")
-			k8s.DeployKustomize(t, testClusters[keyCluster03a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-client/default-partition")
-			k8s.DeployKustomize(t, testClusters[keyCluster01b].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-client/ap1-partition")
-
-			// Verify that both static-server and static-client have been injected and now have 2 containers in each cluster.
-			// Also get the server IP
-			testClusters.setServerIP(t)
-
 			logger.Log(t, "creating exported services")
 			for _, v := range testClusters {
 				if v.hasServer {
@@ -439,6 +414,32 @@ func TestFailover_Connect(t *testing.T) {
 					testClusters[k].pqName = &definition.Name
 				}
 			}
+
+			// Create static server/client after the rest of the config is setup for a more stable testing experience
+			// Create static server deployments.
+			logger.Log(t, "creating static-server and static-client deployments")
+			k8s.DeployKustomize(t, testClusters[keyCluster01a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-server/dc1-default")
+			k8s.DeployKustomize(t, testClusters[keyCluster01b].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-server/dc1-partition")
+			k8s.DeployKustomize(t, testClusters[keyCluster02a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-server/dc2")
+			k8s.DeployKustomize(t, testClusters[keyCluster03a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-server/dc3")
+
+			// Create static client deployments.
+			k8s.DeployKustomize(t, testClusters[keyCluster01a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-client/default-partition")
+			k8s.DeployKustomize(t, testClusters[keyCluster02a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-client/default-partition")
+			k8s.DeployKustomize(t, testClusters[keyCluster03a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-client/default-partition")
+			k8s.DeployKustomize(t, testClusters[keyCluster01b].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-client/ap1-partition")
+
+			// Verify that both static-server and static-client have been injected and now have 2 containers in each cluster.
+			// Also get the server IP
+			testClusters.setServerIP(t)
 
 			// Everything should be up and running now
 			testClusters.verifyServerUpState(t)
