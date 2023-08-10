@@ -176,77 +176,104 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 		annotations      map[string]string
 		expTproxyEnabled bool
 		namespaceLabel   map[string]string
+		openShiftEnabled bool
 	}{
-		"enabled globally, ns not set, annotation not provided, cni disabled": {
+		"enabled globally, ns not set, annotation not provided, cni disabled, openshift disabled": {
 			true,
 			false,
 			nil,
 			true,
 			nil,
+			false,
 		},
-		"enabled globally, ns not set, annotation is false, cni disabled": {
+		"enabled globally, ns not set, annotation is false, cni disabled, openshift disabled": {
 			true,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "false"},
 			false,
 			nil,
+			false,
 		},
-		"enabled globally, ns not set, annotation is true, cni disabled": {
+		"enabled globally, ns not set, annotation is true, cni disabled, openshift disabled": {
 			true,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "true"},
 			true,
 			nil,
+			false,
 		},
-		"disabled globally, ns not set, annotation not provided, cni disabled": {
+		"disabled globally, ns not set, annotation not provided, cni disabled, openshift disabled": {
 			false,
 			false,
 			nil,
 			false,
 			nil,
+			false,
 		},
-		"disabled globally, ns not set, annotation is false, cni disabled": {
+		"disabled globally, ns not set, annotation is false, cni disabled, openshift disabled": {
 			false,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "false"},
 			false,
 			nil,
+			false,
 		},
-		"disabled globally, ns not set, annotation is true, cni disabled": {
+		"disabled globally, ns not set, annotation is true, cni disabled, openshift disabled": {
 			false,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "true"},
 			true,
 			nil,
+			false,
 		},
-		"disabled globally, ns enabled, annotation not set, cni disabled": {
+		"disabled globally, ns enabled, annotation not set, cni disabled, openshift disabled": {
 			false,
 			false,
 			nil,
 			true,
 			map[string]string{constants.KeyTransparentProxy: "true"},
+			false,
 		},
-		"enabled globally, ns disabled, annotation not set, cni disabled": {
+		"enabled globally, ns disabled, annotation not set, cni disabled, openshift disabled": {
 			true,
 			false,
 			nil,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "false"},
+			false,
 		},
-		"disabled globally, ns enabled, annotation not set, cni enabled": {
+		"disabled globally, ns enabled, annotation not set, cni enabled, openshift disabled": {
 			false,
 			true,
 			nil,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "true"},
+			false,
 		},
 
-		"enabled globally, ns not set, annotation not set, cni enabled": {
+		"enabled globally, ns not set, annotation not set, cni enabled, openshift disabled": {
 			true,
 			true,
 			nil,
 			false,
 			nil,
+			false,
+		},
+		"enabled globally, ns not set, annotation not set, cni enabled, openshift enabled": {
+			true,
+			true,
+			nil,
+			false,
+			nil,
+			true,
+		},
+		"enabled globally, ns not set, annotation not set, cni disabled, openshift enabled": {
+			true,
+			false,
+			nil,
+			true,
+			nil,
+			true,
 		},
 	}
 	for name, c := range cases {
@@ -255,9 +282,15 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 				EnableTransparentProxy: c.globalEnabled,
 				EnableCNI:              c.cniEnabled,
 				ConsulConfig:           &consul.Config{HTTPPort: 8500},
+				EnableOpenShift:        c.openShiftEnabled,
 			}
 			pod := minimal()
 			pod.Annotations = c.annotations
+
+			privileged := false
+			if c.openShiftEnabled && !c.cniEnabled {
+				privileged = true
+			}
 
 			var expectedSecurityContext *corev1.SecurityContext
 			if c.cniEnabled {
@@ -265,7 +298,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
 					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
 					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(false),
+					Privileged:   pointer.Bool(privileged),
 					Capabilities: &corev1.Capabilities{
 						Drop: []corev1.Capability{"ALL"},
 					},
@@ -275,7 +308,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 					RunAsUser:    pointer.Int64(0),
 					RunAsGroup:   pointer.Int64(0),
 					RunAsNonRoot: pointer.Bool(false),
-					Privileged:   pointer.Bool(true),
+					Privileged:   pointer.Bool(privileged),
 					Capabilities: &corev1.Capabilities{
 						Add: []corev1.Capability{netAdminCapability},
 					},
