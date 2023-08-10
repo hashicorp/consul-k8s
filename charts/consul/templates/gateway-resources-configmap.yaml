@@ -14,8 +14,6 @@ metadata:
 data:
   {{- if .Values.connectInject.apiGateway.managedGatewayClass.resources }}
   resources.json: |
-    {
-      "resources": {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
-    }
+    {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
   {{- end }}
 {{- end }}

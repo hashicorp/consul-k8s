@@ -303,13 +303,13 @@ func (c *Command) validateFlags() error {
 
 func (c *Command) loadConfig() error {
 	// Load resource.json
-	file, err := os.Open("/consul/config/resource.json")
+	file, err := os.Open("/consul/config/resources.json")
 	defer file.Close()
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		c.UI.Info("No resource.json found, using defaults")
+		c.UI.Info("No resources.json found, using defaults")
 		c.resources = defaultResourceRequirements()
 	}
 	b, err := ioutil.ReadAll(file)
@@ -337,25 +337,18 @@ Usage: consul-k8s-control-plane gateway-resources [options]
 	after a helm installation or upgrade in order to avoid the
 	dependencies of CRDs being in-place prior to resource creation.
 
-      resources:
-        requests:
-          memory: "100Mi"
-          cpu: "100m"
-        limits:
-          memory: "100Mi"
-          cpu: "100m"
 `
 
 func defaultResourceRequirements() v1.ResourceRequirements {
 	// This is a fallback. The resource.json file should be present unless explicitly removed.
 	return v1.ResourceRequirements{
 		Requests: v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse("100Mi"),
 			v1.ResourceMemory: resource.MustParse("100Mi"),
+			v1.ResourceCPU:    resource.MustParse("100m"),
 		},
 		Limits: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse("100Mi"),
 			v1.ResourceCPU:    resource.MustParse("100m"),
-			v1.ResourceMemory: resource.MustParse("128Mi"),
 		},
 	}
 }
