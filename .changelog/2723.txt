@@ -1,0 +1,3 @@
+```release-note:feature
+helm: Add ability to configure resource requests and limits for Gateway API deployments.
+```
