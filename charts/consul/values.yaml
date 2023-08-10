@@ -3086,7 +3086,7 @@ apiGateway:
   # The name (and tag) of the Envoy Docker image used for the
   # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
   # @default: envoyproxy/envoy:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy:v1.25.6"
+  imageEnvoy: "envoyproxy/envoy:v1.25.9"
 
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
   # @type: string
