@@ -4,7 +4,7 @@
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: SamenessGroup
 metadata:
-  name: mine
+  name: group-01
 spec:
   defaultForFailover: true
   members:

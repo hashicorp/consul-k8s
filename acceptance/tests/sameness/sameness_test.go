@@ -26,6 +26,7 @@ import (
 )
 
 const (
+	defaultPartition      = "default"
 	cluster01Partition    = "ap1"
 	cluster01Datacenter   = "dc1"
 	cluster02Datacenter   = "dc2"
@@ -49,7 +50,7 @@ const (
 	peerName2a = keyCluster02a
 	peerName3a = keyCluster03a
 
-	samenessGroupName = "mine"
+	samenessGroupName = "group-01"
 
 	retryTimeout = 5 * time.Minute
 )
@@ -139,10 +140,10 @@ func TestFailover_Connect(t *testing.T) {
 			*/
 
 			testClusters := clusters{
-				keyCluster01a: {name: peerName1a, context: env.DefaultContext(t), hasServer: true, acceptors: []string{peerName2a, peerName3a}},
-				keyCluster01b: {name: peerName1b, context: env.Context(t, 1), partition: cluster01Partition, acceptors: []string{peerName2a, peerName3a}},
-				keyCluster02a: {name: peerName2a, context: env.Context(t, 2), hasServer: true, acceptors: []string{peerName3a}},
-				keyCluster03a: {name: peerName3a, context: env.Context(t, 3), hasServer: true},
+				keyCluster01a: {name: peerName1a, context: env.DefaultContext(t), partition: defaultPartition, hasServer: true, acceptors: []string{peerName2a, peerName3a}},
+				keyCluster01b: {name: peerName1b, context: env.Context(t, 1), partition: cluster01Partition, hasServer: false, acceptors: []string{peerName2a, peerName3a}},
+				keyCluster02a: {name: peerName2a, context: env.Context(t, 2), partition: defaultPartition, hasServer: true, acceptors: []string{peerName3a}},
+				keyCluster03a: {name: peerName3a, context: env.Context(t, 3), partition: defaultPartition, hasServer: true},
 			}
 
 			// Setup Namespaces.
@@ -448,7 +449,7 @@ func TestFailover_Connect(t *testing.T) {
 			// Verify all the failover Scenarios
 			logger.Log(t, "verifying failover scenarios")
 
-			testTable := []struct {
+			subCases := []struct {
 				name      string
 				server    *cluster
 				failovers []struct {
@@ -515,27 +516,27 @@ func TestFailover_Connect(t *testing.T) {
 				},
 			}
 
-			for _, tt := range testTable {
-				t.Run(tt.name, func(t *testing.T) {
+			for _, sc := range subCases {
+				t.Run(sc.name, func(t *testing.T) {
 					// Reset the scale of all servers
 					testClusters.resetScale(t)
 					testClusters.verifyServerUpState(t)
 					// We're resetting the scale, so make sure we have all the new IP addresses saved
 					testClusters.setServerIP(t)
 
-					for _, v := range tt.failovers {
+					for _, v := range sc.failovers {
 						// Verify Failover (If this is the first check, then just verifying we're starting with the right server)
 						logger.Log(t, "checking service failover")
-						serviceFailoverCheck(t, tt.server, v.failoverServer.name)
+						serviceFailoverCheck(t, sc.server, v.failoverServer.name)
 
 						// Verify DNS
-						if tt.checkDNSPQ {
+						if sc.checkDNSPQ {
 							logger.Log(t, "verifying dns")
-							dnsFailoverCheck(t, cfg, releaseName, *tt.server.dnsIP, tt.server, v.failoverServer)
+							dnsFailoverCheck(t, cfg, releaseName, *sc.server.dnsIP, sc.server, v.failoverServer)
 
 							// Verify PQ
 							logger.Log(t, "verifying prepared query")
-							preparedQueryFailoverCheck(t, releaseName, *tt.server.dnsIP, v.expectedPQ, tt.server, v.failoverServer)
+							preparedQueryFailoverCheck(t, releaseName, *sc.server.dnsIP, v.expectedPQ, sc.server, v.failoverServer)
 						} else {
 							// We currently skip running DNS and PQ tests for a couple of reasons
 							// 1. The admin partition does not contain a server, so DNS service will not resolve on the admin partition cluster
@@ -543,7 +544,7 @@ func TestFailover_Connect(t *testing.T) {
 							// e.g kubectl --context kind-dc1 --namespace ns1 exec -i deploy/static-client -c static-client \
 							//	-- dig @test-3lmypr-consul-dns.default static-server.service.ns2.ns.mine.sg.ap1.ap.consul
 							// is not possible at the moment due to a bug. The workaround will be used once this bug is fixed.
-							logger.Logf(t, "skipping DNS and PQ checks for %s", tt.name)
+							logger.Logf(t, "skipping DNS and PQ checks for %s", sc.name)
 						}
 
 						// Scale down static-server on the current failover, will fail over to the next.
@@ -684,7 +685,7 @@ func preparedQueryFailoverCheck(t *testing.T, releaseName string, dnsIP string, 
 // DNS failover check verifies that failover occurred when querying the DNS.
 func dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, dnsIP string, server, failover *cluster) {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
-	dnsLookup := []string{"static-server.service.ns2.ns.mine.sg.consul", "+tcp", "SRV"}
+	dnsLookup := []string{fmt.Sprintf("static-server.service.ns2.ns.%s.sg.consul", samenessGroupName), "+tcp", "SRV"}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		logs := dnsQuery(t, releaseName, dnsLookup, server, failover)
 

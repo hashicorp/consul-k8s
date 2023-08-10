@@ -10,7 +10,7 @@ spec:
     - name: static-server
       namespace: ns2
       consumers:
-        - samenessGroup: mine
+        - samenessGroup: group-01
     - name: mesh-gateway
       consumers:
-        - samenessGroup: mine
+        - samenessGroup: group-01
