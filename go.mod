@@ -10,8 +10,8 @@ require (
 	github.com/google/go-cmp v0.5.5
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul/api v1.4.1-0.20210203205937-0d1301c408a3
-	github.com/hashicorp/consul/sdk v0.7.0
+	github.com/hashicorp/consul/api v1.9.0
+	github.com/hashicorp/consul/sdk v0.8.0
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-discover v0.0.0-20200812215701-c4b85f6ed31f
 	github.com/hashicorp/go-hclog v0.15.0
