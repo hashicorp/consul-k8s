@@ -2021,6 +2021,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 							"envoy_telemetry_collector_bind_socket_dir": "/consul/connect-inject",
 						},
 					},
+					ServiceLocality: &api.Locality{
+						Region: "us-west-1",
+						Zone:   "us-west-1a",
+					},
 					ServiceMeta: map[string]string{
 						"name":                   "abc",
 						"version":                "2",
@@ -2225,6 +2229,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServicePort, instance.ServicePort)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceTags, instance.ServiceTags)
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceLocality, instance.ServiceLocality)
 				if tt.nodeMeta != nil {
 					require.Equal(t, tt.expectedProxySvcInstances[i].NodeMeta, instance.NodeMeta)
 				}
