@@ -1,10 +1,6 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package k8s
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -15,10 +11,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
-)
-
-const (
-	kubectlTimeout = "--timeout=120s"
 )
 
 // kubeAPIConnectErrs are errors that sometimes occur when talking to the
@@ -61,7 +53,7 @@ func RunKubectlAndGetOutputWithLoggerE(t *testing.T, options *k8s.KubectlOptions
 	}
 
 	counter := &retry.Counter{
-		Count: 10,
+		Count: 3,
 		Wait:  1 * time.Second,
 	}
 	var output string
@@ -102,7 +94,7 @@ func KubectlApplyK(t *testing.T, options *k8s.KubectlOptions, kustomizeDir strin
 // deletes it from the cluster by running 'kubectl delete -f'.
 // If there's an error deleting the file, fail the test.
 func KubectlDelete(t *testing.T, options *k8s.KubectlOptions, configPath string) {
-	_, err := RunKubectlAndGetOutputE(t, options, "delete", kubectlTimeout, "-f", configPath)
+	_, err := RunKubectlAndGetOutputE(t, options, "delete", "--timeout=60s", "-f", configPath)
 	require.NoError(t, err)
 }
 
@@ -112,13 +104,7 @@ func KubectlDelete(t *testing.T, options *k8s.KubectlOptions, configPath string)
 func KubectlDeleteK(t *testing.T, options *k8s.KubectlOptions, kustomizeDir string) {
 	// Ignore not found errors because Kubernetes automatically cleans up the kube secrets that we deployed
 	// referencing the ServiceAccount when it is deleted.
-	_, err := RunKubectlAndGetOutputE(t, options, "delete", kubectlTimeout, "--ignore-not-found", "-k", kustomizeDir)
-	require.NoError(t, err)
-}
-
-// KubectlScale takes a deployment and scales it to the provided number of replicas.
-func KubectlScale(t *testing.T, options *k8s.KubectlOptions, deployment string, replicas int) {
-	_, err := RunKubectlAndGetOutputE(t, options, "scale", kubectlTimeout, fmt.Sprintf("--replicas=%d", replicas), deployment)
+	_, err := RunKubectlAndGetOutputE(t, options, "delete", "--timeout=60s", "--ignore-not-found", "-k", kustomizeDir)
 	require.NoError(t, err)
 }
 

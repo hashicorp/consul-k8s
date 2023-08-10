@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 variable "location" {
   default     = "West US 2"
   description = "The location to launch this AKS cluster in."

@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 output "cluster_ids" {
   value = google_container_cluster.cluster.*.id
 }

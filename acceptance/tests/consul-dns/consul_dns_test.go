@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package consuldns
 
 import (
@@ -62,10 +59,10 @@ func TestConsulDNS(t *testing.T) {
 
 			dnsPodName := fmt.Sprintf("%s-dns-pod", releaseName)
 			dnsTestPodArgs := []string{
-				"run", "-it", dnsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
+				"run", "-i", dnsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
 			}
 
-			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
+			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, func() {
 				// Note: this delete command won't wait for pods to be fully terminated.
 				// This shouldn't cause any test pollution because the underlying
 				// objects are deployments, and so when other tests create these
