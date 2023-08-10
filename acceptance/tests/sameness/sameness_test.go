@@ -26,7 +26,6 @@ import (
 )
 
 const (
-	defaultPartition      = "default"
 	cluster01Partition    = "ap1"
 	cluster01Datacenter   = "dc1"
 	cluster02Datacenter   = "dc2"
@@ -140,10 +139,10 @@ func TestFailover_Connect(t *testing.T) {
 			*/
 
 			testClusters := clusters{
-				keyCluster01a: {name: peerName1a, context: env.DefaultContext(t), partition: defaultPartition, hasServer: true, acceptors: []string{peerName2a, peerName3a}},
+				keyCluster01a: {name: peerName1a, context: env.DefaultContext(t), hasServer: true, acceptors: []string{peerName2a, peerName3a}},
 				keyCluster01b: {name: peerName1b, context: env.Context(t, 1), partition: cluster01Partition, hasServer: false, acceptors: []string{peerName2a, peerName3a}},
-				keyCluster02a: {name: peerName2a, context: env.Context(t, 2), partition: defaultPartition, hasServer: true, acceptors: []string{peerName3a}},
-				keyCluster03a: {name: peerName3a, context: env.Context(t, 3), partition: defaultPartition, hasServer: true},
+				keyCluster02a: {name: peerName2a, context: env.Context(t, 2), hasServer: true, acceptors: []string{peerName3a}},
+				keyCluster03a: {name: peerName3a, context: env.Context(t, 3), hasServer: true},
 			}
 
 			// Setup Namespaces.
