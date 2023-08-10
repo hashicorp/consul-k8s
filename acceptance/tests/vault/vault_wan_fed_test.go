@@ -31,7 +31,6 @@ import (
 // in the secondary that will treat the Vault server in the primary as an external server.
 func TestVault_WANFederationViaGateways(t *testing.T) {
 	cfg := suite.Config()
-
 	if cfg.UseKind {
 		t.Skipf("Skipping this test because it's currently flaky on kind")
 	}
@@ -498,7 +497,6 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	})
 
 	// Check that we can connect services over the mesh gateways.
-
 	logger.Log(t, "creating static-server in dc2")
 	k8s.DeployKustomize(t, secondaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
@@ -520,7 +518,6 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, primaryCtx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
-
 }
 
 // vaultAddress returns Vault's server URL depending on test configuration.

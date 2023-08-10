@@ -317,20 +317,6 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 	return nil
 }
 
-func parseLocality(node corev1.Node) *api.Locality {
-	region := node.Labels[corev1.LabelTopologyRegion]
-	zone := node.Labels[corev1.LabelTopologyZone]
-
-	if region == "" {
-		return nil
-	}
-
-	return &api.Locality{
-		Region: region,
-		Zone:   zone,
-	}
-}
-
 // registerGateway creates Consul registrations for the Connect Gateways and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
 func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string, endpointAddressMap map[string]bool) error {
@@ -418,11 +404,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		}
 	}
 
-	var node corev1.Node
-	// Ignore errors because we don't want failures to block running services.
-	_ = r.Client.Get(context.Background(), types.NamespacedName{Name: pod.Spec.NodeName, Namespace: pod.Namespace}, &node)
-	locality := parseLocality(node)
-
 	// We only want that annotation to be present when explicitly overriding the consul svc name
 	// Otherwise, the Consul service name should equal the Kubernetes Service name.
 	// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
@@ -458,7 +439,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Meta:      meta,
 		Namespace: consulNS,
 		Tags:      tags,
-		Locality:  locality,
 	}
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
@@ -535,8 +515,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Namespace: consulNS,
 		Proxy:     proxyConfig,
 		Tags:      tags,
-		// Sidecar locality (not proxied service locality) is used for locality-aware routing.
-		Locality: locality,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.

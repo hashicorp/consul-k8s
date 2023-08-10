@@ -66,9 +66,6 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Datacenter:    "redirect_datacenter",
 						Peer:          "redirect_peer",
 					},
-					PrioritizeByLocality: &ServiceResolverPrioritizeByLocality{
-						Mode: "failover",
-					},
 					Failover: map[string]ServiceResolverFailover{
 						"failover1": {
 							Service:       "failover1",
@@ -150,9 +147,6 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 					Namespace:     "redirect_namespace",
 					Datacenter:    "redirect_datacenter",
 					Peer:          "redirect_peer",
-				},
-				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
-					Mode: "failover",
 				},
 				Failover: map[string]capi.ServiceResolverFailover{
 					"failover1": {
@@ -285,9 +279,6 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						Datacenter:    "redirect_datacenter",
 						Partition:     "redirect_partition",
 					},
-					PrioritizeByLocality: &ServiceResolverPrioritizeByLocality{
-						Mode: "none",
-					},
 					Failover: map[string]ServiceResolverFailover{
 						"failover1": {
 							Service:       "failover1",
@@ -369,9 +360,6 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 					Namespace:     "redirect_namespace",
 					Datacenter:    "redirect_datacenter",
 					Partition:     "redirect_partition",
-				},
-				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
-					Mode: "none",
 				},
 				Failover: map[string]capi.ServiceResolverFailover{
 					"failover1": {
@@ -896,22 +884,6 @@ func TestServiceResolver_Validate(t *testing.T) {
 			expectedErrMsgs: []string{
 				"spec.failover[failA].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set failover.namespace",
 				"spec.failover[failB].namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set failover.namespace",
-			},
-		},
-		"prioritize by locality none": {
-			input: &ServiceResolver{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: ServiceResolverSpec{
-					PrioritizeByLocality: &ServiceResolverPrioritizeByLocality{
-						Mode: "bad",
-					},
-				},
-			},
-			namespacesEnabled: false,
-			expectedErrMsgs: []string{
-				"mode must be one of '', 'none', or 'failover'",
 			},
 		},
 	}

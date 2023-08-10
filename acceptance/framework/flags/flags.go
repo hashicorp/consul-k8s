@@ -35,13 +35,13 @@ type TestFlags struct {
 	flagHelmChartVersion       string
 	flagConsulImage            string
 	flagConsulK8sImage         string
-	flagConsulDataplaneImage   string
 	flagConsulVersion          string
-	flagConsulDataplaneVersion string
 	flagEnvoyImage             string
 	flagConsulCollectorImage   string
 	flagVaultHelmChartVersion  string
 	flagVaultServerVersion     string
+	flagConsulDataplaneImage   string
+	flagConsulDataplaneVersion string
 
 	flagHCPResourceID string
 
@@ -198,7 +198,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	kubeEnvs := config.NewKubeTestConfigList(t.flagKubeconfigs, t.flagKubecontexts, t.flagKubeNamespaces)
 
 	c := &config.TestConfig{
-
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
 
@@ -219,15 +218,14 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		HelmChartVersion:       t.flagHelmChartVersion,
 		ConsulImage:            t.flagConsulImage,
 		ConsulK8SImage:         t.flagConsulK8sImage,
-		ConsulDataplaneImage:   t.flagConsulDataplaneImage,
 		ConsulVersion:          consulVersion,
-		ConsulDataplaneVersion: consulDataplaneVersion,
 		EnvoyImage:             t.flagEnvoyImage,
 		ConsulCollectorImage:   t.flagConsulCollectorImage,
 		VaultHelmChartVersion:  t.flagVaultHelmChartVersion,
 		VaultServerVersion:     t.flagVaultServerVersion,
-
-		HCPResourceID: t.flagHCPResourceID,
+		ConsulDataplaneImage:   t.flagConsulDataplaneImage,
+		ConsulDataplaneVersion: consulDataplaneVersion,
+		HCPResourceID:          t.flagHCPResourceID,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		NoCleanup:          t.flagNoCleanup,

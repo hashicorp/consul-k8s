@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
@@ -72,6 +73,32 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
+func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory, kustomizeDir string) {
+	t.Helper()
+
+	KubectlApplyK(t, options, kustomizeDir)
+
+	output, err := RunKubectlAndGetOutputE(t, options, "kustomize", kustomizeDir)
+	require.NoError(t, err)
+
+	job := batchv1.Job{}
+	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&job)
+	require.NoError(t, err)
+
+	helpers.Cleanup(t, noCleanupOnFailure, noCleanup, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		WritePodsDebugInfoIfFailed(t, options, debugDirectory, labelMapToString(job.GetLabels()))
+		KubectlDeleteK(t, options, kustomizeDir)
+	})
+	logger.Log(t, "job deployed")
+
+	// Because Jobs don't have a "started" condition, we have to check the status of the Pods they create.
+	RunKubectl(t, options, "wait", "--for=condition=Ready", "--timeout=5m", "pods", "--selector", fmt.Sprintf("job-name=%s", job.Name))
+}
+
 // CheckStaticServerConnection execs into a pod of sourceApp
 // and runs a curl command with the provided curlArgs.
 // This function assumes that the connection is made to the static-server and expects the output
@@ -93,7 +120,10 @@ func CheckStaticServerConnection(t *testing.T, options *k8s.KubectlOptions, sour
 // on the existence of any of them.
 func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k8s.KubectlOptions, sourceApp string, expectSuccess bool, failureMessages []string, expectedSuccessOutput string, curlArgs ...string) {
 	t.Helper()
-
+	resourceType := "deploy/"
+	if sourceApp == "job-client" {
+		resourceType = "jobs/"
+	}
 	expectedOutput := "hello world"
 	if expectedSuccessOutput != "" {
 		expectedOutput = expectedSuccessOutput
@@ -101,7 +131,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 
 	retrier := &retry.Timer{Timeout: 320 * time.Second, Wait: 2 * time.Second}
 
-	args := []string{"exec", "deploy/" + sourceApp, "-c", sourceApp, "--", "curl", "-vvvsSf"}
+	args := []string{"exec", resourceType + sourceApp, "-c", sourceApp, "--", "curl", "-vvvsSf"}
 	args = append(args, curlArgs...)
 
 	retry.RunWith(retrier, t, func(r *retry.R) {
