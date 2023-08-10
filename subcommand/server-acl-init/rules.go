@@ -221,6 +221,7 @@ node_prefix "" {
 {{- if .EnableNamespaces }}
 namespace_prefix "" {
 {{- end }}
+  acl = "write"
   service_prefix "" {
     policy = "write"
   }
