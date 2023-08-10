@@ -548,6 +548,11 @@ func (in *GatewayClassConfigSpec) DeepCopyInto(out *GatewayClassConfigSpec) {
 		}
 	}
 	in.DeploymentSpec.DeepCopyInto(&out.DeploymentSpec)
+	if in.Resources != nil {
+		in, out := &in.Resources, &out.Resources
+		*out = new(v1.ResourceRequirements)
+		(*in).DeepCopyInto(*out)
+	}
 	in.CopyAnnotations.DeepCopyInto(&out.CopyAnnotations)
 }
 
