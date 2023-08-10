@@ -32,5 +32,5 @@ load _helpers
         . | tee /dev/stderr |
         yq '.data.["resources.json"]' | tee /dev/stderr)
 
-    [ $resources = '{"limits":{"cpu":"220m","memory":"220Mi"},"requests":{"cpu":"200m","memory":"200Mi"}}' ]
+    [ "$resources" = '{"limits":{"cpu":"220m","memory":"220Mi"},"requests":{"cpu":"200m","memory":"200Mi"}}' ]
 }
