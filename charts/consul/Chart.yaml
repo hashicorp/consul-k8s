@@ -19,7 +19,7 @@ annotations:
     - name: consul-dataplane
       image: hashicorp/consul-dataplane:1.0.9
     - name: envoy
-      image: envoyproxy/envoy:v1.24.8
+      image: envoyproxy/envoy:v1.24.10
   artifacthub.io/license: MPL-2.0
   artifacthub.io/links: |
     - name: Documentation
