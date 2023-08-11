@@ -43,10 +43,10 @@ func TestWANFederation(t *testing.T) {
 		name   string
 		secure bool
 	}{
-		//{
-		//	name:   "secure",
-		//	secure: true,
-		//},
+		{
+			name:   "secure",
+			secure: true,
+		},
 		{
 			name:   "default",
 			secure: false,
@@ -79,8 +79,6 @@ func TestWANFederation(t *testing.T) {
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
-
-				"global.bootstrapExpect": "1",
 			}
 
 			if cfg.UseKind {
@@ -142,8 +140,6 @@ func TestWANFederation(t *testing.T) {
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
-
-				"global.bootstrapExpect": "1",
 			}
 
 			if c.secure {
