@@ -223,6 +223,12 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			})
 	}
 
+	// OpenShift without CNI is the only environment where privileged must be true.
+	privileged := false
+	if w.EnableOpenShift && !w.EnableCNI {
+		privileged = true
+	}
+
 	if tproxyEnabled {
 		if !w.EnableCNI {
 			// Set redirect traffic config for the container so that we can apply iptables rules.
@@ -243,7 +249,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				RunAsGroup: pointer.Int64(rootUserAndGroupID),
 				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
 				RunAsNonRoot: pointer.Bool(false),
-				Privileged:   pointer.Bool(true),
+				Privileged:   pointer.Bool(privileged),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
@@ -253,7 +259,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
 				RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
 				RunAsNonRoot: pointer.Bool(true),
-				Privileged:   pointer.Bool(false),
+				Privileged:   pointer.Bool(privileged),
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
 				},
