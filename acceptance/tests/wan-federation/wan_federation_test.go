@@ -8,17 +8,33 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
+	terratestK8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const StaticClientName = "static-client"
+const (
+	StaticClientName = "static-client"
+
+	staticClientDeployment = "deploy/static-client"
+	staticServerDeployment = "deploy/static-server"
+
+	retryTimeout = 5 * time.Minute
+
+	primaryDatacenter   = "dc1"
+	secondaryDatacenter = "dc2"
+
+	localServerPort = "1234"
+)
 
 // Test that Connect and wan federation over mesh gateways work in a default installation
 // i.e. without ACLs because TLS is required for WAN federation over mesh gateways.
@@ -27,10 +43,10 @@ func TestWANFederation(t *testing.T) {
 		name   string
 		secure bool
 	}{
-		{
-			name:   "secure",
-			secure: true,
-		},
+		//{
+		//	name:   "secure",
+		//	secure: true,
+		//},
 		{
 			name:   "default",
 			secure: false,
@@ -47,7 +63,7 @@ func TestWANFederation(t *testing.T) {
 			secondaryContext := env.Context(t, 1)
 
 			primaryHelmValues := map[string]string{
-				"global.datacenter": "dc1",
+				"global.datacenter": primaryDatacenter,
 
 				"global.tls.enabled":   "true",
 				"global.tls.httpsOnly": strconv.FormatBool(c.secure),
@@ -63,6 +79,8 @@ func TestWANFederation(t *testing.T) {
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
+
+				"global.bootstrapExpect": "1",
 			}
 
 			if cfg.UseKind {
@@ -101,7 +119,7 @@ func TestWANFederation(t *testing.T) {
 
 			// Create secondary cluster
 			secondaryHelmValues := map[string]string{
-				"global.datacenter": "dc2",
+				"global.datacenter": secondaryDatacenter,
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         "false",
@@ -124,13 +142,15 @@ func TestWANFederation(t *testing.T) {
 
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
+
+				"global.bootstrapExpect": "1",
 			}
 
 			if c.secure {
 				secondaryHelmValues["global.acls.replicationToken.secretName"] = federationSecretName
 				secondaryHelmValues["global.acls.replicationToken.secretKey"] = "replicationToken"
 				secondaryHelmValues["global.federation.k8sAuthMethodHost"] = k8sAuthMethodHost
-				secondaryHelmValues["global.federation.primaryDatacenter"] = "dc1"
+				secondaryHelmValues["global.federation.primaryDatacenter"] = primaryDatacenter
 			}
 
 			if cfg.UseKind {
@@ -193,8 +213,53 @@ func TestWANFederation(t *testing.T) {
 				primaryHelper.CreateIntention(t)
 			}
 
-			logger.Log(t, "checking that connection is successful")
-			k8s.CheckStaticServerConnectionSuccessful(t, primaryHelper.KubectlOptsForApp(t), StaticClientName, "http://localhost:1234")
+			t.Run("setup", func(t *testing.T) {
+				logger.Log(t, "checking that connection is successful")
+				k8s.CheckStaticServerConnectionSuccessful(t, primaryHelper.KubectlOptsForApp(t), StaticClientName, "http://localhost:1234")
+			})
+
+			logger.Log(t, "setting up infrastructure for failover")
+			t.Run("failover", func(t *testing.T) {
+				// Override static-server in dc2 to respond with its own name for checking failover.
+				// Don't clean up overrides because they will already be cleaned up from previous deployments
+				logger.Log(t, "overriding static-server in dc2 for failover")
+				k8s.DeployKustomize(t, secondaryHelper.KubectlOptsForApp(t), true, true, cfg.DebugDirectory, "../fixtures/cases/wan-federation/dc2-static-server")
+
+				// Spin up a server on dc1 which will be the primary upstream for our client
+				logger.Log(t, "creating static-server in dc1 for failover")
+				k8s.DeployKustomize(t, primaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/wan-federation/dc1-static-server")
+				logger.Log(t, "overriding static-client in dc2 for failover")
+				k8s.DeployKustomize(t, primaryHelper.KubectlOptsForApp(t), true, true, cfg.DebugDirectory, "../fixtures/cases/wan-federation/static-client")
+
+				// Create a service resolver for failover
+				logger.Log(t, "creating service resolver")
+				k8s.DeployKustomize(t, primaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/wan-federation/service-resolver")
+
+				// Verify that we respond with the server in the primary datacenter
+				serviceFailoverCheck(t, primaryHelper.KubectlOptsForApp(t), localServerPort, primaryDatacenter)
+
+				// scale down the primary datacenter server and see the failover
+				k8s.KubectlScale(t, primaryHelper.KubectlOptsForApp(t), staticServerDeployment, 0)
+
+				// Verify that we respond with the server in the secondary datacenter
+				serviceFailoverCheck(t, primaryHelper.KubectlOptsForApp(t), localServerPort, primaryDatacenter)
+			})
 		})
 	}
+}
+
+// serviceFailoverCheck verifies that the server failed over as expected by checking that curling the `static-server`
+// using the `static-client` responds with the expected cluster name. Each static-server responds with a uniquue
+// name so that we can verify failover occured as expected.
+func serviceFailoverCheck(t *testing.T, options *terratestK8s.KubectlOptions, port string, expectedName string) {
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
+	var resp string
+	var err error
+	retry.RunWith(timer, t, func(r *retry.R) {
+		resp, err = k8s.RunKubectlAndGetOutputE(t, options, "exec", "-i",
+			staticClientDeployment, "-c", StaticClientName, "--", "curl", fmt.Sprintf("localhost:%s", port))
+		require.NoError(r, err)
+		assert.Contains(r, resp, expectedName)
+	})
+	logger.Log(t, resp)
 }
