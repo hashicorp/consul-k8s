@@ -141,6 +141,14 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		},
 		Args:           args,
 		ReadinessProbe: probe,
+		Lifecycle: &corev1.Lifecycle{
+			PostStart: &corev1.LifecycleHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: w.LifecycleConfig.DefaultGracefulStartupPath,
+					Port: intstr.FromString(w.LifecycleConfig.DefaultGracefulPort),
+				},
+			},
+		},
 	}
 
 	if w.AuthMethod != "" {
