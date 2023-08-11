@@ -4,12 +4,11 @@
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: SamenessGroup
 metadata:
-  name: mine
+  name: group-01
 spec:
+  defaultForFailover: true
   members:
     - partition: default
-    - partition: ap1
     - peer: cluster-01-a
     - peer: cluster-01-b
-    - peer: cluster-02-a
     - peer: cluster-03-a

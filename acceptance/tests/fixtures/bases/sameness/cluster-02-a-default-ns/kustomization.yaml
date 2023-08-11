@@ -2,4 +2,4 @@
 # SPDX-License-Identifier: MPL-2.0
 
 resources:
-  - service-defaults.yaml
+  - sameness.yaml
