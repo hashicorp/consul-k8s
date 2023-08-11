@@ -1,3 +1,36 @@
+## 1.0.9 (Aug 10, 2023)
+
+SECURITY:
+
+* Upgrade to use Go 1.19.11 and `x/net/http` 0.12.0.
+  This resolves [CVE-2023-29406](https://github.com/advisories/GHSA-f8f7-69v5-w4vx)(`net/http`). [[GH-2650](https://github.com/hashicorp/consul-k8s/issues/2650)]
+* Upgrade to use Go 1.19.12 and `x/net` 0.13.0.
+  This resolves [CVE-2023-29409](https://nvd.nist.gov/vuln/detail/CVE-2023-29409)(`crypto/tls`)
+  and [CVE-2023-3978](https://nvd.nist.gov/vuln/detail/CVE-2023-3978)(`net/html`). [[GH-2717](https://github.com/hashicorp/consul-k8s/issues/2717)]
+
+IMPROVEMENTS:
+
+* Add support to provide the logLevel flag via helm for multiple low level components. Introduces the following fields
+1. `global.acls.logLevel`
+2. `global.tls.logLevel`
+3. `global.federation.logLevel`
+4. `global.gossipEncryption.logLevel`
+5. `server.logLevel`
+6. `client.logLevel`
+7. `meshGateway.logLevel`
+8. `ingressGateways.logLevel`
+9. `terminatingGateways.logLevel` [[GH-2302](https://github.com/hashicorp/consul-k8s/issues/2302)]
+* control-plane: increase timeout after login for ACL replication to 60 seconds [[GH-2656](https://github.com/hashicorp/consul-k8s/issues/2656)]
+* helm: adds values for `securityContext` and `annotations` on TLS and ACL init/cleanup jobs. [[GH-2525](https://github.com/hashicorp/consul-k8s/issues/2525)]
+* helm: do not set container securityContexts by default on OpenShift < 4.11 [[GH-2678](https://github.com/hashicorp/consul-k8s/issues/2678)]
+* helm: set container securityContexts to match the `restricted` Pod Security Standards policy to support running Consul in a namespace with restricted PSA enforcement enabled [[GH-2572](https://github.com/hashicorp/consul-k8s/issues/2572)]
+
+BUG FIXES:
+
+* control-plane: fix bug in endpoints controller when deregistering services from consul when a node is deleted. [[GH-2571](https://github.com/hashicorp/consul-k8s/issues/2571)]
+* helm: fix CONSUL_LOGIN_DATACENTER for consul client-daemonset. [[GH-2652](https://github.com/hashicorp/consul-k8s/issues/2652)]
+* helm: fix ui ingress manifest formatting, and exclude `ingressClass` when not defined. [[GH-2687](https://github.com/hashicorp/consul-k8s/issues/2687)]
+
 ## 1.1.4 (Aug 10, 2023)
 
 SECURITY:
