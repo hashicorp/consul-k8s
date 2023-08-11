@@ -203,7 +203,7 @@ func (config *KV2Secret) saveSecretAndAddPolicy(t *testing.T, vaultClient *vapi.
 // CreateConnectCARootAndIntermediatePKIPolicy creates the Vault Policy for the connect-ca in a given datacenter.
 func CreateConnectCARootAndIntermediatePKIPolicy(t *testing.T, vaultClient *vapi.Client, policyName, rootPath, intermediatePath string) {
 	// connectCAPolicy allows Consul to bootstrap all certificates for the service mesh in Vault.
-	// Adapted from https://www.consul.io/docs/connect/ca/vault#consul-managed-pki-paths.
+	// Adapted from https://developer.hashicorp.com/consul/docs/connect/ca/vault#consul-managed-pki-paths.
 	err := vaultClient.Sys().PutPolicy(
 		policyName,
 		fmt.Sprintf(`

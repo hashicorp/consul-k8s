@@ -18,7 +18,7 @@ global:
   name: null
 
   # The domain Consul will answer DNS queries for
-  # (see `-domain` (https://consul.io/docs/agent/options#_domain)) and the domain services synced from
+  # (see `-domain` (https://developer.hashicorp.com/consul/docs/agent/config/config-files#_domain)) and the domain services synced from
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.
   domain: consul
 
@@ -121,7 +121,7 @@ global:
     # If true, `verify_outgoing`, `verify_server_hostname`,
     # and `verify_incoming_rpc` will be set to `true` for Consul servers and clients.
     # Set this to false to incrementally roll out TLS on an existing Consul cluster.
-    # Please see https://consul.io/docs/k8s/operations/tls-on-existing-cluster
+    # Please see https://developer.hashicorp.com/consul/docs/k8s/operations/tls-on-existing-cluster
     # for more details.
     verify: true
 
@@ -243,7 +243,7 @@ global:
 
   # The name (and tag) of the Envoy Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
-  # See https://www.consul.io/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
+  # See https://developer.hashicorp.com/consul/docs/connect/proxies/envoy for full compatibility matrix between Consul and Envoy.
   imageEnvoy: "envoyproxy/envoy-alpine:v1.16.0"
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
@@ -271,7 +271,7 @@ server:
   image: null
 
   # The number of server agents to run. This determines the fault tolerance of
-  # the cluster. Please see the deployment table (https://consul.io/docs/internals/consensus#deployment-table)
+  # the cluster. Please see the deployment table (https://developer.hashicorp.com/consul/docs/architecture/consensus#deployment-table)
   # for more information.
   replicas: 3
 
@@ -364,7 +364,7 @@ server:
     # @type: integer
     maxUnavailable: null
 
-  # A raw string of extra JSON configuration (https://consul.io/docs/agent/options) for Consul
+  # A raw string of extra JSON configuration (https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
   # servers. This will be saved as-is into a ConfigMap that is read by the Consul
   # server agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
@@ -573,7 +573,7 @@ client:
   # @type: string
   image: null
 
-  # A list of valid `-retry-join` values (https://consul.io/docs/agent/options#retry-join).
+  # A list of valid `-retry-join` values (https://developer.hashicorp.com/consul/docs/agent/config/config-files#retry_join).
   # If this is `null` (default), then the clients will attempt to automatically
   # join the server cluster running within Kubernetes.
   # This means that with `server.enabled` set to true, clients will automatically
@@ -615,7 +615,7 @@ client:
       memory: "100Mi"
       cpu: "100m"
 
-  # A raw string of extra JSON configuration (https://consul.io/docs/agent/options) for Consul
+  # A raw string of extra JSON configuration (https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
   # clients. This will be saved as-is into a ConfigMap that is read by the Consul
   # client agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
@@ -1239,8 +1239,8 @@ connectInject:
   # If set to an empty string all service accounts can log in.
   # This only has effect if ACLs are enabled.
   #
-  # See https://www.consul.io/docs/acl/acl-auth-methods.html#binding-rules
-  # and https://www.consul.io/docs/acl/auth-methods/kubernetes.html#trusted-identity-attributes
+  # See https://developer.hashicorp.com/consul/docs/security/acl/auth-methods#binding-rules
+  # and https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes#trusted-identity-attributes
   # for more details.
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.0.
   aclBindingRuleSelector: "serviceaccount.name!=default"
@@ -1263,7 +1263,7 @@ connectInject:
   # Requires Consul >= v1.5 and consul-k8s >= v0.8.1.
   centralConfig:
     # enabled controls whether central config is enabled on all servers and clients.
-    # See https://www.consul.io/docs/agent/options.html#enable_central_service_config.
+    # See https://developer.hashicorp.com/consul/docs/agent/config/config-files#enable_central_service_config.
     # If changing this after installation, servers and clients must be restarted
     # for the change to take effect.
     enabled: true
@@ -1277,7 +1277,7 @@ connectInject:
 
     # proxyDefaults is a raw json string that will be written as the value of
     # the "config" key of the global proxy-defaults config entry.
-    # See: https://www.consul.io/docs/agent/config-entries/proxy-defaults.html
+    # See: https://developer.hashicorp.com/consul/docs/connect/config-entries/proxy-defaults
     # NOTE: Changes to this value after the chart is first installed have *no*
     # effect. In order to change the proxy-defaults config after installation,
     # you must use the Consul API.
@@ -1357,14 +1357,14 @@ controller:
 meshGateway:
   # If mesh gateways are enabled, a Deployment will be created that runs
   # gateways and Consul Connect will be configured to use gateways.
-  # See https://www.consul.io/docs/connect/mesh_gateway.html
+  # See https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway
   # Requirements: consul 1.6.0+ and consul-k8s 0.15.0+ if using
   # global.acls.manageSystemACLs.
   enabled: false
 
   # Globally configure which mode the gateway should run in.
   # Can be set to either "remote", "local", "none" or empty string or null.
-  # See https://consul.io/docs/connect/mesh_gateway.html#modes-of-operation for
+  # See https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway#modes for
   # a description of each mode.
   # If set to anything other than "" or null, connectInject.centralConfig.enabled
   # should be set to true so that the global config will actually be used.

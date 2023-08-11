@@ -9,10 +9,10 @@ To learn more about the release, run:
   $ helm get all {{ .Release.Name }} {{- if .Release.Namespace }} --namespace {{ .Release.Namespace }}{{ end }}
 
 Consul on Kubernetes Documentation:
-https://www.consul.io/docs/platform/k8s
+https://developer.hashicorp.com/consul/docs/k8s
 
 Consul on Kubernetes CLI Reference:
-https://www.consul.io/docs/k8s/k8s-cli
+https://developer.hashicorp.com/consul/docs/k8s/k8s-cli
 
 {{- if (and .Values.global.acls.manageSystemACLs (gt (len .Values.server.extraConfig) 3)) }}
 Warning: Defining server extraConfig potentially disrupts the automatic ACL

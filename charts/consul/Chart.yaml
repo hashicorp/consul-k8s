@@ -26,7 +26,7 @@ annotations:
   artifacthub.io/license: MPL-2.0
   artifacthub.io/links: |
     - name: Documentation
-      url: https://www.consul.io/docs/k8s
+      url: https://developer.hashicorp.com/consul/docs/k8s
     - name: hashicorp/consul
       url: https://github.com/hashicorp/consul
     - name: hashicorp/consul-k8s

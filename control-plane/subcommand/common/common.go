@@ -164,7 +164,7 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 	//
 	// A consul client may reach out to a follower instead of a leader to resolve the token for an API call
 	// with that token. This is because clients talk to servers in the stale consistency mode
-	// to decrease the load on the servers (see https://www.consul.io/docs/architecture/consensus#stale).
+	// to decrease the load on the servers (see https://developer.hashicorp.com/consul/docs/architecture/consensus#stale).
 	// In that case, it's possible that the token isn't replicated
 	// to that server instance yet. The client will then get an "ACL not found" error
 	// and subsequently cache this not found response. Then on any API call with the token,
@@ -175,7 +175,7 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 	//
 	// To help with that, we try to first read the token in the stale consistency mode until we
 	// get a successful response. This should not take more than 100ms because raft replication
-	// should in most cases take less than that (see https://www.consul.io/docs/install/performance#read-write-tuning)
+	// should in most cases take less than that (see https://developer.hashicorp.com/consul/docs/install/performance#read-write-tuning)
 	// but we set the timeout to 2s to be sure.
 	//
 	// Note though that this workaround does not eliminate this problem completely. It's still possible

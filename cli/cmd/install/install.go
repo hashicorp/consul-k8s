@@ -520,7 +520,7 @@ func (c *Command) checkForPreviousSecrets(release release.Release) (string, erro
 			return fmt.Sprintf("Found secret %s for Consul federation.", fedSecret), nil
 		} else if len(secrets.Items) == 0 {
 			return "", fmt.Errorf("Missing secret %s for Consul federation.\n"+
-				"Please refer to the Consul Secondary Cluster configuration docs:\nhttps://www.consul.io/docs/k8s/installation/multi-cluster/kubernetes#secondary-cluster-s", fedSecret)
+				"Please refer to the Consul Secondary Cluster configuration docs:\nhttps://developer.hashicorp.com/consul/docs/k8s/deployment-configurations/multi-cluster/kubernetes#secondary-cluster-s", fedSecret)
 		}
 	}
 

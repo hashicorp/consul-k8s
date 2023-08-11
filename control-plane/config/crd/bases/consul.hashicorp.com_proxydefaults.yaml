@@ -88,7 +88,7 @@ spec:
               config:
                 description: Config is an arbitrary map of configuration values used
                   by Connect proxies. Any values that your proxy allows can be configured
-                  globally here. Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
+                  globally here. Supports JSON config values. See https://developer.hashicorp.com/consul/docs/connect/proxies/envoy#configuration-formatting
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
               envoyExtensions:
