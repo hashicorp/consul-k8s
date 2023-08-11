@@ -1,0 +1,13 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: PeeringAcceptor
+metadata:
+  name: cluster-01-a
+spec:
+  peer:
+    secret:
+      name: "cluster-03-a-cluster-01-a-peering-token"
+      key: "data"
+      backend: "kubernetes"

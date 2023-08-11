@@ -2,4 +2,5 @@
 # SPDX-License-Identifier: MPL-2.0
 
 resources:
-  - service-defaults.yaml
+  - peering-dialer-cluster-02-a.yaml
+  - peering-dialer-cluster-03-a.yaml
