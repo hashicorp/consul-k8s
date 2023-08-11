@@ -44,7 +44,7 @@ func TestWANFederation(t *testing.T) {
 		secure bool
 	}{
 		{
-			name:   "securely",
+			name:   "securelyt",
 			secure: true,
 		},
 		{
