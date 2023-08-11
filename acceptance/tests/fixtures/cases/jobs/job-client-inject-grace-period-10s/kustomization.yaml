@@ -1,6 +1,6 @@
 
 resources:
-  - ../../bases/job-client
+  - ../../../bases/job-client
 
 patchesStrategicMerge:
   - patch.yaml
