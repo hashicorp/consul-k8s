@@ -241,7 +241,17 @@ var (
 	// Below is where any custom generic listener validation errors should go.
 	// We map anything under here to a custom ListenerConditionReason of Invalid on
 	// an Accepted status type.
-	errListenerNoTLSPassthrough = errors.New("TLS passthrough is not supported")
+	errListenerNoTLSPassthrough              = errors.New("TLS passthrough is not supported")
+	errListenerTLSCipherSuiteNotConfigurable = errors.New("tls_min_version does not allow tls_cipher_suites configuration")
+	errListenerUnsupportedTLSCipherSuite     = errors.New("unsupported cipher suite in tls_cipher_suites")
+	errListenerUnsupportedTLSMaxVersion      = errors.New("unsupported tls_max_version")
+	errListenerUnsupportedTLSMinVersion      = errors.New("unsupported tls_min_version")
+
+	// This custom listener validation error is used to differentiate between an errListenerPortUnavailable because of
+	// direct port conflicts defined by the user (two listeners on the same port) vs a port conflict because we map
+	// privileged ports by adding the value passed into the gatewayClassConfig.
+	// (i.e. one listener on 80 with a privileged port mapping of 2000, and one listener on 2080 would conflict).
+	errListenerMappedToPrivilegedPortMapping = errors.New("listener conflicts with privileged port mapped by GatewayClassConfig privileged port mapping setting")
 )
 
 // listenerValidationResult contains the result of internally validating a single listener
@@ -291,7 +301,7 @@ func (l listenerValidationResult) programmedCondition(generation int64) metav1.C
 func (l listenerValidationResult) acceptedCondition(generation int64) metav1.Condition {
 	now := timeFunc()
 	switch l.acceptedErr {
-	case errListenerPortUnavailable:
+	case errListenerPortUnavailable, errListenerMappedToPrivilegedPortMapping:
 		return metav1.Condition{
 			Type:               "Accepted",
 			Status:             metav1.ConditionFalse,

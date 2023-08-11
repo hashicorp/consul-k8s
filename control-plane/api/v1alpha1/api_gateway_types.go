@@ -59,6 +59,12 @@ type GatewayClassConfigSpec struct {
 
 	// The name of an existing Kubernetes PodSecurityPolicy to bind to the managed ServiceAccount if ACLs are managed.
 	PodSecurityPolicy string `json:"podSecurityPolicy,omitempty"`
+
+	// The name of the OpenShift SecurityContextConstraints resource for this gateway class to use.
+	OpenshiftSCCName string `json:"openshiftSCCName,omitempty"`
+
+	// The value to add to privileged ports ( ports < 1024) for gateway containers
+	MapPrivilegedContainerPorts int32 `json:"mapPrivilegedContainerPorts,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true

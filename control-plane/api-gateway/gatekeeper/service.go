@@ -15,6 +15,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -76,8 +77,9 @@ func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClas
 		ports = append(ports, corev1.ServicePort{
 			Name: string(listener.Name),
 			// only TCP-based services are supported for now
-			Protocol: corev1.ProtocolTCP,
-			Port:     int32(listener.Port),
+			Protocol:   corev1.ProtocolTCP,
+			Port:       int32(listener.Port),
+			TargetPort: intstr.FromInt(common.ToContainerPort(listener.Port, gcc.Spec.MapPrivilegedContainerPorts)),
 		})
 
 		seenPorts[listener.Port] = struct{}{}

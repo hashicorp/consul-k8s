@@ -132,7 +132,7 @@ func (b *Binder) Snapshot() *Snapshot {
 
 		// calculate the status for the gateway
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
-		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources)
+		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, b.config.GatewayClassConfig)
 	}
 
 	// used for tracking how many routes have successfully bound to which listeners
@@ -182,7 +182,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		if b.config.ConsulGateway != nil {
 			consulStatus = b.config.ConsulGateway.Status
 		}
-		entry := b.config.Translator.ToAPIGateway(b.config.Gateway, b.config.Resources)
+		entry := b.config.Translator.ToAPIGateway(b.config.Gateway, b.config.Resources, gatewayClassConfig)
 		snapshot.Consul.Updates = append(snapshot.Consul.Updates, &common.ConsulUpdateOperation{
 			Entry:    entry,
 			OnUpdate: b.handleGatewaySyncStatus(snapshot, &b.config.Gateway, consulStatus),

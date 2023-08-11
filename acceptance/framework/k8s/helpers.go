@@ -139,6 +139,7 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 		secret.ResourceVersion = ""
 		require.NoError(r, err)
 	})
+	secret.Namespace = destContext.KubectlOptions(t).Namespace
 	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destContext.KubectlOptions(t).Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 	require.NoError(t, err)
 }

@@ -19,7 +19,7 @@ import (
 )
 
 func (g *Gatekeeper) upsertRoleBinding(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
-	if config.AuthMethod == "" {
+	if config.AuthMethod == "" && !config.EnableOpenShift {
 		return g.deleteRole(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
@@ -66,7 +66,7 @@ func (g *Gatekeeper) deleteRoleBinding(ctx context.Context, gwName types.Namespa
 func (g *Gatekeeper) roleBinding(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) *rbac.RoleBinding {
 	// Create resources for reference. This avoids bugs if naming patterns change.
 	serviceAccount := g.serviceAccount(gateway)
-	role := g.role(gateway, gcc)
+	role := g.role(gateway, gcc, config)
 
 	return &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{

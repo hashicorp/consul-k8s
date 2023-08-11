@@ -21,6 +21,7 @@ func TestGatewayClassConfigDeepCopy(t *testing.T) {
 		NodeSelector: map[string]string{
 			"test": "test",
 		},
+		OpenshiftSCCName: "restricted-v2",
 	}
 	config := &GatewayClassConfig{
 		ObjectMeta: metav1.ObjectMeta{

@@ -1,0 +1,12 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: HTTPRouteAuthFilter
+metadata:
+  name: example-route-jwt-filter
+spec:
+  type: JWT
+  JWTProviders:
+  - Provider: "local"
+    VerifyClaims:
+    - Path:
+      - "role"
+      Value: "doctor"

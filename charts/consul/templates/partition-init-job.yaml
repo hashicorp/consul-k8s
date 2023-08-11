@@ -81,6 +81,7 @@ spec:
       containers:
         - name: partition-init-job
           image: {{ .Values.global.imageK8S }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           env:
           {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
           {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}

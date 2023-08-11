@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: support deploying to OpenShift 4.11
+```

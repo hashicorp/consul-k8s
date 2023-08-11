@@ -510,6 +510,47 @@ func TestValidateTLS(t *testing.T) {
 			expectedResolvedRefsErr: nil,
 			expectedAcceptedErr:     nil,
 		},
+		"invalid cipher suite": {
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			tls: &gwv1beta1.GatewayTLSConfig{
+				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+					common.TLSCipherSuitesAnnotationKey: "invalid",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerUnsupportedTLSCipherSuite,
+		},
+		"cipher suite not configurable": {
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			tls: &gwv1beta1.GatewayTLSConfig{
+				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+					common.TLSMinVersionAnnotationKey:   "TLSv1_3",
+					common.TLSCipherSuitesAnnotationKey: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerTLSCipherSuiteNotConfigurable,
+		},
+		"invalid max version": {
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			tls: &gwv1beta1.GatewayTLSConfig{
+				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+					common.TLSMaxVersionAnnotationKey: "invalid",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerUnsupportedTLSMaxVersion,
+		},
+		"invalid min version": {
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			tls: &gwv1beta1.GatewayTLSConfig{
+				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+					common.TLSMinVersionAnnotationKey: "invalid",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerUnsupportedTLSMinVersion,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			resources := common.NewResourceMap(common.ResourceTranslator{}, NewReferenceValidator(tt.grants), logrtest.NewTestLogger(t))
@@ -530,8 +571,10 @@ func TestValidateListeners(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		listeners           []gwv1beta1.Listener
-		expectedAcceptedErr error
+		listeners                   []gwv1beta1.Listener
+		expectedAcceptedErr         error
+		listenerIndexToTest         int
+		mapPrivilegedContainerPorts int32
 	}{
 		"valid protocol HTTP": {
 			listeners: []gwv1beta1.Listener{
@@ -563,9 +606,32 @@ func TestValidateListeners(t *testing.T) {
 			},
 			expectedAcceptedErr: errListenerPortUnavailable,
 		},
+		"conflicted port": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+			},
+			expectedAcceptedErr: errListenerPortUnavailable,
+			listenerIndexToTest: 1,
+		},
+		"conflicted mapped port": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 2080},
+			},
+			expectedAcceptedErr:         errListenerMappedToPrivilegedPortMapping,
+			listenerIndexToTest:         1,
+			mapPrivilegedContainerPorts: 2000,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tt.expectedAcceptedErr, validateListeners(gatewayWithFinalizer(gwv1beta1.GatewaySpec{}), tt.listeners, nil)[0].acceptedErr)
+			gwcc := &v1alpha1.GatewayClassConfig{
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					MapPrivilegedContainerPorts: tt.mapPrivilegedContainerPorts,
+				},
+			}
+
+			require.Equal(t, tt.expectedAcceptedErr, validateListeners(gatewayWithFinalizer(gwv1beta1.GatewaySpec{}), tt.listeners, nil, gwcc)[tt.listenerIndexToTest].acceptedErr)
 		})
 	}
 }
