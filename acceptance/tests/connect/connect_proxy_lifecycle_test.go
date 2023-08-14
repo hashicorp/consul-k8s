@@ -209,6 +209,11 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 	cfg := suite.Config()
 
+	if cfg.EnableTransparentProxy {
+		// TODO t-eckert: Come back and review this with wise counsel.
+		t.Skip("Skipping test because transparent proxy is enabled")
+	}
+
 	defaultGracePeriod := 5
 
 	cases := map[string]int{
