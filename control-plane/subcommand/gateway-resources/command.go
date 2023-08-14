@@ -9,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -302,19 +303,30 @@ func (c *Command) validateFlags() error {
 
 func (c *Command) loadConfig() error {
 	// Load resources.json
-	resources, err := os.ReadFile("/consul/config/resources.json")
+	file, err := os.Open("/consul/config/resources.json")
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
 		c.UI.Info("No resources.json found, using defaults")
 		c.resources = defaultResourceRequirements()
+		return nil
+	}
+
+	resources, err := io.ReadAll(file)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Unable to read resources.json, using defaults: %s", err))
+		c.resources = defaultResourceRequirements()
+		return err
 	}
 
 	if err := json.Unmarshal(resources, &c.resources); err != nil {
 		return err
 	}
 
+	if err := file.Close(); err != nil {
+		return err
+	}
 	return nil
 }
 
