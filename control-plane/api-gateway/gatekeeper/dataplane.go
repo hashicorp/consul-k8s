@@ -86,7 +86,6 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 		},
 		Args:           args,
 		ReadinessProbe: probe,
-		Resources:      *gcc.Spec.Resources,
 	}
 
 	// Configure the Readiness Address for the proxy's health check to be the Pod IP.
@@ -101,6 +100,10 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 		Name:          "proxy-health",
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
+	// Configure the resource requests and limits for the proxy if they are set.
+	if gcc.Spec.Resources != nil {
+		container.Resources = *gcc.Spec.Resources
+	}
 
 	// If not running in an OpenShift environment,
 	// skip setting the security context and let OpenShift set it for us.
