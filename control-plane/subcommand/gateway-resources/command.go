@@ -9,7 +9,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -159,7 +158,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Load config from the configmap.
-	if c.loadConfig(); err != nil {
+	if err := c.loadConfig(); err != nil {
 		c.UI.Error(fmt.Sprintf("Error loading config: %s", err))
 		return 1
 	}
@@ -302,9 +301,8 @@ func (c *Command) validateFlags() error {
 }
 
 func (c *Command) loadConfig() error {
-	// Load resource.json
-	file, err := os.Open("/consul/config/resources.json")
-	defer file.Close()
+	// Load resources.json
+	resources, err := os.ReadFile("/consul/config/resources.json")
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -312,11 +310,8 @@ func (c *Command) loadConfig() error {
 		c.UI.Info("No resources.json found, using defaults")
 		c.resources = defaultResourceRequirements()
 	}
-	b, err := ioutil.ReadAll(file)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(b, &c.resources); err != nil {
+
+	if err := json.Unmarshal(resources, &c.resources); err != nil {
 		return err
 	}
 
