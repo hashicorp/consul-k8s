@@ -32,5 +32,15 @@ load _helpers
         . | tee /dev/stderr |
         yq '.data.["resources.json"]' | tee /dev/stderr)
 
-    [ "$resources" = '{"limits":{"cpu":"220m","memory":"220Mi"},"requests":{"cpu":"200m","memory":"200Mi"}}' ]
+    local actual=$(echo $resources | jq '.requests.memory')
+    [ $actual = "\"200Mi\"" ]
+
+    local actual=$(echo $resources | jq '.requests.cpu')
+    [ $actual = "\"200m\"" ]
+
+    local actual=$(echo $resources | jq '.limits.memory')
+    [ $actual = "\"220Mi\"" ]
+
+    local actual=$(echo $resources | jq '.limits.cpu')
+    [ $actual = "\"220m\"" ]
 }
