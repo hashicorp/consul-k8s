@@ -30,9 +30,6 @@ const (
 
 	retryTimeout = 5 * time.Minute
 
-	primaryDatacenter   = "dc1"
-	secondaryDatacenter = "dc2"
-
 	localServerPort = "1234"
 )
 
@@ -63,7 +60,7 @@ func TestWANFederation(t *testing.T) {
 			secondaryContext := env.Context(t, 1)
 
 			primaryHelmValues := map[string]string{
-				"global.datacenter": primaryDatacenter,
+				"global.datacenter": "dc1",
 
 				"global.tls.enabled":   "true",
 				"global.tls.httpsOnly": strconv.FormatBool(c.secure),
@@ -117,7 +114,7 @@ func TestWANFederation(t *testing.T) {
 
 			// Create secondary cluster
 			secondaryHelmValues := map[string]string{
-				"global.datacenter": secondaryDatacenter,
+				"global.datacenter": "dc2",
 
 				"global.tls.enabled":           "true",
 				"global.tls.httpsOnly":         "false",
@@ -146,7 +143,7 @@ func TestWANFederation(t *testing.T) {
 				secondaryHelmValues["global.acls.replicationToken.secretName"] = federationSecretName
 				secondaryHelmValues["global.acls.replicationToken.secretKey"] = "replicationToken"
 				secondaryHelmValues["global.federation.k8sAuthMethodHost"] = k8sAuthMethodHost
-				secondaryHelmValues["global.federation.primaryDatacenter"] = primaryDatacenter
+				secondaryHelmValues["global.federation.primaryDatacenter"] = "dc1"
 			}
 
 			if cfg.UseKind {
@@ -232,13 +229,13 @@ func TestWANFederation(t *testing.T) {
 				k8s.DeployKustomize(t, primaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/wan-federation/service-resolver")
 
 				// Verify that we respond with the server in the primary datacenter
-				serviceFailoverCheck(t, primaryHelper.KubectlOptsForApp(t), localServerPort, primaryDatacenter)
+				serviceFailoverCheck(t, primaryHelper.KubectlOptsForApp(t), localServerPort, "dc1")
 
 				// scale down the primary datacenter server and see the failover
 				k8s.KubectlScale(t, primaryHelper.KubectlOptsForApp(t), staticServerDeployment, 0)
 
 				// Verify that we respond with the server in the secondary datacenter
-				serviceFailoverCheck(t, primaryHelper.KubectlOptsForApp(t), localServerPort, primaryDatacenter)
+				serviceFailoverCheck(t, primaryHelper.KubectlOptsForApp(t), localServerPort, "dc1")
 			})
 		})
 	}
