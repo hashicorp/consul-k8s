@@ -136,7 +136,7 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 		"pvc",
 		"secrets",
 	} {
-		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--all-namespaces", "--field-selector=metadata.namespace!=kube-system,metadata.name!=kubernetes", resource)
+		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--field-selector=metadata.name!=kubernetes", resource)
 		logger.Log(t, output)
 		if err != nil {
 			logger.Log(t, err)
