@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
+	terratestK8s "github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -114,14 +115,57 @@ func NewHelmCluster(
 	}
 }
 
+func KubectlClobber(t *testing.T, options *terratestK8s.KubectlOptions) {
+	for _, resource := range []string{
+		"jobs",
+		"statefulsets",
+		"daemonsets",
+		"replicasets",
+		"deployments",
+		"services",
+		"pvc",
+		"secrets",
+	} {
+		_, err := k8s.RunKubectlAndGetOutputE(t, options, "delete", "--timeout=30s", "--all", resource)
+		require.NoError(t, err)
+	}
+
+	for _, crd := range []string{
+		"controlplanerequestlimits.consul.hashicorp.com",
+		"exportedservices.consul.hashicorp.com",
+		"gatewayclassconfigs.consul.hashicorp.com",
+		"ingressgateways.consul.hashicorp.com",
+		"jwtproviders.consul.hashicorp.com",
+		"meshes.consul.hashicorp.com",
+		"meshservices.consul.hashicorp.com",
+		"peeringacceptors.consul.hashicorp.com",
+		"peeringdialers.consul.hashicorp.com",
+		"proxydefaults.consul.hashicorp.com",
+		"samenessgroups.consul.hashicorp.com",
+		"servicedefaults.consul.hashicorp.com",
+		"serviceintentions.consul.hashicorp.com",
+		"serviceresolvers.consul.hashicorp.com",
+		"servicerouters.consul.hashicorp.com",
+		"servicesplitters.consul.hashicorp.com",
+		"terminatinggateways.consul.hashicorp.com",
+	} {
+		output, err := k8s.RunKubectlAndGetOutputE(t, options, "patch", crd, "-p '{\"metadata\":{\"finalizers\":[]}}' --type=merge")
+		logger.Log(t, output)
+		if err != nil {
+			logger.Log(t, err)
+		}
+	}
+}
+
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
-
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
 	helpers.Cleanup(t, h.noCleanupOnFailure, h.noCleanup, func() {
 		h.Destroy(t)
 	})
+
+	KubectlClobber(t, h.helmOptions.KubectlOptions)
 
 	// Fail if there are any existing installations of the Helm chart.
 	if !h.SkipCheckForPreviousInstallations {
