@@ -4,7 +4,7 @@
 package sameness
 
 import (
-	"context"
+	ctx "context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -50,6 +51,10 @@ const (
 	peerName3a = keyCluster03a
 
 	samenessGroupName = "group-01"
+
+	cluster01Region = "us-east-1"
+	cluster02Region = "us-west-1"
+	cluster03Region = "us-east-2"
 
 	retryTimeout = 5 * time.Minute
 )
@@ -116,8 +121,8 @@ func TestFailover_Connect(t *testing.T) {
 				|    |  +------------------+       |   |    |             |   |       +------------------+        |
 				|    |  Admin Partitions: Default  |   |    |             |   |                                   |
 				|    |  Name: cluster-01-a         |   |    |             |   |     Admin Partitions: Default     |
-				|    |                             |   |    |             |   |     Name: cluster-02-a            |
-				|    +-----------------------------+   |    |             |   |                                   |
+				|    |  Region: us-east-1          |   |    |             |   |     Name: cluster-02-a            |
+				|    +-----------------------------+   |    |             |   |     Region: us-west-1             |
 				|                                      |    |             |   +-----------------------------------+
 				|                            Failover 1|    |  Failover 3 |
 				|   +-------------------------------+  |    |             |   +-----------------------------------+
@@ -132,17 +137,17 @@ func TestFailover_Connect(t *testing.T) {
 				|   |    +------------------+       |       |                 |                                   |
 				|   |    Admin Partitions: ap1      |       |                 |     Admin Partitions: Default     |
 				|   |    Name: cluster-01-b         |       |                 |     Name: cluster-03-a            |
-				|   |                               |       |                 |                                   |
+				|   |    Region: us-east-1          |       |                 |     Region: us-east-2             |
 				|   +-------------------------------+       |                 |                                   |
 				|                                           |                 +-----------------------------------+
 				+-------------------------------------------+
 			*/
 
 			testClusters := clusters{
-				keyCluster01a: {name: peerName1a, context: env.DefaultContext(t), hasServer: true, acceptors: []string{peerName2a, peerName3a}},
-				keyCluster01b: {name: peerName1b, context: env.Context(t, 1), partition: cluster01Partition, hasServer: false, acceptors: []string{peerName2a, peerName3a}},
-				keyCluster02a: {name: peerName2a, context: env.Context(t, 2), hasServer: true, acceptors: []string{peerName3a}},
-				keyCluster03a: {name: peerName3a, context: env.Context(t, 3), hasServer: true},
+				keyCluster01a: {name: peerName1a, context: env.DefaultContext(t), hasServer: true, acceptors: []string{peerName2a, peerName3a}, locality: localityForRegion(cluster01Region)},
+				keyCluster01b: {name: peerName1b, context: env.Context(t, 1), partition: cluster01Partition, hasServer: false, acceptors: []string{peerName2a, peerName3a}, locality: localityForRegion(cluster01Region)},
+				keyCluster02a: {name: peerName2a, context: env.Context(t, 2), hasServer: true, acceptors: []string{peerName3a}, locality: localityForRegion(cluster02Region)},
+				keyCluster03a: {name: peerName3a, context: env.Context(t, 3), hasServer: true, locality: localityForRegion(cluster03Region)},
 			}
 
 			// Setup Namespaces.
@@ -315,6 +320,11 @@ func TestFailover_Connect(t *testing.T) {
 				}
 			}
 
+			// Apply locality to clusters
+			for _, v := range testClusters {
+				setK8sNodeLocality(t, v.context, v)
+			}
+
 			// Peering/Dialer relationship
 			/*
 				cluster-01-a         cluster-02-a
@@ -388,7 +398,7 @@ func TestFailover_Connect(t *testing.T) {
 
 			// Setup DNS.
 			for _, v := range testClusters {
-				dnsService, err := v.context.KubernetesClient(t).CoreV1().Services("default").Get(context.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
+				dnsService, err := v.context.KubernetesClient(t).CoreV1().Services("default").Get(ctx.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
 				require.NoError(t, err)
 				v.dnsIP = &dnsService.Spec.ClusterIP
 				logger.Logf(t, "%s dnsIP: %s", v.name, *v.dnsIP)
@@ -453,6 +463,15 @@ func TestFailover_Connect(t *testing.T) {
 			// Everything should be up and running now
 			testClusters.verifyServerUpState(t, cfg.EnableTransparentProxy)
 			logger.Log(t, "all infrastructure up and running")
+
+			// Verify locality is set on services based on node labels previously applied.
+			//
+			// This is currently the only locality testing we do for k8s and ensures that single-partition
+			// locality-aware routing will function in consul-k8s. In the future, this test will be expanded
+			// to test multi-cluster locality-based failover with sameness groups.
+			for _, v := range testClusters {
+				checkLocalities(t, v)
+			}
 
 			// Verify all the failover Scenarios
 			logger.Log(t, "verifying failover scenarios")
@@ -536,9 +555,9 @@ func TestFailover_Connect(t *testing.T) {
 						logger.Log(t, "checking service failover")
 
 						if cfg.EnableTransparentProxy {
-							serviceFailoverCheck(t, sc.server, v.failoverServer.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", sc.server.fullTextPartition()))
+							serviceTargetCheck(t, sc.server, v.failoverServer.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", sc.server.fullTextPartition()))
 						} else {
-							serviceFailoverCheck(t, sc.server, v.failoverServer.name, "localhost:8080")
+							serviceTargetCheck(t, sc.server, v.failoverServer.name, "localhost:8080")
 						}
 
 						// Verify DNS
@@ -578,6 +597,7 @@ type expectedPQ struct {
 type cluster struct {
 	name           string
 	partition      string
+	locality       api.Locality
 	context        environment.TestContext
 	helmCluster    *consul.HelmCluster
 	client         *api.Client
@@ -613,7 +633,7 @@ func (c clusters) resetScale(t *testing.T) {
 func (c clusters) setServerIP(t *testing.T) {
 	for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
 		for k, v := range c {
-			podList, err := v.context.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(),
+			podList, err := v.context.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(ctx.Background(),
 				metav1.ListOptions{LabelSelector: labelSelector})
 			require.NoError(t, err)
 			require.Len(t, podList.Items, 1)
@@ -635,9 +655,9 @@ func (c clusters) verifyServerUpState(t *testing.T, isTproxyEnabled bool) {
 	for _, v := range c {
 		// Query using a client and expect its own name, no failover should occur
 		if isTproxyEnabled {
-			serviceFailoverCheck(t, v, v.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", v.fullTextPartition()))
+			serviceTargetCheck(t, v, v.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", v.fullTextPartition()))
 		} else {
-			serviceFailoverCheck(t, v, v.name, "localhost:8080")
+			serviceTargetCheck(t, v, v.name, "localhost:8080")
 		}
 	}
 }
@@ -665,16 +685,28 @@ func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, o
 	})
 }
 
-// serviceFailoverCheck verifies that the server failed over as expected by checking that curling the `static-server`
-// using the `static-client` responds with the expected cluster name. Each static-server responds with a uniquue
-// name so that we can verify failover occured as expected.
-func serviceFailoverCheck(t *testing.T, server *cluster, expectedName string, curlAddress string) {
+// setK8sNodeLocality labels the k8s node corresponding to the given cluster with standard labels indicating the
+// locality of that node. These are propagated by connect-inject to registered Consul services.
+func setK8sNodeLocality(t *testing.T, context environment.TestContext, c *cluster) {
+	nodeList, err := context.KubernetesClient(t).CoreV1().Nodes().List(ctx.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	// Get the name of the (only) node from the Kind cluster.
+	node := nodeList.Items[0].Name
+	k8s.KubectlLabel(t, context.KubectlOptions(t), "node", node, corev1.LabelTopologyRegion, c.locality.Region)
+	k8s.KubectlLabel(t, context.KubectlOptions(t), "node", node, corev1.LabelTopologyZone, c.locality.Zone)
+}
+
+// serviceTargetCheck verifies that curling the `static-server` using the `static-client` responds with the expected
+// cluster name. Each static-server responds with a unique name so that we can verify failover occured as expected.
+func serviceTargetCheck(t *testing.T, server *cluster, expectedName string, curlAddress string) {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	var resp string
 	var err error
 	retry.RunWith(timer, t, func(r *retry.R) {
+		// Use -s/--silent and -S/--show-error flags w/ curl to reduce noise during retries.
+		// This silences extra output like the request progress bar, but preserves errors.
 		resp, err = k8s.RunKubectlAndGetOutputE(t, server.clientOpts, "exec", "-i",
-			staticClientDeployment, "-c", staticClientName, "--", "curl", curlAddress)
+			staticClientDeployment, "-c", staticClientName, "--", "curl", "-sS", curlAddress)
 		require.NoError(r, err)
 		assert.Contains(r, resp, expectedName)
 	})
@@ -775,4 +807,40 @@ func getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig, server *clus
 	})
 
 	return acceptorSecretName
+}
+
+// localityForRegion returns the full api.Locality to use in tests for a given region string.
+func localityForRegion(r string) api.Locality {
+	return api.Locality{
+		Region: r,
+		Zone:   r + "a",
+	}
+}
+
+// checkLocalities checks the given cluster for `static-client` and `static-server` instances matching the locality
+// expected for the cluster.
+func checkLocalities(t *testing.T, c *cluster) {
+	for ns, svcs := range map[string][]string{
+		staticClientNamespace: {
+			staticClientName,
+			staticClientName + "-sidecar-proxy",
+		},
+		staticServerNamespace: {
+			staticServerName,
+			staticServerName + "-sidecar-proxy",
+		},
+	} {
+		for _, svc := range svcs {
+			cs := getCatalogService(t, c, svc, ns, c.partition)
+			assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
+			assert.Equal(t, c.locality, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
+		}
+	}
+}
+
+func getCatalogService(t *testing.T, c *cluster, svc, ns, partition string) *api.CatalogService {
+	resp, _, err := c.client.Catalog().Service(svc, "", &api.QueryOptions{Namespace: ns, Partition: partition})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp, "did not find service %s in cluster %s (partition=%s ns=%s)", svc, c.name, partition, ns)
+	return resp[0]
 }
