@@ -30,17 +30,17 @@ load _helpers
         --set 'connectInject.apiGateway.managedGatewayClass.resources.limits.memory=220Mi' \
         --set 'connectInject.apiGateway.managedGatewayClass.resources.limits.cpu=220m' \
         . | tee /dev/stderr |
-        yq '.data.["resources.json"]' | tee /dev/stderr)
+        yq '.data["resources.json"] | fromjson' | tee /dev/stderr)
 
-    local actual=$(echo $resources | jq '.requests.memory')
-    [ "$actual" = "\"200Mi\"" ]
+    local actual=$(echo $resources | jq -r '.requests.memory')
+    [ $actual = '200Mi' ]
 
-    local actual=$(echo $resources | jq '.requests.cpu')
-    [ "$actual" = "\"200m\"" ]
+    local actual=$(echo $resources | jq -r '.requests.cpu')
+    [ $actual = '200m' ]
 
-    local actual=$(echo $resources | jq '.limits.memory')
-    [ "$actual" = "\"220Mi\"" ]
+    local actual=$(echo $resources | jq -r '.limits.memory')
+    [ $actual = '220Mi' ]
 
-    local actual=$(echo $resources | jq '.limits.cpu')
-    [ "$actual" = "\"220m\"" ]
+    local actual=$(echo $resources | jq -r '.limits.cpu')
+    [ $actual = '220m' ]
 }
