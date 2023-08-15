@@ -64,6 +64,10 @@ func NewHelmCluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *HelmCluster {
+	if cfg.EnableRestrictedPSAEnforcement {
+		configureNamespace(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+	}
+
 	if cfg.EnablePodSecurityPolicies {
 		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
@@ -519,6 +523,35 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
+}
+
+func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	ctx := context.Background()
+
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   namespace,
+			Labels: map[string]string{},
+		},
+	}
+	if cfg.EnableRestrictedPSAEnforcement {
+		ns.ObjectMeta.Labels["pod-security.kubernetes.io/enforce"] = "restricted"
+		ns.ObjectMeta.Labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+	}
+
+	_, createErr := client.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	if createErr == nil {
+		logger.Logf(t, "Created namespace %s", namespace)
+		return
+	}
+
+	_, updateErr := client.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{})
+	if updateErr == nil {
+		logger.Logf(t, "Updated namespace %s", namespace)
+		return
+	}
+
+	require.Failf(t, "Failed to create or update namespace", "Namespace=%s, CreateError=%s, UpdateError=%s", namespace, createErr, updateErr)
 }
 
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
