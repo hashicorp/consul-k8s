@@ -119,7 +119,9 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 	foundReleasesStr, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "ls", "--all", "--short")
 	require.NoError(t, err)
 	for _, release := range strings.Split(foundReleasesStr, "\n") {
-		helm.Delete(t, options, release, true)
+		if release != "" {
+			helm.Delete(t, options, release, true)
+		}
 	}
 
 	t.Logf("deleting k8s resources...")
@@ -133,28 +135,37 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 		"pvc",
 		"secrets",
 	} {
-		_, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--all", resource)
-		require.NoError(t, err)
+		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--all", resource)
+		logger.Log(t, output)
+		if err != nil {
+			logger.Log(t, err)
+		}
 	}
 
+	// We could fetch these dynamically, but
 	t.Logf("deleting k8s namespaces...")
 	for _, ns := range []string{
 		"ns1",
 		"ns2",
 		"vault",
 	} {
-		_, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--ignore-not-found", ns)
-		require.NoError(t, err)
+		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--ignore-not-found", ns)
+		logger.Log(t, output)
+		if err != nil {
+			logger.Log(t, err)
+		}
 	}
 
 	t.Logf("deleting k8s crds...")
 	foundCrdsStr, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "get", "crds", "-o name")
 	require.NoError(t, err)
 	for _, crd := range strings.Split(foundCrdsStr, "\n") {
-		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "patch", crd, "-p '{\"metadata\":{\"finalizers\":[]}}' --type=merge")
-		logger.Log(t, output)
-		if err != nil {
-			logger.Log(t, err)
+		if crd != "" {
+			output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "patch", crd, "-p '{\"metadata\":{\"finalizers\":[]}}' --type=merge")
+			logger.Log(t, output)
+			if err != nil {
+				logger.Log(t, err)
+			}
 		}
 	}
 }
