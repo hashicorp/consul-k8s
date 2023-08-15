@@ -23,6 +23,6 @@ func TestMain(m *testing.M) {
 	} else {
 		fmt.Println(fmt.Sprintf("Skipping sameness tests because either -enable-multi-cluster is "+
 			"not set, the number of clusters did not match the expected count of %d, or --useKind is false. "+
-			"Sameness acceptance tests are currently only suopported on Kind clusters", expectedNumberOfClusters))
+			"Sameness acceptance tests are currently only supported on Kind clusters", expectedNumberOfClusters))
 	}
 }
