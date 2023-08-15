@@ -148,33 +148,9 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 	}
 
 	t.Logf("deleting k8s crds...")
-	for _, crd := range []string{
-		"crd/controlplanerequestlimits.consul.hashicorp.com",
-		"crd/exportedservices.consul.hashicorp.com",
-		"crd/gatewayclassconfigs.consul.hashicorp.com",
-		"crd/gatewayclasses.gateway.networking.consul.hashicorp.com",
-		"crd/gateways.gateway.networking.consul.hashicorp.com",
-		"crd/grpcroutes.gateway.networking.consul.hashicorp.com",
-		"crd/httproutes.gateway.networking.consul.hashicorp.com",
-		"crd/ingressgateways.consul.hashicorp.com",
-		"crd/jwtproviders.consul.hashicorp.com",
-		"crd/meshes.consul.hashicorp.com",
-		"crd/meshservices.consul.hashicorp.com",
-		"crd/peeringacceptors.consul.hashicorp.com",
-		"crd/peeringdialers.consul.hashicorp.com",
-		"crd/proxydefaults.consul.hashicorp.com",
-		"crd/referencegrands.gateway.networking.consul.hashicorp.com",
-		"crd/samenessgroups.consul.hashicorp.com",
-		"crd/servicedefaults.consul.hashicorp.com",
-		"crd/serviceintentions.consul.hashicorp.com",
-		"crd/serviceresolvers.consul.hashicorp.com",
-		"crd/servicerouters.consul.hashicorp.com",
-		"crd/servicesplitters.consul.hashicorp.com",
-		"crd/tcproutes.gateway.networking.consul.hashicorp.com",
-		"crd/terminatinggateways.consul.hashicorp.com",
-		"crd/tlsroutes.gateway.networking.consul.hashicorp.com",
-		"crd/udproutes.gateway.networking.consul.hashicorp.com",
-	} {
+	foundCrdsStr, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "get", "crds", "-o name")
+	require.NoError(t, err)
+	for _, crd := range strings.Split(foundCrdsStr, "\n") {
 		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "patch", crd, "-p '{\"metadata\":{\"finalizers\":[]}}' --type=merge")
 		logger.Log(t, output)
 		if err != nil {
