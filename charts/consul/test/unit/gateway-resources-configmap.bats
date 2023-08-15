@@ -33,14 +33,14 @@ load _helpers
         yq '.data.["resources.json"]' | tee /dev/stderr)
 
     local actual=$(echo $resources | jq '.requests.memory')
-    [ $actual = "\"200Mi\"" ]
+    [ "$actual" = "\"200Mi\"" ]
 
     local actual=$(echo $resources | jq '.requests.cpu')
-    [ $actual = "\"200m\"" ]
+    [ "$actual" = "\"200m\"" ]
 
     local actual=$(echo $resources | jq '.limits.memory')
-    [ $actual = "\"220Mi\"" ]
+    [ "$actual" = "\"220Mi\"" ]
 
     local actual=$(echo $resources | jq '.limits.cpu')
-    [ $actual = "\"220m\"" ]
+    [ "$actual" = "\"220m\"" ]
 }
