@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
-	terratestK8s "github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -115,7 +114,15 @@ func NewHelmCluster(
 	}
 }
 
-func KubectlClobber(t *testing.T, options *terratestK8s.KubectlOptions) {
+func KubectlClobber(t *testing.T, options *helm.Options) {
+	t.Logf("deleting helm releases...")
+	foundReleasesStr, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "ls", "--all", "--short")
+	require.NoError(t, err)
+	for _, release := range strings.Split(foundReleasesStr, "\n") {
+		helm.Delete(t, options, release, true)
+	}
+
+	t.Logf("deleting k8s resources...")
 	for _, resource := range []string{
 		"jobs",
 		"statefulsets",
@@ -126,10 +133,21 @@ func KubectlClobber(t *testing.T, options *terratestK8s.KubectlOptions) {
 		"pvc",
 		"secrets",
 	} {
-		_, err := k8s.RunKubectlAndGetOutputE(t, options, "delete", "--timeout=30s", "--all", resource)
+		_, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--all", resource)
 		require.NoError(t, err)
 	}
 
+	t.Logf("deleting k8s namespaces...")
+	for _, ns := range []string{
+		"ns1",
+		"ns2",
+		"vault",
+	} {
+		_, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--ignore-not-found", ns)
+		require.NoError(t, err)
+	}
+
+	t.Logf("deleting k8s crds...")
 	for _, crd := range []string{
 		"crd/controlplanerequestlimits.consul.hashicorp.com",
 		"crd/exportedservices.consul.hashicorp.com",
@@ -157,7 +175,7 @@ func KubectlClobber(t *testing.T, options *terratestK8s.KubectlOptions) {
 		"crd/tlsroutes.gateway.networking.consul.hashicorp.com",
 		"crd/udproutes.gateway.networking.consul.hashicorp.com",
 	} {
-		output, err := k8s.RunKubectlAndGetOutputE(t, options, "patch", crd, "-p '{\"metadata\":{\"finalizers\":[]}}' --type=merge")
+		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "patch", crd, "-p '{\"metadata\":{\"finalizers\":[]}}' --type=merge")
 		logger.Log(t, output)
 		if err != nil {
 			logger.Log(t, err)
@@ -173,7 +191,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 		h.Destroy(t)
 	})
 
-	KubectlClobber(t, h.helmOptions.KubectlOptions)
+	KubectlClobber(t, h.helmOptions)
 
 	// Fail if there are any existing installations of the Helm chart.
 	if !h.SkipCheckForPreviousInstallations {
