@@ -120,6 +120,7 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 	require.NoError(t, err)
 	for _, release := range strings.Split(foundReleasesStr, "\n") {
 		if release != "" {
+			t.Logf("deleting release: %s", release)
 			helm.Delete(t, options, release, true)
 		}
 	}
@@ -135,7 +136,7 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 		"pvc",
 		"secrets",
 	} {
-		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--all", resource)
+		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--all-namespaces", "--field-selector=metadata.namespace!=kube-system,metadata.name!=kubernetes", resource)
 		logger.Log(t, output)
 		if err != nil {
 			logger.Log(t, err)
@@ -157,7 +158,7 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 	}
 
 	t.Logf("deleting k8s crds...")
-	foundCrdsStr, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "get", "crds", "-o name")
+	foundCrdsStr, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "get", "crds", "-o", "name")
 	require.NoError(t, err)
 	for _, crd := range strings.Split(foundCrdsStr, "\n") {
 		if crd != "" {
