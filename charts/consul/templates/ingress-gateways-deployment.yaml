@@ -244,6 +244,8 @@ spec:
         resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
         {{- end }}
         volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         - name: consul-service
           mountPath: /consul/service
           readOnly: true
