@@ -142,7 +142,7 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 		}
 	}
 
-	// We could fetch these dynamically, but
+	// We could fetch these dynamically, but we may need to filter out system namespaces
 	t.Logf("deleting k8s namespaces...")
 	for _, ns := range []string{
 		"ns1",
