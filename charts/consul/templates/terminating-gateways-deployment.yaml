@@ -226,6 +226,8 @@ spec:
           image: {{ $root.Values.global.imageConsulDataplane | quote }}
           {{- include "consul.restrictedSecurityContext" $ | nindent 10 }}
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
             - name: consul-service
               mountPath: /consul/service
               readOnly: true
