@@ -428,21 +428,30 @@ func TestFailover_Connect(t *testing.T) {
 				"../fixtures/cases/sameness/static-server/dc3")
 
 			// Create static client deployments.
+			staticClientKustomizeDirDefault := "../fixtures/cases/sameness/static-client/default-partition"
+			staticClientKustomizeDirAP1 := "../fixtures/cases/sameness/static-client/ap1-partition"
+
+			// If transparent proxy is enabled create clients without explicit upstreams
+			if cfg.EnableTransparentProxy {
+				staticClientKustomizeDirDefault = fmt.Sprintf("%s-%s", staticClientKustomizeDirDefault, "tproxy")
+				staticClientKustomizeDirAP1 = fmt.Sprintf("%s-%s", staticClientKustomizeDirAP1, "tproxy")
+			}
+
 			k8s.DeployKustomize(t, testClusters[keyCluster01a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-client/default-partition")
+				staticClientKustomizeDirDefault)
 			k8s.DeployKustomize(t, testClusters[keyCluster02a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-client/default-partition")
+				staticClientKustomizeDirDefault)
 			k8s.DeployKustomize(t, testClusters[keyCluster03a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-client/default-partition")
+				staticClientKustomizeDirDefault)
 			k8s.DeployKustomize(t, testClusters[keyCluster01b].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-client/ap1-partition")
+				staticClientKustomizeDirAP1)
 
 			// Verify that both static-server and static-client have been injected and now have 2 containers in each cluster.
 			// Also get the server IP
 			testClusters.setServerIP(t)
 
 			// Everything should be up and running now
-			testClusters.verifyServerUpState(t)
+			testClusters.verifyServerUpState(t, cfg.EnableTransparentProxy)
 			logger.Log(t, "all infrastructure up and running")
 
 			// Verify all the failover Scenarios
@@ -514,19 +523,23 @@ func TestFailover_Connect(t *testing.T) {
 					checkDNSPQ: true,
 				},
 			}
-
 			for _, sc := range subCases {
 				t.Run(sc.name, func(t *testing.T) {
 					// Reset the scale of all servers
 					testClusters.resetScale(t)
-					testClusters.verifyServerUpState(t)
+					testClusters.verifyServerUpState(t, cfg.EnableTransparentProxy)
 					// We're resetting the scale, so make sure we have all the new IP addresses saved
 					testClusters.setServerIP(t)
 
 					for _, v := range sc.failovers {
 						// Verify Failover (If this is the first check, then just verifying we're starting with the right server)
 						logger.Log(t, "checking service failover")
-						serviceFailoverCheck(t, sc.server, v.failoverServer.name)
+
+						if cfg.EnableTransparentProxy {
+							serviceFailoverCheck(t, sc.server, v.failoverServer.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", sc.server.fullTextPartition()))
+						} else {
+							serviceFailoverCheck(t, sc.server, v.failoverServer.name, "localhost:8080")
+						}
 
 						// Verify DNS
 						if sc.checkDNSPQ {
@@ -578,6 +591,14 @@ type cluster struct {
 	acceptors      []string
 }
 
+func (c cluster) fullTextPartition() string {
+	if c.partition == "" {
+		return "default"
+	} else {
+		return c.partition
+	}
+}
+
 type clusters map[string]*cluster
 
 func (c clusters) resetScale(t *testing.T) {
@@ -609,11 +630,15 @@ func (c clusters) setServerIP(t *testing.T) {
 
 // verifyServerUpState will verify that the static-servers are all up and running as
 // expected by curling them from their local datacenters.
-func (c clusters) verifyServerUpState(t *testing.T) {
+func (c clusters) verifyServerUpState(t *testing.T, isTproxyEnabled bool) {
 	logger.Logf(t, "verifying that static-servers are up")
 	for _, v := range c {
 		// Query using a client and expect its own name, no failover should occur
-		serviceFailoverCheck(t, v, v.name)
+		if isTproxyEnabled {
+			serviceFailoverCheck(t, v, v.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", v.fullTextPartition()))
+		} else {
+			serviceFailoverCheck(t, v, v.name, "localhost:8080")
+		}
 	}
 }
 
@@ -643,13 +668,13 @@ func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, o
 // serviceFailoverCheck verifies that the server failed over as expected by checking that curling the `static-server`
 // using the `static-client` responds with the expected cluster name. Each static-server responds with a uniquue
 // name so that we can verify failover occured as expected.
-func serviceFailoverCheck(t *testing.T, server *cluster, expectedName string) {
+func serviceFailoverCheck(t *testing.T, server *cluster, expectedName string, curlAddress string) {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	var resp string
 	var err error
 	retry.RunWith(timer, t, func(r *retry.R) {
 		resp, err = k8s.RunKubectlAndGetOutputE(t, server.clientOpts, "exec", "-i",
-			staticClientDeployment, "-c", staticClientName, "--", "curl", "localhost:8080")
+			staticClientDeployment, "-c", staticClientName, "--", "curl", curlAddress)
 		require.NoError(r, err)
 		assert.Contains(r, resp, expectedName)
 	})
