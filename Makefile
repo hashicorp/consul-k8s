@@ -14,10 +14,6 @@ gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consu
 copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make copy-crds-to-chart
 	@cd hack/copy-crds-to-chart; go run ./...
 
-generate-external-crds: ## Generate CRDs for externally defined CRDs and copy them to charts/consul. Usage: make generate-external-crds
-	@cd ./control-plane/config/crd/external; \
-		kustomize build | yq --split-exp '.metadata.name + ".yaml"' --no-doc
-
 bats-tests: ## Run Helm chart bats tests.
 	 bats --jobs 4 charts/consul/test/unit
 
@@ -53,17 +49,6 @@ control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-
        --push \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
-control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker image.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH) --fips
-	@docker build -t '$(DEV_IMAGE)' \
-       --target=dev \
-       --build-arg 'TARGETARCH=$(GOARCH)' \
-       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
-       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
-       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
-       --push \
-       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
-
 control-plane-test: ## Run go test for the control plane.
 	cd control-plane; go test ./...
 
@@ -85,7 +70,7 @@ cni-plugin-lint:
 	cd control-plane/cni; golangci-lint run -c ../../.golangci.yml
 
 ctrl-generate: get-controller-gen ## Run CRD code generation.
-	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
+	cd control-plane; $(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
 
 # Perform a terraform fmt check but don't change anything
 terraform-fmt-check:
@@ -107,10 +92,6 @@ cli-dev:
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
 
-cli-fips-dev:
-	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
-	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
-
 cli-lint: ## Run linter in the control-plane directory.
 	cd cli; golangci-lint run -c ../.golangci.yml
 
@@ -130,30 +111,22 @@ kind-cni-calico:
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
 	@sleep 20
 
-kind-delete:
+# Helper target for doing local cni acceptance testing
+kind-cni:
 	kind delete cluster --name dc1
 	kind delete cluster --name dc2
-	kind delete cluster --name dc3
-	kind delete cluster --name dc4
-
-
-# Helper target for doing local cni acceptance testing
-kind-cni: kind-delete
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
 
 # Helper target for doing local acceptance testing
-kind: kind-delete
+kind:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
 	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
+
 
 # Helper target for loading local dev images (run with `DEV_IMAGE=...` to load non-k8s images)
 kind-load:
@@ -173,8 +146,6 @@ lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance di
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	make copy-crds-to-chart
-	make generate-external-crds
-	make add-copyright-header
 
 get-controller-gen: ## Download controller-gen program needed for operator SDK.
 ifeq (, $(shell which controller-gen))
@@ -190,13 +161,6 @@ CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
-
-add-copyright-header: ## Add copyright header to all files in the project
-ifeq (, $(shell which copywrite))
-	@echo "Installing copywrite"
-	@go install github.com/hashicorp/copywrite@latest
-endif
-	@copywrite headers --spdx "MPL-2.0" 
 
 # ===========> CI Targets
 
@@ -277,7 +241,7 @@ endif
 
 # ===========> Makefile config
 .DEFAULT_GOAL := help
-.PHONY: gen-helm-docs copy-crds-to-chart generate-external-crds bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
+.PHONY: gen-helm-docs copy-crds-to-chart bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
 SHELL = bash
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)

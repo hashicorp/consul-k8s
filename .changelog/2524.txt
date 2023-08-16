@@ -1,3 +1,0 @@
-```release-note:improvement
-(api-gateway) make API gateway controller less verbose
-```
