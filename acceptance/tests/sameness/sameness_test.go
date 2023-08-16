@@ -431,7 +431,7 @@ func TestFailover_Connect(t *testing.T) {
 			staticClientDefaultKustomizeDir := "../fixtures/cases/sameness/static-client/default-partition"
 			staticClientAP1KustomizeDir := "../fixtures/cases/sameness/static-client/ap1-partition"
 
-			// If transparent proxy is enabled create clients without explicity upstreams
+			// If transparent proxy is enabled create clients without explicit upstreams
 			if cfg.EnableTransparentProxy {
 				staticClientDefaultKustomizeDir = fmt.Sprintf("%s-%s", staticClientDefaultKustomizeDir, "tproxy")
 				staticClientAP1KustomizeDir = fmt.Sprintf("%s-%s", staticClientAP1KustomizeDir, "tproxy")
