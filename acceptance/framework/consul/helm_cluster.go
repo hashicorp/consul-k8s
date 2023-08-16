@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/apis/apiextentions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -114,14 +115,14 @@ func NewHelmCluster(
 	}
 }
 
-func KubectlClobber(t *testing.T, options *helm.Options) {
+func (h *HelmCluster) KubectlClobber(t *testing.T) {
 	t.Logf("deleting helm releases...")
 	foundReleasesStr, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "ls", "--all", "--short")
 	require.NoError(t, err)
 	for _, release := range strings.Split(foundReleasesStr, "\n") {
 		if release != "" {
 			t.Logf("deleting release: %s", release)
-			helm.Delete(t, options, release, true)
+			helm.Delete(t, h.helmOptions, release, true)
 		}
 	}
 
@@ -136,7 +137,7 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 		"pvc",
 		"secrets",
 	} {
-		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--field-selector=metadata.name!=kubernetes", resource)
+		output, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "delete", "--timeout=30s", "--field-selector=metadata.name!=kubernetes", resource)
 		logger.Log(t, output)
 		if err != nil {
 			logger.Log(t, err)
@@ -150,19 +151,27 @@ func KubectlClobber(t *testing.T, options *helm.Options) {
 		"ns2",
 		"vault",
 	} {
-		output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "delete", "--timeout=30s", "--ignore-not-found", ns)
+		output, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "delete", "--timeout=30s", "--ignore-not-found", ns)
 		logger.Log(t, output)
 		if err != nil {
 			logger.Log(t, err)
 		}
 	}
+	crds := &apiextv1.CustomResourceDefinitionList{}
+	if h.runtimeClient.List(context.Background(), &crds, &client.ListOptions{}) == nil {
+		for _, crd := range crds.Items {
+			t.Logf("crd: %s", crd.Name)
+			//item.SetFinalizers([]string{})
+			//_ = h.runtimeClient.Update(context.Background(), &item)
+		}
+	}
 
 	t.Logf("deleting k8s crds...")
-	foundCrdsStr, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "get", "crds", "-o", "name")
+	foundCrdsStr, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "get", "crds", "-o", "name")
 	require.NoError(t, err)
 	for _, crd := range strings.Split(foundCrdsStr, "\n") {
 		if crd != "" {
-			output, err := k8s.RunKubectlAndGetOutputE(t, options.KubectlOptions, "patch", crd, "-p '{\"metadata\":{\"finalizers\":[]}}' --type=merge")
+			output, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "patch", crd, "-p \"{\"metadata\":{\"finalizers\":[]}}\" --type=merge")
 			logger.Log(t, output)
 			if err != nil {
 				logger.Log(t, err)
@@ -179,7 +188,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 		h.Destroy(t)
 	})
 
-	KubectlClobber(t, h.helmOptions)
+	h.KubectlClobber(t)
 
 	// Fail if there are any existing installations of the Helm chart.
 	if !h.SkipCheckForPreviousInstallations {
