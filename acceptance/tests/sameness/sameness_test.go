@@ -428,8 +428,8 @@ func TestFailover_Connect(t *testing.T) {
 				"../fixtures/cases/sameness/static-server/dc3")
 
 			// Create static client deployments.
-			staticClientDefaultKustomizeDir := "../fixtures/cases/sameness/static-client/default-partition"
-			staticClientAP1KustomizeDir := "../fixtures/cases/sameness/static-client/ap1-partition"
+			staticClientKustomizeDirDefault := "../fixtures/cases/sameness/static-client/default-partition"
+			staticClientKustomizeDirAP1 := "../fixtures/cases/sameness/static-client/ap1-partition"
 
 			// If transparent proxy is enabled create clients without explicit upstreams
 			if cfg.EnableTransparentProxy {
