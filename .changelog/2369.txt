@@ -1,0 +1,3 @@
+```release-note:improvement
+(Consul Enterprise) Add support to provide inputs via helm for audit log related configuration
+```

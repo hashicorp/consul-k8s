@@ -55,7 +55,7 @@ resource "azurerm_kubernetes_cluster" "default" {
   location                          = azurerm_resource_group.default[count.index].location
   resource_group_name               = azurerm_resource_group.default[count.index].name
   dns_prefix                        = "consul-k8s-${random_id.suffix[count.index].dec}"
-  kubernetes_version                = "1.24.10"
+  kubernetes_version                = var.kubernetes_version
   role_based_access_control_enabled = true
 
   // We're setting the network plugin and other network properties explicitly
@@ -78,7 +78,7 @@ resource "azurerm_kubernetes_cluster" "default" {
   default_node_pool {
     name            = "default"
     node_count      = 3
-    vm_size         = "Standard_D3_v2"
+    vm_size         = "Standard_D2_v2"
     os_disk_size_gb = 30
     vnet_subnet_id  = azurerm_virtual_network.default[count.index].subnet.*.id[0]
   }

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -15,9 +12,6 @@ import (
 )
 
 // This file contains structs that are shared between multiple config entries.
-
-// metaValueMaxLength is the maximum allowed string length of a metadata value.
-const metaValueMaxLength = 512
 
 type MeshGatewayMode string
 
@@ -56,35 +50,6 @@ type TransparentProxy struct {
 	// The discovery chain is not considered when dialing a service instance directly.
 	// This setting is useful when addressing stateful services, such as a database cluster with a leader node.
 	DialedDirectly bool `json:"dialedDirectly,omitempty"`
-}
-
-type MutualTLSMode string
-
-const (
-	// MutualTLSModeDefault represents no specific mode and should
-	// be used to indicate that a different layer of the configuration
-	// chain should take precedence.
-	MutualTLSModeDefault MutualTLSMode = ""
-
-	// MutualTLSModeStrict requires mTLS for incoming traffic.
-	MutualTLSModeStrict MutualTLSMode = "strict"
-
-	// MutualTLSModePermissive allows incoming non-mTLS traffic.
-	MutualTLSModePermissive MutualTLSMode = "permissive"
-)
-
-func (m MutualTLSMode) validate() error {
-	switch m {
-	case MutualTLSModeDefault, MutualTLSModeStrict, MutualTLSModePermissive:
-		return nil
-	}
-	return fmt.Errorf("Must be one of %q, %q, or %q.",
-		MutualTLSModeDefault, MutualTLSModeStrict, MutualTLSModePermissive,
-	)
-}
-
-func (m MutualTLSMode) toConsul() capi.MutualTLSMode {
-	return capi.MutualTLSMode(m)
 }
 
 // MeshGateway controls how Mesh Gateways are used for upstream Connect
@@ -275,39 +240,6 @@ func (in EnvoyExtension) validate(path *field.Path) *field.Error {
 		return field.Invalid(path.Child("arguments"), string(in.Arguments), fmt.Sprintf(`must be valid map value: %s`, err))
 	}
 	return nil
-}
-
-// FailoverPolicy specifies the exact mechanism used for failover.
-type FailoverPolicy struct {
-	// Mode specifies the type of failover that will be performed. Valid values are
-	// "sequential", "" (equivalent to "sequential") and "order-by-locality".
-	Mode string `json:"mode,omitempty"`
-	// Regions is the ordered list of the regions of the failover targets.
-	// Valid values can be "us-west-1", "us-west-2", and so on.
-	Regions []string `json:"regions,omitempty"`
-}
-
-func (in *FailoverPolicy) toConsul() *capi.ServiceResolverFailoverPolicy {
-	if in == nil {
-		return nil
-	}
-
-	return &capi.ServiceResolverFailoverPolicy{
-		Mode:    in.Mode,
-		Regions: in.Regions,
-	}
-}
-
-func (in *FailoverPolicy) validate(path *field.Path) field.ErrorList {
-	var errs field.ErrorList
-	if in == nil {
-		return nil
-	}
-	modes := []string{"", "sequential", "order-by-locality"}
-	if !sliceContains(modes, in.Mode) {
-		errs = append(errs, field.Invalid(path.Child("mode"), in.Mode, notInSliceMessage(modes)))
-	}
-	return errs
 }
 
 func notInSliceMessage(slice []string) string {

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package preset
 
 import "github.com/hashicorp/consul-k8s/cli/config"

@@ -1,3 +1,0 @@
-```release-note:bug
-api-gateway: Fix creation of invalid Kubernetes Service when multiple Gateway listeners have the same port.
-```
