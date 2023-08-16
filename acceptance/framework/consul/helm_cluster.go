@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/apis/apiextentions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -155,14 +154,6 @@ func (h *HelmCluster) KubectlClobber(t *testing.T) {
 		logger.Log(t, output)
 		if err != nil {
 			logger.Log(t, err)
-		}
-	}
-	crds := &apiextv1.CustomResourceDefinitionList{}
-	if h.runtimeClient.List(context.Background(), &crds, &client.ListOptions{}) == nil {
-		for _, crd := range crds.Items {
-			t.Logf("crd: %s", crd.Name)
-			//item.SetFinalizers([]string{})
-			//_ = h.runtimeClient.Update(context.Background(), &item)
 		}
 	}
 
