@@ -430,18 +430,18 @@ func TestFailover_Connect(t *testing.T) {
 
 			// If transparent proxy is enabled create clients without explicit upstreams
 			if cfg.EnableTransparentProxy {
-				staticClientDefaultKustomizeDir = fmt.Sprintf("%s-%s", staticClientDefaultKustomizeDir, "tproxy")
-				staticClientAP1KustomizeDir = fmt.Sprintf("%s-%s", staticClientAP1KustomizeDir, "tproxy")
+				staticClientKustomizeDirDefault = fmt.Sprintf("%s-%s", staticClientKustomizeDirDefault, "tproxy")
+				staticClientKustomizeDirAP1 = fmt.Sprintf("%s-%s", staticClientKustomizeDirAP1, "tproxy")
 			}
 
 			k8s.DeployKustomize(t, testClusters[keyCluster01a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				staticClientDefaultKustomizeDir)
+				staticClientKustomizeDirDefault)
 			k8s.DeployKustomize(t, testClusters[keyCluster02a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				staticClientDefaultKustomizeDir)
+				staticClientKustomizeDirDefault)
 			k8s.DeployKustomize(t, testClusters[keyCluster03a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				staticClientDefaultKustomizeDir)
+				staticClientKustomizeDirDefault)
 			k8s.DeployKustomize(t, testClusters[keyCluster01b].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				staticClientAP1KustomizeDir)
+				staticClientKustomizeDirAP1)
 
 			// Verify that both static-server and static-client have been injected and now have 2 containers in each cluster.
 			// Also get the server IP
