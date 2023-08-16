@@ -66,7 +66,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Datacenter:    "redirect_datacenter",
 						Peer:          "redirect_peer",
 					},
-					PrioritizeByLocality: &ServiceResolverPrioritizeByLocality{
+					PrioritizeByLocality: &PrioritizeByLocality{
 						Mode: "failover",
 					},
 					Failover: map[string]ServiceResolverFailover{
@@ -285,7 +285,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						Datacenter:    "redirect_datacenter",
 						Partition:     "redirect_partition",
 					},
-					PrioritizeByLocality: &ServiceResolverPrioritizeByLocality{
+					PrioritizeByLocality: &PrioritizeByLocality{
 						Mode: "none",
 					},
 					Failover: map[string]ServiceResolverFailover{
@@ -898,20 +898,20 @@ func TestServiceResolver_Validate(t *testing.T) {
 				"spec.failover[failB].namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set failover.namespace",
 			},
 		},
-		"prioritize by locality none": {
+		"prioritize by locality invalid": {
 			input: &ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: ServiceResolverSpec{
-					PrioritizeByLocality: &ServiceResolverPrioritizeByLocality{
+					PrioritizeByLocality: &PrioritizeByLocality{
 						Mode: "bad",
 					},
 				},
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				"mode must be one of '', 'none', or 'failover'",
+				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.prioritizeByLocality.mode: Invalid value: \"bad\": must be one of \"\", \"none\", \"failover\"",
 			},
 		},
 	}

@@ -84,14 +84,7 @@ type ServiceResolverSpec struct {
 	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
 	// PrioritizeByLocality controls whether the locality of services within the
 	// local partition will be used to prioritize connectivity.
-	PrioritizeByLocality *ServiceResolverPrioritizeByLocality `json:"prioritizeByLocality,omitempty"`
-}
-
-type ServiceResolverPrioritizeByLocality struct {
-	// Mode specifies the type of prioritization that will be performed
-	// when selecting nodes in the local partition.
-	// Valid values are: "" (default "none"), "none", and "failover".
-	Mode string `json:"mode,omitempty"`
+	PrioritizeByLocality *PrioritizeByLocality `json:"prioritizeByLocality,omitempty"`
 }
 
 type ServiceResolverRedirect struct {
@@ -536,16 +529,6 @@ func (in *ServiceResolverFailover) toConsul() *capi.ServiceResolverFailover {
 	}
 }
 
-func (in *ServiceResolverPrioritizeByLocality) toConsul() *capi.ServiceResolverPrioritizeByLocality {
-	if in == nil {
-		return nil
-	}
-
-	return &capi.ServiceResolverPrioritizeByLocality{
-		Mode: in.Mode,
-	}
-}
-
 func (in ServiceResolverFailoverTarget) toConsul() capi.ServiceResolverFailoverTarget {
 	return capi.ServiceResolverFailoverTarget{
 		Service:       in.Service,
@@ -653,25 +636,6 @@ func (in *ServiceResolver) validateEnterprise(consulMeta common.ConsulMeta) fiel
 
 func (in *ServiceResolverFailover) isEmpty() bool {
 	return in.Service == "" && in.ServiceSubset == "" && in.Namespace == "" && len(in.Datacenters) == 0 && len(in.Targets) == 0 && in.Policy == nil && in.SamenessGroup == ""
-}
-
-func (in *ServiceResolverPrioritizeByLocality) validate(path *field.Path) field.ErrorList {
-	var errs field.ErrorList
-
-	if in == nil {
-		return nil
-	}
-
-	switch in.Mode {
-	case "":
-	case "none":
-	case "failover":
-	default:
-		asJSON, _ := json.Marshal(in)
-		errs = append(errs, field.Invalid(path, string(asJSON),
-			"mode must be one of '', 'none', or 'failover'"))
-	}
-	return errs
 }
 
 func (in *ServiceResolverFailover) validate(path *field.Path, consulMeta common.ConsulMeta) field.ErrorList {

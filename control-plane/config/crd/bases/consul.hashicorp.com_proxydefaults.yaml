@@ -156,6 +156,15 @@ spec:
                       type: string
                     type: array
                 type: object
+              prioritizeByLocality:
+                description: PrioritizeByLocality contains the configuration for
+                  locality aware routing.
+                properties:
+                  mode:
+                    description: Mode specifies the behavior of PrioritizeByLocality
+                      routing. Valid values are "", "none", and "failover".
+                    type: string
+                type: object
               meshGateway:
                 description: MeshGateway controls the default mesh gateway configuration
                   for this service.
