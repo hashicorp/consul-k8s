@@ -147,6 +147,8 @@ spec:
         {{- toYaml .Values.server.securityContext | nindent 8 }}
       {{- end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-server-config
@@ -248,7 +250,6 @@ spec:
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image }}"
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
@@ -456,6 +457,9 @@ spec:
               mountPath: /trusted-cas
               readOnly: false
             {{- end }}
+            - name: tmp
+              mountPath: /tmp
+              readOnly: false
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
             - name: http

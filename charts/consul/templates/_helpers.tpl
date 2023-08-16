@@ -19,9 +19,12 @@ as well as the global.name setting.
 {{- if not .Values.global.enablePodSecurityPolicies -}}
 securityContext:
   allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop:
     - ALL
+    add:
+    - NET_BIND_SERVICE
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault

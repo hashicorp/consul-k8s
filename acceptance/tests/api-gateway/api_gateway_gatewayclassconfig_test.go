@@ -63,7 +63,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 
 	k8sClient := ctx.ControllerRuntimeClient(t)
 
-	// create a GatewayClassConfig with configuration set
+	// Create a GatewayClassConfig.
 	gatewayClassConfigName := "gateway-class-config"
 	gatewayClassConfig := &v1alpha1.GatewayClassConfig{
 		ObjectMeta: metav1.ObjectMeta{
@@ -127,7 +127,6 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	gatewayName := "gcctestgateway" + namespace
 	logger.Log(t, "creating controlled gateway")
 	gateway := createGateway(t, k8sClient, gatewayName, namespace, gatewayClassName, certificateName)
-
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all gateways")
 		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.Gateway{}, client.InNamespace(namespace))

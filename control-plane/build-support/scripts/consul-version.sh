@@ -6,6 +6,7 @@ VERSION=$(yq .global.image $FILE)
 
 if [[ "${VERSION}" == *"consul-enterprise:"* ]]; then
 	VERSION=$(echo ${VERSION} | sed "s/consul-enterprise:/consul:/g")
+	VERSION=$(echo ${VERSION} | sed "s/\-ent//")
 fi
 
 echo "${VERSION}"

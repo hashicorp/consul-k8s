@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -280,9 +279,11 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			var encodedPeeringToken string
 			if tt.peeringName != "" {
 				// Create the initial token.
-				baseToken, _, err := acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.peeringName}, nil)
-				require.NoError(t, err)
-				encodedPeeringToken = baseToken.PeeringToken
+				retry.Run(t, func(r *retry.R) {
+					baseToken, _, err := acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.peeringName}, nil)
+					require.NoError(r, err)
+					encodedPeeringToken = baseToken.PeeringToken
+				})
 			}
 
 			// If the peering is not supposed to already exist in Consul, then create a secret with the generated token.
@@ -314,7 +315,8 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 				secret.SetResourceVersion("latest-version")
 				k8sObjects = append(k8sObjects, secret)
 			}
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
@@ -482,8 +484,11 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			// Create a peering connection in Consul by generating and establishing a peering connection before calling
 			// Reconcile().
 			// Generate a token.
-			generatedToken, _, err := acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "peering"}, nil)
-			require.NoError(t, err)
+			var generatedToken *api.PeeringGenerateTokenResponse
+			retry.Run(t, func(r *retry.R) {
+				generatedToken, _, err = acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "peering"}, nil)
+				require.NoError(r, err)
+			})
 
 			// Create test consul server.
 			var testServerCfg *testutil.TestServerConfig
@@ -524,7 +529,8 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			secret.SetResourceVersion("latest-version")
 			k8sObjects = append(k8sObjects, secret)
 
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
@@ -740,7 +746,8 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 	k8sObjects := []runtime.Object{ns, dialer}
 
 	// Add peering types to the scheme.
-	s := scheme.Scheme
+	s := runtime.NewScheme()
+	corev1.AddToScheme(s)
 	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
@@ -881,7 +888,8 @@ func TestDialerUpdateStatus(t *testing.T) {
 			k8sObjects = append(k8sObjects, tt.peeringDialer)
 
 			// Add peering types to the scheme.
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 			// Create the peering dialer controller.
@@ -993,7 +1001,8 @@ func TestDialerUpdateStatusError(t *testing.T) {
 			k8sObjects = append(k8sObjects, tt.dialer)
 
 			// Add peering types to the scheme.
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 			// Create the peering dialer controller.
@@ -1277,7 +1286,8 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.dialers).Build()
 			controller := PeeringDialerController{
