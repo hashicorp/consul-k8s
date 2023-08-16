@@ -109,7 +109,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		// deployments because golang will execute them in reverse order
 		// (i.e. the last registered cleanup function will be executed first).
 		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
+			retrier := &retry.Timer{Timeout: 60 * time.Second, Wait: 100 * time.Millisecond}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
 				require.NoError(r, err)

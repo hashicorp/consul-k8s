@@ -6,8 +6,6 @@ package vault
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -15,7 +13,6 @@ import (
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
@@ -58,32 +55,12 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	kopts := ctx.KubectlOptions(t)
-	ns := ctx.KubectlOptions(t).Namespace
-
-	entstr := "-ent"
 
 	values := defaultHelmValues(releaseName)
 	if cfg.EnablePodSecurityPolicies {
 		values["global.psp.enable"] = "true"
 	}
-	vaultReleaseName := helpers.RandomName()
-	k8sClient := environment.KubernetesClientFromOptions(t, ctx.KubectlOptions(t))
-	vaultLicenseSecretName := fmt.Sprintf("%s-enterprise-license", vaultReleaseName)
-	vaultLicenseSecretKey := "license"
-
-	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
-
 	if cfg.VaultServerVersion != "" {
-
-		if strings.Contains(cfg.VaultServerVersion, entstr) {
-
-			logger.Logf(t, "Creating secret for Vault license")
-			consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
-
-			values["server.image.repository"] = "docker.mirror.hashicorp.services/hashicorp/vault-enterprise"
-			values["server.enterpriseLicense.secretName"] = vaultLicenseSecretName
-			values["server.enterpriseLicense.secretKey"] = vaultLicenseSecretKey
-		}
 		values["server.image.tag"] = cfg.VaultServerVersion
 	}
 	vaultHelmChartVersion := defaultVaultHelmChartVersion
