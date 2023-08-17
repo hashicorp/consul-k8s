@@ -154,6 +154,9 @@ spec:
       terminationGracePeriodSeconds: {{ default $defaults.terminationGracePeriodSeconds .terminationGracePeriodSeconds }}
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
+      - name: tmp
+        emptyDir:
+          medium: "Memory"
       - name: consul-service
         emptyDir:
           medium: "Memory"
@@ -215,6 +218,8 @@ spec:
           -log-level={{ default $root.Values.global.logLevel $root.Values.ingressGateways.logLevel }} \
           -log-json={{ $root.Values.global.logJSON }}
         volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         - name: consul-service
           mountPath: /consul/service
         {{- if $root.Values.global.tls.enabled }}
@@ -239,6 +244,8 @@ spec:
         resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
         {{- end }}
         volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         - name: consul-service
           mountPath: /consul/service
           readOnly: true
