@@ -152,6 +152,18 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 					}
 				}
 			})
+			// Ensure the token is cleaned up
+			if secure {
+				retry.Run(t, func(r *retry.R) {
+					tokens, _, err := consulClient.ACL().TokenList(nil)
+					require.NoError(r, err)
+					for _, t := range tokens {
+						if strings.Contains(t.Description, podName) {
+							r.Errorf("Found a token that was supposed to be deleted for pod %v", podName)
+						}
+					}
+				})
+			}
 		})
 	}
 }
