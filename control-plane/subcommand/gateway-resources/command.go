@@ -219,10 +219,10 @@ func (c *Command) Run(args []string) int {
 				DefaultInstances: nonZeroOrNil(c.flagDeploymentDefaultInstances),
 				MaxInstances:     nonZeroOrNil(c.flagDeploymentMaxInstances),
 				MinInstances:     nonZeroOrNil(c.flagDeploymentMinInstances),
+				Resources:        &c.resources,
 			},
 			OpenshiftSCCName:            c.flagOpenshiftSCCName,
 			MapPrivilegedContainerPorts: int32(c.flagMapPrivilegedContainerPorts),
-			Resources:                   &c.resources,
 		},
 	}
 

@@ -54,9 +54,6 @@ type GatewayClassConfigSpec struct {
 	// Deployment defines the deployment configuration for the gateway.
 	DeploymentSpec DeploymentSpec `json:"deployment,omitempty"`
 
-	// Resources defines the resource requirements for the gateway.
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
-
 	// Annotation Information to copy to services or deployments
 	CopyAnnotations CopyAnnotationsSpec `json:"copyAnnotations,omitempty"`
 
@@ -88,6 +85,9 @@ type DeploymentSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// Minimum allowed number of gateway instances
 	MinInstances *int32 `json:"minInstances,omitempty"`
+
+	// Resources defines the resource requirements for the gateway.
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 //+kubebuilder:object:generate=true

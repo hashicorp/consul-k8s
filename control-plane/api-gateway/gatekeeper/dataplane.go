@@ -101,8 +101,8 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
 	// Configure the resource requests and limits for the proxy if they are set.
-	if gcc.Spec.Resources != nil {
-		container.Resources = *gcc.Spec.Resources
+	if gcc.Spec.DeploymentSpec.Resources != nil {
+		container.Resources = *gcc.Spec.DeploymentSpec.Resources
 	}
 
 	// If not running in an OpenShift environment,
