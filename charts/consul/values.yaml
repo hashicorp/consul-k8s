@@ -525,7 +525,7 @@ global:
     annotations: null
 
   # If set argocd.enabled is set to true, following annotations are added to
-  # jobs - server-acl-init-cleanup-job, gateway-cleanup-job, server-acl-init-job,
+  # jobs - server-acl-init-cleanup-job, gateway-cleanup-job, server-acl-init-job and
   # gateway-resources-job
   # annotations -
   #   argocd.argoproj.io/hook: Sync
