@@ -1,0 +1,4 @@
+```release-note:improvement
+Add support for global.argocd.enabled flaag in values.yaml which adds the global.argocd.annotations in the jobs -
+gateway-cleanup-job, gateway-resources-job, server-acl-init-job and server-acl-init-cleanup-job
+```
