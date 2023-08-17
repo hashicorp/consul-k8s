@@ -376,7 +376,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 
 ### Generating YAML
 1. Run `make ctrl-manifests` to generate the CRD and webhook YAML.
-1. Uncomment your CRD in `control-plane/config/crd/kustomization` under `patchesStrategicMerge:`
+1. Uncomment your CRD in `control-plane/config/crd/kustomization` under `patches:`
 1. Update the sample, e.g. `control-plane/config/samples/consul_v1alpha1_ingressgateway.yaml` to a valid resource
    that can be used for testing:
     ```yaml
