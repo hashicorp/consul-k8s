@@ -22,6 +22,8 @@ securityContext:
   capabilities:
     drop:
     - ALL
+    add:
+    - NET_BIND_SERVICE
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
