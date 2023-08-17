@@ -1,0 +1,3 @@
+```release-note:feature
+Add the `PrioritizeByLocality` field to the `ServiceResolver` and `ProxyDefaults` CRDs.
+```
