@@ -3,8 +3,6 @@
 
 package common
 
-// +kubebuilder:skipversion
-
 type ExternalRouteFilter interface {
 	GetNamespace() string
 }
