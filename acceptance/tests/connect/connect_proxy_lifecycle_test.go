@@ -121,7 +121,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 			if testCfg.secure {
 				connHelper.TestConnectionFailureWithoutIntention(t)
-				connHelper.CreateIntention(t)
+				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
 			}
 
 			connHelper.TestConnectionSuccess(t)
