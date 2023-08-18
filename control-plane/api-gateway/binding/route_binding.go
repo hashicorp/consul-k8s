@@ -163,6 +163,31 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 			parent:  ref,
 			results: result,
 		})
+
+		httproute, ok := route.(*gwv1beta1.HTTPRoute)
+		if ok {
+			if !externalRefsOnRouteAllExist(httproute, r.config.Resources) {
+				results = append(results, parentBindResult{
+					parent: ref,
+					results: []bindResult{
+						{
+							err: errExternalRefNotFound,
+						},
+					},
+				})
+			}
+
+			if !externalRefsKindAllowedOnRoute(httproute) {
+				results = append(results, parentBindResult{
+					parent: ref,
+					results: []bindResult{
+						{
+							err: errInvalidExternalRefType,
+						},
+					},
+				})
+			}
+		}
 	}
 
 	updated := false
@@ -294,6 +319,7 @@ func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client
 			for parent := range parents.Iter() {
 				new.Parents = append(new.Parents, parent.(api.ResourceReference))
 			}
+
 			return new
 		})
 	case *gwv1alpha2.TCPRoute:

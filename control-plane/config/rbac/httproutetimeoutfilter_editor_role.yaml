@@ -1,0 +1,27 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# permissions for end users to edit httproutetimeoutfilters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: httproutetimeoutfilter-editor-role
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - httproutetimeoutfilters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - httproutetimeoutfilters/status
+  verbs:
+  - get
