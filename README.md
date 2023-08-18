@@ -1,4 +1,4 @@
-<h1>
+ <h1>
   <img src="./assets/logo.svg" align="left" height="46px" alt="Consul logo"/>
   <span>Consul on Kubernetes</span>
 </h1>
