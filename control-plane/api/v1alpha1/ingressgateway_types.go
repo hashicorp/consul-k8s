@@ -6,7 +6,6 @@ package v1alpha1
 import (
 	"encoding/json"
 	"fmt"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -77,6 +76,9 @@ type IngressServiceConfig struct {
 	// will be allowed at a single point in time. Use this to limit HTTP/2 traffic,
 	// since HTTP/2 has many requests per connection.
 	MaxConcurrentRequests *uint32 `json:"maxConcurrentRequests,omitempty"`
+	// PassiveHealthCheck configuration determines how upstream proxy instances will
+	// be monitored for removal from the load balancing pool.
+	PassiveHealthCheck *PassiveHealthCheck `json:"passiveHealthCheck,omitempty"`
 }
 
 type GatewayTLSConfig struct {
@@ -364,6 +366,7 @@ func (in IngressService) toConsul() capi.IngressService {
 		MaxConnections:        in.MaxConnections,
 		MaxPendingRequests:    in.MaxPendingRequests,
 		MaxConcurrentRequests: in.MaxConcurrentRequests,
+		PassiveHealthCheck:    in.PassiveHealthCheck.toConsul(),
 	}
 }
 
@@ -457,6 +460,7 @@ func (in *IngressServiceConfig) validate(path *field.Path) field.ErrorList {
 	if in.MaxPendingRequests != nil && *in.MaxPendingRequests <= 0 {
 		errs = append(errs, field.Invalid(path.Child("maxpendingrequests"), *in.MaxPendingRequests, "MaxPendingRequests must be > 0"))
 	}
+
 	return errs
 }
 
@@ -468,5 +472,6 @@ func (in *IngressServiceConfig) toConsul() *capi.IngressServiceConfig {
 		MaxConnections:        in.MaxConnections,
 		MaxPendingRequests:    in.MaxPendingRequests,
 		MaxConcurrentRequests: in.MaxConcurrentRequests,
+		PassiveHealthCheck:    in.PassiveHealthCheck.toConsul(),
 	}
 }
