@@ -355,15 +355,11 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 
 func TestTranslator_ToHTTPRoute(t *testing.T) {
 	t.Parallel()
-	type addExternalFilterArg struct {
-		localObject gwv1beta1.LocalObjectReference
-		filter      client.Object
-	}
 	type args struct {
 		k8sHTTPRoute    gwv1beta1.HTTPRoute
 		services        []types.NamespacedName
 		meshServices    []v1alpha1.MeshService
-		externalFilters []addExternalFilterArg
+		externalFilters []client.Object
 	}
 
 	tests := map[string]struct {
@@ -1302,51 +1298,38 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 				services: []types.NamespacedName{
 					{Name: "service one", Namespace: "other"},
 				},
-				externalFilters: []addExternalFilterArg{
-					{
-						localObject: gwv1beta1.LocalObjectReference{
-							Group: "consul.hashicorp.com/v1alpha1",
-							Kind:  v1alpha1.RouteRetryFilterKind,
-							Name:  "test",
+				externalFilters: []client.Object{
+					&v1alpha1.RouteRetryFilter{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.RouteRetryFilterKind,
+							APIVersion: "consul.hashicorp.com/v1alpha1",
 						},
-						filter: &v1alpha1.RouteRetryFilter{
-							TypeMeta: metav1.TypeMeta{
-								Kind:       v1alpha1.RouteRetryFilterKind,
-								APIVersion: "consul.hashicorp.com/v1alpha1",
-							},
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "test",
-								Namespace: "k8s-ns",
-							},
-							Spec: v1alpha1.RouteRetryFilterSpec{
-								NumRetries:            pointer.Uint32(3),
-								RetryOn:               []string{"cancelled"},
-								RetryOnStatusCodes:    []uint32{500, 502},
-								RetryOnConnectFailure: pointer.Bool(false),
-							},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test",
+							Namespace: "k8s-ns",
+						},
+						Spec: v1alpha1.RouteRetryFilterSpec{
+							NumRetries:            pointer.Uint32(3),
+							RetryOn:               []string{"cancelled"},
+							RetryOnStatusCodes:    []uint32{500, 502},
+							RetryOnConnectFailure: pointer.Bool(false),
 						},
 					},
-					{
-						localObject: gwv1beta1.LocalObjectReference{
-							Group: "consul.hashicorp.com/v1alpha1",
-							Kind:  v1alpha1.RouteRetryFilterKind,
-							Name:  "test",
+
+					&v1alpha1.RouteRetryFilter{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.RouteRetryFilterKind,
+							APIVersion: "consul.hashicorp.com/v1alpha1",
 						},
-						filter: &v1alpha1.RouteRetryFilter{
-							TypeMeta: metav1.TypeMeta{
-								Kind:       v1alpha1.RouteRetryFilterKind,
-								APIVersion: "consul.hashicorp.com/v1alpha1",
-							},
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "test",
-								Namespace: "other-namespace-even-though-same-name",
-							},
-							Spec: v1alpha1.RouteRetryFilterSpec{
-								NumRetries:            pointer.Uint32(3),
-								RetryOn:               []string{"don't"},
-								RetryOnStatusCodes:    []uint32{404},
-								RetryOnConnectFailure: pointer.Bool(true),
-							},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test",
+							Namespace: "other-namespace-even-though-same-name",
+						},
+						Spec: v1alpha1.RouteRetryFilterSpec{
+							NumRetries:            pointer.Uint32(3),
+							RetryOn:               []string{"don't"},
+							RetryOnStatusCodes:    []uint32{404},
+							RetryOnConnectFailure: pointer.Bool(true),
 						},
 					},
 				},
@@ -1435,7 +1418,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 			}
 
 			for _, filterToAdd := range tc.args.externalFilters {
-				resources.AddExternalFilter(filterToAdd.localObject, filterToAdd.filter)
+				resources.AddExternalFilter(filterToAdd)
 			}
 
 			got := tr.ToHTTPRoute(tc.args.k8sHTTPRoute, resources)

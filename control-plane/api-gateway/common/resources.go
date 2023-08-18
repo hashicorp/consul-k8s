@@ -373,13 +373,20 @@ func localObjectReferenceToObjectReference(filterRef gwv1beta1.LocalObjectRefere
 	}
 }
 
-func (s *ResourceMap) AddExternalFilter(filterRef gwv1beta1.LocalObjectReference, filter client.Object) {
+func objectToObjectReference(object client.Object) corev1.ObjectReference {
+	return corev1.ObjectReference{
+		Kind:      object.GetObjectKind().GroupVersionKind().Kind,
+		Name:      object.GetName(),
+		Namespace: object.GetNamespace(),
+	}
+}
+
+func (s *ResourceMap) AddExternalFilter(filter client.Object) {
 	if s.externalFilters == nil {
 		s.externalFilters = make(map[corev1.ObjectReference]client.Object)
 	}
 
-	key := localObjectReferenceToObjectReference(filterRef, filter.GetNamespace())
-
+	key := objectToObjectReference(filter)
 	s.externalFilters[key] = filter
 }
 

@@ -184,6 +184,9 @@ func (b bindResults) Condition() metav1.Condition {
 			case errors.Is(result.err, errRefNotPermitted):
 				// or if we have a ref not permitted, then use that
 				reason = "RefNotPermitted"
+			case errors.Is(result.err, errRouteNoMatchingParent):
+				// or if the route declares a parent that we can't find
+				reason = "NoMatchingParent"
 			case errors.Is(result.err, errExternalRefNotFound):
 				reason = "FilterNotFound"
 			case errors.Is(result.err, errInvalidExternalRefType):
