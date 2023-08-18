@@ -327,3 +327,140 @@ load _helpers
   actual=$(echo $object | jq '.volumeMounts[] | select(.name == "consul-ca-cert")')
   [ "${actual}" = "" ]
 }
+
+#--------------------------------------------------------------------
+# consul.validateResourceAPIs
+# These tests use test-runner.yaml to test the
+# consul.validateResourceAPIs helper since we need an existing template
+
+@test "connectInject/Deployment: fails if resource-apis is set and peering is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.peering.enabled=true' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, global.peering.enabled is currently unsupported." ]]
+}
+
+@test "connectInject/Deployment: fails if resource-apis is set and federation is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'global.tls.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.federation.enabled=true' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, global.federation.enabled is currently unsupported." ]]
+}
+
+@test "connectInject/Deployment: fails if resource-apis is set and cloud is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.resourceId.secretName=hello' \
+      --set 'global.cloud.resourceId.secretKey=hello' \
+      --set 'global.cloud.clientId.secretName=hello' \
+      --set 'global.cloud.clientId.secretKey=hello' \
+      --set 'global.cloud.clientSecret.secretName=hello' \
+      --set 'global.cloud.clientSecret.secretKey=hello' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, global.cloud.enabled is currently unsupported." ]]
+}
+
+@test "connectInject/Deployment: fails if resource-apis is set and client is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'client.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, client.enabled is currently unsupported." ]]
+}
+
+@test "connectInject/Deployment: fails if resource-apis is set and ui is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, ui.enabled is currently unsupported." ]]
+}
+
+@test "connectInject/Deployment: fails if resource-apis is set and syncCatalog is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'syncCatalog.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, syncCatalog.enabled is currently unsupported." ]]
+}
+
+@test "connectInject/Deployment: fails if resource-apis is set and meshGateway is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'meshGateway.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, meshGateway.enabled is currently unsupported." ]]
+}
+
+@test "connectInject/Deployment: fails if resource-apis is set and ingressGateways is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'ingressGateways.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, ingressGateways.enabled is currently unsupported." ]]
+}
+
+@test "connectInject/Deployment: fails if resource-apis is set and terminatingGateways is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'terminatingGateways.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported." ]]
+}
+
+@test "connectInject/Deployment: fails if resource-apis is set and apiGateway is enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'apiGateway.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, apiGateway.enabled is currently unsupported." ]]
+}
