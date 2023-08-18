@@ -27,6 +27,8 @@ const (
 	StaticClientName = "static-client"
 	StaticServerName = "static-server"
 	JobName          = "job-client"
+
+	retryTimeout = 120 * time.Second
 )
 
 // ConnectHelper configures a Consul cluster for connect injection tests.
@@ -49,6 +51,7 @@ type ConnectHelper struct {
 
 	// Ctx is used to deploy Consul
 	Ctx environment.TestContext
+
 	// UseAppNamespace is used top optionally deploy applications into a separate namespace.
 	// If unset, the namespace associated with Ctx is used.
 	UseAppNamespace bool
@@ -90,6 +93,8 @@ func (c *ConnectHelper) Upgrade(t *testing.T) {
 	c.consulCluster.Upgrade(t, c.helmValues())
 }
 
+// KubectlOptsForApp returns options using the -apps appended namespace if
+// UseAppNamespace is enabled. Otherwise, it returns the ctx options.
 func (c *ConnectHelper) KubectlOptsForApp(t *testing.T) *terratestK8s.KubectlOptions {
 	opts := c.Ctx.KubectlOptions(t)
 	if !c.UseAppNamespace {
@@ -110,7 +115,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		// deployments because golang will execute them in reverse order
 		// (i.e. the last registered cleanup function will be executed first).
 		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
+			retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
 				require.NoError(r, err)
@@ -155,7 +160,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
 	retry.RunWith(
-		&retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}, t,
+		&retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}, t,
 		func(r *retry.R) {
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
 				podList, err := c.Ctx.KubernetesClient(t).CoreV1().
@@ -247,6 +252,18 @@ func (c *ConnectHelper) DeployServer(t *testing.T) {
 	}
 }
 
+func (c *ConnectHelper) SetupNamespace(t *testing.T, namespace string) {
+	opts := c.KubectlOptsForApp(t)
+	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
+	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
+		return
+	}
+	require.NoError(t, err)
+	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
+		k8s.RunKubectl(t, opts, "delete", "ns", namespace)
+	})
+}
+
 // SetupAppNamespace creates a namespace where applications are deployed. This
 // does nothing if UseAppNamespace is not set. The app namespace is relevant
 // when testing with restricted PSA enforcement enabled.
@@ -257,14 +274,7 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 	opts := c.KubectlOptsForApp(t)
 	// If we are deploying apps in another namespace, create the namespace.
 
-	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", opts.Namespace)
-	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
-		return
-	}
-	require.NoError(t, err)
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, opts, "delete", "ns", opts.Namespace)
-	})
+	c.SetupNamespace(t, opts.Namespace)
 
 	if c.Cfg.EnableRestrictedPSAEnforcement {
 		// Allow anything to run in the app namespace.
@@ -273,7 +283,6 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 			"pod-security.kubernetes.io/enforce-version=v1.24",
 		)
 	}
-
 }
 
 // CreateResolverRedirect creates a resolver that redirects to a static-server, a corresponding k8s service,
@@ -307,26 +316,48 @@ func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clie
 	}
 }
 
+type IntentionOpts struct {
+	DestinationNamespace string
+	SourceNamespace      string
+}
+
 // CreateIntention creates an intention for the static-server pod to connect to
-// the static-client pod.
-func (c *ConnectHelper) CreateIntention(t *testing.T, clientType ...string) {
+// the static-client pod. opts parameter allows for overriding of some fields. If opts is empty
+// then all namespaces are the KubectlOptsForApp namespaces.
+func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts, clientType ...string) {
 	logger.Log(t, "creating intention")
 	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
 	if len(clientType) > 0 {
 		client = clientType[0]
 	}
-	_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
-		Kind: api.ServiceIntentions,
-		Name: StaticServerName,
-		Sources: []*api.SourceIntention{
-			{
-				Name:   client,
-				Action: api.IntentionActionAllow,
+
+	sourceNamespace := c.KubectlOptsForApp(t).Namespace
+	if opts.SourceNamespace != "" {
+		sourceNamespace = opts.SourceNamespace
+	}
+
+	destinationNamespace := c.KubectlOptsForApp(t).Namespace
+	if opts.SourceNamespace != "" {
+		destinationNamespace = opts.DestinationNamespace
+	}
+
+	retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+			Kind:      api.ServiceIntentions,
+			Name:      StaticServerName,
+			Namespace: destinationNamespace,
+			Sources: []*api.SourceIntention{
+				{
+					Namespace: sourceNamespace,
+					Name:      client,
+					Action:    api.IntentionActionAllow,
+				},
 			},
-		},
-	}, nil)
-	require.NoError(t, err)
+		}, nil)
+		require.NoError(r, err)
+	})
 }
 
 // TestConnectionSuccess ensures the static-server pod can connect to the
