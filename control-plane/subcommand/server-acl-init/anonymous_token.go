@@ -7,6 +7,11 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
+const (
+	AnonymousTokenPolicyName = "anonymous-token-policy"
+	AnonymousTokenAccessorID = "00000000-0000-0000-0000-000000000002"
+)
+
 // configureAnonymousPolicy sets up policies and tokens so that Consul DNS and
 // cross-datacenter Consul connect calls will work.
 func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
@@ -17,6 +22,7 @@ func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
 	if exists {
 		return nil
 	}
+
 	anonRules, err := c.anonymousTokenRules()
 	if err != nil {
 		c.log.Error("Error templating anonymous token rules", "err", err)
@@ -25,7 +31,7 @@ func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
 
 	// Create policy for the anonymous token
 	anonPolicy := api.ACLPolicy{
-		Name:        "anonymous-token-policy",
+		Name:        AnonymousTokenPolicyName,
 		Description: "Anonymous token Policy",
 		Rules:       anonRules,
 	}
@@ -40,7 +46,7 @@ func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
 
 	// Create token to get sent to TokenUpdate
 	aToken := api.ACLToken{
-		AccessorID: "00000000-0000-0000-0000-000000000002",
+		AccessorID: AnonymousTokenAccessorID,
 		Policies:   []*api.ACLTokenPolicyLink{{Name: anonPolicy.Name}},
 	}
 
@@ -53,24 +59,16 @@ func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
 }
 
 func checkIfAnonymousTokenPolicyExists(consulClient *api.Client) (bool, error) {
-	token, _, err := consulClient.ACL().TokenRead("00000000-0000-0000-0000-000000000002", nil)
+	token, _, err := consulClient.ACL().TokenRead(AnonymousTokenAccessorID, nil)
 	if err != nil {
 		return false, err
 	}
-	existingPolicies, _, err := consulClient.ACL().PolicyList(&api.QueryOptions{})
-	if err != nil {
-		return false, err
-	}
-	policyID := ""
-	for _, existingPolicy := range existingPolicies {
-		if existingPolicy.Name == "anonymous-token-policy" && existingPolicy.Description == "Anonymous token Policy" {
-			policyID = existingPolicy.ID
-		}
-	}
+
 	for _, policy := range token.Policies {
-		if policy.ID == policyID {
+		if policy.Name == AnonymousTokenPolicyName {
 			return true, nil
 		}
 	}
+
 	return false, nil
 }
