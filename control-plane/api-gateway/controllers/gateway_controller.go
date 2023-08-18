@@ -871,7 +871,7 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 		}
 
 		//add external ref (or error) to resource map for this route
-		resources.AddExternalFilter(*filter.ExtensionRef, externalFilter.(common.ExternalRouteFilter))
+		resources.AddExternalFilter(*filter.ExtensionRef, externalFilter.(client.Object))
 		externalFilters = append(externalFilters, externalFilter)
 	}
 	return externalFilters, nil

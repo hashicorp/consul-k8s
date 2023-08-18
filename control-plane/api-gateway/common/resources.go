@@ -115,7 +115,7 @@ type ResourceMap struct {
 	tcpRouteGateways      map[api.ResourceReference]*tcpRoute
 	httpRouteGateways     map[api.ResourceReference]*httpRoute
 	gatewayResources      map[api.ResourceReference]*resourceSet
-	externalFilters       map[corev1.ObjectReference]ExternalRouteFilter
+	externalFilters       map[corev1.ObjectReference]client.Object
 
 	// consul resources for a gateway
 	consulTCPRoutes  map[api.ResourceReference]*consulTCPRoute
@@ -373,15 +373,17 @@ func localObjectReferenceToObjectReference(filterRef gwv1beta1.LocalObjectRefere
 	}
 }
 
-func (s *ResourceMap) AddExternalFilter(filterRef gwv1beta1.LocalObjectReference, filter ExternalRouteFilter) {
+func (s *ResourceMap) AddExternalFilter(filterRef gwv1beta1.LocalObjectReference, filter client.Object) {
 	if s.externalFilters == nil {
-		s.externalFilters = make(map[corev1.ObjectReference]ExternalRouteFilter)
+		s.externalFilters = make(map[corev1.ObjectReference]client.Object)
 	}
+
 	key := localObjectReferenceToObjectReference(filterRef, filter.GetNamespace())
+
 	s.externalFilters[key] = filter
 }
 
-func (s *ResourceMap) GetExternalFilter(filterRef gwv1beta1.LocalObjectReference, namespace string) (ExternalRouteFilter, bool) {
+func (s *ResourceMap) GetExternalFilter(filterRef gwv1beta1.LocalObjectReference, namespace string) (client.Object, bool) {
 	key := localObjectReferenceToObjectReference(filterRef, namespace)
 	filter, ok := s.externalFilters[key]
 	return filter, ok

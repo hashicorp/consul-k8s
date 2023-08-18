@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"k8s.io/utils/pointer"
 	"math/big"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 	"testing"
 	"time"
@@ -356,7 +357,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 	t.Parallel()
 	type addExternalFilterArg struct {
 		localObject gwv1beta1.LocalObjectReference
-		filter      ExternalRouteFilter
+		filter      client.Object
 	}
 	type args struct {
 		k8sHTTPRoute    gwv1beta1.HTTPRoute
@@ -1331,7 +1332,22 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							Kind:  v1alpha1.RouteRetryFilterKind,
 							Name:  "test",
 						},
-						filter: &mockExternalRouteFilter{"differentnamespace"},
+						filter: &v1alpha1.RouteRetryFilter{
+							TypeMeta: metav1.TypeMeta{
+								Kind:       v1alpha1.RouteRetryFilterKind,
+								APIVersion: "consul.hashicorp.com/v1alpha1",
+							},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test",
+								Namespace: "other-namespace-even-though-same-name",
+							},
+							Spec: v1alpha1.RouteRetryFilterSpec{
+								NumRetries:            pointer.Uint32(3),
+								RetryOn:               []string{"don't"},
+								RetryOnStatusCodes:    []uint32{404},
+								RetryOnConnectFailure: pointer.Bool(true),
+							},
+						},
 					},
 				},
 			},
@@ -1428,14 +1444,6 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 			}
 		})
 	}
-}
-
-type mockExternalRouteFilter struct {
-	namespace string
-}
-
-func (m mockExternalRouteFilter) GetNamespace() string {
-	return m.namespace
 }
 
 func TestTranslator_ToTCPRoute(t *testing.T) {
