@@ -1,3 +1,0 @@
-```release-note:feature
-api-gateway: translate and validate TLS configuration options, including min/max version and cipher suites, setting Gateway status appropriately
-```

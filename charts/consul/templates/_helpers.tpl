@@ -15,21 +15,39 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+
 {{- define "consul.restrictedSecurityContext" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
+{{/*
+To be compatible with the 'restricted' Pod Security Standards profile, we
+should set this securityContext on containers whenever possible.
+
+In OpenShift < 4.11 the restricted SCC disallows setting most of these fields,
+so we do not set any for simplicity (and because that's how it was configured
+prior to adding restricted PSA support here). In OpenShift >= 4.11, the new
+restricted-v2 SCC allows setting these in the securityContext, and by setting
+them we avoid PSA warnings that are enabled by default.
+
+We use the K8s version as a proxy for the OpenShift version because there is a
+1:1 mapping of versions. OpenShift 4.11 corresponds to K8s 1.24.x.
+*/}}
+{{- if (or (not .Values.global.openshift.enabled) (and (ge .Capabilities.KubeVersion.Major "1") (ge .Capabilities.KubeVersion.Minor "24"))) -}}
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
     - ALL
+    add:
+    - NET_BIND_SERVICE
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
+{{- end -}}
 {{- if not .Values.global.openshift.enabled -}}
 {{/*
 We must set runAsUser or else the root user will be used in some cases and
 containers will fail to start due to runAsNonRoot above (e.g.
-tls-init-cleanup). On OpenShift, runAsUser is automatically. We pick user 100
+tls-init-cleanup). On OpenShift, runAsUser is set automatically. We pick user 100
 because it is a non-root user id that exists in the consul, consul-dataplane,
 and consul-k8s-control-plane images.
 */}}
@@ -96,6 +114,22 @@ and consul-k8s-control-plane images.
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
+{{- define "consul.controllerWebhookTLSCertTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-controller-webhook" $name }}"
+            "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.controllerWebhookTLSKeyTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-controller-webhook" $name }}"
+            "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.private_key -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
@@ -114,6 +148,12 @@ and consul-k8s-control-plane images.
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
 {{ printf "%s-connect-injector,%s-connect-injector.%s,%s-connect-injector.%s.svc,%s-connect-injector.%s.svc.cluster.local" $name $name $ns $name $ns $name $ns}}
+{{- end -}}
+
+{{- define "consul.controllerWebhookTLSAltNames" -}}
+{{- $name := include "consul.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{ printf "%s-controller-webhook,%s-controller-webhook.%s,%s-controller-webhook.%s.svc,%s-controller-webhook.%s.svc.cluster.local" $name $name $ns $name $ns $name $ns}}
 {{- end -}}
 
 {{- define "consul.vaultReplicationTokenTemplate" -}}
@@ -286,17 +326,20 @@ Fails when at least one but not all of the following have been set:
 - global.secretsBackend.vault.connectInjectRole
 - global.secretsBackend.vault.connectInject.tlsCert.secretName
 - global.secretsBackend.vault.connectInject.caCert.secretName
+- global.secretsBackend.vault.controllerRole
+- global.secretsBackend.vault.controller.tlsCert.secretName
+- global.secretsBackend.vault.controller.caCert.secretName
 
 The above values are needed in full to turn off web cert manager and allow
-connect inject to manage its own webhook certs.
+connect inject and controller to manage its own webhook certs.
 
 Usage: {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 
 */}}
 {{- define "consul.validateVaultWebhookCertConfiguration" -}}
-{{- if or .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName}}
-{{- if or (not .Values.global.secretsBackend.vault.connectInjectRole) (not .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) (not .Values.global.secretsBackend.vault.connectInject.caCert.secretName) }}
-{{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName"}}
+{{- if or .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.controllerRole .Values.global.secretsBackend.vault.controller.tlsCert.secretName .Values.global.secretsBackend.vault.controller.caCert.secretName}}
+{{- if or (not .Values.global.secretsBackend.vault.connectInjectRole) (not .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) (not .Values.global.secretsBackend.vault.connectInject.caCert.secretName) (not .Values.global.secretsBackend.vault.controllerRole) (not .Values.global.secretsBackend.vault.controller.tlsCert.secretName) (not .Values.global.secretsBackend.vault.controller.caCert.secretName) }}
+{{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.controllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName."}}
 {{ end }}
 {{ end }}
 {{- end -}}
@@ -358,7 +401,7 @@ Consul server environment variables for consul-k8s commands.
 {{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
 - name: CONSUL_SKIP_SERVER_WATCH
-  value: "true"
+  value: "true" 
 {{- end }}
 {{- end -}}
 
@@ -389,7 +432,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 */}}
 {{- define "consul.validateCloudSecretKeys" -}}
-{{- if and .Values.global.cloud.enabled }}
+{{- if and .Values.global.cloud.enabled }} 
 {{- if or (and .Values.global.cloud.resourceId.secretName (not .Values.global.cloud.resourceId.secretKey)) (and .Values.global.cloud.resourceId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
 {{fail "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set."}}
 {{- end }}
@@ -411,38 +454,3 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 {{- end }}
 {{- end -}}
 
-
-{{/*
-Fails if temeletryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
-- telemetryCollector.cloud.clientId.secretName
-- telemetryCollector.cloud.clientSecret.secretName
-- global.cloud.resourceId.secretName
-
-Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
-
-*/}}
-{{- define "consul.validateTelemetryCollectorCloud" -}}
-{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
-{{- end }}
-{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, global.cloud.resourceId.secretName,telemetryCollector.cloud.clientId.secretName must also be set."}}
-{{- end }}
-{{- end }}
-
-{{/**/}}
-
-{{- define "consul.validateTelemetryCollectorCloudSecretKeys" -}}
-{{- if or (and .Values.telemetryCollector.cloud.clientId.secretName (not .Values.telemetryCollector.cloud.clientId.secretKey)) (and .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.telemetryCollector.cloud.clientId.secretName)) }}
-{{fail "When either telemetryCollector.cloud.clientId.secretName or telemetryCollector.cloud.clientId.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName (not .Values.telemetryCollector.cloud.clientSecret.secretKey)) (and .Values.telemetryCollector.cloud.clientSecret.secretKey (not .Values.telemetryCollector.cloud.clientSecret.secretName)) }}
-{{fail "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
-{{fail "When telemetryCollector has clientId and clientSecret global.cloud.resourceId.secretName must be set"}}
-{{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretKey)) }}
-{{fail "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set"}}
-{{- end }}
-{{- end -}}

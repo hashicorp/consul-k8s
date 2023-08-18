@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package connhelper
 
 import (
@@ -133,22 +130,22 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 		// TODO: A base fixture is the wrong place for these files
 		k8s.KubectlApply(t, opts, "../fixtures/bases/openshift/")
-		helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
+		helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
 			k8s.KubectlDelete(t, opts, "../fixtures/bases/openshift/")
 		})
 
-		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
 		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
 		} else {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
 		}
 	} else {
-		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 		} else {
-			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 		}
 	}
 	// Check that both static-server and static-client have been injected and
@@ -185,7 +182,7 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 		return
 	}
 	require.NoError(t, err)
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
+	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
 		k8s.RunKubectl(t, opts, "delete", "ns", opts.Namespace)
 	})
 
@@ -197,20 +194,6 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 		)
 	}
 
-}
-
-// CreateResolverRedirect creates a resolver that redirects to a static-server, a corresponding k8s service,
-// and intentions. This helper is primarly used to ensure that the virtual-ips are persisted to consul properly.
-func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
-	logger.Log(t, "creating resolver redirect")
-	opts := c.KubectlOptsForApp(t)
-	c.SetupAppNamespace(t)
-	kustomizeDir := "../fixtures/cases/resolver-redirect-virtualip"
-	k8s.KubectlApplyK(t, opts, kustomizeDir)
-
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
-		k8s.KubectlDeleteK(t, opts, kustomizeDir)
-	})
 }
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static

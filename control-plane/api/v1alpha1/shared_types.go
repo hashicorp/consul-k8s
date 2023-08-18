@@ -1,10 +1,6 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -15,9 +11,6 @@ import (
 )
 
 // This file contains structs that are shared between multiple config entries.
-
-// metaValueMaxLength is the maximum allowed string length of a metadata value.
-const metaValueMaxLength = 512
 
 type MeshGatewayMode string
 
@@ -58,35 +51,6 @@ type TransparentProxy struct {
 	DialedDirectly bool `json:"dialedDirectly,omitempty"`
 }
 
-type MutualTLSMode string
-
-const (
-	// MutualTLSModeDefault represents no specific mode and should
-	// be used to indicate that a different layer of the configuration
-	// chain should take precedence.
-	MutualTLSModeDefault MutualTLSMode = ""
-
-	// MutualTLSModeStrict requires mTLS for incoming traffic.
-	MutualTLSModeStrict MutualTLSMode = "strict"
-
-	// MutualTLSModePermissive allows incoming non-mTLS traffic.
-	MutualTLSModePermissive MutualTLSMode = "permissive"
-)
-
-func (m MutualTLSMode) validate() error {
-	switch m {
-	case MutualTLSModeDefault, MutualTLSModeStrict, MutualTLSModePermissive:
-		return nil
-	}
-	return fmt.Errorf("Must be one of %q, %q, or %q.",
-		MutualTLSModeDefault, MutualTLSModeStrict, MutualTLSModePermissive,
-	)
-}
-
-func (m MutualTLSMode) toConsul() capi.MutualTLSMode {
-	return capi.MutualTLSMode(m)
-}
-
 // MeshGateway controls how Mesh Gateways are used for upstream Connect
 // services.
 type MeshGateway struct {
@@ -114,19 +78,6 @@ type HTTPHeaderModifiers struct {
 	// or response.
 	Remove []string `json:"remove,omitempty"`
 }
-
-// EnvoyExtension has configuration for an extension that patches Envoy resources.
-type EnvoyExtension struct {
-	Name     string `json:"name,omitempty"`
-	Required bool   `json:"required,omitempty"`
-	// +kubebuilder:validation:Type=object
-	// +kubebuilder:validation:Schemaless
-	// +kubebuilder:pruning:PreserveUnknownFields
-	Arguments json.RawMessage `json:"arguments,omitempty"`
-}
-
-// EnvoyExtensions represents a list of the EnvoyExtension configuration.
-type EnvoyExtensions []EnvoyExtension
 
 func (in MeshGateway) toConsul() capi.MeshGatewayConfig {
 	mode := capi.MeshGatewayMode(in.Mode)
@@ -223,91 +174,6 @@ func (in *HTTPHeaderModifiers) toConsul() *capi.HTTPHeaderModifiers {
 		Set:    in.Set,
 		Remove: in.Remove,
 	}
-}
-
-func (in EnvoyExtensions) toConsul() []capi.EnvoyExtension {
-	if in == nil {
-		return nil
-	}
-
-	outConfig := make([]capi.EnvoyExtension, 0)
-
-	for _, e := range in {
-		consulExtension := capi.EnvoyExtension{
-			Name:     e.Name,
-			Required: e.Required,
-		}
-
-		// We already validate that arguments is present
-		var args map[string]interface{}
-		_ = json.Unmarshal(e.Arguments, &args)
-		consulExtension.Arguments = args
-		outConfig = append(outConfig, consulExtension)
-	}
-
-	return outConfig
-}
-
-func (in EnvoyExtensions) validate(path *field.Path) field.ErrorList {
-	if len(in) == 0 {
-		return nil
-	}
-
-	var errs field.ErrorList
-	for i, e := range in {
-		if err := e.validate(path.Child("envoyExtension").Index(i)); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	return errs
-}
-
-func (in EnvoyExtension) validate(path *field.Path) *field.Error {
-	// Validate that the arguments are not nil
-	if in.Arguments == nil {
-		err := field.Required(path.Child("arguments"), "arguments must be defined")
-		return err
-	}
-	// Validate that the arguments are valid json
-	var outConfig map[string]interface{}
-	if err := json.Unmarshal(in.Arguments, &outConfig); err != nil {
-		return field.Invalid(path.Child("arguments"), string(in.Arguments), fmt.Sprintf(`must be valid map value: %s`, err))
-	}
-	return nil
-}
-
-// FailoverPolicy specifies the exact mechanism used for failover.
-type FailoverPolicy struct {
-	// Mode specifies the type of failover that will be performed. Valid values are
-	// "sequential", "" (equivalent to "sequential") and "order-by-locality".
-	Mode string `json:"mode,omitempty"`
-	// Regions is the ordered list of the regions of the failover targets.
-	// Valid values can be "us-west-1", "us-west-2", and so on.
-	Regions []string `json:"regions,omitempty"`
-}
-
-func (in *FailoverPolicy) toConsul() *capi.ServiceResolverFailoverPolicy {
-	if in == nil {
-		return nil
-	}
-
-	return &capi.ServiceResolverFailoverPolicy{
-		Mode:    in.Mode,
-		Regions: in.Regions,
-	}
-}
-
-func (in *FailoverPolicy) validate(path *field.Path) field.ErrorList {
-	var errs field.ErrorList
-	if in == nil {
-		return nil
-	}
-	modes := []string{"", "sequential", "order-by-locality"}
-	if !sliceContains(modes, in.Mode) {
-		errs = append(errs, field.Invalid(path.Child("mode"), in.Mode, notInSliceMessage(modes)))
-	}
-	return errs
 }
 
 func notInSliceMessage(slice []string) string {

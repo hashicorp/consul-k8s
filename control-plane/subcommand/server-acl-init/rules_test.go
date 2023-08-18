@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package serveraclinit
 
 import (
@@ -146,7 +143,6 @@ func TestAPIGatewayControllerRules(t *testing.T) {
 	cases := []struct {
 		Name             string
 		EnableNamespaces bool
-		Partition        string
 		Expected         string
 	}{
 		{
@@ -169,7 +165,6 @@ acl = "write"
 operator = "write"
 acl = "write"
 namespace_prefix "" {
-  policy = "write"
   service_prefix "" {
     policy = "write"
     intentions = "write"
@@ -177,26 +172,6 @@ namespace_prefix "" {
   node_prefix "" {
     policy = "read"
   }
-}`,
-		},
-		{
-			Name:             "Namespaces are enabled, partitions enabled",
-			EnableNamespaces: true,
-			Partition:        "Default",
-			Expected: `
-partition "Default" {
-  mesh = "write"
-  acl = "write"
-namespace_prefix "" {
-  policy = "write"
-  service_prefix "" {
-    policy = "write"
-    intentions = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-}
 }`,
 		},
 	}
@@ -205,9 +180,7 @@ namespace_prefix "" {
 		t.Run(tt.Name, func(t *testing.T) {
 			cmd := Command{
 				flagEnableNamespaces: tt.EnableNamespaces,
-				consulFlags: &flags.ConsulFlags{
-					Partition: tt.Partition,
-				},
+				consulFlags:          &flags.ConsulFlags{},
 			}
 
 			meshGatewayRules, err := cmd.apiGatewayControllerRules()
@@ -953,7 +926,6 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    false,
 			Expected: `
-  mesh = "write"
   operator = "write"
   acl = "write"
   node_prefix "" {
@@ -970,7 +942,6 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    false,
 			Expected: `
-  mesh = "write"
   operator = "write"
   acl = "write"
   node_prefix "" {
@@ -989,7 +960,6 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    true,
 			Expected: `
-  mesh = "write"
   operator = "write"
   acl = "write"
   peering = "write"

@@ -10,4 +10,5 @@ elif [[ !"${VERSION}" == *"hashicorp/consul:"* ]]; then
 	VERSION=$(echo ${VERSION} | sed "s/consul:/consul-enterprise:/g" | sed "s/$/-ent/g")
 fi
 
+
 echo "${VERSION}"
