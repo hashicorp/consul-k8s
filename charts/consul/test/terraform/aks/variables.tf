@@ -6,6 +6,11 @@ variable "location" {
   description = "The location to launch this AKS cluster in."
 }
 
+variable "kubernetes_version" {
+  default     = "1.25.17"
+  description = "Kubernetes version supported on AKS (1.25.17 Released August 2nd, 2023)"
+}
+
 variable "client_id" {
   default     = ""
   description = "The client ID of the service principal to be used by Kubernetes when creating Azure resources like load balancers."
