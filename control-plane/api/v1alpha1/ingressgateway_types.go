@@ -460,7 +460,6 @@ func (in *IngressServiceConfig) validate(path *field.Path) field.ErrorList {
 	if in.MaxPendingRequests != nil && *in.MaxPendingRequests <= 0 {
 		errs = append(errs, field.Invalid(path.Child("maxpendingrequests"), *in.MaxPendingRequests, "MaxPendingRequests must be > 0"))
 	}
-
 	return errs
 }
 

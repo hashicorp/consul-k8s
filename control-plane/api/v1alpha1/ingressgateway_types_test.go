@@ -4,7 +4,6 @@
 package v1alpha1
 
 import (
-	"k8s.io/utils/pointer"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 func TestIngressGateway_MatchesConsul(t *testing.T) {
