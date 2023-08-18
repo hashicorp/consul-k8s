@@ -431,6 +431,67 @@ func routeAllowedForListenerHostname(hostname *gwv1beta1.Hostname, hostnames []g
 	return false
 }
 
+// externalRefsOnRouteAllExist checks to make sure that all external filters referenced by the route exist in the resource map.
+func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.ResourceMap) bool {
+	for _, rule := range route.Spec.Rules {
+		for _, filter := range rule.Filters {
+			if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef {
+				continue
+			}
+
+			if !resources.ExternalFilterExists(*filter.ExtensionRef, route.Namespace) {
+				return false
+			}
+
+		}
+
+		for _, backendRef := range rule.BackendRefs {
+			for _, filter := range backendRef.Filters {
+				if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef {
+					continue
+				}
+
+				if !resources.ExternalFilterExists(*filter.ExtensionRef, route.Namespace) {
+					return false
+				}
+			}
+
+		}
+	}
+
+	return true
+}
+
+// externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.
+func externalRefsKindAllowedOnRoute(route *gwv1beta1.HTTPRoute) bool {
+	for _, rule := range route.Spec.Rules {
+		if !filtersAllAllowedType(rule.Filters) {
+			return false
+		}
+
+		//same thing but for backendref
+		for _, backendRef := range rule.BackendRefs {
+			if !filtersAllAllowedType(backendRef.Filters) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func filtersAllAllowedType(filters []gwv1beta1.HTTPRouteFilter) bool {
+	for _, filter := range filters {
+		if filter.ExtensionRef == nil {
+			continue
+		}
+
+		if !common.FilterIsExternalFilter(filter) {
+			return false
+		}
+	}
+	return true
+}
+
 // hostnameMatch checks that an individual hostname matches another hostname for
 // compatibility.
 func hostnamesMatch(a gwv1alpha2.Hostname, b gwv1beta1.Hostname) bool {

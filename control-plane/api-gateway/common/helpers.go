@@ -4,6 +4,7 @@
 package common
 
 import (
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,6 +26,24 @@ func EmptyOrEqual(v, check string) bool {
 
 func NilOrEqual[T ~string](v *T, check string) bool {
 	return v == nil || string(*v) == check
+}
+
+func FilterIsExternalFilter(filter gwv1beta1.HTTPRouteFilter) bool {
+	if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef {
+		return false
+	}
+
+	if !DerefEqual(&filter.ExtensionRef.Group, v1alpha1.ConsulHashicorpGroup) {
+		return false
+	}
+
+	switch filter.ExtensionRef.Kind {
+	case v1alpha1.RouteRetryFilterKind, v1alpha1.RouteTimeoutFilterKind:
+		return true
+	}
+
+	return false
+
 }
 
 func IndexedNamespacedNameWithDefault[T ~string, U ~string, V ~string](t T, u *U, v V) types.NamespacedName {

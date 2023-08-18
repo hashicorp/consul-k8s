@@ -5,6 +5,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -456,6 +457,14 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			// Subscribe to changes from Consul for InlineCertificates
 			&source.Channel{Source: c.Subscribe(ctx, api.InlineCertificate, r.transformConsulInlineCertificate(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
+		).
+		Watches(
+			source.NewKindWithCache((&v1alpha1.RouteRetryFilter{}), mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteRetryFilter(ctx)),
+		).
+		Watches(
+			source.NewKindWithCache((&v1alpha1.RouteTimeoutFilter{}), mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteTimeoutFilter(ctx)),
 		).Complete(r)
 }
 
@@ -572,6 +581,20 @@ func (r *GatewayController) transformConsulHTTPRoute(ctx context.Context) func(e
 	}
 }
 
+// transformRouteRetryFilter will return a list of routes that need to be reconciled.
+func (r *GatewayController) transformRouteRetryFilter(ctx context.Context) func(object client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteRetryFilterIndex, client.ObjectKeyFromObject(o).String())
+	}
+}
+
+// transformTimeoutRetryFilter will return a list of routes that need to be reconciled.
+func (r *GatewayController) transformRouteTimeoutFilter(ctx context.Context) func(object client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteTimeoutFilterIndex, client.ObjectKeyFromObject(o).String())
+	}
+}
+
 func (r *GatewayController) transformConsulTCPRoute(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
 	return func(entry api.ConfigEntry) []types.NamespacedName {
 		parents := mapset.NewSet()
@@ -660,15 +683,17 @@ func (r *GatewayController) transformEndpoints(ctx context.Context) func(o clien
 func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tcpIndex, httpIndex, key string) []reconcile.Request {
 	requestSet := make(map[types.NamespacedName]struct{})
 
-	tcpRouteList := &gwv1alpha2.TCPRouteList{}
-	if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(tcpIndex, key),
-	}); err != nil {
-		r.Log.Error(err, "unable to list TCPRoutes")
-	}
-	for _, route := range tcpRouteList.Items {
-		for _, ref := range common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs) {
-			requestSet[ref] = struct{}{}
+	if tcpIndex != "" {
+		tcpRouteList := &gwv1alpha2.TCPRouteList{}
+		if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(tcpIndex, key),
+		}); err != nil {
+			r.Log.Error(err, "unable to list TCPRoutes")
+		}
+		for _, route := range tcpRouteList.Items {
+			for _, ref := range common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs) {
+				requestSet[ref] = struct{}{}
+			}
 		}
 	}
 
@@ -777,9 +802,79 @@ func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway ty
 
 	for _, route := range list.Items {
 		resources.ReferenceCountHTTPRoute(route)
+
+		_, err := c.getExternalFiltersForHTTPRoute(ctx, route, resources)
+		if err != nil {
+			c.Log.Error(err, "unable to list HTTPRoute ExternalFilters")
+			return nil, err
+		}
 	}
 
 	return list.Items, nil
+}
+
+func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, route gwv1beta1.HTTPRoute, resources *common.ResourceMap) ([]interface{}, error) {
+	var externalFilters []interface{}
+	for _, rule := range route.Spec.Rules {
+		ruleFilters, err := c.filterFiltersForExternalRefs(ctx, route, rule.Filters, resources)
+		if err != nil {
+			return nil, err
+		}
+		externalFilters = append(externalFilters, ruleFilters...)
+
+		for _, backendRef := range rule.BackendRefs {
+			backendRefFilter, err := c.filterFiltersForExternalRefs(ctx, route, backendRef.Filters, resources)
+			if err != nil {
+				return nil, err
+			}
+
+			externalFilters = append(externalFilters, backendRefFilter...)
+		}
+	}
+
+	return externalFilters, nil
+}
+
+func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, route gwv1beta1.HTTPRoute, filters []gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap) ([]interface{}, error) {
+	var externalFilters []interface{}
+
+	for _, filter := range filters {
+		var externalFilter client.Object
+
+		//check to see if we need to grab this filter
+		if filter.ExtensionRef == nil {
+			continue
+		}
+		switch kind := filter.ExtensionRef.Kind; kind {
+		case v1alpha1.RouteRetryFilterKind:
+			externalFilter = &v1alpha1.RouteRetryFilter{}
+		case v1alpha1.RouteTimeoutFilterKind:
+			externalFilter = &v1alpha1.RouteTimeoutFilter{}
+		default:
+			continue
+		}
+
+		//get object from API
+		err := c.Client.Get(ctx, client.ObjectKey{
+			Name:      string(filter.ExtensionRef.Name),
+			Namespace: route.Namespace,
+		}, externalFilter)
+
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				c.Log.Info(fmt.Sprintf("externalref %s:%s not found: %v", filter.ExtensionRef.Kind, filter.ExtensionRef.Name, err))
+				//ignore, the validation call should mark this route as error
+				continue
+			} else {
+				return nil, err
+			}
+		}
+
+		//add external ref (or error) to resource map for this route
+		resources.AddExternalFilter(externalFilter)
+		externalFilters = append(externalFilters, externalFilter)
+	}
+	return externalFilters, nil
 }
 
 func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1alpha2.TCPRoute, error) {
@@ -945,6 +1040,7 @@ func (c *GatewayController) fetchMeshService(ctx context.Context, resources *com
 }
 
 func (c *GatewayController) fetchServicesForEndpoints(ctx context.Context, resources *common.ResourceMap, key types.NamespacedName) error {
+
 	if shouldIgnore(key.Namespace, c.denyK8sNamespacesSet, c.allowK8sNamespacesSet) {
 		return nil
 	}
@@ -972,6 +1068,7 @@ func (c *GatewayController) fetchServicesForEndpoints(ctx context.Context, resou
 				}
 
 				resources.AddService(key, serviceName(pod, endpoints))
+
 			}
 		}
 	}

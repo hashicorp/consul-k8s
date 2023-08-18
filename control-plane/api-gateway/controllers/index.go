@@ -28,6 +28,8 @@ const (
 	TCPRoute_MeshServiceIndex            = "__tcproute_referencing_mesh_service"
 	MeshService_PeerIndex                = "__meshservice_referencing_peer"
 	Secret_GatewayIndex                  = "__secret_referencing_gateway"
+	HTTPRoute_RouteRetryFilterIndex      = "__httproute_referencing_retryfilter"
+	HTTPRoute_RouteTimeoutFilterIndex    = "__httproute_referencing_timeoutfilter"
 )
 
 // RegisterFieldIndexes registers all of the field indexes for the API gateway controllers.
@@ -103,6 +105,16 @@ var indexes = []index{
 		name:        MeshService_PeerIndex,
 		target:      &v1alpha1.MeshService{},
 		indexerFunc: peersForMeshService,
+	},
+	{
+		name:        HTTPRoute_RouteRetryFilterIndex,
+		target:      &gwv1beta1.HTTPRoute{},
+		indexerFunc: filtersForHTTPRoute,
+	},
+	{
+		name:        HTTPRoute_RouteTimeoutFilterIndex,
+		target:      &gwv1beta1.HTTPRoute{},
+		indexerFunc: filtersForHTTPRoute,
 	},
 }
 
@@ -270,4 +282,46 @@ func gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference, status
 		}
 	}
 	return references
+}
+
+func filtersForHTTPRoute(o client.Object) []string {
+	route := o.(*gwv1beta1.HTTPRoute)
+	filters := []string{}
+	var nilString *string
+
+	for _, rule := range route.Spec.Rules {
+	FILTERS_LOOP:
+		for _, filter := range rule.Filters {
+			if common.FilterIsExternalFilter(filter) {
+				//TODO this seems like its type agnostic, so this might just work without having to make
+				//multiple index functions per custom filter type?
+
+				//index external filters
+				filter := common.IndexedNamespacedNameWithDefault(string(filter.ExtensionRef.Name), nilString, route.Namespace).String()
+				for _, member := range filters {
+					if member == filter {
+						continue FILTERS_LOOP
+					}
+				}
+				filters = append(filters, filter)
+			}
+		}
+
+		//same thing but over the backend refs
+	BACKEND_LOOP:
+		for _, ref := range rule.BackendRefs {
+			for _, filter := range ref.Filters {
+				if common.FilterIsExternalFilter(filter) {
+					filter := common.IndexedNamespacedNameWithDefault(string(filter.ExtensionRef.Name), nilString, route.Namespace).String()
+					for _, member := range filters {
+						if member == filter {
+							continue BACKEND_LOOP
+						}
+					}
+					filters = append(filters, filter)
+				}
+			}
+		}
+	}
+	return filters
 }
