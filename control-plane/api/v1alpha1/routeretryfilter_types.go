@@ -30,14 +30,14 @@ type RouteRetryFilter struct {
 
 //+kubebuilder:object:root=true
 
-// RouteRetryFilterList contains a list of RouteRetryFilter
+// RouteRetryFilterList contains a list of RouteRetryFilter.
 type RouteRetryFilterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []RouteRetryFilter `json:"items"`
 }
 
-// RouteRetryFilterSpec defines the desired state of RouteRetryFilter
+// RouteRetryFilterSpec defines the desired state of RouteRetryFilter.
 type RouteRetryFilterSpec struct {
 	// +kubebuilder:validation:Minimum:=0
 	// +kubebuilder:validation:Optional

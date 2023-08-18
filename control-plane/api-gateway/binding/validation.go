@@ -431,7 +431,7 @@ func routeAllowedForListenerHostname(hostname *gwv1beta1.Hostname, hostnames []g
 	return false
 }
 
-// externalRefsOnRouteAllExist
+// externalRefsOnRouteAllExist checks to make sure that all external filters referenced by the route exist in the resource map.
 func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.ResourceMap) bool {
 	for _, rule := range route.Spec.Rules {
 		for _, filter := range rule.Filters {
@@ -462,7 +462,7 @@ func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.R
 	return true
 }
 
-// externalRefsKindAllowedOnRoute
+// externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.
 func externalRefsKindAllowedOnRoute(route *gwv1beta1.HTTPRoute) bool {
 	for _, rule := range route.Spec.Rules {
 		if !filtersAllAllowedType(rule.Filters) {

@@ -31,14 +31,14 @@ type RouteTimeoutFilter struct {
 
 //+kubebuilder:object:root=true
 
-// RouteTimeoutFilterList contains a list of RouteTimeoutFilter
+// RouteTimeoutFilterList contains a list of RouteTimeoutFilter.
 type RouteTimeoutFilterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []RouteTimeoutFilter `json:"items"`
 }
 
-// RouteTimeoutFilterSpec defines the desired state of RouteTimeoutFilter
+// RouteTimeoutFilterSpec defines the desired state of RouteTimeoutFilter.
 type RouteTimeoutFilterSpec struct {
 	// +kubebuilder:validation:Optional
 	RequestTimeout time.Duration `json:"requestTimeout"`

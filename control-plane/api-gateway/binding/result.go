@@ -123,7 +123,6 @@ func (e routeValidationResults) Condition() metav1.Condition {
 type bindResult struct {
 	section gwv1beta1.SectionName
 	err     error
-	message string
 }
 
 // bindResults holds the results of attempting to bind a route to a gateway, having a separate
