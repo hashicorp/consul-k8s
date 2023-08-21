@@ -122,6 +122,14 @@ func KubectlScale(t *testing.T, options *k8s.KubectlOptions, deployment string, 
 	require.NoError(t, err)
 }
 
+// KubectlLabel takes an object and applies the given label to it.
+// Example: `KubectlLabel(t, options, "node", nodeId, corev1.LabelTopologyRegion, "us-east-1")`.
+func KubectlLabel(t *testing.T, options *k8s.KubectlOptions, objectType string, objectId string, key string, value string) {
+	// `kubectl label` doesn't support timeouts
+	_, err := RunKubectlAndGetOutputE(t, options, "label", objectType, objectId, "--overwrite", fmt.Sprintf("%s=%s", key, value))
+	require.NoError(t, err)
+}
+
 // RunKubectl runs an arbitrary kubectl command provided via args and ignores the output.
 // If there's an error running the command, fail the test.
 func RunKubectl(t *testing.T, options *k8s.KubectlOptions, args ...string) {
