@@ -546,7 +546,7 @@ externalServers:
   # If you are setting `global.acls.manageSystemACLs` and
   # `connectInject.enabled` to true, set `k8sAuthMethodHost` to the address of the Kubernetes API server.
   # This address must be reachable from the Consul servers.
-  # Please see the Kubernetes Auth Method documentation (https://consul.io/docs/acl/auth-methods/kubernetes).
+  # Please see the Kubernetes Auth Method documentation (https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
   # Requires consul-k8s >= 0.14.0.
   #
   # You could retrieve this value from your `kubeconfig` by running:
@@ -888,7 +888,7 @@ syncCatalog:
 
   # If true, all valid services in K8S are
   # synced by default. If false, the service must be annotated
-  # (https://consul.io/docs/k8s/service-sync#sync-enable-disable) properly to sync.
+  # (https://developer.hashicorp.com/consul/docs/k8s/service-sync) properly to sync.
   # In either case an annotation can override the default.
   default: true
 
@@ -1075,7 +1075,7 @@ connectInject:
 
   # If true, the injector will inject the
   # Connect sidecar into all pods by default. Otherwise, pods must specify the
-  # injection annotation (https://consul.io/docs/k8s/connect#consul-hashicorp-com-connect-inject)
+  # injection annotation (https://developer.hashicorp.com/consul/docs/k8s/connect)
   # to opt-in to Connect injection. If this is true, pods can use the same annotation
   # to explicitly opt-out of injection.
   default: false
