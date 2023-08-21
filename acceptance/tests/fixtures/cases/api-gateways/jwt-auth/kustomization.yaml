@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: MPL-2.0
 
 resources:
-  - ../../../bases/api-gateway
-  - ../../static-server-inject
-  - ./httproute.yaml
-  - ./jwt-provider.yaml
+- ../../../bases/api-gateway
+- ../../static-server-inject
+- ./httproute.yaml
+- ./jwt-provider.yaml
 
-patchesStrategicMerge:
-  - httproute-no-auth.yaml
-  - api-gateway.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+patches:
+- patch: httproute-no-auth.yaml
+- path: api-gateway.yaml
