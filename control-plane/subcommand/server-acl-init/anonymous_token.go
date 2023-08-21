@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	AnonymousTokenPolicyName = "anonymous-token-policy"
-	AnonymousTokenAccessorID = "00000000-0000-0000-0000-000000000002"
+	anonymousTokenPolicyName = "anonymous-token-policy"
+	anonymousTokenAccessorID = "00000000-0000-0000-0000-000000000002"
 )
 
 // configureAnonymousPolicy sets up policies and tokens so that Consul DNS and
@@ -31,7 +31,7 @@ func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
 
 	// Create policy for the anonymous token
 	anonPolicy := api.ACLPolicy{
-		Name:        AnonymousTokenPolicyName,
+		Name:        anonymousTokenPolicyName,
 		Description: "Anonymous token Policy",
 		Rules:       anonRules,
 	}
@@ -46,7 +46,7 @@ func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
 
 	// Create token to get sent to TokenUpdate
 	aToken := api.ACLToken{
-		AccessorID: AnonymousTokenAccessorID,
+		AccessorID: anonymousTokenAccessorID,
 		Policies:   []*api.ACLTokenPolicyLink{{Name: anonPolicy.Name}},
 	}
 
@@ -59,13 +59,13 @@ func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
 }
 
 func checkIfAnonymousTokenPolicyExists(consulClient *api.Client) (bool, error) {
-	token, _, err := consulClient.ACL().TokenRead(AnonymousTokenAccessorID, nil)
+	token, _, err := consulClient.ACL().TokenRead(anonymousTokenAccessorID, nil)
 	if err != nil {
 		return false, err
 	}
 
 	for _, policy := range token.Policies {
-		if policy.Name == AnonymousTokenPolicyName {
+		if policy.Name == anonymousTokenPolicyName {
 			return true, nil
 		}
 	}
