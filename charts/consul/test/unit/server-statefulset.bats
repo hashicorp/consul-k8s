@@ -856,7 +856,8 @@ load _helpers
   local expected=$(echo '{
     "allowPrivilegeEscalation": false,
     "capabilities": {
-      "drop": ["ALL"]
+      "drop": ["ALL"],
+      "add": ["NET_BIND_SERVICE"]
     },
     "runAsNonRoot": true,
     "seccompProfile": {
@@ -887,7 +888,8 @@ load _helpers
   local expected=$(echo '{
     "allowPrivilegeEscalation": false,
     "capabilities": {
-      "drop": ["ALL"]
+      "drop": ["ALL"],
+      "add": ["NET_BIND_SERVICE"]
     },
     "runAsNonRoot": true,
     "seccompProfile": {
