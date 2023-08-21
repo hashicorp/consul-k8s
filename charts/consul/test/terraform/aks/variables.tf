@@ -7,8 +7,8 @@ variable "location" {
 }
 
 variable "kubernetes_version" {
-  default     = "1.25.17"
-  description = "Kubernetes version supported on AKS (1.25.17 Released August 2nd, 2023)"
+  default     = "1.25"
+  description = "Kubernetes version supported on AKS"
 }
 
 variable "client_id" {
