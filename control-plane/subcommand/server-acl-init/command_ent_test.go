@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 //go:build enterprise
 
 package serveraclinit
@@ -225,6 +222,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 // a non-default partition.
 func TestRun_AnonymousToken_CreatedFromNonDefaultPartition(t *testing.T) {
 	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	tokenFile := common.WriteTempFile(t, bootToken)
 	server := partitionedSetup(t, bootToken, "test")
 	k8s := fake.NewSimpleClientset()
 	setUpK8sServiceAccount(t, k8s, ns)
@@ -233,7 +231,6 @@ func TestRun_AnonymousToken_CreatedFromNonDefaultPartition(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		backend:   &FakeSecretsBackend{bootstrapToken: bootToken},
 	}
 	cmd.init()
 	args := []string{
@@ -242,6 +239,7 @@ func TestRun_AnonymousToken_CreatedFromNonDefaultPartition(t *testing.T) {
 		"-grpc-port=" + strings.Split(server.GRPCAddr, ":")[1],
 		"-resource-prefix=" + resourcePrefix,
 		"-k8s-namespace=" + ns,
+		"-bootstrap-token-file", tokenFile,
 		"-allow-dns",
 		"-partition=test",
 		"-enable-namespaces",

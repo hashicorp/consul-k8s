@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package install
 
 import (
@@ -165,45 +162,39 @@ func TestValidateFlags(t *testing.T) {
 	testCases := []struct {
 		description string
 		input       []string
-		expErr      string
 	}{
 		{
 			"Should disallow non-flag arguments.",
 			[]string{"foo", "-auto-approve"},
-			"should have no non-flag arguments",
 		},
 		{
 			"Should disallow specifying both values file AND presets.",
 			[]string{"-f='f.txt'", "-preset=demo"},
-			"cannot set both -config-file and -preset",
 		},
 		{
 			"Should error on invalid presets.",
 			[]string{"-preset=foo"},
-			"'foo' is not a valid preset (valid presets: cloud, quickstart, secure)",
 		},
 		{
 			"Should error on invalid timeout.",
 			[]string{"-timeout=invalid-timeout"},
-			"unable to parse -timeout: time: invalid duration \"invalid-timeout\"",
 		},
 		{
 			"Should error on an invalid namespace. If this failed, TestValidLabel() probably did too.",
 			[]string{"-namespace=\" nsWithSpace\""},
-			"'\" nsWithSpace\"' is an invalid namespace. Namespaces follow the RFC 1123 label convention and must consist of a lower case alphanumeric character or '-' and must start/end with an alphanumeric character",
 		},
 		{
-			"Should have errored on a non-existent file.",
+			"Should have errored on a non-existant file.",
 			[]string{"-f=\"does_not_exist.txt\""},
-			"file '\"does_not_exist.txt\"' does not exist",
 		},
 	}
 
 	for _, testCase := range testCases {
 		c := getInitializedCommand(t, nil)
 		t.Run(testCase.description, func(t *testing.T) {
-			err := c.validateFlags(testCase.input)
-			require.EqualError(t, err, testCase.expErr)
+			if err := c.validateFlags(testCase.input); err == nil {
+				t.Errorf("Test case should have failed.")
+			}
 		})
 	}
 }
@@ -567,7 +558,7 @@ func TestInstall(t *testing.T) {
 			},
 			messages: []string{
 				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
-				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    --------------------\n    connectInject:\n      enabled: true\n      metrics:\n        defaultEnableMerging: true\n        defaultEnabled: true\n        enableGatewayMetrics: true\n    global:\n      metrics:\n        enableAgentMetrics: true\n        enabled: true\n      name: consul\n    prometheus:\n      enabled: true\n    server:\n      replicas: 1\n    ui:\n      enabled: true\n      service:\n        enabled: true\n    \n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    --------------------\n    connectInject:\n      enabled: true\n      metrics:\n        defaultEnableMerging: true\n        defaultEnabled: true\n        enableGatewayMetrics: true\n    controller:\n      enabled: true\n    global:\n      metrics:\n        enableAgentMetrics: true\n        enabled: true\n      name: consul\n    prometheus:\n      enabled: true\n    server:\n      replicas: 1\n    ui:\n      enabled: true\n      service:\n        enabled: true\n    \n",
 				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
 			},
 			helmActionsRunner:                       &helm.MockActionRunner{},
@@ -583,7 +574,7 @@ func TestInstall(t *testing.T) {
 			},
 			messages: []string{
 				"\n==> Checking if Consul can be installed\n ✓ No existing Consul installations found.\n ✓ No existing Consul persistent volume claims found\n ✓ No existing Consul secrets found.\n",
-				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    --------------------\n    connectInject:\n      enabled: true\n    global:\n      acls:\n        manageSystemACLs: true\n      gossipEncryption:\n        autoGenerate: true\n      name: consul\n      tls:\n        enableAutoEncrypt: true\n        enabled: true\n    server:\n      replicas: 1\n    \n",
+				"\n==> Consul Installation Summary\n    Name: consul\n    Namespace: consul\n    \n    Helm value overrides\n    --------------------\n    connectInject:\n      enabled: true\n    controller:\n      enabled: true\n    global:\n      acls:\n        manageSystemACLs: true\n      gossipEncryption:\n        autoGenerate: true\n      name: consul\n      tls:\n        enableAutoEncrypt: true\n        enabled: true\n    server:\n      replicas: 1\n    \n",
 				"\n==> Installing Consul\n ✓ Downloaded charts.\n ✓ Consul installed in namespace \"consul\".\n",
 			},
 			helmActionsRunner:                       &helm.MockActionRunner{},

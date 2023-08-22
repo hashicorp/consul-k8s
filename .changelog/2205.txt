@@ -1,3 +1,0 @@
-```release-note:improvement
-cli: update cloud preset to enable telemetry collector
-```

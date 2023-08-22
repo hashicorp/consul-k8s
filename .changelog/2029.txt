@@ -1,3 +1,0 @@
-```release-note:bug
-api-gateway: fix ACL issue where when adminPartitions and ACLs are enabled, API Gateway Controller is unable to create a new namespace in Consul
-```

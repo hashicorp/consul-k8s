@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package helpers
 
 import (
@@ -38,7 +35,7 @@ func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, optio
 	// Check if there's an existing cluster and fail if there is one.
 	// We may need to retry since this is the first command run once the Kube
 	// cluster is created and sometimes the API server returns errors.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 15}, t, func(r *retry.R) {
 		var err error
 		// NOTE: It's okay to pass in `t` to RunHelmCommandAndGetOutputE despite being in a retry
 		// because we're using RunHelmCommandAndGetOutputE (not RunHelmCommandAndGetOutput) so the `t` won't
@@ -58,7 +55,7 @@ func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, optio
 
 	// Wait for all pods in the "default" namespace to exit. A previous
 	// release may not be listed by Helm but its pods may still be terminating.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 60}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Second, Count: 60}, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(options.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 		require.NoError(r, err)
 		if len(pods.Items) > 0 {
@@ -87,7 +84,7 @@ func SetupInterruptHandler(cleanup func()) {
 // Cleanup will both register a cleanup function with t
 // and SetupInterruptHandler to make sure resources get cleaned up
 // if an interrupt signal is caught.
-func Cleanup(t *testing.T, noCleanupOnFailure bool, noCleanup bool, cleanup func()) {
+func Cleanup(t *testing.T, noCleanupOnFailure bool, cleanup func()) {
 	t.Helper()
 
 	// Always clean up when an interrupt signal is caught.
@@ -97,7 +94,7 @@ func Cleanup(t *testing.T, noCleanupOnFailure bool, noCleanup bool, cleanup func
 	// We need to wrap the cleanup function because t that is passed in to this function
 	// might not have the information on whether the test has failed yet.
 	wrappedCleanupFunc := func() {
-		if !((noCleanupOnFailure && t.Failed()) || noCleanup) {
+		if !(noCleanupOnFailure && t.Failed()) {
 			logger.Logf(t, "cleaning up resources for %s", t.Name())
 			cleanup()
 		} else {

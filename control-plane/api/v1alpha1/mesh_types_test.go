@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -48,7 +45,6 @@ func TestMesh_MatchesConsul(t *testing.T) {
 					TransparentProxy: TransparentProxyMeshConfig{
 						MeshDestinationsOnly: true,
 					},
-					AllowEnablingPermissiveMutualTLS: true,
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLSv1_0",
@@ -73,7 +69,6 @@ func TestMesh_MatchesConsul(t *testing.T) {
 				TransparentProxy: capi.TransparentProxyMeshConfig{
 					MeshDestinationsOnly: true,
 				},
-				AllowEnablingPermissiveMutualTLS: true,
 				TLS: &capi.MeshTLSConfig{
 					Incoming: &capi.MeshDirectionalTLSConfig{
 						TLSMinVersion: "TLSv1_0",
@@ -150,7 +145,6 @@ func TestMesh_ToConsul(t *testing.T) {
 					TransparentProxy: TransparentProxyMeshConfig{
 						MeshDestinationsOnly: true,
 					},
-					AllowEnablingPermissiveMutualTLS: true,
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLSv1_0",
@@ -175,7 +169,6 @@ func TestMesh_ToConsul(t *testing.T) {
 				TransparentProxy: capi.TransparentProxyMeshConfig{
 					MeshDestinationsOnly: true,
 				},
-				AllowEnablingPermissiveMutualTLS: true,
 				TLS: &capi.MeshTLSConfig{
 					Incoming: &capi.MeshDirectionalTLSConfig{
 						TLSMinVersion: "TLSv1_0",

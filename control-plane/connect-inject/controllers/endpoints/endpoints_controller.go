@@ -1,5 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
 package endpoints
 
 import (
@@ -44,10 +42,9 @@ const (
 	terminatingGateway = "terminating-gateway"
 	ingressGateway     = "ingress-gateway"
 
-	kubernetesSuccessReasonMsg           = "Kubernetes health checks passing"
-	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
-	envoyTelemetryCollectorBindSocketDir = "envoy_telemetry_collector_bind_socket_dir"
-	defaultNS                            = "default"
+	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
+	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
+	defaultNS                  = "default"
 
 	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
@@ -119,10 +116,6 @@ type Controller struct {
 	// EnableAutoEncrypt indicates whether we should use auto-encrypt when talking
 	// to Consul client agents.
 	EnableAutoEncrypt bool
-
-	// EnableTelemetryCollector controls whether the proxy service should be registered
-	// with config to enable telemetry forwarding.
-	EnableTelemetryCollector bool
 
 	MetricsConfig metrics.Config
 	Log           logr.Logger
@@ -298,14 +291,6 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 			return err
 		}
 
-		// Add manual ip to the VIP table
-		r.Log.Info("adding manual ip to virtual ip table in Consul", "name", serviceRegistration.Service.Service,
-			"id", serviceRegistration.ID)
-		err = assignServiceVirtualIP(r.Context, apiClient, serviceRegistration.Service)
-		if err != nil {
-			r.Log.Error(err, "failed to add ip to virtual ip table", "name", serviceRegistration.Service.Service)
-		}
-
 		// Register the proxy service instance with Consul.
 		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service)
 		_, err = apiClient.Catalog().Register(proxyServiceRegistration, nil)
@@ -315,20 +300,6 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		}
 	}
 	return nil
-}
-
-func parseLocality(node corev1.Node) *api.Locality {
-	region := node.Labels[corev1.LabelTopologyRegion]
-	zone := node.Labels[corev1.LabelTopologyZone]
-
-	if region == "" {
-		return nil
-	}
-
-	return &api.Locality{
-		Region: region,
-		Zone:   zone,
-	}
 }
 
 // registerGateway creates Consul registrations for the Connect Gateways and registers them with Consul.
@@ -418,11 +389,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		}
 	}
 
-	var node corev1.Node
-	// Ignore errors because we don't want failures to block running services.
-	_ = r.Client.Get(context.Background(), types.NamespacedName{Name: pod.Spec.NodeName, Namespace: pod.Namespace}, &node)
-	locality := parseLocality(node)
-
 	// We only want that annotation to be present when explicitly overriding the consul svc name
 	// Otherwise, the Consul service name should equal the Kubernetes Service name.
 	// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
@@ -458,7 +424,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Meta:      meta,
 		Namespace: consulNS,
 		Tags:      tags,
-		Locality:  locality,
 	}
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
@@ -506,10 +471,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
 	}
 
-	if r.EnableTelemetryCollector && proxyConfig.Config != nil {
-		proxyConfig.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/connect-inject"
-	}
-
 	if consulServicePort > 0 {
 		proxyConfig.LocalServiceAddress = "127.0.0.1"
 		proxyConfig.LocalServicePort = consulServicePort
@@ -535,8 +496,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Namespace: consulNS,
 		Proxy:     proxyConfig,
 		Tags:      tags,
-		// Sidecar locality (not proxied service locality) is used for locality-aware routing.
-		Locality: locality,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.
@@ -692,9 +651,6 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		ID:      pod.Name,
 		Address: pod.Status.PodIP,
 		Meta:    meta,
-		Proxy: &api.AgentServiceConnectProxyConfig{
-			Config: map[string]interface{}{},
-		},
 	}
 
 	gatewayServiceName, ok := pod.Annotations[constants.AnnotationGatewayConsulServiceName]
@@ -792,10 +748,6 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 				},
 			}
 		}
-	}
-
-	if r.EnableTelemetryCollector && service.Proxy != nil && service.Proxy.Config != nil {
-		service.Proxy.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/service"
 	}
 
 	serviceRegistration := &api.CatalogRegistration{
@@ -1317,26 +1269,6 @@ func (r *Controller) appendNodeMeta(registration *api.CatalogRegistration) {
 	for k, v := range r.NodeMeta {
 		registration.NodeMeta[k] = v
 	}
-}
-
-// assignServiceVirtualIPs manually assigns the ClusterIP to the virtual IP table so that transparent proxy routing works.
-func assignServiceVirtualIP(ctx context.Context, apiClient *api.Client, svc *api.AgentService) error {
-	ip := svc.TaggedAddresses[clusterIPTaggedAddressName].Address
-	if ip == "" {
-		return nil
-	}
-
-	_, _, err := apiClient.Internal().AssignServiceVirtualIP(ctx, svc.Service, []string{ip}, &api.WriteOptions{Namespace: svc.Namespace, Partition: svc.Partition})
-	if err != nil {
-		// Maintain backwards compatibility with older versions of Consul that do not support the VIP improvements. Tproxy
-		// will not work 100% correctly but the mesh will still work
-		if strings.Contains(err.Error(), "404") {
-			return fmt.Errorf("failed to add ip for service %s to virtual ip table. Please upgrade Consul to version 1.16 or higher", svc.Service)
-		} else {
-			return err
-		}
-	}
-	return nil
 }
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.

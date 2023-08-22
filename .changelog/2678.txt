@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: do not set container securityContexts by default on OpenShift < 4.11
+```

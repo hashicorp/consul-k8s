@@ -1,3 +1,0 @@
-```release-note:feature
-helm: Update the ServiceIntentions CRD to support `JWT` fields.
-```
