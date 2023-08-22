@@ -28,8 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -157,18 +160,45 @@ func (h *HelmCluster) KubectlClobber(t *testing.T) {
 		}
 	}
 
-	t.Logf("deleting k8s crds...")
-	foundCrdsStr, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "get", "crds", "-o", "name")
-	require.NoError(t, err)
-	for _, crd := range strings.Split(foundCrdsStr, "\n") {
-		if crd != "" {
-			output, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "patch", crd, "-p \"{\"metadata\":{\"finalizers\":[]}}\" --type=merge")
-			logger.Log(t, output)
-			if err != nil {
-				logger.Log(t, err)
-			}
-		}
+	// Need to use a dynamic client to delete crds
+	t.Logf("getting k8s crds...")
+	dynConfig, err := clientcmd.BuildConfigFromFlags("", h.helmOptions.KubectlOptions.ConfigPath)
+	if err != nil {
+		logger.Log(t, err)
 	}
+
+	dynamicClient, err := dynamic.NewForConfig(dynConfig)
+	if err != nil {
+		logger.Log(t, err)
+	}
+
+	crdGroup := schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  "v1",
+		Resource: "customresourcedefinitions",
+	}
+
+	crds, err := dynamicClient.Resource(crdGroup).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		logger.Log(t, err)
+	}
+
+	for _, crd := range crds.Items {
+		fmt.Println(crd.GetName())
+	}
+
+	// t.Logf("deleting k8s crds...")
+	// foundCrdsStr, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "get", "crds", "-o", "name")
+	// require.NoError(t, err)
+	// for _, crd := range strings.Split(foundCrdsStr, "\n") {
+	// 	if crd != "" {
+	// 		output, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "patch", crd, "-p \"{\"metadata\":{\"finalizers\":[]}}\" --type=merge")
+	// 		logger.Log(t, output)
+	// 		if err != nil {
+	// 			logger.Log(t, err)
+	// 		}
+	// 	}
+	// }
 }
 
 func (h *HelmCluster) Create(t *testing.T) {
