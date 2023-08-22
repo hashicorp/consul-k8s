@@ -75,6 +75,8 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *R
 	}
 }
 
+// func (t ResourceTranslator) ToHTTPRoute(httpAuthFilter v1alpha1.HTTPA)
+
 var listenerProtocolMap = map[string]string{
 	"https": "http",
 	"http":  "http",
