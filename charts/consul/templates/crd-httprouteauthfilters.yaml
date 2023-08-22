@@ -39,7 +39,7 @@ spec:
     schema:
       openAPIV3Schema:
         description: HTTPRouteAuthFilter is the Schema for the httprouteretryfilters
-          API
+          API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -54,23 +54,23 @@ spec:
           metadata:
             type: object
           spec:
-            description: HTTPRouteAuthFilterSpec defines the desired state of HTTPRouteAuthFilter
+            description: HTTPRouteAuthFilterSpec defines the desired state of HTTPRouteAuthFilter.
             properties:
               jwt:
                 description: RouteJWTRequirement defines the JWT requirements per
-                  provider
+                  provider.
                 properties:
                   providers:
                     items:
                       description: RouteJWTProvider defines the configuration for
-                        a specific JWT provider
+                        a specific JWT provider.
                       properties:
                         name:
                           type: string
                         verifyClaims:
                           items:
                             description: RouteJWTClaimVerification defines the specific
-                              claims to be verified
+                              claims to be verified.
                             properties:
                               path:
                                 items:

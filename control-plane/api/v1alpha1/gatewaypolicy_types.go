@@ -14,7 +14,7 @@ func init() {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// GatewayPolicy is the Schema for the gatewaypolicies API
+// GatewayPolicy is the Schema for the gatewaypolicies API.
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
@@ -28,14 +28,14 @@ type GatewayPolicy struct {
 
 //+kubebuilder:object:root=true
 
-// GatewayPolicyList contains a list of GatewayPolicy
+// GatewayPolicyList contains a list of GatewayPolicy.
 type GatewayPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []GatewayPolicy `json:"items"`
 }
 
-// GatewayPolicySpec defines the desired state of GatewayPolicy
+// GatewayPolicySpec defines the desired state of GatewayPolicy.
 type GatewayPolicySpec struct {
 	Override GatewayPolicyConfig `json:"override,omitempty"`
 	Default  GatewayPolicyConfig `json:"default,omitempty"`
@@ -45,13 +45,13 @@ type GatewayPolicyConfig struct {
 	JWT *APIGatewayJWTRequirement `json:"jwt"`
 }
 
-// APIGatewayJWTRequirement holds the list of JWT providers to be verified against
+// APIGatewayJWTRequirement holds the list of JWT providers to be verified against.
 type APIGatewayJWTRequirement struct {
 	// Providers is a list of providers to consider when verifying a JWT.
 	Providers []*APIGatewayJWTProvider `json:"providers"`
 }
 
-// APIGatewayJWTProvider holds the provider and claim verification information
+// APIGatewayJWTProvider holds the provider and claim verification information.
 type APIGatewayJWTProvider struct {
 	// Name is the name of the JWT provider. There MUST be a corresponding
 	// "jwt-provider" config entry with this name.
@@ -61,7 +61,7 @@ type APIGatewayJWTProvider struct {
 	VerifyClaims []*APIGatewayJWTClaimVerification `json:"verifyClaims,omitempty"`
 }
 
-// APIGatewayJWTClaimVerification holds the actual claim information to be verified
+// APIGatewayJWTClaimVerification holds the actual claim information to be verified.
 type APIGatewayJWTClaimVerification struct {
 	// Path is the path to the claim in the token JSON.
 	Path []string `json:"path"`
