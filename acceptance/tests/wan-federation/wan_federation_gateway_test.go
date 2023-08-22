@@ -61,15 +61,6 @@ func TestWANFederation_Gateway(t *testing.T) {
 	primaryConsulCluster := consul.NewHelmCluster(t, primaryHelmValues, primaryContext, cfg, releaseName)
 	primaryConsulCluster.Create(t)
 
-	// Get the federation secret from the primary cluster and apply it to secondary cluster
-	federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
-	logger.Logf(t, "retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
-	federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
-	require.NoError(t, err)
-	federationSecret.ResourceVersion = ""
-	_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
-	require.NoError(t, err)
-
 	var k8sAuthMethodHost string
 	// When running on kind, the kube API address in kubeconfig will have a localhost address
 	// which will not work from inside the container. That's why we need to use the endpoints address instead
@@ -82,6 +73,8 @@ func TestWANFederation_Gateway(t *testing.T) {
 	} else {
 		k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryContext.KubectlOptions(t))
 	}
+
+	federationSecretName := copyFederationSecret(t, releaseName, primaryContext, secondaryContext)
 
 	// Create secondary cluster
 	secondaryHelmValues := map[string]string{

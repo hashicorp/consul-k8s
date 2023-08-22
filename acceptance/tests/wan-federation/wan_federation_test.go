@@ -13,6 +13,7 @@ import (
 	terratestK8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -94,14 +95,7 @@ func TestWANFederation(t *testing.T) {
 			primaryConsulCluster.Create(t)
 
 			// Get the federation secret from the primary cluster and apply it to secondary cluster
-			federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
-			logger.Logf(t, "retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
-			federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
-			require.NoError(t, err)
-			federationSecret.ResourceVersion = ""
-			federationSecret.Namespace = secondaryContext.KubectlOptions(t).Namespace
-			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
-			require.NoError(t, err)
+			federationSecretName := copyFederationSecret(t, releaseName, primaryContext, secondaryContext)
 
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryContext)
 
@@ -275,14 +269,7 @@ func TestWANFederationFailover(t *testing.T) {
 			primaryConsulCluster.Create(t)
 
 			// Get the federation secret from the primary cluster and apply it to secondary cluster
-			federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
-			logger.Logf(t, "Retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
-			federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
-			require.NoError(t, err)
-			federationSecret.ResourceVersion = ""
-			federationSecret.Namespace = secondaryContext.KubectlOptions(t).Namespace
-			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
-			require.NoError(t, err)
+			federationSecretName := copyFederationSecret(t, releaseName, primaryContext, secondaryContext)
 
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryContext)
 
@@ -451,4 +438,18 @@ func serviceFailoverCheck(t *testing.T, options *terratestK8s.KubectlOptions, po
 	f(t)
 
 	logger.Log(t, resp)
+}
+
+func copyFederationSecret(t *testing.T, releaseName string, primaryContext, secondaryContext environment.TestContext) string {
+	// Get the federation secret from the primary cluster and apply it to secondary cluster
+	federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
+	logger.Logf(t, "Retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
+	federationSecret, err := primaryContext.KubernetesClient(t).CoreV1().Secrets(primaryContext.KubectlOptions(t).Namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	federationSecret.ResourceVersion = ""
+	federationSecret.Namespace = secondaryContext.KubectlOptions(t).Namespace
+	_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	return federationSecretName
 }
