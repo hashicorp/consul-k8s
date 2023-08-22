@@ -711,15 +711,15 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "ingressGateways/Deployment: no nodeSelector by default" {
+@test "ingressGateways/Deployment: nodeSelector by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/ingress-gateways-deployment.yaml  \
       --set 'ingressGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -s -r '.[0].spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq -s -r '.[0].spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "linux"  ]
 }
 
 @test "ingressGateways/Deployment: can set a nodeSelector through defaults" {

@@ -46,4 +46,6 @@ spec:
             initialDelaySeconds: 1
             failureThreshold: 1
             periodSeconds: 1
+      nodeSelector:
+        kubernetes.io/os: linux
       serviceAccountName: static-server-tcp

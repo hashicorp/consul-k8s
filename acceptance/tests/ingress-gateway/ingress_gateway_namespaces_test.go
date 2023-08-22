@@ -80,12 +80,21 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			}
 
 			logger.Logf(t, "creating server in %s namespace", testNamespace)
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+			} else {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+
+			}
 
 			// We use the static-client pod so that we can make calls to the ingress gateway
 			// via kubectl exec without needing a route into the cluster from the test machine.
 			logger.Logf(t, "creating static-client in %s namespace", testNamespace)
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client-windows")
+			} else {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+			}
 
 			// With the cluster up, we can create our ingress-gateway config entry.
 			logger.Log(t, "creating config entry")
@@ -109,7 +118,7 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, true, created, "config entry failed")
 
-			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
+			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s.svc.cluster.local:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -199,12 +208,20 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			}
 
 			logger.Logf(t, "creating server in %s namespace", testNamespace)
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+			} else {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			}
 
 			// We use the static-client pod so that we can make calls to the ingress gateway
 			// via kubectl exec without needing a route into the cluster from the test machine.
 			logger.Logf(t, "creating static-client in %s namespace", testNamespace)
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client-windows")
+			} else {
+				k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+			}
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
@@ -230,7 +247,7 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, true, created, "config entry failed")
 
-			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
+			ingressGatewayService := fmt.Sprintf("http://%s-consul-%s.%s.svc.cluster.local:8080/", releaseName, igName, ctx.KubectlOptions(t).Namespace)
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {

@@ -309,7 +309,7 @@ Consul server environment variables for consul-k8s commands.
   {{- if .Values.externalServers.enabled }}
   value: {{ .Values.externalServers.hosts | first }}
   {{- else }}
-  value: {{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+  value: {{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc.cluster.local
   {{- end }}
 - name: CONSUL_GRPC_PORT
   {{- if .Values.externalServers.enabled }}
@@ -351,7 +351,12 @@ Consul server environment variables for consul-k8s commands.
 {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
 - name: CONSUL_TLS_SERVER_NAME
   value: {{ .Values.externalServers.tlsServerName }}
-{{- else if .Values.global.cloud.enabled }}
+  {{- /* We want to supply the SNI value for the case when servers are running in this cluster to avoid
+       backward compatibility issues. We changed the CONSUL_ADDRESSES to point to the full DNS name
+       of the consul servers, however, the certificates we generate for the server do not include that name as a DNS SAN.
+       To avoid having TLS connection errors during upgrades, we want to set this value to a DNS SAN that've been including
+       in the generated certificate. */ -}}
+{{- else if or .Values.global.cloud.enabled (not .Values.externalServers.enabled) }}
 - name: CONSUL_TLS_SERVER_NAME
   value: server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}}
 {{- end }}

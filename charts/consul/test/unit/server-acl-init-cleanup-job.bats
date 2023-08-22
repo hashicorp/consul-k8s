@@ -95,14 +95,14 @@ load _helpers
   [ "${actual}" = "value" ]
 }
 
-@test "serverACLInitCleanup/Job: nodeSelector not set by default" {
+@test "serverACLInitCleanup/Job: nodeSelector set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-acl-init-cleanup-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq -r '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "linux"  ]
 }
 
 @test "serverACLInitCleanup/Job: nodeSelector can be set" {

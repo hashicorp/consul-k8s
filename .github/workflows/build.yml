@@ -241,6 +241,56 @@ jobs:
           name: ${{ env.DEB_PACKAGE }}
           path: out/${{ env.DEB_PACKAGE }}
 
+  build-docker-windows:
+    strategy:
+      matrix:
+        include:
+          - { goos: "windows", goarch: "amd64" }
+    name: Docker ${{ matrix.goarch }} default release build
+    needs: [get-product-version, build]
+    runs-on: windows-2019
+    env:
+      repo: ${{ github.event.repository.name }}
+      version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
+    steps:
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
+        with:
+          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos}}_${{ matrix.goarch }}.zip
+          path: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
+      - name: extract consul-cni zip
+        shell: bash
+        env:
+          ZIP_LOCATION: control-plane/dist/cni/${{ matrix.goos}}/${{ matrix.goarch }}
+        run: |
+          cd "${ZIP_LOCATION}"
+          unzip -j *.zip
+      - name: Docker Build (Action)
+        uses: absolutelightning/actions-docker-build@v26
+        if: ${{ !matrix.fips }}
+        with:
+          smoke_test: |
+            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
+            if [ "${TEST_VERSION}" != "v${version}" ]; then
+              echo "Test FAILED"
+              exit 1
+            fi
+            echo "Test PASSED"
+          version: ${{ env.version }}
+          target: release-default
+          arch: ${{ matrix.goarch }}
+          pkg_name: consul-k8s-control-plane_${{ env.version }}
+          bin_name: consul-k8s-control-plane.exe
+          zip_artifact_name: consul-k8s-control-plane_${{ env.version }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+          dockerfile: ../Dockerfile.windows
+          workdir: control-plane
+          os: windows
+          tags: |
+            docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-windows
+          dev_tags: |
+            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-windows
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}-windows
+
   build-docker:
     name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build
     needs: [get-product-version, build]

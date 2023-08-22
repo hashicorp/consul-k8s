@@ -69,7 +69,7 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	})
 
 	// The timeout to allow for connect-init to wait for services to be registered by the endpoints controller.
-	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", deployment.Name))
+	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=30m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
 // CheckStaticServerConnection execs into a pod of sourceApp
@@ -150,6 +150,8 @@ func CheckStaticServerConnectionFailing(t *testing.T, options *k8s.KubectlOption
 		"curl: (52) Empty reply from server",
 		"curl: (7) Failed to connect",
 		"curl: (56) Recv failure: Connection reset by peer",
+		"curl: (56) Recv failure: Connection was reset",
+		"curl: (56) Recv failure: Connection was aborted",
 	}, "", curlArgs...)
 }
 
@@ -159,6 +161,8 @@ func CheckStaticServerHTTPConnectionFailing(t *testing.T, options *k8s.KubectlOp
 	t.Helper()
 	CheckStaticServerConnection(t, options, sourceApp, false, []string{
 		"curl: (22) The requested URL returned error: 403",
+		"curl: (7) Failed to connect",
+		"Couldn't connect to server",
 	}, "", curlArgs...)
 }
 

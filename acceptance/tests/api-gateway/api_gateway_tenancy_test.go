@@ -100,7 +100,11 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			routeNamespace, routeK8SOptions := createNamespace(t, ctx, cfg)
 
 			logger.Logf(t, "creating target server in %s namespace", serviceNamespace)
-			k8s.DeployKustomize(t, serviceK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			if cfg.EnableWindows {
+				k8s.DeployKustomize(t, serviceK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
+			} else {
+				k8s.DeployKustomize(t, serviceK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			}
 
 			logger.Logf(t, "creating certificate resources in %s namespace", certificateNamespace)
 			applyFixture(t, cfg, certificateK8SOptions, "cases/api-gateways/certificate")

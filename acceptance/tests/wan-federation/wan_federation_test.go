@@ -183,11 +183,19 @@ func TestWANFederation(t *testing.T) {
 			secondaryHelper.SetupAppNamespace(t)
 
 			// Check that we can connect services over the mesh gateways
-			logger.Log(t, "creating static-server in dc2")
-			k8s.DeployKustomize(t, secondaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			if cfg.EnableWindows {
+				logger.Log(t, "creating static-server in dc2")
+				k8s.DeployKustomize(t, secondaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject-windows")
 
-			logger.Log(t, "creating static-client in dc1")
-			k8s.DeployKustomize(t, primaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+				logger.Log(t, "creating static-client in dc1")
+				k8s.DeployKustomize(t, primaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc-windows")
+			} else {
+				logger.Log(t, "creating static-server in dc2")
+				k8s.DeployKustomize(t, secondaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+
+				logger.Log(t, "creating static-client in dc1")
+				k8s.DeployKustomize(t, primaryHelper.KubectlOptsForApp(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+			}
 
 			if c.secure {
 				primaryHelper.CreateIntention(t)

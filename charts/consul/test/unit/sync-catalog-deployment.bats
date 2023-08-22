@@ -72,7 +72,7 @@ load _helpers
 
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_ADDRESSES").value' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-server.default.svc" ]
+  [ "${actual}" = "release-name-consul-server.default.svc.cluster.local" ]
 
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_GRPC_PORT").value' | tee /dev/stderr)
@@ -440,24 +440,24 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "syncCatalog/Deployment: nodeSelector is not set by default" {
+@test "syncCatalog/Deployment: nodeSelector is set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "\"linux\""  ]
 }
 
-@test "syncCatalog/Deployment: nodeSelector is not set by default with sync enabled" {
+@test "syncCatalog/Deployment: nodeSelector is set by default with sync enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
       --set 'syncCatalog.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "\"linux\""  ]
 }
 
 @test "syncCatalog/Deployment: specified nodeSelector" {

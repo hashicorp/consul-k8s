@@ -1,0 +1,29 @@
+# Dispatch to the consul-k8s-workflows with a nightly cron
+name: nightly-acceptance-windows
+#on:
+#  schedule:
+#    # * is a special character in YAML so you have to quote this string
+#    # Run nightly at 12AM UTC/8PM EST/5PM PST
+#    - cron:  '0 0 * * *'
+
+on: pull_request
+
+# these should be the only settings that you will ever need to change
+env:
+  BRANCH: ${{ github.head_ref || github.ref_name }}
+  SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  CONTEXT: "nightly"
+
+jobs:
+  cloud:
+    name: cloud-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+        name: cloud-windows
+        with:
+          workflow: cloud-windows.yml
+          repo: hashicorp/consul-k8s-workflows
+          ref: main
+          token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+          inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'

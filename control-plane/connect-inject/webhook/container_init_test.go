@@ -41,6 +41,9 @@ func TestHandlerContainerInit(t *testing.T) {
 						Name: "web-side",
 					},
 				},
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "",
+				},
 			},
 			Status: corev1.PodStatus{
 				HostIP: "1.1.1.1",
@@ -154,6 +157,109 @@ func TestHandlerContainerInit(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			"windows default cmd and env",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationService] = "web"
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				ConsulAddress: "consul-server.default.svc.cluster.local",
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				LogLevel:      "info",
+			},
+			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \`,
+			[]corev1.EnvVar{
+				{
+					Name:  "CONSUL_ADDRESSES",
+					Value: "consul-server.default.svc.cluster.local",
+				},
+				{
+					Name:  "CONSUL_GRPC_PORT",
+					Value: "8502",
+				},
+				{
+					Name:  "CONSUL_HTTP_PORT",
+					Value: "8500",
+				},
+				{
+					Name:  "CONSUL_API_TIMEOUT",
+					Value: "0s",
+				},
+				{
+					Name:  "CONSUL_NODE_NAME",
+					Value: "$(NODE_NAME)-virtual",
+				},
+			},
+		},
+
+		{
+			"windows with auth method",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationService] = "web"
+				pod.Spec.ServiceAccountName = "a-service-account-name"
+				pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+					{
+						Name:      "sa",
+						MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+					},
+				}
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				AuthMethod:    "an-auth-method",
+				ConsulAddress: "consul-server.default.svc.cluster.local",
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+				LogLevel:      "debug",
+				LogJSON:       true,
+			},
+			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=debug \
+  -log-json=true \
+  -is-windows=true \
+  -service-account-name="a-service-account-name" \
+  -service-name="web" \`,
+			[]corev1.EnvVar{
+				{
+					Name:  "CONSUL_ADDRESSES",
+					Value: "consul-server.default.svc.cluster.local",
+				},
+				{
+					Name:  "CONSUL_GRPC_PORT",
+					Value: "8502",
+				},
+				{
+					Name:  "CONSUL_HTTP_PORT",
+					Value: "8500",
+				},
+				{
+					Name:  "CONSUL_API_TIMEOUT",
+					Value: "5s",
+				},
+				{
+					Name:  "CONSUL_NODE_NAME",
+					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_LOGIN_AUTH_METHOD",
+					Value: "an-auth-method",
+				},
+				{
+					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
+					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+				},
+				{
+					Name:  "CONSUL_LOGIN_META",
+					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+				},
+			},
+		},
 	}
 
 	for _, tt := range cases {
@@ -164,7 +270,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			require.NoError(t, err)
 			actual := strings.Join(container.Command, " ")
 			require.Contains(t, actual, tt.ExpCmd)
-			require.EqualValues(t, container.Env[3:], tt.ExpEnv)
+			require.EqualValues(t, tt.ExpEnv, container.Env[3:])
 		})
 	}
 }
@@ -359,6 +465,9 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 							},
 						},
 					},
+				},
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "",
 				},
 				ServiceAccountName: "web",
 			},
@@ -693,6 +802,339 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 			},
 		},
+		{
+			"Windows default namespace, no partition",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationService] = "web"
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "default",
+				ConsulPartition:            "",
+				ConsulAddress:              "consul-server.default.svc.cluster.local",
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+			},
+			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \`,
+			[]corev1.EnvVar{
+				{
+					Name:  "CONSUL_ADDRESSES",
+					Value: "consul-server.default.svc.cluster.local",
+				},
+				{
+					Name:  "CONSUL_GRPC_PORT",
+					Value: "8502",
+				},
+				{
+					Name:  "CONSUL_HTTP_PORT",
+					Value: "8500",
+				},
+				{
+					Name:  "CONSUL_API_TIMEOUT",
+					Value: "5s",
+				},
+				{
+					Name:  "CONSUL_NODE_NAME",
+					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_NAMESPACE",
+					Value: "default",
+				},
+			},
+		},
+		{
+			"Windows default namespace, default partition",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationService] = "web"
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "default",
+				ConsulPartition:            "default",
+				ConsulAddress:              "consul-server.default.svc.cluster.local",
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+			},
+			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \`,
+			[]corev1.EnvVar{
+				{
+					Name:  "CONSUL_ADDRESSES",
+					Value: "consul-server.default.svc.cluster.local",
+				},
+				{
+					Name:  "CONSUL_GRPC_PORT",
+					Value: "8502",
+				},
+				{
+					Name:  "CONSUL_HTTP_PORT",
+					Value: "8500",
+				},
+				{
+					Name:  "CONSUL_API_TIMEOUT",
+					Value: "5s",
+				},
+				{
+					Name:  "CONSUL_NODE_NAME",
+					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_NAMESPACE",
+					Value: "default",
+				},
+				{
+					Name:  "CONSUL_PARTITION",
+					Value: "default",
+				},
+			},
+		},
+		{
+			"Windows non-default namespace, no partition",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationService] = "web"
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default",
+				ConsulPartition:            "",
+				ConsulAddress:              "consul-server.non-default.svc.cluster.local",
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+			},
+			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \`,
+			[]corev1.EnvVar{
+				{
+					Name:  "CONSUL_ADDRESSES",
+					Value: "consul-server.non-default.svc.cluster.local",
+				},
+				{
+					Name:  "CONSUL_GRPC_PORT",
+					Value: "8502",
+				},
+				{
+					Name:  "CONSUL_HTTP_PORT",
+					Value: "8500",
+				},
+				{
+					Name:  "CONSUL_API_TIMEOUT",
+					Value: "5s",
+				},
+				{
+					Name:  "CONSUL_NODE_NAME",
+					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_NAMESPACE",
+					Value: "non-default",
+				},
+			},
+		},
+		{
+			"Windows non-default namespace, non-default partition",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationService] = "web"
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default",
+				ConsulPartition:            "non-default-part",
+				ConsulAddress:              "consul-server.non-default.svc.cluster.local",
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+			},
+			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \`,
+			[]corev1.EnvVar{
+				{
+					Name:  "CONSUL_ADDRESSES",
+					Value: "consul-server.non-default.svc.cluster.local",
+				},
+				{
+					Name:  "CONSUL_GRPC_PORT",
+					Value: "8502",
+				},
+				{
+					Name:  "CONSUL_HTTP_PORT",
+					Value: "8500",
+				},
+				{
+					Name:  "CONSUL_API_TIMEOUT",
+					Value: "5s",
+				},
+				{
+					Name:  "CONSUL_NODE_NAME",
+					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_NAMESPACE",
+					Value: "non-default",
+				},
+				{
+					Name:  "CONSUL_PARTITION",
+					Value: "non-default-part",
+				},
+			},
+		},
+		{
+			"Windows auth method, non-default namespace, mirroring disabled, default partition",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationService] = ""
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				AuthMethod:                 "auth-method",
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default",
+				ConsulPartition:            "default",
+				ConsulAddress:              "consul-server.non-default.svc.cluster.local",
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+			},
+			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \
+  -service-account-name="web" \
+  -service-name="" \`,
+			[]corev1.EnvVar{
+				{
+					Name:  "CONSUL_ADDRESSES",
+					Value: "consul-server.non-default.svc.cluster.local",
+				},
+				{
+					Name:  "CONSUL_GRPC_PORT",
+					Value: "8502",
+				},
+				{
+					Name:  "CONSUL_HTTP_PORT",
+					Value: "8500",
+				},
+				{
+					Name:  "CONSUL_API_TIMEOUT",
+					Value: "5s",
+				},
+				{
+					Name:  "CONSUL_NODE_NAME",
+					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_LOGIN_AUTH_METHOD",
+					Value: "auth-method",
+				},
+				{
+					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
+					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+				},
+				{
+					Name:  "CONSUL_LOGIN_META",
+					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+				},
+				{
+					Name:  "CONSUL_LOGIN_NAMESPACE",
+					Value: "non-default",
+				},
+				{
+					Name:  "CONSUL_LOGIN_PARTITION",
+					Value: "default",
+				},
+				{
+					Name:  "CONSUL_NAMESPACE",
+					Value: "non-default",
+				},
+				{
+					Name:  "CONSUL_PARTITION",
+					Value: "default",
+				},
+			},
+		},
+		{
+			"Windows auth method, non-default namespace, mirroring enabled, non-default partition",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationService] = ""
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				AuthMethod:                 "auth-method",
+				EnableNamespaces:           true,
+				ConsulDestinationNamespace: "non-default", // Overridden by mirroring
+				EnableK8SNSMirroring:       true,
+				ConsulPartition:            "non-default",
+				ConsulAddress:              "consul-server.non-default.svc.cluster.local",
+				ConsulConfig:               &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+			},
+			`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \
+  -service-account-name="web" \
+  -service-name="" \`,
+			[]corev1.EnvVar{
+				{
+					Name:  "CONSUL_ADDRESSES",
+					Value: "consul-server.non-default.svc.cluster.local",
+				},
+				{
+					Name:  "CONSUL_GRPC_PORT",
+					Value: "8502",
+				},
+				{
+					Name:  "CONSUL_HTTP_PORT",
+					Value: "8500",
+				},
+				{
+					Name:  "CONSUL_API_TIMEOUT",
+					Value: "5s",
+				},
+				{
+					Name:  "CONSUL_NODE_NAME",
+					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_LOGIN_AUTH_METHOD",
+					Value: "auth-method",
+				},
+				{
+					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
+					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+				},
+				{
+					Name:  "CONSUL_LOGIN_META",
+					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+				},
+				{
+					Name:  "CONSUL_LOGIN_NAMESPACE",
+					Value: "default",
+				},
+				{
+					Name:  "CONSUL_LOGIN_PARTITION",
+					Value: "non-default",
+				},
+				{
+					Name:  "CONSUL_NAMESPACE",
+					Value: "k8snamespace",
+				},
+				{
+					Name:  "CONSUL_PARTITION",
+					Value: "non-default",
+				},
+			},
+		},
 	}
 
 	for _, tt := range cases {
@@ -724,6 +1166,9 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 					{
 						Name: "web-admin-service-account",
 					},
+				},
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "",
 				},
 				Containers: []corev1.Container{
 					{
@@ -845,6 +1290,100 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 				{
 					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
 					Value: "/consul/serviceaccount-web-admin/token",
+				},
+			},
+		},
+
+		{
+			"Windows whole template, multiport",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				LogLevel:      "info",
+				ConsulAddress: "consul-server.devautl.svc",
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+			},
+			2,
+			[]multiPortInfo{
+				{
+					serviceIndex: 0,
+					serviceName:  "web",
+				},
+				{
+					serviceIndex: 1,
+					serviceName:  "web-admin",
+				},
+			},
+			[]string{`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \
+  -multiport=true \
+  -proxy-id-file=C:\\consul\\connect-inject\\proxyid-web \
+  -service-name="web" \`,
+
+				`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \
+  -multiport=true \
+  -proxy-id-file=C:\\consul\\connect-inject\\proxyid-web-admin \
+  -service-name="web-admin" \`,
+			},
+			nil,
+		},
+
+		{
+			"Windows whole template, multiport, auth method",
+			func(pod *corev1.Pod) *corev1.Pod {
+				pod.Spec.NodeSelector["kubernetes.io/os"] = "windows"
+				return pod
+			},
+			MeshWebhook{
+				AuthMethod:    "auth-method",
+				ConsulAddress: "consul-server.devautl.svc",
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502, APITimeout: 5 * time.Second},
+				LogLevel:      "info",
+			},
+			2,
+			[]multiPortInfo{
+				{
+					serviceIndex: 0,
+					serviceName:  "web",
+				},
+				{
+					serviceIndex: 1,
+					serviceName:  "web-admin",
+				},
+			},
+			[]string{`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \
+  -service-account-name="web" \
+  -service-name="web" \
+  -multiport=true \
+  -proxy-id-file=C:\\consul\\connect-inject\\proxyid-web \`,
+
+				`sh -ec consul-k8s-control-plane.exe connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+  -log-level=info \
+  -log-json=false \
+  -is-windows=true \
+  -service-account-name="web-admin" \
+  -service-name="web-admin" \
+  -multiport=true \
+  -proxy-id-file=C:\\consul\\connect-inject\\proxyid-web-admin \`,
+			},
+			[]corev1.EnvVar{
+				{
+					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
+					Value: "C:\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\token",
+				},
+				{
+					Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
+					Value: "C:\\consul\\serviceaccount-web-admin\\token",
 				},
 			},
 		},

@@ -514,13 +514,13 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "server/StatefulSet: nodeSelector is not set by default" {
+@test "server/StatefulSet: nodeSelector is set by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.nodeSelector' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
+      yq '.spec.template.spec.nodeSelector["kubernetes.io/os"]' | tee /dev/stderr)
+  [ "${actual}" = "\"linux\""  ]
 }
 
 @test "server/StatefulSet: specified nodeSelector" {
