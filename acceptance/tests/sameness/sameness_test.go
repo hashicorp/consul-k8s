@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -155,7 +156,6 @@ func TestFailover_Connect(t *testing.T) {
 				createNamespaces(t, cfg, v.context)
 			}
 
-			// Create the cluster-01-a.
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
 
@@ -180,106 +180,127 @@ func TestFailover_Connect(t *testing.T) {
 				"connectInject.sidecarProxy.lifecycle.defaultEnabled": "false",
 			}
 
-			defaultPartitionHelmValues := map[string]string{
-				"global.datacenter": cluster01Datacenter,
-			}
-
-			// On Kind, there are no load balancers but since all clusters
-			// share the same node network (docker bridge), we can use
-			// a NodePort service so that we can access node(s) in a different Kind cluster.
-			if cfg.UseKind {
-				defaultPartitionHelmValues["meshGateway.service.type"] = "NodePort"
-				defaultPartitionHelmValues["meshGateway.service.nodePort"] = "30200"
-				defaultPartitionHelmValues["server.exposeService.type"] = "NodePort"
-				defaultPartitionHelmValues["server.exposeService.nodePort.https"] = "30000"
-				defaultPartitionHelmValues["server.exposeService.nodePort.grpc"] = "30100"
-			}
-			helpers.MergeMaps(defaultPartitionHelmValues, commonHelmValues)
-
 			releaseName := helpers.RandomName()
-			testClusters[keyCluster01a].helmCluster = consul.NewHelmCluster(t, defaultPartitionHelmValues, testClusters[keyCluster01a].context, cfg, releaseName)
-			testClusters[keyCluster01a].helmCluster.Create(t)
 
-			// Get the TLS CA certificate and key secret from the server cluster and apply it to the client cluster.
-			caCertSecretName := fmt.Sprintf("%s-consul-ca-cert", releaseName)
+			var wg sync.WaitGroup
 
-			logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
-			k8s.CopySecret(t, testClusters[keyCluster01a].context, testClusters[keyCluster01b].context, caCertSecretName)
+			// Create the cluster-01-a and cluster-01-b
+			// create in same routine as 01-b depends on 01-a being created first
+			wg.Add(1)
+			go func() {
+				// Create the cluster-01-a
+				defaultPartitionHelmValues := map[string]string{
+					"global.datacenter": cluster01Datacenter,
+				}
 
-			// Create Secondary Partition Cluster (cluster-01-b) which will apply the primary (dc1) datacenter.
-			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
-			if c.ACLsEnabled {
-				logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
-				k8s.CopySecret(t, testClusters[keyCluster01a].context, testClusters[keyCluster01b].context, partitionToken)
-			}
+				// On Kind, there are no load balancers but since all clusters
+				// share the same node network (docker bridge), we can use
+				// a NodePort service so that we can access node(s) in a different Kind cluster.
+				if cfg.UseKind {
+					defaultPartitionHelmValues["meshGateway.service.type"] = "NodePort"
+					defaultPartitionHelmValues["meshGateway.service.nodePort"] = "30200"
+					defaultPartitionHelmValues["server.exposeService.type"] = "NodePort"
+					defaultPartitionHelmValues["server.exposeService.nodePort.https"] = "30000"
+					defaultPartitionHelmValues["server.exposeService.nodePort.grpc"] = "30100"
+				}
+				helpers.MergeMaps(defaultPartitionHelmValues, commonHelmValues)
 
-			partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
-			partitionSvcAddress := k8s.ServiceHost(t, cfg, testClusters[keyCluster01a].context, partitionServiceName)
+				testClusters[keyCluster01a].helmCluster = consul.NewHelmCluster(t, defaultPartitionHelmValues, testClusters[keyCluster01a].context, cfg, releaseName)
+				testClusters[keyCluster01a].helmCluster.Create(t)
 
-			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, testClusters[keyCluster01b].context)
+				// Get the TLS CA certificate and key secret from the server cluster and apply it to the client cluster.
+				caCertSecretName := fmt.Sprintf("%s-consul-ca-cert", releaseName)
 
-			secondaryPartitionHelmValues := map[string]string{
-				"global.enabled":    "false",
-				"global.datacenter": cluster01Datacenter,
+				logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
+				k8s.CopySecret(t, testClusters[keyCluster01a].context, testClusters[keyCluster01b].context, caCertSecretName)
 
-				"global.adminPartitions.name": cluster01Partition,
+				// Create Secondary Partition Cluster (cluster-01-b) which will apply the primary (dc1) datacenter.
+				partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
+				if c.ACLsEnabled {
+					logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
+					k8s.CopySecret(t, testClusters[keyCluster01a].context, testClusters[keyCluster01b].context, partitionToken)
+				}
 
-				"global.tls.caCert.secretName": caCertSecretName,
-				"global.tls.caCert.secretKey":  "tls.crt",
+				partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
+				partitionSvcAddress := k8s.ServiceHost(t, cfg, testClusters[keyCluster01a].context, partitionServiceName)
 
-				"externalServers.enabled":       "true",
-				"externalServers.hosts[0]":      partitionSvcAddress,
-				"externalServers.tlsServerName": fmt.Sprintf("server.%s.consul", cluster01Datacenter),
-				"global.server.enabled":         "false",
-			}
+				k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, testClusters[keyCluster01b].context)
 
-			if c.ACLsEnabled {
-				// Setup partition token and auth method host if ACLs enabled.
-				secondaryPartitionHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
-				secondaryPartitionHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
-				secondaryPartitionHelmValues["externalServers.k8sAuthMethodHost"] = k8sAuthMethodHost
-			}
+				secondaryPartitionHelmValues := map[string]string{
+					"global.enabled":    "false",
+					"global.datacenter": cluster01Datacenter,
 
-			if cfg.UseKind {
-				secondaryPartitionHelmValues["externalServers.httpsPort"] = "30000"
-				secondaryPartitionHelmValues["externalServers.grpcPort"] = "30100"
-				secondaryPartitionHelmValues["meshGateway.service.type"] = "NodePort"
-				secondaryPartitionHelmValues["meshGateway.service.nodePort"] = "30200"
-			}
-			helpers.MergeMaps(secondaryPartitionHelmValues, commonHelmValues)
+					"global.adminPartitions.name": cluster01Partition,
 
-			testClusters[keyCluster01b].helmCluster = consul.NewHelmCluster(t, secondaryPartitionHelmValues, testClusters[keyCluster01b].context, cfg, releaseName)
-			testClusters[keyCluster01b].helmCluster.Create(t)
+					"global.tls.caCert.secretName": caCertSecretName,
+					"global.tls.caCert.secretKey":  "tls.crt",
+
+					"externalServers.enabled":       "true",
+					"externalServers.hosts[0]":      partitionSvcAddress,
+					"externalServers.tlsServerName": fmt.Sprintf("server.%s.consul", cluster01Datacenter),
+					"global.server.enabled":         "false",
+				}
+
+				if c.ACLsEnabled {
+					// Setup partition token and auth method host if ACLs enabled.
+					secondaryPartitionHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
+					secondaryPartitionHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
+					secondaryPartitionHelmValues["externalServers.k8sAuthMethodHost"] = k8sAuthMethodHost
+				}
+
+				if cfg.UseKind {
+					secondaryPartitionHelmValues["externalServers.httpsPort"] = "30000"
+					secondaryPartitionHelmValues["externalServers.grpcPort"] = "30100"
+					secondaryPartitionHelmValues["meshGateway.service.type"] = "NodePort"
+					secondaryPartitionHelmValues["meshGateway.service.nodePort"] = "30200"
+				}
+				helpers.MergeMaps(secondaryPartitionHelmValues, commonHelmValues)
+
+				testClusters[keyCluster01b].helmCluster = consul.NewHelmCluster(t, secondaryPartitionHelmValues, testClusters[keyCluster01b].context, cfg, releaseName)
+				testClusters[keyCluster01b].helmCluster.Create(t)
+				wg.Done()
+			}()
 
 			// Create cluster-02-a Cluster.
-			PeerOneHelmValues := map[string]string{
-				"global.datacenter": cluster02Datacenter,
-			}
+			wg.Add(1)
+			go func() {
+				PeerOneHelmValues := map[string]string{
+					"global.datacenter": cluster02Datacenter,
+				}
 
-			if cfg.UseKind {
-				PeerOneHelmValues["server.exposeGossipAndRPCPorts"] = "true"
-				PeerOneHelmValues["meshGateway.service.type"] = "NodePort"
-				PeerOneHelmValues["meshGateway.service.nodePort"] = "30100"
-			}
-			helpers.MergeMaps(PeerOneHelmValues, commonHelmValues)
+				if cfg.UseKind {
+					PeerOneHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+					PeerOneHelmValues["meshGateway.service.type"] = "NodePort"
+					PeerOneHelmValues["meshGateway.service.nodePort"] = "30100"
+				}
+				helpers.MergeMaps(PeerOneHelmValues, commonHelmValues)
 
-			testClusters[keyCluster02a].helmCluster = consul.NewHelmCluster(t, PeerOneHelmValues, testClusters[keyCluster02a].context, cfg, releaseName)
-			testClusters[keyCluster02a].helmCluster.Create(t)
+				testClusters[keyCluster02a].helmCluster = consul.NewHelmCluster(t, PeerOneHelmValues, testClusters[keyCluster02a].context, cfg, releaseName)
+				testClusters[keyCluster02a].helmCluster.Create(t)
+				wg.Done()
+			}()
 
 			// Create cluster-03-a Cluster.
-			PeerTwoHelmValues := map[string]string{
-				"global.datacenter": cluster03Datacenter,
-			}
+			wg.Add(1)
+			go func() {
+				PeerTwoHelmValues := map[string]string{
+					"global.datacenter": cluster03Datacenter,
+				}
 
-			if cfg.UseKind {
-				PeerTwoHelmValues["server.exposeGossipAndRPCPorts"] = "true"
-				PeerTwoHelmValues["meshGateway.service.type"] = "NodePort"
-				PeerTwoHelmValues["meshGateway.service.nodePort"] = "30100"
-			}
-			helpers.MergeMaps(PeerTwoHelmValues, commonHelmValues)
+				if cfg.UseKind {
+					PeerTwoHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+					PeerTwoHelmValues["meshGateway.service.type"] = "NodePort"
+					PeerTwoHelmValues["meshGateway.service.nodePort"] = "30100"
+				}
+				helpers.MergeMaps(PeerTwoHelmValues, commonHelmValues)
 
-			testClusters[keyCluster03a].helmCluster = consul.NewHelmCluster(t, PeerTwoHelmValues, testClusters[keyCluster03a].context, cfg, releaseName)
-			testClusters[keyCluster03a].helmCluster.Create(t)
+				testClusters[keyCluster03a].helmCluster = consul.NewHelmCluster(t, PeerTwoHelmValues, testClusters[keyCluster03a].context, cfg, releaseName)
+				testClusters[keyCluster03a].helmCluster.Create(t)
+				wg.Done()
+			}()
+
+			// Wait for the clusters to start up
+			wg.Wait()
 
 			// Create a ProxyDefaults resource to configure services to use the mesh
 			// gateways and set server and client opts.
@@ -428,14 +449,14 @@ func TestFailover_Connect(t *testing.T) {
 			// Create static server/client after the rest of the config is setup for a more stable testing experience
 			// Create static server deployments.
 			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, testClusters[keyCluster01a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc1-default")
-			k8s.DeployKustomize(t, testClusters[keyCluster01b].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc1-partition")
-			k8s.DeployKustomize(t, testClusters[keyCluster02a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc2")
-			k8s.DeployKustomize(t, testClusters[keyCluster03a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc3")
+			deployCustomizeAsync(t, testClusters[keyCluster01a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-server/dc1-default", &wg)
+			deployCustomizeAsync(t, testClusters[keyCluster01b].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-server/dc1-partition", &wg)
+			deployCustomizeAsync(t, testClusters[keyCluster02a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-server/dc2", &wg)
+			deployCustomizeAsync(t, testClusters[keyCluster03a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				"../fixtures/cases/sameness/static-server/dc3", &wg)
 
 			// Create static client deployments.
 			staticClientKustomizeDirDefault := "../fixtures/cases/sameness/static-client/default-partition"
@@ -447,14 +468,15 @@ func TestFailover_Connect(t *testing.T) {
 				staticClientKustomizeDirAP1 = fmt.Sprintf("%s-%s", staticClientKustomizeDirAP1, "tproxy")
 			}
 
-			k8s.DeployKustomize(t, testClusters[keyCluster01a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				staticClientKustomizeDirDefault)
-			k8s.DeployKustomize(t, testClusters[keyCluster02a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				staticClientKustomizeDirDefault)
-			k8s.DeployKustomize(t, testClusters[keyCluster03a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				staticClientKustomizeDirDefault)
-			k8s.DeployKustomize(t, testClusters[keyCluster01b].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				staticClientKustomizeDirAP1)
+			deployCustomizeAsync(t, testClusters[keyCluster01a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				staticClientKustomizeDirDefault, &wg)
+			deployCustomizeAsync(t, testClusters[keyCluster02a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				staticClientKustomizeDirDefault, &wg)
+			deployCustomizeAsync(t, testClusters[keyCluster03a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				staticClientKustomizeDirDefault, &wg)
+			deployCustomizeAsync(t, testClusters[keyCluster01b].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+				staticClientKustomizeDirAP1, &wg)
+			wg.Wait()
 
 			// Verify that both static-server and static-client have been injected and now have 2 containers in each cluster.
 			// Also get the server IP
@@ -843,4 +865,12 @@ func getCatalogService(t *testing.T, c *cluster, svc, ns, partition string) *api
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp, "did not find service %s in cluster %s (partition=%s ns=%s)", svc, c.name, partition, ns)
 	return resp[0]
+}
+
+func deployCustomizeAsync(t *testing.T, opts *terratestk8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string, wg *sync.WaitGroup) {
+	wg.Add(1)
+	go func() {
+		k8s.DeployKustomize(t, opts, noCleanupOnFailure, noCleanup, debugDirectory, kustomizeDir)
+		wg.Done()
+	}()
 }
