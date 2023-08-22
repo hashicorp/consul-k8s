@@ -22,7 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -501,7 +500,8 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			// Create fake k8s client
 			k8sObjects := append(tt.k8sObjects(), &ns)
 
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
@@ -622,7 +622,8 @@ func TestReconcile_DeletePeeringAcceptor(t *testing.T) {
 	k8sObjects := []runtime.Object{&ns, acceptor}
 
 	// Add peering types to the scheme.
-	s := scheme.Scheme
+	s := runtime.NewScheme()
+	corev1.AddToScheme(s)
 	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
@@ -768,7 +769,8 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 			// Create fake k8s client
 			k8sObjects := []runtime.Object{acceptor, secret, ns}
 
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 
@@ -1080,7 +1082,8 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 			k8sObjects = append(k8sObjects, tt.peeringAcceptor)
 
 			// Add peering types to the scheme.
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 			// Create the peering acceptor controller.
@@ -1192,7 +1195,8 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			k8sObjects = append(k8sObjects, tt.acceptor)
 
 			// Add peering types to the scheme.
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
 			// Create the peering acceptor controller.
@@ -1476,7 +1480,8 @@ func TestAcceptor_RequestsForPeeringTokens(t *testing.T) {
 
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.acceptors).Build()
 			controller := AcceptorController{
