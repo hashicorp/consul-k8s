@@ -98,6 +98,29 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				Name:  "DP_SERVICE_NODE_NAME",
 				Value: "$(NODE_NAME)-virtual",
 			},
+			// The pod name isn't known currently, so we must rely on the environment variable to fill it in rather than using args.
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+				},
+			},
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META",
+				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+			},
+			// This entry exists to support certain versions of consul dataplane, where environment variable entries
+			// utilize this numbered notation to indicate individual KV pairs in a map.
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META1",
+				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -208,7 +231,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 			"-credential-type=login",
 			"-login-auth-method="+w.AuthMethod,
 			"-login-bearer-token-path="+bearerTokenFile,
-			"-login-meta="+fmt.Sprintf("pod=%s/%s", namespace.Name, pod.Name),
+			// We don't know the pod name at this time, so we must use environment variables to populate the login-meta instead.
 		)
 		if w.EnableNamespaces {
 			if w.EnableK8SNSMirroring {
