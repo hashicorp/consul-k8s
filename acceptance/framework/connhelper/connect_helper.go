@@ -176,6 +176,18 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		})
 }
 
+func (c *ConnectHelper) CreateNamespace(t *testing.T, namespace string) {
+	opts := c.Ctx.KubectlOptions(t)
+	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
+	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
+		return
+	}
+	require.NoError(t, err)
+	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
+		k8s.RunKubectl(t, opts, "delete", "ns", namespace)
+	})
+}
+
 // DeployJob deploys a job pod to the Kubernetes
 // cluster which will be used to test service mesh connectivity. If the Secure
 // flag is true, a pre-check is done to ensure that the ACL tokens for the test
@@ -252,18 +264,6 @@ func (c *ConnectHelper) DeployServer(t *testing.T) {
 	}
 }
 
-func (c *ConnectHelper) SetupNamespace(t *testing.T, namespace string) {
-	opts := c.KubectlOptsForApp(t)
-	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
-	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
-		return
-	}
-	require.NoError(t, err)
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, opts, "delete", "ns", namespace)
-	})
-}
-
 // SetupAppNamespace creates a namespace where applications are deployed. This
 // does nothing if UseAppNamespace is not set. The app namespace is relevant
 // when testing with restricted PSA enforcement enabled.
@@ -274,7 +274,7 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 	opts := c.KubectlOptsForApp(t)
 	// If we are deploying apps in another namespace, create the namespace.
 
-	c.SetupNamespace(t, opts.Namespace)
+	c.CreateNamespace(t, opts.Namespace)
 
 	if c.Cfg.EnableRestrictedPSAEnforcement {
 		// Allow anything to run in the app namespace.
@@ -323,7 +323,7 @@ type IntentionOpts struct {
 
 // CreateIntention creates an intention for the static-server pod to connect to
 // the static-client pod. opts parameter allows for overriding of some fields. If opts is empty
-// then all namespaces are the KubectlOptsForApp namespaces.
+// then all namespaces default to the KubectlOptsForApp namespace.
 func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts, clientType ...string) {
 	logger.Log(t, "creating intention")
 	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
@@ -338,7 +338,7 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts, client
 	}
 
 	destinationNamespace := c.KubectlOptsForApp(t).Namespace
-	if opts.SourceNamespace != "" {
+	if opts.DestinationNamespace != "" {
 		destinationNamespace = opts.DestinationNamespace
 	}
 

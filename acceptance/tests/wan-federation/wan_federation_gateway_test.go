@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -217,7 +218,7 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 	targetAddress := fmt.Sprintf("http://%s/", gatewayAddress)
 
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, ctx.KubectlOptions(t), StaticClientName, targetAddress)
+	k8s.CheckStaticServerHTTPConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, targetAddress)
 
 	logger.Log(t, "creating intention")
 	_, _, err := client.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -237,5 +238,5 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 	}()
 
 	logger.Log(t, "checking that connection is successful")
-	k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, targetAddress)
+	k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, targetAddress)
 }

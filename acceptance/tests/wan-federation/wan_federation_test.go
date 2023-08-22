@@ -23,8 +23,6 @@ import (
 )
 
 const (
-	StaticClientName = "static-client"
-
 	staticClientDeployment = "deploy/static-client"
 	staticServerDeployment = "deploy/static-server"
 
@@ -213,7 +211,7 @@ func TestWANFederation(t *testing.T) {
 			}
 
 			logger.Log(t, "checking that connection is successful")
-			k8s.CheckStaticServerConnectionSuccessful(t, primaryHelper.KubectlOptsForApp(t), StaticClientName, "http://localhost:1234")
+			k8s.CheckStaticServerConnectionSuccessful(t, primaryHelper.KubectlOptsForApp(t), connhelper.StaticClientName, "http://localhost:1234")
 		})
 	}
 }
@@ -390,16 +388,18 @@ func TestWANFederationFailover(t *testing.T) {
 			}
 
 			// Create Namespaces
+			// We create a namespace (ns1) in both the primary and secondary datacenters (dc1, dc2)
+			// We then create a secondary namespace (ns2) in the primary datacenter (dc1)
 			primaryNamespaceOpts := primaryHelper.Ctx.KubectlOptionsForNamespace(primaryNamespace)
-			primaryHelper.SetupNamespace(t, primaryNamespaceOpts.Namespace)
+			primaryHelper.CreateNamespace(t, primaryNamespaceOpts.Namespace)
 			primarySecondaryNamepsaceOpts := primaryHelper.Ctx.KubectlOptionsForNamespace(secondaryNamespace)
-			primaryHelper.SetupNamespace(t, primarySecondaryNamepsaceOpts.Namespace)
-			secondaryNamespaceOtps := secondaryHelper.Ctx.KubectlOptionsForNamespace(primaryNamespace)
-			secondaryHelper.SetupNamespace(t, secondaryNamespaceOtps.Namespace)
+			primaryHelper.CreateNamespace(t, primarySecondaryNamepsaceOpts.Namespace)
+			secondaryNamespaceOpts := secondaryHelper.Ctx.KubectlOptionsForNamespace(primaryNamespace)
+			secondaryHelper.CreateNamespace(t, secondaryNamespaceOpts.Namespace)
 
 			// Create a static-server in dc2 to respond with its own name for checking failover.
 			logger.Log(t, "Creating static-server in dc2")
-			k8s.DeployKustomize(t, secondaryNamespaceOtps, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/wan-federation/dc2-static-server")
+			k8s.DeployKustomize(t, secondaryNamespaceOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/wan-federation/dc2-static-server")
 
 			// Spin up a server on dc1 which will be the primary upstream for our client
 			logger.Log(t, "Creating static-server in dc1")
@@ -419,7 +419,7 @@ func TestWANFederationFailover(t *testing.T) {
 				// ns1 static-client (source) -> ns1 static-server (destination)
 				primaryHelper.CreateIntention(t, connhelper.IntentionOpts{DestinationNamespace: primaryNamespaceOpts.Namespace, SourceNamespace: primaryNamespaceOpts.Namespace})
 
-				// ns1 static-client (source) -> ns2 static-sever (destination)
+				// ns1 static-client (source) -> ns2 static-server (destination)
 				primaryHelper.CreateIntention(t, connhelper.IntentionOpts{DestinationNamespace: primarySecondaryNamepsaceOpts.Namespace, SourceNamespace: primaryNamespaceOpts.Namespace})
 			}
 
@@ -441,7 +441,7 @@ func TestWANFederationFailover(t *testing.T) {
 
 			// scale down the primary datacenter static-server and see the failover
 			logger.Log(t, "Scale down dc2 static-server")
-			k8s.KubectlScale(t, secondaryNamespaceOtps, staticServerDeployment, 0)
+			k8s.KubectlScale(t, secondaryNamespaceOpts, staticServerDeployment, 0)
 
 			// Verify that we respond with the static-server in the secondary datacenter
 			logger.Log(t, "Verifying static-server in secondary namespace (ns2) responds")
@@ -457,11 +457,20 @@ func serviceFailoverCheck(t *testing.T, options *terratestK8s.KubectlOptions, po
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	var resp string
 	var err error
-	retry.RunWith(timer, t, func(r *retry.R) {
+
+	f := func(ft require.TestingT) {
 		resp, err = k8s.RunKubectlAndGetOutputE(t, options, "exec", "-i",
-			staticClientDeployment, "-c", StaticClientName, "--", "curl", fmt.Sprintf("localhost:%s", port))
-		require.NoError(r, err)
-		assert.Contains(r, resp, expectedName)
+			staticClientDeployment, "-c", connhelper.StaticClientName, "--", "curl", fmt.Sprintf("localhost:%s", port))
+		require.NoError(ft, err)
+		assert.Contains(ft, resp, expectedName)
+	}
+
+	retry.RunWith(timer, t, func(r *retry.R) {
+		f(r)
 	})
+
+	// Try again to rule out load-balancing
+	f(t)
+
 	logger.Log(t, resp)
 }
