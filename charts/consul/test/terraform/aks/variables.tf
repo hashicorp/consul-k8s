@@ -39,4 +39,3 @@ variable "tags" {
   default     = {}
   description = "Tags to attach to the created resources."
 }
-
