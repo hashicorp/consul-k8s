@@ -42,7 +42,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.AuthMethod = "test-auth-method"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and namespace mirroring": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -51,7 +51,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -login-namespace=default -service-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-login-namespace=default -service-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and single destination namespace": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -60,7 +60,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulDestinationNamespace = "test-ns"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -login-namespace=test-ns -service-namespace=test-ns -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-login-namespace=test-ns -service-namespace=test-ns -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -68,7 +68,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulPartition = "test-part"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-meta=pod=k8snamespace/test-pod -login-partition=test-part -service-partition=test-part -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-login-partition=test-part -service-partition=test-part -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with TLS and CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -219,11 +219,17 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			}
 			require.Equal(t, expectedProbe, container.ReadinessProbe)
 			require.Nil(t, container.StartupProbe)
-			require.Len(t, container.Env, 3)
+			require.Len(t, container.Env, 7)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
 			require.Equal(t, container.Env[0].Value, "/consul/connect-inject")
 			require.Equal(t, container.Env[2].Name, "DP_SERVICE_NODE_NAME")
 			require.Equal(t, container.Env[2].Value, "$(NODE_NAME)-virtual")
+			require.Equal(t, container.Env[3].Name, "POD_NAME")
+			require.Equal(t, container.Env[4].Name, "POD_NAMESPACE")
+			require.Equal(t, container.Env[5].Name, "DP_CREDENTIAL_LOGIN_META")
+			require.Equal(t, container.Env[5].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
+			require.Equal(t, container.Env[6].Name, "DP_CREDENTIAL_LOGIN_META1")
+			require.Equal(t, container.Env[6].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
 		})
 	}
 }
@@ -631,10 +637,10 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				expArgs = []string{
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
-						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
+						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
 					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
-						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -login-meta=pod=k8snamespace/test-pod -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
+						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 				}
 			}
 			expSAVolumeMounts := []corev1.VolumeMount{
