@@ -103,18 +103,7 @@ func TestWANFederation(t *testing.T) {
 			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			var k8sAuthMethodHost string
-			// When running on kind, the kube API address in kubeconfig will have a localhost address
-			// which will not work from inside the container. That's why we need to use the endpoints address instead
-			// which will point the node IP.
-			if cfg.UseKind {
-				// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
-				kubernetesEndpoint, err := secondaryContext.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
-				require.NoError(t, err)
-				k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
-			} else {
-				k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryContext.KubectlOptions(t))
-			}
+			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryContext)
 
 			// Create secondary cluster
 			secondaryHelmValues := map[string]string{
@@ -295,18 +284,7 @@ func TestWANFederationFailover(t *testing.T) {
 			_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			var k8sAuthMethodHost string
-			// When running on kind, the kube API address in kubeconfig will have a localhost address
-			// which will not work from inside the container. That's why we need to use the endpoints address instead
-			// which will point the node IP.
-			if cfg.UseKind {
-				// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
-				kubernetesEndpoint, err := secondaryContext.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
-				require.NoError(t, err)
-				k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
-			} else {
-				k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryContext.KubectlOptions(t))
-			}
+			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryContext)
 
 			// Create secondary cluster
 			secondaryHelmValues := map[string]string{
