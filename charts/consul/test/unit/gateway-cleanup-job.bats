@@ -43,22 +43,3 @@ target=templates/gateway-cleanup-job.yaml
         yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
     [ "${actual}" = "bar" ]
 }
-
-@test "gatewaycleanup/Job: argocd annotations are set if global.argocd.enabled is true" {
-  cd `chart_dir`
-  local actual=$(helm template \
-     -s $target \
-     --set 'global.acls.manageSystemACLs=true' \
-     --set 'global.argocd.enabled=true' \
-     . | tee /dev/stderr |
-     yq -r '.spec.template.metadata.annotations["argocd.argoproj.io/hook"]' | tee /dev/stderr)
-  [ "${actual}" = "Sync" ]
-  local actual=$(helm template \
-     -s $target \
-     --set 'global.acls.manageSystemACLs=true' \
-     --set 'global.argocd.enabled=true' \
-     . | tee /dev/stderr |
-     yq -r '.spec.template.metadata.annotations["argocd.argoproj.io/hook-delete-policy"]' | tee /dev/stderr)
-  [ "${actual}" = "HookSucceeded" ]
-}
-

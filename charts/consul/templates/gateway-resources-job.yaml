@@ -34,9 +34,6 @@ spec:
         {{- if .Values.global.acls.annotations }}
           {{- tpl .Values.global.acls.annotations . | nindent 8 }}
         {{- end }}
-        {{- if .Values.global.argocd.enabled }}
-          {{- tpl .Values.global.argocd.annotations . | nindent 8 }}
-        {{- end}}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-gateway-resources

@@ -2314,3 +2314,21 @@ load _helpers
      yq -r '.spec.template.metadata.annotations["argocd.argoproj.io/hook-delete-policy"]' | tee /dev/stderr)
   [ "${actual}" = "HookSucceeded" ]
 }
+
+@test "serverACLInit/Job: argocd annotations are not set if global.argocd.enabled is false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+     -s templates/server-acl-init-job.yaml \
+     --set 'global.acls.manageSystemACLs=true' \
+     --set 'global.argocd.enabled=false' \
+     . | tee /dev/stderr |
+     yq -r '.spec.template.metadata.annotations["argocd.argoproj.io/hook"]' | tee /dev/stderr)
+  [ "${actual}" = null ]
+  local actual=$(helm template \
+     -s templates/server-acl-init-job.yaml \
+     --set 'global.acls.manageSystemACLs=true' \
+     --set 'global.argocd.enabled=false' \
+     . | tee /dev/stderr |
+     yq -r '.spec.template.metadata.annotations["argocd.argoproj.io/hook-delete-policy"]' | tee /dev/stderr)
+  [ "${actual}" = null ]
+}

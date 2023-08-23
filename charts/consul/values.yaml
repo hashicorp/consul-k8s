@@ -532,9 +532,6 @@ global:
   #   argocd.argoproj.io/hook-delete-policy: HookSucceeded
   argocd:
     enabled: false
-    annotations: |
-      argocd.argoproj.io/hook: Sync
-      argocd.argoproj.io/hook-delete-policy: HookSucceeded
 
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an
