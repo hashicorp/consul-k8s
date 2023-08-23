@@ -65,6 +65,13 @@ type ConnectHelper struct {
 	ConsulClient *api.Client
 }
 
+// ConnHelperOpts allows for configuring optional parameters to be passed into the
+// conn helper methods. This provides added flexibility, although not every value will be used
+// by every method. See documentation for more details.
+type ConnHelperOpts struct {
+	ClientType string
+}
+
 // Setup creates a new cluster using the New*Cluster function and assigns it
 // to the consulCluster field.
 func (c *ConnectHelper) Setup(t *testing.T) {
@@ -300,15 +307,17 @@ func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
 }
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static
-// server fails when no intentions are configured.
-func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clientType ...string) {
+// server fails when no intentions are configured. When provided with a ClientType option
+// the client is overridden, otherwise a default will be used.
+func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, connHelperOpts ConnHelperOpts) {
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	opts := c.KubectlOptsForApp(t)
 	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
-	if len(clientType) > 0 {
-		client = clientType[0]
+	if connHelperOpts.ClientType != "" {
+		client = connHelperOpts.ClientType
 	}
+
 	if c.Cfg.EnableTransparentProxy {
 		k8s.CheckStaticServerConnectionFailing(t, opts, client, "http://static-server")
 	} else {
@@ -317,19 +326,20 @@ func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clie
 }
 
 type IntentionOpts struct {
-	DestinationNamespace string
+	ConnHelperOpts
 	SourceNamespace      string
+	DestinationNamespace string
 }
 
 // CreateIntention creates an intention for the static-server pod to connect to
 // the static-client pod. opts parameter allows for overriding of some fields. If opts is empty
-// then all namespaces default to the KubectlOptsForApp namespace.
-func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts, clientType ...string) {
+// then all namespaces and clients use defaults.
+func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts) {
 	logger.Log(t, "creating intention")
 	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
-	if len(clientType) > 0 {
-		client = clientType[0]
+	if opts.ClientType != "" {
+		client = opts.ClientType
 	}
 
 	sourceNamespace := c.KubectlOptsForApp(t).Namespace
@@ -361,15 +371,17 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts, client
 }
 
 // TestConnectionSuccess ensures the static-server pod can connect to the
-// static-client pod once the intention is set.
-func (c *ConnectHelper) TestConnectionSuccess(t *testing.T, clientType ...string) {
+// static-client pod once the intention is set. When provided with a ClientType option
+// the client is overridden, otherwise a default will be used.
+func (c *ConnectHelper) TestConnectionSuccess(t *testing.T, connHelperOpts ConnHelperOpts) {
 	logger.Log(t, "checking that connection is successful")
 	opts := c.KubectlOptsForApp(t)
 	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
-	if len(clientType) > 0 {
-		client = clientType[0]
+	if connHelperOpts.ClientType != "" {
+		client = connHelperOpts.ClientType
 	}
+
 	if c.Cfg.EnableTransparentProxy {
 		// todo: add an assertion that the traffic is going through the proxy
 		k8s.CheckStaticServerConnectionSuccessful(t, opts, client, "http://static-server")
