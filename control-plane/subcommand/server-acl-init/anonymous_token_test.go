@@ -63,6 +63,6 @@ func Test_configureAnonymousPolicy(t *testing.T) {
 	newPolicy, _, err := consul.ACL().PolicyReadByName(anonymousTokenPolicyName, nil)
 	require.NoError(t, err)
 
-	// assert policy rule is still same.
+	// assert policy is still same.
 	require.Equal(t, updatedPolicy, newPolicy)
 }
