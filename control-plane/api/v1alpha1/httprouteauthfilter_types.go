@@ -8,35 +8,35 @@ import (
 )
 
 func init() {
-	SchemeBuilder.Register(&HTTPRouteAuthFilter{}, &HTTPRouteAuthFilterList{})
+	SchemeBuilder.Register(&RouteAuthFilter{}, &RouteAuthFilterList{})
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// HTTPRouteAuthFilter is the Schema for the httprouteretryfilters API.
+// RouteAuthFilter is the Schema for the httpauthfilters API.
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
-type HTTPRouteAuthFilter struct {
+type RouteAuthFilter struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   HTTPRouteAuthFilterSpec `json:"spec,omitempty"`
+	Spec   RouteAuthFilterSpec `json:"spec,omitempty"`
 	Status `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// HTTPRouteAuthFilterList contains a list of HTTPRouteAuthFilter.
-type HTTPRouteAuthFilterList struct {
+// RouteAuthFilterList contains a list of RouteAuthFilter.
+type RouteAuthFilterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []HTTPRouteAuthFilter `json:"items"`
+	Items           []RouteAuthFilter `json:"items"`
 }
 
-// HTTPRouteAuthFilterSpec defines the desired state of HTTPRouteAuthFilter.
-type HTTPRouteAuthFilterSpec struct {
+// RouteAuthFilterSpec defines the desired state of RouteAuthFilter.
+type RouteAuthFilterSpec struct {
 	//+kubebuilder:validation:Optional
 	JWT *RouteJWTRequirement `json:"jwt,omitempty"`
 }
