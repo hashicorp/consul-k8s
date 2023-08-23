@@ -141,6 +141,8 @@ spec:
         {{- toYaml .Values.server.securityContext | nindent 8 }}
       {{- end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-server-config
@@ -450,6 +452,9 @@ spec:
               mountPath: /trusted-cas
               readOnly: false
             {{- end }}
+            - name: tmp
+              mountPath: /tmp
+              readOnly: false
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
             - name: http
