@@ -858,6 +858,7 @@ load _helpers
     "capabilities": {
       "drop": ["ALL"]
     },
+    "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
     "seccompProfile": {
       "type": "RuntimeDefault"
@@ -889,6 +890,7 @@ load _helpers
     "capabilities": {
       "drop": ["ALL"]
     },
+    "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
     "seccompProfile": {
       "type": "RuntimeDefault"
