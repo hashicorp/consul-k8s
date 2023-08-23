@@ -1,5 +1,5 @@
 ```release-note:improvement
-If argocd.enabled is set to true, following annotations are added to job - server-acl-init-job and
+If argocd.enabled is set to true, following annotations are added to job - server-acl-init-job
  argocd.argoproj.io/hook: Sync
  argocd.argoproj.io/hook-delete-policy: HookSucceeded
 ```
