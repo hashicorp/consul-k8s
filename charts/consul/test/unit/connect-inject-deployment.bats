@@ -2587,3 +2587,30 @@ reservedNameTest() {
     jq -r '. | select( .name == "CONSUL_TLS_SERVER_NAME").value' | tee /dev/stderr)
   [ "${actual}" = "server.dc1.consul" ]
 }
+
+#--------------------------------------------------------------------
+# resource-apis
+
+@test "connectInject/Deployment: resource-apis is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -enable-resource-apis=true is set when global.experiments contains [\"resource-apis\"] " {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}

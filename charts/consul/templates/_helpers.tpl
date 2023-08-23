@@ -447,3 +447,52 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 {{fail "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set"}}
 {{- end }}
 {{- end -}}
+
+{{/*
+Fails if global.experiments.resourceAPIs is set along with any of these unsupported features.
+- global.peering.enabled
+- global.federation.enabled
+- global.cloud.enabled
+- client.enabled
+- ui.enabled
+- syncCatalog.enabled
+- meshGateway.enabled
+- ingressGateways.enabled
+- terminatingGateways.enabled
+- apiGateway.enabled
+
+Usage: {{ template "consul.validateResourceAPIs" . }}
+
+*/}}
+{{- define "consul.validateResourceAPIs" -}}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.peering.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, global.peering.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.federation.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, global.federation.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.cloud.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, global.cloud.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.client.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, client.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ui.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, ui.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.syncCatalog.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, syncCatalog.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.meshGateway.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, meshGateway.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ingressGateways.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, ingressGateways.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.terminatingGateways.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.apiGateway.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, apiGateway.enabled is currently unsupported."}}
+{{- end }}
+{{- end }}

@@ -938,3 +938,43 @@ reservedNameTest() {
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
 }
+
+#--------------------------------------------------------------------
+# global.experiments=["resource-apis"]
+
+@test "partitionInit/Job: -enable-resource-apis=true is not set in command when global.experiments is empty" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/partition-init-job.yaml \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'server.enabled=false' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      . | tee /dev/stderr)
+
+  # Test the flag is set.
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[] | select(.name == "partition-init-job") | .command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "partitionInit/Job:  -enable-resource-apis=true is set in command when global.experiments contains \"resource-apis\"" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/partition-init-job.yaml \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'server.enabled=false' \
+      --set 'global.adminPartitions.name=bar' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$object" |
+    yq '.spec.template.spec.containers[] | select(.name == "partition-init-job") | .command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
