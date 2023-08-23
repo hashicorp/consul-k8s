@@ -1,4 +1,5 @@
 ```release-note:improvement
-Add support for global.argocd.enabled flaag in values.yaml which adds the global.argocd.annotations in the jobs -
-gateway-cleanup-job, gateway-resources-job, server-acl-init-job and server-acl-init-cleanup-job
+If argocd.enabled is set to true, following annotations are added to job - server-acl-init-job and
+ argocd.argoproj.io/hook: Sync
+ argocd.argoproj.io/hook-delete-policy: HookSucceeded
 ```
