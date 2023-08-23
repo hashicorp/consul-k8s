@@ -42,33 +42,27 @@ func Test_configureAnonymousPolicy(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// creates new anonymous token policy
-	errx := cmd.configureAnonymousPolicy(consul)
-	require.NoError(t, errx)
-	var readOnlyPolicy = `acl = "read"`
-
-	_, _, err = consul.ACL().PolicyCreate(&api.ACLPolicy{
-		Name:  "acl-read-policy",
-		Rules: readOnlyPolicy,
-	}, nil)
+	err = cmd.configureAnonymousPolicy(consul)
 	require.NoError(t, err)
 
-	resp, _, err := consul.ACL().TokenCreate(&api.ACLToken{
-		Policies: []*api.ACLTokenPolicyLink{
-			{
-				Name: "acl-read-policy",
-			},
-		},
-	}, nil)
+	policy, _, err := consul.ACL().PolicyReadByName(anonymousTokenPolicyName, nil)
 	require.NoError(t, err)
-	readToken := resp.SecretID
 
-	readOnlyClient, errz := api.NewClient(&api.Config{
-		Address: consulHTTPAddr,
-		Token:   readToken,
-	})
-	require.NoError(t, errz)
-	// does not create/update anonymous token policy
-	erry := cmd.configureAnonymousPolicy(readOnlyClient)
-	require.NoError(t, erry)
+	testPolicy := api.ACLPolicy{
+		ID:          policy.ID,
+		Name:        anonymousTokenPolicyName,
+		Description: "Anonymous token Policy",
+		Rules:       `acl = "read"`,
+	}
+	updatedPolicy, _, err := consul.ACL().PolicyUpdate(&testPolicy, &api.WriteOptions{})
+	require.NoError(t, err)
+
+	err = cmd.configureAnonymousPolicy(consul)
+	require.NoError(t, err)
+
+	newPolicy, _, err := consul.ACL().PolicyReadByName(anonymousTokenPolicyName, nil)
+	require.NoError(t, err)
+
+	// assert policy rule is still same.
+	require.Equal(t, updatedPolicy, newPolicy)
 }

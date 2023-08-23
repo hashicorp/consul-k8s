@@ -17,9 +17,11 @@ const (
 func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
 	exists, err := checkIfAnonymousTokenPolicyExists(consulClient)
 	if err != nil {
+		c.log.Error("Error checking if anonymous token policy exists", "err", err)
 		return err
 	}
 	if exists {
+		c.log.Info("skipping creating anonymous token since it already exists")
 		return nil
 	}
 
