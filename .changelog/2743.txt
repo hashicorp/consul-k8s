@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: Changed the container ordering in connect-inject to insert consul-dataplane container first if lifecycle is enabled. Container ordering is unchanged if lifecycle is disabled. 
+```

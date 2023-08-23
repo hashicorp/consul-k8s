@@ -221,7 +221,7 @@ func TestConnectInjectNamespaces(t *testing.T) {
 			// Test that kubernetes readiness status is synced to Consul.
 			// Create the file so that the readiness probe of the static-server pod fails.
 			logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-			k8s.RunKubectl(t, staticServerOpts, "exec", "deploy/"+connhelper.StaticServerName, "--", "touch", "/tmp/unhealthy")
+			k8s.RunKubectl(t, staticServerOpts, "exec", "deploy/"+connhelper.StaticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
 
 			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 			// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
