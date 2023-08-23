@@ -294,7 +294,10 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// port.
 	annotatedSvcNames := w.annotatedServiceNames(pod)
 	multiPort := len(annotatedSvcNames) > 1
-
+	lifecycleEnabled, ok := w.LifecycleConfig.EnableProxyLifecycle(pod)
+	if ok != nil {
+		w.Log.Error(err, "unable to get lifecycle enabled status")
+	}
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
@@ -311,8 +314,14 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
-		// TODO: invert to start the Envoy sidecar before the application container
-		pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+		//Append the Envoy sidecar before the application container only if lifecycle enabled.
+
+		if lifecycleEnabled && ok == nil {
+			pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
+		} else {
+			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+		}
+
 	} else {
 		// For multi port pods, check for unsupported cases, mount all relevant service account tokens, and mount an init
 		// container and envoy sidecar per port. Tproxy, metrics, and metrics merging are not supported for multi port pods.
@@ -327,6 +336,10 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Error(err, "checking unsupported cases for multi port pods")
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
+
+		//List of sidecar containers for each service. Build as a list to preserve correct ordering in relation
+		//to services.
+		sidecarContainers := []corev1.Container{}
 		for i, svc := range annotatedSvcNames {
 			w.Log.Info(fmt.Sprintf("service: %s", svc))
 			if w.AuthMethod != "" {
@@ -382,9 +395,20 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 			}
-			// TODO: invert to start the Envoy sidecar container before the
-			// application container
-			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+			// If Lifecycle is enabled, add to the list of sidecar containers to be added
+			// to pod containers at the end in order to preserve relative ordering.
+			if lifecycleEnabled {
+				sidecarContainers = append(sidecarContainers, envoySidecar)
+			} else {
+				pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+
+			}
+
+		}
+
+		//Add sidecar containers first if lifecycle enabled.
+		if lifecycleEnabled {
+			pod.Spec.Containers = append(sidecarContainers, pod.Spec.Containers...)
 		}
 	}
 
