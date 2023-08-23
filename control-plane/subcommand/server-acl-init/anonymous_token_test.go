@@ -54,15 +54,15 @@ func Test_configureAnonymousPolicy(t *testing.T) {
 		Description: "Anonymous token Policy",
 		Rules:       `acl = "read"`,
 	}
-	updatedPolicy, _, err := consul.ACL().PolicyUpdate(&testPolicy, &api.WriteOptions{})
+	readOnlyPolicy, _, err := consul.ACL().PolicyUpdate(&testPolicy, &api.WriteOptions{})
 	require.NoError(t, err)
 
 	err = cmd.configureAnonymousPolicy(consul)
 	require.NoError(t, err)
 
-	newPolicy, _, err := consul.ACL().PolicyReadByName(anonymousTokenPolicyName, nil)
+	actualPolicy, _, err := consul.ACL().PolicyReadByName(anonymousTokenPolicyName, nil)
 	require.NoError(t, err)
 
 	// assert policy is still same.
-	require.Equal(t, updatedPolicy, newPolicy)
+	require.Equal(t, readOnlyPolicy, actualPolicy)
 }
