@@ -91,8 +91,6 @@ spec:
                 required:
                 - providers
                 type: object
-            required:
-            - jwt
             type: object
           status:
             properties:

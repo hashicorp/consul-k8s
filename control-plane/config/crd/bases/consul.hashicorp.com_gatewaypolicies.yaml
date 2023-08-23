@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: GatewayPolicy is the Schema for the gatewaypolicies API
+        description: GatewayPolicy is the Schema for the gatewaypolicies API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -49,20 +49,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: GatewayPolicySpec defines the desired state of GatewayPolicy
+            description: GatewayPolicySpec defines the desired state of GatewayPolicy.
             properties:
               default:
                 properties:
                   jwt:
                     description: APIGatewayJWTRequirement holds the list of JWT providers
-                      to be verified against
+                      to be verified against.
                     properties:
                       providers:
                         description: Providers is a list of providers to consider
                           when verifying a JWT.
                         items:
                           description: APIGatewayJWTProvider holds the provider and
-                            claim verification information
+                            claim verification information.
                           properties:
                             name:
                               description: Name is the name of the JWT provider. There
@@ -74,7 +74,7 @@ spec:
                                 to verify in a JWT's payload.
                               items:
                                 description: APIGatewayJWTClaimVerification holds
-                                  the actual claim information to be verified
+                                  the actual claim information to be verified.
                                 properties:
                                   path:
                                     description: Path is the path to the claim in
@@ -108,14 +108,14 @@ spec:
                 properties:
                   jwt:
                     description: APIGatewayJWTRequirement holds the list of JWT providers
-                      to be verified against
+                      to be verified against.
                     properties:
                       providers:
                         description: Providers is a list of providers to consider
                           when verifying a JWT.
                         items:
                           description: APIGatewayJWTProvider holds the provider and
-                            claim verification information
+                            claim verification information.
                           properties:
                             name:
                               description: Name is the name of the JWT provider. There
@@ -127,7 +127,7 @@ spec:
                                 to verify in a JWT's payload.
                               items:
                                 description: APIGatewayJWTClaimVerification holds
-                                  the actual claim information to be verified
+                                  the actual claim information to be verified.
                                 properties:
                                   path:
                                     description: Path is the path to the claim in

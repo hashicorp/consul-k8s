@@ -37,7 +37,7 @@ type HTTPRouteAuthFilterList struct {
 
 // HTTPRouteAuthFilterSpec defines the desired state of HTTPRouteAuthFilter.
 type HTTPRouteAuthFilterSpec struct {
-	JWT RouteJWTRequirement `json:"jwt"`
+	JWT *RouteJWTRequirement `json:"jwt,omitempty"`
 }
 
 // RouteJWTRequirement defines the JWT requirements per provider.
