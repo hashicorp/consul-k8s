@@ -1,0 +1,3 @@
+```release-note:feature
+ingress-gateway: Adds PassiveHealthCheck to IngressGateway CRD
+```
