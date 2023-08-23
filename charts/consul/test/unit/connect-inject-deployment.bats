@@ -2597,12 +2597,12 @@ reservedNameTest() {
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-resource-apis=true"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
 
   [ "${actual}" = "false" ]
 }
 
-@test "connectInject/Deployment: -resource-apis=true is set when global.experiments contains [\"resource-apis\"] " {
+@test "connectInject/Deployment: -enable-resource-apis=true is set when global.experiments contains [\"resource-apis\"] " {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml  \
@@ -2610,7 +2610,7 @@ reservedNameTest() {
       --set 'global.experiments[0]=resource-apis' \
       --set 'ui.enabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-resource-apis=true"))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
 }

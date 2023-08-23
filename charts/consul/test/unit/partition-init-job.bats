@@ -942,7 +942,7 @@ reservedNameTest() {
 #--------------------------------------------------------------------
 # global.experiments=["resource-apis"]
 
-@test "partitionInit/Job: experiments=[\"resource-apis\"] is not set in command when global.experiments is empty" {
+@test "partitionInit/Job: -enable-resource-apis=true is not set in command when global.experiments is empty" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/partition-init-job.yaml \
@@ -956,11 +956,11 @@ reservedNameTest() {
 
   # Test the flag is set.
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "partition-init-job") | .command | any(contains("-resource-apis=true"))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[] | select(.name == "partition-init-job") | .command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
-@test "partitionInit/Job:  experiments=[\"resource-apis\"] is set in command when global.experiments contains \"resource-apis\"" {
+@test "partitionInit/Job:  -enable-resource-apis=true is set in command when global.experiments contains \"resource-apis\"" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/partition-init-job.yaml \
@@ -975,6 +975,6 @@ reservedNameTest() {
       . | tee /dev/stderr)
 
   local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "partition-init-job") | .command | any(contains("-resource-apis=true"))' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[] | select(.name == "partition-init-job") | .command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

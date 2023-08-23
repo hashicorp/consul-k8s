@@ -115,7 +115,7 @@ spec:
                 -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
                 {{- end }}
                 {{- if (mustHas "resource-apis" .Values.global.experiments) }}
-                -resource-apis=true
+                -enable-resource-apis=true
                 {{- end }}
           resources:
             requests:
