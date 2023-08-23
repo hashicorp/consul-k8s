@@ -45,9 +45,30 @@ func Test_configureAnonymousPolicy(t *testing.T) {
 	// creates new anonymous token policy
 	errx := cmd.configureAnonymousPolicy(consul)
 	require.NoError(t, errx)
+	var readOnlyPolicy = `acl = "read"`
 
+	_, _, err = consul.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:  "acl-read-policy",
+		Rules: readOnlyPolicy,
+	}, nil)
+	require.NoError(t, err)
+
+	resp, _, err := consul.ACL().TokenCreate(&api.ACLToken{
+		Policies: []*api.ACLTokenPolicyLink{
+			{
+				Name: "acl-read-policy",
+			},
+		},
+	}, nil)
+	require.NoError(t, err)
+	readToken := resp.SecretID
+
+	readOnlyClient, errz := api.NewClient(&api.Config{
+		Address: consulHTTPAddr,
+		Token:   readToken,
+	})
+	require.NoError(t, errz)
 	// does not create/update anonymous token policy
-	erry := cmd.configureAnonymousPolicy(consul)
+	erry := cmd.configureAnonymousPolicy(readOnlyClient)
 	require.NoError(t, erry)
-
 }
