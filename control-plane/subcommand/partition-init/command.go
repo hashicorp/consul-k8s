@@ -54,7 +54,7 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flags.BoolVar(&c.flagResourceAPIs, "resource-apis", false,
+	c.flags.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
 		"Enable of disable V2 Resource APIs.")
 
 	c.consul = &flags.ConsulFlags{}
@@ -179,7 +179,7 @@ func (c *Command) validateFlags() error {
 
 	// TODO(dans) this needs to be replaced when the partition workflow is available.
 	if c.flagResourceAPIs {
-		return errors.New("partition-init is not implemented when the -resource-apis flag is set for V2 Resource APIs")
+		return errors.New("partition-init is not implemented when the -enable-resource-apis flag is set for V2 Resource APIs")
 	}
 
 	return nil

@@ -224,7 +224,7 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flagSet.BoolVar(&c.flagResourceAPIs, "resource-apis", false,
+	c.flagSet.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
 		"Enable of disable Consul V2 Resource APIs.")
 
 	// Proxy sidecar resource setting flags.
