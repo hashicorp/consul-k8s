@@ -37,6 +37,7 @@ type HTTPRouteAuthFilterList struct {
 
 // HTTPRouteAuthFilterSpec defines the desired state of HTTPRouteAuthFilter.
 type HTTPRouteAuthFilterSpec struct {
+	//+kubebuilder:validation:Optional
 	JWT *RouteJWTRequirement `json:"jwt,omitempty"`
 }
 

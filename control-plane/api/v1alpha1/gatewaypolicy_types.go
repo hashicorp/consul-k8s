@@ -37,12 +37,15 @@ type GatewayPolicyList struct {
 
 // GatewayPolicySpec defines the desired state of GatewayPolicy.
 type GatewayPolicySpec struct {
-	Override GatewayPolicyConfig `json:"override,omitempty"`
-	Default  GatewayPolicyConfig `json:"default,omitempty"`
+	//+kubebuilder:validation:Optional
+	Override *GatewayPolicyConfig `json:"override,omitempty"`
+	//+kubebuilder:validation:Optional
+	Default *GatewayPolicyConfig `json:"default,omitempty"`
 }
 
 type GatewayPolicyConfig struct {
-	JWT *APIGatewayJWTRequirement `json:"jwt"`
+	//+kubebuilder:validation:Optional
+	JWT *APIGatewayJWTRequirement `json:"jwt,omitemtpy"`
 }
 
 // APIGatewayJWTRequirement holds the list of JWT providers to be verified against.

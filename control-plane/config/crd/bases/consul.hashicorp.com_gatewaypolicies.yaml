@@ -101,8 +101,6 @@ spec:
                     required:
                     - providers
                     type: object
-                required:
-                - jwt
                 type: object
               override:
                 properties:
@@ -154,8 +152,6 @@ spec:
                     required:
                     - providers
                     type: object
-                required:
-                - jwt
                 type: object
             type: object
           status:
