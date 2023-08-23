@@ -6,11 +6,13 @@ package common
 import (
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 func TestCommonDetermineAndValidatePort(t *testing.T) {
@@ -257,5 +259,58 @@ func minimal() *corev1.Pod {
 				},
 			},
 		},
+	}
+}
+
+func TestShouldIgnore(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name      string
+		namespace string
+		denySet   mapset.Set
+		allowSet  mapset.Set
+		expected  bool
+	}{
+		{
+			name:      "system namespace",
+			namespace: "kube-system",
+			denySet:   mapset.NewSetWith(),
+			allowSet:  mapset.NewSetWith("*"),
+			expected:  true,
+		},
+		{
+			name:      "other system namespace",
+			namespace: "local-path-storage",
+			denySet:   mapset.NewSetWith(),
+			allowSet:  mapset.NewSetWith("*"),
+			expected:  true,
+		},
+		{
+			name:      "any namespace allowed",
+			namespace: "foo",
+			denySet:   mapset.NewSetWith(),
+			allowSet:  mapset.NewSetWith("*"),
+			expected:  false,
+		},
+		{
+			name:      "in deny list",
+			namespace: "foo",
+			denySet:   mapset.NewSetWith("foo"),
+			allowSet:  mapset.NewSetWith("*"),
+			expected:  true,
+		},
+		{
+			name:      "not in allow list",
+			namespace: "foo",
+			denySet:   mapset.NewSetWith(),
+			allowSet:  mapset.NewSetWith("bar"),
+			expected:  true,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := ShouldIgnore(tt.namespace, tt.denySet, tt.allowSet)
+			require.Equal(t, tt.expected, actual)
+		})
 	}
 }

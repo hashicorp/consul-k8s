@@ -7,22 +7,21 @@ import (
 	"context"
 
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
 
-	//resourceClient, err := consul.NewResourceServiceClient(watcher)
-	//if err != nil {
-	//	return fmt.Errorf("unable to create Consul resource service client: %w", err)
-	//}
+	// Create Consul API config object.
+	consulConfig := c.consul.ConsulClientConfig()
 
-	//// Create Consul API config object.
-	//consulConfig := c.consul.ConsulClientConfig()
-	//
-	////Convert allow/deny lists to sets.
-	//allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
-	//denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
+	//Convert allow/deny lists to sets.
+	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
+	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
 	//lifecycleConfig := lifecycle.Config{
 	//	DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
@@ -41,32 +40,24 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	//	DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	//}
 
-	// TODO(dans): Pods Controller
-	//if err := (&pod.Controller{
-	//	Client:                      mgr.GetClient(),
-	//	ConsulClientConfig:          consulConfig,
-	//	ConsulServerConnMgr:         watcher,
-	//	ConsulResourceServiceClient: client,
-	//	AllowK8sNamespacesSet:       allowK8sNamespaces,
-	//	DenyK8sNamespacesSet:        denyK8sNamespaces,
-	//	MetricsConfig:               metricsConfig,
-	//	EnableConsulPartitions:      c.flagEnablePartitions,
-	//	EnableConsulNamespaces:      c.flagEnableNamespaces,
-	//	ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
-	//	EnableNSMirroring:           c.flagEnableK8SNSMirroring,
-	//	NSMirroringPrefix:           c.flagK8SNSMirroringPrefix,
-	//	EnableTransparentProxy:      c.flagDefaultEnableTransparentProxy,
-	//	TProxyOverwriteProbes:       c.flagTransparentProxyDefaultOverwriteProbes,
-	//	AuthMethod:                  c.flagACLAuthMethod,
-	//	NodeMeta:                    c.flagNodeMeta,
-	//	Log:                         ctrl.Log.WithName("controller").WithName("pods"),
-	//	Scheme:                      mgr.GetScheme(),
-	//	EnableTelemetryCollector:    c.flagEnableTelemetryCollector,
-	//	Context:                     ctx,
-	//}).SetupWithManager(mgr); err != nil {
-	//	setupLog.Error(err, "unable to create controller", "controller", pod.Controller{})
-	//	return err
-	//}
+	if err := (&pod.Controller{
+		Client:                     mgr.GetClient(),
+		ConsulClientConfig:         consulConfig,
+		ConsulServerConnMgr:        watcher,
+		AllowK8sNamespacesSet:      allowK8sNamespaces,
+		DenyK8sNamespacesSet:       denyK8sNamespaces,
+		EnableConsulPartitions:     c.flagEnablePartitions,
+		EnableConsulNamespaces:     c.flagEnableNamespaces,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+		ConsulPartition:            c.consul.Partition,
+		AuthMethod:                 c.flagACLAuthMethod,
+		Log:                        ctrl.Log.WithName("controller").WithName("pods"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", pod.Controller{})
+		return err
+	}
 
 	// TODO: V2 Endpoints Controller
 
