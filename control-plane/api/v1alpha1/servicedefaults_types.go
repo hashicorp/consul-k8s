@@ -201,7 +201,7 @@ type PassiveHealthCheck struct {
 	MaxEjectionPercent *uint32 `json:"maxEjectionPercent,omitempty"`
 	// The base time that a host is ejected for. The real time is equal to the base time
 	// multiplied by the number of times the host has been ejected and is capped by
-	// max_ejection_time (Default 300s). Defaults to 30000ms or 30s.
+	// max_ejection_time (Default 300s). Defaults to 30s.
 	BaseEjectionTime *metav1.Duration `json:"baseEjectionTime,omitempty"`
 }
 

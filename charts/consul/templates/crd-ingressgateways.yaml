@@ -90,13 +90,14 @@ spec:
                         description: The base time that a host is ejected for. The
                           real time is equal to the base time multiplied by the number
                           of times the host has been ejected and is capped by max_ejection_time
-                          (Default 300s). Defaults to 30000ms or 30s.
+                          (Default 300s). Defaults to 30s.
                         type: string
                       enforcingConsecutive5xx:
                         description: EnforcingConsecutive5xx is the % chance that
                           a host will be actually ejected when an outlier status is
                           detected through consecutive 5xx. This setting can be used
-                          to disable ejection or to ramp it up slowly.
+                          to disable ejection or to ramp it up slowly. Ex. Setting this to
+                          10 will make it a 10% chance that the host will be ejected.
                         format: int32
                         type: integer
                       interval:
@@ -204,14 +205,15 @@ spec:
                                   for. The real time is equal to the base time multiplied
                                   by the number of times the host has been ejected
                                   and is capped by max_ejection_time (Default 300s).
-                                  Defaults to 30000ms or 30s.
+                                  Defaults to 30s.
                                 type: string
                               enforcingConsecutive5xx:
                                 description: EnforcingConsecutive5xx is the % chance
                                   that a host will be actually ejected when an outlier
                                   status is detected through consecutive 5xx. This
                                   setting can be used to disable ejection or to ramp
-                                  it up slowly.
+                                  it up slowly. Ex. Setting this to 10 will make it a 
+                                  10% chance that the host will be ejected.
                                 format: int32
                                 type: integer
                               interval:
