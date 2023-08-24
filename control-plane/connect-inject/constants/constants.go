@@ -58,6 +58,12 @@ const (
 	// DefaultGracefulShutdownPath is the default path that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulShutdownPath = "/graceful_shutdown"
 
+	// DefaultGracefulStartupPath is the default path that consul-dataplane uses for graceful startup.
+	DefaultGracefulStartupPath = "/graceful_startup"
+
+	// DefaultStartupGracePeriodSeconds is the default number of seconds to block containers waiting for dataplane to start.
+	DefaultStartupGracePeriodSeconds = 0
+
 	// ConsulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
 	ConsulKubernetesCheckType = "kubernetes-readiness"
 

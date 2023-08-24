@@ -96,11 +96,30 @@ func (lc Config) GracefulShutdownPath(pod corev1.Pod) string {
 	return lc.DefaultGracefulShutdownPath
 }
 
-// TODO use the default if no annotations are set, but use the annotation value if it is set.
+// StartupGracePeriodSeconds returns how long in seconds the graceful_shutdown request should block while waiting for the dataplane to start.
 func (lc Config) StartupGracePeriodSeconds(pod corev1.Pod) int {
-	return 0
+	if raw, ok := pod.Annotations[constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds]; ok && raw != "" {
+		graceperiod, _ := strconv.Atoi(raw)
+		return graceperiod
+	}
+
+	if lc.DefaultGracefulShutdownPath == "" {
+		return constants.DefaultStartupGracePeriodSeconds
+	}
+
+	return lc.DefaultStartupGracePeriodSeconds
 }
 
+// GracefulStartupPath returns the path on which consul-dataplane should serve the graceful startup HTTP endpoint, either via the default value in the meshWebhook, or
+// if it's been overridden via the annotation.
 func (lc Config) GracefulStartupPath(pod corev1.Pod) string {
-	return ""
+	if raw, ok := pod.Annotations[constants.AnnotationSidecarProxyLifecycleGracefulStartupPath]; ok && raw != "" {
+		return raw
+	}
+
+	if lc.DefaultGracefulStartupPath == "" {
+		return constants.DefaultGracefulStartupPath
+	}
+
+	return lc.DefaultGracefulStartupPath
 }
