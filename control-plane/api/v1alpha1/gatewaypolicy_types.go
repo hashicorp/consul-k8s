@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 func init() {
@@ -32,15 +33,52 @@ type GatewayPolicy struct {
 type GatewayPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GatewayPolicy `json:"items"`
+
+	Items []GatewayPolicy `json:"items"`
 }
 
 // GatewayPolicySpec defines the desired state of GatewayPolicy.
 type GatewayPolicySpec struct {
+	// TargetRef identifies an API object to apply policy to.
+	TargetRef PolicyTargetReference `json:"targetRef"`
 	//+kubebuilder:validation:Optional
 	Override *GatewayPolicyConfig `json:"override,omitempty"`
 	//+kubebuilder:validation:Optional
 	Default *GatewayPolicyConfig `json:"default,omitempty"`
+}
+
+// PolicyTargetReference identifies the target that the policy applies to
+type PolicyTargetReference struct {
+	// Group is the group of the target resource.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Group string `json:"group"`
+
+	// Kind is kind of the target resource.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Kind string `json:"kind"`
+
+	// Name is the name of the target resource.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Name string `json:"name"`
+
+	// Namespace is the namespace of the referent. When unspecified, the local
+	// namespace is inferred. Even when policy targets a resource in a different
+	// namespace, it may only apply to traffic originating from the same
+	// namespace as the policy.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// SectionName refers to the listener targeted by this policy.
+	SectionName *gwv1beta1.SectionName `json:"sectionName,omitempty"`
 }
 
 type GatewayPolicyConfig struct {

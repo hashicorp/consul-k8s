@@ -157,6 +157,46 @@ spec:
                     - providers
                     type: object
                 type: object
+              targetRef:
+                description: TargetRef identifies an API object to apply policy to.
+                properties:
+                  group:
+                    description: Group is the group of the target resource.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                  kind:
+                    description: Kind is kind of the target resource.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                  name:
+                    description: Name is the name of the target resource.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace of the referent. When
+                      unspecified, the local namespace is inferred. Even when policy
+                      targets a resource in a different namespace, it may only apply
+                      to traffic originating from the same namespace as the policy.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                  sectionName:
+                    description: SectionName refers to the listener targeted by this
+                      policy.
+                    maxLength: 253
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    type: string
+                required:
+                - group
+                - kind
+                - name
+                type: object
+            required:
+            - targetRef
             type: object
           status:
             properties:
