@@ -509,20 +509,15 @@ spec:
               containerPort: 8600
               protocol: "UDP"
           readinessProbe:
-            # NOTE(mitchellh): when our HTTP status endpoints support the
-            # proper status codes, we should switch to that. This is temporary.
-            exec:
-              command:
-                - "/bin/sh"
-                - "-ec"
-                - |
-                  {{- if .Values.global.tls.enabled }}
-                  curl -k \
-                    https://127.0.0.1:8501/v1/status/leader \
-                  {{- else }}
-                  curl http://127.0.0.1:8500/v1/status/leader \
-                  {{- end }}
-                  2>/dev/null | grep -E '".+"'
+            httpGet:
+              path: /v1/status/leader
+              {{- if .Values.global.tls.enabled }}
+              scheme: "HTTPS"
+              port: 8501
+              {{- else }}
+              scheme: "HTTP"
+              port: 8500
+              {{- end}}
             failureThreshold: 2
             initialDelaySeconds: 5
             periodSeconds: 3
