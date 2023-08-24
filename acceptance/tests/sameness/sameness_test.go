@@ -846,14 +846,6 @@ func dnsQuery(t *testing.T, releaseName string, dnsQuery []string, dnsServer, fa
 	return logs
 }
 
-// localityForRegion returns the full api.Locality to use in tests for a given region string.
-func localityForRegion(r string) api.Locality {
-	return api.Locality{
-		Region: r,
-		Zone:   r + "a",
-	}
-}
-
 // isAcceptor iterates through the provided acceptor list of cluster names and determines if
 // any match the provided name. Returns true if a match is found, false otherwise.
 func isAcceptor(name string, acceptorList []string) bool {
@@ -865,59 +857,12 @@ func isAcceptor(name string, acceptorList []string) bool {
 	return false
 }
 
-// getPeeringAcceptorSecret assures that the secret is created and retrieves the secret from the provided acceptor.
-func getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig, server *cluster, acceptorName string) string {
-	// Ensure the secrets are created.
-	var acceptorSecretName string
-	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
-	retry.RunWith(timer, t, func(r *retry.R) {
-		var err error
-		acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(t, server.context.KubectlOptions(t), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status.secret.name}")
-		require.NoError(r, err)
-		require.NotEmpty(r, acceptorSecretName)
-	})
-
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, server.context.KubectlOptions(t), "delete", "secret", acceptorSecretName)
-	})
-
-	return acceptorSecretName
-}
-
 // localityForRegion returns the full api.Locality to use in tests for a given region string.
 func localityForRegion(r string) api.Locality {
 	return api.Locality{
 		Region: r,
 		Zone:   r + "a",
 	}
-}
-
-// checkLocalities checks the given cluster for `static-client` and `static-server` instances matching the locality
-// expected for the cluster.
-func checkLocalities(t *testing.T, c *cluster) {
-	for ns, svcs := range map[string][]string{
-		staticClientNamespace: {
-			staticClientName,
-			staticClientName + "-sidecar-proxy",
-		},
-		staticServerNamespace: {
-			staticServerName,
-			staticServerName + "-sidecar-proxy",
-		},
-	} {
-		for _, svc := range svcs {
-			cs := getCatalogService(t, c, svc, ns, c.partition)
-			assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
-			assert.Equal(t, c.locality, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
-		}
-	}
-}
-
-func getCatalogService(t *testing.T, c *cluster, svc, ns, partition string) *api.CatalogService {
-	resp, _, err := c.client.Catalog().Service(svc, "", &api.QueryOptions{Namespace: ns, Partition: partition})
-	require.NoError(t, err)
-	assert.NotEmpty(t, resp, "did not find service %s in cluster %s (partition=%s ns=%s)", svc, c.name, partition, ns)
-	return resp[0]
 }
 
 func deployCustomizeAsync(t *testing.T, opts *terratestk8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string, wg *sync.WaitGroup) {
