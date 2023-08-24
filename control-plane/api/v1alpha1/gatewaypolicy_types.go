@@ -47,7 +47,7 @@ type GatewayPolicySpec struct {
 	Default *GatewayPolicyConfig `json:"default,omitempty"`
 }
 
-// PolicyTargetReference identifies the target that the policy applies to
+// PolicyTargetReference identifies the target that the policy applies to.
 type PolicyTargetReference struct {
 	// Group is the group of the target resource.
 	//
