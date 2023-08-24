@@ -45,7 +45,7 @@ type GatewayPolicySpec struct {
 
 type GatewayPolicyConfig struct {
 	//+kubebuilder:validation:Optional
-	JWT *APIGatewayJWTRequirement `json:"jwt,omitemtpy"`
+	JWT *APIGatewayJWTRequirement `json:"jwt,omitempty"`
 }
 
 // APIGatewayJWTRequirement holds the list of JWT providers to be verified against.
