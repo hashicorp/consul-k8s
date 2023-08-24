@@ -151,6 +151,13 @@ func TestFailover_Connect(t *testing.T) {
 				keyCluster03a: {name: peerName3a, context: env.Context(t, 3), hasServer: true, locality: localityForRegion(cluster03Region)},
 			}
 
+			// Set primary clusters per cluster
+			// This is helpful for cases like DNS with partitions where many aspects of the primary cluster must be used
+			testClusters[keyCluster01a].primaryCluster = testClusters[keyCluster01a]
+			testClusters[keyCluster01b].primaryCluster = testClusters[keyCluster01a]
+			testClusters[keyCluster02a].primaryCluster = testClusters[keyCluster02a]
+			testClusters[keyCluster03a].primaryCluster = testClusters[keyCluster03a]
+
 			// Setup Namespaces.
 			for _, v := range testClusters {
 				createNamespaces(t, cfg, v.context)
@@ -366,7 +373,7 @@ func TestFailover_Connect(t *testing.T) {
 				// Copy secrets to the necessary peers to be used for dialing later
 				for _, vv := range testClusters {
 					if isAcceptor(v.name, vv.acceptors) {
-						acceptorSecretName := getPeeringAcceptorSecret(t, cfg, v, vv.name)
+						acceptorSecretName := v.getPeeringAcceptorSecret(t, cfg, vv.name)
 						logger.Logf(t, "acceptor %s created on %s", acceptorSecretName, v.name)
 
 						logger.Logf(t, "copying acceptor token %s from %s to %s", acceptorSecretName, v.name, vv.name)
@@ -426,24 +433,24 @@ func TestFailover_Connect(t *testing.T) {
 			}
 
 			// Setup Prepared Query.
-			definition := &api.PreparedQueryDefinition{
-				Name: "my-query",
-				Service: api.ServiceQuery{
-					Service:       staticServerName,
-					SamenessGroup: samenessGroupName,
-					Namespace:     staticServerNamespace,
-					OnlyPassing:   false,
-				},
-			}
 
 			for k, v := range testClusters {
-				if v.hasServer {
-					pqID, _, err := v.client.PreparedQuery().Create(definition, &api.WriteOptions{})
-					require.NoError(t, err)
-					logger.Logf(t, "%s PQ ID: %s", v.name, pqID)
-					testClusters[k].pqID = &pqID
-					testClusters[k].pqName = &definition.Name
+				definition := &api.PreparedQueryDefinition{
+					Name: fmt.Sprintf("my-query-%s", v.fullTextPartition()),
+					Service: api.ServiceQuery{
+						Service:       staticServerName,
+						SamenessGroup: samenessGroupName,
+						Namespace:     staticServerNamespace,
+						OnlyPassing:   false,
+						Partition:     v.fullTextPartition(),
+					},
 				}
+
+				pqID, _, err := v.client.PreparedQuery().Create(definition, &api.WriteOptions{})
+				require.NoError(t, err)
+				logger.Logf(t, "%s PQ ID: %s", v.name, pqID)
+				testClusters[k].pqID = &pqID
+				testClusters[k].pqName = &definition.Name
 			}
 
 			// Create static server/client after the rest of the config is setup for a more stable testing experience
@@ -492,7 +499,7 @@ func TestFailover_Connect(t *testing.T) {
 			// locality-aware routing will function in consul-k8s. In the future, this test will be expanded
 			// to test multi-cluster locality-based failover with sameness groups.
 			for _, v := range testClusters {
-				checkLocalities(t, v)
+				v.checkLocalities(t)
 			}
 
 			// Verify all the failover Scenarios
@@ -505,7 +512,6 @@ func TestFailover_Connect(t *testing.T) {
 					failoverServer *cluster
 					expectedPQ     expectedPQ
 				}
-				checkDNSPQ bool
 			}{
 				{
 					name:   "cluster-01-a perspective", // This matches the diagram at the beginning of the test
@@ -519,7 +525,6 @@ func TestFailover_Connect(t *testing.T) {
 						{failoverServer: testClusters[keyCluster02a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster02a].name, namespace: "ns2"}},
 						{failoverServer: testClusters[keyCluster03a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster03a].name, namespace: "ns2"}},
 					},
-					checkDNSPQ: true,
 				},
 				{
 					name:   "cluster-01-b partition perspective",
@@ -533,7 +538,6 @@ func TestFailover_Connect(t *testing.T) {
 						{failoverServer: testClusters[keyCluster02a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster02a].name, namespace: "ns2"}},
 						{failoverServer: testClusters[keyCluster03a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster03a].name, namespace: "ns2"}},
 					},
-					checkDNSPQ: false,
 				},
 				{
 					name:   "cluster-02-a perspective",
@@ -547,7 +551,6 @@ func TestFailover_Connect(t *testing.T) {
 						{failoverServer: testClusters[keyCluster01b], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster01b].name, namespace: "ns2"}},
 						{failoverServer: testClusters[keyCluster03a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster03a].name, namespace: "ns2"}},
 					},
-					checkDNSPQ: true,
 				},
 				{
 					name:   "cluster-03-a perspective",
@@ -561,7 +564,6 @@ func TestFailover_Connect(t *testing.T) {
 						{failoverServer: testClusters[keyCluster01b], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster01b].name, namespace: "ns2"}},
 						{failoverServer: testClusters[keyCluster02a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster02a].name, namespace: "ns2"}},
 					},
-					checkDNSPQ: true,
 				},
 			}
 			for _, sc := range subCases {
@@ -577,28 +579,21 @@ func TestFailover_Connect(t *testing.T) {
 						logger.Log(t, "checking service failover")
 
 						if cfg.EnableTransparentProxy {
-							serviceTargetCheck(t, sc.server, v.failoverServer.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", sc.server.fullTextPartition()))
+							sc.server.serviceTargetCheck(t, v.failoverServer.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", sc.server.fullTextPartition()))
 						} else {
-							serviceTargetCheck(t, sc.server, v.failoverServer.name, "localhost:8080")
+							sc.server.serviceTargetCheck(t, v.failoverServer.name, "localhost:8080")
 						}
 
-						// Verify DNS
-						if sc.checkDNSPQ {
-							logger.Log(t, "verifying dns")
-							dnsFailoverCheck(t, cfg, releaseName, *sc.server.dnsIP, sc.server, v.failoverServer)
+						// 1. The admin partition does not contain a server, so DNS service will not resolve on the admin partition cluster
+						// 2. A workaround to perform the DNS and PQ queries on the primary datacenter cluster by specifying the admin partition
+						// e.g kubectl --context kind-dc1 --namespace ns1 exec -i deploy/static-client -c static-client \
+						//	-- dig @test-3lmypr-consul-dns.default static-server.service.ns2.ns.mine.sg.ap1.ap.consul
+						// Verify DNS.
+						logger.Log(t, "verifying dns")
+						sc.server.dnsFailoverCheck(t, cfg, releaseName, v.failoverServer)
 
-							// Verify PQ
-							logger.Log(t, "verifying prepared query")
-							preparedQueryFailoverCheck(t, releaseName, *sc.server.dnsIP, v.expectedPQ, sc.server, v.failoverServer)
-						} else {
-							// We currently skip running DNS and PQ tests for a couple of reasons
-							// 1. The admin partition does not contain a server, so DNS service will not resolve on the admin partition cluster
-							// 2. A workaround to perform the DNS and PQ queries on the primary datacenter cluster by specifying the admin partition
-							// e.g kubectl --context kind-dc1 --namespace ns1 exec -i deploy/static-client -c static-client \
-							//	-- dig @test-3lmypr-consul-dns.default static-server.service.ns2.ns.mine.sg.ap1.ap.consul
-							// is not possible at the moment due to a bug. The workaround will be used once this bug is fixed.
-							logger.Logf(t, "skipping DNS and PQ checks for %s", sc.name)
-						}
+						logger.Log(t, "verifying prepared query")
+						sc.server.preparedQueryFailoverCheck(t, releaseName, v.expectedPQ, v.failoverServer)
 
 						// Scale down static-server on the current failover, will fail over to the next.
 						logger.Logf(t, "scaling server down on %s", v.failoverServer.name)
@@ -631,14 +626,130 @@ type cluster struct {
 	pqName         *string
 	dnsIP          *string
 	acceptors      []string
+	primaryCluster *cluster
 }
 
-func (c cluster) fullTextPartition() string {
+func (c *cluster) fullTextPartition() string {
 	if c.partition == "" {
 		return "default"
 	} else {
 		return c.partition
 	}
+}
+
+// serviceTargetCheck verifies that curling the `static-server` using the `static-client` responds with the expected
+// cluster name. Each static-server responds with a unique name so that we can verify failover occured as expected.
+func (c *cluster) serviceTargetCheck(t *testing.T, expectedName string, curlAddress string) {
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
+	var resp string
+	var err error
+	retry.RunWith(timer, t, func(r *retry.R) {
+		// Use -s/--silent and -S/--show-error flags w/ curl to reduce noise during retries.
+		// This silences extra output like the request progress bar, but preserves errors.
+		resp, err = k8s.RunKubectlAndGetOutputE(t, c.clientOpts, "exec", "-i",
+			staticClientDeployment, "-c", staticClientName, "--", "curl", "-sS", curlAddress)
+		require.NoError(r, err)
+		assert.Contains(r, resp, expectedName)
+	})
+	logger.Log(t, resp)
+}
+
+// preparedQueryFailoverCheck verifies that failover occurs when executing the prepared query. It also assures that
+// executing the prepared query via DNS also provides expected results.
+func (c *cluster) preparedQueryFailoverCheck(t *testing.T, releaseName string, epq expectedPQ, failover *cluster) {
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
+	resp, _, err := c.client.PreparedQuery().Execute(*c.pqID, &api.QueryOptions{Namespace: staticServerNamespace, Partition: c.partition})
+	require.NoError(t, err)
+	require.Len(t, resp.Nodes, 1)
+
+	assert.Equal(t, epq.partition, resp.Nodes[0].Service.Partition)
+	assert.Equal(t, epq.peerName, resp.Nodes[0].Service.PeerName)
+	assert.Equal(t, epq.namespace, resp.Nodes[0].Service.Namespace)
+	assert.Equal(t, *failover.staticServerIP, resp.Nodes[0].Service.Address)
+
+	// Verify that dns lookup is successful, there is no guarantee that the ip address is unique, so for PQ this is
+	// just verifying that we can query using DNS and that the ip address is correct. It does not however prove
+	// that failover occurred, that is left to client `Execute`
+	dnsPQLookup := []string{fmt.Sprintf("%s.query.consul", *c.pqName)}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		logs := dnsQuery(t, releaseName, dnsPQLookup, c.primaryCluster, failover)
+		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", *c.primaryCluster.dnsIP))
+		assert.Contains(r, logs, "ANSWER SECTION:")
+		assert.Contains(r, logs, *failover.staticServerIP)
+	})
+}
+
+// DNS failover check verifies that failover occurred when querying the DNS.
+func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, failover *cluster) {
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
+	dnsLookup := []string{fmt.Sprintf("static-server.service.ns2.ns.%s.sg.%s.ap.consul", samenessGroupName, c.fullTextPartition()), "+tcp", "SRV"}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		// Use the primary cluster when performing a DNS lookup, this mostly affects cases
+		// where we are verifying DNS for a partition
+		logs := dnsQuery(t, releaseName, dnsLookup, c.primaryCluster, failover)
+
+		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", *c.primaryCluster.dnsIP))
+		assert.Contains(r, logs, "ANSWER SECTION:")
+		assert.Contains(r, logs, *failover.staticServerIP)
+
+		// Additional checks
+		// When accessing the SRV record for DNS we can get more information. In the case of Kind,
+		// the context can be used to determine that failover occured to the expected kubernetes cluster
+		// hosting Consul
+		assert.Contains(r, logs, "ADDITIONAL SECTION:")
+		expectedName := failover.context.KubectlOptions(t).ContextName
+		if cfg.UseKind {
+			expectedName = strings.Replace(expectedName, "kind-", "", -1)
+		}
+		assert.Contains(r, logs, expectedName)
+	})
+}
+
+// getPeeringAcceptorSecret assures that the secret is created and retrieves the secret from the provided acceptor.
+func (c *cluster) getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig, acceptorName string) string {
+	// Ensure the secrets are created.
+	var acceptorSecretName string
+	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		var err error
+		acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status.secret.name}")
+		require.NoError(r, err)
+		require.NotEmpty(r, acceptorSecretName)
+	})
+
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.RunKubectl(t, c.context.KubectlOptions(t), "delete", "secret", acceptorSecretName)
+	})
+
+	return acceptorSecretName
+}
+
+// checkLocalities checks the given cluster for `static-client` and `static-server` instances matching the locality
+// expected for the cluster.
+func (c *cluster) checkLocalities(t *testing.T) {
+	for ns, svcs := range map[string][]string{
+		staticClientNamespace: {
+			staticClientName,
+			staticClientName + "-sidecar-proxy",
+		},
+		staticServerNamespace: {
+			staticServerName,
+			staticServerName + "-sidecar-proxy",
+		},
+	} {
+		for _, svc := range svcs {
+			cs := c.getCatalogService(t, svc, ns, c.partition)
+			assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
+			assert.Equal(t, c.locality, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
+		}
+	}
+}
+
+func (c *cluster) getCatalogService(t *testing.T, svc, ns, partition string) *api.CatalogService {
+	resp, _, err := c.client.Catalog().Service(svc, "", &api.QueryOptions{Namespace: ns, Partition: partition})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp, "did not find service %s in cluster %s (partition=%s ns=%s)", svc, c.name, partition, ns)
+	return resp[0]
 }
 
 type clusters map[string]*cluster
@@ -677,9 +788,9 @@ func (c clusters) verifyServerUpState(t *testing.T, isTproxyEnabled bool) {
 	for _, v := range c {
 		// Query using a client and expect its own name, no failover should occur
 		if isTproxyEnabled {
-			serviceTargetCheck(t, v, v.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", v.fullTextPartition()))
+			v.serviceTargetCheck(t, v.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", v.fullTextPartition()))
 		} else {
-			serviceTargetCheck(t, v, v.name, "localhost:8080")
+			v.serviceTargetCheck(t, v.name, "localhost:8080")
 		}
 	}
 }
@@ -718,74 +829,8 @@ func setK8sNodeLocality(t *testing.T, context environment.TestContext, c *cluste
 	k8s.KubectlLabel(t, context.KubectlOptions(t), "node", node, corev1.LabelTopologyZone, c.locality.Zone)
 }
 
-// serviceTargetCheck verifies that curling the `static-server` using the `static-client` responds with the expected
-// cluster name. Each static-server responds with a unique name so that we can verify failover occured as expected.
-func serviceTargetCheck(t *testing.T, server *cluster, expectedName string, curlAddress string) {
-	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
-	var resp string
-	var err error
-	retry.RunWith(timer, t, func(r *retry.R) {
-		// Use -s/--silent and -S/--show-error flags w/ curl to reduce noise during retries.
-		// This silences extra output like the request progress bar, but preserves errors.
-		resp, err = k8s.RunKubectlAndGetOutputE(t, server.clientOpts, "exec", "-i",
-			staticClientDeployment, "-c", staticClientName, "--", "curl", "-sS", curlAddress)
-		require.NoError(r, err)
-		assert.Contains(r, resp, expectedName)
-	})
-	logger.Log(t, resp)
-}
-
-// preparedQueryFailoverCheck verifies that failover occurs when executing the prepared query. It also assures that
-// executing the prepared query via DNS also provides expected results.
-func preparedQueryFailoverCheck(t *testing.T, releaseName string, dnsIP string, epq expectedPQ, server, failover *cluster) {
-	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
-	resp, _, err := server.client.PreparedQuery().Execute(*server.pqID, &api.QueryOptions{Namespace: staticServerNamespace, Partition: server.partition})
-	require.NoError(t, err)
-	require.Len(t, resp.Nodes, 1)
-
-	assert.Equal(t, epq.partition, resp.Nodes[0].Service.Partition)
-	assert.Equal(t, epq.peerName, resp.Nodes[0].Service.PeerName)
-	assert.Equal(t, epq.namespace, resp.Nodes[0].Service.Namespace)
-	assert.Equal(t, *failover.staticServerIP, resp.Nodes[0].Service.Address)
-
-	// Verify that dns lookup is successful, there is no guarantee that the ip address is unique, so for PQ this is
-	// just verifying that we can query using DNS and that the ip address is correct. It does not however prove
-	// that failover occured, that is left to client `Execute`
-	dnsPQLookup := []string{fmt.Sprintf("%s.query.consul", *server.pqName)}
-	retry.RunWith(timer, t, func(r *retry.R) {
-		logs := dnsQuery(t, releaseName, dnsPQLookup, server, failover)
-		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", dnsIP))
-		assert.Contains(r, logs, "ANSWER SECTION:")
-		assert.Contains(r, logs, *failover.staticServerIP)
-	})
-}
-
-// DNS failover check verifies that failover occurred when querying the DNS.
-func dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, dnsIP string, server, failover *cluster) {
-	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
-	dnsLookup := []string{fmt.Sprintf("static-server.service.ns2.ns.%s.sg.consul", samenessGroupName), "+tcp", "SRV"}
-	retry.RunWith(timer, t, func(r *retry.R) {
-		logs := dnsQuery(t, releaseName, dnsLookup, server, failover)
-
-		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", dnsIP))
-		assert.Contains(r, logs, "ANSWER SECTION:")
-		assert.Contains(r, logs, *failover.staticServerIP)
-
-		// Additional checks
-		// When accessing the SRV record for DNS we can get more information. In the case of Kind,
-		// the context can be used to determine that failover occured to the expected kubernetes cluster
-		// hosting Consul
-		assert.Contains(r, logs, "ADDITIONAL SECTION:")
-		expectedName := failover.context.KubectlOptions(t).ContextName
-		if cfg.UseKind {
-			expectedName = strings.Replace(expectedName, "kind-", "", -1)
-		}
-		assert.Contains(r, logs, expectedName)
-	})
-}
-
 // dnsQuery performs a dns query with the provided query string.
-func dnsQuery(t *testing.T, releaseName string, dnsQuery []string, server, failover *cluster) string {
+func dnsQuery(t *testing.T, releaseName string, dnsQuery []string, dnsServer, failover *cluster) string {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
 	var logs string
 	retry.RunWith(timer, t, func(r *retry.R) {
@@ -794,7 +839,7 @@ func dnsQuery(t *testing.T, releaseName string, dnsQuery []string, server, failo
 				releaseName)}
 		args = append(args, dnsQuery...)
 		var err error
-		logs, err = k8s.RunKubectlAndGetOutputE(t, server.clientOpts, args...)
+		logs, err = k8s.RunKubectlAndGetOutputE(t, dnsServer.clientOpts, args...)
 		require.NoError(r, err)
 	})
 	logger.Logf(t, "%s: %s", failover.name, logs)
@@ -812,59 +857,12 @@ func isAcceptor(name string, acceptorList []string) bool {
 	return false
 }
 
-// getPeeringAcceptorSecret assures that the secret is created and retrieves the secret from the provided acceptor.
-func getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig, server *cluster, acceptorName string) string {
-	// Ensure the secrets are created.
-	var acceptorSecretName string
-	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
-	retry.RunWith(timer, t, func(r *retry.R) {
-		var err error
-		acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(t, server.context.KubectlOptions(t), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status.secret.name}")
-		require.NoError(r, err)
-		require.NotEmpty(r, acceptorSecretName)
-	})
-
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, server.context.KubectlOptions(t), "delete", "secret", acceptorSecretName)
-	})
-
-	return acceptorSecretName
-}
-
 // localityForRegion returns the full api.Locality to use in tests for a given region string.
 func localityForRegion(r string) api.Locality {
 	return api.Locality{
 		Region: r,
 		Zone:   r + "a",
 	}
-}
-
-// checkLocalities checks the given cluster for `static-client` and `static-server` instances matching the locality
-// expected for the cluster.
-func checkLocalities(t *testing.T, c *cluster) {
-	for ns, svcs := range map[string][]string{
-		staticClientNamespace: {
-			staticClientName,
-			staticClientName + "-sidecar-proxy",
-		},
-		staticServerNamespace: {
-			staticServerName,
-			staticServerName + "-sidecar-proxy",
-		},
-	} {
-		for _, svc := range svcs {
-			cs := getCatalogService(t, c, svc, ns, c.partition)
-			assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
-			assert.Equal(t, c.locality, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
-		}
-	}
-}
-
-func getCatalogService(t *testing.T, c *cluster, svc, ns, partition string) *api.CatalogService {
-	resp, _, err := c.client.Catalog().Service(svc, "", &api.QueryOptions{Namespace: ns, Partition: partition})
-	require.NoError(t, err)
-	assert.NotEmpty(t, resp, "did not find service %s in cluster %s (partition=%s ns=%s)", svc, c.name, partition, ns)
-	return resp[0]
 }
 
 func deployCustomizeAsync(t *testing.T, opts *terratestk8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string, wg *sync.WaitGroup) {
