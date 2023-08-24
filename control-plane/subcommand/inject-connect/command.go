@@ -34,6 +34,7 @@ import (
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
@@ -87,8 +88,8 @@ type Command struct {
 	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
 	flagDefaultSidecarProxyLifecycleGracefulPort                 string
 	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
-	flagDefaultSidecarProxyLifecycleGracefulStartupPath          string
 	flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds    int
+	flagDefaultSidecarProxyLifecycleGracefulStartupPath          string
 
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
@@ -250,8 +251,8 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds, "default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds", 0, "Default sidecar proxy shutdown grace period in seconds.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulPort, "default-sidecar-proxy-lifecycle-graceful-port", strconv.Itoa(constants.DefaultGracefulPort), "Default port for sidecar proxy lifecycle management HTTP endpoints.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath, "default-sidecar-proxy-lifecycle-graceful-shutdown-path", "/graceful_shutdown", "Default sidecar proxy lifecycle management graceful shutdown path.")
-	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulStartupPath, "default-sidecar-proxy-lifecycle-graceful-startup-path", "/graceful_startup", "Default sidecar proxy lifecycle management graceful startup path.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds, "default-sidecar-proxy-lifecycle-startup-grace-period-seconds", 0, "Default sidecar proxy startup grace period in seconds.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulStartupPath, "default-sidecar-proxy-lifecycle-graceful-startup-path", "/graceful_startup", "Default sidecar proxy lifecycle management graceful startup path.")
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
 	c.flagSet.BoolVar(&c.flagEnableGatewayMetrics, "enable-gateway-metrics", false, "Allows enabling Consul gateway metrics.")
@@ -399,9 +400,20 @@ func (c *Command) Run(args []string) int {
 	} else {
 		err = c.configureV1Controllers(ctx, mgr, watcher)
 	}
+
 	if err != nil {
 		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))
 		return 1
+	}
+
+	lifecycleConfig := lifecycle.Config{
+		DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
+		DefaultEnableShutdownDrainListeners: c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
+		DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
+		DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
+		DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
+		DefaultStartupGracePeriodSeconds:    c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds,
+		DefaultGracefulStartupPath:          c.flagDefaultSidecarProxyLifecycleGracefulStartupPath,
 	}
 
 	if err = mgr.Start(ctx); err != nil {

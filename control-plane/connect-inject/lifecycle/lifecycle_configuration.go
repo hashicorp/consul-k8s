@@ -95,3 +95,12 @@ func (lc Config) GracefulShutdownPath(pod corev1.Pod) string {
 
 	return lc.DefaultGracefulShutdownPath
 }
+
+// TODO use the default if no annotations are set, but use the annotation value if it is set.
+func (lc Config) StartupGracePeriodSeconds(pod corev1.Pod) int {
+	return 0
+}
+
+func (lc Config) GracefulStartupPath(pod corev1.Pod) string {
+	return ""
+}

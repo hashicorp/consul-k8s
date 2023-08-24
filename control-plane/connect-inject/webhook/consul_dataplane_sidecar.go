@@ -141,6 +141,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		},
 		Args:           args,
 		ReadinessProbe: probe,
+		// TODO configure this based on the values in `LifecycleConfig`
 		Lifecycle: &corev1.Lifecycle{
 			PostStart: &corev1.LifecycleHandler{
 				HTTPGet: &corev1.HTTPGetAction{
