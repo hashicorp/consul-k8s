@@ -70,7 +70,7 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
-func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory, kustomizeDir string) {
+func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, debugDirectory, kustomizeDir string) {
 	t.Helper()
 
 	KubectlApplyK(t, options, kustomizeDir)
@@ -82,7 +82,7 @@ func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure boo
 	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&job)
 	require.NoError(t, err)
 
-	helpers.Cleanup(t, noCleanupOnFailure, noCleanup, func() {
+	helpers.Cleanup(t, noCleanupOnFailure, func() {
 		// Note: this delete command won't wait for pods to be fully terminated.
 		// This shouldn't cause any test pollution because the underlying
 		// objects are deployments, and so when other tests create these
