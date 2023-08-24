@@ -163,6 +163,23 @@ func (s *ResourceMap) HasService(id types.NamespacedName) bool {
 	return ok
 }
 
+func (s *ResourceMap) ServicesForRoute(route gwv1beta1.HTTPRoute) []api.ResourceReference {
+
+	services := []api.ResourceReference{}
+
+	for _, rule := range route.Spec.Rules {
+		for _, backendRef := range rule.BackendRefs {
+			namespacedName := types.NamespacedName{
+				Name:      string(backendRef.Name),
+				Namespace: string(*backendRef.Namespace),
+			}
+			services = append(services, s.services[namespacedName])
+		}
+	}
+
+	return services
+}
+
 func (s *ResourceMap) AddMeshService(service v1alpha1.MeshService) {
 	// this needs to be not-normalized since it gets written straight
 	// to Consul's configuration, including in non-enterprise builds.
