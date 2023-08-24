@@ -75,8 +75,6 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *R
 	}
 }
 
-// func (t ResourceTranslator) ToHTTPRoute(httpAuthFilter v1alpha1.HTTPA)
-
 var listenerProtocolMap = map[string]string{
 	"https": "http",
 	"http":  "http",
@@ -206,7 +204,7 @@ func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.GatewayJWT
 func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
 	namespace := t.Namespace(route.Namespace)
 
-	// we don't translate parent refs
+	// We don't translate parent refs.
 
 	hostnames := StringLikeSlice(route.Spec.Hostnames)
 	rules := ConvertSliceFuncIf(route.Spec.Rules, func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
@@ -247,6 +245,26 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 		Matches:  matches,
 		Filters:  filters,
 	}, true
+}
+
+// translateHTTPRouteAuth translates a Kubernetes RouteAuthFilter CRD into the inline configuration
+// for auth on a Consul HTTPRoute Config Entry.
+func (t ResourceTranslator) translateHTTPRouteAuth(route gwv1beta1.HTTPRoute, routeAuth v1alpha1.RouteAuthFilter, resources *ResourceMap) *api.HTTPRouteRule {
+
+	services := ConvertSliceFuncIf(
+		resources.ServicesForRoute(route),
+		func(ref api.ResourceReference) (api.HTTPService, bool) {
+			return api.HTTPService{}, false
+		},
+	)
+
+	filters := api.HTTPFilters{}
+
+	return &api.HTTPRouteRule{
+		Filters:  filters,
+		Matches:  []api.HTTPMatch{},
+		Services: services,
+	}
 }
 
 func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, ref gwv1beta1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
