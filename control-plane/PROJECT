@@ -126,4 +126,20 @@ resources:
   kind: RouteTimeoutFilter
   path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  domain: hashicorp.com
+  group: consul
+  kind: RouteAuthFilter
+  path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  domain: hashicorp.com
+  group: consul
+  kind: GatewayPolicy
+  path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
+  version: v1alpha1
 version: "3"
