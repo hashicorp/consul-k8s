@@ -36,12 +36,18 @@ func Test_NewResourceServiceClient(t *testing.T) {
 
 	opts := hclog.LoggerOptions{Name: "resource-service-client"}
 	logger := hclog.New(&opts)
-	client, watcher, err := NewResourceServiceClient(context.Background(), discoverConfig, logger, serverConfig.Ports.GRPCTLS)
+
+	watcher, err := discovery.NewWatcher(context.Background(), discoverConfig, logger)
 	require.NoError(t, err)
-	require.NotNil(t, client)
 	require.NotNil(t, watcher)
 
 	defer watcher.Stop()
+	go watcher.Run()
+
+	client, err := NewResourceServiceClient(watcher)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	require.NotNil(t, watcher)
 
 	req := createWriteRequest(t, "foo")
 	res, err := client.Write(context.Background(), req)
