@@ -2230,16 +2230,6 @@ connectInject:
         # @type: string
         service: null
 
-      # The resource settings for Pods handling traffic for Gateway API.
-      # @recurse: false
-      # @type: map
-      resources:
-        requests:
-          memory: "100Mi"
-          cpu: "100m"
-        limits:
-          memory: "100Mi"
-          cpu: "100m"
 
       # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
       deployment:
@@ -2271,6 +2261,18 @@ connectInject:
       #
       # @type: string
       annotations: null
+
+
+      # The resource settings for Pods handling traffic for Gateway API.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "100Mi"
+          cpu: "100m"
+        limits:
+          memory: "100Mi"
+          cpu: "100m"
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
