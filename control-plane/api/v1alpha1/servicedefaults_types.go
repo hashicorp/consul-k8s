@@ -18,8 +18,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 const (
@@ -115,6 +116,9 @@ type ServiceDefaultsSpec struct {
 	// proxy threads. The only supported value is exact_balance. By default, no connection balancing is used.
 	// Refer to the Envoy Connection Balance config for details.
 	BalanceInboundConnections string `json:"balanceInboundConnections,omitempty"`
+	// RateLimits is rate limiting configuration that is applied to
+	// inbound traffic for a service. Rate limiting is a Consul enterprise feature.
+	RateLimits *RateLimits `json:"rateLimits,omitempty"`
 	// EnvoyExtensions are a list of extensions to modify Envoy proxy configuration.
 	EnvoyExtensions EnvoyExtensions `json:"envoyExtensions,omitempty"`
 }
@@ -216,6 +220,70 @@ type ServiceDefaultsDestination struct {
 	Port uint32 `json:"port,omitempty"`
 }
 
+// RateLimits is rate limiting configuration that is applied to
+// inbound traffic for a service.
+// Rate limiting is a Consul enterprise feature.
+type RateLimits struct {
+	InstanceLevel InstanceLevelRateLimits `json:"instanceLevel"`
+}
+
+func (rl *RateLimits) toConsul() *capi.RateLimits {
+	if rl == nil {
+		return nil
+	}
+	routes := make([]capi.InstanceLevelRouteRateLimits, len(rl.InstanceLevel.Routes))
+	for i, r := range rl.InstanceLevel.Routes {
+		routes[i] = capi.InstanceLevelRouteRateLimits{
+			PathExact:         r.PathExact,
+			PathPrefix:        r.PathPrefix,
+			PathRegex:         r.PathRegex,
+			RequestsPerSecond: r.RequestsPerSecond,
+			RequestsMaxBurst:  r.RequestsMaxBurst,
+		}
+	}
+	return &capi.RateLimits{
+		InstanceLevel: capi.InstanceLevelRateLimits{
+			RequestsPerSecond: rl.InstanceLevel.RequestsPerSecond,
+			RequestsMaxBurst:  rl.InstanceLevel.RequestsMaxBurst,
+			Routes:            routes,
+		},
+	}
+}
+
+// InstanceLevelRateLimits represents rate limit configuration
+// that are applied per service instance.
+type InstanceLevelRateLimits struct {
+	// RequestsPerSecond is the average number of requests per second that can be
+	// made without being throttled. This field is required if RequestsMaxBurst
+	// is set. The allowed number of requests may exceed RequestsPerSecond up to
+	// the value specified in RequestsMaxBurst.
+	//
+	// Internally, this is the refill rate of the token bucket used for rate limiting.
+	RequestsPerSecond int `json:"requestsPerSecond"`
+
+	// RequestsMaxBurst is the maximum number of requests that can be sent
+	// in a burst. Should be equal to or greater than RequestsPerSecond.
+	// If unset, defaults to RequestsPerSecond.
+	//
+	// Internally, this is the maximum size of the token bucket used for rate limiting.
+	RequestsMaxBurst int `json:"requestsMaxBurst"`
+
+	// Routes is a list of rate limits applied to specific routes.
+	// Overrides any top-level configuration.
+	Routes []InstanceLevelRouteRateLimits `json:"routes,omitempty"`
+}
+
+// InstanceLevelRouteRateLimits represents rate limit configuration
+// applied to a route matching one of PathExact/PathPrefix/PathRegex.
+type InstanceLevelRouteRateLimits struct {
+	PathExact  string `json:"pathExact"`
+	PathPrefix string `json:"pathPrefix"`
+	PathRegex  string `json:"pathRegex"`
+
+	RequestsPerSecond int `json:"requestsPerSecond"`
+	RequestsMaxBurst  int `json:"requestsMaxBurst"`
+}
+
 func (in *ServiceDefaults) ConsulKind() string {
 	return capi.ServiceDefaults
 }
@@ -308,6 +376,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		LocalConnectTimeoutMs:     in.Spec.LocalConnectTimeoutMs,
 		LocalRequestTimeoutMs:     in.Spec.LocalRequestTimeoutMs,
 		BalanceInboundConnections: in.Spec.BalanceInboundConnections,
+		RateLimits:                in.Spec.RateLimits.toConsul(),
 		EnvoyExtensions:           in.Spec.EnvoyExtensions.toConsul(),
 	}
 }
