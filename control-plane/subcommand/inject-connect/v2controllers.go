@@ -5,11 +5,11 @@ package connectinject
 
 import (
 	"context"
-
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpointsv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
@@ -59,7 +59,23 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	// TODO: V2 Endpoints Controller
+	if err := (&endpointsv2.Controller{
+		Client:                     mgr.GetClient(),
+		ConsulServerConnMgr:        watcher,
+		AllowK8sNamespacesSet:      allowK8sNamespaces,
+		DenyK8sNamespacesSet:       denyK8sNamespaces,
+		EnableConsulPartitions:     c.flagEnablePartitions,
+		EnableConsulNamespaces:     c.flagEnableNamespaces,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+		Log:                        ctrl.Log.WithName("controller").WithName("endpoints"),
+		Scheme:                     mgr.GetScheme(),
+		Context:                    ctx,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", endpointsv2.Controller{})
+		return err
+	}
 
 	// TODO: Nodes Controller
 
