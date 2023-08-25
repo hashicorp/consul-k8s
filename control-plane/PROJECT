@@ -131,7 +131,7 @@ resources:
     namespaced: true
   domain: hashicorp.com
   group: consul
-  kind: HTTPRouteAuthFilter
+  kind: RouteAuthFilter
   path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
   version: v1alpha1
 - api:

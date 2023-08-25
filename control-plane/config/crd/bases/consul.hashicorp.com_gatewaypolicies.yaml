@@ -54,15 +54,15 @@ spec:
               default:
                 properties:
                   jwt:
-                    description: APIGatewayJWTRequirement holds the list of JWT providers
+                    description: GatewayJWTRequirement holds the list of JWT providers
                       to be verified against.
                     properties:
                       providers:
                         description: Providers is a list of providers to consider
                           when verifying a JWT.
                         items:
-                          description: APIGatewayJWTProvider holds the provider and
-                            claim verification information.
+                          description: GatewayJWTProvider holds the provider and claim
+                            verification information.
                           properties:
                             name:
                               description: Name is the name of the JWT provider. There
@@ -73,8 +73,8 @@ spec:
                               description: VerifyClaims is a list of additional claims
                                 to verify in a JWT's payload.
                               items:
-                                description: APIGatewayJWTClaimVerification holds
-                                  the actual claim information to be verified.
+                                description: GatewayJWTClaimVerification holds the
+                                  actual claim information to be verified.
                                 properties:
                                   path:
                                     description: Path is the path to the claim in
@@ -105,15 +105,15 @@ spec:
               override:
                 properties:
                   jwt:
-                    description: APIGatewayJWTRequirement holds the list of JWT providers
+                    description: GatewayJWTRequirement holds the list of JWT providers
                       to be verified against.
                     properties:
                       providers:
                         description: Providers is a list of providers to consider
                           when verifying a JWT.
                         items:
-                          description: APIGatewayJWTProvider holds the provider and
-                            claim verification information.
+                          description: GatewayJWTProvider holds the provider and claim
+                            verification information.
                           properties:
                             name:
                               description: Name is the name of the JWT provider. There
@@ -124,8 +124,8 @@ spec:
                               description: VerifyClaims is a list of additional claims
                                 to verify in a JWT's payload.
                               items:
-                                description: APIGatewayJWTClaimVerification holds
-                                  the actual claim information to be verified.
+                                description: GatewayJWTClaimVerification holds the
+                                  actual claim information to be verified.
                                 properties:
                                   path:
                                     description: Path is the path to the claim in
