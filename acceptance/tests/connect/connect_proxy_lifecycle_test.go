@@ -120,11 +120,11 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			})
 
 			if testCfg.secure {
-				connHelper.TestConnectionFailureWithoutIntention(t)
-				connHelper.CreateIntention(t)
+				connHelper.TestConnectionFailureWithoutIntention(t, connhelper.ConnHelperOpts{})
+				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
 			}
 
-			connHelper.TestConnectionSuccess(t)
+			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
 
 			// Get static-client pod name
 			ns := ctx.KubectlOptions(t).Namespace
@@ -278,7 +278,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			}
 		})
 
-		connHelper.TestConnectionSuccess(t, connhelper.JobName)
+		connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{ClientType: connhelper.JobName})
 
 		// Get job-client pod name
 		ns := ctx.KubectlOptions(t).Namespace

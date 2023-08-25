@@ -51,11 +51,11 @@ func TestConnectInject(t *testing.T) {
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
 			if c.secure {
-				connHelper.TestConnectionFailureWithoutIntention(t)
-				connHelper.CreateIntention(t)
+				connHelper.TestConnectionFailureWithoutIntention(t, connhelper.ConnHelperOpts{})
+				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
 			}
 
-			connHelper.TestConnectionSuccess(t)
+			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
 	}

@@ -27,6 +27,8 @@ const (
 	StaticClientName = "static-client"
 	StaticServerName = "static-server"
 	JobName          = "job-client"
+
+	retryTimeout = 120 * time.Second
 )
 
 // ConnectHelper configures a Consul cluster for connect injection tests.
@@ -49,6 +51,7 @@ type ConnectHelper struct {
 
 	// Ctx is used to deploy Consul
 	Ctx environment.TestContext
+
 	// UseAppNamespace is used top optionally deploy applications into a separate namespace.
 	// If unset, the namespace associated with Ctx is used.
 	UseAppNamespace bool
@@ -60,6 +63,13 @@ type ConnectHelper struct {
 
 	// ConsulClient is the client used to test service mesh connectivity.
 	ConsulClient *api.Client
+}
+
+// ConnHelperOpts allows for configuring optional parameters to be passed into the
+// conn helper methods. This provides added flexibility, although not every value will be used
+// by every method. See documentation for more details.
+type ConnHelperOpts struct {
+	ClientType string
 }
 
 // Setup creates a new cluster using the New*Cluster function and assigns it
@@ -90,6 +100,8 @@ func (c *ConnectHelper) Upgrade(t *testing.T) {
 	c.consulCluster.Upgrade(t, c.helmValues())
 }
 
+// KubectlOptsForApp returns options using the -apps appended namespace if
+// UseAppNamespace is enabled. Otherwise, it returns the ctx options.
 func (c *ConnectHelper) KubectlOptsForApp(t *testing.T) *terratestK8s.KubectlOptions {
 	opts := c.Ctx.KubectlOptions(t)
 	if !c.UseAppNamespace {
@@ -110,7 +122,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		// deployments because golang will execute them in reverse order
 		// (i.e. the last registered cleanup function will be executed first).
 		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
+			retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
 				require.NoError(r, err)
@@ -155,7 +167,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
 	retry.RunWith(
-		&retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}, t,
+		&retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}, t,
 		func(r *retry.R) {
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
 				podList, err := c.Ctx.KubernetesClient(t).CoreV1().
@@ -169,6 +181,18 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 				require.Len(r, podList.Items[0].Spec.Containers, 2)
 			}
 		})
+}
+
+func (c *ConnectHelper) CreateNamespace(t *testing.T, namespace string) {
+	opts := c.Ctx.KubectlOptions(t)
+	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
+	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
+		return
+	}
+	require.NoError(t, err)
+	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
+		k8s.RunKubectl(t, opts, "delete", "ns", namespace)
+	})
 }
 
 // DeployJob deploys a job pod to the Kubernetes
@@ -257,14 +281,7 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 	opts := c.KubectlOptsForApp(t)
 	// If we are deploying apps in another namespace, create the namespace.
 
-	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", opts.Namespace)
-	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
-		return
-	}
-	require.NoError(t, err)
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, opts, "delete", "ns", opts.Namespace)
-	})
+	c.CreateNamespace(t, opts.Namespace)
 
 	if c.Cfg.EnableRestrictedPSAEnforcement {
 		// Allow anything to run in the app namespace.
@@ -273,7 +290,6 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 			"pod-security.kubernetes.io/enforce-version=v1.24",
 		)
 	}
-
 }
 
 // CreateResolverRedirect creates a resolver that redirects to a static-server, a corresponding k8s service,
@@ -291,15 +307,17 @@ func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
 }
 
 // TestConnectionFailureWithoutIntention ensures the connection to the static
-// server fails when no intentions are configured.
-func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clientType ...string) {
+// server fails when no intentions are configured. When provided with a ClientType option
+// the client is overridden, otherwise a default will be used.
+func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, connHelperOpts ConnHelperOpts) {
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	opts := c.KubectlOptsForApp(t)
 	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
-	if len(clientType) > 0 {
-		client = clientType[0]
+	if connHelperOpts.ClientType != "" {
+		client = connHelperOpts.ClientType
 	}
+
 	if c.Cfg.EnableTransparentProxy {
 		k8s.CheckStaticServerConnectionFailing(t, opts, client, "http://static-server")
 	} else {
@@ -307,38 +325,63 @@ func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clie
 	}
 }
 
+type IntentionOpts struct {
+	ConnHelperOpts
+	SourceNamespace      string
+	DestinationNamespace string
+}
+
 // CreateIntention creates an intention for the static-server pod to connect to
-// the static-client pod.
-func (c *ConnectHelper) CreateIntention(t *testing.T, clientType ...string) {
+// the static-client pod. opts parameter allows for overriding of some fields. If opts is empty
+// then all namespaces and clients use defaults.
+func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts) {
 	logger.Log(t, "creating intention")
 	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
-	if len(clientType) > 0 {
-		client = clientType[0]
+	if opts.ClientType != "" {
+		client = opts.ClientType
 	}
-	_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
-		Kind: api.ServiceIntentions,
-		Name: StaticServerName,
-		Sources: []*api.SourceIntention{
-			{
-				Name:   client,
-				Action: api.IntentionActionAllow,
+
+	sourceNamespace := c.KubectlOptsForApp(t).Namespace
+	if opts.SourceNamespace != "" {
+		sourceNamespace = opts.SourceNamespace
+	}
+
+	destinationNamespace := c.KubectlOptsForApp(t).Namespace
+	if opts.DestinationNamespace != "" {
+		destinationNamespace = opts.DestinationNamespace
+	}
+
+	retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+			Kind:      api.ServiceIntentions,
+			Name:      StaticServerName,
+			Namespace: destinationNamespace,
+			Sources: []*api.SourceIntention{
+				{
+					Namespace: sourceNamespace,
+					Name:      client,
+					Action:    api.IntentionActionAllow,
+				},
 			},
-		},
-	}, nil)
-	require.NoError(t, err)
+		}, nil)
+		require.NoError(r, err)
+	})
 }
 
 // TestConnectionSuccess ensures the static-server pod can connect to the
-// static-client pod once the intention is set.
-func (c *ConnectHelper) TestConnectionSuccess(t *testing.T, clientType ...string) {
+// static-client pod once the intention is set. When provided with a ClientType option
+// the client is overridden, otherwise a default will be used.
+func (c *ConnectHelper) TestConnectionSuccess(t *testing.T, connHelperOpts ConnHelperOpts) {
 	logger.Log(t, "checking that connection is successful")
 	opts := c.KubectlOptsForApp(t)
 	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
 	client := StaticClientName
-	if len(clientType) > 0 {
-		client = clientType[0]
+	if connHelperOpts.ClientType != "" {
+		client = connHelperOpts.ClientType
 	}
+
 	if c.Cfg.EnableTransparentProxy {
 		// todo: add an assertion that the traffic is going through the proxy
 		k8s.CheckStaticServerConnectionSuccessful(t, opts, client, "http://static-server")
