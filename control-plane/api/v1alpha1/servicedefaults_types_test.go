@@ -160,6 +160,23 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						},
 					},
 					BalanceInboundConnections: "exact_balance",
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsPerSecond: 1234,
+							RequestsMaxBurst:  2345,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathExact:         "/foo",
+									RequestsPerSecond: 111,
+									RequestsMaxBurst:  222,
+								},
+								{
+									PathPrefix:        "/admin",
+									RequestsPerSecond: 333,
+								},
+							},
+						},
+					},
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
@@ -288,6 +305,23 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					},
 				},
 				BalanceInboundConnections: "exact_balance",
+				RateLimits: &capi.RateLimits{
+					InstanceLevel: capi.InstanceLevelRateLimits{
+						RequestsPerSecond: 1234,
+						RequestsMaxBurst:  2345,
+						Routes: []capi.InstanceLevelRouteRateLimits{
+							{
+								PathExact:         "/foo",
+								RequestsPerSecond: 111,
+								RequestsMaxBurst:  222,
+							},
+							{
+								PathPrefix:        "/admin",
+								RequestsPerSecond: 333,
+							},
+						},
+					},
+				},
 				EnvoyExtensions: []capi.EnvoyExtension{
 					{
 						Name: "aws_request_signing",
@@ -559,6 +593,23 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						},
 					},
 					BalanceInboundConnections: "exact_balance",
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsPerSecond: 1234,
+							RequestsMaxBurst:  2345,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathExact:         "/foo",
+									RequestsPerSecond: 111,
+									RequestsMaxBurst:  222,
+								},
+								{
+									PathPrefix:        "/admin",
+									RequestsPerSecond: 333,
+								},
+							},
+						},
+					},
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
@@ -680,6 +731,23 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					},
 				},
 				BalanceInboundConnections: "exact_balance",
+				RateLimits: &capi.RateLimits{
+					InstanceLevel: capi.InstanceLevelRateLimits{
+						RequestsPerSecond: 1234,
+						RequestsMaxBurst:  2345,
+						Routes: []capi.InstanceLevelRouteRateLimits{
+							{
+								PathExact:         "/foo",
+								RequestsPerSecond: 111,
+								RequestsMaxBurst:  222,
+							},
+							{
+								PathPrefix:        "/admin",
+								RequestsPerSecond: 333,
+							},
+						},
+					},
+				},
 				EnvoyExtensions: []capi.EnvoyExtension{
 					{
 						Name: "aws_request_signing",
