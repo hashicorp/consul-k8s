@@ -1,9 +1,8 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-// TODO(dans)
-// This points to a commit on a dev branch. The replace directive should be removed when the SDK is published
-// Even after this commit goes into main, the replace directive is needed be because `api` requires 0.14.1 of SDK
-replace github.com/hashicorp/consul/sdk v0.14.1 => github.com/hashicorp/consul/sdk v0.4.1-0.20230821222840-992198e5f8c7
+// TODO: remove when the SDK is released for Consul 1.17
+// The replace directive is needed be because `api` requires 0.14.1 of SDK and is both a direct and indirect dependency
+replace github.com/hashicorp/consul/sdk v0.14.1 => github.com/hashicorp/consul/sdk v0.4.1-0.20230825164720-ecdcde430924
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
@@ -47,7 +46,7 @@ require (
 )
 
 require (
-	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230821203006-4c95f8ff8d20
+	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230825213844-4ea04860c5ed
 	github.com/hashicorp/consul-server-connection-manager v0.1.4
 	google.golang.org/protobuf v1.30.0
 )
