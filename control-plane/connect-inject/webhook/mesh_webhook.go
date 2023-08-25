@@ -15,13 +15,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/version"
 	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -30,6 +23,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 )
 
 const (
@@ -533,20 +534,24 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 	}
 
 	if tproxyEnabled && overwriteProbes {
-		for i, container := range pod.Spec.Containers {
+		// We don't use the loop index because this needs to line up w.withiptablesConfigJSON,
+		// which is performed before the sidecar is injected.
+		idx := 0
+		for _, container := range pod.Spec.Containers {
 			// skip the "envoy-sidecar" container from having it's probes overridden
 			if container.Name == sidecarContainer {
 				continue
 			}
 			if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
-				container.LivenessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsLivenessPortsRangeStart + i)
+				container.LivenessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsLivenessPortsRangeStart + idx)
 			}
 			if container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil {
-				container.ReadinessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsReadinessPortsRangeStart + i)
+				container.ReadinessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsReadinessPortsRangeStart + idx)
 			}
 			if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
-				container.StartupProbe.HTTPGet.Port = intstr.FromInt(exposedPathsStartupPortsRangeStart + i)
+				container.StartupProbe.HTTPGet.Port = intstr.FromInt(exposedPathsStartupPortsRangeStart + idx)
 			}
+			idx++
 		}
 	}
 	return nil

@@ -6,17 +6,13 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -28,6 +24,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 )
 
 func TestHandlerHandle(t *testing.T) {
@@ -1124,6 +1127,220 @@ func TestHandlerHandle(t *testing.T) {
 					actual[i].Value = nil
 				}
 			}
+			require.ElementsMatch(t, tt.Patches, actual)
+		})
+	}
+}
+
+// This test validates that overwrite probes match the iptables configuration fromiptablesConfigJSON()
+// Because they happen at different points in the injection, the port numbers can get out of sync.
+func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
+	t.Parallel()
+	s := runtime.NewScheme()
+	s.AddKnownTypes(schema.GroupVersion{
+		Group:   "",
+		Version: "v1",
+	}, &corev1.Pod{})
+	decoder, err := admission.NewDecoder(s)
+	require.NoError(t, err)
+
+	cases := []struct {
+		Name    string
+		Webhook MeshWebhook
+		Req     admission.Request
+		Err     string // expected error string, not exact
+		Patches []jsonpatch.Operation
+	}{
+		{
+			"tproxy with overwriteProbes is enabled",
+			MeshWebhook{
+				Log:                    logrtest.New(t),
+				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:   mapset.NewSet(),
+				EnableTransparentProxy: true,
+				TProxyOverwriteProbes:  true,
+				LifecycleConfig:        lifecycle.Config{DefaultEnableProxyLifecycle: true},
+				decoder:                decoder,
+				Clientset:              defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{},
+							// We're setting an existing annotation so that we can assert on the
+							// specific annotations that are set as a result of probes being overwritten.
+							Annotations: map[string]string{"foo": "bar"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "web",
+									LivenessProbe: &corev1.Probe{
+										ProbeHandler: corev1.ProbeHandler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Port: intstr.FromInt(8080),
+											},
+										},
+									},
+									ReadinessProbe: &corev1.Probe{
+										ProbeHandler: corev1.ProbeHandler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Port: intstr.FromInt(8081),
+											},
+										},
+									},
+									StartupProbe: &corev1.Probe{
+										ProbeHandler: corev1.ProbeHandler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Port: intstr.FromInt(8082),
+											},
+										},
+									},
+								},
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe/tcpSocket",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe/initialDelaySeconds",
+				},
+				{
+					Operation: "remove",
+					Path:      "/spec/containers/0/readinessProbe/httpGet",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "remove",
+					Path:      "/spec/containers/0/startupProbe",
+				},
+				{
+					Operation: "remove",
+					Path:      "/spec/containers/0/livenessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyTransparentProxyStatus),
+				},
+
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			tt.Webhook.ConsulConfig = &consul.Config{HTTPPort: 8500}
+			ctx := context.Background()
+			resp := tt.Webhook.Handle(ctx, tt.Req)
+			if (tt.Err == "") != resp.Allowed {
+				t.Fatalf("allowed: %v, expected err: %v", resp.Allowed, tt.Err)
+			}
+			if tt.Err != "" {
+				require.Contains(t, resp.Result.Message, tt.Err)
+				return
+			}
+
+			var iptablesCfg iptables.Config
+			var overwritePorts []string
+			actual := resp.Patches
+			if len(actual) > 0 {
+				for i := range actual {
+
+					// We want to grab the iptables configuration from the connect-init container's
+					// environment.
+					if actual[i].Path == "/spec/initContainers" {
+						value := actual[i].Value.([]any)
+						valueMap := value[0].(map[string]any)
+						envs := valueMap["env"].([]any)
+						redirectEnv := envs[8].(map[string]any)
+						require.Equal(t, redirectEnv["name"].(string), "CONSUL_REDIRECT_TRAFFIC_CONFIG")
+						iptablesJson := redirectEnv["value"].(string)
+
+						err := json.Unmarshal([]byte(iptablesJson), &iptablesCfg)
+						require.NoError(t, err)
+					}
+
+					// We want to accumulate the httpGet Probes from the application container to
+					// compare them to the iptables rules. This is now the second container in the spec
+					if strings.Contains(actual[i].Path, "/spec/containers/1") {
+						valueMap, ok := actual[i].Value.(map[string]any)
+						require.True(t, ok)
+
+						for k, v := range valueMap {
+							if strings.Contains(k, "Probe") {
+								probe := v.(map[string]any)
+								httpProbe := probe["httpGet"]
+								httpProbeMap := httpProbe.(map[string]any)
+								port := httpProbeMap["port"]
+								portNum := port.(float64)
+
+								overwritePorts = append(overwritePorts, strconv.Itoa(int(portNum)))
+							}
+						}
+					}
+
+					// nil out all the patch values to just compare the keys changing.
+					actual[i].Value = nil
+				}
+			}
+			// Make sure the iptables excluded ports match the ports on the container
+			require.ElementsMatch(t, iptablesCfg.ExcludeInboundPorts, overwritePorts)
 			require.ElementsMatch(t, tt.Patches, actual)
 		})
 	}
