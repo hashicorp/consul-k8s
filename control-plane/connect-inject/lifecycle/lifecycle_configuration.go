@@ -96,18 +96,18 @@ func (lc Config) GracefulShutdownPath(pod corev1.Pod) string {
 	return lc.DefaultGracefulShutdownPath
 }
 
-// StartupGracePeriodSeconds returns how long in seconds the graceful_shutdown request should block while waiting for the dataplane to start.
-func (lc Config) StartupGracePeriodSeconds(pod corev1.Pod) int {
-	if raw, ok := pod.Annotations[constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds]; ok && raw != "" {
-		graceperiod, _ := strconv.Atoi(raw)
-		return graceperiod
-	}
+// StartupGracePeriodSeconds returns how long in seconds the graceful_startup request should block while waiting for the dataplane to start.
+func (lc Config) StartupGracePeriodSeconds(pod corev1.Pod) (int, error) {
 
-	if lc.DefaultGracefulShutdownPath == "" {
-		return constants.DefaultStartupGracePeriodSeconds
+	startupGracePeriodSeconds := lc.DefaultStartupGracePeriodSeconds
+	if startupGracePeriodSecondsAnnotation, ok := pod.Annotations[constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds]; ok {
+		val, err := strconv.ParseUint(startupGracePeriodSecondsAnnotation, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("unable to parse annotation %q: %w", constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds, err)
+		}
+		startupGracePeriodSeconds = int(val)
 	}
-
-	return lc.DefaultStartupGracePeriodSeconds
+	return startupGracePeriodSeconds, nil
 }
 
 // GracefulStartupPath returns the path on which consul-dataplane should serve the graceful startup HTTP endpoint, either via the default value in the meshWebhook, or

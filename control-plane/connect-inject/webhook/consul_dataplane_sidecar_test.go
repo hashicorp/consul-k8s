@@ -1363,6 +1363,8 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 	gracefulShutdownSeconds := 10
 	gracefulPort := "20307"
 	gracefulShutdownPath := "/exit"
+	gracefulStartupPath := "/start"
+	gracefulStartupSeconds := 10
 
 	cases := []struct {
 		name        string
@@ -1386,10 +1388,12 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 				},
 			},
 			annotations: nil,
-			expCmdArgs:  "graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit",
+			expCmdArgs:  "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -graceful-startup-path=/start -startup-grace-period-seconds=10",
 		},
 		{
 			name:    "no defaults, all annotations",
@@ -1400,8 +1404,10 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   fmt.Sprint(gracefulShutdownSeconds),
 				constants.AnnotationSidecarProxyLifecycleGracefulPort:                 gracefulPort,
 				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         gracefulShutdownPath,
+				constants.AnnotationSidecarProxyLifecycleGracefulStartupPath:          gracefulStartupPath,
+				constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds:    fmt.Sprint(gracefulStartupSeconds),
 			},
-			expCmdArgs: "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit",
+			expCmdArgs: "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -graceful-startup-path=/start -startup-grace-period-seconds=10",
 		},
 		{
 			name: "annotations override defaults",
@@ -1420,8 +1426,10 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   fmt.Sprint(gracefulShutdownSeconds + 5),
 				constants.AnnotationSidecarProxyLifecycleGracefulPort:                 "20317",
 				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         "/foo",
+				constants.AnnotationSidecarProxyLifecycleGracefulStartupPath:          "/bar",
+				constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds:    fmt.Sprint(gracefulStartupSeconds + 5),
 			},
-			expCmdArgs: "-graceful-port=20317 -shutdown-grace-period-seconds=15 -graceful-shutdown-path=/foo",
+			expCmdArgs: "-graceful-port=20317 -shutdown-grace-period-seconds=15 -graceful-shutdown-path=/foo -graceful-startup-path=/bar -startup-grace-period-seconds=15",
 		},
 		{
 			name: "lifecycle disabled, no annotations",
@@ -1432,6 +1440,8 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 				},
 			},
 			annotations: nil,
@@ -1456,6 +1466,8 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 				},
 			},
 			annotations: map[string]string{
@@ -1463,6 +1475,7 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 			},
 			expCmdArgs: "-graceful-port=20307",
 		},
+		//TODO: Add equiv for graceful startup
 		{
 			name: "annotations skip graceful shutdown",
 			webhook: MeshWebhook{
