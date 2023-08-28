@@ -115,9 +115,6 @@ global:
   secretsBackend:
     vault:
 
-      # Vault namespace
-      namespace: root
-
       # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
       enabled: false
 
@@ -215,6 +212,9 @@ global:
       # Please refer to [Vault ACL policies](https://developer.hashicorp.com/consul/docs/connect/ca/vault#vault-acl-policies)
       # documentation for information on how to configure the Vault policies.
       connectCA:
+        # Vault namespace
+        namespace: ""
+
         # The address of the Vault server.
         address: ""
 
