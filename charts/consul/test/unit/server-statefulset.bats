@@ -859,7 +859,6 @@ load _helpers
       "drop": ["ALL"],
       "add": ["NET_BIND_SERVICE"]
     },
-    "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
     "seccompProfile": {
       "type": "RuntimeDefault"
@@ -892,7 +891,6 @@ load _helpers
       "drop": ["ALL"],
       "add": ["NET_BIND_SERVICE"]
     },
-    "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
     "seccompProfile": {
       "type": "RuntimeDefault"
