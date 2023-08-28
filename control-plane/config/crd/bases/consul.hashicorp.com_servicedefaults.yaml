@@ -287,7 +287,7 @@ spec:
                               The real time is equal to the base time multiplied by
                               the number of times the host has been ejected and is
                               capped by max_ejection_time (Default 300s). Defaults
-                              to 30000ms or 30s.
+                              to 30s.
                             type: string
                           enforcingConsecutive5xx:
                             description: EnforcingConsecutive5xx is the % chance that
@@ -404,7 +404,7 @@ spec:
                                 The real time is equal to the base time multiplied
                                 by the number of times the host has been ejected and
                                 is capped by max_ejection_time (Default 300s). Defaults
-                                to 30000ms or 30s.
+                                to 30s.
                               type: string
                             enforcingConsecutive5xx:
                               description: EnforcingConsecutive5xx is the % chance
