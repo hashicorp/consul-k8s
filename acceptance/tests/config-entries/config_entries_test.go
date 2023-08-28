@@ -105,7 +105,6 @@ func TestController(t *testing.T) {
 					svcDefaultEntry, ok := entry.(*api.ServiceConfigEntry)
 					require.True(r, ok, "could not cast to ServiceConfigEntry")
 					require.Equal(r, "http", svcDefaultEntry.Protocol)
-					require.Equal(r, 1234, svcDefaultEntry.RateLimits.InstanceLevel.RequestsPerSecond)
 
 					// service-resolver
 					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)

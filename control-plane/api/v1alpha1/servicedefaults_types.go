@@ -250,6 +250,14 @@ func (rl *RateLimits) toConsul() *capi.RateLimits {
 	}
 }
 
+func (rl *RateLimits) validate(path *field.Path) field.ErrorList {
+	if rl == nil {
+		return nil
+	}
+
+	return rl.InstanceLevel.validate(path.Child("instanceLevel"))
+}
+
 // InstanceLevelRateLimits represents rate limit configuration
 // that are applied per service instance.
 type InstanceLevelRateLimits struct {
@@ -271,6 +279,66 @@ type InstanceLevelRateLimits struct {
 	// Routes is a list of rate limits applied to specific routes.
 	// Overrides any top-level configuration.
 	Routes []InstanceLevelRouteRateLimits `json:"routes,omitempty"`
+}
+
+func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Track if RequestsPerSecond is set in at least one place in the config
+	isRatelimitSet := irl.RequestsPerSecond > 0
+
+	// Top-level RequestsPerSecond can be 0 (unset) or a positive number.
+	if irl.RequestsPerSecond < 0 {
+		allErrs = append(allErrs,
+			field.Invalid(path.Child("requestsPerSecond"),
+				irl.RequestsPerSecond,
+				"RequestsPerSecond must be positive"))
+	}
+
+	if irl.RequestsPerSecond == 0 && irl.RequestsMaxBurst > 0 {
+		allErrs = append(allErrs,
+			field.Invalid(path.Child("requestsPerSecond"),
+				irl.RequestsPerSecond,
+				"RequestsPerSecond must be greater than 0 if RequestsMaxBurst is set"))
+	}
+
+	if irl.RequestsMaxBurst < 0 {
+		allErrs = append(allErrs,
+			field.Invalid(path.Child("requestsMaxBurst"),
+				irl.RequestsMaxBurst,
+				"RequestsMaxBurst must be greater than 0"))
+	}
+
+	for i, route := range irl.Routes {
+		if exact, prefix, regex := route.PathExact != "", route.PathPrefix != "", route.PathRegex != ""; (!exact && !prefix && !regex) ||
+			(exact && prefix) || (exact && regex) || (prefix && regex) {
+			allErrs = append(allErrs, field.Required(
+				path.Child("routes").Index(i),
+				"Route must define exactly one of PathExact, PathPrefix, or PathRegex"))
+		}
+
+		isRatelimitSet = isRatelimitSet || route.RequestsPerSecond > 0
+
+		// Unlike top-level RequestsPerSecond, any route MUST have a RequestsPerSecond defined.
+		if route.RequestsPerSecond <= 0 {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("routes").Index(i).Child("requestsPerSecond"),
+				route.RequestsPerSecond, "RequestsPerSecond must be greater than 0"))
+		}
+
+		if route.RequestsMaxBurst < 0 {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("routes").Index(i).Child("requestsMaxBurst"),
+				route.RequestsMaxBurst, "RequestsMaxBurst must be greater than 0"))
+		}
+	}
+
+	if !isRatelimitSet {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("requestsPerSecond"),
+			irl.RequestsPerSecond, "At least one of top-level or route-level RequestsPerSecond must be set"))
+	}
+	return allErrs
 }
 
 // InstanceLevelRouteRateLimits represents rate limit configuration
@@ -425,6 +493,7 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
+	allErrs = append(allErrs, in.Spec.RateLimits.validate(path.Child("rateLimits"))...)
 	allErrs = append(allErrs, in.Spec.EnvoyExtensions.validate(path.Child("envoyExtensions"))...)
 
 	if len(allErrs) > 0 {
