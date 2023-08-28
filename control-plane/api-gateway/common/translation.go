@@ -363,6 +363,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 	}
 	var retryFilter *api.RetryFilter
 	var timeoutFilter *api.TimeoutFilter
+	var routeFilter *api.JWTFilter
 
 	for _, filter := range filters {
 		if filter.RequestHeaderModifier != nil {
@@ -414,15 +415,41 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 					IdleTimeout:    timeoutFilterCRD.Spec.IdleTimeout,
 				}
 
+			case v1alpha1.RouteAuthFilterKind:
+
+				routeFilterCRD := crdFilter.(*v1alpha1.RouteAuthFilter)
+
+				routeFilter = &api.JWTFilter{
+					Providers: []*api.APIGatewayJWTProvider{},
+				}
+
+				for _, provider := range routeFilterCRD.Spec.JWT.Providers {
+					// CHECK if we have the "pointer issue"
+
+					p := api.APIGatewayJWTProvider{
+						Name:         provider.Name,
+						VerifyClaims: []*api.APIGatewayJWTClaimVerification{},
+					}
+
+					for _, claim := range provider.VerifyClaims {
+						p.VerifyClaims = append(p.VerifyClaims, &api.APIGatewayJWTClaimVerification{
+							Path:  claim.Path,
+							Value: claim.Value,
+						})
+					}
+
+					routeFilter.Providers = append(routeFilter.Providers, &p)
+				}
 			}
 		}
-
 	}
+
 	return api.HTTPFilters{
 		Headers:       []api.HTTPHeaderFilter{consulFilter},
 		URLRewrite:    urlRewrite,
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
+		JWT:           routeFilter,
 	}
 }
 
