@@ -267,14 +267,14 @@ type InstanceLevelRateLimits struct {
 	// the value specified in RequestsMaxBurst.
 	//
 	// Internally, this is the refill rate of the token bucket used for rate limiting.
-	RequestsPerSecond int `json:"requestsPerSecond"`
+	RequestsPerSecond int `json:"requestsPerSecond,omitempty"`
 
 	// RequestsMaxBurst is the maximum number of requests that can be sent
 	// in a burst. Should be equal to or greater than RequestsPerSecond.
 	// If unset, defaults to RequestsPerSecond.
 	//
 	// Internally, this is the maximum size of the token bucket used for rate limiting.
-	RequestsMaxBurst int `json:"requestsMaxBurst"`
+	RequestsMaxBurst int `json:"requestsMaxBurst,omitempty"`
 
 	// Routes is a list of rate limits applied to specific routes.
 	// Overrides any top-level configuration.
@@ -344,12 +344,12 @@ func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
 // InstanceLevelRouteRateLimits represents rate limit configuration
 // applied to a route matching one of PathExact/PathPrefix/PathRegex.
 type InstanceLevelRouteRateLimits struct {
-	PathExact  string `json:"pathExact"`
-	PathPrefix string `json:"pathPrefix"`
-	PathRegex  string `json:"pathRegex"`
+	PathExact  string `json:"pathExact,omitempty"`
+	PathPrefix string `json:"pathPrefix,omitempty"`
+	PathRegex  string `json:"pathRegex,omitempty"`
 
-	RequestsPerSecond int `json:"requestsPerSecond"`
-	RequestsMaxBurst  int `json:"requestsMaxBurst"`
+	RequestsPerSecond int `json:"requestsPerSecond,omitempty"`
+	RequestsMaxBurst  int `json:"requestsMaxBurst,omitempty"`
 }
 
 func (in *ServiceDefaults) ConsulKind() string {

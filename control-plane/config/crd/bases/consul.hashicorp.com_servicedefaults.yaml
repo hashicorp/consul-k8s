@@ -227,17 +227,8 @@ spec:
                               type: integer
                             requestsPerSecond:
                               type: integer
-                          required:
-                          - pathExact
-                          - pathPrefix
-                          - pathRegex
-                          - requestsMaxBurst
-                          - requestsPerSecond
                           type: object
                         type: array
-                    required:
-                    - requestsMaxBurst
-                    - requestsPerSecond
                     type: object
                 required:
                 - instanceLevel
