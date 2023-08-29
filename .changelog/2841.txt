@@ -1,4 +1,3 @@
 ```release-note:improvement
-vault: Adds `namespace` in `secretsBackend.vault.connectCA` in `values.yaml` .This namespace is used for Vault namespace,
-this introduces one more way to specify namespace other than `"{"connect": [{ "ca_config": [{ "namespace": "value"}]}]}"` in `connectCA.additionalConfig`
+vault: Add `namespace` to `secretsBackend.vault.connectCA` in Helm chart. This provides a more convenient way to specify the Vault namespace than nested JSON in `connectCA.additionalConfig`.
 ```
