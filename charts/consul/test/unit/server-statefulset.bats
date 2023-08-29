@@ -677,6 +677,41 @@ load _helpers
   [ "${actual}" = "/v1/agent/metrics" ]
 }
 
+@test "server/StatefulSet: when global.metrics.enableAgentMetrics=true, adds prometheus scheme=http annotation" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."prometheus.io/scheme"' | tee /dev/stderr)
+  [ "${actual}" = "http" ]
+}
+
+@test "server/StatefulSet: when global.metrics.enableAgentMetrics=true and global.tls.enabled=true, adds prometheus port=8501 annotation" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.tls.enabled=true'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
+  [ "${actual}" = "8501" ]
+}
+
+@test "server/StatefulSet: when global.metrics.enableAgentMetrics=true and global.tls.enabled=true, adds prometheus scheme=https annotation" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.tls.enabled=true'  \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."prometheus.io/scheme"' | tee /dev/stderr)
+  [ "${actual}" = "https" ]
+}
+
 #--------------------------------------------------------------------
 # config-configmap
 
