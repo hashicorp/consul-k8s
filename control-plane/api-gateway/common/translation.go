@@ -148,6 +148,10 @@ func ToContainerPort(portNumber gwv1beta1.PortNumber, mapPrivilegedContainerPort
 }
 
 func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolicy) (*api.APIGatewayPolicy, *api.APIGatewayPolicy) {
+	if policy == nil {
+		return nil, nil
+	}
+
 	defaultPolicy := &api.APIGatewayPolicy{
 		JWT: t.translateJWTRequirement(policy.Spec.Default.JWT),
 	}
