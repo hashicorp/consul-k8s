@@ -158,7 +158,7 @@ func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolic
 	return defaultPolicy, overridePolicy
 }
 
-func (t ResourceTranslator) translateJWTRequirement(crdRequirement *v1alpha1.APIGatewayJWTRequirement) *api.APIGatewayJWTRequirement {
+func (t ResourceTranslator) translateJWTRequirement(crdRequirement *v1alpha1.GatewayJWTRequirement) *api.APIGatewayJWTRequirement {
 	apiRequirement := api.APIGatewayJWTRequirement{}
 	for _, provider := range crdRequirement.Providers {
 		apiRequirement.Providers = append(apiRequirement.Providers, t.translateJWTProvider(provider))
@@ -166,7 +166,7 @@ func (t ResourceTranslator) translateJWTRequirement(crdRequirement *v1alpha1.API
 	return &apiRequirement
 }
 
-func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.APIGatewayJWTProvider) *api.APIGatewayJWTProvider {
+func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.GatewayJWTProvider) *api.APIGatewayJWTProvider {
 	apiProvider := api.APIGatewayJWTProvider{
 		Name: crdProvider.Name,
 	}
@@ -176,7 +176,7 @@ func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.APIGatewa
 	return &apiProvider
 }
 
-func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.APIGatewayJWTClaimVerification) *api.APIGatewayJWTClaimVerification {
+func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.GatewayJWTClaimVerification) *api.APIGatewayJWTClaimVerification {
 	verifyClaim := api.APIGatewayJWTClaimVerification{
 		Path:  crdClaims.Path,
 		Value: crdClaims.Value,

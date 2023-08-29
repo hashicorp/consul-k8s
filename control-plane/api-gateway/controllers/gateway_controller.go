@@ -468,7 +468,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		).
 		Watches(
 			source.NewKindWithCache((&v1alpha1.GatewayPolicy{}), mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformRouteRetryFilter(ctx)),
+			handler.EnqueueRequestsFromMapFunc(r.transformGatewayPolicy(ctx)),
 		).
 		Watches(
 			source.NewKindWithCache((&v1alpha1.RouteRetryFilter{}), mgr.GetCache()),
@@ -593,7 +593,7 @@ func (r *GatewayController) transformConsulHTTPRoute(ctx context.Context) func(e
 	}
 }
 
-// transformGatewayPolicy will return a list of all gateways that need to be reconcilled
+// transformGatewayPolicy will return a list of all gateways that need to be reconcilled.
 func (r *GatewayController) transformGatewayPolicy(ctx context.Context) func(object client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
@@ -606,7 +606,7 @@ func (r *GatewayController) transformGatewayPolicy(ctx context.Context) func(obj
 		}
 		return []reconcile.Request{
 			{
-				gatewayRef,
+				NamespacedName: gatewayRef,
 			},
 		}
 
