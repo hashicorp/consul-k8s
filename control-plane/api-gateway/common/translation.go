@@ -228,10 +228,11 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 }
 
 func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
-	services := ConvertSliceFuncIf(rule.BackendRefs, func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
-
-		return t.translateHTTPBackendRef(route, ref, resources)
-	})
+	services := ConvertSliceFuncIf(
+		rule.BackendRefs,
+		func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
+			return t.translateHTTPBackendRef(route, ref, resources)
+		})
 
 	if len(services) == 0 {
 		return api.HTTPRouteRule{}, false
@@ -356,14 +357,18 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 }
 
 func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) api.HTTPFilters {
-	var urlRewrite *api.URLRewrite
+	var (
+		// Each of these variables will have just one possible value at the end of the function.
+		urlRewrite    *api.URLRewrite
+		retryFilter   *api.RetryFilter
+		timeoutFilter *api.TimeoutFilter
+		jwtFilter     *api.JWTFilter
+	)
+
 	consulFilter := api.HTTPHeaderFilter{
 		Add: make(map[string]string),
 		Set: make(map[string]string),
 	}
-	var retryFilter *api.RetryFilter
-	var timeoutFilter *api.TimeoutFilter
-	var routeFilter *api.JWTFilter
 
 	for _, filter := range filters {
 		if filter.RequestHeaderModifier != nil {
@@ -392,54 +397,14 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 				// this should never be the case because we only translate a route if it's actually valid, and if we're missing filters during the validation step, then we won't get here
 				continue
 			}
+
 			switch filter.ExtensionRef.Kind {
 			case v1alpha1.RouteRetryFilterKind:
-
-				retryFilterCRD := crdFilter.(*v1alpha1.RouteRetryFilter)
-				//new filter that needs to be appended
-
-				retryFilter = &api.RetryFilter{
-					NumRetries:            retryFilterCRD.Spec.NumRetries,
-					RetryOn:               retryFilterCRD.Spec.RetryOn,
-					RetryOnStatusCodes:    retryFilterCRD.Spec.RetryOnStatusCodes,
-					RetryOnConnectFailure: retryFilterCRD.Spec.RetryOnConnectFailure,
-				}
-
+				retryFilter = makeRetryFilter(crdFilter.(*v1alpha1.RouteRetryFilter))
 			case v1alpha1.RouteTimeoutFilterKind:
-
-				timeoutFilterCRD := crdFilter.(*v1alpha1.RouteTimeoutFilter)
-				//new filter that needs to be appended
-
-				timeoutFilter = &api.TimeoutFilter{
-					RequestTimeout: timeoutFilterCRD.Spec.RequestTimeout,
-					IdleTimeout:    timeoutFilterCRD.Spec.IdleTimeout,
-				}
-
+				timeoutFilter = makeTimeoutFilter(crdFilter.(*v1alpha1.RouteTimeoutFilter))
 			case v1alpha1.RouteAuthFilterKind:
-
-				routeFilterCRD := crdFilter.(*v1alpha1.RouteAuthFilter)
-
-				routeFilter = &api.JWTFilter{
-					Providers: []*api.APIGatewayJWTProvider{},
-				}
-
-				for _, provider := range routeFilterCRD.Spec.JWT.Providers {
-					// CHECK if we have the "pointer issue"
-
-					p := api.APIGatewayJWTProvider{
-						Name:         provider.Name,
-						VerifyClaims: []*api.APIGatewayJWTClaimVerification{},
-					}
-
-					for _, claim := range provider.VerifyClaims {
-						p.VerifyClaims = append(p.VerifyClaims, &api.APIGatewayJWTClaimVerification{
-							Path:  claim.Path,
-							Value: claim.Value,
-						})
-					}
-
-					routeFilter.Providers = append(routeFilter.Providers, &p)
-				}
+				jwtFilter = makeJWTFilter(crdFilter.(*v1alpha1.RouteAuthFilter))
 			}
 		}
 	}
@@ -449,7 +414,51 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		URLRewrite:    urlRewrite,
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
-		JWT:           routeFilter,
+		JWT:           jwtFilter,
+	}
+}
+
+func makeRetryFilter(routeRetryFilter *v1alpha1.RouteRetryFilter) *api.RetryFilter {
+	return &api.RetryFilter{
+		NumRetries:            routeRetryFilter.Spec.NumRetries,
+		RetryOn:               routeRetryFilter.Spec.RetryOn,
+		RetryOnStatusCodes:    routeRetryFilter.Spec.RetryOnStatusCodes,
+		RetryOnConnectFailure: routeRetryFilter.Spec.RetryOnConnectFailure,
+	}
+}
+
+func makeTimeoutFilter(routeTimeoutFilter *v1alpha1.RouteTimeoutFilter) *api.TimeoutFilter {
+	return &api.TimeoutFilter{
+		RequestTimeout: routeTimeoutFilter.Spec.RequestTimeout,
+		IdleTimeout:    routeTimeoutFilter.Spec.IdleTimeout,
+	}
+}
+
+func makeJWTFilter(routeJWTFilter *v1alpha1.RouteAuthFilter) *api.JWTFilter {
+	if routeJWTFilter.Spec.JWT == nil || routeJWTFilter.Spec.JWT.Providers == nil {
+		return nil
+	}
+
+	// For each provider, translate the claims to the Consul config entry format.
+	providers := make([]*api.APIGatewayJWTProvider, 0, len(routeJWTFilter.Spec.JWT.Providers))
+	for _, provider := range routeJWTFilter.Spec.JWT.Providers {
+
+		claims := make([]*api.APIGatewayJWTClaimVerification, 0, len(provider.VerifyClaims))
+		for _, claim := range provider.VerifyClaims {
+			claims = append(claims, &api.APIGatewayJWTClaimVerification{
+				Path:  claim.Path,
+				Value: claim.Value,
+			})
+		}
+
+		providers = append(providers, &api.APIGatewayJWTProvider{
+			Name:         provider.Name,
+			VerifyClaims: claims,
+		})
+	}
+
+	return &api.JWTFilter{
+		Providers: providers,
 	}
 }
 
