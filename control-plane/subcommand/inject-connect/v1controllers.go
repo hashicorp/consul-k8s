@@ -115,6 +115,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 				APITimeout: consulConfig.APITimeout,
 			},
 			ImageDataplane:             c.flagConsulDataplaneImage,
+			LogLevelDataplane:          c.flagLogLevelDataplane,
 			ImageConsulK8S:             c.flagConsulK8sImage,
 			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 			NamespaceMirroringPrefix:   c.flagK8SNSMirroringPrefix,
@@ -365,6 +366,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			EnableOpenShift:              c.flagEnableOpenShift,
 			Log:                          ctrl.Log.WithName("handler").WithName("connect"),
 			LogLevel:                     c.flagLogLevel,
+			LogLevelDataplane:            c.flagLogLevelDataplane,
 			LogJSON:                      c.flagLogJSON,
 		}})
 

@@ -48,6 +48,7 @@ type Command struct {
 	flagDefaultInject         bool   // True to inject by default
 	flagConsulImage           string // Docker image for Consul
 	flagConsulDataplaneImage  string // Docker image for Envoy
+	flagLogLevelDataplane     string // Log level for Data Plane Flag
 	flagConsulK8sImage        string // Docker image for consul-k8s
 	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
 	flagEnvoyExtraArgs        string // Extra envoy args when starting envoy
@@ -221,6 +222,9 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagEnableTelemetryCollector, "enable-telemetry-collector", false,
 		"Indicates whether proxies should be registered with configuration to enable forwarding metrics to consul-telemetry-collector")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
+		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
+			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
+	c.flagSet.StringVar(&c.flagLogLevelDataplane, "log-level-dataplane", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
@@ -410,6 +414,10 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagConsulDataplaneImage == "" {
 		return errors.New("-consul-dataplane-image must be set")
+	}
+
+	if c.flagLogLevelDataplane == "" {
+		return errors.New("-log-level-dataplane must be set")
 	}
 
 	if c.flagEnablePartitions && c.consul.Partition == "" {

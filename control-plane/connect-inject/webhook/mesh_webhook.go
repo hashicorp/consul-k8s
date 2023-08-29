@@ -205,9 +205,12 @@ type MeshWebhook struct {
 
 	// Log
 	Log logr.Logger
-	// Log settings for consul-dataplane and connect-init containers.
+	// Log settings for connect-init containers.
 	LogLevel string
 	LogJSON  bool
+
+	//Log level for consul-dataplane and
+	LogLevelDataplane string
 
 	decoder *admission.Decoder
 	// etcResolvFile is only used in tests to stub out /etc/resolv.conf file.

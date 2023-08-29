@@ -138,6 +138,7 @@ spec:
                 -enable-federation \
                 {{- end }}
                 -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
+                -log-level-dataplane={{ default .Values.global.logLevel .Values.global.logLevelDataplane  }} \
                 -log-json={{ .Values.global.logJSON }} \
                 -default-inject={{ .Values.connectInject.default }} \
                 -consul-image="{{ default .Values.global.image .Values.connectInject.imageConsul }}" \

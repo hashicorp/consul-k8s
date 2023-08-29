@@ -628,6 +628,7 @@ global:
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.3-dev
+  logLevelDataplane: ""
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.

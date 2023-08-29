@@ -133,7 +133,7 @@ func getDataplaneArgs(namespace string, config common.HelmConfig, bearerTokenFil
 		"-addresses", config.ConsulConfig.Address,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
-		"-log-level=" + config.LogLevel,
+		"-log-level=" + config.LogLevelDataplane,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
 	}
