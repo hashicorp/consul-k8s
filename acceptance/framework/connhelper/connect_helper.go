@@ -26,7 +26,6 @@ import (
 const (
 	StaticClientName = "static-client"
 	StaticServerName = "static-server"
-	JobName          = "job-client"
 )
 
 // ConnectHelper configures a Consul cluster for connect injection tests.
@@ -110,7 +109,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		// deployments because golang will execute them in reverse order
 		// (i.e. the last registered cleanup function will be executed first).
 		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
+			retrier := &retry.Timer{Timeout: 60 * time.Second, Wait: 100 * time.Millisecond}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
 				require.NoError(r, err)
@@ -134,24 +133,25 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 		// TODO: A base fixture is the wrong place for these files
 		k8s.KubectlApply(t, opts, "../fixtures/bases/openshift/")
-		helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
+		helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
 			k8s.KubectlDelete(t, opts, "../fixtures/bases/openshift/")
 		})
 
-		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
 		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
 		} else {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
 		}
 	} else {
-		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 		} else {
-			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 		}
 	}
+
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
 	retry.RunWith(
@@ -171,82 +171,6 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		})
 }
 
-// DeployJob deploys a job pod to the Kubernetes
-// cluster which will be used to test service mesh connectivity. If the Secure
-// flag is true, a pre-check is done to ensure that the ACL tokens for the test
-// are deleted. The status of the deployment and injection is checked after the
-// deployment is complete to ensure success.
-func (c *ConnectHelper) DeployJob(t *testing.T, path string) {
-	// Check that the ACL token is deleted.
-	if c.Secure {
-		// We need to register the cleanup function before we create the
-		// deployments because golang will execute them in reverse order
-		// (i.e. the last registered cleanup function will be executed first).
-		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
-			retry.RunWith(retrier, t, func(r *retry.R) {
-				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
-				require.NoError(r, err)
-				for _, token := range tokens {
-					require.NotContains(r, token.Description, JobName)
-				}
-			})
-		})
-	}
-
-	logger.Log(t, "creating job-client deployment")
-	k8s.DeployJob(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, path)
-
-	// Check that job-client has been injected and
-	// now have 2 containers.
-	for _, labelSelector := range []string{"app=job-client"} {
-		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		require.NoError(t, err)
-		require.Len(t, podList.Items, 1)
-		require.Len(t, podList.Items[0].Spec.Containers, 2)
-	}
-}
-
-// DeployServer deploys a server pod to the Kubernetes
-// cluster which will be used to test service mesh connectivity. If the Secure
-// flag is true, a pre-check is done to ensure that the ACL tokens for the test
-// are deleted. The status of the deployment and injection is checked after the
-// deployment is complete to ensure success.
-func (c *ConnectHelper) DeployServer(t *testing.T) {
-	// Check that the ACL token is deleted.
-	if c.Secure {
-		// We need to register the cleanup function before we create the
-		// deployments because golang will execute them in reverse order
-		// (i.e. the last registered cleanup function will be executed first).
-		t.Cleanup(func() {
-			retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
-			retry.RunWith(retrier, t, func(r *retry.R) {
-				tokens, _, err := c.ConsulClient.ACL().TokenList(nil)
-				require.NoError(r, err)
-				for _, token := range tokens {
-					require.NotContains(r, token.Description, StaticServerName)
-				}
-			})
-		})
-	}
-
-	logger.Log(t, "creating static-server deployment")
-	k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-
-	// Check that  static-server has been injected and
-	// now have 2 containers.
-	for _, labelSelector := range []string{"app=static-server"} {
-		podList, err := c.Ctx.KubernetesClient(t).CoreV1().Pods(c.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		require.NoError(t, err)
-		require.Len(t, podList.Items, 1)
-		require.Len(t, podList.Items[0].Spec.Containers, 2)
-	}
-}
-
 // SetupAppNamespace creates a namespace where applications are deployed. This
 // does nothing if UseAppNamespace is not set. The app namespace is relevant
 // when testing with restricted PSA enforcement enabled.
@@ -262,7 +186,7 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 		return
 	}
 	require.NoError(t, err)
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
+	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, func() {
 		k8s.RunKubectl(t, opts, "delete", "ns", opts.Namespace)
 	})
 
@@ -276,52 +200,28 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 
 }
 
-// CreateResolverRedirect creates a resolver that redirects to a static-server, a corresponding k8s service,
-// and intentions. This helper is primarly used to ensure that the virtual-ips are persisted to consul properly.
-func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
-	logger.Log(t, "creating resolver redirect")
-	opts := c.KubectlOptsForApp(t)
-	c.SetupAppNamespace(t)
-	kustomizeDir := "../fixtures/cases/resolver-redirect-virtualip"
-	k8s.KubectlApplyK(t, opts, kustomizeDir)
-
-	helpers.Cleanup(t, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, func() {
-		k8s.KubectlDeleteK(t, opts, kustomizeDir)
-	})
-}
-
 // TestConnectionFailureWithoutIntention ensures the connection to the static
 // server fails when no intentions are configured.
-func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T, clientType ...string) {
+func (c *ConnectHelper) TestConnectionFailureWithoutIntention(t *testing.T) {
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	opts := c.KubectlOptsForApp(t)
-	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
-	client := StaticClientName
-	if len(clientType) > 0 {
-		client = clientType[0]
-	}
 	if c.Cfg.EnableTransparentProxy {
-		k8s.CheckStaticServerConnectionFailing(t, opts, client, "http://static-server")
+		k8s.CheckStaticServerConnectionFailing(t, opts, StaticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionFailing(t, opts, client, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionFailing(t, opts, StaticClientName, "http://localhost:1234")
 	}
 }
 
 // CreateIntention creates an intention for the static-server pod to connect to
 // the static-client pod.
-func (c *ConnectHelper) CreateIntention(t *testing.T, clientType ...string) {
+func (c *ConnectHelper) CreateIntention(t *testing.T) {
 	logger.Log(t, "creating intention")
-	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
-	client := StaticClientName
-	if len(clientType) > 0 {
-		client = clientType[0]
-	}
 	_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 		Kind: api.ServiceIntentions,
 		Name: StaticServerName,
 		Sources: []*api.SourceIntention{
 			{
-				Name:   client,
+				Name:   StaticClientName,
 				Action: api.IntentionActionAllow,
 			},
 		},
@@ -331,19 +231,14 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, clientType ...string) {
 
 // TestConnectionSuccess ensures the static-server pod can connect to the
 // static-client pod once the intention is set.
-func (c *ConnectHelper) TestConnectionSuccess(t *testing.T, clientType ...string) {
+func (c *ConnectHelper) TestConnectionSuccess(t *testing.T) {
 	logger.Log(t, "checking that connection is successful")
 	opts := c.KubectlOptsForApp(t)
-	//Default to deploying static-client. If a client type is passed in (ex. job-client), use that instead.
-	client := StaticClientName
-	if len(clientType) > 0 {
-		client = clientType[0]
-	}
 	if c.Cfg.EnableTransparentProxy {
 		// todo: add an assertion that the traffic is going through the proxy
-		k8s.CheckStaticServerConnectionSuccessful(t, opts, client, "http://static-server")
+		k8s.CheckStaticServerConnectionSuccessful(t, opts, StaticClientName, "http://static-server")
 	} else {
-		k8s.CheckStaticServerConnectionSuccessful(t, opts, client, "http://localhost:1234")
+		k8s.CheckStaticServerConnectionSuccessful(t, opts, StaticClientName, "http://localhost:1234")
 	}
 }
 
@@ -357,7 +252,7 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	opts := c.KubectlOptsForApp(t)
 
 	logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
+	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "touch", "/tmp/unhealthy")
 
 	// The readiness probe should take a moment to be reflected in Consul,
 	// CheckStaticServerConnection will retry until Consul marks the service
@@ -382,7 +277,7 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 	}
 
 	// Return the static-server to a "healthy state".
-	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "-c", "static-server", "--", "rm", "/tmp/unhealthy")
+	k8s.RunKubectl(t, opts, "exec", "deploy/"+StaticServerName, "--", "rm", "/tmp/unhealthy")
 }
 
 // helmValues uses the Secure and AutoEncrypt fields to set values for the Helm

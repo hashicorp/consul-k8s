@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package upstreams
 
 import (
@@ -121,7 +118,6 @@ func (c *UpstreamsCommand) Run(args []string) int {
 
 // validateFlags ensures that the flags passed in by the can be used.
 func (c *UpstreamsCommand) validateFlags() error {
-
 	if c.flagPod == "" {
 		return fmt.Errorf("-pod flag is required")
 	}
@@ -207,7 +203,10 @@ func (c *UpstreamsCommand) Troubleshoot() error {
 	c.UI.Output(fmt.Sprintf("Upstream IPs (transparent proxy only) (%v)", len(upstreamIPs)), terminal.WithHeaderStyle())
 	table := terminal.NewTable("IPs ", "Virtual ", "Cluster Names")
 	for _, u := range upstreamIPs {
-		table.AddRow([]string{formatIPs(u.IPs), strconv.FormatBool(u.IsVirtual), formatClusterNames(u.ClusterNames)}, []string{})
+		table.AddRow(
+			[]string{formatIPs(u.IPs), strconv.FormatBool(u.IsVirtual), formatClusterNames(u.ClusterNames)},
+			[]string{},
+		)
 	}
 	c.UI.Table(table)
 

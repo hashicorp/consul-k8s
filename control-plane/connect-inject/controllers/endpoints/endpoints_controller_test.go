@@ -1941,17 +1941,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod1.Annotations[constants.AnnotationUpstreams] = "upstream1:1234"
 				pod1.Annotations[constants.AnnotationEnableMetrics] = "true"
 				pod1.Annotations[constants.AnnotationPrometheusScrapePort] = "12345"
-				pod1.Spec.NodeName = "my-node"
-				node := &corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my-node",
-						Namespace: "default",
-						Labels: map[string]string{
-							corev1.LabelTopologyRegion: "us-west-1",
-							corev1.LabelTopologyZone:   "us-west-1a",
-						},
-					},
-				}
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -1972,7 +1961,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 					},
 				}
-				return []runtime.Object{pod1, node, endpoint}
+				return []runtime.Object{pod1, endpoint}
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
@@ -1992,10 +1981,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					},
 					ServiceTags:  []string{"abc,123", "pod1"},
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
-					ServiceLocality: &api.Locality{
-						Region: "us-west-1",
-						Zone:   "us-west-1a",
-					},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -2020,10 +2005,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 							"envoy_prometheus_bind_addr":                "0.0.0.0:12345",
 							"envoy_telemetry_collector_bind_socket_dir": "/consul/connect-inject",
 						},
-					},
-					ServiceLocality: &api.Locality{
-						Region: "us-west-1",
-						Zone:   "us-west-1a",
 					},
 					ServiceMeta: map[string]string{
 						"name":                   "abc",
@@ -2212,7 +2193,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServicePort, instance.ServicePort)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTags, instance.ServiceTags)
-				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceLocality, instance.ServiceLocality)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTaggedAddresses, instance.ServiceTaggedAddresses)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceProxy, instance.ServiceProxy)
 				if tt.nodeMeta != nil {
@@ -2229,7 +2209,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServicePort, instance.ServicePort)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceTags, instance.ServiceTags)
-				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceLocality, instance.ServiceLocality)
 				if tt.nodeMeta != nil {
 					require.Equal(t, tt.expectedProxySvcInstances[i].NodeMeta, instance.NodeMeta)
 				}
@@ -2258,36 +2237,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestParseLocality(t *testing.T) {
-	t.Run("no labels", func(t *testing.T) {
-		n := corev1.Node{}
-		require.Nil(t, parseLocality(n))
-	})
-
-	t.Run("zone only", func(t *testing.T) {
-		n := corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					corev1.LabelTopologyZone: "us-west-1a",
-				},
-			},
-		}
-		require.Nil(t, parseLocality(n))
-	})
-
-	t.Run("everything", func(t *testing.T) {
-		n := corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					corev1.LabelTopologyRegion: "us-west-1",
-					corev1.LabelTopologyZone:   "us-west-1a",
-				},
-			},
-		}
-		require.Equal(t, &api.Locality{Region: "us-west-1", Zone: "us-west-1a"}, parseLocality(n))
-	})
 }
 
 // Tests updating an Endpoints object.
@@ -6673,55 +6622,4 @@ func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Po
 		},
 	}
 	return pod
-}
-
-func TestReconcileAssignServiceVirtualIP(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	cases := []struct {
-		name      string
-		service   *api.AgentService
-		expectErr bool
-	}{
-		{
-			name: "valid service",
-			service: &api.AgentService{
-				ID:      "",
-				Service: "foo",
-				Port:    80,
-				Address: "1.2.3.4",
-				TaggedAddresses: map[string]api.ServiceAddress{
-					"virtual": {
-						Address: "1.2.3.4",
-						Port:    80,
-					},
-				},
-				Meta: map[string]string{constants.MetaKeyKubeNS: "default"},
-			},
-			expectErr: false,
-		},
-		{
-			name: "service missing IP should not error",
-			service: &api.AgentService{
-				ID:      "",
-				Service: "bar",
-				Meta:    map[string]string{constants.MetaKeyKubeNS: "default"},
-			},
-			expectErr: false,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-
-			// Create test consulServer server.
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			apiClient := testClient.APIClient
-			err := assignServiceVirtualIP(ctx, apiClient, c.service)
-			if err != nil {
-				require.True(t, c.expectErr)
-			} else {
-				require.False(t, c.expectErr)
-			}
-		})
-	}
 }

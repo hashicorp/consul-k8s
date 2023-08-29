@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -226,7 +226,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                     fakeClient,
-				Log:                        logrtest.NewTestLogger(t),
+				Log:                        logrtest.New(t),
 				ConsulClientConfig:         testClient.Cfg,
 				ConsulServerConnMgr:        testClient.Watcher,
 				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
@@ -487,7 +487,7 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                 fakeClient,
-				Log:                    logrtest.NewTestLogger(t),
+				Log:                    logrtest.New(t),
 				ConsulClientConfig:     testClient.Cfg,
 				ConsulServerConnMgr:    testClient.Watcher,
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
@@ -1494,7 +1494,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				// Create the endpoints controller.
 				ep := &Controller{
 					Client:                     fakeClient,
-					Log:                        logrtest.NewTestLogger(t),
+					Log:                        logrtest.New(t),
 					ConsulClientConfig:         testClient.Cfg,
 					ConsulServerConnMgr:        testClient.Watcher,
 					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
@@ -1780,7 +1780,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				// Create the endpoints controller.
 				ep := &Controller{
 					Client:                     fakeClient,
-					Log:                        logrtest.NewTestLogger(t),
+					Log:                        logrtest.New(t),
 					ConsulClientConfig:         testClient.Cfg,
 					ConsulServerConnMgr:        testClient.Watcher,
 					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
@@ -2074,7 +2074,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 				// Create the endpoints controller.
 				ep := &Controller{
 					Client:                 fakeClient,
-					Log:                    logrtest.NewTestLogger(t),
+					Log:                    logrtest.New(t),
 					ConsulClientConfig:     testClient.Cfg,
 					ConsulServerConnMgr:    testClient.Watcher,
 					AllowK8sNamespacesSet:  mapset.NewSetWith("*"),

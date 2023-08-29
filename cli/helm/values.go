@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package helm
 
 // HACK this is a temporary hard-coded struct. We should actually generate this from our `values.yaml` file.
@@ -576,13 +573,11 @@ type CopyAnnotations struct {
 }
 
 type ManagedGatewayClass struct {
-	Enabled                     bool            `yaml:"enabled"`
-	NodeSelector                interface{}     `yaml:"nodeSelector"`
-	ServiceType                 string          `yaml:"serviceType"`
-	UseHostPorts                bool            `yaml:"useHostPorts"`
-	CopyAnnotations             CopyAnnotations `yaml:"copyAnnotations"`
-	OpenshiftSCCName            string          `yaml:"openshiftSCCName"`
-	MapPrivilegedContainerPorts int             `yaml:"mapPrivilegedContainerPorts"`
+	Enabled         bool            `yaml:"enabled"`
+	NodeSelector    interface{}     `yaml:"nodeSelector"`
+	ServiceType     string          `yaml:"serviceType"`
+	UseHostPorts    bool            `yaml:"useHostPorts"`
+	CopyAnnotations CopyAnnotations `yaml:"copyAnnotations"`
 }
 
 type Service struct {

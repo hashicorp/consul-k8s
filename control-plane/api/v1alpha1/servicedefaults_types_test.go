@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -70,7 +67,6 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
-					MutualTLSMode: MutualTLSModePermissive,
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
 							Name:              "upstream-default",
@@ -210,7 +206,6 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
-				MutualTLSMode: capi.MutualTLSModePermissive,
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
@@ -472,7 +467,6 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
-					MutualTLSMode: MutualTLSModeStrict,
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
 							Name:              "upstream-default",
@@ -605,7 +599,6 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
-				MutualTLSMode: capi.MutualTLSModeStrict,
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
@@ -805,7 +798,6 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
-					MutualTLSMode: MutualTLSModePermissive,
 					Expose: Expose{
 						Checks: false,
 						Paths: []ExposePath{
@@ -940,17 +932,6 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: "servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
-		},
-		"mutualTLSMode": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					MutualTLSMode: MutualTLSMode("asdf"),
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.mutualTLSMode: Invalid value: "asdf": Must be one of "", "strict", or "permissive".`,
 		},
 		"mode": {
 			input: &ServiceDefaults{
@@ -1433,7 +1414,7 @@ func TestServiceDefaults_ConsulName(t *testing.T) {
 }
 
 func TestServiceDefaults_KubernetesName(t *testing.T) {
-	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
+	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
 }
 
 func TestServiceDefaults_ConsulNamespace(t *testing.T) {
