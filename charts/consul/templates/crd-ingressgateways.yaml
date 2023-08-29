@@ -96,13 +96,15 @@ spec:
                         description: EnforcingConsecutive5xx is the % chance that
                           a host will be actually ejected when an outlier status is
                           detected through consecutive 5xx. This setting can be used
-                          to disable ejection or to ramp it up slowly. Ex. Setting this to
-                          10 will make it a 10% chance that the host will be ejected.
+                          to disable ejection or to ramp it up slowly. Ex. Setting
+                          this to 10 will make it a 10% chance that the host will
+                          be ejected.
                         format: int32
                         type: integer
                       interval:
                         description: Interval between health check analysis sweeps.
                           Each sweep may remove hosts or return hosts to the pool.
+                          Ex. setting this to "10s" will set the interval to 10 seconds.
                         type: string
                       maxEjectionPercent:
                         description: The maximum % of an upstream cluster that can
@@ -212,14 +214,15 @@ spec:
                                   that a host will be actually ejected when an outlier
                                   status is detected through consecutive 5xx. This
                                   setting can be used to disable ejection or to ramp
-                                  it up slowly. Ex. Setting this to 10 will make it a 
-                                  10% chance that the host will be ejected.
+                                  it up slowly. Ex. Setting this to 10 will make it
+                                  a 10% chance that the host will be ejected.
                                 format: int32
                                 type: integer
                               interval:
                                 description: Interval between health check analysis
                                   sweeps. Each sweep may remove hosts or return hosts
-                                  to the pool.
+                                  to the pool. Ex. setting this to "10s" will set
+                                  the interval to 10 seconds.
                                 type: string
                               maxEjectionPercent:
                                 description: The maximum % of an upstream cluster

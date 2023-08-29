@@ -187,7 +187,8 @@ type UpstreamLimits struct {
 // be monitored for removal from the load balancing pool.
 type PassiveHealthCheck struct {
 	// Interval between health check analysis sweeps. Each sweep may remove
-	// hosts or return hosts to the pool.
+	// hosts or return hosts to the pool. Ex. setting this to "10s" will set
+	// the interval to 10 seconds.
 	Interval metav1.Duration `json:"interval,omitempty"`
 	// MaxFailures is the count of consecutive failures that results in a host
 	// being removed from the pool.
@@ -195,6 +196,7 @@ type PassiveHealthCheck struct {
 	// EnforcingConsecutive5xx is the % chance that a host will be actually ejected
 	// when an outlier status is detected through consecutive 5xx.
 	// This setting can be used to disable ejection or to ramp it up slowly.
+	// Ex. Setting this to 10 will make it a 10% chance that the host will be ejected.
 	EnforcingConsecutive5xx *uint32 `json:"enforcingConsecutive5xx,omitempty"`
 	// The maximum % of an upstream cluster that can be ejected due to outlier detection.
 	// Defaults to 10% but will eject at least one host regardless of the value.
