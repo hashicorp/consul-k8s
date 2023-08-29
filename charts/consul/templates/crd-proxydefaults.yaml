@@ -163,15 +163,6 @@ spec:
                       type: string
                     type: array
                 type: object
-              prioritizeByLocality:
-                description: PrioritizeByLocality contains the configuration for
-                  locality aware routing.
-                properties:
-                  mode:
-                    description: Mode specifies the behavior of PrioritizeByLocality
-                      routing. Valid values are "", "none", and "failover".
-                    type: string
-                type: object
               meshGateway:
                 description: MeshGateway controls the default mesh gateway configuration
                   for this service.
@@ -204,6 +195,16 @@ spec:
                   your services secure, we recommend using "strict" mode whenever
                   possible and enabling "permissive" mode only when necessary.'
                 type: string
+              prioritizeByLocality:
+                description: PrioritizeByLocality controls whether the locality of
+                  services within the local partition will be used to prioritize connectivity.
+                properties:
+                  mode:
+                    description: 'Mode specifies the type of prioritization that will
+                      be performed when selecting nodes in the local partition. Valid
+                      values are: "" (default "none"), "none", and "failover".'
+                    type: string
+                type: object
               transparentProxy:
                 description: 'TransparentProxy controls configuration specific to
                   proxies in transparent mode. Note: This cannot be set using the
