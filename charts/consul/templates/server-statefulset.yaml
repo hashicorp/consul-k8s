@@ -119,7 +119,13 @@ spec:
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
         "prometheus.io/scrape": "true"
         "prometheus.io/path": "/v1/agent/metrics"
+        {{- if .Values.global.tls.enabled }}
+        "prometheus.io/port": "8501"
+        "prometheus.io/scheme": "https"
+        {{- else }}
         "prometheus.io/port": "8500"
+        "prometheus.io/scheme": "http"
+        {{- end }}
         {{- end }}
     spec:
     {{- if .Values.server.affinity }}
