@@ -248,26 +248,6 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 	}, true
 }
 
-// translateHTTPRouteAuth translates a Kubernetes RouteAuthFilter CRD into the inline configuration
-// for auth on a Consul HTTPRoute Config Entry.
-func (t ResourceTranslator) translateHTTPRouteAuth(route gwv1beta1.HTTPRoute, routeAuth v1alpha1.RouteAuthFilter, resources *ResourceMap) *api.HTTPRouteRule {
-
-	services := ConvertSliceFuncIf(
-		resources.ServicesForRoute(route),
-		func(ref api.ResourceReference) (api.HTTPService, bool) {
-			return api.HTTPService{}, false
-		},
-	)
-
-	filters := api.HTTPFilters{}
-
-	return &api.HTTPRouteRule{
-		Filters:  filters,
-		Matches:  []api.HTTPMatch{},
-		Services: services,
-	}
-}
-
 func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, ref gwv1beta1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
 	id := types.NamespacedName{
 		Name:      string(ref.Name),
