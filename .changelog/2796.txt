@@ -1,0 +1,3 @@
+```release-note:bug
+ingress-gateway: Adds missing PassiveHealthCheck to IngressGateways CRD and updates missing fields on ServiceDefaults CRD
+```
