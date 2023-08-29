@@ -113,6 +113,10 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 		}
 	}
 
+	//grab policy if it exists
+	gatewayPolicyCrd := resources.GetPolicyForGateway(&gateway)
+	defaultPolicy, overridePolicy := t.translateGatewayPolicy(gatewayPolicyCrd)
+
 	portMapping := int32(0)
 	if gwcc != nil {
 		portMapping = gwcc.Spec.MapPrivilegedContainerPorts
@@ -129,6 +133,8 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 			MaxVersion:   maxVersion,
 			MinVersion:   minVersion,
 		},
+		Default:  defaultPolicy,
+		Override: overridePolicy,
 	}, true
 }
 
@@ -139,6 +145,43 @@ func ToContainerPort(portNumber gwv1beta1.PortNumber, mapPrivilegedContainerPort
 	}
 
 	return int(portNumber) + int(mapPrivilegedContainerPorts)
+}
+
+func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolicy) (*api.APIGatewayPolicy, *api.APIGatewayPolicy) {
+	defaultPolicy := &api.APIGatewayPolicy{
+		JWT: t.translateJWTRequirement(policy.Spec.Default.JWT),
+	}
+
+	overridePolicy := &api.APIGatewayPolicy{
+		JWT: t.translateJWTRequirement(policy.Spec.Override.JWT),
+	}
+	return defaultPolicy, overridePolicy
+}
+
+func (t ResourceTranslator) translateJWTRequirement(crdRequirement *v1alpha1.APIGatewayJWTRequirement) *api.APIGatewayJWTRequirement {
+	apiRequirement := api.APIGatewayJWTRequirement{}
+	for _, provider := range crdRequirement.Providers {
+		apiRequirement.Providers = append(apiRequirement.Providers, t.translateJWTProvider(provider))
+	}
+	return &apiRequirement
+}
+
+func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.APIGatewayJWTProvider) *api.APIGatewayJWTProvider {
+	apiProvider := api.APIGatewayJWTProvider{
+		Name: crdProvider.Name,
+	}
+	for _, verifyClaim := range crdProvider.VerifyClaims {
+		apiProvider.VerifyClaims = append(apiProvider.VerifyClaims, t.translateVerifyClaims(verifyClaim))
+	}
+	return &apiProvider
+}
+
+func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.APIGatewayJWTClaimVerification) *api.APIGatewayJWTClaimVerification {
+	verifyClaim := api.APIGatewayJWTClaimVerification{
+		Path:  crdClaims.Path,
+		Value: crdClaims.Value,
+	}
+	return &verifyClaim
 }
 
 func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {

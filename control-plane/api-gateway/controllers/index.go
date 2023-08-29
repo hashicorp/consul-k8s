@@ -30,6 +30,7 @@ const (
 	Secret_GatewayIndex                  = "__secret_referencing_gateway"
 	HTTPRoute_RouteRetryFilterIndex      = "__httproute_referencing_retryfilter"
 	HTTPRoute_RouteTimeoutFilterIndex    = "__httproute_referencing_timeoutfilter"
+	Gatewaypolicy_GatewayIndex           = "__gatewaypolicy_referencing_gateway"
 )
 
 // RegisterFieldIndexes registers all of the field indexes for the API gateway controllers.
@@ -115,6 +116,11 @@ var indexes = []index{
 		name:        HTTPRoute_RouteTimeoutFilterIndex,
 		target:      &gwv1beta1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
+	},
+	{
+		name:        Gatewaypolicy_GatewayIndex,
+		target:      &v1alpha1.GatewayPolicy{},
+		indexerFunc: gatewayForGatewayPolicy,
 	},
 }
 
@@ -324,4 +330,16 @@ func filtersForHTTPRoute(o client.Object) []string {
 		}
 	}
 	return filters
+}
+
+func gatewayForGatewayPolicy(o client.Object) []string {
+	gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
+
+	targetGateway := gatewayPolicy.Spec.TargetRef
+	//gateway policy is 1to1
+	if targetGateway.Group == v1alpha1.ConsulHashicorpGroup && targetGateway.Kind == common.KindGateway {
+		return []string{common.IndexedNamespacedNameWithDefault(targetGateway.Name, &targetGateway.Namespace, gatewayPolicy.Namespace).String()}
+	}
+
+	return []string{}
 }

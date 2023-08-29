@@ -47,7 +47,7 @@ type GatewayPolicySpec struct {
 	Default *GatewayPolicyConfig `json:"default,omitempty"`
 }
 
-// PolicyTargetReference identifies the target that the policy applies to.
+// PolicyTargetReference identifies the target that the policy applies to
 type PolicyTargetReference struct {
 	// Group is the group of the target resource.
 	//
@@ -83,27 +83,27 @@ type PolicyTargetReference struct {
 
 type GatewayPolicyConfig struct {
 	//+kubebuilder:validation:Optional
-	JWT *GatewayJWTRequirement `json:"jwt,omitempty"`
+	JWT *APIGatewayJWTRequirement `json:"jwt,omitempty"`
 }
 
-// GatewayJWTRequirement holds the list of JWT providers to be verified against.
-type GatewayJWTRequirement struct {
+// APIGatewayJWTRequirement holds the list of JWT providers to be verified against.
+type APIGatewayJWTRequirement struct {
 	// Providers is a list of providers to consider when verifying a JWT.
-	Providers []*GatewayJWTProvider `json:"providers"`
+	Providers []*APIGatewayJWTProvider `json:"providers"`
 }
 
-// GatewayJWTProvider holds the provider and claim verification information.
-type GatewayJWTProvider struct {
+// APIGatewayJWTProvider holds the provider and claim verification information.
+type APIGatewayJWTProvider struct {
 	// Name is the name of the JWT provider. There MUST be a corresponding
 	// "jwt-provider" config entry with this name.
 	Name string `json:"name"`
 
 	// VerifyClaims is a list of additional claims to verify in a JWT's payload.
-	VerifyClaims []*GatewayJWTClaimVerification `json:"verifyClaims,omitempty"`
+	VerifyClaims []*APIGatewayJWTClaimVerification `json:"verifyClaims,omitempty"`
 }
 
-// GatewayJWTClaimVerification holds the actual claim information to be verified.
-type GatewayJWTClaimVerification struct {
+// APIGatewayJWTClaimVerification holds the actual claim information to be verified.
+type APIGatewayJWTClaimVerification struct {
 	// Path is the path to the claim in the token JSON.
 	Path []string `json:"path"`
 

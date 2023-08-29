@@ -167,6 +167,13 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// get all http routes referencing this gateway
+	policy, err := r.getRelatedGatewayPolicy(ctx, req.NamespacedName, resources)
+	if err != nil {
+		log.Error(err, "unable to list gateway policies")
+		return ctrl.Result{}, err
+	}
+
 	// fetch the rest of the consul objects from cache
 	consulServices := r.getConsulServices(consulKey)
 	consulGateway := r.getConsulGateway(consulKey)
@@ -188,6 +195,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Resources:             resources,
 		ConsulGateway:         consulGateway,
 		ConsulGatewayServices: consulServices,
+		Policy:                policy,
 	})
 
 	updates := binder.Snapshot()
@@ -459,6 +467,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
+			source.NewKindWithCache((&v1alpha1.GatewayPolicy{}), mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteRetryFilter(ctx)),
+		).
+		Watches(
 			source.NewKindWithCache((&v1alpha1.RouteRetryFilter{}), mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteRetryFilter(ctx)),
 		).
@@ -578,6 +590,26 @@ func (r *GatewayController) transformConsulHTTPRoute(ctx context.Context) func(e
 			}
 		}
 		return gateways
+	}
+}
+
+// transformGatewayPolicy will return a list of all gateways that need to be reconcilled
+func (r *GatewayController) transformGatewayPolicy(ctx context.Context) func(object client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
+
+		//gateway policy to gateway is 1to1
+
+		gatewayRef := types.NamespacedName{
+			Namespace: gatewayPolicy.Spec.TargetRef.Namespace,
+			Name:      gatewayPolicy.Spec.TargetRef.Name,
+		}
+		return []reconcile.Request{
+			{
+				gatewayRef,
+			},
+		}
+
 	}
 }
 
@@ -875,6 +907,28 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 		externalFilters = append(externalFilters, externalFilter)
 	}
 	return externalFilters, nil
+}
+
+func (c *GatewayController) getRelatedGatewayPolicy(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) (*v1alpha1.GatewayPolicy, error) {
+	var list v1alpha1.GatewayPolicyList
+
+	if err := c.Client.List(ctx, &list, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(Gatewaypolicy_GatewayIndex, gateway.String()),
+	}); err != nil {
+		return nil, err
+	}
+
+	if len(list.Items) > 0 {
+		//TODO should we error here or assume that this will happen in validation webhook
+		c.Log.Info(gateway.String() + " has more than one gateway policy associated with it")
+	} else if len(list.Items) == 0 {
+		return nil, nil
+	}
+
+	policy := list.Items[0]
+	resources.AddGatewayPolicy(&policy)
+
+	return &policy, nil
 }
 
 func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1alpha2.TCPRoute, error) {
