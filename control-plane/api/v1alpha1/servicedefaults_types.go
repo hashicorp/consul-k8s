@@ -224,7 +224,9 @@ type ServiceDefaultsDestination struct {
 // inbound traffic for a service.
 // Rate limiting is a Consul enterprise feature.
 type RateLimits struct {
-	InstanceLevel InstanceLevelRateLimits `json:"instanceLevel"`
+	// InstanceLevel represents rate limit configuration
+	// that is applied per service instance.
+	InstanceLevel InstanceLevelRateLimits `json:"instanceLevel,omitempty"`
 }
 
 func (rl *RateLimits) toConsul() *capi.RateLimits {
@@ -258,8 +260,6 @@ func (rl *RateLimits) validate(path *field.Path) field.ErrorList {
 	return rl.InstanceLevel.validate(path.Child("instanceLevel"))
 }
 
-// InstanceLevelRateLimits represents rate limit configuration
-// that are applied per service instance.
 type InstanceLevelRateLimits struct {
 	// RequestsPerSecond is the average number of requests per second that can be
 	// made without being throttled. This field is required if RequestsMaxBurst
@@ -277,6 +277,7 @@ type InstanceLevelRateLimits struct {
 	RequestsMaxBurst int `json:"requestsMaxBurst,omitempty"`
 
 	// Routes is a list of rate limits applied to specific routes.
+	// For a given request, the first matching route will be applied, if any.
 	// Overrides any top-level configuration.
 	Routes []InstanceLevelRouteRateLimits `json:"routes,omitempty"`
 }
@@ -344,12 +345,25 @@ func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
 // InstanceLevelRouteRateLimits represents rate limit configuration
 // applied to a route matching one of PathExact/PathPrefix/PathRegex.
 type InstanceLevelRouteRateLimits struct {
-	PathExact  string `json:"pathExact,omitempty"`
+	// Exact path to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
+	PathExact string `json:"pathExact,omitempty"`
+	// Prefix to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
 	PathPrefix string `json:"pathPrefix,omitempty"`
-	PathRegex  string `json:"pathRegex,omitempty"`
+	// Regex to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
+	PathRegex string `json:"pathRegex,omitempty"`
 
+	// RequestsPerSecond is the average number of requests per
+	// second that can be made without being throttled. This field is required
+	// if RequestsMaxBurst is set. The allowed number of requests may exceed
+	// RequestsPerSecond up to the value specified in RequestsMaxBurst.
+	// Internally, this is the refill rate of the token bucket used for rate limiting.
 	RequestsPerSecond int `json:"requestsPerSecond,omitempty"`
-	RequestsMaxBurst  int `json:"requestsMaxBurst,omitempty"`
+
+	// RequestsMaxBurst is the maximum number of requests that can be sent
+	// in a burst. Should be equal to or greater than RequestsPerSecond. If unset,
+	// defaults to RequestsPerSecond. Internally, this is the maximum size of the token
+	// bucket used for rate limiting.
+	RequestsMaxBurst int `json:"requestsMaxBurst,omitempty"`
 }
 
 func (in *ServiceDefaults) ConsulKind() string {
