@@ -1475,7 +1475,6 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 			},
 			expCmdArgs: "-graceful-port=20307",
 		},
-		//TODO: Add equiv for graceful startup
 		{
 			name: "annotations skip graceful shutdown",
 			webhook: MeshWebhook{
@@ -1489,6 +1488,18 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 				constants.AnnotationEnableSidecarProxyLifecycle:                       "false",
 				constants.AnnotationEnableSidecarProxyLifecycleShutdownDrainListeners: "false",
 				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   "0",
+			},
+			expCmdArgs: "",
+		},
+		{
+			name: "annotations skip graceful startup",
+			webhook: MeshWebhook{
+				LifecycleConfig: lifecycle.Config{
+					DefaultEnableProxyLifecycle: false,
+				},
+			},
+			annotations: map[string]string{
+				constants.AnnotationEnableSidecarProxyLifecycle: "false",
 			},
 			expCmdArgs: "",
 		},
