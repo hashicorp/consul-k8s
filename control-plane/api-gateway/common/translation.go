@@ -147,6 +147,38 @@ func ToContainerPort(portNumber gwv1beta1.PortNumber, mapPrivilegedContainerPort
 	return int(portNumber) + int(mapPrivilegedContainerPorts)
 }
 
+func (t ResourceTranslator) translateRouteRetryFilter(routeRetryFilter *v1alpha1.RouteRetryFilter) *api.RetryFilter {
+	return &api.RetryFilter{
+		NumRetries:            routeRetryFilter.Spec.NumRetries,
+		RetryOn:               routeRetryFilter.Spec.RetryOn,
+		RetryOnStatusCodes:    routeRetryFilter.Spec.RetryOnStatusCodes,
+		RetryOnConnectFailure: routeRetryFilter.Spec.RetryOnConnectFailure,
+	}
+}
+
+func (t ResourceTranslator) translateRouteTimeoutFilter(routeTimeoutFilter *v1alpha1.RouteTimeoutFilter) *api.TimeoutFilter {
+	return &api.TimeoutFilter{
+		RequestTimeout: routeTimeoutFilter.Spec.RequestTimeout,
+		IdleTimeout:    routeTimeoutFilter.Spec.IdleTimeout,
+	}
+}
+
+func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.RouteAuthFilter) *api.JWTFilter {
+	if routeJWTFilter.Spec.JWT == nil || routeJWTFilter.Spec.JWT.Providers == nil {
+		return nil
+	}
+
+	// For each provider, translate the claims to the Consul config entry format.
+	providers := make([]*api.APIGatewayJWTProvider, 0, len(routeJWTFilter.Spec.JWT.Providers))
+	for _, provider := range routeJWTFilter.Spec.JWT.Providers {
+		providers = append(providers, t.translateJWTProvider(provider))
+	}
+
+	return &api.JWTFilter{
+		Providers: providers,
+	}
+}
+
 func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolicy) (*api.APIGatewayPolicy, *api.APIGatewayPolicy) {
 	if policy == nil {
 		return nil, nil
@@ -380,11 +412,11 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 
 			switch filter.ExtensionRef.Kind {
 			case v1alpha1.RouteRetryFilterKind:
-				retryFilter = makeRetryFilter(crdFilter.(*v1alpha1.RouteRetryFilter))
+				retryFilter = t.translateRouteRetryFilter(crdFilter.(*v1alpha1.RouteRetryFilter))
 			case v1alpha1.RouteTimeoutFilterKind:
-				timeoutFilter = makeTimeoutFilter(crdFilter.(*v1alpha1.RouteTimeoutFilter))
+				timeoutFilter = t.translateRouteTimeoutFilter(crdFilter.(*v1alpha1.RouteTimeoutFilter))
 			case v1alpha1.RouteAuthFilterKind:
-				jwtFilter = makeJWTFilter(crdFilter.(*v1alpha1.RouteAuthFilter))
+				jwtFilter = t.translateRouteJWTFilter(crdFilter.(*v1alpha1.RouteAuthFilter))
 			}
 		}
 	}
@@ -395,22 +427,6 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
 		JWT:           jwtFilter,
-	}
-}
-
-func makeRetryFilter(routeRetryFilter *v1alpha1.RouteRetryFilter) *api.RetryFilter {
-	return &api.RetryFilter{
-		NumRetries:            routeRetryFilter.Spec.NumRetries,
-		RetryOn:               routeRetryFilter.Spec.RetryOn,
-		RetryOnStatusCodes:    routeRetryFilter.Spec.RetryOnStatusCodes,
-		RetryOnConnectFailure: routeRetryFilter.Spec.RetryOnConnectFailure,
-	}
-}
-
-func makeTimeoutFilter(routeTimeoutFilter *v1alpha1.RouteTimeoutFilter) *api.TimeoutFilter {
-	return &api.TimeoutFilter{
-		RequestTimeout: routeTimeoutFilter.Spec.RequestTimeout,
-		IdleTimeout:    routeTimeoutFilter.Spec.IdleTimeout,
 	}
 }
 
