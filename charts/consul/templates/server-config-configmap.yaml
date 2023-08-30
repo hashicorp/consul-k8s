@@ -72,8 +72,8 @@ data:
               "ca_file": "/consul/vault-ca/tls.crt",
               {{- end }}
               "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
-              {{- if .connectCA.namespace }}
-              "namespace": "{{ .connectCA.namespace }}",
+              {{- if .vaultNamespace }}
+              "namespace": "{{ .vaultNamespace }}",
               {{- end }}
               "root_pki_path": "{{ .connectCA.rootPKIPath }}",
               "auth_method": {
