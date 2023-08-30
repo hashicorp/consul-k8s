@@ -41,6 +41,8 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
 		DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
 		DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
+		DefaultStartupGracePeriodSeconds:    c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds,
+		DefaultGracefulStartupPath:          c.flagDefaultSidecarProxyLifecycleGracefulStartupPath,
 	}
 
 	metricsConfig := metrics.Config{

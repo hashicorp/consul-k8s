@@ -63,6 +63,16 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
 
+	// lifecycleConfig := lifecycle.Config{
+	// 	DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
+	// 	DefaultEnableShutdownDrainListeners: c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
+	// 	DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
+	// 	DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
+	// 	DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
+	// 	DefaultStartupGracePeriodSeconds:    c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds,
+	// 	DefaultGracefulStartupPath:          c.flagDefaultSidecarProxyLifecycleGracefulStartupPath,
+	// }
+
 	if err := (&pod.Controller{
 		Client:                   mgr.GetClient(),
 		ConsulClientConfig:       consulConfig,
