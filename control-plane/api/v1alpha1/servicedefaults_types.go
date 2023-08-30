@@ -318,7 +318,7 @@ func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
 				"Route must define exactly one of PathExact, PathPrefix, or PathRegex"))
 		}
 
-		isRatelimitSet = isRatelimitSet || route.RequestsPerSecond > 0
+		isRateLimitSet = isRateLimitSet || route.RequestsPerSecond > 0
 
 		// Unlike top-level RequestsPerSecond, any route MUST have a RequestsPerSecond defined.
 		if route.RequestsPerSecond <= 0 {

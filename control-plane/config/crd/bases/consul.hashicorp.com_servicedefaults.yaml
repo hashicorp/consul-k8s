@@ -187,7 +187,7 @@ spec:
                 type: string
               rateLimits:
                 description: RateLimits is rate limiting configuration that is applied
-                  to inbound traffic for a service. Rate limiting is a Consul enterprise
+                  to inbound traffic for a service. Rate limiting is a Consul Enterprise
                   feature.
                 properties:
                   instanceLevel:
