@@ -239,9 +239,11 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 	// We don't translate parent refs.
 
 	hostnames := StringLikeSlice(route.Spec.Hostnames)
-	rules := ConvertSliceFuncIf(route.Spec.Rules, func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
-		return t.translateHTTPRouteRule(route, rule, resources)
-	})
+	rules := ConvertSliceFuncIf(
+		route.Spec.Rules,
+		func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
+			return t.translateHTTPRouteRule(route, rule, resources)
+		})
 
 	configEntry := api.HTTPRouteConfigEntry{
 		Kind:      api.HTTPRoute,
