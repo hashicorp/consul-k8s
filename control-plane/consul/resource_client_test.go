@@ -14,6 +14,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 func Test_NewResourceServiceClient(t *testing.T) {
@@ -100,8 +102,9 @@ func createWriteRequest(t *testing.T, name string) *pbresource.WriteRequest {
 					Kind:         "Workload",
 				},
 				Tenancy: &pbresource.Tenancy{
-					Partition: "default",
-					Namespace: "default",
+					Namespace: constants.DefaultConsulNS,
+					Partition: constants.DefaultConsulPartition,
+					PeerName:  constants.DefaultConsulPeer,
 				},
 			},
 			Data: proto,

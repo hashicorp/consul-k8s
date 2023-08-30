@@ -5,15 +5,17 @@ package pod
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/go-multierror"
-	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,8 +30,9 @@ import (
 )
 
 const (
-	metaKeyManagedBy    = "managed-by"
-	tokenMetaPodNameKey = "pod"
+	metaKeyManagedBy = "managed-by"
+
+	DefaultTelemetryBindSocketDir = "/consul/mesh-inject"
 )
 
 type Controller struct {
@@ -63,6 +66,13 @@ type Controller struct {
 
 	// TODO: EnableWANFederation
 
+	// EnableTransparentProxy controls whether transparent proxy should be enabled
+	// for all proxy service registrations.
+	EnableTransparentProxy bool
+	// TProxyOverwriteProbes controls whether the pods controller should expose pod's HTTP probes
+	// via Envoy proxy.
+	TProxyOverwriteProbes bool
+
 	// AuthMethod is the name of the Kubernetes Auth Method that
 	// was used to login with Consul. The Endpoints controller
 	// will delete any tokens associated with this auth method
@@ -74,14 +84,13 @@ type Controller struct {
 	EnableTelemetryCollector bool
 
 	MetricsConfig metrics.Config
-
-	Log logr.Logger
+	Log           logr.Logger
 
 	// ResourceClient is a gRPC client for the resource service. It is public for testing purposes
 	ResourceClient pbresource.ResourceServiceClient
 }
 
-// TODO(dans): logs, logs, logs
+// TODO: logs, logs, logs
 
 // Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
 // correspond to the Kubernetes Service. These events are driven by changes to the Pods backing the Kube service.
@@ -110,26 +119,21 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// we need to remove the Workload from Consul.
 	if k8serrors.IsNotFound(err) {
 
+		// Consul should also clean up the orphaned HealthStatus
 		if err := r.deleteWorkload(ctx, req.NamespacedName); err != nil {
 			errs = multierror.Append(errs, err)
 		}
+
+		// TODO: clean up ACL Tokens
 
 		// TODO: delete explicit upstreams
 		//if err := r.deleteUpstreams(ctx, pod); err != nil {
 		//	errs = multierror.Append(errs, err)
 		//}
 
-		// TODO(dans): delete proxyConfiguration
-		//if err := r.deleteProxyConfiguration(ctx, pod); err != nil {
-		//	errs = multierror.Append(errs, err)
-		//}
-
-		// TODO: clean up ACL Tokens
-
-		// TODO(dans): delete health status, since we don't have finalizers
-		//if err := r.deleteHealthStatus(ctx, pod); err != nil {
-		//	errs = multierror.Append(errs, err)
-		//}
+		if err := r.deleteProxyConfiguration(ctx, req.NamespacedName); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 
 		return ctrl.Result{}, errs
 	} else if err != nil {
@@ -140,21 +144,22 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	r.Log.Info("retrieved", "name", pod.Name, "ns", pod.Namespace)
 
 	if hasBeenInjected(pod) {
-		if err := r.writeWorkload(ctx, pod); err != nil {
+		if err := r.writeProxyConfiguration(ctx, pod); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 
-		// TODO(dans): create proxyConfiguration
+		if err := r.writeWorkload(ctx, pod); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 
 		// TODO: create explicit upstreams
 		//if err := r.writeUpstreams(ctx, pod); err != nil {
 		//	errs = multierror.Append(errs, err)
 		//}
 
-		// TODO(dans): write health status
-		//if err := r.writeHealthStatus(ctx, pod); err != nil {
-		//	errs = multierror.Append(errs, err)
-		//}
+		if err := r.writeHealthStatus(ctx, pod); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
 
 	return ctrl.Result{}, errs
@@ -183,9 +188,14 @@ func (r *Controller) deleteWorkload(ctx context.Context, pod types.NamespacedNam
 	return err
 }
 
-//func (r *Controller) deleteHealthStatus(ctx context.Context, pod corev1.Pod) error {
-//	return nil
-//}
+func (r *Controller) deleteProxyConfiguration(ctx context.Context, pod types.NamespacedName) error {
+	req := &pbresource.DeleteRequest{
+		Id: getProxyConfigurationID(pod.Name, r.getConsulNamespace(pod.Namespace), r.getPartition()),
+	}
+
+	_, err := r.ResourceClient.Delete(ctx, req)
+	return err
+}
 
 func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 
@@ -208,35 +218,221 @@ func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 		NodeName: common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
 		Ports:    workloadPorts,
 	}
-
-	// TODO(dans): replace with common.ToProtoAny when available
-	proto, err := anypb.New(workload)
-	if err != nil {
-		return fmt.Errorf("could not serialize workload: %w", err)
-	}
-
-	// TODO: allow custom workload metadata
-	meta := map[string]string{
-		constants.MetaKeyKubeNS: pod.Namespace,
-		metaKeyManagedBy:        constants.ManagedByPodValue,
-	}
+	data := common.ToProtoAny(workload)
 
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
 			Id:       getWorkloadID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
-			Metadata: meta,
-			Data:     proto,
+			Metadata: metaFromPod(pod),
+			Data:     data,
+		},
+	}
+	_, err := r.ResourceClient.Write(ctx, req)
+	return err
+}
+
+func (r *Controller) writeProxyConfiguration(ctx context.Context, pod corev1.Pod) error {
+	mode, err := r.getTproxyMode(ctx, pod)
+	if err != nil {
+		return fmt.Errorf("failed to get transparent proxy mode: %w", err)
+	}
+
+	exposeConfig, err := r.getExposeConfig(pod)
+	if err != nil {
+		return fmt.Errorf("failed to get expose config: %w", err)
+	}
+
+	bootstrapConfig, err := r.getBootstrapConfig(pod)
+	if err != nil {
+		return fmt.Errorf("failed to get bootstrap config: %w", err)
+	}
+
+	if exposeConfig == nil &&
+		bootstrapConfig == nil &&
+		mode == pbmesh.ProxyMode_PROXY_MODE_DEFAULT {
+		// It's possible to remove interesting annotations and need to clear any existing config,
+		// but for now we treat pods as immutable configs owned by other managers.
+		return nil
+	}
+
+	pc := &pbmesh.ProxyConfiguration{
+		Workloads: &pbcatalog.WorkloadSelector{
+			Names: []string{pod.GetName()},
+		},
+		DynamicConfig: &pbmesh.DynamicConfig{
+			Mode:         mode,
+			ExposeConfig: exposeConfig,
+		},
+		BootstrapConfig: bootstrapConfig,
+	}
+	data := common.ToProtoAny(pc)
+
+	req := &pbresource.WriteRequest{
+		Resource: &pbresource.Resource{
+			Id:       getProxyConfigurationID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
+			Metadata: metaFromPod(pod),
+			Data:     data,
 		},
 	}
 	_, err = r.ResourceClient.Write(ctx, req)
 	return err
 }
 
-//func (r *Controller) writeHealthStatus(pod corev1.Pod) error {
-//	return nil
-//}
+func (r *Controller) getTproxyMode(ctx context.Context, pod corev1.Pod) (pbmesh.ProxyMode, error) {
+	// A user can enable/disable tproxy for an entire namespace.
+	var ns corev1.Namespace
+	err := r.Client.Get(ctx, types.NamespacedName{Name: pod.GetNamespace()}, &ns)
+	if err != nil {
+		return pbmesh.ProxyMode_PROXY_MODE_DEFAULT, fmt.Errorf("could not get namespace info for %s: %w", pod.GetNamespace(), err)
+	}
 
-// TODO(dans): delete ACL token for workload
+	tproxyEnabled, err := common.TransparentProxyEnabled(ns, pod, r.EnableTransparentProxy)
+	if err != nil {
+		return pbmesh.ProxyMode_PROXY_MODE_DEFAULT, fmt.Errorf("could not determine if transparent proxy is enabled: %w", err)
+	}
+
+	if tproxyEnabled {
+		return pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT, nil
+	}
+	return pbmesh.ProxyMode_PROXY_MODE_DEFAULT, nil
+}
+
+func (r *Controller) getExposeConfig(pod corev1.Pod) (*pbmesh.ExposeConfig, error) {
+	// Expose k8s probes as Envoy listeners if needed.
+	overwriteProbes, err := common.ShouldOverwriteProbes(pod, r.TProxyOverwriteProbes)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine if probes should be overwritten: %w", err)
+	}
+
+	if !overwriteProbes {
+		return nil, nil
+	}
+
+	var originalPod corev1.Pod
+	err = json.Unmarshal([]byte(pod.Annotations[constants.AnnotationOriginalPod]), &originalPod)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get original pod spec: %w", err)
+	}
+
+	exposeConfig := &pbmesh.ExposeConfig{}
+	for _, mutatedContainer := range pod.Spec.Containers {
+		for _, originalContainer := range originalPod.Spec.Containers {
+			if originalContainer.Name == mutatedContainer.Name {
+				paths, err := getContainerExposePaths(originalPod, originalContainer, mutatedContainer)
+				if err != nil {
+					return nil, fmt.Errorf("error getting container expose path for %s: %w", originalContainer.Name, err)
+				}
+
+				exposeConfig.ExposePaths = append(exposeConfig.ExposePaths, paths...)
+			}
+		}
+	}
+
+	if len(exposeConfig.ExposePaths) == 0 {
+		return nil, nil
+	}
+	return exposeConfig, nil
+}
+
+func getContainerExposePaths(originalPod corev1.Pod, originalContainer, mutatedContainer corev1.Container) ([]*pbmesh.ExposePath, error) {
+	var paths []*pbmesh.ExposePath
+	if mutatedContainer.LivenessProbe != nil && mutatedContainer.LivenessProbe.HTTPGet != nil {
+		originalLivenessPort, err := common.PortValueFromIntOrString(originalPod, originalContainer.LivenessProbe.HTTPGet.Port)
+		if err != nil {
+			return nil, err
+		}
+
+		newPath := &pbmesh.ExposePath{
+			ListenerPort:  uint32(mutatedContainer.LivenessProbe.HTTPGet.Port.IntValue()),
+			LocalPathPort: originalLivenessPort,
+			Path:          mutatedContainer.LivenessProbe.HTTPGet.Path,
+		}
+		paths = append(paths, newPath)
+	}
+	if mutatedContainer.ReadinessProbe != nil && mutatedContainer.ReadinessProbe.HTTPGet != nil {
+		originalReadinessPort, err := common.PortValueFromIntOrString(originalPod, originalContainer.ReadinessProbe.HTTPGet.Port)
+		if err != nil {
+			return nil, err
+		}
+
+		newPath := &pbmesh.ExposePath{
+			ListenerPort:  uint32(mutatedContainer.ReadinessProbe.HTTPGet.Port.IntValue()),
+			LocalPathPort: originalReadinessPort,
+			Path:          mutatedContainer.ReadinessProbe.HTTPGet.Path,
+		}
+		paths = append(paths, newPath)
+	}
+	if mutatedContainer.StartupProbe != nil && mutatedContainer.StartupProbe.HTTPGet != nil {
+		originalStartupPort, err := common.PortValueFromIntOrString(originalPod, originalContainer.StartupProbe.HTTPGet.Port)
+		if err != nil {
+			return nil, err
+		}
+
+		newPath := &pbmesh.ExposePath{
+			ListenerPort:  uint32(mutatedContainer.StartupProbe.HTTPGet.Port.IntValue()),
+			LocalPathPort: originalStartupPort,
+			Path:          mutatedContainer.StartupProbe.HTTPGet.Path,
+		}
+		paths = append(paths, newPath)
+	}
+	return paths, nil
+}
+
+func (r *Controller) getBootstrapConfig(pod corev1.Pod) (*pbmesh.BootstrapConfig, error) {
+	bootstrap := &pbmesh.BootstrapConfig{}
+
+	// If metrics are enabled, the BootstrapConfig should set envoy_prometheus_bind_addr to a listener on 0.0.0.0 on
+	// the PrometheusScrapePort that points to a metrics backend. The backend for this listener will be determined by
+	// the envoy bootstrapping command (consul connect envoy) or the consul-dataplane GetBoostrapParams rpc.
+	// If there is a merged metrics server, the backend would be that server.
+	// If we are not running the merged metrics server, the backend should just be the Envoy metrics endpoint.
+	enableMetrics, err := r.MetricsConfig.EnableMetrics(pod)
+	if err != nil {
+		return nil, fmt.Errorf("error determining if metrics are enabled: %w", err)
+	}
+	if enableMetrics {
+		prometheusScrapePort, err := r.MetricsConfig.PrometheusScrapePort(pod)
+		if err != nil {
+			return nil, err
+		}
+		prometheusScrapeListener := fmt.Sprintf("0.0.0.0:%s", prometheusScrapePort)
+		bootstrap.PrometheusBindAddr = prometheusScrapeListener
+	}
+
+	if r.EnableTelemetryCollector {
+		bootstrap.TelemetryCollectorBindSocketDir = DefaultTelemetryBindSocketDir
+	}
+
+	if proto.Equal(bootstrap, &pbmesh.BootstrapConfig{}) {
+		return nil, nil
+	}
+	return bootstrap, nil
+}
+
+func (r *Controller) writeHealthStatus(ctx context.Context, pod corev1.Pod) error {
+	status := getHealthStatusFromPod(pod)
+
+	hs := &pbcatalog.HealthStatus{
+		Type:        constants.ConsulKubernetesCheckType,
+		Status:      status,
+		Description: constants.ConsulKubernetesCheckName,
+		Output:      getHealthStatusReason(status, pod),
+	}
+	data := common.ToProtoAny(hs)
+
+	req := &pbresource.WriteRequest{
+		Resource: &pbresource.Resource{
+			Id:       getHealthStatusID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
+			Owner:    getWorkloadID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
+			Metadata: metaFromPod(pod),
+			Data:     data,
+		},
+	}
+	_, err := r.ResourceClient.Write(ctx, req)
+	return err
+}
+
+// TODO: delete ACL token for workload
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
 // has been configured with and will only delete tokens for the provided podName.
@@ -244,6 +440,8 @@ func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 
 // TODO: add support for explicit upstreams
 //func (r *Controller) writeUpstreams(pod corev1.Pod) error
+
+//func (r *Controller) deleteUpstreams(pod corev1.Pod) error
 
 // consulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
 // depending on Consul Namespaces being enabled and the value of namespace mirroring.
@@ -321,6 +519,40 @@ func parseLocality(node corev1.Node) *pbcatalog.Locality {
 	}
 }
 
+func metaFromPod(pod corev1.Pod) map[string]string {
+	// TODO: allow custom workload metadata
+	return map[string]string{
+		constants.MetaKeyKubeNS: pod.GetNamespace(),
+		metaKeyManagedBy:        constants.ManagedByPodValue,
+	}
+}
+
+// getHealthStatusFromPod checks the Pod for a "Ready" condition that is true.
+// This is true when all the containers are ready, vs. "Running" on the PodPhase,
+// which is true if any container is running.
+func getHealthStatusFromPod(pod corev1.Pod) pbcatalog.Health {
+	if pod.Status.Conditions == nil {
+		return pbcatalog.Health_HEALTH_CRITICAL
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+			return pbcatalog.Health_HEALTH_PASSING
+		}
+	}
+	return pbcatalog.Health_HEALTH_CRITICAL
+}
+
+// getHealthStatusReason takes Consul's health check status (either passing or critical)
+// and the pod to return a descriptive output for the HealthStatus Output.
+func getHealthStatusReason(state pbcatalog.Health, pod corev1.Pod) string {
+	if state == pbcatalog.Health_HEALTH_PASSING {
+		return constants.KubernetesSuccessReasonMsg
+	}
+
+	return fmt.Sprintf("Pod \"%s/%s\" is not ready", pod.GetNamespace(), pod.GetName())
+}
+
 func getWorkloadID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
@@ -332,6 +564,48 @@ func getWorkloadID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
+
+			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
+			// At a future point, this will move out of the Tenancy block.
+			PeerName: constants.DefaultConsulPeer,
+		},
+	}
+}
+
+func getProxyConfigurationID(name, namespace, partition string) *pbresource.ID {
+	return &pbresource.ID{
+		Name: name,
+		Type: &pbresource.Type{
+			Group:        "mesh",
+			GroupVersion: "v1alpha1",
+			Kind:         "ProxyConfiguration",
+		},
+		Tenancy: &pbresource.Tenancy{
+			Partition: partition,
+			Namespace: namespace,
+
+			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
+			// At a future point, this will move out of the Tenancy block.
+			PeerName: constants.DefaultConsulPeer,
+		},
+	}
+}
+
+func getHealthStatusID(name, namespace, partition string) *pbresource.ID {
+	return &pbresource.ID{
+		Name: name,
+		Type: &pbresource.Type{
+			Group:        "catalog",
+			GroupVersion: "v1alpha1",
+			Kind:         "HealthStatus",
+		},
+		Tenancy: &pbresource.Tenancy{
+			Partition: partition,
+			Namespace: namespace,
+
+			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
+			// At a future point, this will move out of the Tenancy block.
+			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }
