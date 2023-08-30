@@ -222,7 +222,7 @@ type ServiceDefaultsDestination struct {
 
 // RateLimits is rate limiting configuration that is applied to
 // inbound traffic for a service.
-// Rate limiting is a Consul enterprise feature.
+// Rate limiting is a Consul Enterprise feature.
 type RateLimits struct {
 	// InstanceLevel represents rate limit configuration
 	// that is applied per service instance.
@@ -286,7 +286,7 @@ func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// Track if RequestsPerSecond is set in at least one place in the config
-	isRatelimitSet := irl.RequestsPerSecond > 0
+	isRateLimitSet := irl.RequestsPerSecond > 0
 
 	// Top-level RequestsPerSecond can be 0 (unset) or a positive number.
 	if irl.RequestsPerSecond < 0 {
@@ -307,7 +307,7 @@ func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
 		allErrs = append(allErrs,
 			field.Invalid(path.Child("requestsMaxBurst"),
 				irl.RequestsMaxBurst,
-				"RequestsMaxBurst must be greater than 0"))
+				"RequestsMaxBurst must be positive"))
 	}
 
 	for i, route := range irl.Routes {
@@ -330,11 +330,11 @@ func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
 		if route.RequestsMaxBurst < 0 {
 			allErrs = append(allErrs, field.Invalid(
 				path.Child("routes").Index(i).Child("requestsMaxBurst"),
-				route.RequestsMaxBurst, "RequestsMaxBurst must be greater than 0"))
+				route.RequestsMaxBurst, "RequestsMaxBurst must be positive"))
 		}
 	}
 
-	if !isRatelimitSet {
+	if !isRateLimitSet {
 		allErrs = append(allErrs, field.Invalid(
 			path.Child("requestsPerSecond"),
 			irl.RequestsPerSecond, "At least one of top-level or route-level RequestsPerSecond must be set"))
@@ -342,8 +342,6 @@ func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// InstanceLevelRouteRateLimits represents rate limit configuration
-// applied to a route matching one of PathExact/PathPrefix/PathRegex.
 type InstanceLevelRouteRateLimits struct {
 	// Exact path to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
 	PathExact string `json:"pathExact,omitempty"`

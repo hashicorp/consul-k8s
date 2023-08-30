@@ -221,9 +221,6 @@ spec:
                           routes. For a given request, the first matching route will
                           be applied, if any. Overrides any top-level configuration.
                         items:
-                          description: InstanceLevelRouteRateLimits represents rate
-                            limit configuration applied to a route matching one of
-                            PathExact/PathPrefix/PathRegex.
                           properties:
                             pathExact:
                               description: Exact path to match. Exactly one of PathExact,

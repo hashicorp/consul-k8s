@@ -36,11 +36,13 @@ spec:
       requestsPerSecond: 1234
       requestsMaxBurst: 2345
       routes:
-        - pathExact: "/foo"
+        - pathExact: "/exact"
           requestsPerSecond: 222
           requestsMaxBurst: 333
-        - pathPrefix: "/admin"
+        - pathPrefix: "/prefix"
           requestsPerSecond: 444
+        - pathRegex: "/regex"
+          requestsPerSecond: 555
   envoyExtensions:
     - name: builtin/aws/lambda
       required: false

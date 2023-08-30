@@ -187,7 +187,7 @@ spec:
                 type: string
               rateLimits:
                 description: RateLimits is rate limiting configuration that is applied
-                  to inbound traffic for a service. Rate limiting is a Consul Enterprise
+                  to inbound traffic for a service. Rate limiting is a Consul enterprise
                   feature.
                 properties:
                   instanceLevel:
@@ -211,13 +211,13 @@ spec:
                         type: integer
                       routes:
                         description: Routes is a list of rate limits applied to specific
-                          routes. Overrides any top-level configuration.
+                          routes. For a given request, the first matching route will
+                          be applied, if any. Overrides any top-level configuration.
                         items:
-                          description: InstanceLevelRouteRateLimits represents rate
-                            limit configuration applied to a route matching one of
-                            PathExact/PathPrefix/PathRegex.
                           properties:
                             pathExact:
+                              description: Exact path to match. Exactly one of PathExact,
+                                PathPrefix, or PathRegex must be specified.
                               type: string
                             pathPrefix:
                               description: Prefix to match. Exactly one of PathExact,

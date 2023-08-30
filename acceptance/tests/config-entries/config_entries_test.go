@@ -234,8 +234,6 @@ func TestController(t *testing.T) {
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.KV.WriteRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.ReadRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.WriteRate)
-					// require.Equal(r, 100.0, rateLimitIPConfigEntry.PreparedQuery.ReadRate)
-					// require.Equal(r, 100.0, rateLimitIPConfigEntry.PreparedQuery.WriteRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.ReadRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.WriteRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.ReadRate)

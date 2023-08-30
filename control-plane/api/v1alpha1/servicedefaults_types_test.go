@@ -1459,7 +1459,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.requestsMaxBurst: Invalid value: -1: RequestsMaxBurst must be greater than 0`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.requestsMaxBurst: Invalid value: -1: RequestsMaxBurst must be positive`,
 		},
 		"rateLimits.instanceLevel.routes (invalid path)": {
 			input: &ServiceDefaults{
@@ -1522,7 +1522,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.routes[0].requestsMaxBurst: Invalid value: -1: RequestsMaxBurst must be greater than 0`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.routes[0].requestsMaxBurst: Invalid value: -1: RequestsMaxBurst must be positive`,
 		},
 		"rateLimits.requestsMaxBurst (top-level and route-level unset)": {
 			input: &ServiceDefaults{
