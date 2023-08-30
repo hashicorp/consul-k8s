@@ -416,10 +416,6 @@ func (c *Command) validateFlags() error {
 		return errors.New("-consul-dataplane-image must be set")
 	}
 
-	if c.flagLogLevelDataplane == "" {
-		return errors.New("-log-level-dataplane must be set")
-	}
-
 	if c.flagEnablePartitions && c.consul.Partition == "" {
 		return errors.New("-partition must set if -enable-partitions is set to 'true'")
 	}
