@@ -352,7 +352,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "telemetryCollector/Deployment:: vault namespace annotations are set when tls is enabled and vaultNamespace is set" {
+@test "telemetryCollector/Deployment: vault namespace annotations are set when tls is enabled and vaultNamespace is set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
