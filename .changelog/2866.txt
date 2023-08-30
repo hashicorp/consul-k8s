@@ -1,0 +1,4 @@
+```release-note:improvement
+Adds an argument -log-level-dataplane in connect inject command and flag logLevelDataplane in values.yaml
+Flag and command are used to set -log-level=ll in consul-dataplane container.
+```
