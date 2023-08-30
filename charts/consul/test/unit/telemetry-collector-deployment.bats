@@ -352,6 +352,29 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
+@test "telemetryCollector/Deployment:: vault namespace annotations are set when tls is enabled and vaultNamespace is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
 @test "telemetryCollector/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
   cd `chart_dir`
   local object=$(helm template \
