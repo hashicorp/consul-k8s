@@ -209,7 +209,7 @@ type MeshWebhook struct {
 	LogLevel string
 	LogJSON  bool
 
-	//Log level for consul-dataplane and
+	//Log level for consul-dataplane
 	LogLevelDataplane string
 
 	decoder *admission.Decoder
