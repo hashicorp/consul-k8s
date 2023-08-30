@@ -2323,7 +2323,7 @@ rollingUpdate:
 @test "client/DaemonSet: vault namespace annotations are set when tls is enabled and vaultNamespace is set" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
+      -s templates/client-daemonset.yaml  \
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.image=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
