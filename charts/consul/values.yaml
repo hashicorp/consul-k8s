@@ -114,7 +114,6 @@ global:
   # secretKey should be in the form of "key".
   secretsBackend:
     vault:
-
       # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
       enabled: false
 
