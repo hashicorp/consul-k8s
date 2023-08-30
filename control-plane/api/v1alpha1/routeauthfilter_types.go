@@ -41,23 +41,7 @@ type RouteAuthFilterList struct {
 
 // RouteAuthFilterSpec defines the desired state of RouteAuthFilter.
 type RouteAuthFilterSpec struct {
+	// This re-uses the JWT requirement type from Gateway Policy Types.
 	//+kubebuilder:validation:Optional
-	JWT *RouteJWTRequirement `json:"jwt,omitempty"`
-}
-
-// RouteJWTRequirement defines the JWT requirements per provider.
-type RouteJWTRequirement struct {
-	Providers []RouteJWTProvider `json:"providers"`
-}
-
-// RouteJWTProvider defines the configuration for a specific JWT provider.
-type RouteJWTProvider struct {
-	Name         string                      `json:"name"`
-	VerifyClaims []RouteJWTClaimVerification `json:"verifyClaims"`
-}
-
-// RouteJWTClaimVerification defines the specific claims to be verified.
-type RouteJWTClaimVerification struct {
-	Path  []string `json:"path"`
-	Value string   `json:"value"`
+	JWT *GatewayJWTRequirement `json:"jwt,omitempty"`
 }
