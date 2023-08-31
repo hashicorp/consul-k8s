@@ -1097,7 +1097,7 @@ load _helpers
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
-      --set 'global.secretsBackend.vault.connectCA.additionalConfig={\"connect\" : [{\"ca_config\" : [{\"namespace\" : \"bar\"}]}]}' \
+      --set 'global.secretsBackend.vault.connectCA.additionalConfig={"connect":[{"ca_config":[{"namespace":"bar"}]}]}' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
