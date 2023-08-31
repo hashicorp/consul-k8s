@@ -196,7 +196,9 @@ func (c *Cache) subscribeToConsul(ctx context.Context, kind string) {
 		if err != nil {
 			// if we timeout we don't care about the error message because it's expected to happen on long polls
 			// any other error we want to alert on
-			if !strings.Contains(strings.ToLower(err.Error()), "timeout") {
+			if !strings.Contains(strings.ToLower(err.Error()), "timeout") &&
+				!strings.Contains(strings.ToLower(err.Error()), "no such host") &&
+				!strings.Contains(strings.ToLower(err.Error()), "connection refused") {
 				c.logger.Error(err, fmt.Sprintf("error fetching config entries for kind: %s", kind))
 			}
 			continue
