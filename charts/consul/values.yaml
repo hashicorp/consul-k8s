@@ -524,6 +524,14 @@ global:
     # @type: string
     annotations: null
 
+  # If argocd.enabled is set to true, following annotations are added to
+  # job - server-acl-init-job
+  # annotations -
+  #   argocd.argoproj.io/hook: Sync
+  #   argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  argocd:
+    enabled: false
+
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an
   # enterprise binary. Defining it here applies it to your cluster once a leader
