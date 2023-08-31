@@ -1323,7 +1323,7 @@ func TestCache_Write(t *testing.T) {
 					GRPCPort:        port,
 					APITimeout:      0,
 				},
-				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port),
+				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 				NamespacesEnabled:   false,
 				Logger:              logrtest.NewTestLogger(t),
 			})
@@ -1601,7 +1601,7 @@ func Test_Run(t *testing.T) {
 			GRPCPort:        port,
 			APITimeout:      0,
 		},
-		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port),
+		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 		NamespacesEnabled:   false,
 		Logger:              logrtest.NewTestLogger(t),
 	})
@@ -2002,7 +2002,7 @@ func TestCache_Delete(t *testing.T) {
 					GRPCPort:        port,
 					APITimeout:      0,
 				},
-				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port),
+				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 				NamespacesEnabled:   false,
 				Logger:              logrtest.NewTestLogger(t),
 			})

@@ -234,7 +234,7 @@ func TestConsulSyncer_stopsGracefully(t *testing.T) {
 
 	testClient := &test.TestServerClient{
 		Cfg:     &consul.Config{APIClientConfig: &api.Config{}, HTTPPort: port},
-		Watcher: test.MockConnMgrForIPAndPort(t, parsedURL.Host, port),
+		Watcher: test.MockConnMgrForIPAndPort(t, parsedURL.Host, port, false),
 	}
 
 	// Start the syncer.

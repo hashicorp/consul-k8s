@@ -67,19 +67,13 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 		TestServer: consulServer,
 		APIClient:  client,
 		Cfg:        consulConfig,
-		Watcher:    MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC),
+		Watcher:    MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true),
 	}
 }
 
-func MockConnMgrForIPAndPort(t *testing.T, ip string, port int) *consul.MockServerConnectionManager {
+func MockConnMgrForIPAndPort(t *testing.T, ip string, port int, enableGRPCConn bool) *consul.MockServerConnectionManager {
 	parsedIP := net.ParseIP(ip)
 	connMgr := &consul.MockServerConnectionManager{}
-
-	conn, err := grpc.DialContext(
-		context.Background(),
-		fmt.Sprintf("%s:%d", parsedIP, port),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err)
 
 	mockState := discovery.State{
 		Address: discovery.Addr{
@@ -88,7 +82,17 @@ func MockConnMgrForIPAndPort(t *testing.T, ip string, port int) *consul.MockServ
 				Port: port,
 			},
 		},
-		GRPCConn: conn,
+	}
+
+	// If the connection is enabled, some tests will receive extra HTTP API calls where
+	// the server is being dialed.
+	if enableGRPCConn {
+		conn, err := grpc.DialContext(
+			context.Background(),
+			fmt.Sprintf("%s:%d", parsedIP, port),
+			grpc.WithTransportCredentials(insecure.NewCredentials()))
+		require.NoError(t, err)
+		mockState.GRPCConn = conn
 	}
 	connMgr.On("State").Return(mockState, nil)
 	connMgr.On("Run").Return(nil)
