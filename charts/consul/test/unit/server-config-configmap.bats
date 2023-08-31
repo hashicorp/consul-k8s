@@ -912,6 +912,32 @@ load _helpers
   [ "${actual}" = "5m" ]
 }
 
+@test "server/ConfigMap: when global.metrics.enableAgentMetrics=true and global.metrics.agentDisableHostname is set, sets telemetry config with updated telemetry.disable_hostname" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.agentDisableHostname=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.disable_hostname | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+@test "server/ConfigMap: when global.metrics.enableAgentMetrics=true and global.metrics.agentDisableHostname is not set, sets telemetry config with updated telemetry.disable_hostname" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.agentDisableHostname=false'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.disable_hostname | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
 #--------------------------------------------------------------------
 # auto_reload_config
 
