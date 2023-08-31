@@ -373,30 +373,6 @@ reservedNameTest() {
   [ "${actual}" = "bar" ]
 }
 
-@test "partitionInit/Job: correct vault namespace is set when tls is enabled and vaultNamespace is set and additionalConfig is also set" {
-  cd `chart_dir`
-  local cmd=$(helm template \
-      -s templates/partition-init-job.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
-      --set 'global.secretsBackend.vault.enabled=true' \
-      --set 'global.secretsBackend.vault.consulClientRole=foo' \
-      --set 'global.secretsBackend.vault.consulServerRole=bar' \
-      --set 'global.secretsBackend.vault.consulCARole=test' \
-      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.serverCert.secretName=pki_int/issue/test' \
-      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
-      --set 'global.secretsBackend.vault.connectCA.additionalConfig={\"connect\" : [{\"ca_config\" : [{\"namespace\" : \"bar\"}]}]}' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.metadata' | tee /dev/stderr)
-
-  local actual="$(echo $cmd |
-      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
-  [ "${actual}" = "bar" ]
-}
-
 @test "partitionInit/Job: configures server CA to come from vault when vault and TLS are enabled" {
   cd `chart_dir`
   local object=$(helm template \
