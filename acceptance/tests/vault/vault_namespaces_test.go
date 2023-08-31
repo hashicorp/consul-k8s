@@ -197,8 +197,6 @@ func TestVault_VaultNamespace(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
 		"global.secretsBackend.vault.vaultNamespace":                vaultNamespacePath,
 
-		"global.secretsBackend.vault.agentAnnotations": fmt.Sprintf("\"vault.hashicorp.com/namespace\": \"%s\"", vaultNamespacePath),
-
 		"global.acls.manageSystemACLs":          "true",
 		"global.acls.bootstrapToken.secretName": bootstrapTokenSecret.Path,
 		"global.acls.bootstrapToken.secretKey":  bootstrapTokenSecret.Key,
