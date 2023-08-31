@@ -114,8 +114,9 @@ global:
   # secretKey should be in the form of "key".
   secretsBackend:
     vault:
-      # Vault namespace (optional).
-      # For more details, please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/connect/ca/vault#namespace)
+      # Vault namespace (optional). This sets the Vault namespace for the `vault.hashicorp.com/namespace` 
+      # agent annotation and [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/connect/ca/vault#namespace).
+      # To override one of these values individually, see `agentAnnotations` and `connectCA.additionalConfig`.
       vaultNamespace: ""
 
       # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
