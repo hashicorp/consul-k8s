@@ -352,21 +352,16 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "telemetryCollector/Deployment: vault namespace annotations are set when tls is enabled and vaultNamespace is set" {
+@test "telemetryCollector/Deployment: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.secretsBackend.vault.vaultNamespace=vns' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.serverCert.secretName=pki_int/issue/test' \
-      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
@@ -375,21 +370,16 @@ load _helpers
   [ "${actual}" = "vns" ]
 }
 
-@test "telemetryCollector/Deployment: correct vault namespace annotations are set when tls is enabled and vaultNamespace is set and agentAnnotations are also set" {
+@test "telemetryCollector/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
+      --set 'client.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.secretsBackend.vault.vaultNamespace=vns' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'server.serverCert.secretName=pki_int/issue/test' \
-      --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
       --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
