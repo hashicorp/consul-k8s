@@ -658,7 +658,7 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "server/ConfigMap: doesn't set Vault Namespace in connect CA config when connectCA.namespace is blank in values.yaml" {
+@test "server/ConfigMap: doesn't set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is blank in values.yaml" {
   cd `chart_dir`
 
   local actual=$(helm template \
@@ -676,7 +676,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "server/ConfigMap: set Vault Namespace in connect CA config when connectCA.namespace is not blank in values.yaml" {
+@test "server/ConfigMap: set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is not blank in values.yaml" {
   cd `chart_dir`
 
   local actual=$(helm template \
