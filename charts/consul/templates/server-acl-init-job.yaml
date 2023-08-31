@@ -49,6 +49,10 @@ spec:
         {{- if .Values.global.acls.annotations }}
           {{- tpl .Values.global.acls.annotations . | nindent 8 }}
         {{- end }}
+        {{- if .Values.global.argocd.enabled }}
+        "argocd.argoproj.io/hook": "Sync"
+        "argocd.argoproj.io/hook-delete-policy": "HookSucceeded"
+        {{- end }}
         {{- if .Values.global.secretsBackend.vault.enabled }}
 
         {{- /* Run the Vault agent as both an init container and sidecar.

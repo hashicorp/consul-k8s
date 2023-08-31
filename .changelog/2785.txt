@@ -1,0 +1,3 @@
+```release-note:improvement
+Add new value `global.argocd.enabled`. Set this to `true` when using ArgoCD to deploy this chart.
+```
