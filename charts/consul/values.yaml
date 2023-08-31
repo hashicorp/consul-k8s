@@ -2294,7 +2294,7 @@ connectInject:
   # @type: string
   imageConsul: null
 
-  # Sets the logLevel for `consul-dataplane` and the `consul-connect-inject-init` container. If set, this overrides the global log verbosity level. One of "debug", "info", "warn", or "error".
+  # Sets the logLevel for the `consul-dataplane` sidecar and the `consul-connect-inject-init` container. If set, this overrides the global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
