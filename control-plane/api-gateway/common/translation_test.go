@@ -1383,8 +1383,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Name: "test-jwt-provider",
 										VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
 											{
-												Path:  []string{""},
-												Value: "",
+												Path:  []string{"/okta"},
+												Value: "okta",
 											},
 										},
 									},
@@ -1407,6 +1407,23 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								RetryOn:               []string{"cancelled"},
 								RetryOnStatusCodes:    []uint32{500, 502},
 								RetryOnConnectFailure: pointer.Bool(false),
+							},
+							TimeoutFilter: &api.TimeoutFilter{
+								RequestTimeout: time.Duration(10 * time.Nanosecond),
+								IdleTimeout:    time.Duration(30 * time.Nanosecond),
+							},
+							JWT: &api.JWTFilter{
+								Providers: []*api.APIGatewayJWTProvider{
+									{
+										Name: "test-jwt-provider",
+										VerifyClaims: []*api.APIGatewayJWTClaimVerification{
+											{
+												Path:  []string{"/okta"},
+												Value: "okta",
+											},
+										},
+									},
+								},
 							},
 						},
 						Matches: []api.HTTPMatch{
