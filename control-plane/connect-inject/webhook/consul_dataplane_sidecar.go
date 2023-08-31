@@ -144,12 +144,13 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	}
 
 	if lifecycleEnabled, err := w.LifecycleConfig.EnableProxyLifecycle(pod); lifecycleEnabled && err == nil {
-		gracefulPort, _ := w.LifecycleConfig.GracefulPort(pod)
+		// gracefulPort, _ := w.LifecycleConfig.GracefulPort(pod)
 		container.Lifecycle = &corev1.Lifecycle{
 			PostStart: &corev1.LifecycleHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: w.LifecycleConfig.GracefulStartupPath(pod),
-					Port: intstr.FromInt(gracefulPort),
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/usr/local/bin/consul-dataplane", "-isup",
+					},
 				},
 			},
 		}
