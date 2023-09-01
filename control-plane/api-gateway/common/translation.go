@@ -152,12 +152,18 @@ func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolic
 		return nil, nil
 	}
 
-	defaultPolicy := &api.APIGatewayPolicy{
-		JWT: t.translateJWTRequirement(policy.Spec.Default.JWT),
+	var defaultPolicy, overridePolicy *api.APIGatewayPolicy
+
+	if policy.Spec.Default != nil {
+		defaultPolicy = &api.APIGatewayPolicy{
+			JWT: t.translateJWTRequirement(policy.Spec.Default.JWT),
+		}
 	}
 
-	overridePolicy := &api.APIGatewayPolicy{
-		JWT: t.translateJWTRequirement(policy.Spec.Override.JWT),
+	if policy.Spec.Override != nil {
+		overridePolicy = &api.APIGatewayPolicy{
+			JWT: t.translateJWTRequirement(policy.Spec.Override.JWT),
+		}
 	}
 	return defaultPolicy, overridePolicy
 }
