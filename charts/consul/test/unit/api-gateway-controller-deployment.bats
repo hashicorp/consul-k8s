@@ -1077,7 +1077,7 @@ load _helpers
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
-  [ "${actual}" = "bar" ]
+  [ "${actual}" = "vns" ]
 }
 
 @test "apiGateway/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
@@ -1094,7 +1094,7 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
+      --set 'global.secretsBackend.vault.agentAnnotations="vault.hashicorp.com/namespace": bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
