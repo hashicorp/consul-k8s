@@ -330,7 +330,12 @@ reservedNameTest() {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'client.enabled=true' \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
@@ -351,7 +356,12 @@ reservedNameTest() {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'client.enabled=true' \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.enableConsulNamespaces=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \

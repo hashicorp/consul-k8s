@@ -1074,7 +1074,7 @@ load _helpers
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
-      --set 'client.enabled=true' \
+      --set 'syncCatalog.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
@@ -1095,7 +1095,7 @@ load _helpers
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/sync-catalog-deployment.yaml  \
-      --set 'client.enabled=true' \
+      --set 'syncCatalog.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \

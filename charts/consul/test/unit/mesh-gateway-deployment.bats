@@ -1336,7 +1336,8 @@ key2: value2' \
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/mesh-gateway-deployment.yaml  \
-      --set 'client.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
@@ -1357,7 +1358,8 @@ key2: value2' \
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/mesh-gateway-deployment.yaml  \
-      --set 'client.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \

@@ -692,7 +692,9 @@ load _helpers
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/server-acl-init-job.yaml  \
-      --set 'client.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
@@ -701,6 +703,7 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
@@ -713,7 +716,9 @@ load _helpers
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/server-acl-init-job.yaml  \
-      --set 'client.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
@@ -723,6 +728,7 @@ load _helpers
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
