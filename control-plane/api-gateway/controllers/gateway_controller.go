@@ -598,8 +598,6 @@ func (r *GatewayController) transformGatewayPolicy(ctx context.Context) func(obj
 	return func(o client.Object) []reconcile.Request {
 		gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
 
-		//gateway policy to gateway is 1to1
-
 		gatewayRef := types.NamespacedName{
 			Namespace: gatewayPolicy.Spec.TargetRef.Namespace,
 			Name:      gatewayPolicy.Spec.TargetRef.Name,
