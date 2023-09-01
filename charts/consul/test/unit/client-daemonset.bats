@@ -2382,7 +2382,7 @@ rollingUpdate:
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
-  [ "${actual}" = "bar" ]
+  [ "${actual}" = "vns" ]
 }
 
 @test "client/DaemonSet: vault gossip annotations are set when gossip encryption enabled" {

@@ -1823,7 +1823,7 @@ load _helpers
 
   local actual="$(echo $cmd |
       yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
-  [ "${actual}" = "bar" ]
+  [ "${actual}" = "vns" ]
 }
 
 @test "connectInject/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
