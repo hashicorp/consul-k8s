@@ -8,13 +8,14 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -27,7 +28,7 @@ const (
 	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway v1beta1.Gateway) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -38,7 +39,7 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(namespace, config, bearerTokenFile, name)
+	args, err := getDataplaneArgs(gateway.Namespace, config, bearerTokenFile, gateway.Name)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -54,7 +55,7 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 	}
 
 	container := corev1.Container{
-		Name:  name,
+		Name:  gateway.Name,
 		Image: config.ImageDataplane,
 
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
@@ -95,11 +96,25 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 			FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
 		},
 	})
+
 	// Configure the port on which the readiness probe will query the proxy for its health.
 	container.Ports = append(container.Ports, corev1.ContainerPort{
 		Name:          "proxy-health",
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
+
+	// Configure the listener ports from the gateway
+	seenPorts := map[v1beta1.PortNumber]struct{}{}
+	for _, listener := range gateway.Spec.Listeners {
+		if _, seen := seenPorts[listener.Port]; !seen {
+			container.Ports = append(container.Ports, corev1.ContainerPort{
+				Name:          fmt.Sprintf("listener-port-%d", len(seenPorts)),
+				ContainerPort: int32(listener.Port),
+			})
+			seenPorts[listener.Port] = struct{}{}
+		}
+	}
+
 	// Configure the resource requests and limits for the proxy if they are set.
 	if gcc.Spec.DeploymentSpec.Resources != nil {
 		container.Resources = *gcc.Spec.DeploymentSpec.Resources
