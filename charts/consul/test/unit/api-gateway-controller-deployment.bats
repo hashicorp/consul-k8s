@@ -1039,7 +1039,8 @@ load _helpers
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'client.enabled=true' \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
@@ -1060,16 +1061,17 @@ load _helpers
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'client.enabled=true' \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test' \
       --set 'global.secretsBackend.vault.vaultNamespace=vns' \
-      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
