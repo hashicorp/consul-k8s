@@ -1643,3 +1643,149 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 		})
 	}
 }
+
+func newSectionNamePtr(s string) *gwv1beta1.SectionName {
+	sectionName := gwv1beta1.SectionName(s)
+	return &sectionName
+}
+
+func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
+	type args struct {
+		gateway  gwv1beta1.Gateway
+		listener gwv1beta1.Listener
+		gwcc     *v1alpha1.GatewayClassConfig
+	}
+	tests := []struct {
+		name     string
+		args     args
+		policies []v1alpha1.GatewayPolicy
+		want     api.APIGatewayListener
+		want1    bool
+	}{
+		{
+			name: "listener with jwt auth",
+			policies: []v1alpha1.GatewayPolicy{
+				{
+					Spec: v1alpha1.GatewayPolicySpec{
+						TargetRef: v1alpha1.PolicyTargetReference{
+							Kind:        KindGateway,
+							Name:        "test",
+							Namespace:   "test",
+							SectionName: newSectionNamePtr("test-listener"),
+						},
+						Override: &v1alpha1.GatewayPolicyConfig{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
+									{
+										Name: "override-provider",
+										VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
+											{
+												Path:  []string{"path"},
+												Value: "value",
+											},
+										},
+									},
+								},
+							},
+						},
+						Default: &v1alpha1.GatewayPolicyConfig{JWT: &v1alpha1.GatewayJWTRequirement{
+							Providers: []*v1alpha1.GatewayJWTProvider{
+								{
+									Name: "default-provider",
+									VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
+										{
+											Path:  []string{"path"},
+											Value: "value",
+										},
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
+			args: args{
+				gateway: gwv1beta1.Gateway{
+					TypeMeta: metav1.TypeMeta{
+						Kind: KindGateway,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "test",
+					},
+					Spec: gwv1beta1.GatewaySpec{
+						Listeners: []gwv1beta1.Listener{
+							{
+								Name:     "test-listener",
+								Port:     80,
+								Protocol: "HTTP",
+							},
+						},
+					},
+				},
+				listener: gwv1beta1.Listener{
+					Name:     "test-listener",
+					Port:     80,
+					Protocol: "HTTP",
+				},
+				gwcc: &v1alpha1.GatewayClassConfig{
+					Spec: v1alpha1.GatewayClassConfigSpec{},
+				},
+			},
+			want: api.APIGatewayListener{
+				Name:     "test-listener",
+				Port:     80,
+				Protocol: "http",
+				Override: &api.APIGatewayPolicy{
+					JWT: &api.APIGatewayJWTRequirement{
+						Providers: []*api.APIGatewayJWTProvider{
+							{
+								Name: "override-provider",
+								VerifyClaims: []*api.APIGatewayJWTClaimVerification{
+									{
+										Path:  []string{"path"},
+										Value: "value",
+									},
+								},
+							},
+						},
+					},
+				},
+				Default: &api.APIGatewayPolicy{
+					JWT: &api.APIGatewayJWTRequirement{
+						Providers: []*api.APIGatewayJWTProvider{
+							{
+								Name: "default-provider",
+								VerifyClaims: []*api.APIGatewayJWTClaimVerification{
+									{
+										Path:  []string{"path"},
+										Value: "value",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want1: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t1 *testing.T) {
+			translator := ResourceTranslator{
+				EnableConsulNamespaces: true,
+				ConsulDestNamespace:    "",
+				EnableK8sMirroring:     true,
+				MirroringPrefix:        "",
+			}
+
+			resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+			for _, p := range tt.policies {
+				resources.AddGatewayPolicy(&p)
+			}
+			got, got1 := translator.toAPIGatewayListener(tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
+			assert.Equalf(t, tt.want, got, "toAPIGatewayListener(%v, %v, %v, %v)", tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
+			assert.Equalf(t, tt.want1, got1, "toAPIGatewayListener(%v, %v, %v, %v)", tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
+		})
+	}
+}

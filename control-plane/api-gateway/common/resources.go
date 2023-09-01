@@ -418,6 +418,8 @@ func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v
 		s.gatewayPolicies = make(map[api.ResourceReference]*v1alpha1.GatewayPolicy)
 	}
 
+	s.gatewayPolicies[key] = gatewayPolicy
+
 	return s.gatewayPolicies[key]
 }
 
