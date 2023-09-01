@@ -116,7 +116,7 @@ type ResourceMap struct {
 	httpRouteGateways     map[api.ResourceReference]*httpRoute
 	gatewayResources      map[api.ResourceReference]*resourceSet
 	externalFilters       map[corev1.ObjectReference]client.Object
-	gatewayPolicies       map[v1alpha1.PolicyTargetReference]*v1alpha1.GatewayPolicy
+	gatewayPolicies       map[api.ResourceReference]*v1alpha1.GatewayPolicy
 
 	// consul resources for a gateway
 	consulTCPRoutes  map[api.ResourceReference]*consulTCPRoute
@@ -403,17 +403,31 @@ func (s *ResourceMap) ExternalFilterExists(filterRef gwv1beta1.LocalObjectRefere
 }
 
 func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v1alpha1.GatewayPolicy {
-	key := gatewayPolicy.Spec.TargetRef
+	sectionName := ""
+	if gatewayPolicy.Spec.TargetRef.SectionName != nil {
+		sectionName = string(*gatewayPolicy.Spec.TargetRef.SectionName)
+	}
+	key := api.ResourceReference{
+		Kind:        gatewayPolicy.Spec.TargetRef.Kind,
+		Name:        gatewayPolicy.Spec.TargetRef.Name,
+		SectionName: sectionName,
+		Namespace:   gatewayPolicy.Spec.TargetRef.Namespace,
+	}
 
 	if s.gatewayPolicies == nil {
-		s.gatewayPolicies = make(map[corev1.ObjectReference]*v1alpha1.GatewayPolicy)
+		s.gatewayPolicies = make(map[api.ResourceReference]*v1alpha1.GatewayPolicy)
 	}
 
 	return s.gatewayPolicies[key]
 }
 
-func (s *ResourceMap) GetPolicyForGatewayListener(gateway *gwv1beta1.Gateway) *v1alpha1.GatewayPolicy {
-	key := objectToObjectReference(gateway)
+func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) *v1alpha1.GatewayPolicy {
+	key := api.ResourceReference{
+		Name:        gateway.Name,
+		Kind:        gateway.Kind,
+		SectionName: string(gatewayListener.Name),
+		Namespace:   gateway.Namespace,
+	}
 
 	return s.gatewayPolicies[key]
 }

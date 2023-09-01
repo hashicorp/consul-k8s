@@ -114,7 +114,7 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 	}
 
 	//grab policy if it exists
-	gatewayPolicyCrd := resources.GetPolicyForGateway(&gateway)
+	gatewayPolicyCrd := resources.GetPolicyForGatewayListener(&gateway, listener)
 	defaultPolicy, overridePolicy := t.translateGatewayPolicy(gatewayPolicyCrd)
 
 	portMapping := int32(0)
