@@ -167,8 +167,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	// get all http routes referencing this gateway
-	policy, err := r.getRelatedGatewayPolicy(ctx, req.NamespacedName, resources)
+	// get all gatewaypolicies referencing this gateway
+	policies, err := r.getRelatedGatewayPolicies(ctx, req.NamespacedName, resources)
 	if err != nil {
 		log.Error(err, "unable to list gateway policies")
 		return ctrl.Result{}, err
@@ -195,7 +195,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Resources:             resources,
 		ConsulGateway:         consulGateway,
 		ConsulGatewayServices: consulServices,
-		Policy:                policy,
+		Policies:              policies,
 	})
 
 	updates := binder.Snapshot()
@@ -909,7 +909,7 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 	return externalFilters, nil
 }
 
-func (c *GatewayController) getRelatedGatewayPolicy(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) (*v1alpha1.GatewayPolicy, error) {
+func (c *GatewayController) getRelatedGatewayPolicies(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]v1alpha1.GatewayPolicy, error) {
 	var list v1alpha1.GatewayPolicyList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
@@ -918,17 +918,12 @@ func (c *GatewayController) getRelatedGatewayPolicy(ctx context.Context, gateway
 		return nil, err
 	}
 
-	if len(list.Items) > 0 {
-		//TODO should we error here or assume that this will happen in validation webhook
-		c.Log.Info(gateway.String() + " has more than one gateway policy associated with it")
-	} else if len(list.Items) == 0 {
-		return nil, nil
+	//add all policies to the resourcemap
+	for _, policy := range list.Items {
+		resources.AddGatewayPolicy(&policy)
 	}
 
-	policy := list.Items[0]
-	resources.AddGatewayPolicy(&policy)
-
-	return &policy, nil
+	return list.Items, nil
 }
 
 func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1alpha2.TCPRoute, error) {
