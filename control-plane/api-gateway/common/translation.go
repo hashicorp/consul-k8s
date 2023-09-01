@@ -177,6 +177,10 @@ func (t ResourceTranslator) translateJWTRequirement(crdRequirement *v1alpha1.Gat
 }
 
 func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.GatewayJWTProvider) *api.APIGatewayJWTProvider {
+	if crdProvider == nil {
+		return nil
+	}
+
 	apiProvider := api.APIGatewayJWTProvider{
 		Name: crdProvider.Name,
 	}
@@ -187,6 +191,9 @@ func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.GatewayJW
 }
 
 func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.GatewayJWTClaimVerification) *api.APIGatewayJWTClaimVerification {
+	if crdClaims == nil {
+		return nil
+	}
 	verifyClaim := api.APIGatewayJWTClaimVerification{
 		Path:  crdClaims.Path,
 		Value: crdClaims.Value,
