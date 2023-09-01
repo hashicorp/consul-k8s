@@ -352,7 +352,34 @@ reservedNameTest() {
   [ "${actual}" = "vns" ]
 }
 
-@test "partitionInit/Job: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set" {
+@test "partitionInit/Job: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set without vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set "global.adminPartitions.name=bar" \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=foo' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/agent-extra-secret: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "bar" ]
+}
+
+@test "partitionInit/Job: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
   cd `chart_dir`
   local cmd=$(helm template \
       -s templates/partition-init-job.yaml  \
