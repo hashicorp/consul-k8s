@@ -229,7 +229,7 @@ spec:
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
       {{- end }}
       initContainers:
-      {{- if .Values.server.locality }}
+      {{- if .Values.server.locality.enabled }}
       - name: locality-init
         image: {{ .Values.global.imageK8S }}
         env:
@@ -419,7 +419,7 @@ spec:
                 {{- end }}
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
-                {{- if .Values.server.locality }}
+                {{- if .Values.server.locality.enabled }}
                 -config-file=/consul/extra-config/locality.json
                 {{- end }}
                 {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
