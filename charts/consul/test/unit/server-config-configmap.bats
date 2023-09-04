@@ -716,6 +716,26 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
+@test "server/ConfigMap: set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is blank but connectCA.additionalConfig is blank" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vault-namespace' \
+      --set 'global.secretsBackend.vault.connectCA.additionalConfig={}' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"namespace\": \"vault-namespace\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "server/ConfigMap: doesn't add federation config when global.federation.enabled is false (default)" {
   cd `chart_dir`
   local actual=$(helm template \
