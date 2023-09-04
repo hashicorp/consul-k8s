@@ -776,6 +776,10 @@ server:
   # @type: string
   logLevel: ""
 
+  # If false locality of server nodes won't be stored 
+  # @type: boolean
+  locality: true
+
   # The name of the Docker image (including any tag) for the containers running
   # Consul server agents.
   # @type: string
