@@ -730,7 +730,6 @@ load _helpers
       --set 'global.secretsBackend.vault.ca.secretName=ca' \
       --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
       --set 'global.secretsBackend.vault.vaultNamespace=vault-namespace' \
-      --set 'global.secretsBackend.vault.connectCA.additionalConfig={}' \
       . | tee /dev/stderr |
       yq '.data["connect-ca-config.json"] | contains("\"namespace\": \"vault-namespace\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
