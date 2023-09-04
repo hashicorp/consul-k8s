@@ -115,7 +115,7 @@ global:
   secretsBackend:
     vault:
       # Vault namespace (optional). This sets the Vault namespace for the `vault.hashicorp.com/namespace` 
-      # agent annotation and [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/connect/ca/vault#namespace).
+      # agent annotation and [Vault Connect CA namespace](https://developer.hashicorp.com/consul/docs/connect/ca/vault#namespace).
       # To override one of these values individually, see `agentAnnotations` and `connectCA.additionalConfig`.
       vaultNamespace: ""
 
