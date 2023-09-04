@@ -72,7 +72,7 @@ data:
               "ca_file": "/consul/vault-ca/tls.crt",
               {{- end }}
               "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
-              {{- if .vaultNamespace }}
+              {{- if (and (.vaultNamespace) (not (hasKey (default "" .connectCA.additionalConfig | fromJson) "namespace"))) }}
               "namespace": "{{ .vaultNamespace }}",
               {{- end }}
               "root_pki_path": "{{ .connectCA.rootPKIPath }}",
