@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: MPL-2.0
 
 resources:
-  - ../../../bases/job-client
+- ../../../bases/job-client
 
-patchesStrategicMerge:
-  - patch.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+patches:
+- path: patch.yaml
