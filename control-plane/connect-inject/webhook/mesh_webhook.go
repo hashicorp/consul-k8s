@@ -620,6 +620,7 @@ func (w *MeshWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error 
 		}
 	}
 	pod.Annotations[constants.AnnotationOriginalPod] = podJson
+	pod.Annotations[constants.LegacyAnnotationConsulK8sVersion] = version.GetHumanVersion()
 	pod.Annotations[constants.AnnotationConsulK8sVersion] = version.GetHumanVersion()
 
 	return nil

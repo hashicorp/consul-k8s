@@ -13,9 +13,6 @@ import (
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -27,65 +24,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 const (
 	nodeName       = "test-node"
 	consulNodeName = "test-node-virtual"
 )
-
-func TestShouldIgnore(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name      string
-		namespace string
-		denySet   mapset.Set
-		allowSet  mapset.Set
-		expected  bool
-	}{
-		{
-			name:      "system namespace",
-			namespace: "kube-system",
-			denySet:   mapset.NewSetWith(),
-			allowSet:  mapset.NewSetWith("*"),
-			expected:  true,
-		},
-		{
-			name:      "other system namespace",
-			namespace: "local-path-storage",
-			denySet:   mapset.NewSetWith(),
-			allowSet:  mapset.NewSetWith("*"),
-			expected:  true,
-		},
-		{
-			name:      "any namespace allowed",
-			namespace: "foo",
-			denySet:   mapset.NewSetWith(),
-			allowSet:  mapset.NewSetWith("*"),
-			expected:  false,
-		},
-		{
-			name:      "in deny list",
-			namespace: "foo",
-			denySet:   mapset.NewSetWith("foo"),
-			allowSet:  mapset.NewSetWith("*"),
-			expected:  true,
-		},
-		{
-			name:      "not in allow list",
-			namespace: "foo",
-			denySet:   mapset.NewSetWith(),
-			allowSet:  mapset.NewSetWith("bar"),
-			expected:  true,
-		},
-	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := shouldIgnore(tt.namespace, tt.denySet, tt.allowSet)
-			require.Equal(t, tt.expected, actual)
-		})
-	}
-}
 
 func TestHasBeenInjected(t *testing.T) {
 	t.Parallel()
@@ -3715,7 +3663,7 @@ func TestReconcileUpdateEndpoint_LegacyService(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Status.HostIP = "127.0.0.1"
-				pod1.Annotations[constants.AnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
+				pod1.Annotations[constants.LegacyAnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -3780,7 +3728,7 @@ func TestReconcileUpdateEndpoint_LegacyService(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Status.HostIP = "127.0.0.1"
-				pod1.Annotations[constants.AnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
+				pod1.Annotations[constants.LegacyAnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -6624,7 +6572,7 @@ func createServicePod(name, ip string, inject bool, managedByEndpointsController
 			Namespace: "default",
 			Labels:    map[string]string{},
 			Annotations: map[string]string{
-				constants.AnnotationConsulK8sVersion: "1.0.0",
+				constants.LegacyAnnotationConsulK8sVersion: "1.0.0",
 			},
 		},
 		Status: corev1.PodStatus{

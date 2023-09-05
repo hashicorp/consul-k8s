@@ -21,11 +21,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
+	"github.com/hashicorp/consul/api"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul/api"
 )
 
 func Test_resourceCache_diff(t *testing.T) {
@@ -1322,7 +1323,7 @@ func TestCache_Write(t *testing.T) {
 					GRPCPort:        port,
 					APITimeout:      0,
 				},
-				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 				NamespacesEnabled:   false,
 				Logger:              logrtest.NewTestLogger(t),
 			})
@@ -1600,7 +1601,7 @@ func Test_Run(t *testing.T) {
 			GRPCPort:        port,
 			APITimeout:      0,
 		},
-		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 		NamespacesEnabled:   false,
 		Logger:              logrtest.NewTestLogger(t),
 	})
@@ -2001,7 +2002,7 @@ func TestCache_Delete(t *testing.T) {
 					GRPCPort:        port,
 					APITimeout:      0,
 				},
-				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 				NamespacesEnabled:   false,
 				Logger:              logrtest.NewTestLogger(t),
 			})

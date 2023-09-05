@@ -6,12 +6,13 @@ package endpoints
 import (
 	"fmt"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-version"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 const minSupportedConsulDataplaneVersion = "v1.0.0-beta1"
@@ -19,7 +20,12 @@ const minSupportedConsulDataplaneVersion = "v1.0.0-beta1"
 // isConsulDataplaneSupported returns true if the consul-k8s version on the pod supports
 // consul-dataplane architecture of Consul.
 func isConsulDataplaneSupported(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[constants.AnnotationConsulK8sVersion]; ok {
+	anno, ok := pod.Annotations[constants.LegacyAnnotationConsulK8sVersion]
+	if !ok {
+		anno, ok = pod.Annotations[constants.AnnotationConsulK8sVersion]
+	}
+
+	if ok {
 		consulK8sVersion, err := version.NewVersion(anno)
 		if err != nil {
 			// Only consul-k8s v1.0.0+ (including pre-release versions) have the version annotation. So it would be

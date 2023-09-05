@@ -7,14 +7,15 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 func TestIsConsulDataplaneSupported(t *testing.T) {
@@ -46,7 +47,7 @@ func TestIsConsulDataplaneSupported(t *testing.T) {
 				},
 			}
 			if version != "" {
-				pod.ObjectMeta.Annotations[constants.AnnotationConsulK8sVersion] = version
+				pod.ObjectMeta.Annotations[constants.LegacyAnnotationConsulK8sVersion] = version
 			}
 
 			require.Equal(t, c.expIsConsulDataplaneSupported, isConsulDataplaneSupported(pod))

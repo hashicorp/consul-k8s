@@ -4,6 +4,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,12 +14,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
 )
 
 const (
@@ -62,20 +67,33 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 		TestServer: consulServer,
 		APIClient:  client,
 		Cfg:        consulConfig,
-		Watcher:    MockConnMgrForIPAndPort("127.0.0.1", cfg.Ports.GRPC),
+		Watcher:    MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true),
 	}
 }
 
-func MockConnMgrForIPAndPort(ip string, port int) *consul.MockServerConnectionManager {
+func MockConnMgrForIPAndPort(t *testing.T, ip string, port int, enableGRPCConn bool) *consul.MockServerConnectionManager {
 	parsedIP := net.ParseIP(ip)
 	connMgr := &consul.MockServerConnectionManager{}
+
 	mockState := discovery.State{
 		Address: discovery.Addr{
 			TCPAddr: net.TCPAddr{
 				IP:   parsedIP,
 				Port: port,
 			},
-		}}
+		},
+	}
+
+	// If the connection is enabled, some tests will receive extra HTTP API calls where
+	// the server is being dialed.
+	if enableGRPCConn {
+		conn, err := grpc.DialContext(
+			context.Background(),
+			fmt.Sprintf("%s:%d", parsedIP, port),
+			grpc.WithTransportCredentials(insecure.NewCredentials()))
+		require.NoError(t, err)
+		mockState.GRPCConn = conn
+	}
 	connMgr.On("State").Return(mockState, nil)
 	connMgr.On("Run").Return(nil)
 	connMgr.On("Stop").Return(nil)
@@ -255,6 +273,27 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	// This API call will idempotently create the binding rule (it won't fail if it already exists).
 	_, _, err = consulClient.ACL().BindingRuleCreate(&aclBindingRule, nil)
 	require.NoError(t, err)
+}
+
+// ResourceHasPersisted checks that a recently written resource exists in the Consul
+// state store with a valid version. This must be true before a resource is overwritten
+// or deleted.
+func ResourceHasPersisted(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID) {
+	req := &pbresource.ReadRequest{Id: id}
+
+	require.Eventually(t, func() bool {
+		res, err := client.Read(context.Background(), req)
+		if err != nil {
+			return false
+		}
+
+		if res.GetResource().GetVersion() == "" {
+			return false
+		}
+
+		return true
+	}, 5*time.Second,
+		time.Second)
 }
 
 func TokenReviewsResponse(name, ns string) string {
