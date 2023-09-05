@@ -1079,7 +1079,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											BackendObjectReference: gwv1beta1.BackendObjectReference{
 												Name:      "some-service-part-three",
 												Namespace: PointerTo(gwv1beta1.Namespace("svc-ns")),
-												Group:     PointerTo(gwv1beta1.Group(v1alpha1.GroupVersion.String())),
+												Group:     PointerTo(gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup)),
 												Kind:      PointerTo(gwv1beta1.Kind(v1alpha1.MeshServiceKind)),
 											},
 										},
