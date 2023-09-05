@@ -432,34 +432,6 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 	}
 }
 
-func makeJWTFilter(routeJWTFilter *v1alpha1.RouteAuthFilter) *api.JWTFilter {
-	if routeJWTFilter.Spec.JWT == nil || routeJWTFilter.Spec.JWT.Providers == nil {
-		return nil
-	}
-
-	// For each provider, translate the claims to the Consul config entry format.
-	providers := make([]*api.APIGatewayJWTProvider, 0, len(routeJWTFilter.Spec.JWT.Providers))
-	for _, provider := range routeJWTFilter.Spec.JWT.Providers {
-
-		claims := make([]*api.APIGatewayJWTClaimVerification, 0, len(provider.VerifyClaims))
-		for _, claim := range provider.VerifyClaims {
-			claims = append(claims, &api.APIGatewayJWTClaimVerification{
-				Path:  claim.Path,
-				Value: claim.Value,
-			})
-		}
-
-		providers = append(providers, &api.APIGatewayJWTProvider{
-			Name:         provider.Name,
-			VerifyClaims: claims,
-		})
-	}
-
-	return &api.JWTFilter{
-		Providers: providers,
-	}
-}
-
 func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *ResourceMap) *api.TCPRouteConfigEntry {
 	namespace := t.Namespace(route.Namespace)
 
