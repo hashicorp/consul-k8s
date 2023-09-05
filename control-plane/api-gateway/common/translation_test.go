@@ -34,10 +34,6 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
-const (
-	ConsulHashicorpGroup = "consul.hashicorp.com/v1alpha1"
-)
-
 type fakeReferenceValidator struct{}
 
 func (v fakeReferenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
@@ -1083,7 +1079,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											BackendObjectReference: gwv1beta1.BackendObjectReference{
 												Name:      "some-service-part-three",
 												Namespace: PointerTo(gwv1beta1.Namespace("svc-ns")),
-												Group:     PointerTo(gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup)),
+												Group:     PointerTo(gwv1beta1.Group(v1alpha1.GroupVersion.String())),
 												Kind:      PointerTo(gwv1beta1.Kind(v1alpha1.MeshServiceKind)),
 											},
 										},
@@ -1272,21 +1268,21 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										ExtensionRef: &gwv1beta1.LocalObjectReference{
 											Name:  "test",
 											Kind:  v1alpha1.RouteRetryFilterKind,
-											Group: ConsulHashicorpGroup,
+											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
 										},
 									},
 									{
 										ExtensionRef: &gwv1beta1.LocalObjectReference{
 											Name:  "test-timeout-filter",
 											Kind:  v1alpha1.RouteTimeoutFilterKind,
-											Group: ConsulHashicorpGroup,
+											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
 										},
 									},
 									{
 										ExtensionRef: &gwv1beta1.LocalObjectReference{
 											Name:  "test-jwt-filter",
 											Kind:  v1alpha1.RouteAuthFilterKind,
-											Group: ConsulHashicorpGroup,
+											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
 										},
 									},
 								},
