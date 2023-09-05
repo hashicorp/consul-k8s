@@ -9,7 +9,7 @@ env:
   CONTEXT: "pr"
   SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
-#make another changes
+#make another change, man
 jobs:
   test:
     name: test
