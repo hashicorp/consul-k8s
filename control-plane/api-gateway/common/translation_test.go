@@ -511,6 +511,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							},
 							URLRewrite: &api.URLRewrite{Path: "v1"},
 						},
+						ResponseFilters: api.HTTPResponseFilters{
+							Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+						},
 						Matches: []api.HTTPMatch{
 							{
 								Headers: []api.HTTPHeaderMatch{
@@ -536,8 +539,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 						},
 						Services: []api.HTTPService{
 							{
-								Name:   "service one",
-								Weight: 45,
+								Name:      "service one",
+								Namespace: "other",
 								Filters: api.HTTPFilters{
 									Headers: []api.HTTPHeaderFilter{
 										{
@@ -555,7 +558,10 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Path: "path",
 									},
 								},
-								Namespace: "other",
+								ResponseFilters: api.HTTPResponseFilters{
+									Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+								},
+								Weight: 45,
 							},
 						},
 					},
@@ -715,6 +721,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								},
 							},
 						},
+						ResponseFilters: api.HTTPResponseFilters{
+							Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+						},
 						Matches: []api.HTTPMatch{
 							{
 								Headers: []api.HTTPHeaderMatch{
@@ -740,8 +749,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 						},
 						Services: []api.HTTPService{
 							{
-								Name:   "service one",
-								Weight: 45,
+								Name:      "service one",
+								Namespace: "some ns",
 								Filters: api.HTTPFilters{
 									Headers: []api.HTTPHeaderFilter{
 										{
@@ -759,7 +768,10 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Path: "path",
 									},
 								},
-								Namespace: "some ns",
+								ResponseFilters: api.HTTPResponseFilters{
+									Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+								},
+								Weight: 45,
 							},
 						},
 					},
@@ -927,6 +939,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							},
 							URLRewrite: &api.URLRewrite{Path: "v1"},
 						},
+						ResponseFilters: api.HTTPResponseFilters{
+							Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+						},
 						Matches: []api.HTTPMatch{
 							{
 								Headers: []api.HTTPHeaderMatch{
@@ -952,8 +967,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 						},
 						Services: []api.HTTPService{
 							{
-								Name:   "service one",
-								Weight: 45,
+								Name:      "service one",
+								Namespace: "some ns",
 								Filters: api.HTTPFilters{
 									Headers: []api.HTTPHeaderFilter{
 										{
@@ -971,7 +986,10 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Path: "path",
 									},
 								},
-								Namespace: "some ns",
+								ResponseFilters: api.HTTPResponseFilters{
+									Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+								},
+								Weight: 45,
 							},
 						},
 					},
@@ -1153,6 +1171,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							},
 							URLRewrite: &api.URLRewrite{Path: "v1"},
 						},
+						ResponseFilters: api.HTTPResponseFilters{
+							Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+						},
 						Matches: []api.HTTPMatch{
 							{
 								Headers: []api.HTTPHeaderMatch{
@@ -1177,10 +1198,17 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							},
 						},
 						Services: []api.HTTPService{
-							{Name: "some-override", Namespace: "svc-ns", Weight: 1, Filters: api.HTTPFilters{Headers: []api.HTTPHeaderFilter{{Add: make(map[string]string), Set: make(map[string]string)}}}},
 							{
-								Name:   "service one",
-								Weight: 45,
+								Name:      "some-override",
+								Namespace: "svc-ns",
+								Weight:    1,
+								Filters:   api.HTTPFilters{Headers: []api.HTTPHeaderFilter{{Add: make(map[string]string), Set: make(map[string]string)}}},
+								ResponseFilters: api.HTTPResponseFilters{
+									Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+								}},
+							{
+								Name:      "service one",
+								Namespace: "some ns",
 								Filters: api.HTTPFilters{
 									Headers: []api.HTTPHeaderFilter{
 										{
@@ -1198,7 +1226,10 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Path: "path",
 									},
 								},
-								Namespace: "some ns",
+								ResponseFilters: api.HTTPResponseFilters{
+									Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+								},
+								Weight: 45,
 							},
 						},
 					},
@@ -1349,6 +1380,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								RetryOnConnectFailure: pointer.Bool(false),
 							},
 						},
+						ResponseFilters: api.HTTPResponseFilters{
+							Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
+						},
 						Matches: []api.HTTPMatch{
 							{
 								Headers: []api.HTTPHeaderMatch{
@@ -1384,6 +1418,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										RetryOnStatusCodes:    []uint32{500, 502},
 										RetryOnConnectFailure: pointer.Bool(false),
 									},
+								},
+								ResponseFilters: api.HTTPResponseFilters{
+									Headers: []api.HTTPHeaderFilter{{Add: map[string]string{}, Set: map[string]string{}}},
 								},
 								Namespace: "other",
 							},
@@ -1603,10 +1640,11 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 		filters []gwv1beta1.HTTPRouteFilter
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   api.HTTPFilters
+		name                string
+		fields              fields
+		args                args
+		want                api.HTTPFilters
+		wantResponseFilters api.HTTPResponseFilters
 	}{
 		{
 			name:   "no httproutemodifier set",
@@ -1627,6 +1665,14 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 				},
 				URLRewrite: nil,
 			},
+			wantResponseFilters: api.HTTPResponseFilters{
+				Headers: []api.HTTPHeaderFilter{
+					{
+						Add: map[string]string{},
+						Set: map[string]string{},
+					},
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -1639,7 +1685,9 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 				ConsulPartition:        tt.fields.ConsulPartition,
 				Datacenter:             tt.fields.Datacenter,
 			}
-			assert.Equalf(t1, tt.want, t.translateHTTPFilters(tt.args.filters, nil, ""), "translateHTTPFilters(%v)", tt.args.filters)
+			requestHeaders, responseHeaders := t.translateHTTPFilters(tt.args.filters, nil, "")
+			assert.Equalf(t1, tt.want, requestHeaders, "translateHTTPFilters(%v)", tt.args.filters)
+			assert.Equalf(t1, tt.wantResponseFilters, responseHeaders, "translateHTTPFilters(%v)", tt.args.filters)
 		})
 	}
 }

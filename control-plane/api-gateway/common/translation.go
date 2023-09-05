@@ -178,12 +178,13 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 	}
 
 	matches := ConvertSliceFunc(rule.Matches, t.translateHTTPMatch)
-	filters := t.translateHTTPFilters(rule.Filters, resources, route.Namespace)
+	filters, responseFilters := t.translateHTTPFilters(rule.Filters, resources, route.Namespace)
 
 	return api.HTTPRouteRule{
-		Services: services,
-		Matches:  matches,
-		Filters:  filters,
+		Filters:         filters,
+		Matches:         matches,
+		ResponseFilters: responseFilters,
+		Services:        services,
 	}, true
 }
 
@@ -196,28 +197,30 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
 
 	if isServiceRef && resources.HasService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
 		service := resources.Service(id)
 		return api.HTTPService{
-			Name:      service.Name,
-			Namespace: service.Namespace,
-			Partition: t.ConsulPartition,
-			Filters:   filters,
-			Weight:    DerefIntOr(ref.Weight, 1),
+			Name:            service.Name,
+			Namespace:       service.Namespace,
+			Partition:       t.ConsulPartition,
+			Filters:         filters,
+			ResponseFilters: responseFilters,
+			Weight:          DerefIntOr(ref.Weight, 1),
 		}, true
 	}
 
 	isMeshServiceRef := DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && DerefEqual(ref.Kind, v1alpha1.MeshServiceKind)
 	if isMeshServiceRef && resources.HasMeshService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
 		service := resources.MeshService(id)
 
 		return api.HTTPService{
-			Name:      service.Name,
-			Namespace: service.Namespace,
-			Partition: t.ConsulPartition,
-			Filters:   filters,
-			Weight:    DerefIntOr(ref.Weight, 1),
+			Name:            service.Name,
+			Namespace:       service.Namespace,
+			Partition:       t.ConsulPartition,
+			Filters:         filters,
+			ResponseFilters: responseFilters,
+			Weight:          DerefIntOr(ref.Weight, 1),
 		}, true
 	}
 
@@ -275,15 +278,24 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 	}
 }
 
-func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) api.HTTPFilters {
+func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters) {
 	var urlRewrite *api.URLRewrite
+	// TODO Consider only setting a filter on the resulting Consul config entry
+	//   if we encounter a gwb1beta1.HTTPRouteFilter that requires it
 	consulFilter := api.HTTPHeaderFilter{
+		Add: make(map[string]string),
+		Set: make(map[string]string),
+	}
+	consulResponseFilter := api.HTTPHeaderFilter{
 		Add: make(map[string]string),
 		Set: make(map[string]string),
 	}
 	var retryFilter *api.RetryFilter
 	var timeoutFilter *api.TimeoutFilter
 
+	// Convert Gateway API filters to portions of the Consul request and response filters.
+	// Multiple filters applying the same or conflicting operations are allowed but may
+	// result in unexpected behavior.
 	for _, filter := range filters {
 		if filter.RequestHeaderModifier != nil {
 			consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
@@ -294,6 +306,18 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 
 			for _, toSet := range filter.RequestHeaderModifier.Set {
 				consulFilter.Set[string(toSet.Name)] = toSet.Value
+			}
+		}
+
+		if filter.ResponseHeaderModifier != nil {
+			consulResponseFilter.Remove = append(consulResponseFilter.Remove, filter.ResponseHeaderModifier.Remove...)
+
+			for _, toAdd := range filter.ResponseHeaderModifier.Add {
+				consulResponseFilter.Add[string(toAdd.Name)] = toAdd.Value
+			}
+
+			for _, toSet := range filter.ResponseHeaderModifier.Set {
+				consulResponseFilter.Set[string(toSet.Name)] = toSet.Value
 			}
 		}
 
@@ -338,12 +362,19 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		}
 
 	}
-	return api.HTTPFilters{
+
+	requestFilter := api.HTTPFilters{
 		Headers:       []api.HTTPHeaderFilter{consulFilter},
 		URLRewrite:    urlRewrite,
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
 	}
+
+	responseFilter := api.HTTPResponseFilters{
+		Headers: []api.HTTPHeaderFilter{consulResponseFilter},
+	}
+
+	return requestFilter, responseFilter
 }
 
 func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *ResourceMap) *api.TCPRouteConfigEntry {
