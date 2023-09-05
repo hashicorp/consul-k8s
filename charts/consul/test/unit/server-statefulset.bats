@@ -945,6 +945,32 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# server.locality.enabled = true
+
+@test "server/StatefulSet: server locality enabled by default" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      . | tee /dev/stderr)
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "locality-init")) | .[0].name')
+  [ "$actual" == "locality-init" ]
+}
+
+#--------------------------------------------------------------------
+
+# server.locality.enabled = false
+
+@test "server/StatefulSet: server locality disabled" {
+  cd `chart_dir`
+  local manifest=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.locality.enabled=false' \
+      . | tee /dev/stderr)
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "locality-init"))')
+  [ "$actual" == "[]" ]
+}
+
+#--------------------------------------------------------------------
 # gossip encryption
 
 @test "server/StatefulSet: gossip encryption disabled in server StatefulSet by default" {
