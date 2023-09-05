@@ -9,6 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/hashicorp/go-uuid"
+	"github.com/stretchr/testify/require"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -16,10 +21,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/hashicorp/go-uuid"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -104,6 +105,7 @@ func TestController(t *testing.T) {
 					svcDefaultEntry, ok := entry.(*api.ServiceConfigEntry)
 					require.True(r, ok, "could not cast to ServiceConfigEntry")
 					require.Equal(r, "http", svcDefaultEntry.Protocol)
+					require.Equal(r, 1234, svcDefaultEntry.RateLimits.InstanceLevel.RequestsPerSecond)
 
 					// service-resolver
 					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)
@@ -232,8 +234,6 @@ func TestController(t *testing.T) {
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.KV.WriteRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.ReadRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.WriteRate)
-					//require.Equal(r, 100.0, rateLimitIPConfigEntry.PreparedQuery.ReadRate)
-					//require.Equal(r, 100.0, rateLimitIPConfigEntry.PreparedQuery.WriteRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.ReadRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.WriteRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.ReadRate)

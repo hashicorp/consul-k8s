@@ -12,8 +12,10 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/google/go-cmp v0.5.9
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul/api v1.10.1-0.20230821180813-217d305b38d5
-	github.com/hashicorp/consul/proto-public v0.1.2-0.20230829221456-f8812eddf1ef // this points to a commit on Consul main
+	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230825213844-4ea04860c5ed
+	github.com/hashicorp/consul-server-connection-manager v0.1.4
+	github.com/hashicorp/consul/api v1.10.1-0.20230825164720-ecdcde430924
+	github.com/hashicorp/consul/proto-public v0.1.2-0.20230829221456-f8812eddf1ef
 	github.com/hashicorp/consul/sdk v0.14.1
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
@@ -35,6 +37,8 @@ require (
 	golang.org/x/text v0.11.0
 	golang.org/x/time v0.3.0
 	gomodules.xyz/jsonpatch/v2 v2.3.0
+	google.golang.org/grpc v1.55.0
+	google.golang.org/protobuf v1.30.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.26.3
 	k8s.io/apimachinery v0.26.3
@@ -43,13 +47,6 @@ require (
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/controller-runtime v0.14.6
 	sigs.k8s.io/gateway-api v0.7.1
-)
-
-require (
-	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230825213844-4ea04860c5ed
-	github.com/hashicorp/consul-server-connection-manager v0.1.4
-	google.golang.org/grpc v1.55.0
-	google.golang.org/protobuf v1.30.0
 )
 
 require (

@@ -31,6 +31,18 @@ spec:
         interval: 10s
         maxFailures: 2
   balanceInboundConnections: "exact_balance"
+  rateLimits:
+    instanceLevel:
+      requestsPerSecond: 1234
+      requestsMaxBurst: 2345
+      routes:
+        - pathExact: "/exact"
+          requestsPerSecond: 222
+          requestsMaxBurst: 333
+        - pathPrefix: "/prefix"
+          requestsPerSecond: 444
+        - pathRegex: "/regex"
+          requestsPerSecond: 555
   envoyExtensions:
     - name: builtin/aws/lambda
       required: false

@@ -160,6 +160,23 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						},
 					},
 					BalanceInboundConnections: "exact_balance",
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsPerSecond: 1234,
+							RequestsMaxBurst:  2345,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathExact:         "/foo",
+									RequestsPerSecond: 111,
+									RequestsMaxBurst:  222,
+								},
+								{
+									PathPrefix:        "/admin",
+									RequestsPerSecond: 333,
+								},
+							},
+						},
+					},
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
@@ -288,6 +305,23 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					},
 				},
 				BalanceInboundConnections: "exact_balance",
+				RateLimits: &capi.RateLimits{
+					InstanceLevel: capi.InstanceLevelRateLimits{
+						RequestsPerSecond: 1234,
+						RequestsMaxBurst:  2345,
+						Routes: []capi.InstanceLevelRouteRateLimits{
+							{
+								PathExact:         "/foo",
+								RequestsPerSecond: 111,
+								RequestsMaxBurst:  222,
+							},
+							{
+								PathPrefix:        "/admin",
+								RequestsPerSecond: 333,
+							},
+						},
+					},
+				},
 				EnvoyExtensions: []capi.EnvoyExtension{
 					{
 						Name: "aws_request_signing",
@@ -559,6 +593,23 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						},
 					},
 					BalanceInboundConnections: "exact_balance",
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsPerSecond: 1234,
+							RequestsMaxBurst:  2345,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathExact:         "/foo",
+									RequestsPerSecond: 111,
+									RequestsMaxBurst:  222,
+								},
+								{
+									PathPrefix:        "/admin",
+									RequestsPerSecond: 333,
+								},
+							},
+						},
+					},
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
@@ -680,6 +731,23 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					},
 				},
 				BalanceInboundConnections: "exact_balance",
+				RateLimits: &capi.RateLimits{
+					InstanceLevel: capi.InstanceLevelRateLimits{
+						RequestsPerSecond: 1234,
+						RequestsMaxBurst:  2345,
+						Routes: []capi.InstanceLevelRouteRateLimits{
+							{
+								PathExact:         "/foo",
+								RequestsPerSecond: 111,
+								RequestsMaxBurst:  222,
+							},
+							{
+								PathPrefix:        "/admin",
+								RequestsPerSecond: 333,
+							},
+						},
+					},
+				},
 				EnvoyExtensions: []capi.EnvoyExtension{
 					{
 						Name: "aws_request_signing",
@@ -1328,6 +1396,152 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.envoyExtensions.envoyExtension[0].arguments: Invalid value: "{\"SOME_INVALID_JSON\"}": must be valid map value: invalid character '}' after object key`,
+		},
+		"rateLimits.instanceLevel.requestsPerSecond (negative value)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsPerSecond: -1,
+							RequestsMaxBurst:  0,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathPrefix:        "/admin",
+									RequestsPerSecond: 222,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.requestsPerSecond: Invalid value: -1: RequestsPerSecond must be positive`,
+		},
+		"rateLimits.instanceLevel.requestsPerSecond (invalid value)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsMaxBurst: 1000,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathPrefix:        "/admin",
+									RequestsPerSecond: 222,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.requestsPerSecond: Invalid value: 0: RequestsPerSecond must be greater than 0 if RequestsMaxBurst is set`,
+		},
+		"rateLimits.instanceLevel.requestsMaxBurst (negative value)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsMaxBurst: -1,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathPrefix:        "/admin",
+									RequestsPerSecond: 222,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.requestsMaxBurst: Invalid value: -1: RequestsMaxBurst must be positive`,
+		},
+		"rateLimits.instanceLevel.routes (invalid path)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsPerSecond: 1234,
+							RequestsMaxBurst:  2345,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									RequestsPerSecond: 222,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.routes[0]: Required value: Route must define exactly one of PathExact, PathPrefix, or PathRegex`,
+		},
+		"rateLimits.instanceLevel.routes.requestsPerSecond (zero value)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsPerSecond: 1234,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathExact: "/",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.routes[0].requestsPerSecond: Invalid value: 0: RequestsPerSecond must be greater than 0`,
+		},
+		"rateLimits.instanceLevel.routes.requestsMaxBurst (negative value)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							RequestsPerSecond: 1234,
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathExact:         "/",
+									RequestsPerSecond: 222,
+									RequestsMaxBurst:  -1,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.routes[0].requestsMaxBurst: Invalid value: -1: RequestsMaxBurst must be positive`,
+		},
+		"rateLimits.requestsMaxBurst (top-level and route-level unset)": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					RateLimits: &RateLimits{
+						InstanceLevel: InstanceLevelRateLimits{
+							Routes: []InstanceLevelRouteRateLimits{
+								{
+									PathExact: "/",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.rateLimits.instanceLevel.routes[0].requestsPerSecond: Invalid value: 0: RequestsPerSecond must be greater than 0, spec.rateLimits.instanceLevel.requestsPerSecond: Invalid value: 0: At least one of top-level or route-level RequestsPerSecond must be set]`,
 		},
 	}
 
