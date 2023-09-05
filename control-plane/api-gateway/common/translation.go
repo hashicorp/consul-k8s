@@ -164,18 +164,12 @@ func (t ResourceTranslator) translateRouteTimeoutFilter(routeTimeoutFilter *v1al
 }
 
 func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.RouteAuthFilter) *api.JWTFilter {
-	if routeJWTFilter.Spec.JWT == nil || routeJWTFilter.Spec.JWT.Providers == nil {
+	if routeJWTFilter.Spec.JWT == nil {
 		return nil
 	}
 
-	// For each provider, translate the claims to the Consul config entry format.
-	providers := make([]*api.APIGatewayJWTProvider, 0, len(routeJWTFilter.Spec.JWT.Providers))
-	for _, provider := range routeJWTFilter.Spec.JWT.Providers {
-		providers = append(providers, t.translateJWTProvider(provider))
-	}
-
 	return &api.JWTFilter{
-		Providers: providers,
+		Providers: ConvertSliceFunc(routeJWTFilter.Spec.JWT.Providers, t.translateJWTProvider),
 	}
 }
 
