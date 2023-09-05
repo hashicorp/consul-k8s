@@ -967,7 +967,7 @@ load _helpers
       --set 'server.locality.enabled=false' \
       . | tee /dev/stderr)
   local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "locality-init"))')
-  [ "$actual" == "[]" ]
+  [ $actual == [] ]
 }
 
 #--------------------------------------------------------------------
