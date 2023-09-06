@@ -80,7 +80,7 @@ type ProxyDefaultsSpec struct {
 	MutualTLSMode MutualTLSMode `json:"mutualTLSMode,omitempty"`
 	// Config is an arbitrary map of configuration values used by Connect proxies.
 	// Any values that your proxy allows can be configured globally here.
-	// Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
+	// Supports JSON config values. See https://developer.hashicorp.com/consul/docs/connect/proxies/envoy#configuration-formatting
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:pruning:PreserveUnknownFields
