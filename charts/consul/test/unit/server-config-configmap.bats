@@ -716,7 +716,7 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "server/ConfigMap: set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is blank but connectCA.additionalConfig is blank" {
+@test "server/ConfigMap: set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is not blank and connectCA.additionalConfig is blank" {
   cd `chart_dir`
 
   local actual=$(helm template \
