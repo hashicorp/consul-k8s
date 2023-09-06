@@ -721,7 +721,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 3714bf1fbca840dcd10b5aeb40c6ef35e349bd534727abe80b831c77f88da7da ]
+  [ "${actual}" = dc165411861bb45d37e20a0a337697336f333407f5fb29fca9252cdba652339c ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -731,7 +731,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 87126fac3c7704fba1d4265201ad0345f4d972d2123df6e6fb416b40c5823d80 ]
+  [ "${actual}" = d69874f33a862f6728265246a3e38b3f64702e013ecd4afc5dcdc33d34a66954 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -741,7 +741,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = d98ff135c5dee661058f33e29970675761ecf235676db0d4d24f354908eee425 ]
+  [ "${actual}" = 95a3d3b4816a0f183b8a9aac41ff386e659cd2a465f3030f01c5c4a2b9052a6c ]
 }
 
 #--------------------------------------------------------------------
@@ -881,9 +881,11 @@ load _helpers
 #--------------------------------------------------------------------
 # global.openshift.enabled
 
-@test "server/StatefulSet: restricted container securityContexts are set when global.openshift.enabled=true" {
+@test "server/StatefulSet: restricted container securityContexts are set when global.openshift.enabled=true on OpenShift >= 4.11" {
   cd `chart_dir`
+  # OpenShift 4.11 == Kube 1.24
   local manifest=$(helm template \
+      --kube-version '1.24' \
       -s templates/server-statefulset.yaml  \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr)
@@ -904,11 +906,20 @@ load _helpers
   local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
   local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
   [ "$equal" == "true" ]
+}
 
-  # Check locality-init container
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "locality-init")) | .[0].securityContext')
-  local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
-  [ "$equal" == "true" ]
+@test "server/StatefulSet: restricted container securityContexts are not set when global.openshift.enabled=true on OpenShift < 4.11" {
+  cd `chart_dir`
+  # OpenShift 4.11 == Kube 1.24
+  local manifest=$(helm template \
+      --kube-version '1.23' \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.openshift.enabled=true' \
+      . | tee /dev/stderr)
+
+  # Check consul container
+  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
+  [ "$actual" == "null" ]
 }
 
 #--------------------------------------------------------------------
@@ -935,11 +946,6 @@ load _helpers
 
   # Check consul container
   local actual=$(echo "$manifest" | yq -r '.spec.template.spec.containers | map(select(.name == "consul")) | .[0].securityContext')
-  local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
-  [ "$equal" == "true" ]
-
-  # Check locality-init container
-  local actual=$(echo "$manifest" | yq -r '.spec.template.spec.initContainers | map(select(.name == "locality-init")) | .[0].securityContext')
   local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
   [ "$equal" == "true" ]
 }
@@ -2931,33 +2937,5 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'server.snapshotAgent.interval=10h34m5s' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[1].command[2] | contains("-interval=10h34m5s")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# global.experiments=["resource-apis"]
-
-@test "server/StatefulSet: experiments=[\"resource-apis\"] is not set in command when global.experiments is empty" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      . | tee /dev/stderr)
-
-  # Test the flag is set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"experiments=[\\\"resource-apis\\\"]\""))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/StatefulSet: experiments=[\"resource-apis\"] is set in command when global.experiments contains \"resource-apis\"" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'ui.enabled=false' \
-      . | tee /dev/stderr)
-
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"experiments=[\\\"resource-apis\\\"]\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

@@ -1,21 +1,18 @@
 {{- if .Values.connectInject.enabled }}
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: exportedservices.consul.hashicorp.com
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
-  name: exportedservices.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -79,12 +76,8 @@ spec:
                               the service to.
                             type: string
                           peer:
-                            description: Peer is the name of the peer to export the
-                              service to.
-                            type: string
-                          samenessGroup:
-                            description: SamenessGroup is the name of the sameness
-                              group to export the service to.
+                            description: '[Experimental] Peer is the name of the peer
+                              to export the service to.'
                             type: string
                         type: object
                       type: array

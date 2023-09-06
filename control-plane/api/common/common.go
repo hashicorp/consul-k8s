@@ -1,22 +1,16 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 // Package common holds code that isn't tied to a particular CRD version or type.
 package common
 
 const (
-	ServiceDefaults          string = "servicedefaults"
-	ProxyDefaults            string = "proxydefaults"
-	ServiceResolver          string = "serviceresolver"
-	ServiceRouter            string = "servicerouter"
-	ServiceSplitter          string = "servicesplitter"
-	ServiceIntentions        string = "serviceintentions"
-	ExportedServices         string = "exportedservices"
-	IngressGateway           string = "ingressgateway"
-	TerminatingGateway       string = "terminatinggateway"
-	SamenessGroup            string = "samenessgroup"
-	JWTProvider              string = "jwtprovider"
-	ControlPlaneRequestLimit string = "controlplanerequestlimit"
+	ServiceDefaults    string = "servicedefaults"
+	ProxyDefaults      string = "proxydefaults"
+	ServiceResolver    string = "serviceresolver"
+	ServiceRouter      string = "servicerouter"
+	ServiceSplitter    string = "servicesplitter"
+	ServiceIntentions  string = "serviceintentions"
+	ExportedServices   string = "exportedservices"
+	IngressGateway     string = "ingressgateway"
+	TerminatingGateway string = "terminatinggateway"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"

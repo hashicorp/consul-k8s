@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 function hashicorp_release {
    # Arguments:
    #   $1 - Path to directory containing all of the release artifacts

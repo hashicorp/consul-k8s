@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -11,16 +8,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	capi "github.com/hashicorp/consul/api"
 	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-
-	capi "github.com/hashicorp/consul/api"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 const (
@@ -75,17 +70,6 @@ type ServiceDefaultsSpec struct {
 	// Note: This cannot be set using the CRD and should be set using annotations on the
 	// services that are part of the mesh.
 	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
-	// MutualTLSMode controls whether mutual TLS is required for all incoming
-	// connections when transparent proxy is enabled. This can be set to
-	// "permissive" or "strict". "strict" is the default which requires mutual
-	// TLS for incoming connections. In the insecure "permissive" mode,
-	// connections to the sidecar proxy public listener port require mutual
-	// TLS, but connections to the service port do not require mutual TLS and
-	// are proxied to the application unmodified. Note: Intentions are not
-	// enforced for non-mTLS connections. To keep your services secure, we
-	// recommend using "strict" mode whenever possible and enabling
-	// "permissive" mode only when necessary.
-	MutualTLSMode MutualTLSMode `json:"mutualTLSMode,omitempty"`
 	// MeshGateway controls the default mesh gateway configuration for this service.
 	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
@@ -116,9 +100,6 @@ type ServiceDefaultsSpec struct {
 	// proxy threads. The only supported value is exact_balance. By default, no connection balancing is used.
 	// Refer to the Envoy Connection Balance config for details.
 	BalanceInboundConnections string `json:"balanceInboundConnections,omitempty"`
-	// RateLimits is rate limiting configuration that is applied to
-	// inbound traffic for a service. Rate limiting is a Consul enterprise feature.
-	RateLimits *RateLimits `json:"rateLimits,omitempty"`
 	// EnvoyExtensions are a list of extensions to modify Envoy proxy configuration.
 	EnvoyExtensions EnvoyExtensions `json:"envoyExtensions,omitempty"`
 }
@@ -220,150 +201,6 @@ type ServiceDefaultsDestination struct {
 	Port uint32 `json:"port,omitempty"`
 }
 
-// RateLimits is rate limiting configuration that is applied to
-// inbound traffic for a service.
-// Rate limiting is a Consul Enterprise feature.
-type RateLimits struct {
-	// InstanceLevel represents rate limit configuration
-	// that is applied per service instance.
-	InstanceLevel InstanceLevelRateLimits `json:"instanceLevel,omitempty"`
-}
-
-func (rl *RateLimits) toConsul() *capi.RateLimits {
-	if rl == nil {
-		return nil
-	}
-	routes := make([]capi.InstanceLevelRouteRateLimits, len(rl.InstanceLevel.Routes))
-	for i, r := range rl.InstanceLevel.Routes {
-		routes[i] = capi.InstanceLevelRouteRateLimits{
-			PathExact:         r.PathExact,
-			PathPrefix:        r.PathPrefix,
-			PathRegex:         r.PathRegex,
-			RequestsPerSecond: r.RequestsPerSecond,
-			RequestsMaxBurst:  r.RequestsMaxBurst,
-		}
-	}
-	return &capi.RateLimits{
-		InstanceLevel: capi.InstanceLevelRateLimits{
-			RequestsPerSecond: rl.InstanceLevel.RequestsPerSecond,
-			RequestsMaxBurst:  rl.InstanceLevel.RequestsMaxBurst,
-			Routes:            routes,
-		},
-	}
-}
-
-func (rl *RateLimits) validate(path *field.Path) field.ErrorList {
-	if rl == nil {
-		return nil
-	}
-
-	return rl.InstanceLevel.validate(path.Child("instanceLevel"))
-}
-
-type InstanceLevelRateLimits struct {
-	// RequestsPerSecond is the average number of requests per second that can be
-	// made without being throttled. This field is required if RequestsMaxBurst
-	// is set. The allowed number of requests may exceed RequestsPerSecond up to
-	// the value specified in RequestsMaxBurst.
-	//
-	// Internally, this is the refill rate of the token bucket used for rate limiting.
-	RequestsPerSecond int `json:"requestsPerSecond,omitempty"`
-
-	// RequestsMaxBurst is the maximum number of requests that can be sent
-	// in a burst. Should be equal to or greater than RequestsPerSecond.
-	// If unset, defaults to RequestsPerSecond.
-	//
-	// Internally, this is the maximum size of the token bucket used for rate limiting.
-	RequestsMaxBurst int `json:"requestsMaxBurst,omitempty"`
-
-	// Routes is a list of rate limits applied to specific routes.
-	// For a given request, the first matching route will be applied, if any.
-	// Overrides any top-level configuration.
-	Routes []InstanceLevelRouteRateLimits `json:"routes,omitempty"`
-}
-
-func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-
-	// Track if RequestsPerSecond is set in at least one place in the config
-	isRateLimitSet := irl.RequestsPerSecond > 0
-
-	// Top-level RequestsPerSecond can be 0 (unset) or a positive number.
-	if irl.RequestsPerSecond < 0 {
-		allErrs = append(allErrs,
-			field.Invalid(path.Child("requestsPerSecond"),
-				irl.RequestsPerSecond,
-				"RequestsPerSecond must be positive"))
-	}
-
-	if irl.RequestsPerSecond == 0 && irl.RequestsMaxBurst > 0 {
-		allErrs = append(allErrs,
-			field.Invalid(path.Child("requestsPerSecond"),
-				irl.RequestsPerSecond,
-				"RequestsPerSecond must be greater than 0 if RequestsMaxBurst is set"))
-	}
-
-	if irl.RequestsMaxBurst < 0 {
-		allErrs = append(allErrs,
-			field.Invalid(path.Child("requestsMaxBurst"),
-				irl.RequestsMaxBurst,
-				"RequestsMaxBurst must be positive"))
-	}
-
-	for i, route := range irl.Routes {
-		if exact, prefix, regex := route.PathExact != "", route.PathPrefix != "", route.PathRegex != ""; (!exact && !prefix && !regex) ||
-			(exact && prefix) || (exact && regex) || (prefix && regex) {
-			allErrs = append(allErrs, field.Required(
-				path.Child("routes").Index(i),
-				"Route must define exactly one of PathExact, PathPrefix, or PathRegex"))
-		}
-
-		isRateLimitSet = isRateLimitSet || route.RequestsPerSecond > 0
-
-		// Unlike top-level RequestsPerSecond, any route MUST have a RequestsPerSecond defined.
-		if route.RequestsPerSecond <= 0 {
-			allErrs = append(allErrs, field.Invalid(
-				path.Child("routes").Index(i).Child("requestsPerSecond"),
-				route.RequestsPerSecond, "RequestsPerSecond must be greater than 0"))
-		}
-
-		if route.RequestsMaxBurst < 0 {
-			allErrs = append(allErrs, field.Invalid(
-				path.Child("routes").Index(i).Child("requestsMaxBurst"),
-				route.RequestsMaxBurst, "RequestsMaxBurst must be positive"))
-		}
-	}
-
-	if !isRateLimitSet {
-		allErrs = append(allErrs, field.Invalid(
-			path.Child("requestsPerSecond"),
-			irl.RequestsPerSecond, "At least one of top-level or route-level RequestsPerSecond must be set"))
-	}
-	return allErrs
-}
-
-type InstanceLevelRouteRateLimits struct {
-	// Exact path to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
-	PathExact string `json:"pathExact,omitempty"`
-	// Prefix to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
-	PathPrefix string `json:"pathPrefix,omitempty"`
-	// Regex to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
-	PathRegex string `json:"pathRegex,omitempty"`
-
-	// RequestsPerSecond is the average number of requests per
-	// second that can be made without being throttled. This field is required
-	// if RequestsMaxBurst is set. The allowed number of requests may exceed
-	// RequestsPerSecond up to the value specified in RequestsMaxBurst.
-	// Internally, this is the refill rate of the token bucket used for rate limiting.
-	RequestsPerSecond int `json:"requestsPerSecond,omitempty"`
-
-	// RequestsMaxBurst is the maximum number of requests that can be sent
-	// in a burst. Should be equal to or greater than RequestsPerSecond. If unset,
-	// defaults to RequestsPerSecond. Internally, this is the maximum size of the token
-	// bucket used for rate limiting.
-	RequestsMaxBurst int `json:"requestsMaxBurst,omitempty"`
-}
-
 func (in *ServiceDefaults) ConsulKind() string {
 	return capi.ServiceDefaults
 }
@@ -448,7 +285,6 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		Expose:                    in.Spec.Expose.toConsul(),
 		ExternalSNI:               in.Spec.ExternalSNI,
 		TransparentProxy:          in.Spec.TransparentProxy.toConsul(),
-		MutualTLSMode:             in.Spec.MutualTLSMode.toConsul(),
 		UpstreamConfig:            in.Spec.UpstreamConfig.toConsul(),
 		Destination:               in.Spec.Destination.toConsul(),
 		Meta:                      meta(datacenter),
@@ -456,7 +292,6 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		LocalConnectTimeoutMs:     in.Spec.LocalConnectTimeoutMs,
 		LocalRequestTimeoutMs:     in.Spec.LocalRequestTimeoutMs,
 		BalanceInboundConnections: in.Spec.BalanceInboundConnections,
-		RateLimits:                in.Spec.RateLimits.toConsul(),
 		EnvoyExtensions:           in.Spec.EnvoyExtensions.toConsul(),
 	}
 }
@@ -476,9 +311,6 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 	}
 	if err := in.Spec.TransparentProxy.validate(path.Child("transparentProxy")); err != nil {
 		allErrs = append(allErrs, err)
-	}
-	if err := in.Spec.MutualTLSMode.validate(); err != nil {
-		allErrs = append(allErrs, field.Invalid(path.Child("mutualTLSMode"), in.Spec.MutualTLSMode, err.Error()))
 	}
 	if err := in.Spec.Mode.validate(path.Child("mode")); err != nil {
 		allErrs = append(allErrs, err)
@@ -505,7 +337,6 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
-	allErrs = append(allErrs, in.Spec.RateLimits.validate(path.Child("rateLimits"))...)
 	allErrs = append(allErrs, in.Spec.EnvoyExtensions.validate(path.Child("envoyExtensions"))...)
 
 	if len(allErrs) > 0 {

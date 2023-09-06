@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package consul
 
 import (
@@ -8,10 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	capi "github.com/hashicorp/consul/api"
-
-	"github.com/hashicorp/consul-k8s/control-plane/version"
 )
 
 //go:generate mockery --name ServerConnectionManager --inpkg
@@ -21,7 +17,7 @@ type ServerConnectionManager interface {
 	Stop()
 }
 
-// NewClient returns a V1 Consul API client. It adds a required User-Agent
+// NewClient returns a Consul API client. It adds a required User-Agent
 // header that describes the version of consul-k8s making the call.
 func NewClient(config *capi.Config, consulAPITimeout time.Duration) (*capi.Client, error) {
 	if consulAPITimeout <= 0 {
@@ -70,7 +66,7 @@ type Config struct {
 }
 
 // todo (ishustava): replace all usages of this one.
-// NewClientFromConnMgrState creates a new V1 API client with an IP address from the state
+// NewClientFromConnMgrState creates a new API client with an IP address from the state
 // of the consul-server-connection-manager.
 func NewClientFromConnMgrState(config *Config, state discovery.State) (*capi.Client, error) {
 	ipAddress := state.Address.IP
@@ -81,7 +77,7 @@ func NewClientFromConnMgrState(config *Config, state discovery.State) (*capi.Cli
 	return NewClient(config.APIClientConfig, config.APITimeout)
 }
 
-// NewClientFromConnMgr creates a new V1 API client by first getting the state of the passed watcher.
+// NewClientFromConnMgr creates a new API client by first getting the state of the passed watcher.
 func NewClientFromConnMgr(config *Config, watcher ServerConnectionManager) (*capi.Client, error) {
 	// Create a new consul client.
 	serverState, err := watcher.State()

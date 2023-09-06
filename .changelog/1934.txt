@@ -1,3 +1,0 @@
-```release-note:improvement
-control-plane: update alpine to 3.17 in the Docker image.
-```
