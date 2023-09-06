@@ -696,7 +696,7 @@ load _helpers
 }
 
 
-@test "server/ConfigMap: set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is blank but connectCA.additionalConfig is not blank" {
+@test "server/ConfigMap: do not set Vault Namespace in connect CA config from global.secretsBackend.vault.vaultNamespace when also set in connectCA.additionalConfig" {
   cd `chart_dir`
 
   local actual=$(helm template \
