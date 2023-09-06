@@ -204,7 +204,11 @@ data:
               {{- if ne $k "name" }}
               {{- if ne $firstKeyValuePair false }},{{end}}
               {{- $firstKeyValuePair = true }}
+              {{- if or (eq $k "rotate_max_files") (eq $k "rotate_bytes") }}
+              "{{ $k }}": {{ $v }}
+              {{- else }}
               "{{ $k }}": "{{ $v }}"
+              {{- end }}
               {{- end }}
             {{- end }}
           }

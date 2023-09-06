@@ -1112,6 +1112,8 @@ load _helpers
       --set 'server.auditLogs.sinks[0].format=json' \
       --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
       --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].rotate_max_files=20' \
+      --set 'server.auditLogs.sinks[0].rotate_bytes=12455355' \
       --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
       . | tee /dev/stderr |
       yq -r '.data["audit-logging.json"]' | tee /dev/stderr)
@@ -1124,6 +1126,12 @@ load _helpers
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_duration | tee /dev/stderr)
   [ "${actual}" = "24h" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 20 ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_bytes | tee /dev/stderr)
+  [ ${actual} = 12455355 ]
 }
 
 @test "server/ConfigMap: server.auditLogs is enabled with 1 sink input object and it does not contain the name attribute" {
@@ -1137,6 +1145,8 @@ load _helpers
       --set 'server.auditLogs.sinks[0].format=json' \
       --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
       --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].rotate_max_files=20' \
+      --set 'server.auditLogs.sinks[0].rotate_bytes=12455355' \
       --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
       . | tee /dev/stderr |
       yq -r '.data["audit-logging.json"]' | jq -r .audit.sink.name | tee /dev/stderr)
@@ -1155,13 +1165,16 @@ load _helpers
       --set 'server.auditLogs.sinks[0].format=json' \
       --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
       --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].rotate_max_files=15' \
+      --set 'server.auditLogs.sinks[0].rotate_bytes=12445' \
       --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
       --set 'server.auditLogs.sinks[1].name=MySink2' \
       --set 'server.auditLogs.sinks[1].type=file' \
       --set 'server.auditLogs.sinks[1].format=json' \
       --set 'server.auditLogs.sinks[1].delivery_guarantee=best-effort' \
-      --set 'server.auditLogs.sinks[1].rotate_max_files=15' \
       --set 'server.auditLogs.sinks[1].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[1].rotate_max_files=25' \
+      --set 'server.auditLogs.sinks[1].rotate_bytes=152445' \
       --set 'server.auditLogs.sinks[1].path=/tmp/audit-2.json' \
       --set 'server.auditLogs.sinks[2].name=MySink3' \
       --set 'server.auditLogs.sinks[2].type=file' \
@@ -1169,6 +1182,7 @@ load _helpers
       --set 'server.auditLogs.sinks[2].delivery_guarantee=best-effort' \
       --set 'server.auditLogs.sinks[2].rotate_max_files=20' \
       --set 'server.auditLogs.sinks[2].rotate_duration=18h' \
+      --set 'server.auditLogs.sinks[2].rotate_bytes=12445' \
       --set 'server.auditLogs.sinks[2].path=/tmp/audit-3.json' \
       . | tee /dev/stderr |
       yq -r '.data["audit-logging.json"]' | tee /dev/stderr)
@@ -1185,17 +1199,26 @@ load _helpers
   local actual=$(echo $object |  jq -r .audit.sink.MySink1.name | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 15 ]
+
   local actual=$(echo $object |  jq -r .audit.sink.MySink3.delivery_guarantee | tee /dev/stderr)
   [ "${actual}" = "best-effort" ]
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink2.rotate_duration | tee /dev/stderr)
   [ "${actual}" = "24h" ]
 
+  local actual=$(echo $object |  jq -r .audit.sink.MySink2.rotate_bytes | tee /dev/stderr)
+  [ ${actual} = 152445 ]
+
   local actual=$(echo $object |  jq -r .audit.sink.MySink1.format | tee /dev/stderr)
   [ "${actual}" = "json" ]
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink3.type | tee /dev/stderr)
   [ "${actual}" = "file" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink3.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 20 ]
 }
 
 @test "server/ConfigMap: server.logLevel is empty" {
