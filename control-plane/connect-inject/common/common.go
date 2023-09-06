@@ -8,11 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // DetermineAndValidatePort behaves as follows:
@@ -91,26 +88,6 @@ func ShouldOverwriteProbes(pod corev1.Pod, globalOverwrite bool) (bool, error) {
 	}
 
 	return globalOverwrite, nil
-}
-
-// ShouldIgnore ignores namespaces where we don't mesh-inject.
-func ShouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
-	// Ignores system namespaces.
-	if namespace == metav1.NamespaceSystem || namespace == metav1.NamespacePublic || namespace == "local-path-storage" {
-		return true
-	}
-
-	// Ignores deny list.
-	if denySet.Contains(namespace) {
-		return true
-	}
-
-	// Ignores if not in allow list or allow list is not *.
-	if !allowSet.Contains("*") && !allowSet.Contains(namespace) {
-		return true
-	}
-
-	return false
 }
 
 func ConsulNodeNameFromK8sNode(nodeName string) string {

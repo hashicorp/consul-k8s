@@ -28,8 +28,6 @@ rules:
   - meshservices
   - samenessgroups
   - controlplanerequestlimits
-  - routeretryfilters
-  - routetimeoutfilters
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers

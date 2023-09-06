@@ -512,7 +512,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			r.Service.ID = serviceID(r.Service.Service, ip)
 			r.Service.Address = ip
 			// Adding information about service weight.
-			// Overrides the existing weight if present.
+			// Overrides the existing weight if present
 			if weight, ok := svc.Annotations[annotationServiceWeight]; ok && weight != "" {
 				weightI, err := getServiceWeight(weight)
 				if err == nil {
@@ -561,7 +561,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				r.Service.Address = addr
 
 				// Adding information about service weight.
-				// Overrides the existing weight if present.
+				// Overrides the existing weight if present
 				if weight, ok := svc.Annotations[annotationServiceWeight]; ok && weight != "" {
 					weightI, err := getServiceWeight(weight)
 					if err == nil {
@@ -1028,7 +1028,7 @@ func consulHealthCheckID(k8sNS string, serviceID string) string {
 
 // Calculates the passing service weight.
 func getServiceWeight(weight string) (int, error) {
-	// error validation if the input param is a number.
+	// error validation if the input param is a number
 	weightI, err := strconv.Atoi(weight)
 	if err != nil {
 		return -1, err

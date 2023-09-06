@@ -1189,7 +1189,7 @@ load _helpers
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink1.path | tee /dev/stderr)
   [ "${actual}" = "/tmp/audit.json" ]
-  
+
   local actual=$(echo $object |  jq -r .audit.sink.MySink3.path | tee /dev/stderr)
   [ "${actual}" = "/tmp/audit-3.json" ]
 

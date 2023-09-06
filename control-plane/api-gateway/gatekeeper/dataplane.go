@@ -11,7 +11,6 @@ import (
 	"k8s.io/utils/pointer"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -27,7 +26,7 @@ const (
 	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -100,10 +99,6 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 		Name:          "proxy-health",
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
-	// Configure the resource requests and limits for the proxy if they are set.
-	if gcc.Spec.DeploymentSpec.Resources != nil {
-		container.Resources = *gcc.Spec.DeploymentSpec.Resources
-	}
 
 	// If not running in an OpenShift environment,
 	// skip setting the security context and let OpenShift set it for us.

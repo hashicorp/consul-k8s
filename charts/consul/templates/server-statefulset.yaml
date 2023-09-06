@@ -248,7 +248,6 @@ spec:
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image }}"
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
@@ -420,9 +419,6 @@ spec:
                 -config-file=/consul/extra-config/locality.json
                 {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
                 -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
-                {{- end }}
-                {{- if (mustHas "resource-apis" .Values.global.experiments) }}
-                -hcl="experiments=[\"resource-apis\"]"
                 {{- end }}
           volumeMounts:
             - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}

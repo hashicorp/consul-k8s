@@ -7,12 +7,6 @@ const (
 	// ConsulCAFile is the location of the Consul CA file inside the injected pod.
 	ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
 
-	// DefaultConsulNS is the default Consul namespace name.
-	DefaultConsulNS = "default"
-
-	// DefaultConsulPartition is the default Consul partition name.
-	DefaultConsulPartition = "default"
-
 	// ProxyDefaultInboundPort is the default inbound port for the proxy.
 	ProxyDefaultInboundPort = 20000
 
