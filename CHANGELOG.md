@@ -1,4 +1,4 @@
-## 1.1.5- (September 6, 2023)
+## 1.1.5 (September 6, 2023)
 
 IMPROVEMENTS:
 
