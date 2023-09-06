@@ -1,5 +1,5 @@
 ```release-note:improvement
-vault: Adds `namespace` to `secretsBackend.vault.connectCA` in Helm chart and annotation: "vault.hashicorp.com/namespace: namespace" to
+vault: Adds `secretsBackend.vault.vaultNamespace` value to configure a new value `secretsBackend.vault.connectCA` in the Helm chart and used to append the following value "vault.hashicorp.com/namespace: namespace" to `secretsBackend.vault.agentAnnotations` 
 secretsBackend.vault.agentAnnotations if "vault.hashicorp.com/namespace" annotation is not present.
 This provides a more convenient way to specify the Vault namespace than nested JSON in `connectCA.additionalConfig`.
 ```
