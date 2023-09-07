@@ -85,6 +85,9 @@ type DeploymentSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// Minimum allowed number of gateway instances
 	MinInstances *int32 `json:"minInstances,omitempty"`
+
+	// Resources defines the resource requirements for the gateway.
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 //+kubebuilder:object:generate=true

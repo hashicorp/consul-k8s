@@ -5,9 +5,12 @@ package gatewayresources
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"os"
 	"sync"
 	"time"
 
@@ -19,7 +22,9 @@ import (
 	"github.com/mitchellh/cli"
 	yaml "gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -83,6 +88,7 @@ type Command struct {
 	nodeSelector       map[string]string
 	tolerations        []corev1.Toleration
 	serviceAnnotations []string
+	resources          corev1.ResourceRequirements
 
 	ctx context.Context
 }
@@ -152,6 +158,12 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	// Load config from the configmap.
+	if err := c.loadConfig(); err != nil {
+		c.UI.Error(fmt.Sprintf("Error loading config: %s", err))
+		return 1
+	}
+
 	if c.ctx == nil {
 		c.ctx = context.Background()
 	}
@@ -207,6 +219,7 @@ func (c *Command) Run(args []string) int {
 				DefaultInstances: nonZeroOrNil(c.flagDeploymentDefaultInstances),
 				MaxInstances:     nonZeroOrNil(c.flagDeploymentMaxInstances),
 				MinInstances:     nonZeroOrNil(c.flagDeploymentMinInstances),
+				Resources:        &c.resources,
 			},
 			OpenshiftSCCName:            c.flagOpenshiftSCCName,
 			MapPrivilegedContainerPorts: int32(c.flagMapPrivilegedContainerPorts),
@@ -288,6 +301,35 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
+func (c *Command) loadConfig() error {
+	// Load resources.json
+	file, err := os.Open("/consul/config/resources.json")
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		c.UI.Info("No resources.json found, using defaults")
+		c.resources = defaultResourceRequirements()
+		return nil
+	}
+
+	resources, err := io.ReadAll(file)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Unable to read resources.json, using defaults: %s", err))
+		c.resources = defaultResourceRequirements()
+		return err
+	}
+
+	if err := json.Unmarshal(resources, &c.resources); err != nil {
+		return err
+	}
+
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Command) Synopsis() string { return synopsis }
 func (c *Command) Help() string {
 	c.once.Do(c.init)
@@ -303,6 +345,20 @@ Usage: consul-k8s-control-plane gateway-resources [options]
 	dependencies of CRDs being in-place prior to resource creation.
 
 `
+
+func defaultResourceRequirements() v1.ResourceRequirements {
+	// This is a fallback. The resource.json file should be present unless explicitly removed.
+	return v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+			v1.ResourceCPU:    resource.MustParse("100m"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+			v1.ResourceCPU:    resource.MustParse("100m"),
+		},
+	}
+}
 
 func forceClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha1.GatewayClassConfig) error {
 	return backoff.Retry(func() error {

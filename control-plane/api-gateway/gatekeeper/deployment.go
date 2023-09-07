@@ -90,7 +90,7 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 		return nil, err
 	}
 
-	container, err := consulDataplaneContainer(config, gateway.Name, gateway.Namespace)
+	container, err := consulDataplaneContainer(config, gcc, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -205,17 +205,16 @@ func newDeploymentMutator(deployment, mutated *appsv1.Deployment, gcc v1alpha1.G
 func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32) *int32 {
 	instanceValue := defaultInstances
 
-	//if currentReplicas is not nil use current value when building deployment
+	// If currentReplicas is not nil use current value when building deployment...
 	if currentReplicas != nil {
 		instanceValue = *currentReplicas
 	} else if gcc.Spec.DeploymentSpec.DefaultInstances != nil {
-		// otherwise use the default value on the GatewayClassConfig if set
+		// otherwise use the default value on the GatewayClassConfig if set.
 		instanceValue = *gcc.Spec.DeploymentSpec.DefaultInstances
 	}
 
 	if gcc.Spec.DeploymentSpec.MaxInstances != nil {
-
-		//check if over maximum and lower to maximum
+		// Check if the deployment replicas are greater than the maximum and lower to the maximum if so.
 		maxValue := *gcc.Spec.DeploymentSpec.MaxInstances
 		if instanceValue > maxValue {
 			instanceValue = maxValue
@@ -223,7 +222,7 @@ func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32)
 	}
 
 	if gcc.Spec.DeploymentSpec.MinInstances != nil {
-		//check if less than minimum and raise to minimum
+		// Check if the deployment replicas are less than the minimum and raise to the minimum if so.
 		minValue := *gcc.Spec.DeploymentSpec.MinInstances
 		if instanceValue < minValue {
 			instanceValue = minValue

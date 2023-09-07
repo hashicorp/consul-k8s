@@ -14,13 +14,15 @@ const componentAuthMethod = "k8s-component-auth-method"
 // This is a combination of the apiGateway stanza and other settings that impact api-gateways.
 type HelmConfig struct {
 	// ImageDataplane is the Consul Dataplane image to use in gateway deployments.
-	ImageDataplane             string
+	ImageDataplane string
+	// ImageConsulK8S is the Consul Kubernetes Control Plane image to use in gateway deployments.
 	ImageConsulK8S             string
 	ConsulDestinationNamespace string
 	NamespaceMirroringPrefix   string
 	EnableNamespaces           bool
 	EnableNamespaceMirroring   bool
 	AuthMethod                 string
+
 	// LogLevel is the logging level of the deployed Consul Dataplanes.
 	LogLevel            string
 	ConsulPartition     string
