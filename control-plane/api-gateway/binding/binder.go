@@ -61,6 +61,9 @@ type BinderConfig struct {
 	// Resources is a map containing all service targets to verify
 	// against the routing backends.
 	Resources *common.ResourceMap
+
+	//Policies is a list containing all GatewayPolicies that are part of the Gateway Deployment
+	Policies []v1alpha1.GatewayPolicy
 }
 
 // Binder is used for generating a Snapshot of all operations that should occur both

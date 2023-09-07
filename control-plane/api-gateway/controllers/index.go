@@ -5,6 +5,7 @@ package controllers
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +31,7 @@ const (
 	Secret_GatewayIndex                  = "__secret_referencing_gateway"
 	HTTPRoute_RouteRetryFilterIndex      = "__httproute_referencing_retryfilter"
 	HTTPRoute_RouteTimeoutFilterIndex    = "__httproute_referencing_timeoutfilter"
+	Gatewaypolicy_GatewayIndex           = "__gatewaypolicy_referencing_gateway"
 )
 
 // RegisterFieldIndexes registers all of the field indexes for the API gateway controllers.
@@ -115,6 +117,11 @@ var indexes = []index{
 		name:        HTTPRoute_RouteTimeoutFilterIndex,
 		target:      &gwv1beta1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
+	},
+	{
+		name:        Gatewaypolicy_GatewayIndex,
+		target:      &v1alpha1.GatewayPolicy{},
+		indexerFunc: gatewayForGatewayPolicy,
 	},
 }
 
@@ -324,4 +331,25 @@ func filtersForHTTPRoute(o client.Object) []string {
 		}
 	}
 	return filters
+}
+
+func gatewayForGatewayPolicy(o client.Object) []string {
+	gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
+
+	targetGateway := gatewayPolicy.Spec.TargetRef
+	if targetGateway.Group == gwv1beta1.GroupVersion.String() && targetGateway.Kind == common.KindGateway {
+		policyNamespace := gatewayPolicy.Namespace
+		if policyNamespace == "" {
+			policyNamespace = "default"
+		}
+		targetNS := targetGateway.Namespace
+		if targetNS == "" {
+			targetNS = policyNamespace
+		}
+
+		namespacedName := types.NamespacedName{Name: targetGateway.Name, Namespace: targetNS}
+		return []string{namespacedName.String()}
+	}
+
+	return []string{}
 }
