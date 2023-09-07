@@ -170,9 +170,7 @@ func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolic
 
 func (t ResourceTranslator) translateJWTRequirement(crdRequirement *v1alpha1.GatewayJWTRequirement) *api.APIGatewayJWTRequirement {
 	apiRequirement := api.APIGatewayJWTRequirement{}
-	for _, provider := range crdRequirement.Providers {
-		apiRequirement.Providers = append(apiRequirement.Providers, t.translateJWTProvider(provider))
-	}
+    return ConvertSliceFunc(crdRequirement.Providers, t.translateJWTProvider)
 	return &apiRequirement
 }
 
