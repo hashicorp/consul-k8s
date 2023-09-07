@@ -147,6 +147,32 @@ func ToContainerPort(portNumber gwv1beta1.PortNumber, mapPrivilegedContainerPort
 	return int(portNumber) + int(mapPrivilegedContainerPorts)
 }
 
+func (t ResourceTranslator) translateRouteRetryFilter(routeRetryFilter *v1alpha1.RouteRetryFilter) *api.RetryFilter {
+	return &api.RetryFilter{
+		NumRetries:            routeRetryFilter.Spec.NumRetries,
+		RetryOn:               routeRetryFilter.Spec.RetryOn,
+		RetryOnStatusCodes:    routeRetryFilter.Spec.RetryOnStatusCodes,
+		RetryOnConnectFailure: routeRetryFilter.Spec.RetryOnConnectFailure,
+	}
+}
+
+func (t ResourceTranslator) translateRouteTimeoutFilter(routeTimeoutFilter *v1alpha1.RouteTimeoutFilter) *api.TimeoutFilter {
+	return &api.TimeoutFilter{
+		RequestTimeout: routeTimeoutFilter.Spec.RequestTimeout,
+		IdleTimeout:    routeTimeoutFilter.Spec.IdleTimeout,
+	}
+}
+
+func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.RouteAuthFilter) *api.JWTFilter {
+	if routeJWTFilter.Spec.JWT == nil {
+		return nil
+	}
+
+	return &api.JWTFilter{
+		Providers: ConvertSliceFunc(routeJWTFilter.Spec.JWT.Providers, t.translateJWTProvider),
+	}
+}
+
 func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolicy) (*api.APIGatewayPolicy, *api.APIGatewayPolicy) {
 	if policy == nil {
 		return nil, nil
@@ -202,12 +228,14 @@ func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.GatewayJWT
 func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
 	namespace := t.Namespace(route.Namespace)
 
-	// we don't translate parent refs
+	// We don't translate parent refs.
 
 	hostnames := StringLikeSlice(route.Spec.Hostnames)
-	rules := ConvertSliceFuncIf(route.Spec.Rules, func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
-		return t.translateHTTPRouteRule(route, rule, resources)
-	})
+	rules := ConvertSliceFuncIf(
+		route.Spec.Rules,
+		func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
+			return t.translateHTTPRouteRule(route, rule, resources)
+		})
 
 	configEntry := api.HTTPRouteConfigEntry{
 		Kind:      api.HTTPRoute,
@@ -226,10 +254,11 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 }
 
 func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
-	services := ConvertSliceFuncIf(rule.BackendRefs, func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
-
-		return t.translateHTTPBackendRef(route, ref, resources)
-	})
+	services := ConvertSliceFuncIf(
+		rule.BackendRefs,
+		func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
+			return t.translateHTTPBackendRef(route, ref, resources)
+		})
 
 	if len(services) == 0 {
 		return api.HTTPRouteRule{}, false
@@ -334,13 +363,18 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 }
 
 func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) api.HTTPFilters {
-	var urlRewrite *api.URLRewrite
+	var (
+		// Each of these variables will have just one possible value at the end of the function.
+		urlRewrite    *api.URLRewrite
+		retryFilter   *api.RetryFilter
+		timeoutFilter *api.TimeoutFilter
+		jwtFilter     *api.JWTFilter
+	)
+
 	consulFilter := api.HTTPHeaderFilter{
 		Add: make(map[string]string),
 		Set: make(map[string]string),
 	}
-	var retryFilter *api.RetryFilter
-	var timeoutFilter *api.TimeoutFilter
 
 	for _, filter := range filters {
 		if filter.RequestHeaderModifier != nil {
@@ -369,38 +403,24 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 				// this should never be the case because we only translate a route if it's actually valid, and if we're missing filters during the validation step, then we won't get here
 				continue
 			}
+
 			switch filter.ExtensionRef.Kind {
 			case v1alpha1.RouteRetryFilterKind:
-
-				retryFilterCRD := crdFilter.(*v1alpha1.RouteRetryFilter)
-				//new filter that needs to be appended
-
-				retryFilter = &api.RetryFilter{
-					NumRetries:            retryFilterCRD.Spec.NumRetries,
-					RetryOn:               retryFilterCRD.Spec.RetryOn,
-					RetryOnStatusCodes:    retryFilterCRD.Spec.RetryOnStatusCodes,
-					RetryOnConnectFailure: retryFilterCRD.Spec.RetryOnConnectFailure,
-				}
-
+				retryFilter = t.translateRouteRetryFilter(crdFilter.(*v1alpha1.RouteRetryFilter))
 			case v1alpha1.RouteTimeoutFilterKind:
-
-				timeoutFilterCRD := crdFilter.(*v1alpha1.RouteTimeoutFilter)
-				//new filter that needs to be appended
-
-				timeoutFilter = &api.TimeoutFilter{
-					RequestTimeout: timeoutFilterCRD.Spec.RequestTimeout,
-					IdleTimeout:    timeoutFilterCRD.Spec.IdleTimeout,
-				}
-
+				timeoutFilter = t.translateRouteTimeoutFilter(crdFilter.(*v1alpha1.RouteTimeoutFilter))
+			case v1alpha1.RouteAuthFilterKind:
+				jwtFilter = t.translateRouteJWTFilter(crdFilter.(*v1alpha1.RouteAuthFilter))
 			}
 		}
-
 	}
+
 	return api.HTTPFilters{
 		Headers:       []api.HTTPHeaderFilter{consulFilter},
 		URLRewrite:    urlRewrite,
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
+		JWT:           jwtFilter,
 	}
 }
 

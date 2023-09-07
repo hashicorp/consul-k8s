@@ -10,12 +10,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"k8s.io/utils/pointer"
 	"math/big"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -1267,7 +1268,21 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										ExtensionRef: &gwv1beta1.LocalObjectReference{
 											Name:  "test",
 											Kind:  v1alpha1.RouteRetryFilterKind,
-											Group: "consul.hashicorp.com/v1alpha1",
+											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
+										},
+									},
+									{
+										ExtensionRef: &gwv1beta1.LocalObjectReference{
+											Name:  "test-timeout-filter",
+											Kind:  v1alpha1.RouteTimeoutFilterKind,
+											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
+										},
+									},
+									{
+										ExtensionRef: &gwv1beta1.LocalObjectReference{
+											Name:  "test-jwt-filter",
+											Kind:  v1alpha1.RouteAuthFilterKind,
+											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
 										},
 									},
 								},
@@ -1332,6 +1347,47 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							RetryOnConnectFailure: pointer.Bool(true),
 						},
 					},
+
+					&v1alpha1.RouteTimeoutFilter{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.RouteTimeoutFilterKind,
+							APIVersion: "consul.hashicorp.com/v1alpha1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-timeout-filter",
+							Namespace: "k8s-ns",
+						},
+						Spec: v1alpha1.RouteTimeoutFilterSpec{
+							RequestTimeout: 10,
+							IdleTimeout:    30,
+						},
+					},
+
+					&v1alpha1.RouteAuthFilter{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.RouteAuthFilterKind,
+							APIVersion: "consul.hashicorp.com/v1alpha1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-jwt-filter",
+							Namespace: "k8s-ns",
+						},
+						Spec: v1alpha1.RouteAuthFilterSpec{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
+									{
+										Name: "test-jwt-provider",
+										VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
+											{
+												Path:  []string{"/okta"},
+												Value: "okta",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			want: api.HTTPRouteConfigEntry{
@@ -1347,6 +1403,23 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								RetryOn:               []string{"cancelled"},
 								RetryOnStatusCodes:    []uint32{500, 502},
 								RetryOnConnectFailure: pointer.Bool(false),
+							},
+							TimeoutFilter: &api.TimeoutFilter{
+								RequestTimeout: time.Duration(10 * time.Nanosecond),
+								IdleTimeout:    time.Duration(30 * time.Nanosecond),
+							},
+							JWT: &api.JWTFilter{
+								Providers: []*api.APIGatewayJWTProvider{
+									{
+										Name: "test-jwt-provider",
+										VerifyClaims: []*api.APIGatewayJWTClaimVerification{
+											{
+												Path:  []string{"/okta"},
+												Value: "okta",
+											},
+										},
+									},
+								},
 							},
 						},
 						Matches: []api.HTTPMatch{
