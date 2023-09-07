@@ -149,7 +149,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			PostStart: &corev1.LifecycleHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{
-						"/usr/local/bin/consul-dataplane", "-isup",
+						"/usr/local/bin/consul-dataplane", "graceful-startup",
 					},
 				},
 			},
