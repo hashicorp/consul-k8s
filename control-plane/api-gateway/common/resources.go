@@ -423,7 +423,7 @@ func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v
 	return s.gatewayPolicies[key]
 }
 
-func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) *v1alpha1.GatewayPolicy {
+func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
 	key := api.ResourceReference{
 		Name:        gateway.Name,
 		Kind:        gateway.Kind,
@@ -431,7 +431,9 @@ func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gat
 		Namespace:   gateway.Namespace,
 	}
 
-	return s.gatewayPolicies[key]
+	value, exists := s.gatewayPolicies[key]
+
+	return value, exists
 }
 
 func (s *ResourceMap) ReferenceCountTCPRoute(route gwv1alpha2.TCPRoute) {

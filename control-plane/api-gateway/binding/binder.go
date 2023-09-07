@@ -62,6 +62,7 @@ type BinderConfig struct {
 	// against the routing backends.
 	Resources *common.ResourceMap
 
+	//Policies is a list containing all GatewayPolicies that are part of the Gateway Deployment
 	Policies []v1alpha1.GatewayPolicy
 }
 
