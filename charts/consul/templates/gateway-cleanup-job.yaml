@@ -31,9 +31,6 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        {{- if .Values.global.acls.annotations }}
-          {{- tpl .Values.global.acls.annotations . | nindent 8 }}
-        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-gateway-cleanup
@@ -57,9 +54,5 @@ spec:
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
-      {{- end }}
-      {{- if .Values.global.acls.nodeSelector }}
-      nodeSelector:
-        {{ tpl .Values.global.acls.nodeSelector . | indent 8 | trim }}
       {{- end }}
 {{- end }}
