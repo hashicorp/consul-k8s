@@ -6,6 +6,7 @@ package controllers
 import (
 	"context"
 
+
 	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -311,10 +312,10 @@ func filtersForHTTPRoute(o client.Object) []string {
 	FILTERS_LOOP:
 		for _, filter := range rule.Filters {
 			if common.FilterIsExternalFilter(filter) {
-				//TODO this seems like its type agnostic, so this might just work without having to make
-				//multiple index functions per custom filter type?
+				// TODO this seems like its type agnostic, so this might just work without having to make
+				// multiple index functions per custom filter type?
 
-				//index external filters
+				// index external filters
 				filter := common.IndexedNamespacedNameWithDefault(string(filter.ExtensionRef.Name), nilString, route.Namespace).String()
 				for _, member := range filters {
 					if member == filter {
@@ -325,7 +326,7 @@ func filtersForHTTPRoute(o client.Object) []string {
 			}
 		}
 
-		//same thing but over the backend refs
+		// same thing but over the backend refs
 	BACKEND_LOOP:
 		for _, ref := range rule.BackendRefs {
 			for _, filter := range ref.Filters {
