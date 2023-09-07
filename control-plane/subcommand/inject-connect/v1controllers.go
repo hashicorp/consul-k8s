@@ -23,12 +23,11 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	"github.com/hashicorp/consul-k8s/control-plane/controllers"
-	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
+	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
-
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
 
@@ -139,7 +138,6 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Partition:               c.consul.Partition,
 		Datacenter:              c.consul.Datacenter,
 	})
-
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return err
@@ -458,6 +456,13 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			ConsulMeta: consulMeta,
 		}})
 
+	mgr.GetWebhookServer().Register("/validate-v1alpha1-gatewaypolicy",
+		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.GatewayPolicyWebhook{
+			Client:     mgr.GetClient(),
+			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.GatewayPolicy),
+			ConsulMeta: consulMeta,
+		}})
+
 	if c.flagEnableWebhookCAUpdate {
 		err = c.updateWebhookCABundle(ctx)
 		if err != nil {
@@ -476,7 +481,7 @@ func (c *Command) updateWebhookCABundle(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, c.clientset, webhookConfigName, caCert)
+	err = webhookconfiguration.UpdateWithCABundle(ctx, c.clientset, webhookConfigName, caCert)
 	if err != nil {
 		return err
 	}
