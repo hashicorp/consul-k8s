@@ -2203,6 +2203,17 @@ connectInject:
         # @type: string
         service: null
 
+      # The resource settings for Pods handling traffic for Gateway API.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "100Mi"
+          cpu: "100m"
+        limits:
+          memory: "100Mi"
+          cpu: "100m"
+
       # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
       deployment:
         defaultInstances: 1
@@ -2233,17 +2244,6 @@ connectInject:
       #
       # @type: string
       annotations: null
-
-    # The resource settings for Pods handling traffic for Gateway API.
-    # @recurse: false
-    # @type: map
-    resources:
-      requests:
-        memory: "100Mi"
-        cpu: "100m"
-      limits:
-        memory: "100Mi"
-        cpu: "100m"
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
@@ -3054,8 +3054,9 @@ ingressGateways:
 
   # Gateways is a list of gateway objects. The only required field for
   # each is `name`, though they can also contain any of the fields in
-  # `defaults`. Values defined here override the defaults except in the
-  # case of annotations where both will be applied.
+  # `defaults`. You must provide a unique name for each ingress gateway. These names 
+  # must be unique across different namespaces. 
+  # Values defined here override the defaults, except in the case of annotations where both will be applied.
   # @type: array<map>
   gateways:
     - name: ingress-gateway
