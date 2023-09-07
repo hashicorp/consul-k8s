@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/gruntwork-io/terratest v0.31.2
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20221117191905-0b1cc2b631e3
-	github.com/hashicorp/consul/api v1.17.0
+	github.com/hashicorp/consul/api v1.18.1-0.20230906185923-ff6111651dfc
 	github.com/hashicorp/consul/sdk v0.13.0
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/go-version v1.6.0
