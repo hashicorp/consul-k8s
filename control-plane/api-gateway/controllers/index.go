@@ -5,6 +5,7 @@ package controllers
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -336,9 +337,9 @@ func gatewayForGatewayPolicy(o client.Object) []string {
 	gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
 
 	targetGateway := gatewayPolicy.Spec.TargetRef
-	//gateway policy is 1to1
-	if targetGateway.Group == v1alpha1.ConsulHashicorpGroup && targetGateway.Kind == common.KindGateway {
-		return []string{common.IndexedNamespacedNameWithDefault(targetGateway.Name, &targetGateway.Namespace, gatewayPolicy.Namespace).String()}
+	if targetGateway.Group == common.BetaGroup && targetGateway.Kind == common.KindGateway {
+		namespacedName := types.NamespacedName{Name: targetGateway.Name, Namespace: targetGateway.Namespace}
+		return []string{namespacedName.String()}
 	}
 
 	return []string{}

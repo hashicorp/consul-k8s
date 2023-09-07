@@ -113,7 +113,7 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 		}
 	}
 
-	//grab policy if it exists
+	//Grab policy if it exists.
 	gatewayPolicyCrd := resources.GetPolicyForGatewayListener(gateway, listener)
 	defaultPolicy, overridePolicy := t.translateGatewayPolicy(gatewayPolicyCrd)
 
@@ -196,7 +196,8 @@ func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolic
 
 func (t ResourceTranslator) translateJWTRequirement(crdRequirement *v1alpha1.GatewayJWTRequirement) *api.APIGatewayJWTRequirement {
 	apiRequirement := api.APIGatewayJWTRequirement{}
-    return ConvertSliceFunc(crdRequirement.Providers, t.translateJWTProvider)
+	providers := ConvertSliceFunc(crdRequirement.Providers, t.translateJWTProvider)
+	apiRequirement.Providers = providers
 	return &apiRequirement
 }
 
@@ -208,9 +209,9 @@ func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.GatewayJW
 	apiProvider := api.APIGatewayJWTProvider{
 		Name: crdProvider.Name,
 	}
-	for _, verifyClaim := range crdProvider.VerifyClaims {
-		apiProvider.VerifyClaims = append(apiProvider.VerifyClaims, t.translateVerifyClaims(verifyClaim))
-	}
+	claims := ConvertSliceFunc(crdProvider.VerifyClaims, t.translateVerifyClaims)
+	apiProvider.VerifyClaims = claims
+
 	return &apiProvider
 }
 
