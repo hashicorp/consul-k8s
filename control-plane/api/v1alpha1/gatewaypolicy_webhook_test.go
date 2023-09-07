@@ -204,7 +204,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 			},
 			expAllow:      false,
-			expErrMessage: "policy targets a gateway listener that is already the target of an existing policy",
+			expErrMessage: "policy targets gateway listener \"l1\" that is already the target of an existing policy \"my-policy\"",
 		},
 	}
 	for name, tt := range tests {

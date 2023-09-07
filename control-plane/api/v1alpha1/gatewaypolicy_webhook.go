@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/go-logr/logr"
@@ -52,7 +53,7 @@ func (v *GatewayPolicyWebhook) Handle(ctx context.Context, req admission.Request
 
 	for _, policy := range list.Items {
 		if differentPolicySameTarget(resource, policy) {
-			return admission.Denied("policy targets a gateway listener that is already the target of an existing policy")
+			return admission.Denied(fmt.Sprintf("policy targets gateway listener %q that is already the target of an existing policy %q", DerefStringOr(resource.Spec.TargetRef.SectionName, ""), policy.Name))
 		}
 	}
 
