@@ -10,8 +10,8 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230511143918-bd16ab83383d
 	github.com/hashicorp/consul-server-connection-manager v0.1.3
-	github.com/hashicorp/consul/api v1.22.0-rc1
-	github.com/hashicorp/consul/sdk v0.14.0-rc1
+	github.com/hashicorp/consul/api v1.22.0-rc1.0.20230906181627-0b2e31bbfa2c
+	github.com/hashicorp/consul/sdk v0.14.1
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
 	github.com/hashicorp/go-hclog v1.5.0

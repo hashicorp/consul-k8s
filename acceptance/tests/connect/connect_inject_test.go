@@ -134,6 +134,24 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 			require.Len(t, pods.Items, 1)
 			podName := pods.Items[0].Name
 
+			// Ensure the token exists
+			if secure {
+				retry.Run(t, func(r *retry.R) {
+					tokens, _, err := consulClient.ACL().TokenListFiltered(
+						api.ACLTokenFilterOptions{ServiceName: "static-client"}, nil)
+					require.NoError(r, err)
+					// Ensure that the tokens exist. Note that we must iterate over the tokens and scan for the name,
+					// because older versions of Consul do not support the filtered query param and will return
+					// the full list of tokens instead.
+					count := 0
+					for _, t := range tokens {
+						if len(t.ServiceIdentities) > 0 && t.ServiceIdentities[0].ServiceName == "static-client" {
+							count++
+						}
+					}
+					require.Greater(r, count, 0)
+				})
+			}
 			logger.Logf(t, "force killing the static-client pod %q", podName)
 			var gracePeriod int64 = 0
 			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
