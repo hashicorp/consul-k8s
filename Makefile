@@ -85,6 +85,7 @@ cni-plugin-lint:
 	cd control-plane/cni; golangci-lint run -c ../../.golangci.yml
 
 ctrl-generate: get-controller-gen ## Run CRD code generation.
+	make ensure-controller-gen-version
 	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
 
 # Perform a terraform fmt check but don't change anything
@@ -171,6 +172,7 @@ lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance di
 	for p in control-plane cli acceptance;  do cd $$p; golangci-lint run --path-prefix $$p -c ../.golangci.yml; cd ..; done
 
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
+	make ensure-controller-gen-version
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	make copy-crds-to-chart
 	make generate-external-crds
@@ -189,6 +191,15 @@ ifeq (, $(shell which controller-gen))
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+ensure-controller-gen-version: ## Ensure controller-gen version is v0.8.0.
+ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.8.0))
+	@echo "controller-gen version is not v0.8.0, uninstall the binary and install the correct version with 'make get-controller-gen'."
+	@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
+	@exit 1
+else
+	@echo "Found correct version: $(shell $(CONTROLLER_GEN) --version)"
 endif
 
 add-copyright-header: ## Add copyright header to all files in the project
