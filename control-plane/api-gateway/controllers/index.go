@@ -338,7 +338,16 @@ func gatewayForGatewayPolicy(o client.Object) []string {
 
 	targetGateway := gatewayPolicy.Spec.TargetRef
 	if targetGateway.Group == common.BetaGroup && targetGateway.Kind == common.KindGateway {
-		namespacedName := types.NamespacedName{Name: targetGateway.Name, Namespace: targetGateway.Namespace}
+		policyNamespace := gatewayPolicy.Namespace
+		if policyNamespace == "" {
+			policyNamespace = "default"
+		}
+		targetNS := targetGateway.Namespace
+		if targetNS == "" {
+			targetNS = policyNamespace
+		}
+
+		namespacedName := types.NamespacedName{Name: targetGateway.Name, Namespace: targetNS}
 		return []string{namespacedName.String()}
 	}
 
