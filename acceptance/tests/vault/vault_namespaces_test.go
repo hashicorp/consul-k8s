@@ -23,7 +23,7 @@ import (
 // TestVault_VaultNamespace installs Vault, configures a Vault namespace, and then bootstraps it
 // with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works
-// with the vault namespace.
+// with the vault namespace. Namespace is added in this via global.secretsBackend.vault.vaultNamespace.
 func TestVault_VaultNamespace(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
@@ -195,9 +195,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.address":             vaultCluster.Address(),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
-		"global.secretsBackend.vault.connectCA.additionalConfig":    fmt.Sprintf(`"{\"connect\": [{ \"ca_config\": [{ \"namespace\": \"%s\"}]}]}"`, vaultNamespacePath),
-
-		"global.secretsBackend.vault.agentAnnotations": fmt.Sprintf("\"vault.hashicorp.com/namespace\": \"%s\"", vaultNamespacePath),
+		"global.secretsBackend.vault.vaultNamespace":                vaultNamespacePath,
 
 		"global.acls.manageSystemACLs":          "true",
 		"global.acls.bootstrapToken.secretName": bootstrapTokenSecret.Path,
