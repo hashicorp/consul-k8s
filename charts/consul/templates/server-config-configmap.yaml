@@ -72,6 +72,9 @@ data:
               "ca_file": "/consul/vault-ca/tls.crt",
               {{- end }}
               "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
+              {{- if (and (.vaultNamespace) (not (contains "namespace" (default "" .connectCA.additionalConfig)))) }}
+              "namespace": "{{ .vaultNamespace }}",
+              {{- end }}
               "root_pki_path": "{{ .connectCA.rootPKIPath }}",
               "auth_method": {
                 "type": "kubernetes",
