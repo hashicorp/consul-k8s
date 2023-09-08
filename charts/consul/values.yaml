@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.17-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.14-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -86,7 +86,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.3.0-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.0.10-dev
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -169,6 +169,12 @@ global:
       # and check the name of `metadata.name`.
       adminPartitionsRole: ""
 
+      # The Vault role to read Consul controller's webhook's
+      # CA and issue a certificate and private key.
+      # A Vault policy must be created which grants issue capabilities to
+      # `global.secretsBackend.vault.controller.tlsCert.secretName`.
+      controllerRole: ""
+
       # The Vault role to read Consul connect-injector webhook's CA
       # and issue a certificate and private key.
       # A Vault policy must be created which grants issue capabilities to
@@ -242,6 +248,25 @@ global:
         # ```
         additionalConfig: |
           {}
+          
+      controller:
+        # Configuration to the Vault Secret that Kubernetes will use on
+        # Kubernetes CRD creation, deletion, and update, to get TLS certificates
+        # used issued from vault to send webhooks to the controller.
+        tlsCert:
+          # The Vault secret path that issues TLS certificates for controller
+          # webhooks.
+          # @type: string
+          secretName: null
+
+        # Configuration to the Vault Secret that Kubernetes will use on
+        # Kubernetes CRD creation, deletion, and update, to get CA certificates
+        # used issued from vault to send webhooks to the controller.
+        caCert:
+          # The Vault secret path that contains the CA certificate for controller
+          # webhooks.
+          # @type: string
+          secretName: null
 
       connectInject:
         # Configuration to the Vault Secret that Kubernetes uses on
@@ -293,7 +318,7 @@ global:
     # The key within the Kubernetes secret or Vault secret key that holds the gossip
     # encryption key.
     secretKey: ""
-    # Override global log verbosity level for gossip-encryption-autogenerate-job pods. One of "trace", "debug", "info", "warn", or "error".
+    # Override global log verbosity level for `gossip-encryption-autogenerate-job` pods. One of "trace", "debug", "info", "warn", or "error".
     # @type: string
     logLevel: ""
 
@@ -391,7 +416,7 @@ global:
       secretKey: null
 
     # This value defines additional annotations for
-    # tls init jobs. This should be formatted as a multi-line string.
+    # tls init jobs. Format this value as a multi-line string.
     #
     # ```yaml
     # annotations: |
@@ -421,20 +446,15 @@ global:
     # @type: string
     logLevel: ""
 
-    # A Kubernetes or Vault secret containing the bootstrap token to use for creating policies and
-    # tokens for all Consul and consul-k8s-control-plane components. If `secretName` and `secretKey`
-    # are unset, a default secret name and secret key are used. If the secret is populated, then
-    # we will skip ACL bootstrapping of the servers and will only initialize ACLs for the Consul
-    # clients and consul-k8s-control-plane system components.
-    # If the secret is empty, then we will bootstrap ACLs on the Consul servers, and write the
-    # bootstrap token to this secret. If ACLs are already bootstrapped on the servers, then the
-    # secret must contain the bootstrap token.
+    # A Kubernetes or Vault secret containing the bootstrap token to use for
+    # creating policies and tokens for all Consul and consul-k8s-control-plane components.
+    # If set, we will skip ACL bootstrapping of the servers and will only
+    # initialize ACLs for the Consul clients and consul-k8s-control-plane system components.
+
     bootstrapToken:
       # The name of the Kubernetes or Vault secret that holds the bootstrap token.
-      # If unset, this defaults to `{{ global.name }}-bootstrap-acl-token`.
       secretName: null
       # The key within the Kubernetes or Vault secret that holds the bootstrap token.
-      # If unset, this defaults to `token`.
       secretKey: null
 
     # If true, an ACL token will be created that can be used in secondary
@@ -517,7 +537,7 @@ global:
     nodeSelector: null
 
     # This value defines additional annotations for
-    # acl init jobs. This should be formatted as a multi-line string.
+    # acl init jobs. Format this value as a multi-line string.
     #
     # ```yaml
     # annotations: |
@@ -631,15 +651,10 @@ global:
     # @type: boolean
     enableGatewayMetrics: true
 
-    # Configures the Helm chart’s components to forward envoy metrics for the Consul service mesh to the
-    # consul-telemetry-collector. This includes gateway metrics and sidecar metrics.
-    # @type: boolean
-    enableTelemetryCollector: false
-
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.3-dev
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.1-dev
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -732,37 +747,7 @@ global:
   # @type: map
   extraLabels: {}
 
-  # Optional PEM-encoded CA certificates that will be added to trusted system CAs.
-  #
-  # Example:
-  #
-  # ```yaml
-  # trustedCAs: [
-  #   |
-  #   -----BEGIN CERTIFICATE-----
-  #   MIIC7jCCApSgAwIBAgIRAIq2zQEVexqxvtxP6J0bXAwwCgYIKoZIzj0EAwIwgbkx
-  #   ...
-  # ]
-  # ```
-  # @type: array<string>
-  trustedCAs: [ ]
 
-  # Consul feature flags that will be enabled across components.
-  # Supported feature flags:
-  # * `resource-apis`:
-  #   _**Danger**_! This feature is under active development. It is not
-  #   recommended for production use. Setting this flag during an
-  #   upgrade could risk breaking your Consul cluster.
-  #   If this flag is set, Consul components will use the
-  #   V2 resources APIs for all operations.
-  #
-  # Example:
-  #
-  # ```yaml
-  # experiments: [ "resource-apis" ]
-  # ```
-  # @type: array<string>
-  experiments: [ ]
 
 
 # Server, when enabled, configures a server cluster to run. This should
@@ -1310,42 +1295,7 @@ server:
     # @type: array<map>
     sinks: []
 
-  # Settings for potentially limiting timeouts, rate limiting on clients as well
-  # as servers, and other settings to limit exposure too many requests, requests
-  # waiting for too long, and other runtime considerations.
-  limits:
-    # This object specifies configurations that limit the rate of RPC and gRPC
-    # requests on the Consul server. Limiting the rate of gRPC and RPC requests
-    # also limits HTTP requests to the Consul server.
-    # https://developer.hashicorp.com/consul/docs/agent/config/config-files#request_limits
-    requestLimits:
-      # Setting for disabling or enabling rate limiting.  If not disabled, it
-      # enforces the action that will occur when RequestLimitsReadRate
-      # or RequestLimitsWriteRate is exceeded.  The default value of "disabled" will
-      # prevent any rate limiting from occuring.  A value of "enforce" will block
-      # the request from processings by returning an error.  A value of
-      # "permissive" will not block the request and will allow the request to
-      # continue processing.
-      # @type: string
-      mode: "disabled"
 
-      # Setting that controls how frequently RPC, gRPC, and HTTP
-      # queries are allowed to happen. In any large enough time interval, rate
-      # limiter limits the rate to RequestLimitsReadRate tokens per second.
-      #
-      # See https://en.wikipedia.org/wiki/Token_bucket for more about token
-      # buckets.
-      # @type: integer
-      readRate: -1
-
-      # Setting that controls how frequently RPC, gRPC, and HTTP
-      # writes are allowed to happen. In any large enough time interval, rate
-      # limiter limits the rate to RequestLimitsWriteRate tokens per second.
-      #
-      # See https://en.wikipedia.org/wiki/Token_bucket for more about token
-      # buckets.
-      # @type: integer
-      writeRate: -1
 
 # Configuration for Consul servers when the servers are running outside of Kubernetes.
 # When running external servers, configuring these values is recommended
@@ -2177,95 +2127,6 @@ connectInject:
     # @type: integer
     minAvailable: null
 
-  # Configuration settings for the Consul API Gateway integration.
-  apiGateway:
-    # Enables Consul on Kubernetes to manage the CRDs used for Gateway API.
-    # Setting this to true will install the CRDs used for the Gateway API when Consul on Kubernetes is installed.
-    # These CRDs can clash with existing Gateway API CRDs if they are already installed in your cluster.
-    # If this setting is false, you will need to install the Gateway API CRDs manually.
-    manageExternalCRDs: true
-
-    # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
-    managedGatewayClass:
-      # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
-      # labels for gateway pod assignment, formatted as a multi-line string.
-      #
-      # Example:
-      #
-      # ```yaml
-      # nodeSelector: |
-      #   beta.kubernetes.io/arch: amd64
-      # ```
-      #
-      # @type: string
-      nodeSelector: null
-
-      # Toleration settings for gateway pods created with the managed gateway class.
-      # This should be a multi-line string matching the
-      # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
-      #
-      # @type: string
-      tolerations: null
-
-      # This value defines the type of Service created for gateways (e.g. LoadBalancer, ClusterIP)
-      serviceType: LoadBalancer
-
-      # Configuration settings for annotations to be copied from the Gateway to other child resources.
-      copyAnnotations:
-        # This value defines a list of annotations to be copied from the Gateway to the Service created, formatted as a multi-line string.
-        #
-        # Example:
-        #
-        # ```yaml
-        # service:
-        #   annotations: |
-        #     - external-dns.alpha.kubernetes.io/hostname
-        # ```
-        #
-        # @type: string
-        service: null
-
-      # The resource settings for Pods handling traffic for Gateway API.
-      # @recurse: false
-      # @type: map
-      resources:
-        requests:
-          memory: "100Mi"
-          cpu: "100m"
-        limits:
-          memory: "100Mi"
-          cpu: "100m"
-
-      # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
-      deployment:
-        defaultInstances: 1
-        maxInstances: 1
-        minInstances: 1
-
-      # The name of the OpenShift SecurityContextConstraints resource to use for Gateways.
-      # Only applicable if `global.openshift.enabled` is true.
-      # @type: string
-      openshiftSCCName: "restricted-v2"
-
-      # This value defines the amount we will add to privileged container ports on gateways that use this class.
-      # This is useful if you don't want to give your containers extra permissions to run privileged ports.
-      # Example: The gateway listener is defined on port 80, but the underlying value of the port on the container
-      # will be the 80 + the number defined below.
-      mapPrivilegedContainerPorts: 0
-
-    # Configuration for the ServiceAccount created for the api-gateway component
-    serviceAccount:
-      # This value defines additional annotations for the client service account. This should be formatted as a multi-line
-      # string.
-      #
-      # ```yaml
-      # annotations: |
-      #   "sample/annotation1": "foo"
-      #   "sample/annotation2": "bar"
-      # ```
-      #
-      # @type: string
-      annotations: null
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
@@ -2667,16 +2528,16 @@ connectInject:
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-shutdown-path`
     # @type: map
     lifecycle:
-        # @type: boolean
-        defaultEnabled: true
-        # @type: boolean
-        defaultEnableShutdownDrainListeners: true
-        # @type: integer
-        defaultShutdownGracePeriodSeconds: 30
-        # @type: integer
-        defaultGracefulPort: 20600
-        # @type: string
-        defaultGracefulShutdownPath: "/graceful_shutdown"
+      # @type: boolean
+      defaultEnabled: true
+      # @type: boolean
+      defaultEnableShutdownDrainListeners: true
+      # @type: integer
+      defaultShutdownGracePeriodSeconds: 30
+      # @type: integer
+      defaultGracefulPort: 20600
+      # @type: string
+      defaultGracefulShutdownPath: "/graceful_shutdown"
 
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of
@@ -2707,7 +2568,7 @@ meshGateway:
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
-  # Override global log verbosity level for mesh-gateway-deployment pods. One of "trace", "debug", "info", "warn", or "error".
+  # Override global log verbosity level for `mesh-gateway-deployment pods`. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2921,6 +2782,7 @@ meshGateway:
 # Requirements: consul >= 1.8.0
 ingressGateways:
   # Enable ingress gateway deployment. Requires `connectInject.enabled=true`.
+  # and `client.enabled=true`.
   enabled: false
 
   # Override global log verbosity level for ingress-gateways-deployment pods. One of "trace", "debug", "info", "warn", or "error".
