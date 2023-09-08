@@ -75,6 +75,9 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- if and .Values.global.enterpriseLicense.secretName (not .Values.global.acls.manageSystemACLs) }}
         {{- with .Values.global.enterpriseLicense }}
         "vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt": "{{ .secretName }}"
