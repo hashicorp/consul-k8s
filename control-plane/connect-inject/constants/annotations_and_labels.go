@@ -6,7 +6,8 @@ package constants
 const (
 	// KeyInjectStatus is the key of the annotation that is added to
 	// a pod after an injection is done.
-	KeyInjectStatus = "consul.hashicorp.com/connect-inject-status"
+	KeyInjectStatus   = "consul.hashicorp.com/connect-inject-status"
+	KeyInjectStatusV2 = "consul.hashicorp.com/mesh-inject-status"
 
 	// KeyTransparentProxyStatus is the key of the annotation that is added to
 	// a pod when transparent proxy is done.
@@ -21,7 +22,8 @@ const (
 	// AnnotationInject is the key of the annotation that controls whether
 	// injection is explicitly enabled or disabled for a pod. This should
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
-	AnnotationInject = "consul.hashicorp.com/connect-inject"
+	AnnotationInject   = "consul.hashicorp.com/connect-inject"
+	AnnotationInjectV2 = "consul.hashicorp.com/mesh-inject"
 
 	// AnnotationGatewayKind is the key of the annotation that indicates pods
 	// that represent Consul Connect Gateways. This should be set to a
@@ -78,7 +80,8 @@ const (
 	// service name should map to a Consul service namd and the local port
 	// is the local port in the pod that the listener will bind to. It can
 	// be a named port.
-	AnnotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
+	AnnotationUpstreams   = "consul.hashicorp.com/connect-service-upstreams"
+	AnnotationUpstreamsV2 = "consul.hashicorp.com/mesh-service-destinations"
 
 	// AnnotationTags is a list of tags to register with the service
 	// this is specified as a comma separated list e.g. abc,123.
