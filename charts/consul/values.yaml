@@ -248,7 +248,7 @@ global:
         # ```
         additionalConfig: |
           {}
-          
+
       controller:
         # Configuration to the Vault Secret that Kubernetes will use on
         # Kubernetes CRD creation, deletion, and update, to get TLS certificates
@@ -450,7 +450,6 @@ global:
     # creating policies and tokens for all Consul and consul-k8s-control-plane components.
     # If set, we will skip ACL bootstrapping of the servers and will only
     # initialize ACLs for the Consul clients and consul-k8s-control-plane system components.
-
     bootstrapToken:
       # The name of the Kubernetes or Vault secret that holds the bootstrap token.
       secretName: null
@@ -477,7 +476,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods. 
+    # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
     # This should be a YAML map corresponding to a Kubernetes
     # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
     # object.
@@ -548,14 +547,6 @@ global:
     # @type: string
     annotations: null
 
-  # If argocd.enabled is set to true, following annotations are added to
-  # job - server-acl-init-job
-  # annotations -
-  #   argocd.argoproj.io/hook: Sync
-  #   argocd.argoproj.io/hook-delete-policy: HookSucceeded
-  argocd:
-    enabled: false
-
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an
   # enterprise binary. Defining it here applies it to your cluster once a leader
@@ -578,7 +569,7 @@ global:
     # If enabled, this datacenter will be federation-capable. Only federation
     # via mesh gateways is supported.
     # Mesh gateways and servers will be configured to allow federation.
-    # Requires `global.tls.enabled`, `connectInject.enabled`, and one of 
+    # Requires `global.tls.enabled`, `connectInject.enabled`, and one of
     # `meshGateway.enabled` or `externalServers.enabled` to be true.
     # Requires Consul 1.8+.
     enabled: false
@@ -608,7 +599,7 @@ global:
     # from the one used by the Consul Service Mesh.
     # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
     #
-    # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and 
+    # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
     # `externalServers.k8sAuthMethodHost` should be set to the same value.
     #
     # You can retrieve this value from your `kubeconfig` by running:
@@ -621,7 +612,7 @@ global:
     # @type: string
     k8sAuthMethodHost: null
 
-    # Override global log verbosity level for the create-federation-secret-job pods. One of "trace", "debug", "info", "warn", or "error".
+    # Override global log verbosity level for the `create-federation-secret-job` pods. One of "trace", "debug", "info", "warn", or "error".
     # @type: string
     logLevel: ""
 
@@ -747,9 +738,6 @@ global:
   # @type: map
   extraLabels: {}
 
-
-
-
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.
@@ -871,7 +859,7 @@ server:
   # _will not_ automatically secure pod communication, this
   # setting will only enable usage of the feature. Consul will automatically initialize
   # a new CA and set of certificates. Additional service mesh settings can be configured
-  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries). 
+  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries).
   connect: true
 
   serviceAccount:
@@ -1241,7 +1229,7 @@ server:
     # @type: string
     caCert: null
 
-  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing 
+  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing
   # and configure a sink and filters for their audit logs. Please refer to
   # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
   # for further information.
@@ -1250,7 +1238,7 @@ server:
     # global.acls.manageSystemACLs must be enabled to use this feature.
     enabled: false
 
-    # A single entry of the sink object provides configuration for the destination to which Consul 
+    # A single entry of the sink object provides configuration for the destination to which Consul
     # will log auditing events.
     #
     # Example:
@@ -1265,7 +1253,7 @@ server:
     #     rotate_duration: 24h
     #     rotate_max_files: 15
     #     rotate_bytes: 25165824
-    #     
+    #
     # ```
     #
     # The sink object supports the following keys:
@@ -1294,8 +1282,6 @@ server:
     #
     # @type: array<map>
     sinks: []
-
-
 
 # Configuration for Consul servers when the servers are running outside of Kubernetes.
 # When running external servers, configuring these values is recommended
@@ -1342,7 +1328,7 @@ externalServers:
   # This address must be reachable from the Consul servers.
   # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
   #
-  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and 
+  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
   # `externalServers.k8sAuthMethodHost` should be set to the same value.
   #
   # You could retrieve this value from your `kubeconfig` by running:
@@ -2127,7 +2113,6 @@ connectInject:
     # @type: integer
     minAvailable: null
 
-
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
     # If true, then all traffic redirection setup uses the consul-cni plugin.
@@ -2305,7 +2290,7 @@ connectInject:
   # @type: string
   imageConsul: null
 
-  # Sets the `logLevel` for the `consul-dataplane` sidecar and the `consul-connect-inject-init` container. When set, this value overrides the global log verbosity level. One of "debug", "info", "warn", or "error".
+  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2568,7 +2553,7 @@ meshGateway:
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
-  # Override global log verbosity level for `mesh-gateway-deployment pods`. One of "trace", "debug", "info", "warn", or "error".
+  # Override global log verbosity level for `mesh-gateway-deployment` pods. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2781,11 +2766,11 @@ meshGateway:
 # for a specific gateway.
 # Requirements: consul >= 1.8.0
 ingressGateways:
-  # Enable ingress gateway deployment. Requires `connectInject.enabled=true`.
+  # Enable ingress gateway deployment. Requires `connectInject.enabled=true`
   # and `client.enabled=true`.
   enabled: false
 
-  # Override global log verbosity level for ingress-gateways-deployment pods. One of "trace", "debug", "info", "warn", or "error".
+  # Override global log verbosity level for `ingress-gateways-deployment` pods. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2938,9 +2923,8 @@ ingressGateways:
 
   # Gateways is a list of gateway objects. The only required field for
   # each is `name`, though they can also contain any of the fields in
-  # `defaults`. You must provide a unique name for each ingress gateway. These names 
-  # must be unique across different namespaces. 
-  # Values defined here override the defaults, except in the case of annotations where both will be applied.
+  # `defaults`. Values defined here override the defaults except in the
+  # case of annotations where both will be applied.
   # @type: array<map>
   gateways:
     - name: ingress-gateway
@@ -2953,7 +2937,8 @@ ingressGateways:
 # for a specific gateway.
 # Requirements: consul >= 1.8.0
 terminatingGateways:
-  # Enable terminating gateway deployment. Requires `connectInject.enabled=true`.
+  # Enable terminating gateway deployment. Requires `connectInject.enabled=true`
+  # and `client.enabled=true`.
   enabled: false
 
   # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
@@ -3090,7 +3075,6 @@ terminatingGateways:
   gateways:
     - name: terminating-gateway
 
-# [DEPRECATED] Use connectInject.apiGateway instead. This stanza will be removed with the release of Consul 1.17
 # Configuration settings for the Consul API Gateway integration
 apiGateway:
   # When true the helm chart will install the Consul API Gateway controller
@@ -3105,7 +3089,7 @@ apiGateway:
   # The name (and tag) of the Envoy Docker image used for the
   # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
   # @default: envoyproxy/envoy:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy:v1.25.1"
+  imageEnvoy: "envoyproxy/envoy:v1.24.10"
 
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
   # @type: string
@@ -3292,97 +3276,3 @@ prometheus:
 # is only useful when running helm template.
 tests:
   enabled: true
-
-telemetryCollector:
-  # Enables the consul-telemetry-collector deployment
-  # @type: boolean
-  enabled: false
-
-  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
-  # @type: string
-  logLevel: ""
-
-  # The name of the Docker image (including any tag) for the containers running
-  # the consul-telemetry-collector
-  # @type: string
-  image: "hashicorp/consul-telemetry-collector:0.0.1"
-
-  # The resource settings for consul-telemetry-collector pods.
-  # @recurse: false
-  # @type: map
-  resources:
-    requests:
-      memory: "512Mi"
-      cpu: "1000m"
-    limits:
-      memory: "512Mi"
-      cpu: "1000m"
-
-  # This value sets the number of consul-telemetry-collector replicas to deploy.
-  replicas: 1
-
-  # This value defines additional configuration for the telemetry collector. It should be formatted as a multi-line
-  # json blob string
-  #
-  # ```yaml
-  # customExporterConfig: |
-  #   {"http_collector_endpoint": "other-otel-collector"}
-  # ```
-  #
-  # @type: string
-  customExporterConfig: null
-
-  service:
-    # This value defines additional annotations for the server service account. This should be formatted as a multi-line
-    # string.
-    #
-    # ```yaml
-    # annotations: |
-    #   "sample/annotation1": "foo"
-    #   "sample/annotation2": "bar"
-    # ```
-    #
-    # @type: string
-    annotations: null
-
-  serviceAccount:
-    # This value defines additional annotations for the telemetry-collector's service account. This should be formatted
-    # as a multi-line string.
-    #
-    # ```yaml
-    # annotations: |
-    #   "sample/annotation1": "foo"
-    #   "sample/annotation2": "bar"
-    # ```
-    #
-    # @type: string
-    annotations: null
-
-  cloud:
-    clientId:
-      secretName: null
-      secretKey: null
-    clientSecret:
-      secretName: null
-      secretKey: null
-
-  initContainer:
-    # The resource settings for consul-telemetry-collector initContainer.
-    # @recurse: false
-    # @type: map
-    resources: {}
-
-  # Optional YAML string to specify a nodeSelector config.
-  # @type: string
-  nodeSelector: null
-
-  # Optional priorityClassName.
-  # @type: string
-  priorityClassName: ""
-
-  # A list of extra environment variables to set within the stateful set.
-  # These could be used to include proxy settings required for cloud auto-join
-  # feature, in case kubernetes cluster is behind egress http proxies. Additionally,
-  # it could be used to configure custom consul parameters.
-  # @type: map
-  extraEnvironmentVars: { }
