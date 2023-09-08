@@ -987,9 +987,18 @@ func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, sv
 		return nil
 	}
 
-	tokens, _, err := apiClient.ACL().TokenList(&api.QueryOptions{
-		Namespace: svc.Namespace,
-	})
+	// Note that while the `TokenListFiltered` query below should only return a subset
+	// of tokens from the Consul servers, it will return an unfiltered list on older
+	// versions of Consul (because they do not yet support the query parameter).
+	// To be safe, we still need to iterate over tokens and assert the service name
+	// matches as well.
+	tokens, _, err := apiClient.ACL().TokenListFiltered(
+		api.ACLTokenFilterOptions{
+			ServiceName: svc.Service,
+		},
+		&api.QueryOptions{
+			Namespace: svc.Namespace,
+		})
 	if err != nil {
 		return fmt.Errorf("failed to get a list of tokens from Consul: %s", err)
 	}
