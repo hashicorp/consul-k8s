@@ -1,6 +1,4 @@
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if (not (or (eq .Values.server.limits.requestLimits.mode "disabled") (eq .Values.server.limits.requestLimits.mode "permissive") (eq .Values.server.limits.requestLimits.mode "enforce"))) }}{{fail "server.limits.requestLimits.mode must be one of the following values: disabled, permissive, and enforce." }}{{ end -}}
-{{- if and .Values.server.auditLogs.enabled (not .Values.global.acls.manageSystemACLs) }}{{fail "ACLs must be enabled inorder to configure audit logs"}}{{ end -}}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: v1
 kind: ConfigMap
@@ -194,16 +192,7 @@ data:
         "sink": {
           {{- range $index, $element := .Values.server.auditLogs.sinks }}
           {{- if ne $index 0 }},{{end}}
-          "{{ $element.name }}": {
-            {{- $firstKeyValuePair := false }}
-            {{- range $k, $v := $element }}
-              {{- if ne $k "name" }}
-              {{- if ne $firstKeyValuePair false }},{{end}}
-              {{- $firstKeyValuePair = true }}
-              "{{ $k }}": "{{ $v }}"
-              {{- end }}
-            {{- end }}
-          }
+          "{{ get $element "name" }}": {{ omit $element "name" | toJson }}
           {{- end }}
         }
       }
