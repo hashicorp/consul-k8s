@@ -118,7 +118,7 @@ global:
       # agent annotation and [Vault Connect CA namespace](https://developer.hashicorp.com/consul/docs/connect/ca/vault#namespace).
       # To override one of these values individually, see `agentAnnotations` and `connectCA.additionalConfig`.
       vaultNamespace: ""
-
+      
       # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
       enabled: false
 
@@ -546,6 +546,14 @@ global:
     #
     # @type: string
     annotations: null
+
+  # If argocd.enabled is set to true, following annotations are added to
+  # job - server-acl-init-job
+  # annotations -
+  #   argocd.argoproj.io/hook: Sync
+  #   argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  argocd:
+    enabled: false
 
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an
@@ -2290,7 +2298,7 @@ connectInject:
   # @type: string
   imageConsul: null
 
-  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # Sets the `logLevel` for the `consul-dataplane` sidecar and the `consul-connect-inject-init` container. When set, this value overrides the global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2923,8 +2931,9 @@ ingressGateways:
 
   # Gateways is a list of gateway objects. The only required field for
   # each is `name`, though they can also contain any of the fields in
-  # `defaults`. Values defined here override the defaults except in the
-  # case of annotations where both will be applied.
+  # `defaults`. You must provide a unique name for each ingress gateway. These names
+  # must be unique across different namespaces.
+  # Values defined here override the defaults, except in the case of annotations where both will be applied.
   # @type: array<map>
   gateways:
     - name: ingress-gateway
