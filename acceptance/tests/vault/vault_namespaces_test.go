@@ -23,7 +23,7 @@ import (
 // TestVault_VaultNamespace installs Vault, configures a Vault namespace, and then bootstraps it
 // with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works
-// with the vault namespace. Namespace is added in this via global.secretsBackend.vault.vaultNamespace
+// with the vault namespace. Namespace is added in this via global.secretsBackend.vault.vaultNamespace.
 func TestVault_VaultNamespace(t *testing.T) {
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
