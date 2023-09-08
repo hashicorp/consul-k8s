@@ -198,16 +198,7 @@ data:
         "sink": {
           {{- range $index, $element := .Values.server.auditLogs.sinks }}
           {{- if ne $index 0 }},{{end}}
-          "{{ $element.name }}": {
-            {{- $firstKeyValuePair := false }}
-            {{- range $k, $v := $element }}
-              {{- if ne $k "name" }}
-              {{- if ne $firstKeyValuePair false }},{{end}}
-              {{- $firstKeyValuePair = true }}
-              "{{ $k }}": "{{ $v }}"
-              {{- end }}
-            {{- end }}
-          }
+          "{{ get $element "name" }}": {{ omit $element "name" | toJson }}
           {{- end }}
         }
       }
