@@ -1,0 +1,3 @@
+```release-note:bug
+audit-log: fix parsing error for some audit log configuration fields fail with uncovertible string to integer errors. 
+```
