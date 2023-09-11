@@ -6,6 +6,8 @@ package main
 import (
 	"os"
 
+	"github.com/mitchellh/cli"
+
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
@@ -18,6 +20,7 @@ import (
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
 	cmdInstallCNI "github.com/hashicorp/consul-k8s/control-plane/subcommand/install-cni"
+	cmdMeshInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/mesh-init"
 	cmdPartitionInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/partition-init"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/server-acl-init"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/control-plane/subcommand/sync-catalog"
@@ -25,7 +28,6 @@ import (
 	cmdVersion "github.com/hashicorp/consul-k8s/control-plane/subcommand/version"
 	webhookCertManager "github.com/hashicorp/consul-k8s/control-plane/subcommand/webhook-cert-manager"
 	"github.com/hashicorp/consul-k8s/control-plane/version"
-	"github.com/mitchellh/cli"
 )
 
 // Commands is the mapping of all available consul-k8s commands.
@@ -41,6 +43,10 @@ func init() {
 
 		"connect-init": func() (cli.Command, error) {
 			return &cmdConnectInit.Command{UI: ui}, nil
+		},
+
+		"mesh-init": func() (cli.Command, error) {
+			return &cmdMeshInit.Command{UI: ui}, nil
 		},
 
 		"inject-connect": func() (cli.Command, error) {
