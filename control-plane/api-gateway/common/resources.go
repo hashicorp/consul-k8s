@@ -407,11 +407,17 @@ func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v
 	if gatewayPolicy.Spec.TargetRef.SectionName != nil {
 		sectionName = string(*gatewayPolicy.Spec.TargetRef.SectionName)
 	}
+
+	gwNamespace := gatewayPolicy.Spec.TargetRef.Namespace
+	if gwNamespace == "" {
+		gwNamespace = gatewayPolicy.Namespace
+	}
+
 	key := api.ResourceReference{
 		Kind:        gatewayPolicy.Spec.TargetRef.Kind,
 		Name:        gatewayPolicy.Spec.TargetRef.Name,
 		SectionName: sectionName,
-		Namespace:   gatewayPolicy.Spec.TargetRef.Namespace,
+		Namespace:   gwNamespace,
 	}
 
 	if s.gatewayPolicies == nil {

@@ -103,7 +103,67 @@ func (e entryComparator) apiGatewayListenersEqual(a, b api.APIGatewayListener) b
 		a.Port == b.Port &&
 		// normalize the protocol name
 		strings.EqualFold(a.Protocol, b.Protocol) &&
-		e.apiGatewayListenerTLSConfigurationsEqual(a.TLS, b.TLS)
+		e.apiGatewayListenerTLSConfigurationsEqual(a.TLS, b.TLS) &&
+		e.apiGatewayPoliciesEqual(a.Override, b.Override) &&
+		e.apiGatewayPoliciesEqual(a.Default, b.Default)
+}
+
+func (e entryComparator) apiGatewayPoliciesEqual(a, b *api.APIGatewayPolicy) bool {
+	// if both are nil then return true
+	if a == nil && b == nil {
+		return true
+	}
+
+	// if only one is nil then return false
+	if a == nil || b == nil {
+		return false
+	}
+
+	return e.equalJWTProviders(a.JWT, b.JWT)
+}
+
+func (e entryComparator) equalJWTProviders(a, b *api.APIGatewayJWTRequirement) bool {
+	if a == nil && b == nil {
+		return true
+	}
+
+	if a == nil || b == nil {
+		return false
+	}
+
+	if len(a.Providers) != len(b.Providers) {
+		return false
+	}
+
+	for i := range a.Providers {
+		aProvider := a.Providers[i]
+		bProvider := b.Providers[i]
+		if aProvider == nil && bProvider == nil {
+			continue
+		}
+
+		if aProvider == nil || bProvider == nil {
+			return false
+		}
+
+		if aProvider.Name != bProvider.Name {
+			return false
+		}
+
+		if len(aProvider.VerifyClaims) != len(bProvider.VerifyClaims) {
+			return false
+		}
+
+		for j := range aProvider.VerifyClaims {
+		    aClaim := aProvider.VerifyClaims[j]
+		    bClaim := bProvider.VerifyClaims[j]
+		    if aClaim != bClaim {
+			return false
+		    }
+		}
+	}
+
+	return true
 }
 
 func (e entryComparator) apiGatewayListenerTLSConfigurationsEqual(a, b api.APIGatewayTLSConfiguration) bool {
