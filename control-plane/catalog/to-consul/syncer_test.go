@@ -13,13 +13,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
-
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 const (
@@ -234,7 +233,7 @@ func TestConsulSyncer_stopsGracefully(t *testing.T) {
 
 	testClient := &test.TestServerClient{
 		Cfg:     &consul.Config{APIClientConfig: &api.Config{}, HTTPPort: port},
-		Watcher: test.MockConnMgrForIPAndPort(t, parsedURL.Host, port, false),
+		Watcher: test.MockConnMgrForIPAndPort(parsedURL.Host, port),
 	}
 
 	// Start the syncer.

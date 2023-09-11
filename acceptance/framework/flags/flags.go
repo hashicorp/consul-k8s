@@ -35,13 +35,13 @@ type TestFlags struct {
 	flagHelmChartVersion       string
 	flagConsulImage            string
 	flagConsulK8sImage         string
-	flagConsulDataplaneImage   string
 	flagConsulVersion          string
-	flagConsulDataplaneVersion string
 	flagEnvoyImage             string
 	flagConsulCollectorImage   string
 	flagVaultHelmChartVersion  string
 	flagVaultServerVersion     string
+	flagConsulDataplaneImage   string
+	flagConsulDataplaneVersion string
 
 	flagHCPResourceID string
 
@@ -117,13 +117,13 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagEnableCNI, "enable-cni", false,
 		"If true, the test suite will run tests with consul-cni plugin enabled. "+
 			"In general, this will only run against tests that are mesh related (connect, mesh-gateway, peering, etc")
-
 	flag.BoolVar(&t.flagEnableRestrictedPSAEnforcement, "enable-restricted-psa-enforcement", false,
-		"If true, deploy Consul into a namespace with restricted PSA enforcement enabled. "+
-			"The Consul namespaces (-kube-namespaces) will be configured with restricted PSA enforcement. "+
-			"The CNI and test applications are deployed in different namespaces because they need more privilege than is allowed in a restricted namespace. "+
-			"The CNI will be deployed into the kube-system namespace, which is a privileged namespace that should always exist. "+
-			"Test applications are deployed, by default, into a namespace named '<consul-namespace>-apps' instead of the Consul namespace.")
+		"If true, this indicates that Consul is being run in a namespace with restricted PSA enforcement enabled. "+
+			"The tests do not configure Consul's namespace with PSA enforcement enabled. This must configured before tests are run. "+
+			"The CNI and test applications need more privilege than is allowed in a restricted namespace. "+
+			"When set, the CNI will be deployed into the kube-system namespace, and in supported test cases, applications "+
+			"are deployed, by default, into a namespace named '<consul-namespace>-apps' instead of being deployed into the "+
+			"Consul namespace.")
 
 	flag.BoolVar(&t.flagEnableTransparentProxy, "enable-transparent-proxy", false,
 		"If true, the test suite will run tests with transparent proxy enabled. "+
@@ -198,7 +198,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	kubeEnvs := config.NewKubeTestConfigList(t.flagKubeconfigs, t.flagKubecontexts, t.flagKubeNamespaces)
 
 	c := &config.TestConfig{
-
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
 
@@ -219,15 +218,14 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		HelmChartVersion:       t.flagHelmChartVersion,
 		ConsulImage:            t.flagConsulImage,
 		ConsulK8SImage:         t.flagConsulK8sImage,
-		ConsulDataplaneImage:   t.flagConsulDataplaneImage,
 		ConsulVersion:          consulVersion,
-		ConsulDataplaneVersion: consulDataplaneVersion,
 		EnvoyImage:             t.flagEnvoyImage,
 		ConsulCollectorImage:   t.flagConsulCollectorImage,
 		VaultHelmChartVersion:  t.flagVaultHelmChartVersion,
 		VaultServerVersion:     t.flagVaultServerVersion,
-
-		HCPResourceID: t.flagHCPResourceID,
+		ConsulDataplaneImage:   t.flagConsulDataplaneImage,
+		ConsulDataplaneVersion: consulDataplaneVersion,
+		HCPResourceID:          t.flagHCPResourceID,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		NoCleanup:          t.flagNoCleanup,

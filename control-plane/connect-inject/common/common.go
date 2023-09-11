@@ -8,14 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // DetermineAndValidatePort behaves as follows:
@@ -96,67 +90,6 @@ func ShouldOverwriteProbes(pod corev1.Pod, globalOverwrite bool) (bool, error) {
 	return globalOverwrite, nil
 }
 
-// ShouldIgnore ignores namespaces where we don't mesh-inject.
-func ShouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
-	// Ignores system namespaces.
-	if namespace == metav1.NamespaceSystem || namespace == metav1.NamespacePublic || namespace == "local-path-storage" {
-		return true
-	}
-
-	// Ignores deny list.
-	if denySet.Contains(namespace) {
-		return true
-	}
-
-	// Ignores if not in allow list or allow list is not *.
-	if !allowSet.Contains("*") && !allowSet.Contains(namespace) {
-		return true
-	}
-
-	return false
-}
-
 func ConsulNodeNameFromK8sNode(nodeName string) string {
 	return fmt.Sprintf("%s-virtual", nodeName)
-}
-
-// ********************
-// V2 Exclusive Common Code
-// ********************
-
-// ToProtoAny is a convenience function for converting proto.Message values to anypb.Any without error handling.
-// This should _only_ be used in cases where a nil or valid proto.Message value is _guaranteed_, else it will panic.
-// If the type of m is *anypb.Any, that value will be returned unmodified.
-func ToProtoAny(m proto.Message) *anypb.Any {
-	switch v := m.(type) {
-	case nil:
-		return nil
-	case *anypb.Any:
-		return v
-	}
-	a, err := anypb.New(m)
-	if err != nil {
-		panic(fmt.Errorf("unexpected error: failed to convert proto message to anypb.Any: %w", err))
-	}
-	return a
-}
-
-// GetPortProtocol matches the Kubernetes EndpointPort.AppProtocol or ServicePort.AppProtocol (*string) to a supported
-// Consul catalog port protocol. If nil or unrecognized, the default of `PROTOCOL_UNSPECIFIED` is returned.
-func GetPortProtocol(appProtocol *string) pbcatalog.Protocol {
-	if appProtocol == nil {
-		return pbcatalog.Protocol_PROTOCOL_UNSPECIFIED
-	}
-	switch *appProtocol {
-	case "tcp":
-		return pbcatalog.Protocol_PROTOCOL_TCP
-	case "http":
-		return pbcatalog.Protocol_PROTOCOL_HTTP
-	case "http2":
-		return pbcatalog.Protocol_PROTOCOL_HTTP2
-	case "grpc":
-		return pbcatalog.Protocol_PROTOCOL_GRPC
-	}
-	// If unrecognized or empty string, return default
-	return pbcatalog.Protocol_PROTOCOL_UNSPECIFIED
 }

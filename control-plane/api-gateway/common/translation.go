@@ -151,7 +151,7 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 		return t.translateHTTPRouteRule(route, rule, resources)
 	})
 
-	configEntry := api.HTTPRouteConfigEntry{
+	return &api.HTTPRouteConfigEntry{
 		Kind:      api.HTTPRoute,
 		Name:      route.Name,
 		Namespace: namespace,
@@ -163,13 +163,10 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 		Hostnames: hostnames,
 		Rules:     rules,
 	}
-
-	return &configEntry
 }
 
 func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
 	services := ConvertSliceFuncIf(rule.BackendRefs, func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
-
 		return t.translateHTTPBackendRef(route, ref, resources)
 	})
 
@@ -178,7 +175,7 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 	}
 
 	matches := ConvertSliceFunc(rule.Matches, t.translateHTTPMatch)
-	filters := t.translateHTTPFilters(rule.Filters, resources, route.Namespace)
+	filters := t.translateHTTPFilters(rule.Filters)
 
 	return api.HTTPRouteRule{
 		Services: services,
@@ -196,8 +193,9 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
 
 	if isServiceRef && resources.HasService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters := t.translateHTTPFilters(ref.Filters)
 		service := resources.Service(id)
+
 		return api.HTTPService{
 			Name:      service.Name,
 			Namespace: service.Namespace,
@@ -209,7 +207,7 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 
 	isMeshServiceRef := DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && DerefEqual(ref.Kind, v1alpha1.MeshServiceKind)
 	if isMeshServiceRef && resources.HasMeshService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters := t.translateHTTPFilters(ref.Filters)
 		service := resources.MeshService(id)
 
 		return api.HTTPService{
@@ -275,14 +273,12 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 	}
 }
 
-func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) api.HTTPFilters {
+func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter) api.HTTPFilters {
 	var urlRewrite *api.URLRewrite
 	consulFilter := api.HTTPHeaderFilter{
 		Add: make(map[string]string),
 		Set: make(map[string]string),
 	}
-	var retryFilter *api.RetryFilter
-	var timeoutFilter *api.TimeoutFilter
 
 	for _, filter := range filters {
 		if filter.RequestHeaderModifier != nil {
@@ -303,46 +299,10 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 			filter.URLRewrite.Path.Type == gwv1beta1.PrefixMatchHTTPPathModifier {
 			urlRewrite = &api.URLRewrite{Path: DerefStringOr(filter.URLRewrite.Path.ReplacePrefixMatch, "")}
 		}
-
-		if filter.ExtensionRef != nil {
-			//get crd from resources map
-			crdFilter, exists := resourceMap.GetExternalFilter(*filter.ExtensionRef, namespace)
-			if !exists {
-				// this should never be the case because we only translate a route if it's actually valid, and if we're missing filters during the validation step, then we won't get here
-				continue
-			}
-			switch filter.ExtensionRef.Kind {
-			case v1alpha1.RouteRetryFilterKind:
-
-				retryFilterCRD := crdFilter.(*v1alpha1.RouteRetryFilter)
-				//new filter that needs to be appended
-
-				retryFilter = &api.RetryFilter{
-					NumRetries:            retryFilterCRD.Spec.NumRetries,
-					RetryOn:               retryFilterCRD.Spec.RetryOn,
-					RetryOnStatusCodes:    retryFilterCRD.Spec.RetryOnStatusCodes,
-					RetryOnConnectFailure: retryFilterCRD.Spec.RetryOnConnectFailure,
-				}
-
-			case v1alpha1.RouteTimeoutFilterKind:
-
-				timeoutFilterCRD := crdFilter.(*v1alpha1.RouteTimeoutFilter)
-				//new filter that needs to be appended
-
-				timeoutFilter = &api.TimeoutFilter{
-					RequestTimeout: timeoutFilterCRD.Spec.RequestTimeout,
-					IdleTimeout:    timeoutFilterCRD.Spec.IdleTimeout,
-				}
-
-			}
-		}
-
 	}
 	return api.HTTPFilters{
-		Headers:       []api.HTTPHeaderFilter{consulFilter},
-		URLRewrite:    urlRewrite,
-		RetryFilter:   retryFilter,
-		TimeoutFilter: timeoutFilter,
+		Headers:    []api.HTTPHeaderFilter{consulFilter},
+		URLRewrite: urlRewrite,
 	}
 }
 
