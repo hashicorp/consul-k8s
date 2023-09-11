@@ -49,7 +49,7 @@ func TestConnectInject_LocalRateLimiting(t *testing.T) {
 
 	opts := newRateLimitOptions(t, ctx)
 
-	// Ensure that all requests from static-client to static-server succeed.
+	// Ensure that all requests from static-client to static-server succeed (no rate limiting set).
 	for addr, rps := range rateLimitMap {
 		opts.rps = rps
 		assertRateLimits(t, opts, addr)
