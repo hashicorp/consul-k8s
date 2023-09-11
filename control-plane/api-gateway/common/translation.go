@@ -279,46 +279,64 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 }
 
 func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters) {
-	var urlRewrite *api.URLRewrite
-	// TODO Consider only setting a filter on the resulting Consul config entry
-	//   if we encounter a gwb1beta1.HTTPRouteFilter that requires it
-	consulFilter := api.HTTPHeaderFilter{
-		Add: make(map[string]string),
-		Set: make(map[string]string),
-	}
-	consulResponseFilter := api.HTTPHeaderFilter{
-		Add: make(map[string]string),
-		Set: make(map[string]string),
-	}
-	var retryFilter *api.RetryFilter
-	var timeoutFilter *api.TimeoutFilter
+	var (
+		urlRewrite            *api.URLRewrite
+		retryFilter           *api.RetryFilter
+		timeoutFilter         *api.TimeoutFilter
+		requestHeaderFilters  = []api.HTTPHeaderFilter{}
+		responseHeaderFilters = []api.HTTPHeaderFilter{}
+	)
 
 	// Convert Gateway API filters to portions of the Consul request and response filters.
 	// Multiple filters applying the same or conflicting operations are allowed but may
 	// result in unexpected behavior.
 	for _, filter := range filters {
 		if filter.RequestHeaderModifier != nil {
-			consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
+			newFilter := api.HTTPHeaderFilter{}
 
-			for _, toAdd := range filter.RequestHeaderModifier.Add {
-				consulFilter.Add[string(toAdd.Name)] = toAdd.Value
+			if len(filter.RequestHeaderModifier.Remove) > 0 {
+				newFilter.Remove = append(newFilter.Remove, filter.RequestHeaderModifier.Remove...)
 			}
 
-			for _, toSet := range filter.RequestHeaderModifier.Set {
-				consulFilter.Set[string(toSet.Name)] = toSet.Value
+			if len(filter.RequestHeaderModifier.Add) > 0 {
+				newFilter.Add = map[string]string{}
+				for _, toAdd := range filter.RequestHeaderModifier.Add {
+					newFilter.Add[string(toAdd.Name)] = toAdd.Value
+				}
 			}
+
+			if len(filter.RequestHeaderModifier.Set) > 0 {
+				newFilter.Set = map[string]string{}
+				for _, toSet := range filter.RequestHeaderModifier.Set {
+					newFilter.Set[string(toSet.Name)] = toSet.Value
+				}
+			}
+
+			requestHeaderFilters = append(requestHeaderFilters, newFilter)
 		}
 
 		if filter.ResponseHeaderModifier != nil {
-			consulResponseFilter.Remove = append(consulResponseFilter.Remove, filter.ResponseHeaderModifier.Remove...)
+			newFilter := api.HTTPHeaderFilter{}
 
-			for _, toAdd := range filter.ResponseHeaderModifier.Add {
-				consulResponseFilter.Add[string(toAdd.Name)] = toAdd.Value
+			if len(filter.ResponseHeaderModifier.Remove) > 0 {
+				newFilter.Remove = append(newFilter.Remove, filter.ResponseHeaderModifier.Remove...)
 			}
 
-			for _, toSet := range filter.ResponseHeaderModifier.Set {
-				consulResponseFilter.Set[string(toSet.Name)] = toSet.Value
+			if len(filter.ResponseHeaderModifier.Add) > 0 {
+				newFilter.Add = map[string]string{}
+				for _, toAdd := range filter.ResponseHeaderModifier.Add {
+					newFilter.Add[string(toAdd.Name)] = toAdd.Value
+				}
 			}
+
+			if len(filter.ResponseHeaderModifier.Set) > 0 {
+				newFilter.Set = map[string]string{}
+				for _, toSet := range filter.ResponseHeaderModifier.Set {
+					newFilter.Set[string(toSet.Name)] = toSet.Value
+				}
+			}
+
+			responseHeaderFilters = append(responseHeaderFilters, newFilter)
 		}
 
 		// we drop any path rewrites that are not prefix matches as we don't support those
@@ -364,14 +382,14 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 	}
 
 	requestFilter := api.HTTPFilters{
-		Headers:       []api.HTTPHeaderFilter{consulFilter},
+		Headers:       requestHeaderFilters,
 		URLRewrite:    urlRewrite,
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
 	}
 
 	responseFilter := api.HTTPResponseFilters{
-		Headers: []api.HTTPHeaderFilter{consulResponseFilter},
+		Headers: responseHeaderFilters,
 	}
 
 	return requestFilter, responseFilter
