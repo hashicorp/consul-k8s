@@ -150,7 +150,7 @@ spec:
               fieldPath: metadata.name
         # Extract the Vault namespace from the Vault agent annotations.
         {{- if .Values.global.secretsBackend.vault.enabled }}
-        {{- if and (.Values.global.secretsBackend.vault.agentAnnotations) (hasKey default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml "vault.hashicorp.com/namespace") }}
+        {{- if and (.Values.global.secretsBackend.vault.agentAnnotations) (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace") }}
         - name: VAULT_NAMESPACE
           value: {{ get (tpl .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace" }}
         {{- else if .Values.global.secretsBackend.vault.vaultNamespace }}
