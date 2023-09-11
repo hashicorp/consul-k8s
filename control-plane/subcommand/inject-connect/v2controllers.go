@@ -143,12 +143,18 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 			TProxyOverwriteProbes:        c.flagTransparentProxyDefaultOverwriteProbes,
 			EnableConsulDNS:              c.flagEnableConsulDNS,
 			EnableOpenShift:              c.flagEnableOpenShift,
-			Log:                          ctrl.Log.WithName("handler").WithName("connect"),
+			Log:                          ctrl.Log.WithName("handler").WithName("consul-mesh"),
 			LogLevel:                     c.flagLogLevel,
 			LogJSON:                      c.flagLogJSON,
 		}})
 
-	// TODO: Update Webhook CA Bundle
+	if c.flagEnableWebhookCAUpdate {
+		err := c.updateWebhookCABundle(ctx)
+		if err != nil {
+			setupLog.Error(err, "problem getting CA Cert")
+			return err
+		}
+	}
 
 	return nil
 }

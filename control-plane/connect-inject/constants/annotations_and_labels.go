@@ -6,8 +6,7 @@ package constants
 const (
 	// KeyInjectStatus is the key of the annotation that is added to
 	// a pod after an injection is done.
-	KeyInjectStatus   = "consul.hashicorp.com/connect-inject-status"
-	KeyInjectStatusV2 = "consul.hashicorp.com/mesh-inject-status"
+	KeyInjectStatus = "consul.hashicorp.com/connect-inject-status"
 
 	// KeyTransparentProxyStatus is the key of the annotation that is added to
 	// a pod when transparent proxy is done.
@@ -22,8 +21,7 @@ const (
 	// AnnotationInject is the key of the annotation that controls whether
 	// injection is explicitly enabled or disabled for a pod. This should
 	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
-	AnnotationInject   = "consul.hashicorp.com/connect-inject"
-	AnnotationInjectV2 = "consul.hashicorp.com/mesh-inject"
+	AnnotationInject = "consul.hashicorp.com/connect-inject"
 
 	// AnnotationGatewayKind is the key of the annotation that indicates pods
 	// that represent Consul Connect Gateways. This should be set to a
@@ -80,8 +78,7 @@ const (
 	// service name should map to a Consul service namd and the local port
 	// is the local port in the pod that the listener will bind to. It can
 	// be a named port.
-	AnnotationUpstreams   = "consul.hashicorp.com/connect-service-upstreams"
-	AnnotationUpstreamsV2 = "consul.hashicorp.com/mesh-service-destinations"
+	AnnotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
 
 	// AnnotationTags is a list of tags to register with the service
 	// this is specified as a comma separated list e.g. abc,123.
@@ -232,6 +229,12 @@ const (
 	// ManagedByPodValue is used in Consul metadata to identify the manager
 	// of resources.
 	ManagedByPodValue = "consul-k8s-pod-controller"
+
+	// AnnotationMeshDestinations is a list of upstreams to register with the
+	// proxy. The service name should map to a Consul service namd and the local
+	// port is the local port in the pod that the listener will bind to. It can
+	// be a named port.
+	AnnotationMeshDestinations = "consul.hashicorp.com/mesh-service-destinations"
 )
 
 // Annotations used by Prometheus.

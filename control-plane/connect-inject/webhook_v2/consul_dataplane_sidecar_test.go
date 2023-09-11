@@ -52,7 +52,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-namespace=default -service-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-login-namespace=default -proxy-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and single destination namespace": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -61,7 +61,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulDestinationNamespace = "test-ns"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-namespace=test-ns -service-namespace=test-ns -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-login-namespace=test-ns -proxy-namespace=test-ns -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -69,7 +69,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulPartition = "test-part"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-partition=test-part -service-partition=test-part -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-login-partition=test-part -proxy-partition=test-part -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with TLS and CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -91,14 +91,14 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableNamespaces = true
 				w.ConsulDestinationNamespace = "consul-namespace"
 			},
-			additionalExpCmdArgs: " -service-namespace=consul-namespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -proxy-namespace=consul-namespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with namespace mirroring": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.EnableNamespaces = true
 				w.EnableK8SNSMirroring = true
 			},
-			additionalExpCmdArgs: " -service-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -proxy-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with namespace mirroring prefix": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -106,13 +106,13 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 				w.K8SNSMirroringPrefix = "foo-"
 			},
-			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -proxy-namespace=foo-k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.ConsulPartition = "partition-1"
 			},
-			additionalExpCmdArgs: " -service-partition=partition-1 -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -proxy-partition=partition-1 -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with different log level": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -186,8 +186,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			container, err := w.consulDataplaneSidecar(testNS, pod)
 			require.NoError(t, err)
 			expCmd := "-addresses 1.1.1.1 -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
-				" -proxy-service-id-path=/consul/mesh-inject/proxyid " +
-				"-log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs
+				" -log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs
 			require.Equal(t, expCmd, strings.Join(container.Args, " "))
 
 			if w.AuthMethod != "" {
@@ -223,10 +222,10 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			require.Len(t, container.Env, 7)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
 			require.Equal(t, container.Env[0].Value, "/consul/mesh-inject")
-			require.Equal(t, container.Env[2].Name, "DP_SERVICE_NODE_NAME")
-			require.Equal(t, container.Env[2].Value, "$(NODE_NAME)-virtual")
-			require.Equal(t, container.Env[3].Name, "POD_NAME")
-			require.Equal(t, container.Env[4].Name, "POD_NAMESPACE")
+			require.Equal(t, container.Env[2].Name, "POD_NAME")
+			require.Equal(t, container.Env[3].Name, "POD_NAMESPACE")
+			require.Equal(t, container.Env[4].Name, "DP_PROXY_ID")
+			require.Equal(t, container.Env[4].Value, "$(POD_NAME)")
 			require.Equal(t, container.Env[5].Name, "DP_CREDENTIAL_LOGIN_META")
 			require.Equal(t, container.Env[5].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
 			require.Equal(t, container.Env[6].Name, "DP_CREDENTIAL_LOGIN_META1")

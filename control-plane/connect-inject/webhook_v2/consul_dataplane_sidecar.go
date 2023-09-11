@@ -91,10 +91,6 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 					},
 				},
 			},
-			{
-				Name:  "DP_SERVICE_NODE_NAME",
-				Value: "$(NODE_NAME)-virtual",
-			},
 			// The pod name isn't known currently, so we must rely on the environment variable to fill it in rather than using args.
 			{
 				Name: "POD_NAME",
@@ -107,6 +103,10 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
 				},
+			},
+			{
+				Name:  "DP_PROXY_ID",
+				Value: "$(POD_NAME)",
 			},
 			{
 				Name:  "DP_CREDENTIAL_LOGIN_META",
@@ -143,7 +143,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		})
 		// Configure the port on which the readiness probe will query the proxy for its health.
 		container.Ports = append(container.Ports, corev1.ContainerPort{
-			Name:          fmt.Sprintf("%s", "proxy-health"),
+			Name:          "proxy-health",
 			ContainerPort: int32(constants.ProxyDefaultHealthPort),
 		})
 	}
@@ -194,8 +194,6 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 }
 
 func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, bearerTokenFile string, pod corev1.Pod) ([]string, error) {
-	proxyIDFileName := "/consul/mesh-inject/proxyid"
-
 	envoyConcurrency := w.DefaultEnvoyProxyConcurrency
 
 	// Check to see if the user has overriden concurrency via an annotation.
@@ -210,7 +208,6 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, bearer
 	args := []string{
 		"-addresses", w.ConsulAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
-		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,
 		"-log-json=" + strconv.FormatBool(w.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
@@ -239,10 +236,10 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, bearer
 		}
 	}
 	if w.EnableNamespaces {
-		args = append(args, "-service-namespace="+w.consulNamespace(namespace.Name))
+		args = append(args, "-proxy-namespace="+w.consulNamespace(namespace.Name))
 	}
 	if w.ConsulPartition != "" {
-		args = append(args, "-service-partition="+w.ConsulPartition)
+		args = append(args, "-proxy-partition="+w.ConsulPartition)
 	}
 	if w.TLSEnabled {
 		if w.ConsulTLSServerName != "" {

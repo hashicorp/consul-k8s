@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
+	"golang.org/x/exp/slices"
 	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -314,7 +314,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
 	// and does not need to be checked for being a nil value.
-	pod.Annotations[constants.KeyInjectStatusV2] = constants.Injected
+	pod.Annotations[constants.KeyMeshInjectStatus] = constants.Injected
 
 	tproxyEnabled, err := common.TransparentProxyEnabled(*ns, pod, w.EnableTransparentProxy)
 	if err != nil {
@@ -350,7 +350,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
-	pod.Labels[constants.KeyInjectStatusV2] = constants.Injected
+	pod.Labels[constants.KeyMeshInjectStatus] = constants.Injected
 
 	// Consul-ENT only: Add the Consul destination namespace as an annotation to the pod.
 	if w.EnableNamespaces {
@@ -456,7 +456,7 @@ func (w *MeshWebhook) injectVolumeMount(pod corev1.Pod) {
 	containersToInject := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationInjectMountVolumes, pod)
 
 	for index, container := range pod.Spec.Containers {
-		if sliceContains(containersToInject, container.Name) {
+		if slices.Contains(containersToInject, container.Name) {
 			pod.Spec.Containers[index].VolumeMounts = append(pod.Spec.Containers[index].VolumeMounts, corev1.VolumeMount{
 				Name:      volumeName,
 				MountPath: "/consul/connect-inject",
@@ -483,14 +483,14 @@ func (w *MeshWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, erro
 	}
 
 	// If we already injected then don't inject again
-	if pod.Annotations[constants.KeyInjectStatusV2] != "" {
+	if pod.Annotations[constants.KeyMeshInjectStatus] != "" || pod.Annotations[constants.KeyInjectStatus] != "" {
 		return false, nil
 	}
 
 	// If the explicit true/false is on, then take that value. Note that
 	// this has to be the last check since it sets a default value after
 	// all other checks.
-	if raw, ok := pod.Annotations[constants.AnnotationInjectV2]; ok {
+	if raw, ok := pod.Annotations[constants.AnnotationMeshInject]; ok {
 		return strconv.ParseBool(raw)
 	}
 
@@ -557,24 +557,7 @@ func findServiceAccountVolumeMount(pod corev1.Pod) (corev1.VolumeMount, string, 
 	return volumeMount, "/var/run/secrets/kubernetes.io/serviceaccount/token", nil
 }
 
-func (w *MeshWebhook) annotatedServiceNames(pod corev1.Pod) []string {
-	var annotatedSvcNames []string
-	if anno, ok := pod.Annotations[constants.AnnotationService]; ok {
-		annotatedSvcNames = strings.Split(anno, ",")
-	}
-	return annotatedSvcNames
-}
-
 func (w *MeshWebhook) InjectDecoder(d *admission.Decoder) error {
 	w.decoder = d
 	return nil
-}
-
-func sliceContains(slice []string, entry string) bool {
-	for _, s := range slice {
-		if entry == s {
-			return true
-		}
-	}
-	return false
 }

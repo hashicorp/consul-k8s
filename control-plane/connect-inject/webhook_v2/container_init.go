@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	injectInitContainerName      = "consul-connect-inject-init"
+	injectInitContainerName      = "consul-mesh-init"
 	rootUserAndGroupID           = 0
 	sidecarUserAndGroupID        = 5995
 	initContainersUserAndGroupID = 5996
