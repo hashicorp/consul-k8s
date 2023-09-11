@@ -1236,7 +1236,7 @@ key2: value2' \
   [ "${actual}" = "bar" ]
 }
 
-@test "ingressGateway/Deployment: vault namespace annotations can be set when secretsBackend.vault.vaultNamespace is set and .global.secretsBackend.vault.agentAnnotations is not set." {
+@test "terminatingGateways/Deployment: vault namespace annotations can be set when secretsBackend.vault.vaultNamespace is set and .global.secretsBackend.vault.agentAnnotations is not set." {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \
