@@ -29,6 +29,7 @@ const (
 	HTTPRoute_MeshServiceIndex        = "__httproute_referencing_mesh_service"
 	HTTPRoute_RouteRetryFilterIndex   = "__httproute_referencing_retryfilter"
 	HTTPRoute_RouteTimeoutFilterIndex = "__httproute_referencing_timeoutfilter"
+	HTTPRoute_RouteAuthFilterIndex    = "__httproute_referencing_routeauthfilter"
 
 	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
 	TCPRoute_ServiceIndex     = "__tcproute_referencing_service"
@@ -120,6 +121,11 @@ var indexes = []index{
 	},
 	{
 		name:        HTTPRoute_RouteTimeoutFilterIndex,
+		target:      &gwv1beta1.HTTPRoute{},
+		indexerFunc: filtersForHTTPRoute,
+	},
+	{
+		name:        HTTPRoute_RouteAuthFilterIndex,
 		target:      &gwv1beta1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
