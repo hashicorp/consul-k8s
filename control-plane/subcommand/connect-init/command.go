@@ -432,5 +432,5 @@ const help = `
 Usage: consul-k8s-control-plane connect-init [options]
 
   Bootstraps connect-injected pod components.
-  Not intended for stand-alone use.
+  Hello World.
 `
