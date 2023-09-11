@@ -477,7 +477,13 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Watches(
 			source.NewKindWithCache((&v1alpha1.RouteTimeoutFilter{}), mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteTimeoutFilter(ctx)),
-		).Complete(r)
+		).
+		Watches(
+			// Subscribe to changes in RouteAuthFilter custom resources referenced by HTTPRoutes.
+			source.NewKindWithCache((&v1alpha1.RouteAuthFilter{}), mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteAuthFilter(ctx)),
+		).
+		Complete(r)
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
@@ -625,6 +631,12 @@ func (r *GatewayController) transformRouteRetryFilter(ctx context.Context) func(
 func (r *GatewayController) transformRouteTimeoutFilter(ctx context.Context) func(object client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteTimeoutFilterIndex, client.ObjectKeyFromObject(o).String())
+	}
+}
+
+func (r *GatewayController) transformRouteAuthFilter(ctx context.Context) func(object client.Object) []reconcile.Request {
+	return func(o client.Object) []reconcile.Request {
+		return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteAuthFilterIndex, client.ObjectKeyFromObject(o).String())
 	}
 }
 
