@@ -203,6 +203,7 @@ const (
 	Enabled = "enabled"
 
 	// ManagedByValue is the value for keyManagedBy.
+	//TODO(zalimeni) rename this to ManagedByLegacyEndpointsValue.
 	ManagedByValue = "consul-k8s-endpoints-controller"
 )
 
@@ -220,8 +221,13 @@ const (
 	// a pod after an injection is done.
 	KeyMeshInjectStatus = "consul.hashicorp.com/mesh-inject-status"
 
+	// ManagedByEndpointsValue is used in Consul metadata to identify the manager
+	// of resources. The 'v2' suffix is used to differentiate from the legacy
+	// endpoints controller of the same name.
+	ManagedByEndpointsValue = "consul-k8s-endpoints-controller-v2"
+
 	// ManagedByPodValue is used in Consul metadata to identify the manager
-	// of this resource.
+	// of resources.
 	ManagedByPodValue = "consul-k8s-pod-controller"
 )
 
