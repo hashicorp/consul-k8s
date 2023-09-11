@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package serveraclinit
 
 import (
@@ -330,7 +327,6 @@ partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"
 {{- else }}
-  mesh = "write"
   operator = "write"
   acl = "write"
 {{- end }}

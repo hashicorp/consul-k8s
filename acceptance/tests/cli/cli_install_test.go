@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package cli
 
 import (
@@ -52,8 +49,8 @@ func TestInstall(t *testing.T) {
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
 			if c.secure {
-				connHelper.TestConnectionFailureWithoutIntention(t, connhelper.ConnHelperOpts{})
-				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
+				connHelper.TestConnectionFailureWithoutIntention(t)
+				connHelper.CreateIntention(t)
 			}
 
 			// Run proxy list and get the two results.
@@ -121,7 +118,7 @@ func TestInstall(t *testing.T) {
 				logger.Log(t, string(proxyOut))
 			}
 
-			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+			connHelper.TestConnectionSuccess(t)
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
 	}

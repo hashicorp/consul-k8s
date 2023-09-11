@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package serveraclinit
 
 import (
@@ -953,7 +950,6 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    false,
 			Expected: `
-  mesh = "write"
   operator = "write"
   acl = "write"
   node_prefix "" {
@@ -970,7 +966,6 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    false,
 			Expected: `
-  mesh = "write"
   operator = "write"
   acl = "write"
   node_prefix "" {
@@ -989,7 +984,6 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    true,
 			Expected: `
-  mesh = "write"
   operator = "write"
   acl = "write"
   peering = "write"

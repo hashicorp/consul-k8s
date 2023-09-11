@@ -24,7 +24,6 @@
     1. [Writing Acceptance tests](#writing-acceptance-tests)
 1. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
 1. [Helm Reference Docs](#helm-reference-docs)
-1. [Managing External CRD Dependencies](#managing-external-crd-dependencies)
 1. [Adding a Changelog Entry](#adding-a-changelog-entry)
 
 ## Contributing 101
@@ -168,7 +167,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```bash
     operator-sdk create api --group consul --version v1alpha1 --kind IngressGateway --controller --namespaced=true --make=false --resource=true
     ```
-1. Re-order the generated ingressgateway_types.go file, so it looks like:
+1. Re-order the file so it looks like:
     ```go
     func init() {
     	SchemeBuilder.Register(&IngressGateway{}, &IngressGatewayList{})
@@ -214,7 +213,6 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```go
     // ServiceRouter is the Schema for the servicerouters API
     // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
-    // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
     // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
     type ServiceRouter struct {
     ```
@@ -233,7 +231,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```
 1. Go to the Consul `api` package for the config entry, e.g. https://github.com/hashicorp/consul/blob/main/api/config_entry_gateways.go
 1. Copy the top-level fields over into the `Spec` struct except for
-   `Kind`, `Name`, `Namespace`, `Partition`, `Meta`, `CreateIndex` and `ModifyIndex`. In this
+   `Kind`, `Name`, `Namespace`, `Meta`, `CreateIndex` and `ModifyIndex`. In this
    example, the top-level fields remaining are `TLS` and `Listeners`:
    
     ```go
@@ -322,6 +320,8 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 
 ### Controller
 1. Delete the file `control-plane/controllers/suite_test.go`. We don't write suite tests, just unit tests.
+1. Move `control-plane/controllers/ingressgateway_controller.go` to `control-plane/controller` directory.
+1. Delete the `control-plane/controllers` directory.
 1. Rename `Reconciler` to `Controller`, e.g. `IngressGatewayReconciler` => `IngressGatewayController`
 1. Use the existing controller files as a guide and make this file match.
 1. Add your controller as a case in the tests in `configentry_controller_test.go`:
@@ -376,7 +376,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 
 ### Generating YAML
 1. Run `make ctrl-manifests` to generate the CRD and webhook YAML.
-1. Uncomment your CRD in `control-plane/config/crd/kustomization` under `patches:`
+1. Uncomment your CRD in `control-plane/config/crd/kustomization` under `patchesStrategicMerge:`
 1. Update the sample, e.g. `control-plane/config/samples/consul_v1alpha1_ingressgateway.yaml` to a valid resource
    that can be used for testing:
     ```yaml
@@ -395,13 +395,13 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```
 
 ### Updating Helm chart
-1. Update `charts/consul/templates/connect-inject-mutatingwebhookconfiguration` with the webhook for this resource
+1. Update `charts/consul/templates/controller-mutatingwebhookconfiguration` with the webhook for this resource
    using the updated `control-plane/config/webhook/manifests.v1beta1.yaml` and replacing `clientConfig.service.name/namespace`
    with the templated strings shown below to match the other webhooks.:
     ```yaml
     - clientConfig:
         service:
-          name: {{ template "consul.fullname" . }}-connect-injector
+          name: {{ template "consul.fullname" . }}-controller-webhook
           namespace: {{ .Release.Namespace }}
           path: /mutate-v1alpha1-ingressgateway
       failurePolicy: Fail
@@ -421,7 +421,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
             - ingressgateways
       sideEffects: None
     ```
-1. Update `charts/consul/templates/connect-inject-clusterrole.yaml` to allow the controller to
+1. Update `charts/consul/templates/controller-clusterrole.yaml` to allow the controller to
    manage your resource type.
 
 ### Testing A New CRD
@@ -1208,26 +1208,6 @@ So that the documentation can look like:
 ```markdown
 - `ports` ((#v-ingressgateways-defaults-service-ports)) (`array<map>: [{port: 8080, port: 8443}]`) - Port docs
 ```
-
-## Managing External CRD Dependencies
-
-Some of the features of Consul on Kubernetes make use of CustomResourceDefinitions (CRDs) that we don't directly
-manage. One such example is the Gateway API CRDs which we use to configure API Gateways, but are managed by SIG
-Networking.
-
-To pull external CRDs into our Helm chart and make sure they get installed, we generate their configuration using
-[Kustomize](https://kustomize.io/) which can pull in Kubernetes config from external sources. We split these 
-generated CRDs into individual files and store them in the `charts/consul/templates` directory.
-
-If you need to update the external CRDs we depend on, or add to them, you can do this by editing the 
-[control-plane/config/crd/external/kustomization.yaml](/control-plane/config/crd/external/kustomization.yaml) file. 
-Once modified, running
-
-```bash
-make generate-external-crds
-```
-
-will update the CRDs in the `/templates` directory.
 
 ## Adding a Changelog Entry
 

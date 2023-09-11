@@ -1,23 +1,13 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package common
 
 import (
 	"testing"
 
-	mapset "github.com/deckarep/golang-set"
-	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/testing/protocmp"
-	"google.golang.org/protobuf/types/known/anypb"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCommonDetermineAndValidatePort(t *testing.T) {
@@ -264,138 +254,5 @@ func minimal() *corev1.Pod {
 				},
 			},
 		},
-	}
-}
-
-func TestShouldIgnore(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name      string
-		namespace string
-		denySet   mapset.Set
-		allowSet  mapset.Set
-		expected  bool
-	}{
-		{
-			name:      "system namespace",
-			namespace: "kube-system",
-			denySet:   mapset.NewSetWith(),
-			allowSet:  mapset.NewSetWith("*"),
-			expected:  true,
-		},
-		{
-			name:      "other system namespace",
-			namespace: "local-path-storage",
-			denySet:   mapset.NewSetWith(),
-			allowSet:  mapset.NewSetWith("*"),
-			expected:  true,
-		},
-		{
-			name:      "any namespace allowed",
-			namespace: "foo",
-			denySet:   mapset.NewSetWith(),
-			allowSet:  mapset.NewSetWith("*"),
-			expected:  false,
-		},
-		{
-			name:      "in deny list",
-			namespace: "foo",
-			denySet:   mapset.NewSetWith("foo"),
-			allowSet:  mapset.NewSetWith("*"),
-			expected:  true,
-		},
-		{
-			name:      "not in allow list",
-			namespace: "foo",
-			denySet:   mapset.NewSetWith(),
-			allowSet:  mapset.NewSetWith("bar"),
-			expected:  true,
-		},
-	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := ShouldIgnore(tt.namespace, tt.denySet, tt.allowSet)
-			require.Equal(t, tt.expected, actual)
-		})
-	}
-}
-
-func TestToProtoAny(t *testing.T) {
-	t.Parallel()
-
-	t.Run("nil gets nil", func(t *testing.T) {
-		require.Nil(t, ToProtoAny(nil))
-	})
-
-	t.Run("anypb.Any gets same value", func(t *testing.T) {
-		testMsg := &pbresource.Resource{Id: &pbresource.ID{Name: "foo"}}
-		testAny, err := anypb.New(testMsg)
-		require.NoError(t, err)
-
-		require.Equal(t, testAny, ToProtoAny(testAny))
-	})
-
-	t.Run("valid proto is successfully serialized", func(t *testing.T) {
-		testMsg := &pbresource.Resource{Id: &pbresource.ID{Name: "foo"}}
-		testAny, err := anypb.New(testMsg)
-		require.NoError(t, err)
-
-		if diff := cmp.Diff(testAny, ToProtoAny(testMsg), protocmp.Transform()); diff != "" {
-			t.Errorf("unexpected difference:\n%v", diff)
-		}
-	})
-}
-
-func TestGetPortProtocol(t *testing.T) {
-	t.Parallel()
-	toStringPtr := func(s string) *string {
-		return &s
-	}
-	cases := []struct {
-		name     string
-		input    *string
-		expected pbcatalog.Protocol
-	}{
-		{
-			name:     "nil gets UNSPECIFIED",
-			input:    nil,
-			expected: pbcatalog.Protocol_PROTOCOL_UNSPECIFIED,
-		},
-		{
-			name:     "tcp gets TCP",
-			input:    toStringPtr("tcp"),
-			expected: pbcatalog.Protocol_PROTOCOL_TCP,
-		},
-		{
-			name:     "http gets HTTP",
-			input:    toStringPtr("http"),
-			expected: pbcatalog.Protocol_PROTOCOL_HTTP,
-		},
-		{
-			name:     "http2 gets HTTP2",
-			input:    toStringPtr("http2"),
-			expected: pbcatalog.Protocol_PROTOCOL_HTTP2,
-		},
-		{
-			name:     "grpc gets GRPC",
-			input:    toStringPtr("grpc"),
-			expected: pbcatalog.Protocol_PROTOCOL_GRPC,
-		},
-		{
-			name:     "case sensitive",
-			input:    toStringPtr("gRPC"),
-			expected: pbcatalog.Protocol_PROTOCOL_UNSPECIFIED,
-		},
-		{
-			name:     "unknown gets UNSPECIFIED",
-			input:    toStringPtr("foo"),
-			expected: pbcatalog.Protocol_PROTOCOL_UNSPECIFIED,
-		},
-	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := GetPortProtocol(tt.input)
-			require.Equal(t, tt.expected, actual)
-		})
 	}
 }

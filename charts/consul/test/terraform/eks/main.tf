@@ -1,16 +1,6 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
-terraform {
-  required_providers {
-    aws = {
-      version = ">= 4.0.0"
-    }
-  }
-}
-
 provider "aws" {
-  region = var.region
+  version = ">= 2.28.1"
+  region  = var.region
 
   assume_role {
     role_arn = var.role_arn
@@ -35,7 +25,7 @@ resource "random_string" "suffix" {
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
-  version = "4.0.0"
+  version = "3.11.0"
 
   name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
@@ -68,7 +58,7 @@ module "eks" {
   kubeconfig_api_version = "client.authentication.k8s.io/v1beta1"
 
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
-  cluster_version = "1.26"
+  cluster_version = "1.23"
   subnets         = module.vpc[count.index].private_subnets
   enable_irsa     = true
 
@@ -80,7 +70,7 @@ module "eks" {
       max_capacity     = 3
       min_capacity     = 3
 
-      instance_type = "m5.xlarge"
+      instance_type = "m5.large"
     }
   }
 
@@ -124,13 +114,12 @@ resource "aws_iam_role_policy_attachment" "csi" {
 }
 
 resource "aws_eks_addon" "csi-driver" {
-  count                       = var.cluster_count
-  cluster_name                = module.eks[count.index].cluster_id
-  addon_name                  = "aws-ebs-csi-driver"
-  addon_version               = "v1.15.0-eksbuild.1"
-  service_account_role_arn    = aws_iam_role.csi-driver-role[count.index].arn
-  resolve_conflicts_on_create = "OVERWRITE"
-  resolve_conflicts_on_update = "OVERWRITE"
+  count                    = var.cluster_count
+  cluster_name             = module.eks[count.index].cluster_id
+  addon_name               = "aws-ebs-csi-driver"
+  addon_version            = "v1.15.0-eksbuild.1"
+  service_account_role_arn = aws_iam_role.csi-driver-role[count.index].arn
+  resolve_conflicts        = "OVERWRITE"
 }
 
 data "aws_eks_cluster" "cluster" {

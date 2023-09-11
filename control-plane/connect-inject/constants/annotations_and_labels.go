@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package constants
 
 const (
@@ -181,12 +178,8 @@ const (
 	// to explicitly perform the peering operation again.
 	AnnotationPeeringVersion = "consul.hashicorp.com/peering-version"
 
-	// LegacyAnnotationConsulK8sVersion is the current version of this binary.
-	// TODO: remove this annotation in a future release.
-	LegacyAnnotationConsulK8sVersion = "consul.hashicorp.com/connect-k8s-version"
-
 	// AnnotationConsulK8sVersion is the current version of this binary.
-	AnnotationConsulK8sVersion = "consul.hashicorp.com/consul-k8s-version"
+	AnnotationConsulK8sVersion = "consul.hashicorp.com/connect-k8s-version"
 
 	// LabelServiceIgnore is a label that can be added to a service to prevent it from being
 	// registered with Consul.
@@ -203,32 +196,7 @@ const (
 	Enabled = "enabled"
 
 	// ManagedByValue is the value for keyManagedBy.
-	//TODO(zalimeni) rename this to ManagedByLegacyEndpointsValue.
 	ManagedByValue = "consul-k8s-endpoints-controller"
-)
-
-// ********************
-// V2 Exclusive Annotations & Labels
-// ********************
-
-const (
-	// AnnotationMeshInject is the key of the annotation that controls whether
-	// V2 mesh injection is explicitly enabled or disabled for a pod using.
-	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
-	AnnotationMeshInject = "consul.hashicorp.com/mesh-inject"
-
-	// KeyMeshInjectStatus is the key of the annotation that is added to
-	// a pod after an injection is done.
-	KeyMeshInjectStatus = "consul.hashicorp.com/mesh-inject-status"
-
-	// ManagedByEndpointsValue is used in Consul metadata to identify the manager
-	// of resources. The 'v2' suffix is used to differentiate from the legacy
-	// endpoints controller of the same name.
-	ManagedByEndpointsValue = "consul-k8s-endpoints-controller-v2"
-
-	// ManagedByPodValue is used in Consul metadata to identify the manager
-	// of resources.
-	ManagedByPodValue = "consul-k8s-pod-controller"
 )
 
 // Annotations used by Prometheus.

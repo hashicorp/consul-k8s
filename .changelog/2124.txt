@@ -1,3 +1,0 @@
-``release-note:improvement
-control-plane: Transparent proxy enhancements for failover and virtual Services
-```

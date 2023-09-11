@@ -15,8 +15,23 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+
 {{- define "consul.restrictedSecurityContext" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
+{{/*
+To be compatible with the 'restricted' Pod Security Standards profile, we
+should set this securityContext on containers whenever possible.
+
+In OpenShift < 4.11 the restricted SCC disallows setting most of these fields,
+so we do not set any for simplicity (and because that's how it was configured
+prior to adding restricted PSA support here). In OpenShift >= 4.11, the new
+restricted-v2 SCC allows setting these in the securityContext, and by setting
+them we avoid PSA warnings that are enabled by default.
+
+We use the K8s version as a proxy for the OpenShift version because there is a
+1:1 mapping of versions. OpenShift 4.11 corresponds to K8s 1.24.x.
+*/}}
+{{- if (or (not .Values.global.openshift.enabled) (and (ge .Capabilities.KubeVersion.Major "1") (ge .Capabilities.KubeVersion.Minor "24"))) -}}
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
@@ -27,11 +42,12 @@ securityContext:
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
+{{- end -}}
 {{- if not .Values.global.openshift.enabled -}}
 {{/*
 We must set runAsUser or else the root user will be used in some cases and
 containers will fail to start due to runAsNonRoot above (e.g.
-tls-init-cleanup). On OpenShift, runAsUser is automatically. We pick user 100
+tls-init-cleanup). On OpenShift, runAsUser is set automatically. We pick user 100
 because it is a non-root user id that exists in the consul, consul-dataplane,
 and consul-k8s-control-plane images.
 */}}
@@ -360,7 +376,7 @@ Consul server environment variables for consul-k8s commands.
 {{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
 - name: CONSUL_SKIP_SERVER_WATCH
-  value: "true"
+  value: "true" 
 {{- end }}
 {{- end -}}
 
@@ -391,7 +407,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 */}}
 {{- define "consul.validateCloudSecretKeys" -}}
-{{- if and .Values.global.cloud.enabled }}
+{{- if and .Values.global.cloud.enabled }} 
 {{- if or (and .Values.global.cloud.resourceId.secretName (not .Values.global.cloud.resourceId.secretKey)) (and .Values.global.cloud.resourceId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
 {{fail "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set."}}
 {{- end }}
@@ -448,52 +464,3 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 {{fail "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set"}}
 {{- end }}
 {{- end -}}
-
-{{/*
-Fails if global.experiments.resourceAPIs is set along with any of these unsupported features.
-- global.peering.enabled
-- global.federation.enabled
-- global.cloud.enabled
-- client.enabled
-- ui.enabled
-- syncCatalog.enabled
-- meshGateway.enabled
-- ingressGateways.enabled
-- terminatingGateways.enabled
-- apiGateway.enabled
-
-Usage: {{ template "consul.validateResourceAPIs" . }}
-
-*/}}
-{{- define "consul.validateResourceAPIs" -}}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.peering.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.peering.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.federation.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.federation.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.cloud.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.cloud.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.client.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, client.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ui.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, ui.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.syncCatalog.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, syncCatalog.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.meshGateway.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, meshGateway.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ingressGateways.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, ingressGateways.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.terminatingGateways.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.apiGateway.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, apiGateway.enabled is currently unsupported."}}
-{{- end }}
-{{- end }}

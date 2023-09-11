@@ -1,5 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
 package endpoints
 
 import (
@@ -13,22 +11,22 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-multierror"
-	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-multierror"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -142,7 +140,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var serviceEndpoints corev1.Endpoints
 
 	// Ignore the request if the namespace of the endpoint is not allowed.
-	if common.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
+	if shouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
 		return ctrl.Result{}, nil
 	}
 
@@ -298,14 +296,6 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 			return err
 		}
 
-		// Add manual ip to the VIP table
-		r.Log.Info("adding manual ip to virtual ip table in Consul", "name", serviceRegistration.Service.Service,
-			"id", serviceRegistration.ID)
-		err = assignServiceVirtualIP(r.Context, apiClient, serviceRegistration.Service)
-		if err != nil {
-			r.Log.Error(err, "failed to add ip to virtual ip table", "name", serviceRegistration.Service.Service)
-		}
-
 		// Register the proxy service instance with Consul.
 		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service)
 		_, err = apiClient.Catalog().Register(proxyServiceRegistration, nil)
@@ -315,20 +305,6 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		}
 	}
 	return nil
-}
-
-func parseLocality(node corev1.Node) *api.Locality {
-	region := node.Labels[corev1.LabelTopologyRegion]
-	zone := node.Labels[corev1.LabelTopologyZone]
-
-	if region == "" {
-		return nil
-	}
-
-	return &api.Locality{
-		Region: region,
-		Zone:   zone,
-	}
 }
 
 // registerGateway creates Consul registrations for the Connect Gateways and registers them with Consul.
@@ -418,11 +394,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		}
 	}
 
-	var node corev1.Node
-	// Ignore errors because we don't want failures to block running services.
-	_ = r.Client.Get(context.Background(), types.NamespacedName{Name: pod.Spec.NodeName, Namespace: pod.Namespace}, &node)
-	locality := parseLocality(node)
-
 	// We only want that annotation to be present when explicitly overriding the consul svc name
 	// Otherwise, the Consul service name should equal the Kubernetes Service name.
 	// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
@@ -458,7 +429,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Meta:      meta,
 		Namespace: consulNS,
 		Tags:      tags,
-		Locality:  locality,
 	}
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
@@ -535,8 +505,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Namespace: consulNS,
 		Proxy:     proxyConfig,
 		Tags:      tags,
-		// Sidecar locality (not proxied service locality) is used for locality-aware routing.
-		Locality: locality,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.
@@ -1296,6 +1264,26 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 	return upstream, nil
 }
 
+// shouldIgnore ignores namespaces where we don't connect-inject.
+func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
+	// Ignores system namespaces.
+	if namespace == metav1.NamespaceSystem || namespace == metav1.NamespacePublic || namespace == "local-path-storage" {
+		return true
+	}
+
+	// Ignores deny list.
+	if denySet.Contains(namespace) {
+		return true
+	}
+
+	// Ignores if not in allow list or allow list is not *.
+	if !allowSet.Contains("*") && !allowSet.Contains(namespace) {
+		return true
+	}
+
+	return false
+}
+
 // consulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
 // depending on Consul Namespaces being enabled and the value of namespace mirroring.
 func (r *Controller) consulNamespace(namespace string) string {
@@ -1306,26 +1294,6 @@ func (r *Controller) appendNodeMeta(registration *api.CatalogRegistration) {
 	for k, v := range r.NodeMeta {
 		registration.NodeMeta[k] = v
 	}
-}
-
-// assignServiceVirtualIPs manually assigns the ClusterIP to the virtual IP table so that transparent proxy routing works.
-func assignServiceVirtualIP(ctx context.Context, apiClient *api.Client, svc *api.AgentService) error {
-	ip := svc.TaggedAddresses[clusterIPTaggedAddressName].Address
-	if ip == "" {
-		return nil
-	}
-
-	_, _, err := apiClient.Internal().AssignServiceVirtualIP(ctx, svc.Service, []string{ip}, &api.WriteOptions{Namespace: svc.Namespace, Partition: svc.Partition})
-	if err != nil {
-		// Maintain backwards compatibility with older versions of Consul that do not support the VIP improvements. Tproxy
-		// will not work 100% correctly but the mesh will still work
-		if strings.Contains(err.Error(), "404") {
-			return fmt.Errorf("failed to add ip for service %s to virtual ip table. Please upgrade Consul to version 1.16 or higher", svc.Service)
-		} else {
-			return err
-		}
-	}
-	return nil
 }
 
 // hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.

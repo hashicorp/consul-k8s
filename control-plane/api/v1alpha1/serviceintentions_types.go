@@ -1,11 +1,7 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -59,8 +55,6 @@ type ServiceIntentionsSpec struct {
 	// The order of this list does not matter, but out of convenience Consul will always store this
 	// reverse sorted by intention precedence, as that is the order that they will be evaluated at enforcement time.
 	Sources SourceIntentions `json:"sources,omitempty"`
-	// JWT specifies the configuration to validate a JSON Web Token for all incoming requests.
-	JWT *IntentionJWTRequirement `json:"jwt,omitempty"`
 }
 
 type IntentionDestination struct {
@@ -84,12 +78,10 @@ type SourceIntention struct {
 	Name string `json:"name,omitempty"`
 	// Namespace is the namespace for the Name parameter.
 	Namespace string `json:"namespace,omitempty"`
-	// Peer is the peer name for the Name parameter.
+	// [Experimental] Peer is the peer name for the Name parameter.
 	Peer string `json:"peer,omitempty"`
 	// Partition is the Admin Partition for the Name parameter.
 	Partition string `json:"partition,omitempty"`
-	// SamenessGroup is the name of the sameness group, if applicable.
-	SamenessGroup string `json:"samenessGroup,omitempty"`
 	// Action is required for an L4 intention, and should be set to one of
 	// "allow" or "deny" for the action that should be taken if this intention matches a request.
 	Action IntentionAction `json:"action,omitempty"`
@@ -110,8 +102,6 @@ type IntentionPermission struct {
 	Action IntentionAction `json:"action,omitempty"`
 	// HTTP is a set of HTTP-specific authorization criteria.
 	HTTP *IntentionHTTPPermission `json:"http,omitempty"`
-	// JWT specifies configuration to validate a JSON Web Token for incoming requests.
-	JWT *IntentionJWTRequirement `json:"jwt,omitempty"`
 }
 
 type IntentionHTTPPermission struct {
@@ -144,30 +134,6 @@ type IntentionHTTPHeaderPermission struct {
 	Regex string `json:"regex,omitempty"`
 	// Invert inverts the logic of the match.
 	Invert bool `json:"invert,omitempty"`
-}
-
-type IntentionJWTRequirement struct {
-	// Providers is a list of providers to consider when verifying a JWT.
-	Providers []*IntentionJWTProvider `json:"providers,omitempty"`
-}
-
-type IntentionJWTProvider struct {
-	// Name is the name of the JWT provider. There MUST be a corresponding
-	// "jwt-provider" config entry with this name.
-	Name string `json:"name,omitempty"`
-
-	// VerifyClaims is a list of additional claims to verify in a JWT's payload.
-	VerifyClaims []*IntentionJWTClaimVerification `json:"verifyClaims,omitempty"`
-}
-
-type IntentionJWTClaimVerification struct {
-	// Path is the path to the claim in the token JSON.
-	Path []string `json:"path,omitempty"`
-
-	// Value is the expected value at the given path. If the type at the path
-	// is a list then we verify that this value is contained in the list. If
-	// the type at the path is a string then we verify that this value matches.
-	Value string `json:"value,omitempty"`
 }
 
 // IntentionAction is the action that the intention represents. This
@@ -254,7 +220,6 @@ func (in *ServiceIntentions) ToConsul(datacenter string) api.ConfigEntry {
 		Name:      in.Spec.Destination.Name,
 		Namespace: in.Spec.Destination.Namespace,
 		Sources:   in.Spec.Sources.toConsul(),
-		JWT:       in.Spec.JWT.toConsul(),
 		Meta:      meta(datacenter),
 	}
 }
@@ -321,12 +286,10 @@ func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 		} else {
 			errs = append(errs, source.Permissions.validate(path.Child("sources").Index(i))...)
 		}
-		errs = append(errs, source.validate(path.Child("sources").Index(i), consulMeta.PartitionsEnabled)...)
 	}
 
 	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
-
-	errs = append(errs, in.Spec.JWT.validate(path.Child("jwt"))...)
+	errs = append(errs, in.validateSourcePeerAndPartitions(consulMeta.PartitionsEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -334,46 +297,6 @@ func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 			in.KubernetesName(), errs)
 	}
 	return nil
-}
-
-func (in *SourceIntention) validate(path *field.Path, partitionsEnabled bool) field.ErrorList {
-	var errs field.ErrorList
-
-	if in.Name == "" {
-		errs = append(errs, field.Required(path.Child("name"), "name is required."))
-	}
-
-	if strings.Contains(in.Partition, WildcardSpecifier) {
-		errs = append(errs, field.Invalid(path.Child("partition"), in.Partition, "partition cannot use or contain wildcard '*'"))
-	}
-	if strings.Contains(in.Peer, WildcardSpecifier) {
-		errs = append(errs, field.Invalid(path.Child("peer"), in.Peer, "peer cannot use or contain wildcard '*'"))
-	}
-	if strings.Contains(in.SamenessGroup, WildcardSpecifier) {
-		errs = append(errs, field.Invalid(path.Child("samenessgroup"), in.SamenessGroup, "samenessgroup cannot use or contain wildcard '*'"))
-	}
-
-	if in.Partition != "" && !partitionsEnabled {
-		errs = append(errs, field.Invalid(path.Child("partition"), in.Partition, `Consul Enterprise Admin Partitions must be enabled to set source.partition`))
-	}
-
-	if in.Peer != "" && in.Partition != "" {
-		errs = append(errs, field.Invalid(path, *in, "cannot set peer and partition at the same time."))
-	}
-
-	if in.SamenessGroup != "" && in.Partition != "" {
-		errs = append(errs, field.Invalid(path, *in, "cannot set samenessgroup and partition at the same time."))
-	}
-
-	if in.SamenessGroup != "" && in.Peer != "" {
-		errs = append(errs, field.Invalid(path, *in, "cannot set samenessgroup and peer at the same time."))
-	}
-
-	if len(in.Description) > metaValueMaxLength {
-		errs = append(errs, field.Invalid(path, "", fmt.Sprintf("description exceeds maximum length %d", metaValueMaxLength)))
-	}
-
-	return errs
 }
 
 // DefaultNamespaceFields sets the namespace field on spec.destination to their default values if namespaces are enabled.
@@ -404,14 +327,13 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 		return nil
 	}
 	return &capi.SourceIntention{
-		Name:          in.Name,
-		Namespace:     in.Namespace,
-		Partition:     in.Partition,
-		Peer:          in.Peer,
-		SamenessGroup: in.SamenessGroup,
-		Action:        in.Action.toConsul(),
-		Permissions:   in.Permissions.toConsul(),
-		Description:   in.Description,
+		Name:        in.Name,
+		Namespace:   in.Namespace,
+		Partition:   in.Partition,
+		Peer:        in.Peer,
+		Action:      in.Action.toConsul(),
+		Permissions: in.Permissions.toConsul(),
+		Description: in.Description,
 	}
 }
 
@@ -425,7 +347,6 @@ func (in IntentionPermissions) toConsul() []*capi.IntentionPermission {
 		consulIntentionPermissions = append(consulIntentionPermissions, &capi.IntentionPermission{
 			Action: permission.Action.toConsul(),
 			HTTP:   permission.HTTP.toConsul(),
-			JWT:    permission.JWT.toConsul(),
 		})
 	}
 	return consulIntentionPermissions
@@ -461,54 +382,15 @@ func (in IntentionHTTPHeaderPermissions) toConsul() []capi.IntentionHTTPHeaderPe
 	return headerPermissions
 }
 
-func (in *IntentionJWTRequirement) toConsul() *capi.IntentionJWTRequirement {
-	if in == nil {
-		return nil
-	}
-	var providers []*capi.IntentionJWTProvider
-	for _, p := range in.Providers {
-		providers = append(providers, p.toConsul())
-	}
-	return &capi.IntentionJWTRequirement{
-		Providers: providers,
-	}
-}
-
-func (in *IntentionJWTProvider) toConsul() *capi.IntentionJWTProvider {
-	if in == nil {
-		return nil
-	}
-	var claims []*capi.IntentionJWTClaimVerification
-	for _, c := range in.VerifyClaims {
-		claims = append(claims, c.toConsul())
-	}
-	return &capi.IntentionJWTProvider{
-		Name:         in.Name,
-		VerifyClaims: claims,
-	}
-}
-
-func (in *IntentionJWTClaimVerification) toConsul() *capi.IntentionJWTClaimVerification {
-	if in == nil {
-		return nil
-	}
-	return &capi.IntentionJWTClaimVerification{
-		Path:  in.Path,
-		Value: in.Value,
-	}
-}
-
 func (in IntentionPermissions) validate(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
 	for i, permission := range in {
-		permPath := path.Child("permissions").Index(i)
-		if err := permission.Action.validate(permPath); err != nil {
+		if err := permission.Action.validate(path.Child("permissions").Index(i)); err != nil {
 			errs = append(errs, err)
 		}
 		if permission.HTTP != nil {
-			errs = append(errs, permission.HTTP.validate(permPath)...)
+			errs = append(errs, permission.HTTP.validate(path.Child("permissions").Index(i))...)
 		}
-		errs = append(errs, permission.JWT.validate(permPath.Child("jwt"))...)
 	}
 	return errs
 }
@@ -593,6 +475,21 @@ func (in *ServiceIntentions) validateNamespaces(namespacesEnabled bool) field.Er
 	return errs
 }
 
+func (in *ServiceIntentions) validateSourcePeerAndPartitions(partitionsEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	for i, source := range in.Spec.Sources {
+		if source.Partition != "" && !partitionsEnabled {
+			errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("partition"), source.Partition, `Consul Enterprise Admin Partitions must be enabled to set source.partition`))
+		}
+
+		if source.Peer != "" && source.Partition != "" {
+			errs = append(errs, field.Invalid(path.Child("sources").Index(i), source, `Both source.peer and source.partition cannot be set.`))
+		}
+	}
+	return errs
+}
+
 func (in IntentionAction) validate(path *field.Path) *field.Error {
 	actions := []string{"allow", "deny"}
 	if !sliceContains(actions, string(in)) {
@@ -609,27 +506,6 @@ func numNotEmpty(ss ...string) int {
 		}
 	}
 	return count
-}
-
-func (in *IntentionJWTRequirement) validate(path *field.Path) field.ErrorList {
-	var errs field.ErrorList
-	if in == nil {
-		return errs
-	}
-
-	for i, p := range in.Providers {
-		if err := p.validate(path.Child("providers").Index(i)); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errs
-}
-
-func (in *IntentionJWTProvider) validate(path *field.Path) *field.Error {
-	if in != nil && in.Name == "" {
-		return field.Invalid(path.Child("name"), in.Name, "JWT provider name is required")
-	}
-	return nil
 }
 
 // sourceIntentionSortKey returns a string that can be used to sort intention

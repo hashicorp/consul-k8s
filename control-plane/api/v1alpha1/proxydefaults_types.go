@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -67,17 +64,6 @@ type ProxyDefaultsSpec struct {
 	// Note: This cannot be set using the CRD and should be set using annotations on the
 	// services that are part of the mesh.
 	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
-	// MutualTLSMode controls whether mutual TLS is required for all incoming
-	// connections when transparent proxy is enabled. This can be set to
-	// "permissive" or "strict". "strict" is the default which requires mutual
-	// TLS for incoming connections. In the insecure "permissive" mode,
-	// connections to the sidecar proxy public listener port require mutual
-	// TLS, but connections to the service port do not require mutual TLS and
-	// are proxied to the application unmodified. Note: Intentions are not
-	// enforced for non-mTLS connections. To keep your services secure, we
-	// recommend using "strict" mode whenever possible and enabling
-	// "permissive" mode only when necessary.
-	MutualTLSMode MutualTLSMode `json:"mutualTLSMode,omitempty"`
 	// Config is an arbitrary map of configuration values used by Connect proxies.
 	// Any values that your proxy allows can be configured globally here.
 	// Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
@@ -93,11 +79,6 @@ type ProxyDefaultsSpec struct {
 	AccessLogs *AccessLogs `json:"accessLogs,omitempty"`
 	// EnvoyExtensions are a list of extensions to modify Envoy proxy configuration.
 	EnvoyExtensions EnvoyExtensions `json:"envoyExtensions,omitempty"`
-	// FailoverPolicy specifies the exact mechanism used for failover.
-	FailoverPolicy *FailoverPolicy `json:"failoverPolicy,omitempty"`
-	// PrioritizeByLocality controls whether the locality of services within the
-	// local partition will be used to prioritize connectivity.
-	PrioritizeByLocality *PrioritizeByLocality `json:"prioritizeByLocality,omitempty"`
 }
 
 func (in *ProxyDefaults) GetObjectMeta() metav1.ObjectMeta {
@@ -182,18 +163,15 @@ func (in *ProxyDefaults) SetLastSyncedTime(time *metav1.Time) {
 func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	consulConfig := in.convertConfig()
 	return &capi.ProxyConfigEntry{
-		Kind:                 in.ConsulKind(),
-		Name:                 in.ConsulName(),
-		MeshGateway:          in.Spec.MeshGateway.toConsul(),
-		Expose:               in.Spec.Expose.toConsul(),
-		Config:               consulConfig,
-		TransparentProxy:     in.Spec.TransparentProxy.toConsul(),
-		MutualTLSMode:        in.Spec.MutualTLSMode.toConsul(),
-		AccessLogs:           in.Spec.AccessLogs.toConsul(),
-		EnvoyExtensions:      in.Spec.EnvoyExtensions.toConsul(),
-		FailoverPolicy:       in.Spec.FailoverPolicy.toConsul(),
-		PrioritizeByLocality: in.Spec.PrioritizeByLocality.toConsul(),
-		Meta:                 meta(datacenter),
+		Kind:             in.ConsulKind(),
+		Name:             in.ConsulName(),
+		MeshGateway:      in.Spec.MeshGateway.toConsul(),
+		Expose:           in.Spec.Expose.toConsul(),
+		Config:           consulConfig,
+		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
+		AccessLogs:       in.Spec.AccessLogs.toConsul(),
+		EnvoyExtensions:  in.Spec.EnvoyExtensions.toConsul(),
+		Meta:             meta(datacenter),
 	}
 }
 
@@ -217,9 +195,6 @@ func (in *ProxyDefaults) Validate(_ common.ConsulMeta) error {
 	if err := in.Spec.TransparentProxy.validate(path.Child("transparentProxy")); err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if err := in.Spec.MutualTLSMode.validate(); err != nil {
-		allErrs = append(allErrs, field.Invalid(path.Child("mutualTLSMode"), in.Spec.MutualTLSMode, err.Error()))
-	}
 	if err := in.Spec.Mode.validate(path.Child("mode")); err != nil {
 		allErrs = append(allErrs, err)
 	}
@@ -231,8 +206,6 @@ func (in *ProxyDefaults) Validate(_ common.ConsulMeta) error {
 	}
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
 	allErrs = append(allErrs, in.Spec.EnvoyExtensions.validate(path.Child("envoyExtensions"))...)
-	allErrs = append(allErrs, in.Spec.FailoverPolicy.validate(path.Child("failoverPolicy"))...)
-	allErrs = append(allErrs, in.Spec.PrioritizeByLocality.validate(path.Child("prioritizeByLocality"))...)
 
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
