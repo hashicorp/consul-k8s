@@ -44,7 +44,6 @@ const (
 	terminatingGateway = "terminating-gateway"
 	ingressGateway     = "ingress-gateway"
 
-	kubernetesSuccessReasonMsg           = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
 	envoyTelemetryCollectorBindSocketDir = "envoy_telemetry_collector_bind_socket_dir"
 	defaultNS                            = "default"
@@ -57,12 +56,6 @@ const (
 	// This address does not need to be routable as this node is ephemeral, and we're only providing it because
 	// Consul's API currently requires node address to be provided when registering a node.
 	consulNodeAddress = "127.0.0.1"
-
-	// consulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
-	consulKubernetesCheckType = "kubernetes-readiness"
-
-	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
-	consulKubernetesCheckName = "Kubernetes Readiness Check"
 )
 
 type Controller struct {
@@ -469,8 +462,8 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Service: service,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, svcID),
-			Name:      consulKubernetesCheckName,
-			Type:      consulKubernetesCheckType,
+			Name:      constants.ConsulKubernetesCheckName,
+			Type:      constants.ConsulKubernetesCheckType,
 			Status:    healthStatus,
 			ServiceID: svcID,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
@@ -664,8 +657,8 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Service: proxyService,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, proxySvcID),
-			Name:      consulKubernetesCheckName,
-			Type:      consulKubernetesCheckType,
+			Name:      constants.ConsulKubernetesCheckName,
+			Type:      constants.ConsulKubernetesCheckType,
 			Status:    healthStatus,
 			ServiceID: proxySvcID,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
@@ -807,8 +800,8 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		Service: service,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, pod.Name),
-			Name:      consulKubernetesCheckName,
-			Type:      consulKubernetesCheckType,
+			Name:      constants.ConsulKubernetesCheckName,
+			Type:      constants.ConsulKubernetesCheckType,
 			Status:    healthStatus,
 			ServiceID: pod.Name,
 			Namespace: consulNS,
@@ -900,7 +893,7 @@ func consulHealthCheckID(k8sNS string, serviceID string) string {
 // as well as pod name and namespace and returns the reason message.
 func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string) string {
 	if healthCheckStatus == api.HealthPassing {
-		return kubernetesSuccessReasonMsg
+		return constants.KubernetesSuccessReasonMsg
 	}
 
 	return fmt.Sprintf("Pod \"%s/%s\" is not ready", podNamespace, podName)

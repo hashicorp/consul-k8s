@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpointsv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -31,14 +32,14 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	//	DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
 	//}
 
-	//metricsConfig := metrics.Config{
-	//	DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
-	//	EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
-	//	DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
-	//	DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
-	//	DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
-	//	DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
-	//}
+	metricsConfig := metrics.Config{
+		DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
+		EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+		DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
+		DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
+		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+	}
 
 	if err := (&pod.Controller{
 		Client:                     mgr.GetClient(),
@@ -52,7 +53,11 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
 		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 		ConsulPartition:            c.consul.Partition,
+		EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
+		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
 		AuthMethod:                 c.flagACLAuthMethod,
+		MetricsConfig:              metricsConfig,
+		EnableTelemetryCollector:   c.flagEnableTelemetryCollector,
 		Log:                        ctrl.Log.WithName("controller").WithName("pods"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", pod.Controller{})

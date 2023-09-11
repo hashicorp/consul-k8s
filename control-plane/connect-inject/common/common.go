@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
@@ -159,4 +160,20 @@ func GetPortProtocol(appProtocol *string) pbcatalog.Protocol {
 	}
 	// If unrecognized or empty string, return default
 	return pbcatalog.Protocol_PROTOCOL_UNSPECIFIED
+}
+
+// PortValueFromIntOrString returns the integer port value from the port that can be
+// a named port, an integer string (e.g. "80"), or an integer. If the port is a named port,
+// this function will attempt to find the value from the containers of the pod.
+func PortValueFromIntOrString(pod corev1.Pod, port intstr.IntOrString) (uint32, error) {
+	if port.Type == intstr.Int {
+		return uint32(port.IntValue()), nil
+	}
+
+	// Otherwise, find named port or try to parse the string as an int.
+	portVal, err := PortValue(pod, port.StrVal)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(portVal), nil
 }

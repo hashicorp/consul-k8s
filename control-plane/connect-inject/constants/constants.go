@@ -13,6 +13,9 @@ const (
 	// DefaultConsulPartition is the default Consul partition name.
 	DefaultConsulPartition = "default"
 
+	// DefaultConsulPeer is the name used to refer to resources that are in the same cluster.
+	DefaultConsulPeer = "local"
+
 	// ProxyDefaultInboundPort is the default inbound port for the proxy.
 	ProxyDefaultInboundPort = 20000
 
@@ -39,4 +42,12 @@ const (
 
 	// DefaultGracefulShutdownPath is the default path that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulShutdownPath = "/graceful_shutdown"
+
+	// ConsulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
+	ConsulKubernetesCheckType = "kubernetes-readiness"
+
+	// ConsulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
+	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
+
+	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 )
