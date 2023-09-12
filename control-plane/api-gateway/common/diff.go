@@ -131,48 +131,44 @@ func (e entryComparator) equalJWTProviders(a, b *api.APIGatewayJWTRequirement) b
 		return false
 	}
 
-	if len(a.Providers) != len(b.Providers) {
+	return slices.EqualFunc(a.Providers, b.Providers, providersEqual)
+}
+
+func providersEqual(a, b *api.APIGatewayJWTProvider) bool {
+	if a == nil && b == nil {
+		return true
+	}
+
+	if a == nil || b == nil {
 		return false
 	}
 
-	for i := range a.Providers {
-		aProvider := a.Providers[i]
-		bProvider := b.Providers[i]
-		if aProvider == nil && bProvider == nil {
-			continue
-		}
+	if a.Name != b.Name {
+		return false
+	}
 
-		if aProvider == nil || bProvider == nil {
-			return false
-		}
+	return slices.EqualFunc(a.VerifyClaims, b.VerifyClaims, equalClaims)
+}
 
-		if aProvider.Name != bProvider.Name {
-			return false
-		}
+func equalClaims(a, b *api.APIGatewayJWTClaimVerification) bool {
+	if a == nil && b == nil {
+		return true
+	}
 
-		if len(aProvider.VerifyClaims) != len(bProvider.VerifyClaims) {
-			return false
-		}
+	if a == nil || b == nil {
+		return false
+	}
 
-		for j := range aProvider.VerifyClaims {
-			aClaim := aProvider.VerifyClaims[j]
-			bClaim := bProvider.VerifyClaims[j]
-			if aClaim.Value != bClaim.Value {
-				return false
-			}
+	if a.Value != b.Value {
+		return false
+	}
 
-			if len(aClaim.Path) != len(bClaim.Path) {
-				return false
-			}
+	if len(a.Path) != len(b.Path) {
+		return false
+	}
 
-			for idx, _ := range aClaim.Path {
-			    aPath := aClaim.Path[idx]
-			    bPath := bClaim.Path[idx]
-			    if aPath != bPath {
-				return false
-			    }
-			}
-		}
+	if !slices.Equal(a.Path, b.Path) {
+		return false
 	}
 
 	return true
