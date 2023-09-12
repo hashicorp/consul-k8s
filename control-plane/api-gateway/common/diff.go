@@ -155,11 +155,11 @@ func (e entryComparator) equalJWTProviders(a, b *api.APIGatewayJWTRequirement) b
 		}
 
 		for j := range aProvider.VerifyClaims {
-		    aClaim := aProvider.VerifyClaims[j]
-		    bClaim := bProvider.VerifyClaims[j]
-		    if aClaim != bClaim {
-			return false
-		    }
+			aClaim := aProvider.VerifyClaims[j]
+			bClaim := bProvider.VerifyClaims[j]
+			if aClaim != bClaim {
+				return false
+			}
 		}
 	}
 
