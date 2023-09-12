@@ -1,10 +1,11 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-// TODO: remove when the SDK is released for Consul 1.17
-// The replace directive is needed be because `api` requires 0.14.1 of SDK and is both a direct and indirect dependency
+// TODO: remove these when the SDK is released for Consul 1.17 and coinciding patch releases
 replace (
+	// This replace directive is needed because `api` requires 0.4.1 of proto-public but we need an unreleased version
 	github.com/hashicorp/consul/proto-public v0.4.1 => github.com/hashicorp/consul/proto-public v0.1.2-0.20230911164019-a69e901660bd
-	github.com/hashicorp/consul/sdk v0.14.1 => github.com/hashicorp/consul/sdk v0.4.1-0.20230825164720-ecdcde430924
+	// This replace directive is needed because `api` requires 0.14.1 of `sdk` but we need an unreleased version
+	github.com/hashicorp/consul/sdk v0.14.1 => github.com/hashicorp/consul/sdk v0.4.1-0.20230911164019-a69e901660bd
 )
 
 require (
