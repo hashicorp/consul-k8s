@@ -294,9 +294,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		if filter.RequestHeaderModifier != nil {
 			newFilter := api.HTTPHeaderFilter{}
 
-			if len(filter.RequestHeaderModifier.Remove) > 0 {
-				newFilter.Remove = append(newFilter.Remove, filter.RequestHeaderModifier.Remove...)
-			}
+			newFilter.Remove = append(newFilter.Remove, filter.RequestHeaderModifier.Remove...)
 
 			if len(filter.RequestHeaderModifier.Add) > 0 {
 				newFilter.Add = map[string]string{}
@@ -318,9 +316,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		if filter.ResponseHeaderModifier != nil {
 			newFilter := api.HTTPHeaderFilter{}
 
-			if len(filter.ResponseHeaderModifier.Remove) > 0 {
-				newFilter.Remove = append(newFilter.Remove, filter.ResponseHeaderModifier.Remove...)
-			}
+			newFilter.Remove = append(newFilter.Remove, filter.ResponseHeaderModifier.Remove...)
 
 			if len(filter.ResponseHeaderModifier.Add) > 0 {
 				newFilter.Add = map[string]string{}
