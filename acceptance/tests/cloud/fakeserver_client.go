@@ -11,30 +11,44 @@ import (
 )
 
 const (
+	// Validation are used in the validationBody to distinguish metrics for consul vs. collector during validation.
 	validationPathConsul    = "/v1/metrics/consul"
 	validationPathCollector = "/v1/metrics/collector"
 )
 
+var (
+	errCreatingRequest      = errors.New("failed to create HTTP request")
+	errMakingRequest        = errors.New("failed to make request")
+	errReadingBody          = errors.New("failed to read body")
+	errParsingBody          = errors.New("failed to parse body")
+	errValidation           = errors.New("failed validation")
+	errUnexpectedStatusCode = errors.New("unexpected status code")
+)
+
+// fakeServerClient provides an interface to communicate with the fakesever (a fake HCP Telemetry Gateway) via HTTP.
 type fakeServerClient struct {
 	client *http.Client
 	tunnel string
 }
 
-type errMsg struct {
-	Error string `json:"error"`
-}
-
+// TokenResponse is used to read a token response from the fakeserver.
 type TokenResponse struct {
 	Token string `json:"token"`
 }
 
+// errMsg is used to obtain the error trace of a valiation failure.
+type errMsg struct {
+	Error string `json:"error"`
+}
+
+// modifyTelemetryConfigBody is a POST body that provides telemetry config changes to the fakeserver.
 type modifyTelemetryConfigBody struct {
 	Filters  []string          `json:"filters"`
 	Labels   map[string]string `json:"labels"`
 	Disabled bool              `json:"disabled"`
-	Time     int64             `json:"time"`
 }
 
+// validationBody is a POST body that provides validation verifications to the fakeserver.
 type validationBody struct {
 	Path                 string   `json:"path"`
 	ExpectedLabelKeys    []string `json:"expectedLabelKeys"`
@@ -44,6 +58,7 @@ type validationBody struct {
 	FilterRecordsSince   int64    `json:"filterRecordsSince"`
 }
 
+// newfakeServerClient returns a fakeServerClient to be used in tests to communicate with the fake Telemetry Gateway.
 func newfakeServerClient(tunnel string) *fakeServerClient {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -60,8 +75,7 @@ func (f *fakeServerClient) requestToken(endpoint string) (string, error) {
 	url := fmt.Sprintf("https://%s/token", endpoint)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
-		return "", errors.New("error creating /token request")
+		return "", fmt.Errorf("%w: %w", errCreatingRequest, err)
 	}
 
 	return f.handleTokenRequest(req)
@@ -76,8 +90,7 @@ func (f *fakeServerClient) modifyTelemetryConfig(payload *modifyTelemetryConfigB
 
 	req, err := http.NewRequest("POST", url, payloadBuf)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
-		return errors.New("error creating modify_telemetry_config request")
+		return fmt.Errorf("%w: %w", errCreatingRequest, err)
 	}
 
 	return f.handleRequest(req)
@@ -92,7 +105,7 @@ func (f *fakeServerClient) validateMetrics(payload *validationBody) error {
 	url := fmt.Sprintf("https://%s/validation", f.tunnel)
 	req, err := http.NewRequest("POST", url, payloadBuf)
 	if err != nil {
-		return errors.New("error creating /validation request")
+		return fmt.Errorf("%w: %w", errCreatingRequest, err)
 	}
 
 	return f.handleRequest(req)
@@ -100,26 +113,21 @@ func (f *fakeServerClient) validateMetrics(payload *validationBody) error {
 
 // handleTokenRequest returns a token if the request is succesful.
 func (f *fakeServerClient) handleTokenRequest(req *http.Request) (string, error) {
-	// Perform request
 	resp, err := f.client.Do(req)
 	if err != nil {
-		fmt.Println("Error sending request:", err)
-		return "", errors.New("error making request")
+		return "", fmt.Errorf("%w : %w", errMakingRequest, err)
 	}
 	defer resp.Body.Close()
 
-	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading response:", err)
-		return "", errors.New("error reading body")
+		return "", fmt.Errorf("%w : %w", errReadingBody, err)
 	}
 
 	var tokenResponse TokenResponse
 	err = json.Unmarshal(body, &tokenResponse)
 	if err != nil {
-		fmt.Println("Error parsing response:", err)
-		return "", errors.New("error parsing body")
+		return "", fmt.Errorf("%w : %w", errParsingBody, err)
 	}
 
 	return tokenResponse.Token, nil
@@ -129,28 +137,27 @@ func (f *fakeServerClient) handleTokenRequest(req *http.Request) (string, error)
 func (f *fakeServerClient) handleRequest(req *http.Request) error {
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return errors.New("error making request")
+		return fmt.Errorf("%w : %w", errMakingRequest, err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusExpectationFailed {
-		// Read the response body
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			fmt.Println("Error reading response:", err)
-			return errors.New("error reading body")
+			return fmt.Errorf("%w : %w", errReadingBody, err)
 		}
+
 		var message errMsg
 		err = json.Unmarshal(body, &message)
 		if err != nil {
-			fmt.Println("Error parsing response:", err)
-			return errors.New("error parsing body")
+			return fmt.Errorf("%w : %w", errParsingBody, err)
 		}
 
-		return fmt.Errorf("failed validation: %s", message)
+		return errValidation
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.New("unexpected status code response from failure")
+		return errUnexpectedStatusCode
 	}
 
 	return nil

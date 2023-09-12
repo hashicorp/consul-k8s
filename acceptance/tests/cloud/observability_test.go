@@ -224,7 +224,7 @@ func TestObservabilityCloud(t *testing.T) {
 			}
 
 			// Validate that exported metrics are correct using fakeserver's /validation endpoint, which records metric exports that occured.
-			// We need to use retry as we wait for Consul or the Collector to export metrics.
+			// We need to use retry as we wait for Consul or the Collector to export metrics. This is the best we can do to avoid flakiness.
 			retry.RunWith(&retry.Timer{Timeout: tc.timeout, Wait: tc.wait}, t, func(r *retry.R) {
 				err := fsClient.validateMetrics(tc.validation)
 				require.NoError(r, err)
