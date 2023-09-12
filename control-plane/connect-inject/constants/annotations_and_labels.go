@@ -230,6 +230,10 @@ const (
 	// of resources.
 	ManagedByPodValue = "consul-k8s-pod-controller"
 
+	// ManagedByServiceAccountValue is used in Consul metadata to identify the manager
+	// of resources.
+	ManagedByServiceAccountValue = "consul-k8s-service-account-controller"
+
 	// AnnotationMeshDestinations is a list of upstreams to register with the
 	// proxy. The service name should map to a Consul service namd and the local
 	// port is the local port in the pod that the listener will bind to. It can

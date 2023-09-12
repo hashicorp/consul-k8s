@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"strconv"
 
-	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
@@ -30,8 +29,6 @@ import (
 )
 
 const (
-	metaKeyManagedBy = "managed-by"
-
 	DefaultTelemetryBindSocketDir = "/consul/mesh-inject"
 )
 
@@ -41,28 +38,10 @@ type Controller struct {
 	ConsulClientConfig *consul.Config
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
 	ConsulServerConnMgr consul.ServerConnectionManager
-	// Only pods in the AllowK8sNamespacesSet are reconciled.
-	AllowK8sNamespacesSet mapset.Set
-	// Pods in the DenyK8sNamespacesSet are ignored.
-	DenyK8sNamespacesSet mapset.Set
-	// EnableConsulPartitions indicates that a user is running Consul Enterprise
-	EnableConsulPartitions bool
-	// ConsulPartition is the Consul Partition to which this controller belongs
-	ConsulPartition string
-	// EnableConsulNamespaces indicates that a user is running Consul Enterprise
-	EnableConsulNamespaces bool
-	// ConsulDestinationNamespace is the name of the Consul namespace to create
-	// all config entries in. If EnableNSMirroring is true this is ignored.
-	ConsulDestinationNamespace string
-	// EnableNSMirroring causes Consul namespaces to be created to match the
-	// k8s namespace of any config entry custom resource. Config entries will
-	// be created in the matching Consul namespace.
-	EnableNSMirroring bool
-	// NSMirroringPrefix is an optional prefix that can be added to the Consul
-	// namespaces created while mirroring. For example, if it is set to "k8s-",
-	// then the k8s `default` namespace will be mirrored in Consul's
-	// `k8s-default` namespace.
-	NSMirroringPrefix string
+	// K8sNamespaceConfig manages allow/deny Kubernetes namespaces.
+	common.K8sNamespaceConfig
+	// ConsulTenancyConfig manages settings related to Consul namespaces and partitions.
+	common.ConsulTenancyConfig
 
 	// TODO: EnableWANFederation
 
@@ -521,8 +500,8 @@ func parseLocality(node corev1.Node) *pbcatalog.Locality {
 func metaFromPod(pod corev1.Pod) map[string]string {
 	// TODO: allow custom workload metadata
 	return map[string]string{
-		constants.MetaKeyKubeNS: pod.GetNamespace(),
-		metaKeyManagedBy:        constants.ManagedByPodValue,
+		constants.MetaKeyKubeNS:    pod.GetNamespace(),
+		constants.MetaKeyManagedBy: constants.ManagedByPodValue,
 	}
 }
 

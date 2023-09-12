@@ -19,7 +19,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -153,13 +153,15 @@ func TestWorkloadWrite(t *testing.T) {
 
 		// Create the pod controller.
 		pc := &Controller{
-			Client:                fakeClient,
-			Log:                   logrtest.New(t),
-			ConsulClientConfig:    testClient.Cfg,
-			ConsulServerConnMgr:   testClient.Watcher,
-			AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:  mapset.NewSetWith(),
-			ResourceClient:        resourceClient,
+			Client:              fakeClient,
+			Log:                 logrtest.New(t),
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
+			ResourceClient: resourceClient,
 		}
 
 		err = pc.writeWorkload(context.Background(), *tc.pod)
@@ -341,13 +343,15 @@ func TestWorkloadDelete(t *testing.T) {
 
 		// Create the pod controller.
 		pc := &Controller{
-			Client:                fakeClient,
-			Log:                   logrtest.New(t),
-			ConsulClientConfig:    testClient.Cfg,
-			ConsulServerConnMgr:   testClient.Watcher,
-			AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:  mapset.NewSetWith(),
-			ResourceClient:        resourceClient,
+			Client:              fakeClient,
+			Log:                 logrtest.New(t),
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
+			ResourceClient: resourceClient,
 		}
 
 		workload, err := anypb.New(tc.existingWorkload)
@@ -423,13 +427,15 @@ func TestHealthStatusWrite(t *testing.T) {
 
 		// Create the pod controller.
 		pc := &Controller{
-			Client:                fakeClient,
-			Log:                   logrtest.New(t),
-			ConsulClientConfig:    testClient.Cfg,
-			ConsulServerConnMgr:   testClient.Watcher,
-			AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:  mapset.NewSetWith(),
-			ResourceClient:        resourceClient,
+			Client:              fakeClient,
+			Log:                 logrtest.New(t),
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
+			ResourceClient: resourceClient,
 		}
 
 		// The owner of a resource is validated, so create a dummy workload for the HealthStatus
@@ -537,12 +543,14 @@ func TestProxyConfigurationWrite(t *testing.T) {
 
 		// Create the pod controller.
 		pc := &Controller{
-			Client:                   fakeClient,
-			Log:                      logrtest.New(t),
-			ConsulClientConfig:       testClient.Cfg,
-			ConsulServerConnMgr:      testClient.Watcher,
-			AllowK8sNamespacesSet:    mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:     mapset.NewSetWith(),
+			Client:              fakeClient,
+			Log:                 logrtest.New(t),
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
 			EnableTransparentProxy:   tc.tproxy,
 			TProxyOverwriteProbes:    tc.overwriteProbes,
 			EnableTelemetryCollector: tc.telemetry,
@@ -583,7 +591,7 @@ func TestProxyConfigurationWrite(t *testing.T) {
 		err = actualRes.GetResource().GetData().UnmarshalTo(actualProxyConfiguration)
 		require.NoError(t, err)
 
-		diff := cmp.Diff(actualProxyConfiguration, tc.expectedProxyConfiguration, protocmp.Transform())
+		diff := cmp.Diff(actualProxyConfiguration, tc.expectedProxyConfiguration, test.CmpProtoIgnoreOrder()...)
 		require.Equal(t, "", diff)
 	}
 
@@ -728,13 +736,15 @@ func TestProxyConfigurationDelete(t *testing.T) {
 
 		// Create the pod controller.
 		pc := &Controller{
-			Client:                fakeClient,
-			Log:                   logrtest.New(t),
-			ConsulClientConfig:    testClient.Cfg,
-			ConsulServerConnMgr:   testClient.Watcher,
-			AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:  mapset.NewSetWith(),
-			ResourceClient:        resourceClient,
+			Client:              fakeClient,
+			Log:                 logrtest.New(t),
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
+			ResourceClient: resourceClient,
 		}
 
 		// Create the existing ProxyConfiguration
@@ -844,12 +854,14 @@ func TestReconcileCreatePod(t *testing.T) {
 
 		// Create the pod controller.
 		pc := &Controller{
-			Client:                   fakeClient,
-			Log:                      logrtest.New(t),
-			ConsulClientConfig:       testClient.Cfg,
-			ConsulServerConnMgr:      testClient.Watcher,
-			AllowK8sNamespacesSet:    mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:     mapset.NewSetWith(),
+			Client:              fakeClient,
+			Log:                 logrtest.New(t),
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
 			TProxyOverwriteProbes:    tc.overwriteProbes,
 			EnableTransparentProxy:   tc.tproxy,
 			EnableTelemetryCollector: tc.telemetry,
@@ -1014,12 +1026,14 @@ func TestReconcileUpdatePod(t *testing.T) {
 
 		// Create the pod controller.
 		pc := &Controller{
-			Client:                   fakeClient,
-			Log:                      logrtest.New(t),
-			ConsulClientConfig:       testClient.Cfg,
-			ConsulServerConnMgr:      testClient.Watcher,
-			AllowK8sNamespacesSet:    mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:     mapset.NewSetWith(),
+			Client:              fakeClient,
+			Log:                 logrtest.New(t),
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
 			TProxyOverwriteProbes:    tc.overwriteProbes,
 			EnableTransparentProxy:   tc.tproxy,
 			EnableTelemetryCollector: tc.telemetry,
@@ -1226,12 +1240,14 @@ func TestReconcileDeletePod(t *testing.T) {
 
 		// Create the pod controller.
 		pc := &Controller{
-			Client:                fakeClient,
-			Log:                   logrtest.New(t),
-			ConsulClientConfig:    testClient.Cfg,
-			ConsulServerConnMgr:   testClient.Watcher,
-			AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			Client:              fakeClient,
+			Log:                 logrtest.New(t),
+			ConsulClientConfig:  testClient.Cfg,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
 		}
 		if tc.aclsEnabled {
 			pc.AuthMethod = test.AuthMethod

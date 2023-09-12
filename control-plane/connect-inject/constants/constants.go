@@ -22,6 +22,9 @@ const (
 	// ProxyDefaultHealthPort is the default HTTP health check port for the proxy.
 	ProxyDefaultHealthPort = 21000
 
+	// MetaKeyManagedBy is the meta key name for indicating which Kubernetes controller manages a Consul resource.
+	MetaKeyManagedBy = "managed-by"
+
 	// MetaKeyKubeNS is the meta key name for Kubernetes namespace used for the Consul services.
 	MetaKeyKubeNS = "k8s-namespace"
 

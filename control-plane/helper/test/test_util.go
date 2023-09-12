@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/proto-public/pbresource"
@@ -21,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
@@ -339,6 +342,16 @@ func ServiceAccountGetResponse(name, ns string) string {
    }
  ]
 }`, name, ns, ns, name, name)
+}
+
+// CmpProtoIgnoreOrder returns a slice of cmp.Option useful for comparing proto messages independent of the order of
+// their repeated fields.
+func CmpProtoIgnoreOrder() []cmp.Option {
+	return []cmp.Option{
+		protocmp.Transform(),
+		// Stringify any type passed to the sorter so that we can reliably compare most values.
+		cmpopts.SortSlices(func(a, b any) bool { return fmt.Sprintf("%v", a) < fmt.Sprintf("%v", b) }),
+	}
 }
 
 const AuthMethod = "consul-k8s-auth-method"
