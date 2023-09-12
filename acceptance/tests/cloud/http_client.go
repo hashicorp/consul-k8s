@@ -15,7 +15,7 @@ const (
 	validationPathCollector = "/v1/metrics/collector"
 )
 
-type httpClient struct {
+type fakeServerClient struct {
 	client *http.Client
 	tunnel string
 }
@@ -41,42 +41,36 @@ type validationBody struct {
 	DisallowedMetricName string   `json:"disallowedMetricName"`
 	ExpectedMetricName   string   `json:"expectedMetricName"`
 	MetricsDisabled      bool     `json:"metricsDisabled"`
-	RefreshTime          int64    `json:"refreshTime"`
+	FilterRecordsSince   int64    `json:"filterRecordsSince"`
 }
 
-func newHttpClient(tunnel string) *httpClient {
+func newfakeServerClient(tunnel string) *fakeServerClient {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 
-	return &httpClient{
+	return &fakeServerClient{
 		client: &http.Client{Transport: tr},
 		tunnel: tunnel,
 	}
 }
 
-// The fake-server has a requestToken endpoint to retrieve the token.
-func (h *httpClient) requestToken(endpoint string) (string, error) {
+// requestToken retrieves a token from the fakeserver's token endpoint.
+func (f *fakeServerClient) requestToken(endpoint string) (string, error) {
 	url := fmt.Sprintf("https://%s/token", endpoint)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		fmt.Println("Error creating request:", err)
-		return "", errors.New("error creating request")
+		return "", errors.New("error creating /token request")
 	}
 
-	// Perform request
-	resp, err := h.client.Do(req)
-	if err != nil {
-		fmt.Println("Error sending request:", err)
-		return "", errors.New("error making request")
-	}
-	defer resp.Body.Close()
-
-	return handleTokenResponse(resp)
+	return f.handleTokenRequest(req)
 }
 
-func (h *httpClient) modifyTelemetryConfig(payload *modifyTelemetryConfigBody) error {
-	url := fmt.Sprintf("https://%s/modify_telemetry_config", h.tunnel)
+// modifyTelemetryConfig can update the telemetry config returned by the fakeserver.
+// via the fakeserver's modify_telemetry_config endpoint.
+func (f *fakeServerClient) modifyTelemetryConfig(payload *modifyTelemetryConfigBody) error {
+	url := fmt.Sprintf("https://%s/modify_telemetry_config", f.tunnel)
 	payloadBuf := new(bytes.Buffer)
 	json.NewEncoder(payloadBuf).Encode(payload)
 
@@ -86,33 +80,34 @@ func (h *httpClient) modifyTelemetryConfig(payload *modifyTelemetryConfigBody) e
 		return errors.New("error creating modify_telemetry_config request")
 	}
 
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return errors.New("error making modify_telemetry_config request")
-	}
-
-	return handleResponse(resp)
+	return f.handleRequest(req)
 }
 
-func (h *httpClient) validateMetrics(payload *validationBody) error {
+// validateMetrics queries the fakeserver's validation endpoint, which verifies metrics
+// are exported successfully with the expected labels and filters.
+func (f *fakeServerClient) validateMetrics(payload *validationBody) error {
 	payloadBuf := new(bytes.Buffer)
 	json.NewEncoder(payloadBuf).Encode(payload)
 
-	url := fmt.Sprintf("https://%s/validation", h.tunnel)
+	url := fmt.Sprintf("https://%s/validation", f.tunnel)
 	req, err := http.NewRequest("POST", url, payloadBuf)
 	if err != nil {
-		return errors.New("error creating validation request")
+		return errors.New("error creating /validation request")
 	}
 
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return errors.New("error making validation request")
-	}
-
-	return handleResponse(resp)
+	return f.handleRequest(req)
 }
 
-func handleTokenResponse(resp *http.Response) (string, error) {
+// handleTokenRequest returns a token if the request is succesful.
+func (f *fakeServerClient) handleTokenRequest(req *http.Request) (string, error) {
+	// Perform request
+	resp, err := f.client.Do(req)
+	if err != nil {
+		fmt.Println("Error sending request:", err)
+		return "", errors.New("error making request")
+	}
+	defer resp.Body.Close()
+
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -130,7 +125,13 @@ func handleTokenResponse(resp *http.Response) (string, error) {
 	return tokenResponse.Token, nil
 }
 
-func handleResponse(resp *http.Response) error {
+// handleRequest makes a request to any endpoint and handles errors.
+func (f *fakeServerClient) handleRequest(req *http.Request) error {
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return errors.New("error making request")
+	}
+
 	if resp.StatusCode == http.StatusExpectationFailed {
 		// Read the response body
 		body, err := io.ReadAll(resp.Body)

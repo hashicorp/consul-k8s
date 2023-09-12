@@ -88,9 +88,9 @@ func TestObservabilityCloud(t *testing.T) {
 		require.NoError(r, tunnel.ForwardPortE(t))
 	})
 
-	httpClient := newHttpClient(tunnel.Endpoint())
+	fsClient := newfakeServerClient(tunnel.Endpoint())
 	logger.Log(t, "fake-server addr:"+tunnel.Endpoint())
-	consulToken, err := httpClient.requestToken(tunnel.Endpoint())
+	consulToken, err := fsClient.requestToken(tunnel.Endpoint())
 	if err != nil {
 		logger.Log(t, "error finding consul token")
 		return
@@ -130,7 +130,7 @@ func TestObservabilityCloud(t *testing.T) {
 		// TODO: Take this out
 
 		"telemetryCollector.enabled":                   "true",
-		"telemetryCollector.image":                     cfg.ConsulCollectorImage,
+		"telemetryCollector.image":                     "hashicorp/consul-telemetry-collector:0.0.1",
 		"telemetryCollector.cloud.clientId.secretName": clientIDSecretName,
 		"telemetryCollector.cloud.clientId.secretKey":  clientIDSecretKey,
 
@@ -149,11 +149,7 @@ func TestObservabilityCloud(t *testing.T) {
 	if cfg.ConsulImage != "" {
 		helmValues["global.image"] = cfg.ConsulImage
 	}
-	if cfg.ConsulCollectorImage != "" {
-		helmValues["telemetryCollector.image"] = cfg.ConsulCollectorImage
-	}
 
-	initNow := time.Now()
 	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 	consulCluster.Create(t)
 
@@ -170,9 +166,8 @@ func TestObservabilityCloud(t *testing.T) {
 			ExpectedLabelKeys:    []string{"service_name", "service_instance_id"},
 			ExpectedMetricName:   "otelcol_receiver_accepted_metric_points",
 			DisallowedMetricName: "server.memory_heap_size",
-			RefreshTime:          initNow.UnixNano(),
 		}
-		require.NoError(r, httpClient.validateMetrics(validationPayload))
+		require.NoError(r, fsClient.validateMetrics(validationPayload))
 	})
 
 	// Consul Core (Server Metrics) Tests
@@ -183,20 +178,19 @@ func TestObservabilityCloud(t *testing.T) {
 			ExpectedLabelKeys:    []string{"node_id", "node_name"},
 			ExpectedMetricName:   "consul.rpc",
 			DisallowedMetricName: "consul.state",
-			RefreshTime:          initNow.UnixNano(),
 		}
-		require.NoError(r, httpClient.validateMetrics(validationPayload))
+		require.NoError(r, fsClient.validateMetrics(validationPayload))
 	})
 
 	// Refresh Test - New Configuration
 	// 1. Add a new label and new filter that was previously disallowed via modify telemetry config endpoint.
-	now := time.Now()
+	refreshTime := time.Now()
 	modifyPayload := &modifyTelemetryConfigBody{
 		Filters: []string{"consul.state"},
 		Labels:  map[string]string{"new_label": "testLabel"},
 	}
-	require.NoError(t, httpClient.modifyTelemetryConfig(modifyPayload))
-	refreshTime := now.Add(2 * 5 * time.Second).UnixNano()
+	require.NoError(t, fsClient.modifyTelemetryConfig(modifyPayload))
+
 	// 2. Verify refresh has an effect on the exported metrics.
 	// Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
 	// Try to obtain exported metrics with refreshed changes for max 5 minutes.
@@ -207,31 +201,30 @@ func TestObservabilityCloud(t *testing.T) {
 			ExpectedMetricName:   "consul.state.services",
 			DisallowedMetricName: "consul.fsm",
 			// Add 10 seconds (2 * periodic refresh interval in tests) to allow a periodic refresh from Consul side to take place.
-			RefreshTime: refreshTime,
+			FilterRecordsSince: refreshTime.Add(2 * 5 * time.Second).UnixNano(),
 		}
-		require.NoError(r, httpClient.validateMetrics(validationPayload))
+		require.NoError(r, fsClient.validateMetrics(validationPayload))
 	})
 
 	// Refresh Test - Disable metrics
 	// 1. Disable metrics via modify telemetry config endpoint
-	now = time.Now()
+	refreshTime = time.Now()
 	modifyDisablePayload := &modifyTelemetryConfigBody{
 		Filters:  []string{"consul.state"},
 		Labels:   map[string]string{"new_label": "testLabel"},
 		Disabled: true,
 	}
-	require.NoError(t, httpClient.modifyTelemetryConfig(modifyDisablePayload))
-	refreshTime = now.Add(2 * 5 * time.Second).UnixNano()
+	require.NoError(t, fsClient.modifyTelemetryConfig(modifyDisablePayload))
 
 	// 2. Verify refresh has turned metrics off
 	// Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
 	// Try to obtain exported metrics with refreshed changes for max 5 minutes.
 	retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Minute}, t, func(r *retry.R) {
 		validationPayload := &validationBody{
-			Path:            validationPathConsul,
-			MetricsDisabled: true,
-			RefreshTime:     refreshTime,
+			Path:               validationPathConsul,
+			MetricsDisabled:    true,
+			FilterRecordsSince: refreshTime.Add(2 * 5 * time.Second).UnixNano(),
 		}
-		require.NoError(r, httpClient.validateMetrics(validationPayload))
+		require.NoError(r, fsClient.validateMetrics(validationPayload))
 	})
 }
