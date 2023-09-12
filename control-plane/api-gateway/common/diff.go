@@ -148,6 +148,7 @@ func (e entryComparator) httpRoutesEqual(a, b api.HTTPRouteConfigEntry) bool {
 func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 	return slices.EqualFunc(a.Filters.Headers, b.Filters.Headers, e.httpHeaderFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.URLRewrite, b.Filters.URLRewrite, e.urlRewritesEqual) &&
+		slices.EqualFunc(a.ResponseFilters.Headers, b.ResponseFilters.Headers, e.httpHeaderFiltersEqual) &&
 		slices.EqualFunc(a.Matches, b.Matches, e.httpMatchesEqual) &&
 		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual) &&
 		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
@@ -160,7 +161,8 @@ func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
 		orDefault(a.Namespace, e.namespaceA) == orDefault(b.Namespace, e.namespaceB) &&
 		orDefault(a.Partition, e.partitionA) == orDefault(b.Partition, e.partitionB) &&
 		slices.EqualFunc(a.Filters.Headers, b.Filters.Headers, e.httpHeaderFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.URLRewrite, b.Filters.URLRewrite, e.urlRewritesEqual)
+		bothNilOrEqualFunc(a.Filters.URLRewrite, b.Filters.URLRewrite, e.urlRewritesEqual) &&
+		slices.EqualFunc(a.ResponseFilters.Headers, b.ResponseFilters.Headers, e.httpHeaderFiltersEqual)
 }
 
 func (e entryComparator) httpMatchesEqual(a, b api.HTTPMatch) bool {

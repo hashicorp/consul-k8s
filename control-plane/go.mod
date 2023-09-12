@@ -1,8 +1,12 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-// TODO: remove when the SDK is released for Consul 1.17
-// The replace directive is needed be because `api` requires 0.14.1 of SDK and is both a direct and indirect dependency
-replace github.com/hashicorp/consul/sdk v0.14.1 => github.com/hashicorp/consul/sdk v0.4.1-0.20230825164720-ecdcde430924
+// TODO: remove these when the SDK is released for Consul 1.17 and coinciding patch releases
+replace (
+	// This replace directive is needed because `api` requires 0.4.1 of proto-public but we need an unreleased version
+	github.com/hashicorp/consul/proto-public v0.4.1 => github.com/hashicorp/consul/proto-public v0.1.2-0.20230911164019-a69e901660bd
+	// This replace directive is needed because `api` requires 0.14.1 of `sdk` but we need an unreleased version
+	github.com/hashicorp/consul/sdk v0.14.1 => github.com/hashicorp/consul/sdk v0.4.1-0.20230911164019-a69e901660bd
+)
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
@@ -14,8 +18,8 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230825213844-4ea04860c5ed
 	github.com/hashicorp/consul-server-connection-manager v0.1.4
-	github.com/hashicorp/consul/api v1.10.1-0.20230906155245-56917eb4c968
-	github.com/hashicorp/consul/proto-public v0.1.2-0.20230906155245-56917eb4c968
+	github.com/hashicorp/consul/api v1.10.1-0.20230911164019-a69e901660bd
+	github.com/hashicorp/consul/proto-public v0.4.1
 	github.com/hashicorp/consul/sdk v0.14.1
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
@@ -23,6 +27,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-netaddrs v0.1.0
 	github.com/hashicorp/go-rootcerts v1.0.2
+	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/serf v0.10.1
 	github.com/hashicorp/vault/api v1.8.3
@@ -33,8 +38,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/stretchr/testify v1.8.3
 	go.uber.org/zap v1.24.0
-	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
-	golang.org/x/text v0.11.0
+	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
+	golang.org/x/text v0.12.0
 	golang.org/x/time v0.3.0
 	gomodules.xyz/jsonpatch/v2 v2.3.0
 	google.golang.org/grpc v1.55.0
@@ -104,7 +109,6 @@ require (
 	github.com/hashicorp/go-secure-stdlib/parseutil v0.1.6 // indirect
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
-	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/mdns v1.0.4 // indirect
@@ -151,14 +155,14 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/crypto v0.11.0 // indirect
-	golang.org/x/mod v0.9.0 // indirect
-	golang.org/x/net v0.13.0 // indirect
+	golang.org/x/crypto v0.12.0 // indirect
+	golang.org/x/mod v0.12.0 // indirect
+	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/oauth2 v0.6.0 // indirect
-	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
-	golang.org/x/term v0.10.0 // indirect
-	golang.org/x/tools v0.7.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/term v0.11.0 // indirect
+	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect
 	google.golang.org/api v0.114.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
