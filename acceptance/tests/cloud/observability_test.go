@@ -158,73 +158,77 @@ func TestObservabilityCloud(t *testing.T) {
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 	t.Log("Finished deployment. Validating expected conditions now")
 
-	// Consul Telemetry Collector Test
-	// Metrics Export Test - Validate that metrics are exported to the gateway from the Consul-Telemetry-Collector.
-	retry.RunWith(&retry.Timer{Timeout: 1 * time.Minute, Wait: 10 * time.Second}, t, func(r *retry.R) {
-		validationPayload := &validationBody{
-			Path:                 validationPathCollector,
-			ExpectedLabelKeys:    []string{"service_name", "service_instance_id"},
-			ExpectedMetricName:   "otelcol_receiver_accepted_metric_points",
-			DisallowedMetricName: "server.memory_heap_size",
-		}
-		require.NoError(r, fsClient.validateMetrics(validationPayload))
-	})
+	for name, tc := range map[string]struct {
+		refresh    *modifyTelemetryConfigBody
+		validation *validationBody
+		timeout    time.Duration
+		wait       time.Duration
+	}{
+		"collectorExportsMetrics": {
+			validation: &validationBody{
+				Path:                 validationPathCollector,
+				ExpectedLabelKeys:    []string{"service_name", "service_instance_id"},
+				ExpectedMetricName:   "otelcol_receiver_accepted_metric_points",
+				DisallowedMetricName: "server.memory_heap_size",
+			},
+			timeout: 1 * time.Minute,
+			wait:    10 * time.Second,
+		},
+		"consulExportsMetrics": {
+			validation: &validationBody{
+				Path:                 validationPathCollector,
+				ExpectedLabelKeys:    []string{"service_name", "service_instance_id"},
+				ExpectedMetricName:   "otelcol_receiver_accepted_metric_points",
+				DisallowedMetricName: "server.memory_heap_size",
+			},
+			// High timeout as Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
+			timeout: 3 * time.Minute,
+			wait:    30 * time.Second,
+		},
+		"consulPeriodicRefreshUpdateConfig": {
+			refresh: &modifyTelemetryConfigBody{
+				Filters: []string{"consul.state"},
+				Labels:  map[string]string{"new_label": "testLabel"},
+			}, validation: &validationBody{
+				Path:                 validationPathConsul,
+				ExpectedLabelKeys:    []string{"node_id", "node_name", "new_label"},
+				ExpectedMetricName:   "consul.state.services",
+				DisallowedMetricName: "consul.fsm",
+			},
+			//  High timeout as Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
+			timeout: 3 * time.Minute,
+			wait:    30 * time.Second,
+		},
+		"consulPeriodicRefreshDisabled": {
+			refresh: &modifyTelemetryConfigBody{
+				Filters:  []string{"consul.state"},
+				Labels:   map[string]string{"new_label": "testLabel"},
+				Disabled: true,
+			}, validation: &validationBody{
+				Path:            validationPathConsul,
+				MetricsDisabled: true,
+			},
+			// High timeout as Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
+			timeout: 3 * time.Minute,
+			wait:    30 * time.Second,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// For a refresh test, we force a telemetry config update before validating metrics using fakeserver's /telemetry_config_modify endpoint.
+			if tc.refresh != nil {
+				refreshTime := time.Now()
+				err := fsClient.modifyTelemetryConfig(tc.refresh)
+				require.NoError(t, err)
+				// Add 10 seconds (2 * periodic refresh interval in fakeserver) to allow a periodic refresh from Consul side to take place.
+				tc.validation.FilterRecordsSince = refreshTime.Add(10 * time.Second).UnixNano()
+			}
 
-	// Consul Core (Server Metrics) Tests
-	// Metrics Export Test - Validate that metrics are exported to the gateway from Consul core servers.
-	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 1 * time.Minute}, t, func(r *retry.R) {
-		validationPayload := &validationBody{
-			Path:                 validationPathConsul,
-			ExpectedLabelKeys:    []string{"node_id", "node_name"},
-			ExpectedMetricName:   "consul.rpc",
-			DisallowedMetricName: "consul.state",
-		}
-		require.NoError(r, fsClient.validateMetrics(validationPayload))
-	})
-
-	// Refresh Test - New Configuration
-	// 1. Add a new label and new filter that was previously disallowed via modify telemetry config endpoint.
-	refreshTime := time.Now()
-	modifyPayload := &modifyTelemetryConfigBody{
-		Filters: []string{"consul.state"},
-		Labels:  map[string]string{"new_label": "testLabel"},
+			// Validate that exported metrics are correct using fakeserver's /validation endpoint, which records metric exports that occured.
+			// We need to use retry as we wait for Consul or the Collector to export metrics.
+			retry.RunWith(&retry.Timer{Timeout: tc.timeout, Wait: tc.wait}, t, func(r *retry.R) {
+				err := fsClient.validateMetrics(tc.validation)
+				require.NoError(r, err)
+			})
+		})
 	}
-	require.NoError(t, fsClient.modifyTelemetryConfig(modifyPayload))
-
-	// 2. Verify refresh has an effect on the exported metrics.
-	// Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
-	// Try to obtain exported metrics with refreshed changes for max 5 minutes.
-	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 1 * time.Minute}, t, func(r *retry.R) {
-		validationPayload := &validationBody{
-			Path:                 validationPathConsul,
-			ExpectedLabelKeys:    []string{"node_id", "node_name", "new_label"},
-			ExpectedMetricName:   "consul.state.services",
-			DisallowedMetricName: "consul.fsm",
-			// Add 10 seconds (2 * periodic refresh interval in tests) to allow a periodic refresh from Consul side to take place.
-			FilterRecordsSince: refreshTime.Add(2 * 5 * time.Second).UnixNano(),
-		}
-		require.NoError(r, fsClient.validateMetrics(validationPayload))
-	})
-
-	// Refresh Test - Disable metrics
-	// 1. Disable metrics via modify telemetry config endpoint
-	refreshTime = time.Now()
-	modifyDisablePayload := &modifyTelemetryConfigBody{
-		Filters:  []string{"consul.state"},
-		Labels:   map[string]string{"new_label": "testLabel"},
-		Disabled: true,
-	}
-	require.NoError(t, fsClient.modifyTelemetryConfig(modifyDisablePayload))
-
-	// 2. Verify refresh has turned metrics off
-	// Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
-	// Try to obtain exported metrics with refreshed changes for max 5 minutes.
-	retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Minute}, t, func(r *retry.R) {
-		validationPayload := &validationBody{
-			Path:               validationPathConsul,
-			MetricsDisabled:    true,
-			FilterRecordsSince: refreshTime.Add(2 * 5 * time.Second).UnixNano(),
-		}
-		require.NoError(r, fsClient.validateMetrics(validationPayload))
-	})
 }
