@@ -226,6 +226,32 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 	return nil, refsErr
 }
 
+func validateJWT(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *common.ResourceMap) error {
+	policy, _ := resources.GetPolicyForGatewayListener(gateway, listener)
+	if policy == nil {
+		return nil
+	}
+
+	if policy.Spec.Override != nil && policy.Spec.Override.JWT != nil {
+		for _, provider := range policy.Spec.Override.JWT.Providers {
+			_, ok := resources.GetJWTProviderForProvider(provider)
+			if !ok {
+				return errListenerJWTProviderNotFound
+			}
+		}
+	}
+
+	if policy.Spec.Default != nil && policy.Spec.Default.JWT != nil {
+		for _, provider := range policy.Spec.Default.JWT.Providers {
+			_, ok := resources.GetJWTProviderForProvider(provider)
+			if !ok {
+				return errListenerJWTProviderNotFound
+			}
+		}
+	}
+	return nil
+}
+
 func validateCertificateRefs(gateway gwv1beta1.Gateway, refs []gwv1beta1.SecretObjectReference, resources *common.ResourceMap) error {
 	for _, cert := range refs {
 		// Verify that the reference has a group and kind that we support
@@ -336,8 +362,12 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 		var result listenerValidationResult
 
 		err, refErr := validateTLS(gateway, listener.TLS, resources)
-		result.refErr = refErr
-		if err != nil {
+		result.refErrs = append(result.refErrs, refErr)
+
+		jwtErr := validateJWT(gateway, listener, resources)
+		result.refErrs = append(result.refErrs, jwtErr)
+
+		if err != nil || jwtErr != nil {
 			result.acceptedErr = err
 		} else {
 			_, supported := supportedKindsForProtocol[listener.Protocol]
@@ -455,7 +485,6 @@ func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.R
 					return false
 				}
 			}
-
 		}
 	}
 

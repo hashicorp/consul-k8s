@@ -121,6 +121,7 @@ type ResourceMap struct {
 	// consul resources for a gateway
 	consulTCPRoutes  map[api.ResourceReference]*consulTCPRoute
 	consulHTTPRoutes map[api.ResourceReference]*consulHTTPRoute
+	jwtProviders     map[api.ResourceReference]*v1alpha1.JWTProvider
 
 	// mutations
 	consulMutations []*ConsulUpdateOperation
@@ -141,6 +142,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
 		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
 		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
+		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
 }
 
@@ -427,6 +429,25 @@ func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v
 	s.gatewayPolicies[key] = gatewayPolicy
 
 	return s.gatewayPolicies[key]
+}
+
+func (s *ResourceMap) AddJWTProvider(provider *v1alpha1.JWTProvider) {
+	key := api.ResourceReference{
+		Kind: provider.Kind,
+		Name: provider.Name,
+	}
+	s.logger.Info("resourceMap", "key when adding", key)
+	s.jwtProviders[key] = provider
+}
+
+func (s *ResourceMap) GetJWTProviderForProvider(provider *v1alpha1.GatewayJWTProvider) (*v1alpha1.JWTProvider, bool) {
+	key := api.ResourceReference{
+		Name: provider.Name,
+		Kind: "JWTProvider",
+	}
+	s.logger.Info("resourceMap", "providers", s.jwtProviders[key], "key", key)
+	value, exists := s.jwtProviders[key]
+	return value, exists
 }
 
 func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {

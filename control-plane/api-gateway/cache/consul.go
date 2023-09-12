@@ -55,7 +55,7 @@ const (
 	apiTimeout        = 5 * time.Minute
 )
 
-var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate}
+var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate, api.JWTProvider}
 
 type Config struct {
 	ConsulClientConfig      *consul.Config
@@ -94,6 +94,7 @@ func New(config Config) *Cache {
 	for _, kind := range Kinds {
 		cache[kind] = common.NewReferenceMap()
 	}
+
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
@@ -222,7 +223,7 @@ func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind strin
 
 	for _, entry := range entries {
 		meta := entry.GetMeta()
-		if meta[constants.MetaKeyKubeName] == "" || meta[constants.MetaKeyDatacenter] != c.datacenter {
+		if (meta[constants.MetaKeyKubeName] == "" || meta[constants.MetaKeyDatacenter] != c.datacenter) && kind != api.JWTProvider {
 			// Don't process things that don't belong to us. The main reason
 			// for this is so that we don't garbage collect config entries that
 			// are either user-created or that another controller running in a
