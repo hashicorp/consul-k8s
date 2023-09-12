@@ -103,7 +103,75 @@ func (e entryComparator) apiGatewayListenersEqual(a, b api.APIGatewayListener) b
 		a.Port == b.Port &&
 		// normalize the protocol name
 		strings.EqualFold(a.Protocol, b.Protocol) &&
-		e.apiGatewayListenerTLSConfigurationsEqual(a.TLS, b.TLS)
+		e.apiGatewayListenerTLSConfigurationsEqual(a.TLS, b.TLS) &&
+		e.apiGatewayPoliciesEqual(a.Override, b.Override) &&
+		e.apiGatewayPoliciesEqual(a.Default, b.Default)
+}
+
+func (e entryComparator) apiGatewayPoliciesEqual(a, b *api.APIGatewayPolicy) bool {
+	// if both are nil then return true
+	if a == nil && b == nil {
+		return true
+	}
+
+	// if only one is nil then return false
+	if a == nil || b == nil {
+		return false
+	}
+
+	return e.equalJWTProviders(a.JWT, b.JWT)
+}
+
+func (e entryComparator) equalJWTProviders(a, b *api.APIGatewayJWTRequirement) bool {
+	if a == nil && b == nil {
+		return true
+	}
+
+	if a == nil || b == nil {
+		return false
+	}
+
+	return slices.EqualFunc(a.Providers, b.Providers, providersEqual)
+}
+
+func providersEqual(a, b *api.APIGatewayJWTProvider) bool {
+	if a == nil && b == nil {
+		return true
+	}
+
+	if a == nil || b == nil {
+		return false
+	}
+
+	if a.Name != b.Name {
+		return false
+	}
+
+	return slices.EqualFunc(a.VerifyClaims, b.VerifyClaims, equalClaims)
+}
+
+func equalClaims(a, b *api.APIGatewayJWTClaimVerification) bool {
+	if a == nil && b == nil {
+		return true
+	}
+
+	if a == nil || b == nil {
+		return false
+	}
+
+	if a.Value != b.Value {
+		return false
+	}
+
+	if len(a.Path) != len(b.Path) {
+		return false
+	}
+
+	if !slices.Equal(a.Path, b.Path) {
+		return false
+	}
+
+	return true
 }
 
 func (e entryComparator) apiGatewayListenerTLSConfigurationsEqual(a, b api.APIGatewayTLSConfiguration) bool {

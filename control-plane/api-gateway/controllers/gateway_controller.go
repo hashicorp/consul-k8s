@@ -598,8 +598,12 @@ func (r *GatewayController) transformGatewayPolicy(ctx context.Context) func(obj
 	return func(o client.Object) []reconcile.Request {
 		gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
 
+		gwNamespace := gatewayPolicy.Spec.TargetRef.Namespace
+		if gwNamespace == "" {
+			gwNamespace = gatewayPolicy.Namespace
+		}
 		gatewayRef := types.NamespacedName{
-			Namespace: gatewayPolicy.Spec.TargetRef.Namespace,
+			Namespace: gwNamespace,
 			Name:      gatewayPolicy.Spec.TargetRef.Name,
 		}
 		return []reconcile.Request{
@@ -607,7 +611,6 @@ func (r *GatewayController) transformGatewayPolicy(ctx context.Context) func(obj
 				NamespacedName: gatewayRef,
 			},
 		}
-
 	}
 }
 
