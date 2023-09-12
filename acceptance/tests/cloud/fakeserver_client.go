@@ -71,8 +71,8 @@ func newfakeServerClient(tunnel string) *fakeServerClient {
 }
 
 // requestToken retrieves a token from the fakeserver's token endpoint.
-func (f *fakeServerClient) requestToken(endpoint string) (string, error) {
-	url := fmt.Sprintf("https://%s/token", endpoint)
+func (f *fakeServerClient) requestToken() (string, error) {
+	url := fmt.Sprintf("https://%s/token", f.tunnel)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errCreatingRequest, err)

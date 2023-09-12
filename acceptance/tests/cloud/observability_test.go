@@ -90,7 +90,7 @@ func TestObservabilityCloud(t *testing.T) {
 
 	fsClient := newfakeServerClient(tunnel.Endpoint())
 	logger.Log(t, "fake-server addr:"+tunnel.Endpoint())
-	consulToken, err := fsClient.requestToken(tunnel.Endpoint())
+	consulToken, err := fsClient.requestToken()
 	if err != nil {
 		logger.Log(t, "error finding consul token")
 		return
