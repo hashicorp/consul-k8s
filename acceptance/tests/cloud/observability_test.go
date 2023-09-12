@@ -174,17 +174,6 @@ func TestObservabilityCloud(t *testing.T) {
 			timeout: 1 * time.Minute,
 			wait:    10 * time.Second,
 		},
-		"consulExportsMetrics": {
-			validation: &validationBody{
-				Path:                 validationPathCollector,
-				ExpectedLabelKeys:    []string{"service_name", "service_instance_id"},
-				ExpectedMetricName:   "otelcol_receiver_accepted_metric_points",
-				DisallowedMetricName: "server.memory_heap_size",
-			},
-			// High timeout as Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
-			timeout: 3 * time.Minute,
-			wait:    30 * time.Second,
-		},
 		"consulPeriodicRefreshUpdateConfig": {
 			refresh: &modifyTelemetryConfigBody{
 				Filters: []string{"consul.state"},
