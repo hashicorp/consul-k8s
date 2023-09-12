@@ -5,13 +5,17 @@ package connectinject
 
 import (
 	"context"
+
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpointsv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	webhookV2 "github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook_v2"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -24,13 +28,13 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
-	//lifecycleConfig := lifecycle.Config{
-	//	DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
-	//	DefaultEnableShutdownDrainListeners: c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
-	//	DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
-	//	DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
-	//	DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
-	//}
+	lifecycleConfig := lifecycle.Config{
+		DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
+		DefaultEnableShutdownDrainListeners: c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
+		DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
+		DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
+		DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
+	}
 
 	metricsConfig := metrics.Config{
 		DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
@@ -99,8 +103,58 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	//}
 
 	// TODO: register webhooks
+	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
-	// TODO: Update Webhook CA Bundle
+	mgr.GetWebhookServer().Register("/mutate",
+		&ctrlRuntimeWebhook.Admission{Handler: &webhookV2.MeshWebhook{
+			Clientset:                    c.clientset,
+			ReleaseNamespace:             c.flagReleaseNamespace,
+			ConsulConfig:                 consulConfig,
+			ConsulServerConnMgr:          watcher,
+			ImageConsul:                  c.flagConsulImage,
+			ImageConsulDataplane:         c.flagConsulDataplaneImage,
+			EnvoyExtraArgs:               c.flagEnvoyExtraArgs,
+			ImageConsulK8S:               c.flagConsulK8sImage,
+			RequireAnnotation:            !c.flagDefaultInject,
+			AuthMethod:                   c.flagACLAuthMethod,
+			ConsulCACert:                 string(c.caCertPem),
+			TLSEnabled:                   c.consul.UseTLS,
+			ConsulAddress:                c.consul.Addresses,
+			SkipServerWatch:              c.consul.SkipServerWatch,
+			ConsulTLSServerName:          c.consul.TLSServerName,
+			DefaultProxyCPURequest:       c.sidecarProxyCPURequest,
+			DefaultProxyCPULimit:         c.sidecarProxyCPULimit,
+			DefaultProxyMemoryRequest:    c.sidecarProxyMemoryRequest,
+			DefaultProxyMemoryLimit:      c.sidecarProxyMemoryLimit,
+			DefaultEnvoyProxyConcurrency: c.flagDefaultEnvoyProxyConcurrency,
+			LifecycleConfig:              lifecycleConfig,
+			MetricsConfig:                metricsConfig,
+			InitContainerResources:       c.initContainerResources,
+			ConsulPartition:              c.consul.Partition,
+			AllowK8sNamespacesSet:        allowK8sNamespaces,
+			DenyK8sNamespacesSet:         denyK8sNamespaces,
+			EnableNamespaces:             c.flagEnableNamespaces,
+			ConsulDestinationNamespace:   c.flagConsulDestinationNamespace,
+			EnableK8SNSMirroring:         c.flagEnableK8SNSMirroring,
+			K8SNSMirroringPrefix:         c.flagK8SNSMirroringPrefix,
+			CrossNamespaceACLPolicy:      c.flagCrossNamespaceACLPolicy,
+			EnableTransparentProxy:       c.flagDefaultEnableTransparentProxy,
+			EnableCNI:                    c.flagEnableCNI,
+			TProxyOverwriteProbes:        c.flagTransparentProxyDefaultOverwriteProbes,
+			EnableConsulDNS:              c.flagEnableConsulDNS,
+			EnableOpenShift:              c.flagEnableOpenShift,
+			Log:                          ctrl.Log.WithName("handler").WithName("consul-mesh"),
+			LogLevel:                     c.flagLogLevel,
+			LogJSON:                      c.flagLogJSON,
+		}})
+
+	if c.flagEnableWebhookCAUpdate {
+		err := c.updateWebhookCABundle(ctx)
+		if err != nil {
+			setupLog.Error(err, "problem getting CA Cert")
+			return err
+		}
+	}
 
 	return nil
 }
