@@ -4,6 +4,8 @@
 package common
 
 import (
+	"fmt"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -12,8 +14,9 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 // ConsulUpdateOperation is an operation representing an
@@ -142,6 +145,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
 		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
 		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
+		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.GatewayPolicy),
 		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
 }
@@ -436,7 +440,6 @@ func (s *ResourceMap) AddJWTProvider(provider *v1alpha1.JWTProvider) {
 		Kind: provider.Kind,
 		Name: provider.Name,
 	}
-	s.logger.Info("resourceMap", "key when adding", key)
 	s.jwtProviders[key] = provider
 }
 
@@ -445,7 +448,6 @@ func (s *ResourceMap) GetJWTProviderForProvider(provider *v1alpha1.GatewayJWTPro
 		Name: provider.Name,
 		Kind: "JWTProvider",
 	}
-	s.logger.Info("resourceMap", "providers", s.jwtProviders[key], "key", key)
 	value, exists := s.jwtProviders[key]
 	return value, exists
 }
