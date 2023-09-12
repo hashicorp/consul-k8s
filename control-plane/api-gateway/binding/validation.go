@@ -362,13 +362,19 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 		var result listenerValidationResult
 
 		err, refErr := validateTLS(gateway, listener.TLS, resources)
-		result.refErrs = append(result.refErrs, refErr)
+		if refErr != nil {
+			result.refErrs = append(result.refErrs, refErr)
+		}
 
 		jwtErr := validateJWT(gateway, listener, resources)
+		if jwtErr != nil {
 		result.refErrs = append(result.refErrs, jwtErr)
+	    }
 
-		if err != nil || jwtErr != nil {
+		if err != nil {
 			result.acceptedErr = err
+		} else if jwtErr != nil {
+			result.acceptedErr = jwtErr
 		} else {
 			_, supported := supportedKindsForProtocol[listener.Protocol]
 			if !supported {
