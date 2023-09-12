@@ -125,6 +125,9 @@ spec:
         {{- if $root.Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl $root.Values.global.secretsBackend.vault.agentAnnotations $root | nindent 8 | trim }}
         {{- end }}
+        {{- if (and ($root.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" $root.Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ $root.Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- end }}
         {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
         "prometheus.io/scrape": "true"
