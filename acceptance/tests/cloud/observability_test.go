@@ -4,12 +4,6 @@
 package cloud
 
 import (
-	"crypto/tls"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -23,10 +17,6 @@ import (
 	"github.com/hashicorp/serf/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
-
-type TokenResponse struct {
-	Token string `json:"token"`
-}
 
 var (
 	resourceSecretName     = "resource-sec-name"
@@ -54,47 +44,7 @@ var (
 	scadaAddressSecretKeyValue = "fake-server:443"
 )
 
-// The fake-server has a requestToken endpoint to retrieve the token.
-func requestToken(endpoint string) (string, error) {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	client := &http.Client{Transport: tr}
-	url := fmt.Sprintf("https://%s/token", endpoint)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		fmt.Println("Error creating request:", err)
-		return "", errors.New("error creating request")
-	}
-
-	// Perform the request
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error sending request:", err)
-		return "", errors.New("error making request")
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("Error reading response:", err)
-		return "", errors.New("error reading body")
-	}
-
-	var tokenResponse TokenResponse
-	err = json.Unmarshal(body, &tokenResponse)
-	if err != nil {
-		fmt.Println("Error parsing response:", err)
-		return "", errors.New("error parsing body")
-	}
-
-	return tokenResponse.Token, nil
-
-}
-
-func TestBasicCloud(t *testing.T) {
+func TestObservabilityCloud(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 
 	kubectlOptions := ctx.KubectlOptions(t)
@@ -138,8 +88,9 @@ func TestBasicCloud(t *testing.T) {
 		require.NoError(r, tunnel.ForwardPortE(t))
 	})
 
+	httpClient := newHttpClient(tunnel.Endpoint())
 	logger.Log(t, "fake-server addr:"+tunnel.Endpoint())
-	consulToken, err := requestToken(tunnel.Endpoint())
+	consulToken, err := httpClient.requestToken(tunnel.Endpoint())
 	if err != nil {
 		logger.Log(t, "error finding consul token")
 		return
@@ -185,8 +136,6 @@ func TestBasicCloud(t *testing.T) {
 
 		"telemetryCollector.cloud.clientSecret.secretName": clientSecretName,
 		"telemetryCollector.cloud.clientSecret.secretKey":  clientSecretKey,
-		// Either we set the global.trustedCAs (make sure it's idented exactly) or we
-		// set TLS to insecure
 
 		"telemetryCollector.extraEnvironmentVars.HCP_API_TLS":       "insecure",
 		"telemetryCollector.extraEnvironmentVars.HCP_AUTH_TLS":      "insecure",
@@ -196,26 +145,6 @@ func TestBasicCloud(t *testing.T) {
 		"server.extraEnvironmentVars.HCP_API_TLS":   "insecure",
 		"server.extraEnvironmentVars.HCP_AUTH_TLS":  "insecure",
 		"server.extraEnvironmentVars.HCP_SCADA_TLS": "insecure",
-
-		// This is pregenerated CA used for testing. It can be replaced at any time and isn't
-		// meant for anything other than testing
-		// 		"global.trustedCAs[0]": `-----BEGIN CERTIFICATE-----
-		// MIICrjCCAZYCCQD5LxMcnMY8rDANBgkqhkiG9w0BAQsFADAZMRcwFQYDVQQDDA5m
-		// YWtlLXNlcnZlci1jYTAeFw0yMzA1MTkxMjIwMzhaFw0zMzA1MTYxMjIwMzhaMBkx
-		// FzAVBgNVBAMMDmZha2Utc2VydmVyLWNhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
-		// MIIBCgKCAQEAwhbiII7sMultedFzQVhVZz5Ti+9lWrpZb8y0ZR6NaNvoxDPX151t
-		// Adh5NegSeH/+351iDBGZHhmKECtBuk8FJgk88O7y8A7Yg+/lyeZd0SJTEeiYUe7d
-		// sSaBTYSmixyn6s15Y5MVp9gM7t2YXrocRkFxDtdhLMWf0zwzJEwDouFMMiFZw5II
-		// yDbI6UfwKyB8C8ln10+TcczbheaOMQ1jGn35YWAG/LEdutU6DO2Y/GZYQ41nyLF1
-		// klqh34USQPVQSQW7R7GiDxyhh1fGaDF6RAzH4RerzQSNvvTHmBXIGurB/Hnu1n3p
-		// CwWeatWMU5POy1es73S/EPM0NpWD5RabSwIDAQABMA0GCSqGSIb3DQEBCwUAA4IB
-		// AQBayoTltSW55PvKVp9cmqGOBMlkIMKPd6Ny4bCb/3UF+3bzQmIblh3O3kEt7WoY
-		// fA9vp+6cSRGVqgBfR2bi40RrerLNA79yywIZjfBMteNuRoul5VeD+mLyFCo4197r
-		// Atl2TEx2kl2V8rjCsEBcTqKqetVOMLYEZ2tbCeUt1A/K7OzaJfHgelEYcsVt68Q9
-		// /BLoo2UXfOpRrcsx7u7s5HPVbG3bx+1MvGJZ2C3i0B6agnkGDzEpoM4KZGxEefB9
-		// DOHIJfie9d9BQD52nZh3SGHz0b3vfJ430XrQmaNZ26fuIEyIYrpvyAhBXckj2iTD
-		// 1TXpqr/1D7EUbddktyhXTK9e
-		// -----END CERTIFICATE-----`,
 	}
 	if cfg.ConsulImage != "" {
 		helmValues["global.image"] = cfg.ConsulImage
@@ -224,6 +153,7 @@ func TestBasicCloud(t *testing.T) {
 		helmValues["telemetryCollector.image"] = cfg.ConsulCollectorImage
 	}
 
+	initNow := time.Now()
 	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 	consulCluster.Create(t)
 
@@ -231,56 +161,77 @@ func TestBasicCloud(t *testing.T) {
 
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 	t.Log("Finished deployment. Validating expected conditions now")
-	// Give some time for collector send metrics
-	time.Sleep(5 * time.Second)
-	err = validate(tunnel.Endpoint())
-	logger.Log(t, fmt.Sprintf("result: %v", err))
-	require.NoError(t, err)
 
-}
-
-func validate(endpoint string) error {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	client := &http.Client{Transport: tr}
-	url := fmt.Sprintf("https://%s/validation", endpoint)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		fmt.Println("Error creating request:", err)
-		return errors.New("error creating validation request")
-	}
-
-	// Perform the request
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error sending request:", err)
-		return errors.New("error making  validation request")
-	}
-	if resp.StatusCode == http.StatusExpectationFailed {
-		// Read the response body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println("Error reading response:", err)
-			return errors.New("error reading body")
+	// Consul Telemetry Collector Test
+	// Metrics Export Test - Validate that metrics are exported to the gateway from the Consul-Telemetry-Collector.
+	retry.RunWith(&retry.Timer{Timeout: 1 * time.Minute, Wait: 10 * time.Second}, t, func(r *retry.R) {
+		validationPayload := &validationBody{
+			Path:                 validationPathCollector,
+			ExpectedLabelKeys:    []string{"service_name", "service_instance_id"},
+			ExpectedMetricName:   "otelcol_receiver_accepted_metric_points",
+			DisallowedMetricName: "server.memory_heap_size",
+			RefreshTime:          initNow.UnixNano(),
 		}
-		var message errMsg
-		err = json.Unmarshal(body, &message)
-		if err != nil {
-			fmt.Println("Error parsing response:", err)
-			return errors.New("error parsing body")
+		require.NoError(r, httpClient.validateMetrics(validationPayload))
+	})
+
+	// Consul Core (Server Metrics) Tests
+	// Metrics Export Test - Validate that metrics are exported to the gateway from Consul core servers.
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 1 * time.Minute}, t, func(r *retry.R) {
+		validationPayload := &validationBody{
+			Path:                 validationPathConsul,
+			ExpectedLabelKeys:    []string{"node_id", "node_name"},
+			ExpectedMetricName:   "consul.rpc",
+			DisallowedMetricName: "consul.state",
+			RefreshTime:          initNow.UnixNano(),
 		}
+		require.NoError(r, httpClient.validateMetrics(validationPayload))
+	})
 
-		return fmt.Errorf("Failed validation: %s", message)
-	} else if resp.StatusCode != http.StatusOK {
-		return errors.New("unexpected status code response from failure")
+	// Refresh Test - New Configuration
+	// 1. Add a new label and new filter that was previously disallowed via modify telemetry config endpoint.
+	now := time.Now()
+	modifyPayload := &modifyTelemetryConfigBody{
+		Filters: []string{"consul.state"},
+		Labels:  map[string]string{"new_label": "testLabel"},
 	}
+	require.NoError(t, httpClient.modifyTelemetryConfig(modifyPayload))
+	refreshTime := now.Add(2 * 5 * time.Second).UnixNano()
+	// 2. Verify refresh has an effect on the exported metrics.
+	// Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
+	// Try to obtain exported metrics with refreshed changes for max 5 minutes.
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 1 * time.Minute}, t, func(r *retry.R) {
+		validationPayload := &validationBody{
+			Path:                 validationPathConsul,
+			ExpectedLabelKeys:    []string{"node_id", "node_name", "new_label"},
+			ExpectedMetricName:   "consul.state.services",
+			DisallowedMetricName: "consul.fsm",
+			// Add 10 seconds (2 * periodic refresh interval in tests) to allow a periodic refresh from Consul side to take place.
+			RefreshTime: refreshTime,
+		}
+		require.NoError(r, httpClient.validateMetrics(validationPayload))
+	})
 
-	return nil
+	// Refresh Test - Disable metrics
+	// 1. Disable metrics via modify telemetry config endpoint
+	now = time.Now()
+	modifyDisablePayload := &modifyTelemetryConfigBody{
+		Filters:  []string{"consul.state"},
+		Labels:   map[string]string{"new_label": "testLabel"},
+		Disabled: true,
+	}
+	require.NoError(t, httpClient.modifyTelemetryConfig(modifyDisablePayload))
+	refreshTime = now.Add(2 * 5 * time.Second).UnixNano()
 
-}
-
-type errMsg struct {
-	Error string `json:"error"`
+	// 2. Verify refresh has turned metrics off
+	// Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
+	// Try to obtain exported metrics with refreshed changes for max 5 minutes.
+	retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Minute}, t, func(r *retry.R) {
+		validationPayload := &validationBody{
+			Path:            validationPathConsul,
+			MetricsDisabled: true,
+			RefreshTime:     refreshTime,
+		}
+		require.NoError(r, httpClient.validateMetrics(validationPayload))
+	})
 }
