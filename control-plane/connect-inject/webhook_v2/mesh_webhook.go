@@ -387,29 +387,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	// Check and potentially create Consul resources. This is done after
-	// all patches are created to guarantee no errors were encountered in
-	// that process before modifying the Consul cluster.
-	if w.EnableNamespaces {
-		serverState, err := w.ConsulServerConnMgr.State()
-		if err != nil {
-			w.Log.Error(err, "error checking or creating namespace",
-				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
-		}
-		apiClient, err := consul.NewClientFromConnMgrState(w.ConsulConfig, serverState)
-		if err != nil {
-			w.Log.Error(err, "error checking or creating namespace",
-				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
-		}
-		if _, err := namespaces.EnsureExists(apiClient, w.consulNamespace(req.Namespace), w.CrossNamespaceACLPolicy); err != nil {
-			w.Log.Error(err, "error checking or creating namespace",
-				"ns", w.consulNamespace(req.Namespace), "request name", req.Name)
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error checking or creating namespace: %s", err))
-		}
-	}
-
 	// Return a Patched response along with the patches we intend on applying to the
 	// Pod received by the meshWebhook.
 	return admission.Patched(fmt.Sprintf("valid %s request", pod.Kind), patches...)

@@ -159,6 +159,51 @@ func TestEnsureExists_CreatesNS(tt *testing.T) {
 	}
 }
 
+// Test that it creates the namespace if it doesn't exist.
+func TestEnsureDelete(tt *testing.T) {
+	name := "foo"
+	for _, c := range []struct {
+		NamespaceExists bool
+	}{
+		{
+			NamespaceExists: true,
+		},
+		{
+			NamespaceExists: false,
+		},
+	} {
+		tt.Run(fmt.Sprintf("namespace: %t", c.NamespaceExists), func(t *testing.T) {
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForLeader(t)
+
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: consul.HTTPAddr,
+			})
+			require.NoError(t, err)
+
+			if c.NamespaceExists {
+				ns := capi.Namespace{
+					Name: name,
+				}
+				_, _, err = consulClient.Namespaces().Create(&ns, nil)
+				require.NoError(t, err)
+			}
+
+			err = EnsureDeleted(consulClient, name)
+			require.NoError(t, err)
+
+			// Ensure it was created.
+			cNS, _, err := consulClient.Namespaces().Read(name, nil)
+			require.NoError(t, err)
+			if cNS != nil && cNS.DeletedAt == nil {
+				require.Fail(t, "the namespace was not deleted")
+			}
+		})
+	}
+}
+
 func TestConsulNamespace(t *testing.T) {
 	cases := map[string]struct {
 		kubeNS                 string
