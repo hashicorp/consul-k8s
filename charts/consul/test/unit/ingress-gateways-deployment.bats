@@ -1181,8 +1181,9 @@ key2: value2' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       --set 'global.secretsBackend.vault.vaultNamespace=vns' \
-      . | tee /dev/stderr)
-  local actual=$(echo $object | yq -r '.spec.template.metadata.annotations."vault.hashicorp.com/namespace"')
+       . | tee /dev/stderr |
+      yq -r '.spec.template' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/namespace"')
   [ "${actual}" = "vns" ]
 }
 
