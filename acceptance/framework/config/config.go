@@ -157,7 +157,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	}
 
 	// UseGKEAutopilot is a temporary hack that we need in place as GKE Autopilot is already installing
-	// Gateway CRDs in the clusters. There are still other CRDs we need to install though (see helm cluster installE)
+	// Gateway CRDs in the clusters. There are still other CRDs we need to install though (see helm cluster install)
 	if t.UseGKEAutopilot {
 		setIfNotEmpty(helmValues, "global.server.resources.requests.cpu", "500m")
 		setIfNotEmpty(helmValues, "global.server.resources.limits.cpu", "500m")
