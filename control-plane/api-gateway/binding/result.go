@@ -240,6 +240,7 @@ var (
 	errListenerInvalidCertificateRef_InvalidData      = errors.New("certificate is invalid or does not contain a supported server name")
 	errListenerInvalidCertificateRef_NonFIPSRSAKeyLen = errors.New("certificate has an invalid length: RSA Keys must be at least 2048-bit")
 	errListenerInvalidCertificateRef_FIPSRSAKeyLen    = errors.New("certificate has an invalid length: RSA keys must be either 2048-bit, 3072-bit, or 4096-bit in FIPS mode")
+	errListenerJWTProviderNotFound                    = errors.New("policy referencing this listener references unknown JWT provider")
 	errListenerInvalidRouteKinds                      = errors.New("allowed route kind is invalid")
 	errListenerProgrammed_Invalid                     = errors.New("listener cannot be programmed because it is invalid")
 
@@ -269,7 +270,7 @@ type listenerValidationResult struct {
 	// status type: Conflicted
 	conflictedErr error
 	// status type: ResolvedRefs
-	refErr error
+	refErrs []error
 	// status type: ResolvedRefs (but with internal validation)
 	routeKindErr error
 }
@@ -281,7 +282,7 @@ func (l listenerValidationResult) programmedCondition(generation int64) metav1.C
 	now := timeFunc()
 
 	switch {
-	case l.acceptedErr != nil, l.conflictedErr != nil, l.refErr != nil, l.routeKindErr != nil:
+	case l.acceptedErr != nil, l.conflictedErr != nil, len(l.refErrs) != 0, l.routeKindErr != nil:
 		return metav1.Condition{
 			Type:               "Programmed",
 			Status:             metav1.ConditionFalse,
@@ -382,59 +383,78 @@ func (l listenerValidationResult) conflictedCondition(generation int64) metav1.C
 }
 
 // acceptedCondition constructs the condition for the ResolvedRefs status type.
-func (l listenerValidationResult) resolvedRefsCondition(generation int64) metav1.Condition {
+func (l listenerValidationResult) resolvedRefsConditions(generation int64) []metav1.Condition {
 	now := timeFunc()
 
+	conditions := make([]metav1.Condition, 0)
+
 	if l.routeKindErr != nil {
-		return metav1.Condition{
+		return []metav1.Condition{{
 			Type:               "ResolvedRefs",
 			Status:             metav1.ConditionFalse,
 			Reason:             "InvalidRouteKinds",
 			ObservedGeneration: generation,
 			Message:            l.routeKindErr.Error(),
 			LastTransitionTime: now,
-		}
+		}}
 	}
 
-	switch l.refErr {
-	case errListenerInvalidCertificateRef_NotFound, errListenerInvalidCertificateRef_NotSupported, errListenerInvalidCertificateRef_InvalidData, errListenerInvalidCertificateRef_NonFIPSRSAKeyLen, errListenerInvalidCertificateRef_FIPSRSAKeyLen:
-		return metav1.Condition{
-			Type:               "ResolvedRefs",
-			Status:             metav1.ConditionFalse,
-			Reason:             "InvalidCertificateRef",
-			ObservedGeneration: generation,
-			Message:            l.refErr.Error(),
-			LastTransitionTime: now,
+	for _, refErr := range l.refErrs {
+		switch refErr {
+		case errListenerInvalidCertificateRef_NotFound,
+			errListenerInvalidCertificateRef_NotSupported,
+			errListenerInvalidCertificateRef_InvalidData,
+			errListenerInvalidCertificateRef_NonFIPSRSAKeyLen,
+			errListenerInvalidCertificateRef_FIPSRSAKeyLen:
+			conditions = append(conditions, metav1.Condition{
+				Type:               "ResolvedRefs",
+				Status:             metav1.ConditionFalse,
+				Reason:             "InvalidCertificateRef",
+				ObservedGeneration: generation,
+				Message:            refErr.Error(),
+				LastTransitionTime: now,
+			})
+		case errListenerJWTProviderNotFound:
+			conditions = append(conditions, metav1.Condition{
+				Type:               "ResolvedRefs",
+				Status:             metav1.ConditionFalse,
+				Reason:             "InvalidJWTProviderRef",
+				ObservedGeneration: generation,
+				Message:            refErr.Error(),
+				LastTransitionTime: now,
+			})
+		case errRefNotPermitted:
+			conditions = append(conditions, metav1.Condition{
+				Type:               "ResolvedRefs",
+				Status:             metav1.ConditionFalse,
+				Reason:             "RefNotPermitted",
+				ObservedGeneration: generation,
+				Message:            refErr.Error(),
+				LastTransitionTime: now,
+			})
 		}
-	case errRefNotPermitted:
-		return metav1.Condition{
-			Type:               "ResolvedRefs",
-			Status:             metav1.ConditionFalse,
-			Reason:             "RefNotPermitted",
-			ObservedGeneration: generation,
-			Message:            l.refErr.Error(),
-			LastTransitionTime: now,
-		}
-	default:
-		return metav1.Condition{
+	}
+	if len(conditions) == 0 {
+		conditions = append(conditions, metav1.Condition{
 			Type:               "ResolvedRefs",
 			Status:             metav1.ConditionTrue,
 			Reason:             "ResolvedRefs",
 			ObservedGeneration: generation,
 			Message:            "resolved certificate references",
 			LastTransitionTime: now,
-		}
+		})
 	}
+	return conditions
 }
 
 // Conditions constructs the entire set of conditions for a given gateway listener.
 func (l listenerValidationResult) Conditions(generation int64) []metav1.Condition {
-	return []metav1.Condition{
+	conditions := []metav1.Condition{
 		l.acceptedCondition(generation),
 		l.programmedCondition(generation),
 		l.conflictedCondition(generation),
-		l.resolvedRefsCondition(generation),
 	}
+	return append(conditions, l.resolvedRefsConditions(generation)...)
 }
 
 // listenerValidationResults holds all of the results for a gateway's listeners

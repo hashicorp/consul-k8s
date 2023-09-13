@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func TestValidateRefs(t *testing.T) {
@@ -575,35 +576,47 @@ func TestValidateListeners(t *testing.T) {
 		expectedAcceptedErr         error
 		listenerIndexToTest         int
 		mapPrivilegedContainerPorts int32
+		gateway                     gwv1beta1.Gateway
+		resources                   resourceMapResources
 	}{
 		"valid protocol HTTP": {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.HTTPProtocolType},
 			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
 			expectedAcceptedErr: nil,
 		},
 		"valid protocol HTTPS": {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.HTTPSProtocolType},
 			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
 			expectedAcceptedErr: nil,
 		},
 		"valid protocol TCP": {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.TCPProtocolType},
 			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
 			expectedAcceptedErr: nil,
 		},
 		"invalid protocol UDP": {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.UDPProtocolType},
 			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
 			expectedAcceptedErr: errListenerUnsupportedProtocol,
 		},
 		"invalid port": {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 20000},
 			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
 			expectedAcceptedErr: errListenerPortUnavailable,
 		},
 		"conflicted port": {
@@ -611,6 +624,8 @@ func TestValidateListeners(t *testing.T) {
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
 			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
 			expectedAcceptedErr: errListenerPortUnavailable,
 			listenerIndexToTest: 1,
 		},
@@ -619,9 +634,179 @@ func TestValidateListeners(t *testing.T) {
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 2080},
 			},
+			gateway:                     gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
 			expectedAcceptedErr:         errListenerMappedToPrivilegedPortMapping,
+			resources:                   resourceMapResources{},
 			listenerIndexToTest:         1,
 			mapPrivilegedContainerPorts: 2000,
+		},
+		"valid JWT provider in override of policy": {
+			listeners: []gwv1beta1.Listener{
+				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			},
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources: resourceMapResources{
+				jwtProviders: []*v1alpha1.JWTProvider{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind: "JWTProvider",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "okta",
+						},
+					},
+				},
+				gatewayPolicies: []*v1alpha1.GatewayPolicy{
+					{
+						Spec: v1alpha1.GatewayPolicySpec{
+							TargetRef: v1alpha1.PolicyTargetReference{
+								Group:       gwv1beta1.GroupVersion.String(),
+								Kind:        common.KindGateway,
+								Name:        "gateway",
+								Namespace:   "default",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							},
+							Override: &v1alpha1.GatewayPolicyConfig{
+								JWT: &v1alpha1.GatewayJWTRequirement{
+									Providers: []*v1alpha1.GatewayJWTProvider{
+										{
+											Name: "okta",
+										},
+									},
+								},
+							},
+							Default: &v1alpha1.GatewayPolicyConfig{},
+						},
+					},
+				},
+			},
+			expectedAcceptedErr: nil,
+		},
+		"valid JWT provider in default of policy": {
+			listeners: []gwv1beta1.Listener{
+				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			},
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources: resourceMapResources{
+				jwtProviders: []*v1alpha1.JWTProvider{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind: "JWTProvider",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "okta",
+						},
+					},
+				},
+				gatewayPolicies: []*v1alpha1.GatewayPolicy{
+					{
+						Spec: v1alpha1.GatewayPolicySpec{
+							TargetRef: v1alpha1.PolicyTargetReference{
+								Group:       gwv1beta1.GroupVersion.String(),
+								Kind:        common.KindGateway,
+								Name:        "gateway",
+								Namespace:   "default",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							},
+							Default: &v1alpha1.GatewayPolicyConfig{
+								JWT: &v1alpha1.GatewayJWTRequirement{
+									Providers: []*v1alpha1.GatewayJWTProvider{
+										{
+											Name: "okta",
+										},
+									},
+								},
+							},
+							Override: &v1alpha1.GatewayPolicyConfig{},
+						},
+					},
+				},
+			},
+			expectedAcceptedErr: nil,
+		},
+		"invalid JWT provider in override of policy": {
+			listeners: []gwv1beta1.Listener{
+				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			},
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources: resourceMapResources{
+				jwtProviders: []*v1alpha1.JWTProvider{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind: "JWTProvider",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "okta",
+						},
+					},
+				},
+				gatewayPolicies: []*v1alpha1.GatewayPolicy{
+					{
+						Spec: v1alpha1.GatewayPolicySpec{
+							TargetRef: v1alpha1.PolicyTargetReference{
+								Group:       gwv1beta1.GroupVersion.String(),
+								Kind:        common.KindGateway,
+								Name:        "gateway",
+								Namespace:   "default",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							},
+							Override: &v1alpha1.GatewayPolicyConfig{
+								JWT: &v1alpha1.GatewayJWTRequirement{
+									Providers: []*v1alpha1.GatewayJWTProvider{
+										{
+											Name: "local",
+										},
+									},
+								},
+							},
+							Default: &v1alpha1.GatewayPolicyConfig{},
+						},
+					},
+				},
+			},
+			expectedAcceptedErr: errListenerJWTProviderNotFound,
+		},
+		"invalid JWT provider in default of policy": {
+			listeners: []gwv1beta1.Listener{
+				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			},
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources: resourceMapResources{
+				jwtProviders: []*v1alpha1.JWTProvider{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind: "JWTProvider",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "okta",
+						},
+					},
+				},
+				gatewayPolicies: []*v1alpha1.GatewayPolicy{
+					{
+						Spec: v1alpha1.GatewayPolicySpec{
+							TargetRef: v1alpha1.PolicyTargetReference{
+								Group:       gwv1beta1.GroupVersion.String(),
+								Kind:        common.KindGateway,
+								Name:        "gateway",
+								Namespace:   "default",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							},
+							Default: &v1alpha1.GatewayPolicyConfig{
+								JWT: &v1alpha1.GatewayJWTRequirement{
+									Providers: []*v1alpha1.GatewayJWTProvider{
+										{
+											Name: "local",
+										},
+									},
+								},
+							},
+							Override: &v1alpha1.GatewayPolicyConfig{},
+						},
+					},
+				},
+			},
+			expectedAcceptedErr: errListenerJWTProviderNotFound,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -631,7 +816,7 @@ func TestValidateListeners(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, tt.expectedAcceptedErr, validateListeners(gatewayWithFinalizer(gwv1beta1.GatewaySpec{}), tt.listeners, nil, gwcc)[tt.listenerIndexToTest].acceptedErr)
+			require.Equal(t, tt.expectedAcceptedErr, validateListeners(tt.gateway, tt.listeners, newTestResourceMap(t, tt.resources), gwcc)[tt.listenerIndexToTest].acceptedErr)
 		})
 	}
 }

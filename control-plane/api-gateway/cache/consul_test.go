@@ -1543,6 +1543,10 @@ func Test_Run(t *testing.T) {
 	inlineCert := setupInlineCertificate()
 	certs := []*api.InlineCertificateConfigEntry{inlineCert}
 
+	// setup jwt providers
+	jwtProvider := setupJWTProvider()
+	providers := []*api.JWTProviderConfigEntry{jwtProvider}
+
 	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/config/http-route":
@@ -1571,6 +1575,14 @@ func Test_Run(t *testing.T) {
 			fmt.Fprintln(w, string(val))
 		case "/v1/config/inline-certificate":
 			val, err := json.Marshal(certs)
+			if err != nil {
+				w.WriteHeader(500)
+				fmt.Fprintln(w, err)
+				return
+			}
+			fmt.Fprintln(w, string(val))
+		case "/v1/config/jwt-provider":
+			val, err := json.Marshal(providers)
 			if err != nil {
 				w.WriteHeader(500)
 				fmt.Fprintln(w, err)
@@ -1615,7 +1627,7 @@ func Test_Run(t *testing.T) {
 	}
 
 	expectedCache := loadedReferenceMaps([]api.ConfigEntry{
-		gw, tcpRoute, httpRouteOne, httpRouteTwo, inlineCert,
+		gw, tcpRoute, httpRouteOne, httpRouteTwo, inlineCert, jwtProvider,
 	})
 
 	ctx, cancelFn := context.WithCancel(context.Background())
@@ -1675,6 +1687,16 @@ func Test_Run(t *testing.T) {
 		}
 	})
 
+	jwtProviderNsn := types.NamespacedName{
+		Name:      jwtProvider.Name,
+		Namespace: jwtProvider.Namespace,
+	}
+
+	jwtSubscriber := c.Subscribe(ctx, api.JWTProvider, func(cfe api.ConfigEntry) []types.NamespacedName {
+		return []types.NamespacedName{
+			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
+		}
+	})
 	// mark this subscription as ended
 	canceledSub.Cancel()
 
@@ -1685,9 +1707,10 @@ func Test_Run(t *testing.T) {
 	gwExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(gwNsn)}
 	tcpExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(tcpRouteNsn)}
 	certExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(certNsn)}
+	jwtProviderExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(jwtProviderNsn)}
 
-	// 2 http routes + 1 gw + 1 tcp route + 1 cert = 5
-	i := 5
+	// 2 http routes + 1 gw + 1 tcp route + 1 cert + 1 jwtProvider = 6
+	i := 6
 	for {
 		if i == 0 {
 			break
@@ -1701,6 +1724,8 @@ func Test_Run(t *testing.T) {
 			require.Equal(t, tcpExpectedEvent, actualTCPRouteEvent)
 		case actualCertExpectedEvent := <-certSubscriber.Events():
 			require.Equal(t, certExpectedEvent, actualCertExpectedEvent)
+		case actualJWTExpectedEvent := <-jwtSubscriber.Events():
+			require.Equal(t, jwtProviderExpectedEvent, actualJWTExpectedEvent)
 		}
 		i -= 1
 	}
@@ -1953,6 +1978,13 @@ func setupInlineCertificate() *api.InlineCertificateConfigEntry {
 			"metaKey":                 "meta val",
 			constants.MetaKeyKubeName: "name",
 		},
+	}
+}
+
+func setupJWTProvider() *api.JWTProviderConfigEntry {
+	return &api.JWTProviderConfigEntry{
+		Kind: api.JWTProvider,
+		Name: "okta",
 	}
 }
 
