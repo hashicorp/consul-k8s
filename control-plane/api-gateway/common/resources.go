@@ -12,8 +12,9 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 // ConsulUpdateOperation is an operation representing an
@@ -121,6 +122,7 @@ type ResourceMap struct {
 	// consul resources for a gateway
 	consulTCPRoutes  map[api.ResourceReference]*consulTCPRoute
 	consulHTTPRoutes map[api.ResourceReference]*consulHTTPRoute
+	jwtProviders     map[api.ResourceReference]*v1alpha1.JWTProvider
 
 	// mutations
 	consulMutations []*ConsulUpdateOperation
@@ -141,6 +143,8 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
 		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
 		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
+		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.GatewayPolicy),
+		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
 }
 
@@ -427,6 +431,24 @@ func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v
 	s.gatewayPolicies[key] = gatewayPolicy
 
 	return s.gatewayPolicies[key]
+}
+
+func (s *ResourceMap) AddJWTProvider(provider *v1alpha1.JWTProvider) {
+	key := api.ResourceReference{
+		Kind: provider.Kind,
+		Name: provider.Name,
+	}
+	s.jwtProviders[key] = provider
+}
+
+func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.GatewayJWTProvider) (*v1alpha1.JWTProvider, bool) {
+	key := api.ResourceReference{
+		Name: provider.Name,
+		Kind: "JWTProvider",
+	}
+
+	value, exists := s.jwtProviders[key]
+	return value, exists
 }
 
 func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {

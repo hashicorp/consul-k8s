@@ -174,6 +174,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	_, err = r.getJWTProviders(ctx, resources)
+	if err != nil {
+		log.Error(err, "unable to list JWT providers")
+		return ctrl.Result{}, err
+	}
+
 	// fetch the rest of the consul objects from cache
 	consulServices := r.getConsulServices(consulKey)
 	consulGateway := r.getConsulGateway(consulKey)
@@ -467,6 +473,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
+			&source.Channel{Source: c.Subscribe(ctx, api.JWTProvider, r.transformConsulJWTProvider(ctx)).Events()},
+			&handler.EnqueueRequestForObject{},
+		).
+		Watches(
 			source.NewKindWithCache((&v1alpha1.GatewayPolicy{}), mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayPolicy(ctx)),
 		).
@@ -679,6 +689,42 @@ func (r *GatewayController) transformConsulInlineCertificate(ctx context.Context
 			}
 		}
 
+		return gateways
+	}
+}
+
+func (r *GatewayController) transformConsulJWTProvider(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
+	return func(entry api.ConfigEntry) []types.NamespacedName {
+		var gateways []types.NamespacedName
+
+		jwtEntry := entry.(*api.JWTProviderConfigEntry)
+		r.Log.Info("gatewaycontroller", "gateway items", r.cache.List(api.APIGateway))
+		for _, gwEntry := range r.cache.List(api.APIGateway) {
+			gateway := gwEntry.(*api.APIGatewayConfigEntry)
+		LISTENER_LOOP:
+			for _, listener := range gateway.Listeners {
+
+				r.Log.Info("override names", "listener", fmt.Sprintf("%#v", listener))
+				if listener.Override != nil && listener.Override.JWT != nil {
+					for _, provider := range listener.Override.JWT.Providers {
+						r.Log.Info("override names", "provider", provider.Name, "entry", jwtEntry.Name)
+						if provider.Name == jwtEntry.Name {
+							gateways = append(gateways, common.EntryToNamespacedName(gateway))
+							continue LISTENER_LOOP
+						}
+					}
+				}
+
+				if listener.Default != nil && listener.Default.JWT != nil {
+					for _, provider := range listener.Default.JWT.Providers {
+						if provider.Name == jwtEntry.Name {
+							gateways = append(gateways, common.EntryToNamespacedName(gateway))
+							continue LISTENER_LOOP
+						}
+					}
+				}
+			}
+		}
 		return gateways
 	}
 }
@@ -936,6 +982,21 @@ func (c *GatewayController) getRelatedGatewayPolicies(ctx context.Context, gatew
 	//add all policies to the resourcemap
 	for _, policy := range list.Items {
 		resources.AddGatewayPolicy(&policy)
+	}
+
+	return list.Items, nil
+}
+
+func (c *GatewayController) getJWTProviders(ctx context.Context, resources *common.ResourceMap) ([]v1alpha1.JWTProvider, error) {
+	var list v1alpha1.JWTProviderList
+
+	if err := c.Client.List(ctx, &list, &client.ListOptions{}); err != nil {
+		return nil, err
+	}
+
+	// add all policies to the resourcemap
+	for _, provider := range list.Items {
+		resources.AddJWTProvider(&provider)
 	}
 
 	return list.Items, nil
