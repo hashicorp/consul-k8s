@@ -2185,6 +2185,11 @@ connectInject:
     # If this setting is false, you will need to install the Gateway API CRDs manually.
     manageExternalCRDs: true
 
+    # Enables Consul on Kubernets to manage only the custom CRDs used for Gateway API. If manageExternalCRDs is true 
+    # then all CRDs will be installed. If manageCustomerCRDs is true then only TCPRoute, gatewayclassconfigs and meshservice
+    # will be installed.
+    manageCustomCRDs: false
+
     # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
     managedGatewayClass:
       # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
