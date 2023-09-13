@@ -895,6 +895,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 			externalFilter = &v1alpha1.RouteRetryFilter{}
 		case v1alpha1.RouteTimeoutFilterKind:
 			externalFilter = &v1alpha1.RouteTimeoutFilter{}
+		case v1alpha1.RouteAuthFilterKind:
+			externalFilter = &v1alpha1.RouteAuthFilter{}
 		default:
 			continue
 		}
