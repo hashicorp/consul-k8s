@@ -441,7 +441,7 @@ func (s *ResourceMap) AddJWTProvider(provider *v1alpha1.JWTProvider) {
 	s.jwtProviders[key] = provider
 }
 
-func (s *ResourceMap) GetJWTProviderForProvider(provider *v1alpha1.GatewayJWTProvider) (*v1alpha1.JWTProvider, bool) {
+func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.GatewayJWTProvider) (*v1alpha1.JWTProvider, bool) {
 	key := api.ResourceReference{
 		Name: provider.Name,
 		Kind: "JWTProvider",

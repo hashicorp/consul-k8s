@@ -15,10 +15,11 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul/api"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/version"
-	"github.com/hashicorp/consul/api"
 )
 
 var (
@@ -234,7 +235,7 @@ func validateJWT(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resourc
 
 	if policy.Spec.Override != nil && policy.Spec.Override.JWT != nil {
 		for _, provider := range policy.Spec.Override.JWT.Providers {
-			_, ok := resources.GetJWTProviderForProvider(provider)
+			_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
 			if !ok {
 				return errListenerJWTProviderNotFound
 			}
@@ -243,7 +244,7 @@ func validateJWT(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resourc
 
 	if policy.Spec.Default != nil && policy.Spec.Default.JWT != nil {
 		for _, provider := range policy.Spec.Default.JWT.Providers {
-			_, ok := resources.GetJWTProviderForProvider(provider)
+			_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
 			if !ok {
 				return errListenerJWTProviderNotFound
 			}
@@ -368,8 +369,8 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 
 		jwtErr := validateJWT(gateway, listener, resources)
 		if jwtErr != nil {
-		result.refErrs = append(result.refErrs, jwtErr)
-	    }
+			result.refErrs = append(result.refErrs, jwtErr)
+		}
 
 		if err != nil {
 			result.acceptedErr = err
