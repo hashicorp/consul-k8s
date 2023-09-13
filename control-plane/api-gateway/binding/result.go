@@ -401,7 +401,11 @@ func (l listenerValidationResult) resolvedRefsConditions(generation int64) []met
 
 	for _, refErr := range l.refErrs {
 		switch refErr {
-		case errListenerInvalidCertificateRef_NotFound, errListenerInvalidCertificateRef_NotSupported, errListenerInvalidCertificateRef_InvalidData, errListenerInvalidCertificateRef_NonFIPSRSAKeyLen, errListenerInvalidCertificateRef_FIPSRSAKeyLen:
+		case errListenerInvalidCertificateRef_NotFound,
+			errListenerInvalidCertificateRef_NotSupported,
+			errListenerInvalidCertificateRef_InvalidData,
+			errListenerInvalidCertificateRef_NonFIPSRSAKeyLen,
+			errListenerInvalidCertificateRef_FIPSRSAKeyLen:
 			conditions = append(conditions, metav1.Condition{
 				Type:               "ResolvedRefs",
 				Status:             metav1.ConditionFalse,
@@ -450,8 +454,7 @@ func (l listenerValidationResult) Conditions(generation int64) []metav1.Conditio
 		l.programmedCondition(generation),
 		l.conflictedCondition(generation),
 	}
-	conditions = append(conditions, l.resolvedRefsConditions(generation)...)
-	return conditions
+	return append(conditions, l.resolvedRefsConditions(generation)...)
 }
 
 // listenerValidationResults holds all of the results for a gateway's listeners
