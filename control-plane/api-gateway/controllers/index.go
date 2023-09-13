@@ -5,6 +5,7 @@ package controllers
 
 import (
 	"context"
+
 	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -20,18 +21,23 @@ const (
 	// Naming convention: TARGET_REFERENCE.
 	GatewayClass_GatewayClassConfigIndex = "__gatewayclass_referencing_gatewayclassconfig"
 	GatewayClass_ControllerNameIndex     = "__gatewayclass_controller_name"
-	Gateway_GatewayClassIndex            = "__gateway_referencing_gatewayclass"
-	HTTPRoute_GatewayIndex               = "__httproute_referencing_gateway"
-	HTTPRoute_ServiceIndex               = "__httproute_referencing_service"
-	HTTPRoute_MeshServiceIndex           = "__httproute_referencing_mesh_service"
-	TCPRoute_GatewayIndex                = "__tcproute_referencing_gateway"
-	TCPRoute_ServiceIndex                = "__tcproute_referencing_service"
-	TCPRoute_MeshServiceIndex            = "__tcproute_referencing_mesh_service"
-	MeshService_PeerIndex                = "__meshservice_referencing_peer"
-	Secret_GatewayIndex                  = "__secret_referencing_gateway"
-	HTTPRoute_RouteRetryFilterIndex      = "__httproute_referencing_retryfilter"
-	HTTPRoute_RouteTimeoutFilterIndex    = "__httproute_referencing_timeoutfilter"
-	Gatewaypolicy_GatewayIndex           = "__gatewaypolicy_referencing_gateway"
+
+	Gateway_GatewayClassIndex = "__gateway_referencing_gatewayclass"
+
+	HTTPRoute_GatewayIndex            = "__httproute_referencing_gateway"
+	HTTPRoute_ServiceIndex            = "__httproute_referencing_service"
+	HTTPRoute_MeshServiceIndex        = "__httproute_referencing_mesh_service"
+	HTTPRoute_RouteRetryFilterIndex   = "__httproute_referencing_retryfilter"
+	HTTPRoute_RouteTimeoutFilterIndex = "__httproute_referencing_timeoutfilter"
+	HTTPRoute_RouteAuthFilterIndex    = "__httproute_referencing_routeauthfilter"
+
+	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
+	TCPRoute_ServiceIndex     = "__tcproute_referencing_service"
+	TCPRoute_MeshServiceIndex = "__tcproute_referencing_mesh_service"
+
+	MeshService_PeerIndex      = "__meshservice_referencing_peer"
+	Secret_GatewayIndex        = "__secret_referencing_gateway"
+	Gatewaypolicy_GatewayIndex = "__gatewaypolicy_referencing_gateway"
 )
 
 // RegisterFieldIndexes registers all of the field indexes for the API gateway controllers.
@@ -115,6 +121,11 @@ var indexes = []index{
 	},
 	{
 		name:        HTTPRoute_RouteTimeoutFilterIndex,
+		target:      &gwv1beta1.HTTPRoute{},
+		indexerFunc: filtersForHTTPRoute,
+	},
+	{
+		name:        HTTPRoute_RouteAuthFilterIndex,
 		target:      &gwv1beta1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
