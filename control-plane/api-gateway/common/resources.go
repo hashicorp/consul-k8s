@@ -446,7 +446,9 @@ func (s *ResourceMap) GetJWTProviderForProvider(provider *v1alpha1.GatewayJWTPro
 		Name: provider.Name,
 		Kind: "JWTProvider",
 	}
-	return s.jwtProviders[key]
+
+	value, exists := s.jwtProviders[key]
+	return value, exists
 }
 
 func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
