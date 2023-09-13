@@ -9,7 +9,7 @@ import (
 
 // volumeName is the name of the volume that is created to store the
 // Consul Connect injection data.
-const volumeName = "consul-connect-inject-data"
+const volumeName = "consul-mesh-inject-data"
 
 // containerVolume returns the volume data to add to the pod. This volume
 // is used for shared data between containers.

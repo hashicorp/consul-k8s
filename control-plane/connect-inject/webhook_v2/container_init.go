@@ -29,13 +29,14 @@ type initContainerCommandData struct {
 	ServiceAccountName string
 	AuthMethod         string
 
-	// Log settings for the connect-init command.
+	// Log settings for the mesh-init command.
 	LogLevel string
 	LogJSON  bool
 }
 
-// containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
-// so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
+// containerInit returns the init container spec for mesh-init that polls for the workload's bootstrap config
+// so that it optionally set up iptables for transparent proxy. Otherwise, it ensures the workload exists before
+// the pod starts.
 func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
@@ -53,7 +54,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod) 
 	volMounts := []corev1.VolumeMount{
 		{
 			Name:      volumeName,
-			MountPath: "/consul/connect-inject",
+			MountPath: "/consul/mesh-inject",
 		},
 	}
 
@@ -99,14 +100,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod) 
 				},
 			},
 			{
-				Name: "NODE_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "spec.nodeName",
-					},
-				},
-			},
-			{
 				Name:  "CONSUL_ADDRESSES",
 				Value: w.ConsulAddress,
 			},
@@ -121,10 +114,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod) 
 			{
 				Name:  "CONSUL_API_TIMEOUT",
 				Value: w.ConsulConfig.APITimeout.String(),
-			},
-			{
-				Name:  "CONSUL_NODE_NAME",
-				Value: "$(NODE_NAME)-virtual",
 			},
 		},
 		Resources:    w.InitContainerResources,
@@ -222,7 +211,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod) 
 					Value: redirectTrafficConfig,
 				})
 
-			// Running consul connect redirect-traffic with iptables
+			// Running consul mesh-init redirect-traffic with iptables
 			// requires both being a root user and having NET_ADMIN capability.
 			container.SecurityContext = &corev1.SecurityContext{
 				RunAsUser:  pointer.Int64(rootUserAndGroupID),
@@ -290,11 +279,7 @@ func splitCommaSeparatedItemsFromAnnotation(annotation string, pod corev1.Pod) [
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
 const initContainerCommandTpl = `
-consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+consul-k8s-control-plane mesh-init -proxy-name=${POD_NAME} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
-  {{- if .AuthMethod }}
-  -service-account-name="{{ .ServiceAccountName }}" \
-  -service-name="{{ .ServiceName }}" \
-  {{- end }}
 `

@@ -453,13 +453,13 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 }
 
 func (w *MeshWebhook) injectVolumeMount(pod corev1.Pod) {
-	containersToInject := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationInjectMountVolumes, pod)
+	containersToInject := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationMeshInjectMountVolumes, pod)
 
 	for index, container := range pod.Spec.Containers {
 		if slices.Contains(containersToInject, container.Name) {
 			pod.Spec.Containers[index].VolumeMounts = append(pod.Spec.Containers[index].VolumeMounts, corev1.VolumeMount{
 				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
+				MountPath: "/consul/mesh-inject",
 			})
 		}
 	}

@@ -722,7 +722,7 @@ func TestHandlerConsulDataplaneSidecar_UserVolumeMounts(t *testing.T) {
 			},
 			expectedContainerVolumeMounts: []corev1.VolumeMount{
 				{
-					Name:      "consul-connect-inject-data",
+					Name:      "consul-mesh-inject-data",
 					MountPath: "/consul/mesh-inject",
 				},
 				{
