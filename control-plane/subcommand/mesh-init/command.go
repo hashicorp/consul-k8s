@@ -39,9 +39,7 @@ const (
 type Command struct {
 	UI cli.Ui
 
-	flagProxyName       string
-	flagConsulNamespace string
-	flagConsulPartition string
+	flagProxyName string
 
 	maxPollingAttempts uint64 // Number of times to poll Consul for proxy registrations.
 
@@ -178,14 +176,14 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	var res pbdataplane.GetEnvoyBootstrapParamsResponse
-	if err := backoff.Retry(c.getBootstrapParams(dc, &res), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.maxPollingAttempts)); err != nil {
+	var bootstrapConfig *pbmesh.BootstrapConfig
+	if err := backoff.Retry(c.getBootstrapParams(dc, bootstrapConfig), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.maxPollingAttempts)); err != nil {
 		c.logger.Error("Timed out waiting for bootstrap parameters", "error", err)
 		return 1
 	}
 
 	if c.flagRedirectTrafficConfig != "" {
-		err := c.applyTrafficRedirectionRules(res.GetBootstrapConfig()) // BootstrapConfig is always populated non-nil from the RPC
+		err := c.applyTrafficRedirectionRules(bootstrapConfig) // BootstrapConfig is always populated non-nil from the RPC
 		if err != nil {
 			c.logger.Error("error applying traffic redirection rules", "err", err)
 			return 1
@@ -211,7 +209,7 @@ func (c *Command) Help() string {
 
 func (c *Command) getBootstrapParams(
 	client pbdataplane.DataplaneServiceClient,
-	response *pbdataplane.GetEnvoyBootstrapParamsResponse) backoff.Operation {
+	bootstrapConfig *pbmesh.BootstrapConfig) backoff.Operation {
 
 	return func() error {
 		req := &pbdataplane.GetEnvoyBootstrapParamsRequest{
@@ -224,7 +222,7 @@ func (c *Command) getBootstrapParams(
 			c.logger.Error("Unable to get bootstrap parameters", "error", err)
 			return err
 		}
-		*response = *res
+		*bootstrapConfig = *res.GetBootstrapConfig()
 		return nil
 	}
 }

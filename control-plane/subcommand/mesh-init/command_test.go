@@ -376,7 +376,7 @@ func getProxyConfigurationID(name, namespace, partition string) *pbresource.ID {
 	}
 }
 
-// getProxyConfiguration creates a proxyConfiguration that matches the pod from createWorkload
+// getProxyConfiguration creates a proxyConfiguration that matches the pod from createWorkload.
 func getProxyConfiguration() *pbmesh.ProxyConfiguration {
 	return &pbmesh.ProxyConfiguration{
 		Workloads: &pbcatalog.WorkloadSelector{

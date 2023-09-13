@@ -38,7 +38,6 @@ spec:
         # to gateways
         "consul.hashicorp.com/transparent-proxy": "false"
         "consul.hashicorp.com/transparent-proxy-overwrite-probes": "false"
-        "consul.hashicorp.com/connect-k8s-version": {{ $.Chart.Version }}
         "consul.hashicorp.com/consul-k8s-version": {{ $.Chart.Version }}
         {{- if .Values.telemetryCollector.customExporterConfig }}
         # configmap checksum

@@ -186,7 +186,7 @@ func createProxyConfiguration(t *testing.T, watcher ServerConnectionManager, nam
 // resourceHasPersisted checks that a recently written resource exists in the Consul
 // state store with a valid version. This must be true before a resource is overwritten
 // or deleted.
-// TODO: refactor so that there isn't an import cycle when using test.ResourceHasPersisted
+// TODO: refactor so that there isn't an import cycle when using test.ResourceHasPersisted.
 func resourceHasPersisted(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID) {
 	req := &pbresource.ReadRequest{Id: id}
 
