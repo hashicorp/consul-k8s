@@ -23,8 +23,8 @@ type GatewayPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   GatewayPolicySpec `json:"spec,omitempty"`
-	Status `json:"status,omitempty"`
+	Spec   GatewayPolicySpec   `json:"spec,omitempty"`
+	Status GatewayPolicyStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -114,4 +114,22 @@ type GatewayJWTClaimVerification struct {
 	// - If the type at the path is a string then we verify
 	//   that this value matches.
 	Value string `json:"value"`
+}
+
+// GatewayPolicyStatus defines the observed state of the gateway
+type GatewayPolicyStatus struct {
+	// Conditions describe the current conditions of the Policy.
+	//
+	//
+	// Known condition types are:
+	//
+	// * "Accepted"
+	// * "ResolvedRefs"
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	// +kubebuilder:validation:MaxItems=8
+	// +kubebuilder:default={{type: "Accepted", status: "Unknown", reason:"Pending", message:"Waiting for controller", lastTransitionTime: "1970-01-01T00:00:00Z"},{type: "Programmed", status: "Unknown", reason:"Pending", message:"Waiting for controller", lastTransitionTime: "1970-01-01T00:00:00Z"}}
+	Conditions []metav1.Condition `json:"conditions,omitemtpy"`
 }

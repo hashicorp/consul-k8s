@@ -440,7 +440,7 @@ func (l listenerValidationResult) resolvedRefsConditions(generation int64) []met
 			Status:             metav1.ConditionTrue,
 			Reason:             "ResolvedRefs",
 			ObservedGeneration: generation,
-			Message:            "resolved certificate references",
+			Message:            "resolved references",
 			LastTransitionTime: now,
 		})
 	}
