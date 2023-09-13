@@ -31,8 +31,6 @@ type Command struct {
 	flagLogJSON  bool
 	flagTimeout  time.Duration
 
-	flagResourceAPIs bool // Use V2 APIs
-
 	// ctx is cancelled when the command timeout is reached.
 	ctx           context.Context
 	retryDuration time.Duration
@@ -54,8 +52,6 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flags.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
-		"Enable of disable V2 Resource APIs.")
 
 	c.consul = &flags.ConsulFlags{}
 	flags.Merge(c.flags, c.consul.Flags())
@@ -175,11 +171,6 @@ func (c *Command) validateFlags() error {
 
 	if c.consul.APITimeout <= 0 {
 		return errors.New("-api-timeout must be set to a value greater than 0")
-	}
-
-	// TODO(dans) this needs to be replaced when the partition workflow is available.
-	if c.flagResourceAPIs {
-		return errors.New("partition-init is not implemented when the -enable-resource-apis flag is set for V2 Resource APIs")
 	}
 
 	return nil
