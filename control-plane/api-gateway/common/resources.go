@@ -460,6 +460,7 @@ func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gat
 		Namespace:   gateway.Namespace,
 	}
 
+	fmt.Printf("%#v\n", s.gatewayPolicies)
 	value, exists := s.gatewayPolicies[key]
 
 	return value, exists
