@@ -219,7 +219,8 @@ func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 		slices.EqualFunc(a.Matches, b.Matches, e.httpMatchesEqual) &&
 		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual) &&
 		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual)
+		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual) &&
+		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual)
 }
 
 func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
@@ -267,6 +268,16 @@ func (e entryComparator) retryFiltersEqual(a, b api.RetryFilter) bool {
 
 func (e entryComparator) timeoutFiltersEqual(a, b api.TimeoutFilter) bool {
 	return a.RequestTimeout == b.RequestTimeout && a.IdleTimeout == b.IdleTimeout
+}
+
+// jwtFiltersEqual compares the contents of the list of providers on the JWT filters for a route, returning true if the
+// filters have equal contents.
+func (e entryComparator) jwtFiltersEqual(a, b api.JWTFilter) bool {
+	if len(a.Providers) != len(b.Providers) {
+		return false
+	}
+
+	return slices.EqualFunc(a.Providers, b.Providers, providersEqual)
 }
 
 func tcpRoutesEqual(a, b *api.TCPRouteConfigEntry) bool {
