@@ -176,14 +176,14 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	var bootstrapConfig *pbmesh.BootstrapConfig
-	if err := backoff.Retry(c.getBootstrapParams(dc, bootstrapConfig), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.maxPollingAttempts)); err != nil {
+	var bootstrapConfig pbmesh.BootstrapConfig
+	if err := backoff.Retry(c.getBootstrapParams(dc, &bootstrapConfig), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.maxPollingAttempts)); err != nil {
 		c.logger.Error("Timed out waiting for bootstrap parameters", "error", err)
 		return 1
 	}
 
 	if c.flagRedirectTrafficConfig != "" {
-		err := c.applyTrafficRedirectionRules(bootstrapConfig) // BootstrapConfig is always populated non-nil from the RPC
+		err := c.applyTrafficRedirectionRules(&bootstrapConfig) // BootstrapConfig is always populated non-nil from the RPC
 		if err != nil {
 			c.logger.Error("error applying traffic redirection rules", "err", err)
 			return 1
@@ -222,7 +222,9 @@ func (c *Command) getBootstrapParams(
 			c.logger.Error("Unable to get bootstrap parameters", "error", err)
 			return err
 		}
-		*bootstrapConfig = *res.GetBootstrapConfig()
+		if res.GetBootstrapConfig() != nil {
+			*bootstrapConfig = *res.GetBootstrapConfig()
+		}
 		return nil
 	}
 }

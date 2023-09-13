@@ -32,7 +32,7 @@ spec:
       annotations:
         "consul.hashicorp.com/mesh-inject": "false"
         # This annotation tells the pod controller that this pod was injected even though it wasn't.
-        # This prevents the pod controller from syncing it into Consul.
+        # This ensures the pod controller will sync a workload for the pod into Consul
         "consul.hashicorp.com/mesh-inject-status": "injected"
         # We aren't using tproxy and we don't have an original pod. This would be simpler if we made a path similar
         # to gateways
