@@ -67,6 +67,7 @@ rules:
   {{- end }}
   - jwtproviders/status
   - routeauthfilters/status
+  - gatewaypolicies/status
   verbs:
   - get
   - patch

@@ -248,11 +248,9 @@ func (b *Binder) Snapshot() *Snapshot {
 			policy := policy
 			var policyStatus v1alpha1.GatewayPolicyStatus
 			policyStatus.Conditions = policyValidation.Conditions(policy.Generation, idx)
-			b.config.Logger.Info("BINDER POLICY STATUS EQUAL", "statusEqual", common.GatewayPolicyStatusesEqual(policyStatus, policy.Status))
-			b.config.Logger.Info("POLICY STATUS", "status", policyStatus.Conditions)
 			if !common.GatewayPolicyStatusesEqual(policyStatus, policy.Status) {
 				b.config.Policies[idx].Status = policyStatus
-				snapshot.Kubernetes.Updates.Add(&b.config.Policies[idx])
+				snapshot.Kubernetes.StatusUpdates.Add(&b.config.Policies[idx])
 			}
 		}
 	} else {

@@ -280,8 +280,8 @@ func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) 
 
 	conditions := make([]metav1.Condition, 0, len(g.resolvedRefsErrs))
 	for _, err := range g.resolvedRefsErrs {
-		switch err {
-		case errPolicyListenerReferenceDoesNotExist:
+		switch {
+		case errors.Is(err, errPolicyListenerReferenceDoesNotExist):
 			conditions = append(conditions, metav1.Condition{
 				Type:               "ResolvedRefs",
 				Status:             metav1.ConditionFalse,
@@ -290,7 +290,7 @@ func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) 
 				Message:            err.Error(),
 				LastTransitionTime: now,
 			})
-		case errPolicyJWTProvidersReferenceDoesNotExist:
+		case errors.Is(err, errPolicyJWTProvidersReferenceDoesNotExist):
 			conditions = append(conditions, metav1.Condition{
 				Type:               "ResolvedRefs",
 				Status:             metav1.ConditionFalse,
