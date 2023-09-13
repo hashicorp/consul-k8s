@@ -201,8 +201,8 @@ func TestRun_TrafficRedirection(t *testing.T) {
 	}{
 		"no proxyConfiguration provided": {
 			expIptablesParamsFunc: func(actual iptables.Config) error {
-				if len(actual.ExcludeInboundPorts) != 1 || actual.ExcludeInboundPorts[0] != "9090" {
-					return fmt.Errorf("ExcludeInboundPorts in iptables.Config was %v, but should be [1234]", actual.ExcludeInboundPorts)
+				if len(actual.ExcludeInboundPorts) != 0 {
+					return fmt.Errorf("ExcludeInboundPorts in iptables.Config was %v, but should be empty", actual.ExcludeInboundPorts)
 				}
 				if actual.ProxyInboundPort != 20000 {
 					return fmt.Errorf("ProxyInboundPort in iptables.Config was %d, but should be [20000]", actual.ProxyOutboundPort)
@@ -217,7 +217,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			registerProxyConfiguration: true,
 			expIptablesParamsFunc: func(actual iptables.Config) error {
 				if len(actual.ExcludeInboundPorts) != 1 || actual.ExcludeInboundPorts[0] != "9090" {
-					return fmt.Errorf("ExcludeInboundPorts in iptables.Config was %v, but should be [1234]", actual.ExcludeInboundPorts)
+					return fmt.Errorf("ExcludeInboundPorts in iptables.Config was %v, but should be [9090, 1234]", actual.ExcludeInboundPorts)
 				}
 				if actual.ProxyInboundPort != 20000 {
 					return fmt.Errorf("ProxyInboundPort in iptables.Config was %d, but should be [20000]", actual.ProxyOutboundPort)
