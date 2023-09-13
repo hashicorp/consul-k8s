@@ -469,6 +469,9 @@ Usage: {{ template "consul.validateResourceAPIs" . }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.peering.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, global.peering.enabled is currently unsupported."}}
 {{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.adminPartitions.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, global.adminPartitions.enabled is currently unsupported."}}
+{{- end }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.federation.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, global.federation.enabled is currently unsupported."}}
 {{- end }}
