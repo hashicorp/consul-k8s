@@ -165,18 +165,6 @@ func validateGateway(gateway gwv1beta1.Gateway, pods []corev1.Pod, consulGateway
 	return result
 }
 
-type gatewayPolicyValidationResult struct {
-	acceptedErr      error
-	resolvedRefsErrs []error
-}
-
-type gatewayPolicyValidationResults []gatewayPolicyValidationResult
-
-var (
-	errPolicyListenerReferenceDoesNotExist     = errors.New("gateway policy references a listener that does not exist")
-	errPolicyJWTProvidersReferenceDoesNotExist = errors.New("gateway policy references one or more jwt providers that do not exist")
-)
-
 func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.GatewayPolicy, resources *common.ResourceMap) gatewayPolicyValidationResults {
 	results := make(gatewayPolicyValidationResults, 0, len(policies))
 
@@ -193,7 +181,7 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 		missingJWTProviders := make([]string, 0)
 		if policy.Spec.Override != nil && policy.Spec.Override.JWT != nil {
 			for _, policyJWTProvider := range policy.Spec.Override.JWT.Providers {
-				_, jwtExists := resources.GetJWTProviderForProvider(policyJWTProvider)
+				_, jwtExists := resources.GetJWTProviderForGatewayJWTProvider(policyJWTProvider)
 				if !jwtExists {
 					missingJWTProviders = append(missingJWTProviders, policyJWTProvider.Name)
 				}
@@ -202,7 +190,7 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 
 		if policy.Spec.Default != nil && policy.Spec.Default.JWT != nil {
 			for _, policyJWTProvider := range policy.Spec.Default.JWT.Providers {
-				_, jwtExists := resources.GetJWTProviderForProvider(policyJWTProvider)
+				_, jwtExists := resources.GetJWTProviderForGatewayJWTProvider(policyJWTProvider)
 				if !jwtExists {
 					missingJWTProviders = append(missingJWTProviders, policyJWTProvider.Name)
 				}
@@ -226,82 +214,6 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 func listenerExistsForPolicy(gateway gwv1beta1.Gateway, policy v1alpha1.GatewayPolicy) bool {
 	return gateway.Name == policy.Spec.TargetRef.Name &&
 		slices.ContainsFunc(gateway.Spec.Listeners, func(l gwv1beta1.Listener) bool { return l.Name == *policy.Spec.TargetRef.SectionName })
-}
-
-func (g gatewayPolicyValidationResults) Conditions(generation int64, idx int) []metav1.Condition {
-	result := g[idx]
-	return result.Conditions(generation)
-}
-
-func (g gatewayPolicyValidationResult) Conditions(generation int64) []metav1.Condition {
-	conditions := make([]metav1.Condition, 0)
-
-	conditions = append(conditions, g.acceptedCondition(generation))
-	conditions = append(conditions, g.resolvedRefsConditions(generation)...)
-	return conditions
-}
-
-func (g gatewayPolicyValidationResult) acceptedCondition(generation int64) metav1.Condition {
-	now := timeFunc()
-	if g.acceptedErr != nil {
-		return metav1.Condition{
-			Type:               "Accepted",
-			Status:             metav1.ConditionFalse,
-			Reason:             "ReferencesNotValid",
-			ObservedGeneration: generation,
-			Message:            g.acceptedErr.Error(),
-			LastTransitionTime: now,
-		}
-	}
-	return metav1.Condition{
-		Type:               "Accepted",
-		Status:             metav1.ConditionTrue,
-		Reason:             "Accepted",
-		ObservedGeneration: generation,
-		Message:            "gateway policy accepted",
-		LastTransitionTime: now,
-	}
-}
-
-func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) []metav1.Condition {
-	now := timeFunc()
-	if len(g.resolvedRefsErrs) == 0 {
-		return []metav1.Condition{
-			{
-				Type:               "ResolvedRefs",
-				Status:             metav1.ConditionTrue,
-				Reason:             "ResolvedRefs",
-				ObservedGeneration: generation,
-				Message:            "resolved references",
-				LastTransitionTime: now,
-			},
-		}
-	}
-
-	conditions := make([]metav1.Condition, 0, len(g.resolvedRefsErrs))
-	for _, err := range g.resolvedRefsErrs {
-		switch {
-		case errors.Is(err, errPolicyListenerReferenceDoesNotExist):
-			conditions = append(conditions, metav1.Condition{
-				Type:               "ResolvedRefs",
-				Status:             metav1.ConditionFalse,
-				Reason:             "MissingListenerReference",
-				ObservedGeneration: generation,
-				Message:            err.Error(),
-				LastTransitionTime: now,
-			})
-		case errors.Is(err, errPolicyJWTProvidersReferenceDoesNotExist):
-			conditions = append(conditions, metav1.Condition{
-				Type:               "ResolvedRefs",
-				Status:             metav1.ConditionFalse,
-				Reason:             "MissingJWTProviderReference",
-				ObservedGeneration: generation,
-				Message:            err.Error(),
-				LastTransitionTime: now,
-			})
-		}
-	}
-	return conditions
 }
 
 // mergedListener associates a listener with its indexed position

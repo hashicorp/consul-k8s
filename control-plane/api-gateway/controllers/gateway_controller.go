@@ -498,12 +498,6 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Complete(r)
 }
 
-func (r *GatewayController) transformJWTProvider(ctx context.Context) func(o client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		return []reconcile.Request{}
-	}
-}
-
 // transformGatewayClass will check the list of GatewayClass objects for a matching
 // class, then return a list of reconcile Requests for it.
 func (r *GatewayController) transformGatewayClass(ctx context.Context) func(o client.Object) []reconcile.Request {
