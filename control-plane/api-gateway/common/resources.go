@@ -4,8 +4,6 @@
 package common
 
 import (
-	"fmt"
-
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -448,8 +446,7 @@ func (s *ResourceMap) GetJWTProviderForProvider(provider *v1alpha1.GatewayJWTPro
 		Name: provider.Name,
 		Kind: "JWTProvider",
 	}
-	value, exists := s.jwtProviders[key]
-	return value, exists
+	return s.jwtProviders[key]
 }
 
 func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
@@ -460,7 +457,6 @@ func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gat
 		Namespace:   gateway.Namespace,
 	}
 
-	fmt.Printf("%#v\n", s.gatewayPolicies)
 	value, exists := s.gatewayPolicies[key]
 
 	return value, exists
