@@ -93,7 +93,7 @@ func TestRun_WithNamespaces(t *testing.T) {
 }
 
 // EnsurePartitionExists ensures a Consul partition exists.
-// Boolean return value indicates if the namespace was created by this call.
+// Boolean return value indicates if the partition was created by this call.
 // This is borrowed from namespaces.EnsureExists
 func EnsurePartitionExists(client *api.Client, name string) (bool, error) {
 	if name == constants.DefaultConsulPartition {
