@@ -476,6 +476,68 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				require.Equal(t, "test-issuer", jwt.Issuer)
 			},
 		},
+		{
+			kubeKind:   "JWTProvider",
+			consulKind: capi.JWTProvider,
+			configEntryResource: &v1alpha1.JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-jwt-provider",
+					Namespace: kubeNS,
+				},
+				Spec: v1alpha1.JWTProviderSpec{
+					JSONWebKeySet: &v1alpha1.JSONWebKeySet{
+						Remote: &v1alpha1.RemoteJWKS{
+							URI: "https://jwks.example.com",
+							JWKSCluster: &v1alpha1.JWKSCluster{
+								DiscoveryType: "STRICT_DNS",
+								TLSCertificates: &v1alpha1.JWKSTLSCertificate{
+									CaCertificateProviderInstance: &v1alpha1.JWKSTLSCertProviderInstance{
+										InstanceName:    "InstanceName",
+										CertificateName: "ROOTCA",
+									},
+								},
+							},
+						},
+					},
+					Issuer: "test-issuer",
+				},
+			},
+			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
+				return &JWTProviderController{
+					Client: client,
+					Log:    logger,
+					ConfigEntryController: &ConfigEntryController{
+						ConsulClientConfig:  cfg,
+						ConsulServerConnMgr: watcher,
+						DatacenterName:      datacenterName,
+					},
+				}
+			},
+			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
+				jwt, ok := consulEntry.(*capi.JWTProviderConfigEntry)
+				require.True(t, ok, "cast error")
+				require.Equal(t, capi.JWTProvider, jwt.Kind)
+				require.Equal(t, "test-jwt-provider", jwt.Name)
+				require.Equal(t,
+					&capi.JSONWebKeySet{
+						Remote: &capi.RemoteJWKS{
+							URI: "https://jwks.example.com",
+							JWKSCluster: &capi.JWKSCluster{
+								DiscoveryType: "STRICT_DNS",
+								TLSCertificates: &capi.JWKSTLSCertificate{
+									CaCertificateProviderInstance: &capi.JWKSTLSCertProviderInstance{
+										InstanceName:    "InstanceName",
+										CertificateName: "ROOTCA",
+									},
+								},
+							},
+						},
+					},
+					jwt.JSONWebKeySet,
+				)
+				require.Equal(t, "test-issuer", jwt.Issuer)
+			},
+		},
 	}
 
 	for _, c := range cases {
