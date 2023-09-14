@@ -1,3 +1,0 @@
-```releast-note:feature
-api-gateway: Add CRD for GatewayPolicy and HTTPRouteAuthFilter
-```
