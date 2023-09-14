@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	// Validation are used in the validationBody to distinguish metrics for consul vs. collector during validation.
+	// validationPathConsul and validationPathCollector distinguish metrics for consul vs. collector during validation.
 	validationPathConsul    = "/v1/metrics/consul"
 	validationPathCollector = "/v1/metrics/collector"
 )

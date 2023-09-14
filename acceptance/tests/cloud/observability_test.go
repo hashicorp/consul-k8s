@@ -130,7 +130,7 @@ func TestObservabilityCloud(t *testing.T) {
 		// TODO: Take this out
 
 		"telemetryCollector.enabled":                   "true",
-		"telemetryCollector.image":                     "hashicorp/consul-telemetry-collector:0.0.1",
+		"telemetryCollector.image":                     cfg.ConsulCollectorImage,
 		"telemetryCollector.cloud.clientId.secretName": clientIDSecretName,
 		"telemetryCollector.cloud.clientId.secretKey":  clientIDSecretKey,
 
