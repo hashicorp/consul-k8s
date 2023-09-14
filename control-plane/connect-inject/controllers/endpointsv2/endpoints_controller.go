@@ -5,6 +5,7 @@ package endpointsv2
 import (
 	"context"
 	"net"
+	"sort"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
@@ -16,13 +17,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/go-multierror"
 )
 
 const (
@@ -304,6 +306,10 @@ func getWorkloadSelector(podPrefixes, podExactNames map[string]any) *pbcatalog.W
 	for v := range podExactNames {
 		workloads.Names = append(workloads.Names, v)
 	}
+	// sort for stability
+	sort.Strings(workloads.Prefixes)
+	sort.Strings(workloads.Names)
+
 	return workloads
 }
 

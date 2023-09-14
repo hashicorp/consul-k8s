@@ -365,7 +365,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								constants.AnnotationInjectMountVolumes: "",
+								constants.AnnotationMeshInjectMountVolumes: "",
 							},
 						},
 						Spec: basicSpec,
@@ -419,7 +419,7 @@ func TestHandlerHandle(t *testing.T) {
 					Object: encodeRaw(t, &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
-								constants.AnnotationInjectMountVolumes: "web,unknown,web_three_point_oh",
+								constants.AnnotationMeshInjectMountVolumes: "web,unknown,web_three_point_oh",
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -1101,7 +1101,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 						value := actual[i].Value.([]any)
 						valueMap := value[0].(map[string]any)
 						envs := valueMap["env"].([]any)
-						redirectEnv := envs[8].(map[string]any)
+						redirectEnv := envs[6].(map[string]any)
 						require.Equal(t, redirectEnv["name"].(string), "CONSUL_REDIRECT_TRAFFIC_CONFIG")
 						iptablesJson := redirectEnv["value"].(string)
 

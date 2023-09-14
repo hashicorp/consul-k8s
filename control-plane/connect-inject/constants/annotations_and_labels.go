@@ -235,6 +235,12 @@ const (
 	// port is the local port in the pod that the listener will bind to. It can
 	// be a named port.
 	AnnotationMeshDestinations = "consul.hashicorp.com/mesh-service-destinations"
+
+	// AnnotationMeshInjectMountVolumes is the key of the annotation that controls whether
+	// the data volume that mesh inject uses to store data including the Consul ACL token
+	// is mounted to other containers in the pod. It is a comma-separated list of container names
+	// to mount the volume on. It will be mounted at the path `/consul/mesh-inject`.
+	AnnotationMeshInjectMountVolumes = "consul.hashicorp.com/mesh-inject-mount-volume"
 )
 
 // Annotations used by Prometheus.

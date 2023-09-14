@@ -2,17 +2,21 @@
 
 load _helpers
 
-@test "telemetryCollector/Deployment: disabled by default" {
+@test "telemetryCollector/Deployment(V2):  disabled by default" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       .
 }
 
-@test "telemetryCollector/Deployment: fails if no image is set" {
+@test "telemetryCollector/Deployment(V2):  fails if no image is set" {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=null' \
       .
@@ -20,26 +24,32 @@ load _helpers
   [[ "$output" =~ "telemetryCollector.image must be set to enable consul-telemetry-collector" ]]
 }
 
-@test "telemetryCollector/Deployment: disable with telemetry-collector.enabled" {
+@test "telemetryCollector/Deployment(V2):  disable with telemetry-collector.enabled" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=false' \
       .
 }
 
-@test "telemetryCollector/Deployment: disable with global.enabled" {
+@test "telemetryCollector/Deployment(V2):  disable with global.enabled" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'global.enabled=false' \
       .
 }
 
-@test "telemetryCollector/Deployment: container image overrides" {
+@test "telemetryCollector/Deployment(V2):  container image overrides" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       . | tee /dev/stderr |
@@ -50,10 +60,12 @@ load _helpers
 #--------------------------------------------------------------------
 # nodeSelector
 
-@test "telemetryCollector/Deployment: nodeSelector is not set by default" {
+@test "telemetryCollector/Deployment(V2):  nodeSelector is not set by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       . | tee /dev/stderr |
@@ -61,10 +73,12 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "telemetryCollector/Deployment: specified nodeSelector" {
+@test "telemetryCollector/Deployment(V2):  specified nodeSelector" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.nodeSelector=testing' \
@@ -76,10 +90,12 @@ load _helpers
 #--------------------------------------------------------------------
 # consul.name
 
-@test "telemetryCollector/Deployment: name is constant regardless of consul name" {
+@test "telemetryCollector/Deployment(V2):  name is constant regardless of consul name" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'consul.name=foobar' \
       . | tee /dev/stderr |
@@ -90,10 +106,12 @@ load _helpers
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "telemetryCollector/Deployment: Adds tls-ca-cert volume when global.tls.enabled is true" {
+@test "telemetryCollector/Deployment(V2):  Adds tls-ca-cert volume when global.tls.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
@@ -102,10 +120,12 @@ load _helpers
   [ "${actual}" != "" ]
 }
 
-@test "telemetryCollector/Deployment: Adds tls-ca-cert volumeMounts when global.tls.enabled is true" {
+@test "telemetryCollector/Deployment(V2):  Adds tls-ca-cert volumeMounts when global.tls.enabled is true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
@@ -114,10 +134,12 @@ load _helpers
   [ "${actual}" != "" ]
 }
 
-@test "telemetryCollector/Deployment: can overwrite CA secret with the provided one" {
+@test "telemetryCollector/Deployment(V2):  can overwrite CA secret with the provided one" {
   cd `chart_dir`
   local ca_cert_volume=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
@@ -141,10 +163,12 @@ load _helpers
 #--------------------------------------------------------------------
 # global.tls.enableAutoEncrypt
 
-@test "telemetryCollector/Deployment: consul-ca-cert volumeMount is added when TLS with auto-encrypt is enabled without clients" {
+@test "telemetryCollector/Deployment(V2):  consul-ca-cert volumeMount is added when TLS with auto-encrypt is enabled without clients" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
@@ -156,10 +180,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "telemetryCollector/Deployment: consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
+@test "telemetryCollector/Deployment(V2):  consul-ca-cert volume is not added if externalServers.enabled=true and externalServers.useSystemRoots=true" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
@@ -175,10 +201,12 @@ load _helpers
 #--------------------------------------------------------------------
 # resources
 
-@test "telemetryCollector/Deployment: resources has default" {
+@test "telemetryCollector/Deployment(V2):  resources has default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       . | tee /dev/stderr |
@@ -190,10 +218,12 @@ load _helpers
   [ $(echo "${actual}" | yq -r '.limits.cpu') = "1000m" ]
 }
 
-@test "telemetryCollector/Deployment: resources can be overridden" {
+@test "telemetryCollector/Deployment(V2):  resources can be overridden" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'telemetryCollector.resources.foo=bar' \
@@ -205,10 +235,12 @@ load _helpers
 #--------------------------------------------------------------------
 # init container resources
 
-@test "telemetryCollector/Deployment: init container has default resources" {
+@test "telemetryCollector/Deployment(V2):  init container has default resources" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -221,10 +253,12 @@ load _helpers
   [ $(echo "${actual}" | yq -r '.limits.cpu') = "50m" ]
 }
 
-@test "telemetryCollector/Deployment: init container resources can be set" {
+@test "telemetryCollector/Deployment(V2):  init container resources can be set" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -251,10 +285,12 @@ load _helpers
 #--------------------------------------------------------------------
 # priorityClassName
 
-@test "telemetryCollector/Deployment: no priorityClassName by default" {
+@test "telemetryCollector/Deployment(V2):  no priorityClassName by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       . | tee /dev/stderr |
@@ -263,10 +299,12 @@ load _helpers
   [ "${actual}" = "null" ]
 }
 
-@test "telemetryCollector/Deployment: can set a priorityClassName" {
+@test "telemetryCollector/Deployment(V2):  can set a priorityClassName" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'telemetryCollector.priorityClassName=name' \
@@ -279,10 +317,12 @@ load _helpers
 #--------------------------------------------------------------------
 # replicas
 
-@test "telemetryCollector/Deployment: replicas defaults to 1" {
+@test "telemetryCollector/Deployment(V2):  replicas defaults to 1" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       . | tee /dev/stderr |
@@ -291,10 +331,12 @@ load _helpers
   [ "${actual}" = "1" ]
 }
 
-@test "telemetryCollector/Deployment: replicas can be set" {
+@test "telemetryCollector/Deployment(V2):  replicas can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'telemetryCollector.replicas=3' \
@@ -307,10 +349,12 @@ load _helpers
 #--------------------------------------------------------------------
 # Vault
 
-@test "telemetryCollector/Deployment: vault CA is not configured by default" {
+@test "telemetryCollector/Deployment(V2):  vault CA is not configured by default" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/telemetry-collector-deployment.yaml  \
+    -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
     --set 'telemetryCollector.enabled=true' \
     --set 'telemetryCollector.image=foo' \
     --set 'global.tls.enabled=true' \
@@ -329,10 +373,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "telemetryCollector/Deployment: vault CA is not configured when secretName is set but secretKey is not" {
+@test "telemetryCollector/Deployment(V2):  vault CA is not configured when secretName is set but secretKey is not" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/telemetry-collector-deployment.yaml  \
+    -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
     --set 'telemetryCollector.enabled=true' \
     --set 'telemetryCollector.image=foo' \
     --set 'global.tls.enabled=true' \
@@ -352,10 +398,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "telemetryCollector/Deployment: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
+@test "telemetryCollector/Deployment(V2):  vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -374,10 +422,12 @@ load _helpers
   [ "${actual}" = "vns" ]
 }
 
-@test "telemetryCollector/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set without vaultNamespace annotation" {
+@test "telemetryCollector/Deployment(V2):  correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set without vaultNamespace annotation" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -397,10 +447,12 @@ load _helpers
   [ "${actual}" = "vns" ]
 }
 
-@test "telemetryCollector/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
+@test "telemetryCollector/Deployment(V2):  correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -420,10 +472,12 @@ load _helpers
   [ "${actual}" = "bar" ]
 }
 
-@test "telemetryCollector/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
+@test "telemetryCollector/Deployment(V2):  vault CA is not configured when secretKey is set but secretName is not" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/telemetry-collector-deployment.yaml  \
+    -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
     --set 'telemetryCollector.enabled=true' \
     --set 'telemetryCollector.image=foo' \
     --set 'global.tls.enabled=true' \
@@ -443,10 +497,12 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "telemetryCollector/Deployment: vault CA is configured when both secretName and secretKey are set" {
+@test "telemetryCollector/Deployment(V2):  vault CA is configured when both secretName and secretKey are set" {
   cd `chart_dir`
   local object=$(helm template \
-    -s templates/telemetry-collector-deployment.yaml  \
+    -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
     --set 'telemetryCollector.enabled=true' \
     --set 'telemetryCollector.image=foo' \
     --set 'global.tls.enabled=true' \
@@ -467,10 +523,12 @@ load _helpers
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
 
-@test "telemetryCollector/Deployment: vault tls annotations are set when tls is enabled" {
+@test "telemetryCollector/Deployment(V2):  vault tls annotations are set when tls is enabled" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.secretsBackend.vault.enabled=true' \
@@ -506,10 +564,12 @@ load _helpers
   [ "${actual}" = "test" ]
 }
 
-@test "telemetryCollector/Deployment: vault agent annotations can be set" {
+@test "telemetryCollector/Deployment(V2):  vault agent annotations can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=foo' \
       --set 'global.tls.enabled=true' \
@@ -528,10 +588,12 @@ load _helpers
 #--------------------------------------------------------------------
 # telemetryCollector.cloud
 
-@test "telemetryCollector/Deployment: success with all cloud bits set" {
+@test "telemetryCollector/Deployment(V2):  success with all cloud bits set" {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.cloud.enabled=true' \
@@ -544,10 +606,12 @@ load _helpers
       .
 }
 
-@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId is set and global.cloud.resourceId is not set or global.cloud.clientSecret.secretName is not set" {
+@test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientId is set and global.cloud.resourceId is not set or global.cloud.clientSecret.secretName is not set" {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -564,10 +628,12 @@ load _helpers
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when global.cloud.enabled is true and global.cloud.clientSecret.secretName is not set but global.cloud.clientId.secretName and global.cloud.resourceId.secretName is set" {
+@test "telemetryCollector/Deployment(V2):  fails when global.cloud.enabled is true and global.cloud.clientSecret.secretName is not set but global.cloud.clientId.secretName and global.cloud.resourceId.secretName is set" {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -584,10 +650,12 @@ load _helpers
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when global.cloud.enabled is true and global.cloud.resourceId.secretName is not set but global.cloud.clientId.secretName and global.cloud.clientSecret.secretName is set" {
+@test "telemetryCollector/Deployment(V2):  fails when global.cloud.enabled is true and global.cloud.resourceId.secretName is not set but global.cloud.clientId.secretName and global.cloud.clientSecret.secretName is set" {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -604,10 +672,12 @@ load _helpers
   [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when global.cloud.resourceId.secretName is set but global.cloud.resourceId.secretKey is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when global.cloud.resourceId.secretName is set but global.cloud.resourceId.secretKey is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -625,10 +695,12 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when global.cloud.authURL.secretName is set but global.cloud.authURL.secretKey is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when global.cloud.authURL.secretName is set but global.cloud.authURL.secretKey is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -649,10 +721,12 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when global.cloud.authURL.secretKey is set but global.cloud.authURL.secretName is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when global.cloud.authURL.secretKey is set but global.cloud.authURL.secretName is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -673,10 +747,12 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when global.cloud.apiHost.secretName is set but global.cloud.apiHost.secretKey is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when global.cloud.apiHost.secretName is set but global.cloud.apiHost.secretKey is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -697,10 +773,12 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -721,10 +799,12 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when global.cloud.scadaAddress.secretName is set but global.cloud.scadaAddress.secretKey is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when global.cloud.scadaAddress.secretName is set but global.cloud.scadaAddress.secretKey is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -745,10 +825,12 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when global.cloud.scadaAddress.secretKey is set but global.cloud.scadaAddress.secretName is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when global.cloud.scadaAddress.secretKey is set but global.cloud.scadaAddress.secretName is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -769,10 +851,12 @@ load _helpers
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId.secretName is set but telemetryCollector.cloud.clientId.secretKey is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientId.secretName is set but telemetryCollector.cloud.clientId.secretKey is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
@@ -786,10 +870,12 @@ load _helpers
   [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId.secretKey is set but telemetryCollector.cloud.clientId.secretName is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientId.secretKey is set but telemetryCollector.cloud.clientId.secretName is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
@@ -803,10 +889,12 @@ load _helpers
   [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientSecret.secretName is set but telemetryCollector.cloud.clientId.secretName is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientSecret.secretName is set but telemetryCollector.cloud.clientId.secretName is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
@@ -819,10 +907,12 @@ load _helpers
   [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId.secretName is set but telemetry.cloud.clientId.secretKey is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientId.secretName is set but telemetry.cloud.clientId.secretKey is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
@@ -834,10 +924,12 @@ load _helpers
   [[ "$output" =~ "When either telemetryCollector.cloud.clientId.secretName or telemetryCollector.cloud.clientId.secretKey is defined, both must be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientSecret.secretName is set but telemetry.cloud.clientSecret.secretKey is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientSecret.secretName is set but telemetry.cloud.clientSecret.secretKey is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
@@ -850,10 +942,12 @@ load _helpers
   [[ "$output" =~ "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set." ]]
 }
 
-@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId and telemetryCollector.cloud.clientSecret is set but global.cloud.resourceId.secretKey is not set." {
+@test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientId and telemetryCollector.cloud.clientSecret is set but global.cloud.resourceId.secretKey is not set." {
   cd `chart_dir`
   run helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
@@ -870,11 +964,13 @@ load _helpers
 #--------------------------------------------------------------------
 # global.tls.enabled
 
-@test "telemetryCollector/Deployment: sets -tls-disabled args when when not using TLS." {
+@test "telemetryCollector/Deployment(V2):  sets -tls-disabled args when when not using TLS." {
   cd `chart_dir`
 
   local flags=$(helm template  \
-    -s templates/telemetry-collector-deployment.yaml \
+    -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
     --set 'telemetryCollector.enabled=true'     \
     --set 'telemetryCollector.image=bar'    \
     --set 'global.tls.enabled=false'    \
@@ -885,10 +981,12 @@ load _helpers
 
 }
 
-@test "telemetryCollector/Deployment: -ca-certs set correctly when using TLS." {
+@test "telemetryCollector/Deployment(V2):  -ca-certs set correctly when using TLS." {
   cd `chart_dir`
   local flags=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -902,10 +1000,12 @@ load _helpers
 #--------------------------------------------------------------------
 # External Server
 
-@test "telemetryCollector/Deployment: sets external server args when global.tls.enabled and externalServers.enabled" {
+@test "telemetryCollector/Deployment(V2):  sets external server args when global.tls.enabled and externalServers.enabled" {
   cd `chart_dir`
   local flags=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.tls.enabled=true' \
@@ -932,10 +1032,12 @@ load _helpers
 #--------------------------------------------------------------------
 # Admin Partitions
 
-@test "telemetryCollector/Deployment: partition flags are set when using admin partitions" {
+@test "telemetryCollector/Deployment(V2):  partition flags are set when using admin partitions" {
   cd `chart_dir`
   local flags=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.enableConsulNamespaces=true' \
@@ -952,10 +1054,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "telemetryCollector/Deployment: consul-ca-cert volume mount is not set when using externalServers and useSystemRoots" {
+@test "telemetryCollector/Deployment(V2):  consul-ca-cert volume mount is not set when using externalServers and useSystemRoots" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -969,10 +1073,12 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
-@test "telemetryCollector/Deployment: config volume mount is set when config exists" {
+@test "telemetryCollector/Deployment(V2):  config volume mount is set when config exists" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.customExporterConfig="foo"' \
@@ -981,10 +1087,12 @@ load _helpers
   [ "${actual}" = "config" ]
 }
 
-@test "telemetryCollector/Deployment: config flag is set when config exists" {
+@test "telemetryCollector/Deployment(V2):  config flag is set when config exists" {
   cd `chart_dir`
   local flags=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.customExporterConfig="foo"' \
@@ -995,10 +1103,12 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "telemetryCollector/Deployment: consul-ca-cert volume mount is not set on acl-init when using externalServers and useSystemRoots" {
+@test "telemetryCollector/Deployment(V2):  consul-ca-cert volume mount is not set on acl-init when using externalServers and useSystemRoots" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.acls.manageSystemACLs=true' \
@@ -1014,10 +1124,12 @@ load _helpers
 #--------------------------------------------------------------------
 # trustedCAs
 
-@test "telemetryCollector/Deployment: trustedCAs: if trustedCAs is set command is modified correctly" {
+@test "telemetryCollector/Deployment(V2):  trustedCAs: if trustedCAs is set command is modified correctly" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
@@ -1026,10 +1138,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
-@test "telemetryCollector/Deployment: trustedCAs: if multiple Trusted cas were set" {
+@test "telemetryCollector/Deployment(V2):  trustedCAs: if multiple Trusted cas were set" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
@@ -1045,10 +1159,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
-@test "telemetryCollector/Deployment: trustedCAs: if trustedCAs is set /trusted-cas volumeMount is added" {
+@test "telemetryCollector/Deployment(V2):  trustedCAs: if trustedCAs is set /trusted-cas volumeMount is added" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
@@ -1058,10 +1174,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 }
 
 
-@test "telemetryCollector/Deployment: trustedCAs: if trustedCAs is set SSL_CERT_DIR env var is set" {
+@test "telemetryCollector/Deployment(V2):  trustedCAs: if trustedCAs is set SSL_CERT_DIR env var is set" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
@@ -1076,10 +1194,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 #--------------------------------------------------------------------
 # extraLabels
 
-@test "telemetryCollector/Deployment: no extra labels defined by default" {
+@test "telemetryCollector/Deployment(V2):  no extra labels defined by default" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       . | tee /dev/stderr |
@@ -1088,10 +1208,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "{}" ]
 }
 
-@test "telemetryCollector/Deployment: extra global labels can be set" {
+@test "telemetryCollector/Deployment(V2):  extra global labels can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.extraLabels.foo=bar' \
@@ -1102,10 +1224,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actualTemplateBar}" = "bar" ]
 }
 
-@test "telemetryCollector/Deployment: multiple global extra labels can be set" {
+@test "telemetryCollector/Deployment(V2):  multiple global extra labels can be set" {
   cd `chart_dir`
   local actual=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.extraLabels.foo=bar' \
@@ -1124,10 +1248,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 #--------------------------------------------------------------------
 # extraEnvironmentVariables
 
-@test "telemetryCollector/Deployment: extra environment variables" {
+@test "telemetryCollector/Deployment(V2):  extra environment variables" {
   cd `chart_dir`
   local object=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.extraEnvironmentVars.HCP_AUTH_TLS=insecure' \
       --set 'telemetryCollector.extraEnvironmentVars.foo=bar' \
@@ -1146,10 +1272,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 #--------------------------------------------------------------------
 # logLevel
 
-@test "telemetryCollector/Deployment: use global.logLevel by default" {
+@test "telemetryCollector/Deployment(V2):  use global.logLevel by default" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
@@ -1159,10 +1287,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
-@test "telemetryCollector/Deployment: override global.logLevel when telemetryCollector.logLevel is set" {
+@test "telemetryCollector/Deployment(V2):  override global.logLevel when telemetryCollector.logLevel is set" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.logLevel=warn' \
       . | tee /dev/stderr |
@@ -1173,10 +1303,14 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
-@test "telemetryCollector/Deployment: use global.logLevel by default for dataplane container" {
+@test "telemetryCollector/Deployment(V2):  use global.logLevel by default for dataplane container" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[1].args' | tee /dev/stderr)
@@ -1186,10 +1320,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
-@test "telemetryCollector/Deployment: override global.logLevel when telemetryCollector.logLevel is set for dataplane container" {
+@test "telemetryCollector/Deployment(V2):  override global.logLevel when telemetryCollector.logLevel is set for dataplane container" {
   cd `chart_dir`
   local cmd=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.logLevel=debug' \
       . | tee /dev/stderr |
@@ -1203,13 +1339,11 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 #--------------------------------------------------------------------
 # global.experiments=["resource-apis"]
 
-@test "telemetryCollector/Deployment: disabled when V2 is enabled" {
+@test "telemetryCollector/Deployment(V2):  disabled when V2 is disabled" {
   cd `chart_dir`
   assert_empty helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
+      -s templates/telemetry-collector-v2-deployment.yaml  \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
-      --set 'ui.enabled=false' \
-      --set 'global.experiments[0]=resource-apis' \
       .
 }
