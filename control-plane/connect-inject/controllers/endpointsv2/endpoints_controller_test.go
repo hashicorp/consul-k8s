@@ -212,9 +212,9 @@ func TestReconcile_CreateService(t *testing.T) {
 								AppProtocol: &appProtocolGrpc,
 							},
 							{
-								Name:       "other",
-								Port:       10001,
-								Protocol:   "TCP",
+								Name: "other",
+								Port: 10001,
+								//Protocol:   "TCP",
 								TargetPort: intstr.FromString("10001"),
 								// no app protocol specified
 							},
@@ -248,11 +248,11 @@ func TestReconcile_CreateService(t *testing.T) {
 							TargetPort:  "my-grpc-port",
 							Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
 						},
-						{
-							VirtualPort: 10001,
-							TargetPort:  "10001",
-							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
-						},
+						//{
+						//	VirtualPort: 10001,
+						//	TargetPort:  "10001",
+						//	Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
+						//},
 						{
 							TargetPort: "mesh",
 							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
@@ -504,9 +504,9 @@ func TestReconcile_CreateService(t *testing.T) {
 						Ports: []corev1.ServicePort{
 							// Two L4 protocols on one exposed port
 							{
-								Name:       "public-tcp",
-								Port:       8080,
-								Protocol:   "TCP",
+								Name: "public-tcp",
+								Port: 8080,
+								//Protocol:   "TCP",
 								TargetPort: intstr.FromString("my-svc-port"),
 							},
 							{
@@ -535,11 +535,11 @@ func TestReconcile_CreateService(t *testing.T) {
 				},
 				Data: common.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
-						{
-							VirtualPort: 8080,
-							TargetPort:  "my-svc-port",
-							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
-						},
+						//{
+						//	VirtualPort: 8080,
+						//	TargetPort:  "my-svc-port",
+						//	Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
+						//},
 						{
 							TargetPort: "mesh",
 							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,

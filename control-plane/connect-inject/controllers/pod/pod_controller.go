@@ -123,10 +123,26 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	if common.HasBeenMeshInjected(pod) {
 		if err := r.writeProxyConfiguration(ctx, pod); err != nil {
+			// We could be racing with the namespace controller.
+			// Requeue (which includes backoff) to try again.
+			if common.ConsulNamespaceIsNotFound(err) {
+				r.Log.Info("Consul namespace not found; re-queueing request",
+					"pod", req.Name, "ns", req.Namespace, "consul-ns",
+					r.getConsulNamespace(req.Namespace), "err", err.Error())
+				return ctrl.Result{Requeue: true}, nil
+			}
 			errs = multierror.Append(errs, err)
 		}
 
 		if err := r.writeWorkload(ctx, pod); err != nil {
+			// Technically this is not needed, but keeping in case this gets refactored in
+			// a different order
+			if common.ConsulNamespaceIsNotFound(err) {
+				r.Log.Info("Consul namespace not found; re-queueing request",
+					"pod", req.Name, "ns", req.Namespace, "consul-ns",
+					r.getConsulNamespace(req.Namespace), "err", err.Error())
+				return ctrl.Result{Requeue: true}, nil
+			}
 			errs = multierror.Append(errs, err)
 		}
 
@@ -136,6 +152,14 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		//}
 
 		if err := r.writeHealthStatus(ctx, pod); err != nil {
+			// Technically this is not needed, but keeping in case this gets refactored in
+			// a different order
+			if common.ConsulNamespaceIsNotFound(err) {
+				r.Log.Info("Consul namespace not found; re-queueing request",
+					"pod", req.Name, "ns", req.Namespace, "consul-ns",
+					r.getConsulNamespace(req.Namespace), "err", err.Error())
+				return ctrl.Result{Requeue: true}, nil
+			}
 			errs = multierror.Append(errs, err)
 		}
 	}
