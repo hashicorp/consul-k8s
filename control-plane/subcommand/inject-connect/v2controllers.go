@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/namespace"
 	webhookV2 "github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook_v2"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
@@ -62,7 +63,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		AuthMethod:                 c.flagACLAuthMethod,
 		MetricsConfig:              metricsConfig,
 		EnableTelemetryCollector:   c.flagEnableTelemetryCollector,
-		Log:                        ctrl.Log.WithName("controller").WithName("pods"),
+		Log:                        ctrl.Log.WithName("controller").WithName("pod"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", pod.Controller{})
 		return err
@@ -86,7 +87,24 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	// TODO: Nodes Controller
+	if c.flagEnableNamespaces {
+		err := (&namespace.Controller{
+			Client:                     mgr.GetClient(),
+			ConsulClientConfig:         consulConfig,
+			ConsulServerConnMgr:        watcher,
+			AllowK8sNamespacesSet:      allowK8sNamespaces,
+			DenyK8sNamespacesSet:       denyK8sNamespaces,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+			NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+			Log:                        ctrl.Log.WithName("controller").WithName("namespace"),
+		}).SetupWithManager(mgr)
+		if err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", namespace.Controller{})
+			return err
+		}
+	}
 
 	// TODO: Serviceaccounts Controller
 
