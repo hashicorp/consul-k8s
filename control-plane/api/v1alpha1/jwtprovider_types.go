@@ -22,7 +22,12 @@ import (
 )
 
 const (
-	JWTProviderKubeKind string = "jwtprovider"
+	JWTProviderKubeKind      string               = "jwtprovider"
+	DiscoveryTypeStrictDNS   ClusterDiscoveryType = "STRICT_DNS"
+	DiscoveryTypeStatic      ClusterDiscoveryType = "STATIC"
+	DiscoveryTypeLogicalDNS  ClusterDiscoveryType = "LOGICAL_DNS"
+	DiscoveryTypeEDS         ClusterDiscoveryType = "EDS"
+	DiscoveryTypeOriginalDST ClusterDiscoveryType = "ORIGINAL_DST"
 )
 
 func init() {
@@ -404,6 +409,9 @@ type RemoteJWKS struct {
 	//
 	// There is no retry by default.
 	RetryPolicy *JWKSRetryPolicy `json:"retryPolicy,omitempty"`
+
+	// JWKSCluster defines how the specified Remote JWKS URI is to be fetched.
+	JWKSCluster *JWKSCluster `json:"jwksCluster,omitempty"`
 }
 
 func (r *RemoteJWKS) toConsul() *capi.RemoteJWKS {
@@ -416,6 +424,7 @@ func (r *RemoteJWKS) toConsul() *capi.RemoteJWKS {
 		CacheDuration:       r.CacheDuration,
 		FetchAsynchronously: r.FetchAsynchronously,
 		RetryPolicy:         r.RetryPolicy.toConsul(),
+		JWKSCluster:         r.JWKSCluster.toConsul(),
 	}
 }
 
@@ -432,9 +441,188 @@ func (r *RemoteJWKS) validate(path *field.Path) field.ErrorList {
 	}
 
 	errs = append(errs, r.RetryPolicy.validate(path.Child("retryPolicy"))...)
+	errs = append(errs, r.JWKSCluster.validate(path.Child("jwksCluster"))...)
 	return errs
 }
 
+// JWKSCluster defines how the specified Remote JWKS URI is to be fetched.
+type JWKSCluster struct {
+	// DiscoveryType refers to the service discovery type to use for resolving the cluster.
+	//
+	// This defaults to STRICT_DNS.
+	// Other options include STATIC, LOGICAL_DNS, EDS or ORIGINAL_DST.
+	DiscoveryType ClusterDiscoveryType `json:"discoveryType,omitempty"`
+
+	// TLSCertificates refers to the data containing certificate authority certificates to use
+	// in verifying a presented peer certificate.
+	// If not specified and a peer certificate is presented it will not be verified.
+	//
+	// Must be either CaCertificateProviderInstance or TrustedCA.
+	TLSCertificates *JWKSTLSCertificate `json:"tlsCertificates,omitempty"`
+
+	// The timeout for new network connections to hosts in the cluster.
+	// If not set, a default value of 5s will be used.
+	ConnectTimeout time.Duration `json:"connectTimeout,omitempty"`
+}
+
+func (c *JWKSCluster) toConsul() *capi.JWKSCluster {
+	if c == nil {
+		return nil
+	}
+	return &capi.JWKSCluster{
+		DiscoveryType:   c.DiscoveryType.toConsul(),
+		TLSCertificates: c.TLSCertificates.toConsul(),
+		ConnectTimeout:  c.ConnectTimeout,
+	}
+}
+
+func (c *JWKSCluster) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if c == nil {
+		return errs
+	}
+
+	errs = append(errs, c.DiscoveryType.validate(path.Child("discoveryType"))...)
+	errs = append(errs, c.TLSCertificates.validate(path.Child("tlsCertificates"))...)
+
+	return errs
+}
+
+type ClusterDiscoveryType string
+
+func (d ClusterDiscoveryType) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	switch d {
+	case DiscoveryTypeStatic, DiscoveryTypeStrictDNS, DiscoveryTypeLogicalDNS, DiscoveryTypeEDS, DiscoveryTypeOriginalDST:
+		return errs
+	default:
+		errs = append(errs, field.Invalid(path, string(d), "unsupported jwks cluster discovery type."))
+	}
+	return errs
+}
+
+func (d ClusterDiscoveryType) toConsul() capi.ClusterDiscoveryType {
+	return capi.ClusterDiscoveryType(string(d))
+}
+
+// JWKSTLSCertificate refers to the data containing certificate authority certificates to use
+// in verifying a presented peer certificate.
+// If not specified and a peer certificate is presented it will not be verified.
+//
+// Must be either CaCertificateProviderInstance or TrustedCA.
+type JWKSTLSCertificate struct {
+	// CaCertificateProviderInstance Certificate provider instance for fetching TLS certificates.
+	CaCertificateProviderInstance *JWKSTLSCertProviderInstance `json:"caCertificateProviderInstance,omitempty"`
+
+	// TrustedCA defines TLS certificate data containing certificate authority certificates
+	// to use in verifying a presented peer certificate.
+	//
+	// Exactly one of Filename, EnvironmentVariable, InlineString or InlineBytes must be specified.
+	TrustedCA *JWKSTLSCertTrustedCA `json:"trustedCA,omitempty"`
+}
+
+func (c *JWKSTLSCertificate) toConsul() *capi.JWKSTLSCertificate {
+	if c == nil {
+		return nil
+	}
+
+	return &capi.JWKSTLSCertificate{
+		TrustedCA:                     c.TrustedCA.toConsul(),
+		CaCertificateProviderInstance: c.CaCertificateProviderInstance.toConsul(),
+	}
+}
+
+func (c *JWKSTLSCertificate) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if c == nil {
+		return errs
+	}
+
+	hasProviderInstance := c.CaCertificateProviderInstance != nil
+	hasTrustedCA := c.TrustedCA != nil
+
+	if countTrue(hasTrustedCA, hasProviderInstance) != 1 {
+		asJSON, _ := json.Marshal(c)
+		errs = append(errs, field.Invalid(path, string(asJSON), "exactly one of 'trustedCa' or 'caCertificateProviderInstance' is required"))
+	}
+
+	errs = append(errs, c.TrustedCA.validate(path.Child("trustedCa"))...)
+
+	return errs
+}
+
+// JWKSTLSCertProviderInstance Certificate provider instance for fetching TLS certificates.
+type JWKSTLSCertProviderInstance struct {
+	// InstanceName refers to the certificate provider instance name.
+	//
+	// The default value is "default".
+	InstanceName string `json:"instanceName,omitempty"`
+
+	// CertificateName is used to specify certificate instances or types. For example, "ROOTCA" to specify
+	// a root-certificate (validation context) or "example.com" to specify a certificate for a
+	// particular domain.
+	//
+	// The default value is the empty string.
+	CertificateName string `json:"certificateName,omitempty"`
+}
+
+func (c *JWKSTLSCertProviderInstance) toConsul() *capi.JWKSTLSCertProviderInstance {
+	if c == nil {
+		return nil
+	}
+
+	return &capi.JWKSTLSCertProviderInstance{
+		InstanceName:    c.InstanceName,
+		CertificateName: c.CertificateName,
+	}
+}
+
+// JWKSTLSCertTrustedCA defines TLS certificate data containing certificate authority certificates
+// to use in verifying a presented peer certificate.
+//
+// Exactly one of Filename, EnvironmentVariable, InlineString or InlineBytes must be specified.
+type JWKSTLSCertTrustedCA struct {
+	Filename            string `json:"filename,omitempty"`
+	EnvironmentVariable string `json:"environmentVariable,omitempty"`
+	InlineString        string `json:"inlineString,omitempty"`
+	InlineBytes         []byte `json:"inlineBytes,omitempty"`
+}
+
+func (c *JWKSTLSCertTrustedCA) toConsul() *capi.JWKSTLSCertTrustedCA {
+	if c == nil {
+		return nil
+	}
+
+	return &capi.JWKSTLSCertTrustedCA{
+		Filename:            c.Filename,
+		EnvironmentVariable: c.EnvironmentVariable,
+		InlineBytes:         c.InlineBytes,
+		InlineString:        c.InlineString,
+	}
+}
+
+func (c *JWKSTLSCertTrustedCA) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if c == nil {
+		return errs
+	}
+
+	hasFilename := c.Filename != ""
+	hasEnv := c.EnvironmentVariable != ""
+	hasInlineBytes := len(c.InlineBytes) > 0
+	hasInlineString := c.InlineString != ""
+
+	if countTrue(hasFilename, hasEnv, hasInlineString, hasInlineBytes) != 1 {
+		asJSON, _ := json.Marshal(c)
+		errs = append(errs, field.Invalid(path, string(asJSON), "exactly one of 'filename', 'environmentVariable', 'inlineString' or 'inlineBytes' is required"))
+	}
+	return errs
+}
+
+// JWKSRetryPolicy defines a retry policy for fetching JWKS.
+//
+// There is no retry by default.
 type JWKSRetryPolicy struct {
 	// NumRetries is the number of times to retry fetching the JWKS.
 	// The retry strategy uses jittered exponential backoff with
@@ -443,9 +631,9 @@ type JWKSRetryPolicy struct {
 	// Default value is 0.
 	NumRetries int `json:"numRetries,omitempty"`
 
-	// Backoff policy
+	// Retry's backoff policy.
 	//
-	// Defaults to Envoy's backoff policy
+	// Defaults to Envoy's backoff policy.
 	RetryPolicyBackOff *RetryPolicyBackOff `json:"retryPolicyBackOff,omitempty"`
 }
 
@@ -468,16 +656,19 @@ func (j *JWKSRetryPolicy) validate(path *field.Path) field.ErrorList {
 	return append(errs, j.RetryPolicyBackOff.validate(path.Child("retryPolicyBackOff"))...)
 }
 
+// RetryPolicyBackOff defines retry's policy backoff.
+//
+// Defaults to Envoy's backoff policy.
 type RetryPolicyBackOff struct {
-	// BaseInterval to be used for the next back off computation
+	// BaseInterval to be used for the next back off computation.
 	//
-	// The default value from envoy is 1s
+	// The default value from envoy is 1s.
 	BaseInterval time.Duration `json:"baseInterval,omitempty"`
 
 	// MaxInternal to be used to specify the maximum interval between retries.
 	// Optional but should be greater or equal to BaseInterval.
 	//
-	// Defaults to 10 times BaseInterval
+	// Defaults to 10 times BaseInterval.
 	MaxInterval time.Duration `json:"maxInterval,omitempty"`
 }
 
