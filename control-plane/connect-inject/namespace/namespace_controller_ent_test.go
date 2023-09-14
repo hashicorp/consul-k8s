@@ -30,9 +30,9 @@ const (
 	testCrossACLPolicy = "cross-namespace-policy"
 )
 
-// TestReconcileCreatePod ensures that a new pod reconciliation fans out to create
-// the appropriate Consul resources. Translation details from pod to Consul workload are
-// tested at the relevant private functions. Any error states that are also tested here.
+// TestReconcileCreateNamespace ensures that a new namespace is reconciled to a
+// Consul namespace. The actual namespace in Consul depends on if the controller
+// is configured with a destination namespace or mirroring enabled.
 func TestReconcileCreateNamespace(t *testing.T) {
 	t.Parallel()
 
@@ -343,7 +343,7 @@ func TestReconcileDeleteNamespace(t *testing.T) {
 			partition:               "baz",
 			nsMirrorPrefix:          "k8s-",
 			enableNSMirroring:       true,
-			existingConsulNamespace: getNamespace("k8s-foo", "", false),
+			existingConsulNamespace: getNamespace("k8s-foo", "baz", false),
 		},
 		{
 			name:                    "mirrored namespaces overrides destination namespace",

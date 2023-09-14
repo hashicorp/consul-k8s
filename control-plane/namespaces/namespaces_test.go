@@ -189,6 +189,11 @@ func TestEnsureDelete(tt *testing.T) {
 				}
 				_, _, err = consulClient.Namespaces().Create(&ns, nil)
 				require.NoError(t, err)
+
+				check, _, err := consulClient.Namespaces().Read(name, nil)
+				require.NoError(t, err)
+				require.NotNil(t, check)
+				require.Equal(t, name, check.Name)
 			}
 
 			err = EnsureDeleted(consulClient, name)

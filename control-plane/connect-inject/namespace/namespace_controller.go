@@ -26,9 +26,9 @@ type Controller struct {
 	ConsulClientConfig *consul.Config
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
 	ConsulServerConnMgr consul.ServerConnectionManager
-	// Only pods in the AllowK8sNamespacesSet are reconciled.
+	// AllowK8sNamespacesSet determines kube namespace that are reconciled.
 	AllowK8sNamespacesSet mapset.Set
-	// Pods in the DenyK8sNamespacesSet are ignored.
+	// DenyK8sNamespacesSet determines kube namespace that are ignored.
 	DenyK8sNamespacesSet mapset.Set
 
 	// Partition is not required. It should already be set in the API ClientConfig
@@ -105,6 +105,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager registers this controller with the manager.
 func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Namespace{}).
