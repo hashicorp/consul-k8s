@@ -581,7 +581,7 @@ func checkIfReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resou
 	for _, provider := range authFilter.Spec.JWT.Providers {
 		_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
 		if !ok {
-			invalidFilters[fmt.Sprintf("%s/%s",namespace,  authFilter.Name)] = struct{}{}
+			invalidFilters[fmt.Sprintf("%s/%s", namespace, authFilter.Name)] = struct{}{}
 			return
 		}
 	}
