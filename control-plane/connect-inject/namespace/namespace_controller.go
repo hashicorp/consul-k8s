@@ -55,7 +55,7 @@ type Controller struct {
 }
 
 // Reconcile reads of Kubernetes Namespace and reconciles the mapped namespace in Consul.
-// TODO: Move the creation of a destination namespace to a dedicated, single-flight goroutine
+// TODO: Move the creation of a destination namespace to a dedicated, single-flight goroutine.
 func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var namespace corev1.Namespace
 
