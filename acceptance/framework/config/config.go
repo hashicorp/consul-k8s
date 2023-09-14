@@ -162,7 +162,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		setIfNotEmpty(helmValues, "global.server.resources.requests.cpu", "500m")
 		setIfNotEmpty(helmValues, "global.server.resources.limits.cpu", "500m")
 		setIfNotEmpty(helmValues, "connectInject.apiGateway.manageExternalCRDs", "false")
-		setIfNotEmpty(helmValues, "connectInject.apiGateway.manageCustomCRDs", "true")
+		setIfNotEmpty(helmValues, "connectInject.apiGateway.manageNonStandardCRDs", "true")
 	}
 
 	setIfNotEmpty(helmValues, "connectInject.transparentProxy.defaultEnabled", strconv.FormatBool(t.EnableTransparentProxy))
