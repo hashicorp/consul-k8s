@@ -11,12 +11,18 @@ import (
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func GatewayStatusesEqual(a, b gwv1beta1.GatewayStatus) bool {
 	return slices.EqualFunc(a.Addresses, b.Addresses, gatewayStatusesAddressesEqual) &&
 		slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual) &&
 		slices.EqualFunc(a.Listeners, b.Listeners, gatewayStatusesListenersEqual)
+}
+
+func GatewayPolicyStatusesEqual(a, b v1alpha1.GatewayPolicyStatus) bool {
+	return slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
 }
 
 func gatewayStatusesAddressesEqual(a, b gwv1beta1.GatewayAddress) bool {

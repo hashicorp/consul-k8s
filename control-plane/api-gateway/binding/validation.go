@@ -4,8 +4,10 @@
 package binding
 
 import (
+	"fmt"
 	"strings"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -160,6 +162,70 @@ func validateGateway(gateway gwv1beta1.Gateway, pods []corev1.Pod, consulGateway
 	}
 
 	return result
+}
+
+func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.GatewayPolicy, resources *common.ResourceMap) gatewayPolicyValidationResults {
+	results := make(gatewayPolicyValidationResults, 0, len(policies))
+
+	for _, policy := range policies {
+		result := gatewayPolicyValidationResult{
+			resolvedRefsErrs: []error{},
+		}
+
+		exists := listenerExistsForPolicy(gateway, policy)
+		if !exists {
+			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingListener(policy.Spec.TargetRef.Name, string(*policy.Spec.TargetRef.SectionName)))
+		}
+
+		missingJWTProviders := make(map[string]struct{})
+		if policy.Spec.Override != nil && policy.Spec.Override.JWT != nil {
+			for _, policyJWTProvider := range policy.Spec.Override.JWT.Providers {
+				_, jwtExists := resources.GetJWTProviderForGatewayJWTProvider(policyJWTProvider)
+				if !jwtExists {
+					missingJWTProviders[policyJWTProvider.Name] = struct{}{}
+				}
+			}
+		}
+
+		if policy.Spec.Default != nil && policy.Spec.Default.JWT != nil {
+			for _, policyJWTProvider := range policy.Spec.Default.JWT.Providers {
+				_, jwtExists := resources.GetJWTProviderForGatewayJWTProvider(policyJWTProvider)
+				if !jwtExists {
+					missingJWTProviders[policyJWTProvider.Name] = struct{}{}
+				}
+			}
+		}
+
+		if len(missingJWTProviders) > 0 {
+			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingJWTProviders(missingJWTProviders))
+		}
+
+		if len(result.resolvedRefsErrs) > 0 {
+			result.acceptedErr = errNotAcceptedDueToInvalidRefs
+		}
+		results = append(results, result)
+
+	}
+	return results
+}
+
+func listenerExistsForPolicy(gateway gwv1beta1.Gateway, policy v1alpha1.GatewayPolicy) bool {
+	return gateway.Name == policy.Spec.TargetRef.Name &&
+		slices.ContainsFunc(gateway.Spec.Listeners, func(l gwv1beta1.Listener) bool { return l.Name == *policy.Spec.TargetRef.SectionName })
+}
+
+func errorForMissingListener(name, listenerName string) error {
+	return fmt.Errorf("%w: gatewayName - %q, listenerName - %q", errPolicyListenerReferenceDoesNotExist, name, listenerName)
+}
+
+func errorForMissingJWTProviders(names map[string]struct{}) error {
+	namesList := make([]string, 0, len(names))
+	for name := range names {
+		namesList = append(namesList, name)
+	}
+	slices.Sort(namesList)
+	mergedNames := strings.Join(namesList, ",")
+	return fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, mergedNames)
 }
 
 // mergedListener associates a listener with its indexed position
@@ -505,7 +571,7 @@ func externalRefsKindAllowedOnRoute(route *gwv1beta1.HTTPRoute) bool {
 			return false
 		}
 
-		//same thing but for backendref
+		// same thing but for backendref
 		for _, backendRef := range rule.BackendRefs {
 			if !filtersAllAllowedType(backendRef.Filters) {
 				return false

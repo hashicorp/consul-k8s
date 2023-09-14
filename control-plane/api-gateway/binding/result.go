@@ -440,7 +440,7 @@ func (l listenerValidationResult) resolvedRefsConditions(generation int64) []met
 			Status:             metav1.ConditionTrue,
 			Reason:             "ResolvedRefs",
 			ObservedGeneration: generation,
-			Message:            "resolved certificate references",
+			Message:            "resolved references",
 			LastTransitionTime: now,
 		})
 	}
@@ -581,4 +581,90 @@ func (l gatewayValidationResult) Conditions(generation int64, listenersInvalid b
 		l.acceptedCondition(generation, listenersInvalid),
 		l.programmedCondition(generation),
 	}
+}
+
+type gatewayPolicyValidationResult struct {
+	acceptedErr      error
+	resolvedRefsErrs []error
+}
+
+type gatewayPolicyValidationResults []gatewayPolicyValidationResult
+
+var (
+	errPolicyListenerReferenceDoesNotExist     = errors.New("gateway policy references a listener that does not exist")
+	errPolicyJWTProvidersReferenceDoesNotExist = errors.New("gateway policy references one or more jwt providers that do not exist")
+	errNotAcceptedDueToInvalidRefs             = errors.New("policy is not accepted due to errors with references")
+)
+
+func (g gatewayPolicyValidationResults) Conditions(generation int64, idx int) []metav1.Condition {
+	result := g[idx]
+	return result.Conditions(generation)
+}
+
+func (g gatewayPolicyValidationResult) Conditions(generation int64) []metav1.Condition {
+
+	return append([]metav1.Condition{g.acceptedCondition(generation)}, g.resolvedRefsConditions(generation)...)
+}
+
+func (g gatewayPolicyValidationResult) acceptedCondition(generation int64) metav1.Condition {
+	now := timeFunc()
+	if g.acceptedErr != nil {
+		return metav1.Condition{
+			Type:               "Accepted",
+			Status:             metav1.ConditionFalse,
+			Reason:             "ReferencesNotValid",
+			ObservedGeneration: generation,
+			Message:            g.acceptedErr.Error(),
+			LastTransitionTime: now,
+		}
+	}
+	return metav1.Condition{
+		Type:               "Accepted",
+		Status:             metav1.ConditionTrue,
+		Reason:             "Accepted",
+		ObservedGeneration: generation,
+		Message:            "gateway policy accepted",
+		LastTransitionTime: now,
+	}
+}
+
+func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) []metav1.Condition {
+	now := timeFunc()
+	if len(g.resolvedRefsErrs) == 0 {
+		return []metav1.Condition{
+			{
+				Type:               "ResolvedRefs",
+				Status:             metav1.ConditionTrue,
+				Reason:             "ResolvedRefs",
+				ObservedGeneration: generation,
+				Message:            "resolved references",
+				LastTransitionTime: now,
+			},
+		}
+	}
+
+	conditions := make([]metav1.Condition, 0, len(g.resolvedRefsErrs))
+	for _, err := range g.resolvedRefsErrs {
+		switch {
+		case errors.Is(err, errPolicyListenerReferenceDoesNotExist):
+			conditions = append(conditions, metav1.Condition{
+				Type:               "ResolvedRefs",
+				Status:             metav1.ConditionFalse,
+				Reason:             "MissingListenerReference",
+				ObservedGeneration: generation,
+				Message:            err.Error(),
+				LastTransitionTime: now,
+			})
+		case errors.Is(err, errPolicyJWTProvidersReferenceDoesNotExist):
+			conditions = append(conditions, metav1.Condition{
+				Type:               "ResolvedRefs",
+				Status:             metav1.ConditionFalse,
+				Reason:             "MissingJWTProviderReference",
+				ObservedGeneration: generation,
+				Message:            err.Error(),
+				LastTransitionTime: now,
+			})
+		}
+	}
+	return conditions
 }
