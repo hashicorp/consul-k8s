@@ -43,6 +43,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/gateway-kind": "mesh-gateway"
         "consul.hashicorp.com/gateway-consul-service-name": "{{ .Values.meshGateway.consulServiceName }}"
         "consul.hashicorp.com/mesh-gateway-container-port": "{{ .Values.meshGateway.containerPort }}"

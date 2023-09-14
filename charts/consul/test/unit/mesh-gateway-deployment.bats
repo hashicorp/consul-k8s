@@ -44,7 +44,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | length' | tee /dev/stderr)
-  [ "${actual}" = "7" ]
+  [ "${actual}" = "8" ]
 }
 
 @test "meshGateway/Deployment: extra annotations can be set" {
@@ -57,7 +57,7 @@ load _helpers
 key2: value2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | length' | tee /dev/stderr)
-  [ "${actual}" = "9" ]
+  [ "${actual}" = "10" ]
 }
 
 #--------------------------------------------------------------------
@@ -1415,7 +1415,18 @@ key2: value2' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."consul.hashicorp.com/gateway-kind") | del(."consul.hashicorp.com/gateway-wan-address-source") | del(."consul.hashicorp.com/mesh-gateway-container-port") | del(."consul.hashicorp.com/gateway-wan-address-static") | del(."consul.hashicorp.com/gateway-wan-port") | del(."consul.hashicorp.com/gateway-consul-service-name")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."vault.hashicorp.com/agent-inject") |
+      del(."vault.hashicorp.com/role") |
+      del(."consul.hashicorp.com/gateway-kind") |
+      del(."consul.hashicorp.com/gateway-wan-address-source") |
+      del(."consul.hashicorp.com/mesh-gateway-container-port") |
+      del(."consul.hashicorp.com/gateway-wan-address-static") |
+      del(."consul.hashicorp.com/gateway-wan-port") |
+      del(."consul.hashicorp.com/gateway-consul-service-name")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
