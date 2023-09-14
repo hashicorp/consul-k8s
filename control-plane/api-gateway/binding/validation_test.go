@@ -1124,8 +1124,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			}}),
 			expected: gatewayPolicyValidationResults{
 				{
-					acceptedErr: nil,
-					resolvedRefsErrs: []error{	},
+					acceptedErr:      nil,
+					resolvedRefsErrs: []error{},
 				},
 			},
 		},
@@ -1492,6 +1492,82 @@ func TestValidateGatewayPolicies(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			require.EqualValues(t, tc.expected, validateGatewayPolicies(tc.gateway, tc.policies, tc.resources))
+		})
+	}
+}
+
+func TestValidateAuthFilters(t *testing.T) {
+	for name, tc := range map[string]struct {
+		authFilters []*v1alpha1.RouteAuthFilter
+		resources   *common.ResourceMap
+		expected    authFilterValidationResults
+	}{
+		"auth filter valid": {
+			authFilters: []*v1alpha1.RouteAuthFilter{
+				{
+					Spec: v1alpha1.RouteAuthFilterSpec{
+						JWT: &v1alpha1.GatewayJWTRequirement{
+							Providers: []*v1alpha1.GatewayJWTProvider{
+								{
+									Name: "okta",
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "okta",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "okta",
+					},
+				},
+			}}),
+			expected: authFilterValidationResults{authFilterValidationResult{}},
+		},
+		"auth filter references missing JWT Provider": {
+			authFilters: []*v1alpha1.RouteAuthFilter{
+				{
+					Spec: v1alpha1.RouteAuthFilterSpec{
+						JWT: &v1alpha1.GatewayJWTRequirement{
+							Providers: []*v1alpha1.GatewayJWTProvider{
+								{
+									Name: "auth0",
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "okta",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "okta",
+					},
+				},
+			}}),
+			expected: authFilterValidationResults{
+				authFilterValidationResult{
+					acceptedErr:    errNotAcceptedDueToInvalidRefs,
+					resolvedRefErr: fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "auth0"),
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, validateAuthFilters(tc.authFilters, tc.resources))
 		})
 	}
 }

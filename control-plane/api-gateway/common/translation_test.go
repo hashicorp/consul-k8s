@@ -29,9 +29,10 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 
+	"github.com/hashicorp/consul/api"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul/api"
 )
 
 type fakeReferenceValidator struct{}
@@ -1202,7 +1203,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								Filters:   api.HTTPFilters{Headers: []api.HTTPHeaderFilter{}},
 								ResponseFilters: api.HTTPResponseFilters{
 									Headers: []api.HTTPHeaderFilter{},
-								}},
+								},
+							},
 							{
 								Name:      "service one",
 								Namespace: "some ns",

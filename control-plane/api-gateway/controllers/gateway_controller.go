@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
+
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 
 	"github.com/go-logr/logr"
@@ -30,13 +31,14 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul/api"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/binding"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/gatekeeper"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul/api"
 )
 
 // GatewayControllerConfig holds the values necessary for configuring the GatewayController.
@@ -613,7 +615,6 @@ func (r *GatewayController) transformConsulHTTPRoute(ctx context.Context) func(e
 func (r *GatewayController) transformGatewayPolicy(ctx context.Context) func(object client.Object) []reconcile.Request {
 	return func(o client.Object) []reconcile.Request {
 		gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
-
 		gwNamespace := gatewayPolicy.Spec.TargetRef.Namespace
 		if gwNamespace == "" {
 			gwNamespace = gatewayPolicy.Namespace
@@ -932,7 +933,7 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 	for _, filter := range filters {
 		var externalFilter client.Object
 
-		//check to see if we need to grab this filter
+		// check to see if we need to grab this filter
 		if filter.ExtensionRef == nil {
 			continue
 		}
@@ -947,23 +948,22 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 			continue
 		}
 
-		//get object from API
+		// get object from API
 		err := c.Client.Get(ctx, client.ObjectKey{
 			Name:      string(filter.ExtensionRef.Name),
 			Namespace: route.Namespace,
 		}, externalFilter)
-
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				c.Log.Info(fmt.Sprintf("externalref %s:%s not found: %v", filter.ExtensionRef.Kind, filter.ExtensionRef.Name, err))
-				//ignore, the validation call should mark this route as error
+				// ignore, the validation call should mark this route as error
 				continue
 			} else {
 				return nil, err
 			}
 		}
 
-		//add external ref (or error) to resource map for this route
+		// add external ref (or error) to resource map for this route
 		resources.AddExternalFilter(externalFilter)
 		externalFilters = append(externalFilters, externalFilter)
 	}
@@ -979,7 +979,7 @@ func (c *GatewayController) getRelatedGatewayPolicies(ctx context.Context, gatew
 		return nil, err
 	}
 
-	//add all policies to the resourcemap
+	// add all policies to the resourcemap
 	for _, policy := range list.Items {
 		resources.AddGatewayPolicy(&policy)
 	}
@@ -1165,7 +1165,6 @@ func (c *GatewayController) fetchMeshService(ctx context.Context, resources *com
 }
 
 func (c *GatewayController) fetchServicesForEndpoints(ctx context.Context, resources *common.ResourceMap, key types.NamespacedName) error {
-
 	if shouldIgnore(key.Namespace, c.denyK8sNamespacesSet, c.allowK8sNamespacesSet) {
 		return nil
 	}

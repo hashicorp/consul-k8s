@@ -37,7 +37,7 @@ func TestResourceMap_JWTProvider(t *testing.T) {
 
 	resourceMap.AddJWTProvider(provider)
 
-	require.Len(t, resourceMap.jwtProviders,1 )
+	require.Len(t, resourceMap.jwtProviders, 1)
 	require.NotNil(t, resourceMap.jwtProviders[key])
 	require.Equal(t, resourceMap.jwtProviders[key], provider)
 }
