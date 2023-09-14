@@ -593,6 +593,7 @@ type gatewayPolicyValidationResults []gatewayPolicyValidationResult
 var (
 	errPolicyListenerReferenceDoesNotExist     = errors.New("gateway policy references a listener that does not exist")
 	errPolicyJWTProvidersReferenceDoesNotExist = errors.New("gateway policy references one or more jwt providers that do not exist")
+	errNotAcceptedDueToInvalidRefs             = errors.New("policy is not accepted due to errors with references")
 )
 
 

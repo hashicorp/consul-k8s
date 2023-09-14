@@ -4,7 +4,6 @@
 package binding
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -175,15 +174,15 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 
 		exists := listenerExistsForPolicy(gateway, policy)
 		if !exists {
-			result.resolvedRefsErrs = append(result.resolvedRefsErrs, fmt.Errorf("%w: gatewayName - %q, listenerName - %q", errPolicyListenerReferenceDoesNotExist, policy.Spec.TargetRef.Name, policy.Spec.TargetRef.SectionName))
+			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingListener(policy.Spec.TargetRef.Name, string(*policy.Spec.TargetRef.SectionName)))
 		}
 
-		missingJWTProviders := make([]string, 0)
+		missingJWTProviders := make(map[string]struct{})
 		if policy.Spec.Override != nil && policy.Spec.Override.JWT != nil {
 			for _, policyJWTProvider := range policy.Spec.Override.JWT.Providers {
 				_, jwtExists := resources.GetJWTProviderForGatewayJWTProvider(policyJWTProvider)
 				if !jwtExists {
-					missingJWTProviders = append(missingJWTProviders, policyJWTProvider.Name)
+					missingJWTProviders[policyJWTProvider.Name] = struct{}{}
 				}
 			}
 		}
@@ -192,18 +191,17 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 			for _, policyJWTProvider := range policy.Spec.Default.JWT.Providers {
 				_, jwtExists := resources.GetJWTProviderForGatewayJWTProvider(policyJWTProvider)
 				if !jwtExists {
-					missingJWTProviders = append(missingJWTProviders, policyJWTProvider.Name)
+					missingJWTProviders[policyJWTProvider.Name] = struct{}{}
 				}
 			}
 		}
 
 		if len(missingJWTProviders) > 0 {
-			names := strings.Join(missingJWTProviders, ",")
-			result.resolvedRefsErrs = append(result.resolvedRefsErrs, fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, names))
+			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingJWTProviders(missingJWTProviders))
 		}
 
 		if len(result.resolvedRefsErrs) > 0 {
-			result.acceptedErr = errors.New("policy is not accepted due to errors with references")
+			result.acceptedErr = errNotAcceptedDueToInvalidRefs
 		}
 		results = append(results, result)
 
@@ -214,6 +212,20 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 func listenerExistsForPolicy(gateway gwv1beta1.Gateway, policy v1alpha1.GatewayPolicy) bool {
 	return gateway.Name == policy.Spec.TargetRef.Name &&
 		slices.ContainsFunc(gateway.Spec.Listeners, func(l gwv1beta1.Listener) bool { return l.Name == *policy.Spec.TargetRef.SectionName })
+}
+
+func errorForMissingListener(name, listenerName string) error {
+	return fmt.Errorf("%w: gatewayName - %q, listenerName - %q", errPolicyListenerReferenceDoesNotExist, name, listenerName)
+}
+
+func errorForMissingJWTProviders(names map[string]struct{}) error {
+	namesList := make([]string, 0, len(names))
+	for name := range names {
+		namesList = append(namesList, name)
+	}
+	slices.Sort(namesList)
+	mergedNames := strings.Join(namesList, ",")
+	return fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, mergedNames)
 }
 
 // mergedListener associates a listener with its indexed position
