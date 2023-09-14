@@ -86,7 +86,7 @@ func TestReconcileCreateNamespace(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Create the pod controller.
+		// Create the namespace controller.
 		nc := &Controller{
 			Client:                     fakeClient,
 			Log:                        logrtest.New(t),
@@ -261,7 +261,7 @@ func TestReconcileDeleteNamespace(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Create the pod controller.
+		// Create the namespace controller.
 		nc := &Controller{
 			Client:                     fakeClient,
 			Log:                        logrtest.New(t),

@@ -54,7 +54,7 @@ type Controller struct {
 	Log logr.Logger
 }
 
-// Reconcile reads of Kubernetes Namespace and reconciles the mapped namespace in Consul.
+// Reconcile reads a Kubernetes Namespace and reconciles the mapped namespace in Consul.
 // TODO: Move the creation of a destination namespace to a dedicated, single-flight goroutine.
 func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var namespace corev1.Namespace
@@ -111,7 +111,7 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// consulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
+// getConsulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
 // depending on Consul Namespaces being enabled and the value of namespace mirroring.
 func (r *Controller) getConsulNamespace(kubeNamespace string) string {
 	ns := namespaces.ConsulNamespace(

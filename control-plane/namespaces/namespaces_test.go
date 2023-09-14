@@ -194,7 +194,7 @@ func TestEnsureDelete(tt *testing.T) {
 			err = EnsureDeleted(consulClient, name)
 			require.NoError(t, err)
 
-			// Ensure it was created.
+			// Ensure it was deleted.
 			cNS, _, err := consulClient.Namespaces().Read(name, nil)
 			require.NoError(t, err)
 			if cNS != nil && cNS.DeletedAt == nil {
