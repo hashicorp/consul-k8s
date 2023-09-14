@@ -212,7 +212,7 @@ spec:
                   message: Waiting for controller
                   reason: Pending
                   status: Unknown
-                  type: Programmed
+                  type: ResolvedRefs
                 description: "Conditions describe the current conditions of the Policy.
                   \n Known condition types are: \n * \"Accepted\" * \"ResolvedRefs\""
                 items:

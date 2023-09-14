@@ -250,7 +250,7 @@ func (b *Binder) Snapshot() *Snapshot {
 			var policyStatus v1alpha1.GatewayPolicyStatus
 
 			policyStatus.Conditions = policyValidation.Conditions(policy.Generation, idx)
-			// only mark the policy as needing a status update if there's a diff with it's old status
+			// only mark the policy as needing a status update if there's a diff with its old status
 			if !common.GatewayPolicyStatusesEqual(policyStatus, policy.Status) {
 				b.config.Policies[idx].Status = policyStatus
 				snapshot.Kubernetes.StatusUpdates.Add(&b.config.Policies[idx])

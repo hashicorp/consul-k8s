@@ -596,18 +596,14 @@ var (
 	errNotAcceptedDueToInvalidRefs             = errors.New("policy is not accepted due to errors with references")
 )
 
-
 func (g gatewayPolicyValidationResults) Conditions(generation int64, idx int) []metav1.Condition {
 	result := g[idx]
 	return result.Conditions(generation)
 }
 
 func (g gatewayPolicyValidationResult) Conditions(generation int64) []metav1.Condition {
-	conditions := make([]metav1.Condition, 0)
 
-	conditions = append(conditions, g.acceptedCondition(generation))
-	conditions = append(conditions, g.resolvedRefsConditions(generation)...)
-	return conditions
+	return append([]metav1.Condition{g.acceptedCondition(generation)}, g.resolvedRefsConditions(generation)...)
 }
 
 func (g gatewayPolicyValidationResult) acceptedCondition(generation int64) metav1.Condition {
@@ -672,4 +668,3 @@ func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) 
 	}
 	return conditions
 }
-
