@@ -564,49 +564,40 @@ func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.R
 	return true
 }
 
+func filterReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap, namespace string) bool {
+	if filter.Type == gwv1beta1.HTTPRouteFilterExtensionRef {
+		externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
+		if !ok {
+			return false
+		}
+		authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
+		if !ok {
+			return false
+		}
+
+		for _, provider := range authFilter.Spec.JWT.Providers {
+			_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
+			if !ok {
+				return true
+			}
+		}
+
+	}
+	return false
+}
+
 func authFilterReferencesMissingJWTProvider(httproute *gwv1beta1.HTTPRoute, resources *common.ResourceMap) bool {
 	for _, rule := range httproute.Spec.Rules {
 		for _, filter := range rule.Filters {
-			if filter.Type == gwv1beta1.HTTPRouteFilterExtensionRef {
-				externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, httproute.Namespace)
-				if !ok {
-					continue
-				}
-				authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
-				if !ok {
-					fmt.Printf("\n\nCouldn't assert the filter to auth filter: %s\n\n\n", externalFilter)
-					continue
-				}
-
-				for _, provider := range authFilter.Spec.JWT.Providers {
-					_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
-					if !ok {
-						return true
-					}
-				}
-
+			if filterReferencesMissingJWTProvider(filter, resources, httproute.Namespace) {
+				return true
 			}
 		}
 
 		for _, backendRef := range rule.BackendRefs {
 			for _, filter := range backendRef.Filters {
-				if filter.Type == gwv1beta1.HTTPRouteFilterExtensionRef {
-					externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, httproute.Namespace)
-					if !ok {
-						continue
-					}
-					authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
-					if !ok {
-						continue
-					}
-
-					for _, provider := range authFilter.Spec.JWT.Providers {
-						_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
-						if !ok {
-							return true
-						}
-					}
-
+				if filterReferencesMissingJWTProvider(filter, resources, httproute.Namespace) {
+					return true
 				}
 			}
 		}
