@@ -635,7 +635,15 @@ reservedNameTest() {
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/agent-pre-populate-only") | del(."vault.hashicorp.com/role") | del(."vault.hashicorp.com/agent-inject-secret-serverca.crt") | del(."vault.hashicorp.com/agent-inject-template-serverca.crt")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."vault.hashicorp.com/agent-inject") |
+      del(."vault.hashicorp.com/agent-pre-populate-only") |
+      del(."vault.hashicorp.com/role") |
+      del(."vault.hashicorp.com/agent-inject-secret-serverca.crt") |
+      del(."vault.hashicorp.com/agent-inject-template-serverca.crt")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 

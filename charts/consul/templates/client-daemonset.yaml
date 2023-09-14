@@ -86,6 +86,7 @@ spec:
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/client-config-configmap.yaml") . | sha256sum }}
         {{- if .Values.client.annotations }}
           {{- tpl .Values.client.annotations . | nindent 8 }}

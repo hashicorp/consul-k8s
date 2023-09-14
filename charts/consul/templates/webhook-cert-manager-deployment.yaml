@@ -36,6 +36,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/webhook-cert-manager-configmap.yaml") . | sha256sum }}
     spec:
       containers:

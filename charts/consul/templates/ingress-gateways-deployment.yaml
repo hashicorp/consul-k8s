@@ -74,6 +74,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/gateway-kind": "ingress-gateway"
         "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
         {{- if $root.Values.global.enableConsulNamespaces }}

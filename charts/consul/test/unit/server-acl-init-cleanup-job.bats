@@ -236,7 +236,11 @@ load _helpers
       -s templates/server-acl-init-cleanup-job.yaml \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
