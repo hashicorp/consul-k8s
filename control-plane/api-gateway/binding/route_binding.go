@@ -4,6 +4,9 @@
 package binding
 
 import (
+	"fmt"
+	"strings"
+
 	mapset "github.com/deckarep/golang-set"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -178,12 +181,12 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 				})
 			}
 
-			if authFilterReferencesMissingJWTProvider(httproute, r.config.Resources) {
+			if invalidFilterNames := authFilterReferencesMissingJWTProvider(httproute, r.config.Resources); len(invalidFilterNames) > 0 {
 				results = append(results, parentBindResult{
 					parent: ref,
 					results: []bindResult{
 						{
-							err: errReferencedJWTProviderMissing,
+							err: fmt.Errorf("%w: %s", errFilterInvalid, strings.Join(invalidFilterNames, ",")),
 						},
 					},
 				})

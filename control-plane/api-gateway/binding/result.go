@@ -36,7 +36,7 @@ var (
 	errRouteNoMatchingParent                = errors.New("no matching parent")
 	errInvalidExternalRefType               = errors.New("invalid externalref filter kind")
 	errExternalRefNotFound                  = errors.New("ref not found")
-	errReferencedJWTProviderMissing         = errors.New("externalRef references missing JWT provider")
+	errFilterInvalid         = errors.New("filter invalid")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
@@ -190,7 +190,7 @@ func (b bindResults) Condition() metav1.Condition {
 				reason = "NoMatchingParent"
 			case errors.Is(result.err, errExternalRefNotFound):
 				reason = "FilterNotFound"
-			case errors.Is(result.err, errReferencedJWTProviderMissing):
+			case errors.Is(result.err, errFilterInvalid):
 				reason = "JWTProviderNotFound"
 			case errors.Is(result.err, errInvalidExternalRefType):
 				reason = "UnsupportedValue"

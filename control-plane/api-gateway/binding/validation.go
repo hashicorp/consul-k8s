@@ -564,46 +564,49 @@ func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.R
 	return true
 }
 
-func filterReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap, namespace string) bool {
+func checkIfReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap, namespace string, invalidFilters map[string]struct{}) {
 	if filter.Type == gwv1beta1.HTTPRouteFilterExtensionRef {
 		externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
 		if !ok {
-			return false
+			return
 		}
 		authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
 		if !ok {
-			return false
+			return
 		}
 
 		for _, provider := range authFilter.Spec.JWT.Providers {
 			_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
 			if !ok {
-				return true
+				invalidFilters[fmt.Sprintf("%s/%s", authFilter.Name, namespace)] = struct{}{}
+				return
 			}
 		}
 
 	}
-	return false
 }
 
-func authFilterReferencesMissingJWTProvider(httproute *gwv1beta1.HTTPRoute, resources *common.ResourceMap) bool {
+func authFilterReferencesMissingJWTProvider(httproute *gwv1beta1.HTTPRoute, resources *common.ResourceMap) []string {
+	invalidFilters := make(map[string]struct{})
 	for _, rule := range httproute.Spec.Rules {
 		for _, filter := range rule.Filters {
-			if filterReferencesMissingJWTProvider(filter, resources, httproute.Namespace) {
-				return true
-			}
+			checkIfReferencesMissingJWTProvider(filter, resources, httproute.Namespace, invalidFilters)
 		}
 
 		for _, backendRef := range rule.BackendRefs {
 			for _, filter := range backendRef.Filters {
-				if filterReferencesMissingJWTProvider(filter, resources, httproute.Namespace) {
-					return true
-				}
+				checkIfReferencesMissingJWTProvider(filter, resources, httproute.Namespace, invalidFilters)
 			}
 		}
 	}
 
-	return false
+	invalidList := make([]string, 0, len(invalidFilters))
+
+	for name := range invalidFilters {
+		invalidList = append(invalidList, name)
+	}
+
+	return invalidList
 }
 
 // externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.
