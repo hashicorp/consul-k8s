@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -565,24 +566,24 @@ func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.R
 }
 
 func checkIfReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap, namespace string, invalidFilters map[string]struct{}) {
-	if filter.Type == gwv1beta1.HTTPRouteFilterExtensionRef {
-		externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
+	if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef {
+		return
+	}
+	externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
+	if !ok {
+		return
+	}
+	authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
+	if !ok {
+		return
+	}
+
+	for _, provider := range authFilter.Spec.JWT.Providers {
+		_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
 		if !ok {
+			invalidFilters[fmt.Sprintf("%s/%s",namespace,  authFilter.Name)] = struct{}{}
 			return
 		}
-		authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
-		if !ok {
-			return
-		}
-
-		for _, provider := range authFilter.Spec.JWT.Providers {
-			_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
-			if !ok {
-				invalidFilters[fmt.Sprintf("%s/%s", authFilter.Name, namespace)] = struct{}{}
-				return
-			}
-		}
-
 	}
 }
 
@@ -600,13 +601,7 @@ func authFilterReferencesMissingJWTProvider(httproute *gwv1beta1.HTTPRoute, reso
 		}
 	}
 
-	invalidList := make([]string, 0, len(invalidFilters))
-
-	for name := range invalidFilters {
-		invalidList = append(invalidList, name)
-	}
-
-	return invalidList
+	return maps.Keys(invalidFilters)
 }
 
 // externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.

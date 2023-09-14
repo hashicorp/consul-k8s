@@ -36,7 +36,7 @@ var (
 	errRouteNoMatchingParent                = errors.New("no matching parent")
 	errInvalidExternalRefType               = errors.New("invalid externalref filter kind")
 	errExternalRefNotFound                  = errors.New("ref not found")
-	errFilterInvalid         = errors.New("filter invalid")
+	errFilterInvalid                        = errors.New("filter invalid")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
