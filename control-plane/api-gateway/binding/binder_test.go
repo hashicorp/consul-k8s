@@ -256,7 +256,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 									Type:    "ResolvedRefs",
 									Status:  metav1.ConditionTrue,
 									Reason:  "ResolvedRefs",
-									Message: "resolved certificate references",
+									Message: "resolved references",
 								},
 							},
 						}},
