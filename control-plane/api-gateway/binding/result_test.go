@@ -187,3 +187,62 @@ func TestGatewayPolicyValidationResult_Conditions(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthFilterValidationResult_Conditions(t *testing.T) {
+	t.Parallel()
+	var generation int64 = 5
+	for name, tc := range map[string]struct {
+		results  authFilterValidationResult
+		expected []metav1.Condition
+	}{
+		"policy valid": {
+			results: authFilterValidationResult{},
+			expected: []metav1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             metav1.ConditionTrue,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "Accepted",
+					Message:            "route auth filter accepted",
+				},
+				{
+					Type:               "ResolvedRefs",
+					Status:             metav1.ConditionTrue,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "ResolvedRefs",
+					Message:            "resolved references",
+				},
+			},
+		},
+		"errors with JWT references": {
+			results: authFilterValidationResult{
+				acceptedErr:    errNotAcceptedDueToInvalidRefs,
+				resolvedRefErr: fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta"),
+			},
+			expected: []metav1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "ReferencesNotValid",
+					Message:            errNotAcceptedDueToInvalidRefs.Error(),
+				},
+				{
+					Type:               "ResolvedRefs",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "MissingJWTProviderReference",
+					Message:            fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta").Error(),
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.EqualValues(t, tc.expected, tc.results.Conditions(generation))
+		})
+	}
+}

@@ -564,6 +564,57 @@ func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.R
 	return true
 }
 
+func authFilterReferencesMissingJWTProvider(httproute *gwv1beta1.HTTPRoute, resources *common.ResourceMap) bool {
+	for _, rule := range httproute.Spec.Rules {
+		for _, filter := range rule.Filters {
+			if filter.Type == gwv1beta1.HTTPRouteFilterExtensionRef {
+				externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, httproute.Namespace)
+				if !ok {
+					continue
+				}
+				authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
+				if !ok {
+					fmt.Printf("\n\nCouldn't assert the filter to auth filter: %s\n\n\n", externalFilter)
+					continue
+				}
+
+				for _, provider := range authFilter.Spec.JWT.Providers {
+					_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
+					if !ok {
+						return true
+					}
+				}
+
+			}
+		}
+
+		for _, backendRef := range rule.BackendRefs {
+			for _, filter := range backendRef.Filters {
+				if filter.Type == gwv1beta1.HTTPRouteFilterExtensionRef {
+					externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, httproute.Namespace)
+					if !ok {
+						continue
+					}
+					authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
+					if !ok {
+						continue
+					}
+
+					for _, provider := range authFilter.Spec.JWT.Providers {
+						_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
+						if !ok {
+							return true
+						}
+					}
+
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 // externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.
 func externalRefsKindAllowedOnRoute(route *gwv1beta1.HTTPRoute) bool {
 	for _, rule := range route.Spec.Rules {
@@ -642,6 +693,35 @@ func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRout
 	}
 
 	return routeKindIsAllowedForListener(allowedRoutes.Kinds, gk)
+}
+
+func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *common.ResourceMap) authFilterValidationResults {
+	results := make(authFilterValidationResults, 0, len(authFilters))
+
+	for _, filter := range authFilters {
+		if filter == nil {
+			continue
+		}
+		var result authFilterValidationResult
+		missingJWTProviders := make([]string, 0)
+		for _, provider := range filter.Spec.JWT.Providers {
+			if _, ok := resources.GetJWTProviderForGatewayJWTProvider(provider); !ok {
+				missingJWTProviders = append(missingJWTProviders, provider.Name)
+			}
+		}
+
+		if len(missingJWTProviders) > 0 {
+			mergedNames := strings.Join(missingJWTProviders, ",")
+			result.resolvedRefErr = fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, mergedNames)
+		}
+
+		if result.resolvedRefErr != nil {
+			result.acceptedErr = errNotAcceptedDueToInvalidRefs
+		}
+
+		results = append(results, result)
+	}
+	return results
 }
 
 // toNamespaceSet constructs a list of labels used to match a Namespace.

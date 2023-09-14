@@ -36,6 +36,7 @@ var (
 	errRouteNoMatchingParent                = errors.New("no matching parent")
 	errInvalidExternalRefType               = errors.New("invalid externalref filter kind")
 	errExternalRefNotFound                  = errors.New("ref not found")
+	errReferencedJWTProviderMissing         = errors.New("externalRef references missing JWT provider")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
@@ -189,6 +190,8 @@ func (b bindResults) Condition() metav1.Condition {
 				reason = "NoMatchingParent"
 			case errors.Is(result.err, errExternalRefNotFound):
 				reason = "FilterNotFound"
+			case errors.Is(result.err, errReferencedJWTProviderMissing):
+				reason = "JWTProviderNotFound"
 			case errors.Is(result.err, errInvalidExternalRefType):
 				reason = "UnsupportedValue"
 			}
@@ -602,7 +605,6 @@ func (g gatewayPolicyValidationResults) Conditions(generation int64, idx int) []
 }
 
 func (g gatewayPolicyValidationResult) Conditions(generation int64) []metav1.Condition {
-
 	return append([]metav1.Condition{g.acceptedCondition(generation)}, g.resolvedRefsConditions(generation)...)
 }
 
@@ -667,4 +669,68 @@ func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) 
 		}
 	}
 	return conditions
+}
+
+type authFilterValidationResults []authFilterValidationResult
+
+type authFilterValidationResult struct {
+	acceptedErr    error
+	resolvedRefErr error
+}
+
+func (g authFilterValidationResults) Conditions(generation int64, idx int) []metav1.Condition {
+	result := g[idx]
+	return result.Conditions(generation)
+}
+
+func (g authFilterValidationResult) Conditions(generation int64) []metav1.Condition {
+	return []metav1.Condition{
+		g.acceptedCondition(generation),
+		g.resolvedRefsCondition(generation),
+	}
+}
+
+func (g authFilterValidationResult) acceptedCondition(generation int64) metav1.Condition {
+	now := timeFunc()
+	if g.acceptedErr != nil {
+		return metav1.Condition{
+			Type:               "Accepted",
+			Status:             metav1.ConditionFalse,
+			Reason:             "ReferencesNotValid",
+			ObservedGeneration: generation,
+			Message:            g.acceptedErr.Error(),
+			LastTransitionTime: now,
+		}
+	}
+	return metav1.Condition{
+		Type:               "Accepted",
+		Status:             metav1.ConditionTrue,
+		Reason:             "Accepted",
+		ObservedGeneration: generation,
+		Message:            "route auth filter accepted",
+		LastTransitionTime: now,
+	}
+}
+
+func (g authFilterValidationResult) resolvedRefsCondition(generation int64) metav1.Condition {
+	now := timeFunc()
+	if g.resolvedRefErr == nil {
+		return metav1.Condition{
+			Type:               "ResolvedRefs",
+			Status:             metav1.ConditionTrue,
+			Reason:             "ResolvedRefs",
+			ObservedGeneration: generation,
+			Message:            "resolved references",
+			LastTransitionTime: now,
+		}
+	}
+
+	return metav1.Condition{
+		Type:               "ResolvedRefs",
+		Status:             metav1.ConditionFalse,
+		Reason:             "MissingJWTProviderReference",
+		ObservedGeneration: generation,
+		Message:            g.resolvedRefErr.Error(),
+		LastTransitionTime: now,
+	}
 }

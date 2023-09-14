@@ -406,6 +406,16 @@ func (s *ResourceMap) ExternalFilterExists(filterRef gwv1beta1.LocalObjectRefere
 	return ok
 }
 
+func (s *ResourceMap) GetExternalAuthFilters() []*v1alpha1.RouteAuthFilter {
+	filters := make([]*v1alpha1.RouteAuthFilter, 0, len(s.externalFilters))
+	for _, filter := range s.externalFilters {
+		if authFilter, ok := filter.(*v1alpha1.RouteAuthFilter); ok {
+			filters = append(filters, authFilter)
+		}
+	}
+	return filters
+}
+
 func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v1alpha1.GatewayPolicy {
 	sectionName := ""
 	if gatewayPolicy.Spec.TargetRef.SectionName != nil {

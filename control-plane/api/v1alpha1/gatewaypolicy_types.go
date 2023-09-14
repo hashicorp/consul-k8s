@@ -116,7 +116,7 @@ type GatewayJWTClaimVerification struct {
 	Value string `json:"value"`
 }
 
-// GatewayPolicyStatus defines the observed state of the gateway
+// GatewayPolicyStatus defines the observed state of the gateway.
 type GatewayPolicyStatus struct {
 	// Conditions describe the current conditions of the Policy.
 	//
@@ -131,5 +131,5 @@ type GatewayPolicyStatus struct {
 	// +listMapKey=type
 	// +kubebuilder:validation:MaxItems=8
 	// +kubebuilder:default={{type: "Accepted", status: "Unknown", reason:"Pending", message:"Waiting for controller", lastTransitionTime: "1970-01-01T00:00:00Z"},{type: "ResolvedRefs", status: "Unknown", reason:"Pending", message:"Waiting for controller", lastTransitionTime: "1970-01-01T00:00:00Z"}}
-	Conditions []metav1.Condition `json:"conditions,omitemtpy"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

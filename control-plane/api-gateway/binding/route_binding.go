@@ -11,8 +11,9 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul/api"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
 
 // bindRoute contains the main logic for binding a route to a given gateway.
@@ -172,6 +173,17 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 					results: []bindResult{
 						{
 							err: errExternalRefNotFound,
+						},
+					},
+				})
+			}
+
+			if authFilterReferencesMissingJWTProvider(httproute, r.config.Resources) {
+				results = append(results, parentBindResult{
+					parent: ref,
+					results: []bindResult{
+						{
+							err: errReferencedJWTProviderMissing,
 						},
 					},
 				})

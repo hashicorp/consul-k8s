@@ -25,6 +25,10 @@ func GatewayPolicyStatusesEqual(a, b v1alpha1.GatewayPolicyStatus) bool {
 	return slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
 }
 
+func RouteAuthFilterStatusesEqual(a, b v1alpha1.RouteAuthFilterStatus) bool {
+	return slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
+}
+
 func gatewayStatusesAddressesEqual(a, b gwv1beta1.GatewayAddress) bool {
 	return BothNilOrEqual(a.Type, b.Type) &&
 		a.Value == b.Value

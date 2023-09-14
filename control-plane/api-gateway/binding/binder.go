@@ -123,7 +123,9 @@ func (b *Binder) Snapshot() *Snapshot {
 	var gatewayValidation gatewayValidationResult
 	var listenerValidation listenerValidationResults
 	var policyValidation gatewayPolicyValidationResults
+	var authFilterValidation authFilterValidationResults
 
+	authFilters := b.config.Resources.GetExternalAuthFilters()
 	if !isGatewayDeleted {
 		var updated bool
 
@@ -141,6 +143,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
 		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, b.config.GatewayClassConfig)
 		policyValidation = validateGatewayPolicies(b.config.Gateway, b.config.Policies, b.config.Resources)
+		authFilterValidation = validateAuthFilters(authFilters, b.config.Resources)
 	}
 
 	// used for tracking how many routes have successfully bound to which listeners
@@ -254,6 +257,23 @@ func (b *Binder) Snapshot() *Snapshot {
 			if !common.GatewayPolicyStatusesEqual(policyStatus, policy.Status) {
 				b.config.Policies[idx].Status = policyStatus
 				snapshot.Kubernetes.StatusUpdates.Add(&b.config.Policies[idx])
+			}
+		}
+
+		for idx, authFilter := range authFilters {
+			if authFilter == nil {
+				continue
+			}
+			authFilter := authFilter
+
+			var filterStatus v1alpha1.RouteAuthFilterStatus
+
+			filterStatus.Conditions = authFilterValidation.Conditions(authFilter.Generation, idx)
+
+			// only mark the filter as needing a status update if there's a diff with its old status
+			if !common.RouteAuthFilterStatusesEqual(filterStatus, authFilter.Status) {
+				authFilter.Status = filterStatus
+				snapshot.Kubernetes.StatusUpdates.Add(authFilter)
 			}
 		}
 	} else {
