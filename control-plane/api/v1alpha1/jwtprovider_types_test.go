@@ -64,6 +64,22 @@ func TestJWTProvider_MatchesConsul(t *testing.T) {
 									MaxInterval:  456,
 								},
 							},
+							JWKSCluster: &JWKSCluster{
+								DiscoveryType: "STRICT_DNS",
+								TLSCertificates: &JWKSTLSCertificate{
+									CaCertificateProviderInstance: &JWKSTLSCertProviderInstance{
+										InstanceName:    "InstanceName",
+										CertificateName: "ROOTCA",
+									},
+									TrustedCA: &JWKSTLSCertTrustedCA{
+										Filename:            "cert.crt",
+										EnvironmentVariable: "env-variable",
+										InlineString:        "inline-string",
+										InlineBytes:         []byte("inline-bytes"),
+									},
+								},
+								ConnectTimeout: 890,
+							},
 						},
 					},
 					Issuer:    "test-issuer",
@@ -117,6 +133,22 @@ func TestJWTProvider_MatchesConsul(t *testing.T) {
 								BaseInterval: 23,
 								MaxInterval:  456,
 							},
+						},
+						JWKSCluster: &capi.JWKSCluster{
+							DiscoveryType: "STRICT_DNS",
+							TLSCertificates: &capi.JWKSTLSCertificate{
+								CaCertificateProviderInstance: &capi.JWKSTLSCertProviderInstance{
+									InstanceName:    "InstanceName",
+									CertificateName: "ROOTCA",
+								},
+								TrustedCA: &capi.JWKSTLSCertTrustedCA{
+									Filename:            "cert.crt",
+									EnvironmentVariable: "env-variable",
+									InlineString:        "inline-string",
+									InlineBytes:         []byte("inline-bytes"),
+								},
+							},
+							ConnectTimeout: 890,
 						},
 					},
 				},
@@ -215,6 +247,22 @@ func TestJWTProvider_ToConsul(t *testing.T) {
 									MaxInterval:  456,
 								},
 							},
+							JWKSCluster: &JWKSCluster{
+								DiscoveryType: "STRICT_DNS",
+								TLSCertificates: &JWKSTLSCertificate{
+									CaCertificateProviderInstance: &JWKSTLSCertProviderInstance{
+										InstanceName:    "InstanceName",
+										CertificateName: "ROOTCA",
+									},
+									TrustedCA: &JWKSTLSCertTrustedCA{
+										Filename:            "cert.crt",
+										EnvironmentVariable: "env-variable",
+										InlineString:        "inline-string",
+										InlineBytes:         []byte("inline-bytes"),
+									},
+								},
+								ConnectTimeout: 890,
+							},
 						},
 					},
 					Issuer:    "test-issuer",
@@ -267,6 +315,22 @@ func TestJWTProvider_ToConsul(t *testing.T) {
 								BaseInterval: 23,
 								MaxInterval:  456,
 							},
+						},
+						JWKSCluster: &capi.JWKSCluster{
+							DiscoveryType: "STRICT_DNS",
+							TLSCertificates: &capi.JWKSTLSCertificate{
+								CaCertificateProviderInstance: &capi.JWKSTLSCertProviderInstance{
+									InstanceName:    "InstanceName",
+									CertificateName: "ROOTCA",
+								},
+								TrustedCA: &capi.JWKSTLSCertTrustedCA{
+									Filename:            "cert.crt",
+									EnvironmentVariable: "env-variable",
+									InlineString:        "inline-string",
+									InlineBytes:         []byte("inline-bytes"),
+								},
+							},
+							ConnectTimeout: 890,
 						},
 					},
 				},
@@ -366,7 +430,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 			expectedErrMsgs: nil,
 		},
 
-		"valid - remote jwks with all fields": {
+		"valid - remote jwks with all fields with trustedCa": {
 			input: &JWTProvider{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-jwt-provider",
@@ -384,6 +448,80 @@ func TestJWTProvider_Validate(t *testing.T) {
 									BaseInterval: 5 * time.Second,
 									MaxInterval:  20 * time.Second,
 								},
+							},
+							JWKSCluster: &JWKSCluster{
+								DiscoveryType: "STRICT_DNS",
+								TLSCertificates: &JWKSTLSCertificate{
+									TrustedCA: &JWKSTLSCertTrustedCA{
+										Filename: "cert.crt",
+									},
+								},
+								ConnectTimeout: 890,
+							},
+						},
+					},
+					Issuer:    "test-issuer",
+					Audiences: []string{"aud1", "aud2"},
+					Locations: []*JWTLocation{
+						{
+							Header: &JWTLocationHeader{
+								Name:        "Authorization",
+								ValuePrefix: "Bearer",
+								Forward:     true,
+							},
+						},
+						{
+							QueryParam: &JWTLocationQueryParam{
+								Name: "access-token",
+							},
+						},
+						{
+							Cookie: &JWTLocationCookie{
+								Name: "session-id",
+							},
+						},
+					},
+					Forwarding: &JWTForwardingConfig{
+						HeaderName:              "jwt-forward-header",
+						PadForwardPayloadHeader: true,
+					},
+					ClockSkewSeconds: 20,
+					CacheConfig: &JWTCacheConfig{
+						Size: 30,
+					},
+				},
+			},
+			expectedErrMsgs: nil,
+		},
+
+		"valid - remote jwks with all fields with CaCertificateProviderInstance": {
+			input: &JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-jwt-provider",
+				},
+				Spec: JWTProviderSpec{
+					JSONWebKeySet: &JSONWebKeySet{
+						Remote: &RemoteJWKS{
+							URI:                 "https://jwks.example.com",
+							RequestTimeoutMs:    5000,
+							CacheDuration:       10 * time.Second,
+							FetchAsynchronously: true,
+							RetryPolicy: &JWKSRetryPolicy{
+								NumRetries: 3,
+								RetryPolicyBackOff: &RetryPolicyBackOff{
+									BaseInterval: 5 * time.Second,
+									MaxInterval:  20 * time.Second,
+								},
+							},
+							JWKSCluster: &JWKSCluster{
+								DiscoveryType: "STRICT_DNS",
+								TLSCertificates: &JWKSTLSCertificate{
+									CaCertificateProviderInstance: &JWKSTLSCertProviderInstance{
+										InstanceName:    "InstanceName",
+										CertificateName: "ROOTCA",
+									},
+								},
+								ConnectTimeout: 890,
 							},
 						},
 					},
@@ -519,6 +657,119 @@ func TestJWTProvider_Validate(t *testing.T) {
 			},
 			expectedErrMsgs: []string{
 				`jwtprovider.consul.hashicorp.com "test-jwks-invalid-uri" is invalid: spec.jsonWebKeySet.remote.uri: Invalid value: "invalid-uri": remote JWKS URI is invalid`,
+			},
+		},
+
+		"invalid - remote jwks invalid jwkcluster - all TLSCertificates fields set": {
+			input: &JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-jwks-invalid-uri",
+				},
+				Spec: JWTProviderSpec{
+					JSONWebKeySet: &JSONWebKeySet{
+						Remote: &RemoteJWKS{
+							URI: "https://jwks.example.com",
+							JWKSCluster: &JWKSCluster{
+								DiscoveryType: "STRICT_DNS",
+								TLSCertificates: &JWKSTLSCertificate{
+									CaCertificateProviderInstance: &JWKSTLSCertProviderInstance{
+										InstanceName: "InstanceName",
+									},
+									TrustedCA: &JWKSTLSCertTrustedCA{
+										Filename: "cert.crt",
+									},
+								},
+								ConnectTimeout: 890,
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`jwtprovider.consul.hashicorp.com "test-jwks-invalid-uri" is invalid: spec.jsonWebKeySet.remote.jwksCluster.tlsCertificates: Invalid value:`,
+				`exactly one of 'trustedCa' or 'caCertificateProviderInstance' is required`,
+			},
+		},
+
+		"invalid - remote jwks invalid jwkcluster - invalid discovery type": {
+			input: &JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-jwks-invalid-uri",
+				},
+				Spec: JWTProviderSpec{
+					JSONWebKeySet: &JSONWebKeySet{
+						Remote: &RemoteJWKS{
+							URI: "https://jwks.example.com",
+							JWKSCluster: &JWKSCluster{
+								DiscoveryType:  "FAKE_DNS",
+								ConnectTimeout: 890,
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`jwtprovider.consul.hashicorp.com "test-jwks-invalid-uri" is invalid: spec.jsonWebKeySet.remote.jwksCluster.discoveryType: Invalid value: "FAKE_DNS": unsupported jwks cluster discovery type.`,
+			},
+		},
+
+		"invalid - remote jwks invalid jwkcluster - all trustedCa fields set": {
+			input: &JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-jwks-invalid-uri",
+				},
+				Spec: JWTProviderSpec{
+					JSONWebKeySet: &JSONWebKeySet{
+						Remote: &RemoteJWKS{
+							URI: "https://jwks.example.com",
+							JWKSCluster: &JWKSCluster{
+								DiscoveryType: "STRICT_DNS",
+								TLSCertificates: &JWKSTLSCertificate{
+									TrustedCA: &JWKSTLSCertTrustedCA{
+										Filename:            "cert.crt",
+										EnvironmentVariable: "env-variable",
+										InlineString:        "inline-string",
+										InlineBytes:         []byte("inline-bytes"),
+									},
+								},
+								ConnectTimeout: 890,
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`jwtprovider.consul.hashicorp.com "test-jwks-invalid-uri" is invalid: spec.jsonWebKeySet.remote.jwksCluster.tlsCertificates.trustedCa: Invalid value:`,
+				`exactly one of 'filename', 'environmentVariable', 'inlineString' or 'inlineBytes' is required`,
+			},
+		},
+
+		"invalid - remote jwks invalid jwkcluster - set 2 trustedCa fields": {
+			input: &JWTProvider{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-jwks-invalid-uri",
+				},
+				Spec: JWTProviderSpec{
+					JSONWebKeySet: &JSONWebKeySet{
+						Remote: &RemoteJWKS{
+							URI: "https://jwks.example.com",
+							JWKSCluster: &JWKSCluster{
+								DiscoveryType: "STRICT_DNS",
+								TLSCertificates: &JWKSTLSCertificate{
+									TrustedCA: &JWKSTLSCertTrustedCA{
+										Filename:            "cert.crt",
+										EnvironmentVariable: "env-variable",
+									},
+								},
+								ConnectTimeout: 890,
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`jwtprovider.consul.hashicorp.com "test-jwks-invalid-uri" is invalid: spec.jsonWebKeySet.remote.jwksCluster.tlsCertificates.trustedCa: Invalid value:`,
+				`exactly one of 'filename', 'environmentVariable', 'inlineString' or 'inlineBytes' is required`,
 			},
 		},
 

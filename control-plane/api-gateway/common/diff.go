@@ -148,11 +148,8 @@ func (e entryComparator) httpRoutesEqual(a, b api.HTTPRouteConfigEntry) bool {
 func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 	return slices.EqualFunc(a.Filters.Headers, b.Filters.Headers, e.httpHeaderFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.URLRewrite, b.Filters.URLRewrite, e.urlRewritesEqual) &&
-		slices.EqualFunc(a.ResponseFilters.Headers, b.ResponseFilters.Headers, e.httpHeaderFiltersEqual) &&
 		slices.EqualFunc(a.Matches, b.Matches, e.httpMatchesEqual) &&
-		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual) &&
-		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual)
+		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual)
 }
 
 func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
@@ -161,8 +158,7 @@ func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
 		orDefault(a.Namespace, e.namespaceA) == orDefault(b.Namespace, e.namespaceB) &&
 		orDefault(a.Partition, e.partitionA) == orDefault(b.Partition, e.partitionB) &&
 		slices.EqualFunc(a.Filters.Headers, b.Filters.Headers, e.httpHeaderFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.URLRewrite, b.Filters.URLRewrite, e.urlRewritesEqual) &&
-		slices.EqualFunc(a.ResponseFilters.Headers, b.ResponseFilters.Headers, e.httpHeaderFiltersEqual)
+		bothNilOrEqualFunc(a.Filters.URLRewrite, b.Filters.URLRewrite, e.urlRewritesEqual)
 }
 
 func (e entryComparator) httpMatchesEqual(a, b api.HTTPMatch) bool {
@@ -192,15 +188,6 @@ func (e entryComparator) httpHeaderFiltersEqual(a, b api.HTTPHeaderFilter) bool 
 
 func (e entryComparator) urlRewritesEqual(a, b api.URLRewrite) bool {
 	return a.Path == b.Path
-}
-
-func (e entryComparator) retryFiltersEqual(a, b api.RetryFilter) bool {
-	return BothNilOrEqual(a.NumRetries, b.NumRetries) && BothNilOrEqual(a.RetryOnConnectFailure, b.RetryOnConnectFailure) &&
-		slices.Equal(a.RetryOn, b.RetryOn) && slices.Equal(a.RetryOnStatusCodes, b.RetryOnStatusCodes)
-}
-
-func (e entryComparator) timeoutFiltersEqual(a, b api.TimeoutFilter) bool {
-	return a.RequestTimeout == b.RequestTimeout && a.IdleTimeout == b.IdleTimeout
 }
 
 func tcpRoutesEqual(a, b *api.TCPRouteConfigEntry) bool {

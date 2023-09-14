@@ -25,6 +25,7 @@ var errRefNotPermitted = errors.New("reference not permitted due to lack of Refe
 
 var (
 	// Each of the below are specified in the Gateway spec under RouteConditionReason
+	// the general usage is that each error is specified as errRoute* where * corresponds
 	// to the RouteConditionReason given in the spec. If a reason is overloaded and can
 	// be used with two different types of things (i.e. something is not found or it's not supported)
 	// then we distinguish those two usages with errRoute*_Usage.
@@ -34,8 +35,6 @@ var (
 	errRouteInvalidKind                     = errors.New("invalid backend kind")
 	errRouteBackendNotFound                 = errors.New("backend not found")
 	errRouteNoMatchingParent                = errors.New("no matching parent")
-	errInvalidExternalRefType               = errors.New("invalid externalref filter kind")
-	errExternalRefNotFound                  = errors.New("ref not found")
 )
 
 // routeValidationResult holds the result of validating a route globally, in other
@@ -177,20 +176,16 @@ func (b bindResults) Condition() metav1.Condition {
 	// if we only have a single binding error, we can get more specific
 	if len(b) == 1 {
 		for _, result := range b {
-			switch {
-			case errors.Is(result.err, errRouteNoMatchingListenerHostname):
+			switch result.err {
+			case errRouteNoMatchingListenerHostname:
 				// if we have a hostname mismatch error, then use the more specific reason
 				reason = "NoMatchingListenerHostname"
-			case errors.Is(result.err, errRefNotPermitted):
+			case errRefNotPermitted:
 				// or if we have a ref not permitted, then use that
 				reason = "RefNotPermitted"
-			case errors.Is(result.err, errRouteNoMatchingParent):
+			case errRouteNoMatchingParent:
 				// or if the route declares a parent that we can't find
 				reason = "NoMatchingParent"
-			case errors.Is(result.err, errExternalRefNotFound):
-				reason = "FilterNotFound"
-			case errors.Is(result.err, errInvalidExternalRefType):
-				reason = "UnsupportedValue"
 			}
 		}
 	}

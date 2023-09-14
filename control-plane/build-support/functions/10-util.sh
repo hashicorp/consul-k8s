@@ -733,7 +733,11 @@ function set_changelog {
 		rel_date="$3"
 	fi
 	local last_release_date_git_tag=$4
-        local preReleaseVersion="-$5"
+
+  local preReleaseVersion
+	if test -n "$5"; then
+    local preReleaseVersion="-$5"
+  fi
 
 	if test -z "${version}"; then
 		err "ERROR: Must specify a version to put into the changelog"

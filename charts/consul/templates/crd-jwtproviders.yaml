@@ -123,6 +123,66 @@ spec:
                           the proxy listener will wait for the JWKS to be fetched
                           before being activated. \n Default value is false."
                         type: boolean
+                      jwksCluster:
+                        description: "JWKSCluster defines how the specified Remote JWKS
+                          URI is to be fetched."
+                        properties:
+                          connectTimeout:
+                            description: "The timeout for new network connections to hosts
+                              in the cluster. \n If not set, a default value of 5s will be
+                              used."
+                            format: int64
+                            type: integer
+                          discoveryType:
+                            description: "DiscoveryType refers to the service discovery type
+                              to use for resolving the cluster. \n Defaults to STRICT_DNS."
+                            type: string
+                          tlsCertificates:
+                            description: "TLSCertificates refers to the data containing
+                              certificate authority certificates to use in verifying a presented
+                              peer certificate."
+                            properties:
+                              caCertificateProviderInstance:
+                                description: "CaCertificateProviderInstance Certificate provider
+                                  instance for fetching TLS certificates."
+                                properties:
+                                  instanceName:
+                                    description: "InstanceName refers to the certificate provider
+                                      instance name. \n The default value is 'default'."
+                                    type: string
+                                  certificateName:
+                                    description: "CertificateName is used to specify certificate 
+                                      instances or types. For example, \"ROOTCA\" to specify a 
+                                      root-certificate (validation context) or \"example.com\" 
+                                      to specify a certificate for a particular domain. \n 
+                                      The default value is the empty string."
+                                    type: string
+                                type: object
+                              trustedCA:
+                                description: "TrustedCA defines TLS certificate data containing
+                                  certificate authority certificates to use in verifying a presented
+                                  peer certificate. \n Exactly one of Filename, EnvironmentVariable, 
+                                  InlineString or InlineBytes must be specified."
+                                properties:
+                                  filename:
+                                    description: "The name of the file on the local system to use a
+                                      data source for trusted CA certificates."
+                                    type: string
+                                  environmentVariable:
+                                    description: "The environment variable on the local system to use
+                                      a data source for trusted CA certificates."
+                                    type: string
+                                  inlineString: 
+                                    description: "A string to inline in the configuration for use as 
+                                      a data source for trusted CA certificates."
+                                    type: string
+                                  inlineBytes:
+                                    description: "A sequence of bytes to inline in the configuration 
+                                      for use as a data source for trusted CA certificates."
+                                    type: string
+                                type: object
+                            type: object
+                        type: object
                       requestTimeoutMs:
                         description: RequestTimeoutMs is the number of milliseconds
                           to time out when making a request for the JWKS.

@@ -151,7 +151,7 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 		return t.translateHTTPRouteRule(route, rule, resources)
 	})
 
-	configEntry := api.HTTPRouteConfigEntry{
+	return &api.HTTPRouteConfigEntry{
 		Kind:      api.HTTPRoute,
 		Name:      route.Name,
 		Namespace: namespace,
@@ -163,13 +163,10 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 		Hostnames: hostnames,
 		Rules:     rules,
 	}
-
-	return &configEntry
 }
 
 func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
 	services := ConvertSliceFuncIf(rule.BackendRefs, func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
-
 		return t.translateHTTPBackendRef(route, ref, resources)
 	})
 
@@ -178,13 +175,12 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 	}
 
 	matches := ConvertSliceFunc(rule.Matches, t.translateHTTPMatch)
-	filters, responseFilters := t.translateHTTPFilters(rule.Filters, resources, route.Namespace)
+	filters := t.translateHTTPFilters(rule.Filters)
 
 	return api.HTTPRouteRule{
-		Filters:         filters,
-		Matches:         matches,
-		ResponseFilters: responseFilters,
-		Services:        services,
+		Services: services,
+		Matches:  matches,
+		Filters:  filters,
 	}, true
 }
 
@@ -197,30 +193,29 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
 
 	if isServiceRef && resources.HasService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters := t.translateHTTPFilters(ref.Filters)
 		service := resources.Service(id)
+
 		return api.HTTPService{
-			Name:            service.Name,
-			Namespace:       service.Namespace,
-			Partition:       t.ConsulPartition,
-			Filters:         filters,
-			ResponseFilters: responseFilters,
-			Weight:          DerefIntOr(ref.Weight, 1),
+			Name:      service.Name,
+			Namespace: service.Namespace,
+			Partition: t.ConsulPartition,
+			Filters:   filters,
+			Weight:    DerefIntOr(ref.Weight, 1),
 		}, true
 	}
 
 	isMeshServiceRef := DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && DerefEqual(ref.Kind, v1alpha1.MeshServiceKind)
 	if isMeshServiceRef && resources.HasMeshService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters := t.translateHTTPFilters(ref.Filters)
 		service := resources.MeshService(id)
 
 		return api.HTTPService{
-			Name:            service.Name,
-			Namespace:       service.Namespace,
-			Partition:       t.ConsulPartition,
-			Filters:         filters,
-			ResponseFilters: responseFilters,
-			Weight:          DerefIntOr(ref.Weight, 1),
+			Name:      service.Name,
+			Namespace: service.Namespace,
+			Partition: t.ConsulPartition,
+			Filters:   filters,
+			Weight:    DerefIntOr(ref.Weight, 1),
 		}, true
 	}
 
@@ -278,61 +273,24 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 	}
 }
 
-func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters) {
-	var (
-		urlRewrite            *api.URLRewrite
-		retryFilter           *api.RetryFilter
-		timeoutFilter         *api.TimeoutFilter
-		requestHeaderFilters  = []api.HTTPHeaderFilter{}
-		responseHeaderFilters = []api.HTTPHeaderFilter{}
-	)
+func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter) api.HTTPFilters {
+	var urlRewrite *api.URLRewrite
+	consulFilter := api.HTTPHeaderFilter{
+		Add: make(map[string]string),
+		Set: make(map[string]string),
+	}
 
-	// Convert Gateway API filters to portions of the Consul request and response filters.
-	// Multiple filters applying the same or conflicting operations are allowed but may
-	// result in unexpected behavior.
 	for _, filter := range filters {
 		if filter.RequestHeaderModifier != nil {
-			newFilter := api.HTTPHeaderFilter{}
+			consulFilter.Remove = append(consulFilter.Remove, filter.RequestHeaderModifier.Remove...)
 
-			newFilter.Remove = append(newFilter.Remove, filter.RequestHeaderModifier.Remove...)
-
-			if len(filter.RequestHeaderModifier.Add) > 0 {
-				newFilter.Add = map[string]string{}
-				for _, toAdd := range filter.RequestHeaderModifier.Add {
-					newFilter.Add[string(toAdd.Name)] = toAdd.Value
-				}
+			for _, toAdd := range filter.RequestHeaderModifier.Add {
+				consulFilter.Add[string(toAdd.Name)] = toAdd.Value
 			}
 
-			if len(filter.RequestHeaderModifier.Set) > 0 {
-				newFilter.Set = map[string]string{}
-				for _, toSet := range filter.RequestHeaderModifier.Set {
-					newFilter.Set[string(toSet.Name)] = toSet.Value
-				}
+			for _, toSet := range filter.RequestHeaderModifier.Set {
+				consulFilter.Set[string(toSet.Name)] = toSet.Value
 			}
-
-			requestHeaderFilters = append(requestHeaderFilters, newFilter)
-		}
-
-		if filter.ResponseHeaderModifier != nil {
-			newFilter := api.HTTPHeaderFilter{}
-
-			newFilter.Remove = append(newFilter.Remove, filter.ResponseHeaderModifier.Remove...)
-
-			if len(filter.ResponseHeaderModifier.Add) > 0 {
-				newFilter.Add = map[string]string{}
-				for _, toAdd := range filter.ResponseHeaderModifier.Add {
-					newFilter.Add[string(toAdd.Name)] = toAdd.Value
-				}
-			}
-
-			if len(filter.ResponseHeaderModifier.Set) > 0 {
-				newFilter.Set = map[string]string{}
-				for _, toSet := range filter.ResponseHeaderModifier.Set {
-					newFilter.Set[string(toSet.Name)] = toSet.Value
-				}
-			}
-
-			responseHeaderFilters = append(responseHeaderFilters, newFilter)
 		}
 
 		// we drop any path rewrites that are not prefix matches as we don't support those
@@ -341,54 +299,11 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 			filter.URLRewrite.Path.Type == gwv1beta1.PrefixMatchHTTPPathModifier {
 			urlRewrite = &api.URLRewrite{Path: DerefStringOr(filter.URLRewrite.Path.ReplacePrefixMatch, "")}
 		}
-
-		if filter.ExtensionRef != nil {
-			//get crd from resources map
-			crdFilter, exists := resourceMap.GetExternalFilter(*filter.ExtensionRef, namespace)
-			if !exists {
-				// this should never be the case because we only translate a route if it's actually valid, and if we're missing filters during the validation step, then we won't get here
-				continue
-			}
-			switch filter.ExtensionRef.Kind {
-			case v1alpha1.RouteRetryFilterKind:
-
-				retryFilterCRD := crdFilter.(*v1alpha1.RouteRetryFilter)
-				//new filter that needs to be appended
-
-				retryFilter = &api.RetryFilter{
-					NumRetries:            retryFilterCRD.Spec.NumRetries,
-					RetryOn:               retryFilterCRD.Spec.RetryOn,
-					RetryOnStatusCodes:    retryFilterCRD.Spec.RetryOnStatusCodes,
-					RetryOnConnectFailure: retryFilterCRD.Spec.RetryOnConnectFailure,
-				}
-
-			case v1alpha1.RouteTimeoutFilterKind:
-
-				timeoutFilterCRD := crdFilter.(*v1alpha1.RouteTimeoutFilter)
-				//new filter that needs to be appended
-
-				timeoutFilter = &api.TimeoutFilter{
-					RequestTimeout: timeoutFilterCRD.Spec.RequestTimeout,
-					IdleTimeout:    timeoutFilterCRD.Spec.IdleTimeout,
-				}
-
-			}
-		}
-
 	}
-
-	requestFilter := api.HTTPFilters{
-		Headers:       requestHeaderFilters,
-		URLRewrite:    urlRewrite,
-		RetryFilter:   retryFilter,
-		TimeoutFilter: timeoutFilter,
+	return api.HTTPFilters{
+		Headers:    []api.HTTPHeaderFilter{consulFilter},
+		URLRewrite: urlRewrite,
 	}
-
-	responseFilter := api.HTTPResponseFilters{
-		Headers: responseHeaderFilters,
-	}
-
-	return requestFilter, responseFilter
 }
 
 func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *ResourceMap) *api.TCPRouteConfigEntry {

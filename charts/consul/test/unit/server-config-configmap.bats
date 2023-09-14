@@ -1258,26 +1258,26 @@ load _helpers
       --set 'server.auditLogs.sinks[2].format=json' \
       --set 'server.auditLogs.sinks[2].delivery_guarantee=best-effort' \
       --set 'server.auditLogs.sinks[2].rotate_max_files=20' \
-      --set 'server.auditLogs.sinks[2].rotate_duration=18h' \
       --set 'server.auditLogs.sinks[2].rotate_bytes=12445' \
+      --set 'server.auditLogs.sinks[2].rotate_duration=18h' \
       --set 'server.auditLogs.sinks[2].path=/tmp/audit-3.json' \
       . | tee /dev/stderr |
       yq -r '.data["audit-logging.json"]' | tee /dev/stderr)
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink1.path | tee /dev/stderr)
   [ "${actual}" = "/tmp/audit.json" ]
-  
+
   local actual=$(echo $object |  jq -r .audit.sink.MySink3.path | tee /dev/stderr)
   [ "${actual}" = "/tmp/audit-3.json" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 15 ]
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink2.path | tee /dev/stderr)
   [ "${actual}" = "/tmp/audit-2.json" ]
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink1.name | tee /dev/stderr)
   [ "${actual}" = "null" ]
-
-  local actual=$(echo $object |  jq -r .audit.sink.MySink1.rotate_max_files | tee /dev/stderr)
-  [ ${actual} = 15 ]
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink3.delivery_guarantee | tee /dev/stderr)
   [ "${actual}" = "best-effort" ]

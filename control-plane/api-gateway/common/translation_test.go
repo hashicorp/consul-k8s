@@ -10,9 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"k8s.io/utils/pointer"
 	"math/big"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 	"testing"
 	"time"
@@ -356,12 +354,10 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 func TestTranslator_ToHTTPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		k8sHTTPRoute    gwv1beta1.HTTPRoute
-		services        []types.NamespacedName
-		meshServices    []v1alpha1.MeshService
-		externalFilters []client.Object
+		k8sHTTPRoute gwv1beta1.HTTPRoute
+		services     []types.NamespacedName
+		meshServices []v1alpha1.MeshService
 	}
-
 	tests := map[string]struct {
 		args args
 		want api.HTTPRouteConfigEntry
@@ -511,7 +507,6 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							},
 							URLRewrite: &api.URLRewrite{Path: "v1"},
 						},
-						ResponseFilters: api.HTTPResponseFilters{Headers: []api.HTTPHeaderFilter{}},
 						Matches: []api.HTTPMatch{
 							{
 								Headers: []api.HTTPHeaderMatch{
@@ -537,8 +532,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 						},
 						Services: []api.HTTPService{
 							{
-								Name:      "service one",
-								Namespace: "other",
+								Name:   "service one",
+								Weight: 45,
 								Filters: api.HTTPFilters{
 									Headers: []api.HTTPHeaderFilter{
 										{
@@ -556,8 +551,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Path: "path",
 									},
 								},
-								ResponseFilters: api.HTTPResponseFilters{Headers: []api.HTTPHeaderFilter{}},
-								Weight:          45,
+								Namespace: "other",
 							},
 						},
 					},
@@ -717,9 +711,6 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								},
 							},
 						},
-						ResponseFilters: api.HTTPResponseFilters{
-							Headers: []api.HTTPHeaderFilter{},
-						},
 						Matches: []api.HTTPMatch{
 							{
 								Headers: []api.HTTPHeaderMatch{
@@ -745,8 +736,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 						},
 						Services: []api.HTTPService{
 							{
-								Name:      "service one",
-								Namespace: "some ns",
+								Name:   "service one",
+								Weight: 45,
 								Filters: api.HTTPFilters{
 									Headers: []api.HTTPHeaderFilter{
 										{
@@ -764,10 +755,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Path: "path",
 									},
 								},
-								ResponseFilters: api.HTTPResponseFilters{
-									Headers: []api.HTTPHeaderFilter{},
-								},
-								Weight: 45,
+								Namespace: "some ns",
 							},
 						},
 					},
@@ -935,9 +923,6 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							},
 							URLRewrite: &api.URLRewrite{Path: "v1"},
 						},
-						ResponseFilters: api.HTTPResponseFilters{
-							Headers: []api.HTTPHeaderFilter{},
-						},
 						Matches: []api.HTTPMatch{
 							{
 								Headers: []api.HTTPHeaderMatch{
@@ -963,8 +948,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 						},
 						Services: []api.HTTPService{
 							{
-								Name:      "service one",
-								Namespace: "some ns",
+								Name:   "service one",
+								Weight: 45,
 								Filters: api.HTTPFilters{
 									Headers: []api.HTTPHeaderFilter{
 										{
@@ -982,10 +967,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Path: "path",
 									},
 								},
-								ResponseFilters: api.HTTPResponseFilters{
-									Headers: []api.HTTPHeaderFilter{},
-								},
-								Weight: 45,
+								Namespace: "some ns",
 							},
 						},
 					},
@@ -1167,9 +1149,6 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							},
 							URLRewrite: &api.URLRewrite{Path: "v1"},
 						},
-						ResponseFilters: api.HTTPResponseFilters{
-							Headers: []api.HTTPHeaderFilter{},
-						},
 						Matches: []api.HTTPMatch{
 							{
 								Headers: []api.HTTPHeaderMatch{
@@ -1194,17 +1173,10 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							},
 						},
 						Services: []api.HTTPService{
+							{Name: "some-override", Namespace: "svc-ns", Weight: 1, Filters: api.HTTPFilters{Headers: []api.HTTPHeaderFilter{{Add: make(map[string]string), Set: make(map[string]string)}}}},
 							{
-								Name:      "some-override",
-								Namespace: "svc-ns",
-								Weight:    1,
-								Filters:   api.HTTPFilters{Headers: []api.HTTPHeaderFilter{}},
-								ResponseFilters: api.HTTPResponseFilters{
-									Headers: []api.HTTPHeaderFilter{},
-								}},
-							{
-								Name:      "service one",
-								Namespace: "some ns",
+								Name:   "service one",
+								Weight: 45,
 								Filters: api.HTTPFilters{
 									Headers: []api.HTTPHeaderFilter{
 										{
@@ -1222,203 +1194,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Path: "path",
 									},
 								},
-								ResponseFilters: api.HTTPResponseFilters{
-									Headers: []api.HTTPHeaderFilter{},
-								},
-								Weight: 45,
-							},
-						},
-					},
-				},
-				Hostnames: []string{
-					"host-name.example.com",
-					"consul.io",
-				},
-				Meta: map[string]string{
-					constants.MetaKeyKubeNS:   "k8s-ns",
-					constants.MetaKeyKubeName: "k8s-http-route",
-				},
-				Namespace: "k8s-ns",
-			},
-		},
-		"test with external filters": {
-			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:        "k8s-http-route",
-						Namespace:   "k8s-ns",
-						Annotations: map[string]string{},
-					},
-					Spec: gwv1beta1.HTTPRouteSpec{
-						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-							ParentRefs: []gwv1beta1.ParentReference{
-								{
-									Namespace:   PointerTo(gwv1beta1.Namespace("k8s-gw-ns")),
-									Name:        gwv1beta1.ObjectName("api-gw"),
-									Kind:        PointerTo(gwv1beta1.Kind("Gateway")),
-									SectionName: PointerTo(gwv1beta1.SectionName("listener-1")),
-								},
-							},
-						},
-						Hostnames: []gwv1beta1.Hostname{
-							"host-name.example.com",
-							"consul.io",
-						},
-						Rules: []gwv1beta1.HTTPRouteRule{
-							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
-									{
-										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
-											Value: PointerTo("/v1"),
-										},
-										Headers: []gwv1beta1.HTTPHeaderMatch{
-											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
-												Name:  "my header match",
-												Value: "the value",
-											},
-										},
-										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
-											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
-												Name:  "search",
-												Value: "term",
-											},
-										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
-									},
-								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
-									{
-										ExtensionRef: &gwv1beta1.LocalObjectReference{
-											Name:  "test",
-											Kind:  v1alpha1.RouteRetryFilterKind,
-											Group: "consul.hashicorp.com/v1alpha1",
-										},
-									},
-								},
-								BackendRefs: []gwv1beta1.HTTPBackendRef{
-									{
-										BackendRef: gwv1beta1.BackendRef{
-											BackendObjectReference: gwv1beta1.BackendObjectReference{
-												Name:      "service one",
-												Namespace: PointerTo(gwv1beta1.Namespace("other")),
-											},
-											Weight: PointerTo(int32(45)),
-										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
-											{
-												ExtensionRef: &gwv1beta1.LocalObjectReference{
-													Name:  "test",
-													Kind:  v1alpha1.RouteRetryFilterKind,
-													Group: "consul.hashicorp.com/v1alpha1",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				services: []types.NamespacedName{
-					{Name: "service one", Namespace: "other"},
-				},
-				externalFilters: []client.Object{
-					&v1alpha1.RouteRetryFilter{
-						TypeMeta: metav1.TypeMeta{
-							Kind:       v1alpha1.RouteRetryFilterKind,
-							APIVersion: "consul.hashicorp.com/v1alpha1",
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "test",
-							Namespace: "k8s-ns",
-						},
-						Spec: v1alpha1.RouteRetryFilterSpec{
-							NumRetries:            pointer.Uint32(3),
-							RetryOn:               []string{"cancelled"},
-							RetryOnStatusCodes:    []uint32{500, 502},
-							RetryOnConnectFailure: pointer.Bool(false),
-						},
-					},
-
-					&v1alpha1.RouteRetryFilter{
-						TypeMeta: metav1.TypeMeta{
-							Kind:       v1alpha1.RouteRetryFilterKind,
-							APIVersion: "consul.hashicorp.com/v1alpha1",
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "test",
-							Namespace: "other-namespace-even-though-same-name",
-						},
-						Spec: v1alpha1.RouteRetryFilterSpec{
-							NumRetries:            pointer.Uint32(3),
-							RetryOn:               []string{"don't"},
-							RetryOnStatusCodes:    []uint32{404},
-							RetryOnConnectFailure: pointer.Bool(true),
-						},
-					},
-				},
-			},
-			want: api.HTTPRouteConfigEntry{
-				Kind: api.HTTPRoute,
-				Name: "k8s-http-route",
-				Rules: []api.HTTPRouteRule{
-					{
-						Filters: api.HTTPFilters{
-							Headers:    []api.HTTPHeaderFilter{},
-							URLRewrite: nil,
-							RetryFilter: &api.RetryFilter{
-								NumRetries:            pointer.Uint32(3),
-								RetryOn:               []string{"cancelled"},
-								RetryOnStatusCodes:    []uint32{500, 502},
-								RetryOnConnectFailure: pointer.Bool(false),
-							},
-						},
-						ResponseFilters: api.HTTPResponseFilters{
-							Headers: []api.HTTPHeaderFilter{},
-						},
-						Matches: []api.HTTPMatch{
-							{
-								Headers: []api.HTTPHeaderMatch{
-									{
-										Match: api.HTTPHeaderMatchExact,
-										Name:  "my header match",
-										Value: "the value",
-									},
-								},
-								Method: api.HTTPMatchMethodGet,
-								Path: api.HTTPPathMatch{
-									Match: api.HTTPPathMatchPrefix,
-									Value: "/v1",
-								},
-								Query: []api.HTTPQueryMatch{
-									{
-										Match: api.HTTPQueryMatchExact,
-										Name:  "search",
-										Value: "term",
-									},
-								},
-							},
-						},
-						Services: []api.HTTPService{
-							{
-								Name:   "service one",
-								Weight: 45,
-								Filters: api.HTTPFilters{
-									Headers: []api.HTTPHeaderFilter{},
-									RetryFilter: &api.RetryFilter{
-										NumRetries:            pointer.Uint32(3),
-										RetryOn:               []string{"cancelled"},
-										RetryOnStatusCodes:    []uint32{500, 502},
-										RetryOnConnectFailure: pointer.Bool(false),
-									},
-								},
-								ResponseFilters: api.HTTPResponseFilters{
-									Headers: []api.HTTPHeaderFilter{},
-								},
-								Namespace: "other",
+								Namespace: "some ns",
 							},
 						},
 					},
@@ -1448,10 +1224,6 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 			}
 			for _, service := range tc.args.meshServices {
 				resources.AddMeshService(service)
-			}
-
-			for _, filterToAdd := range tc.args.externalFilters {
-				resources.AddExternalFilter(filterToAdd)
 			}
 
 			got := tr.ToHTTPRoute(tc.args.k8sHTTPRoute, resources)
@@ -1636,11 +1408,10 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 		filters []gwv1beta1.HTTPRouteFilter
 	}
 	tests := []struct {
-		name                string
-		fields              fields
-		args                args
-		want                api.HTTPFilters
-		wantResponseFilters api.HTTPResponseFilters
+		name   string
+		fields fields
+		args   args
+		want   api.HTTPFilters
 	}{
 		{
 			name:   "no httproutemodifier set",
@@ -1653,11 +1424,13 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 				},
 			},
 			want: api.HTTPFilters{
-				Headers:    []api.HTTPHeaderFilter{},
+				Headers: []api.HTTPHeaderFilter{
+					{
+						Add: map[string]string{},
+						Set: map[string]string{},
+					},
+				},
 				URLRewrite: nil,
-			},
-			wantResponseFilters: api.HTTPResponseFilters{
-				Headers: []api.HTTPHeaderFilter{},
 			},
 		},
 	}
@@ -1671,9 +1444,7 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 				ConsulPartition:        tt.fields.ConsulPartition,
 				Datacenter:             tt.fields.Datacenter,
 			}
-			requestHeaders, responseHeaders := t.translateHTTPFilters(tt.args.filters, nil, "")
-			assert.Equalf(t1, tt.want, requestHeaders, "translateHTTPFilters(%v)", tt.args.filters)
-			assert.Equalf(t1, tt.wantResponseFilters, responseHeaders, "translateHTTPFilters(%v)", tt.args.filters)
+			assert.Equalf(t1, tt.want, t.translateHTTPFilters(tt.args.filters), "translateHTTPFilters(%v)", tt.args.filters)
 		})
 	}
 }
