@@ -18,6 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -29,10 +32,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 var ns = "default"
@@ -1120,7 +1119,7 @@ func TestRun_NoLeader(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 	}
 
 	done := make(chan bool)
@@ -1376,7 +1375,7 @@ func TestRun_ClientPolicyAndBindingRuleRetry(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 	}
 	responseCode := cmd.Run([]string{
 		"-timeout=1m",
@@ -1525,7 +1524,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 	}
 
 	responseCode := cmd.Run(cmdArgs)
@@ -1710,7 +1709,7 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 		backend:   &FakeSecretsBackend{bootstrapToken: bootToken},
 	}
 	responseCode := cmd.Run([]string{
@@ -1754,7 +1753,7 @@ func TestRun_Timeout(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort(t, "localhost", 12345, false),
+		watcher:   test.MockConnMgrForIPAndPort("localhost", 12345),
 	}
 
 	responseCode := cmd.Run([]string{

@@ -1461,10 +1461,7 @@ load _helpers
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -2220,12 +2217,7 @@ load _helpers
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject") |
-      del(."vault.hashicorp.com/agent-inject") |
-      del(."vault.hashicorp.com/role")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -2661,29 +2653,3 @@ reservedNameTest() {
   [ "${actual}" = "server.dc1.consul" ]
 }
 
-#--------------------------------------------------------------------
-# resource-apis
-
-@test "connectInject/Deployment: resource-apis is not set by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
-
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: -enable-resource-apis=true is set when global.experiments contains [\"resource-apis\"] " {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'ui.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
-
-  [ "${actual}" = "true" ]
-}

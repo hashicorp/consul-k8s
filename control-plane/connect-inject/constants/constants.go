@@ -7,23 +7,11 @@ const (
 	// ConsulCAFile is the location of the Consul CA file inside the injected pod.
 	ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
 
-	// DefaultConsulNS is the default Consul namespace name.
-	DefaultConsulNS = "default"
-
-	// DefaultConsulPartition is the default Consul partition name.
-	DefaultConsulPartition = "default"
-
-	// DefaultConsulPeer is the name used to refer to resources that are in the same cluster.
-	DefaultConsulPeer = "local"
-
 	// ProxyDefaultInboundPort is the default inbound port for the proxy.
 	ProxyDefaultInboundPort = 20000
 
 	// ProxyDefaultHealthPort is the default HTTP health check port for the proxy.
 	ProxyDefaultHealthPort = 21000
-
-	// MetaKeyManagedBy is the meta key name for indicating which Kubernetes controller manages a Consul resource.
-	MetaKeyManagedBy = "managed-by"
 
 	// MetaKeyKubeNS is the meta key name for Kubernetes namespace used for the Consul services.
 	MetaKeyKubeNS = "k8s-namespace"
@@ -45,12 +33,4 @@ const (
 
 	// DefaultGracefulShutdownPath is the default path that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulShutdownPath = "/graceful_shutdown"
-
-	// ConsulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
-	ConsulKubernetesCheckType = "kubernetes-readiness"
-
-	// ConsulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
-	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
-
-	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 )

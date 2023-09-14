@@ -17,6 +17,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/cli"
@@ -24,12 +29,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-
-	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 const (
@@ -267,7 +266,7 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 		}
 
 		iterLog.Info("Updating webhook configuration")
-		err = webhookconfiguration.UpdateWithCABundle(ctx, c.clientset, bundle.WebhookConfigName, bundle.CACert)
+		err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, c.clientset, bundle.WebhookConfigName, bundle.CACert)
 		if err != nil {
 			iterLog.Error("Error updating webhook configuration")
 			return err
@@ -310,7 +309,7 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 	}
 
 	iterLog.Info("Updating webhook configuration with new CA")
-	err = webhookconfiguration.UpdateWithCABundle(ctx, clientset, bundle.WebhookConfigName, bundle.CACert)
+	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, clientset, bundle.WebhookConfigName, bundle.CACert)
 	if err != nil {
 		iterLog.Error("Error updating webhook configuration", "err", err)
 		return err
@@ -321,21 +320,11 @@ func (c *Command) reconcileCertificates(ctx context.Context, clientset kubernete
 // webhookUpdated verifies if every caBundle on the specified webhook configuration matches the desired CA certificate.
 // It returns true if the CA is up-to date and false if it needs to be updated.
 func (c *Command) webhookUpdated(ctx context.Context, bundle cert.MetaBundle, clientset kubernetes.Interface) bool {
-	mutatingWebhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, bundle.WebhookConfigName, metav1.GetOptions{})
+	webhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, bundle.WebhookConfigName, metav1.GetOptions{})
 	if err != nil {
 		return false
 	}
-	for _, webhook := range mutatingWebhookCfg.Webhooks {
-		if !bytes.Equal(webhook.ClientConfig.CABundle, bundle.CACert) {
-			return false
-		}
-	}
-
-	validatingWebhookCfg, err := clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, bundle.WebhookConfigName, metav1.GetOptions{})
-	if err != nil {
-		return false
-	}
-	for _, webhook := range validatingWebhookCfg.Webhooks {
+	for _, webhook := range webhookCfg.Webhooks {
 		if !bytes.Equal(webhook.ClientConfig.CABundle, bundle.CACert) {
 			return false
 		}
@@ -355,12 +344,8 @@ func (c webhookConfig) validate(ctx context.Context, client kubernetes.Interface
 	if c.Name == "" {
 		err = multierror.Append(err, errors.New(`config.Name cannot be ""`))
 	} else {
-		_, mutHookErr := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{})
-
-		_, validatingHookErr := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{})
-
-		if (mutHookErr != nil && k8serrors.IsNotFound(mutHookErr)) && (validatingHookErr != nil && k8serrors.IsNotFound(validatingHookErr)) {
-			err = multierror.Append(err, fmt.Errorf("ValidatingWebhookConfiguration or MutatingWebhookConfiguration with name \"%s\" must exist in cluster", c.Name))
+		if _, err2 := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{}); err2 != nil && k8serrors.IsNotFound(err2) {
+			err = multierror.Append(err, fmt.Errorf("MutatingWebhookConfiguration with name \"%s\" must exist in cluster", c.Name))
 		}
 	}
 	if c.SecretName == "" {
@@ -402,12 +387,10 @@ func (c *Command) sendSignal(sig os.Signal) {
 	c.sigCh <- sig
 }
 
-const (
-	synopsis = "Starts the Consul Kubernetes webhook-cert-manager"
-	help     = `
+const synopsis = "Starts the Consul Kubernetes webhook-cert-manager"
+const help = `
 Usage: consul-k8s-control-plane webhook-cert-manager [options]
 
   Starts the Consul Kubernetes webhook-cert-manager that manages the lifecycle for webhook TLS certificates.
 
 `
-)

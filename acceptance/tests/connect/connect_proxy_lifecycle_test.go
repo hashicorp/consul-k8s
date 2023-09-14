@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -120,11 +120,11 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			})
 
 			if testCfg.secure {
-				connHelper.TestConnectionFailureWithoutIntention(t, connhelper.ConnHelperOpts{})
-				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
+				connHelper.TestConnectionFailureWithoutIntention(t)
+				connHelper.CreateIntention(t)
 			}
 
-			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+			connHelper.TestConnectionSuccess(t)
 
 			// Get static-client pod name
 			ns := ctx.KubectlOptions(t).Namespace
@@ -278,7 +278,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			}
 		})
 
-		connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{ClientType: connhelper.JobName})
+		connHelper.TestConnectionSuccess(t, connhelper.JobName)
 
 		// Get job-client pod name
 		ns := ctx.KubectlOptions(t).Namespace
