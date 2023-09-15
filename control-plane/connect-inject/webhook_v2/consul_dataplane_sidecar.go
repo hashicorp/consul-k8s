@@ -12,7 +12,6 @@ import (
 	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -47,29 +46,29 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 
 	containerName := sidecarContainer
 
-	var probe *corev1.Probe
-	if useProxyHealthCheck(pod) {
-		// If using the proxy health check for a service, configure an HTTP handler
-		// that queries the '/ready' endpoint of the proxy.
-		probe = &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Port: intstr.FromInt(constants.ProxyDefaultHealthPort),
-					Path: "/ready",
-				},
-			},
-			InitialDelaySeconds: 1,
-		}
-	} else {
-		probe = &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt(constants.ProxyDefaultInboundPort),
-				},
-			},
-			InitialDelaySeconds: 1,
-		}
-	}
+	//var probe *corev1.Probe
+	//if useProxyHealthCheck(pod) {
+	//	// If using the proxy health check for a service, configure an HTTP handler
+	//	// that queries the '/ready' endpoint of the proxy.
+	//	probe = &corev1.Probe{
+	//		ProbeHandler: corev1.ProbeHandler{
+	//			HTTPGet: &corev1.HTTPGetAction{
+	//				Port: intstr.FromInt(constants.ProxyDefaultHealthPort),
+	//				Path: "/ready",
+	//			},
+	//		},
+	//		InitialDelaySeconds: 1,
+	//	}
+	//} else {
+	//	probe = &corev1.Probe{
+	//		ProbeHandler: corev1.ProbeHandler{
+	//			TCPSocket: &corev1.TCPSocketAction{
+	//				Port: intstr.FromInt(constants.ProxyDefaultInboundPort),
+	//			},
+	//		},
+	//		InitialDelaySeconds: 1,
+	//	}
+	//}
 
 	container := corev1.Container{
 		Name:      containerName,
@@ -134,8 +133,9 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				MountPath: "/consul/mesh-inject",
 			},
 		},
-		Args:           args,
-		ReadinessProbe: probe,
+		Args: args,
+		// failing right now with tproxy because expose paths are not implemented
+		//ReadinessProbe: probe,
 	}
 
 	if w.AuthMethod != "" {
