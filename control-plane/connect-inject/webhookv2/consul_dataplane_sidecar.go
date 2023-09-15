@@ -109,6 +109,15 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				Value: "$(POD_NAME)",
 			},
 			{
+				Name:  "DP_PROXY_NAMESPACE",
+				Value: "$(POD_NAMESPACE)",
+			},
+			{
+				Name: "DP_PROXY_PARTITION",
+				// TODO: actually use the right partition
+				Value: "default",
+			},
+			{
 				Name:  "DP_CREDENTIAL_LOGIN_META",
 				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 			},
