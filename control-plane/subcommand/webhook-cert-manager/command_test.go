@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/webhook-cert-manager/mocks"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
@@ -22,6 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/webhook-cert-manager/mocks"
 )
 
 func TestRun_ExitsCleanlyOnSignals(t *testing.T) {
@@ -701,7 +702,7 @@ func TestValidate(t *testing.T) {
 				SecretNamespace: "default",
 			},
 			clientset: fake.NewSimpleClientset(),
-			expErr:    `MutatingWebhookConfiguration with name "webhook-config-name" must exist in cluster`,
+			expErr:    `ValidatingWebhookConfiguration or MutatingWebhookConfiguration with name "webhook-config-name" must exist in cluster`,
 		},
 		"secretName": {
 			config: webhookConfig{

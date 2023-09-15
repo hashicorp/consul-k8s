@@ -17,11 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/cli"
@@ -29,6 +24,12 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 const (
@@ -354,12 +355,12 @@ func (c webhookConfig) validate(ctx context.Context, client kubernetes.Interface
 	if c.Name == "" {
 		err = multierror.Append(err, errors.New(`config.Name cannot be ""`))
 	} else {
-		if _, err2 := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{}); err2 != nil && k8serrors.IsNotFound(err2) {
-			err = multierror.Append(err, fmt.Errorf("MutatingWebhookConfiguration with name \"%s\" must exist in cluster", c.Name))
-		}
+		_, mutHookErr := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{})
 
-		if _, err2 := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{}); err2 != nil && k8serrors.IsNotFound(err2) {
-			err = multierror.Append(err, fmt.Errorf("ValidatingWebhookConfiguration with name \"%s\" must exist in cluster", c.Name))
+		_, validatingHookErr := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, c.Name, metav1.GetOptions{})
+
+		if (mutHookErr != nil && k8serrors.IsNotFound(mutHookErr)) && (validatingHookErr != nil && k8serrors.IsNotFound(validatingHookErr)) {
+			err = multierror.Append(err, fmt.Errorf("ValidatingWebhookConfiguration or MutatingWebhookConfiguration with name \"%s\" must exist in cluster", c.Name))
 		}
 	}
 	if c.SecretName == "" {
