@@ -18,7 +18,7 @@ func init() {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// RouteAuthFilter is the Schema for the httpauthfilters API.
+// RouteAuthFilter is the Schema for the routeauthfilters API.
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"

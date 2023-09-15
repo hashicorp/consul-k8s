@@ -2,7 +2,7 @@
 
 load _helpers
 
-@test "httproute-auth-filters/CustomResourceDefinition: enabled by default" {
+@test "routeauth-filters/CustomResourceDefinition: enabled by default" {
     cd `chart_dir`
     local actual=$(helm template \
         -s templates/crd-routeauthfilters.yaml \
@@ -11,7 +11,7 @@ load _helpers
     [ "$actual" = "true" ]
 }
 
-@test "httproute-auth-filter/CustomResourceDefinition: disabled with connectInject.enabled=false" {
+@test "routeauth-filter/CustomResourceDefinition: disabled with connectInject.enabled=false" {
     cd `chart_dir`
     assert_empty helm template \
         -s templates/crd-routeauthfilters.yaml \
