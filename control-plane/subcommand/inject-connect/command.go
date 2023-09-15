@@ -384,9 +384,10 @@ func (c *Command) Run(args []string) int {
 	//Right now we exclusively start controllers for V1 or V2.
 	//In the future we might add a flag to pick and choose from both.
 	if c.flagResourceAPIs {
-		err = c.configureV2Controllers(ctx, mgr, watcher)
+		c.flagCertDir = "/etc/connect-injector/certs"
+		err = c.configureV2Controllers(ctx, mgr, watcher, setupLog)
 	} else {
-		err = c.configureV1Controllers(ctx, mgr, watcher)
+		err = c.configureV1Controllers(ctx, mgr, watcher, setupLog)
 	}
 	if err != nil {
 		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))

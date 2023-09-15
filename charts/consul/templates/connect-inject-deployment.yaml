@@ -152,7 +152,7 @@ spec:
                 -resource-prefix={{ template "consul.fullname" . }} \
                 -listen=:8080 \
                 {{- if (mustHas "resource-apis" .Values.global.experiments) }}
-                -enable-resource-apis=true
+                -enable-resource-apis=true \
                 {{- end }}
                 {{- range $k, $v := .Values.connectInject.consulNode.meta }}
                 -node-meta={{ $k }}={{ $v }} \
