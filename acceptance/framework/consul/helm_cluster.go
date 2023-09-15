@@ -143,6 +143,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
 		}
 	}
+
 	helm.Install(t, h.helmOptions, chartName, h.releaseName)
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))

@@ -92,13 +92,12 @@ type Controller struct {
 
 // TODO: logs, logs, logs
 
-// Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
-// correspond to the Kubernetes Service. These events are driven by changes to the Pods backing the Kube service.
+// Reconcile reads the state of a Kubernetes Pod and reconciles Consul workloads that are 1:1 mapped.
 func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
 	var pod corev1.Pod
 
-	// Ignore the request if the namespace of the endpoint is not allowed.
+	// Ignore the request if the namespace of the pod is not allowed.
 	// Strictly speaking, this is not required because the mesh webhook also knows valid namespaces
 	// for injection, but it will somewhat reduce the amount of unnecessary deletions for non-injected
 	// pods

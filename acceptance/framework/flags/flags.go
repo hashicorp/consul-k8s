@@ -50,10 +50,11 @@ type TestFlags struct {
 
 	flagDebugDirectory string
 
-	flagUseAKS  bool
-	flagUseEKS  bool
-	flagUseGKE  bool
-	flagUseKind bool
+	flagUseAKS          bool
+	flagUseEKS          bool
+	flagUseGKE          bool
+	flagUseGKEAutopilot bool
+	flagUseKind         bool
 
 	flagDisablePeering bool
 
@@ -145,6 +146,9 @@ func (t *TestFlags) init() {
 		"If true, the tests will assume they are running against an EKS cluster(s).")
 	flag.BoolVar(&t.flagUseGKE, "use-gke", false,
 		"If true, the tests will assume they are running against a GKE cluster(s).")
+	flag.BoolVar(&t.flagUseGKEAutopilot, "use-gke-autopilot", false,
+		"If true, the tests will assume they are running against a GKE Autopilot cluster(s).")
+
 	flag.BoolVar(&t.flagUseKind, "use-kind", false,
 		"If true, the tests will assume they are running against a local kind cluster(s).")
 
@@ -235,6 +239,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		UseAKS:             t.flagUseAKS,
 		UseEKS:             t.flagUseEKS,
 		UseGKE:             t.flagUseGKE,
+		UseGKEAutopilot:    t.flagUseGKEAutopilot,
 		UseKind:            t.flagUseKind,
 	}
 
