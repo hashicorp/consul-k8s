@@ -89,20 +89,23 @@ func TestReconcile_CreateService(t *testing.T) {
 							{
 								Name:        "public",
 								Port:        8080,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("my-http-port"),
 								AppProtocol: &appProtocolHttp,
 							},
 							{
 								Name:        "api",
 								Port:        9090,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("my-grpc-port"),
 								AppProtocol: &appProtocolGrpc,
 							},
 							{
 								Name:       "other",
 								Port:       10001,
+								Protocol:   "TCP",
 								TargetPort: intstr.FromString("10001"),
-								// no protocol specified
+								// no app protocol specified
 							},
 						},
 					},
@@ -169,18 +172,21 @@ func TestReconcile_CreateService(t *testing.T) {
 							Addresses: addressesForPods(pod1, pod2),
 							Ports: []corev1.EndpointPort{
 								{
-									Name:        "my-http-port",
-									AppProtocol: &appProtocolHttp,
+									Name:        "public",
 									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
 								},
 								{
-									Name:        "my-grpc-port",
-									AppProtocol: &appProtocolGrpc,
+									Name:        "api",
 									Port:        6789,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolGrpc,
 								},
 								{
-									Name: "10001",
-									Port: 10001,
+									Name:     "other",
+									Port:     10001,
+									Protocol: "TCP",
 								},
 							},
 						},
@@ -197,20 +203,23 @@ func TestReconcile_CreateService(t *testing.T) {
 							{
 								Name:        "public",
 								Port:        8080,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("my-http-port"),
 								AppProtocol: &appProtocolHttp,
 							},
 							{
 								Name:        "api",
 								Port:        9090,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("my-grpc-port"),
 								AppProtocol: &appProtocolGrpc,
 							},
 							{
 								Name:       "other",
 								Port:       10001,
+								Protocol:   "TCP",
 								TargetPort: intstr.FromString("10001"),
-								// no protocol specified
+								// no app protocol specified
 							},
 						},
 					},
@@ -282,9 +291,10 @@ func TestReconcile_CreateService(t *testing.T) {
 							NotReadyAddresses: addressesForPods(pod2),
 							Ports: []corev1.EndpointPort{
 								{
-									Name:        "my-http-port",
-									AppProtocol: &appProtocolHttp,
+									Name:        "public",
 									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
 								},
 							},
 						},
@@ -301,6 +311,7 @@ func TestReconcile_CreateService(t *testing.T) {
 							{
 								Name:        "public",
 								Port:        8080,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("my-http-port"),
 								AppProtocol: &appProtocolHttp,
 							},
@@ -366,9 +377,10 @@ func TestReconcile_CreateService(t *testing.T) {
 							Addresses: addressesForPods(pod1),
 							Ports: []corev1.EndpointPort{
 								{
-									Name:        "my-http-port",
-									AppProtocol: &appProtocolHttp,
+									Name:        "public",
 									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
 								},
 							},
 						},
@@ -376,9 +388,10 @@ func TestReconcile_CreateService(t *testing.T) {
 							Addresses: addressesForPods(pod2),
 							Ports: []corev1.EndpointPort{
 								{
-									Name:        "my-grpc-port",
-									AppProtocol: &appProtocolGrpc,
+									Name:        "api",
 									Port:        6789,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolGrpc,
 								},
 							},
 						},
@@ -395,12 +408,14 @@ func TestReconcile_CreateService(t *testing.T) {
 							{
 								Name:        "public",
 								Port:        8080,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("my-http-port"),
 								AppProtocol: &appProtocolHttp,
 							},
 							{
 								Name:        "api",
 								Port:        9090,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("my-grpc-port"),
 								AppProtocol: &appProtocolGrpc,
 							},
@@ -454,6 +469,95 @@ func TestReconcile_CreateService(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    "Only L4 TCP ports get a Consul Service port when L4 protocols are multiplexed",
+			svcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: addressesForPods(pod1),
+							Ports: []corev1.EndpointPort{
+								{
+									Name:     "public-tcp",
+									Port:     2345,
+									Protocol: "TCP",
+								},
+								{
+									Name:     "public-udp",
+									Port:     2345,
+									Protocol: "UDP",
+								},
+							},
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							// Two L4 protocols on one exposed port
+							{
+								Name:       "public-tcp",
+								Port:       8080,
+								Protocol:   "TCP",
+								TargetPort: intstr.FromString("my-svc-port"),
+							},
+							{
+								Name:       "public-udp",
+								Port:       8080,
+								Protocol:   "UDP",
+								TargetPort: intstr.FromString("my-svc-port"),
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoints, service}
+			},
+			expectedResource: &pbresource.Resource{
+				Id: &pbresource.ID{
+					Name: "service-created",
+					Type: &pbresource.Type{
+						Group:        "catalog",
+						GroupVersion: "v1alpha1",
+						Kind:         "Service",
+					},
+					Tenancy: &pbresource.Tenancy{
+						Namespace: constants.DefaultConsulNS,
+						Partition: constants.DefaultConsulPartition,
+					},
+				},
+				Data: common.ToProtoAny(&pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-svc-port",
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				}),
+				Metadata: map[string]string{
+					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
+					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+				},
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -484,8 +588,9 @@ func TestReconcile_UpdateService(t *testing.T) {
 							Ports: []corev1.EndpointPort{
 								{
 									Name:        "my-http-port",
-									AppProtocol: &appProtocolHttp,
 									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
 								},
 							},
 						},
@@ -502,6 +607,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 							{
 								Name:        "public",
 								Port:        8080,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("my-http-port"),
 								AppProtocol: &appProtocolHttp,
 							},
@@ -613,13 +719,15 @@ func TestReconcile_UpdateService(t *testing.T) {
 							Ports: []corev1.EndpointPort{
 								{
 									Name:        "my-http-port",
-									AppProtocol: &appProtocolHttp,
 									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
 								},
 								{
 									Name:        "my-grpc-port",
-									AppProtocol: &appProtocolHttp,
 									Port:        6789,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
 								},
 							},
 						},
@@ -636,12 +744,14 @@ func TestReconcile_UpdateService(t *testing.T) {
 							{
 								Name:        "public",
 								Port:        8080,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("new-http-port"),
 								AppProtocol: &appProtocolHttp2,
 							},
 							{
 								Name:        "api",
 								Port:        9091,
+								Protocol:    "TCP",
 								TargetPort:  intstr.FromString("my-grpc-port"),
 								AppProtocol: &appProtocolGrpc,
 							},

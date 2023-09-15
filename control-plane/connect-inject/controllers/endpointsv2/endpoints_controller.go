@@ -4,6 +4,7 @@ package endpointsv2
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sort"
 	"strings"
@@ -202,23 +203,24 @@ func getOwnerPrefixFromPod(pod *corev1.Pod) string {
 
 // registerService creates a Consul service registration from the provided Kuberetes service and endpoint information.
 func (r *Controller) registerService(ctx context.Context, resourceClient pbresource.ResourceServiceClient, service corev1.Service, selector *pbcatalog.WorkloadSelector) error {
-	serviceResource := r.getServiceResource(
-		&pbcatalog.Service{
-			Workloads:  selector,
-			Ports:      getServicePorts(service),
-			VirtualIps: r.getServiceVIPs(service),
-		},
+	consulSvc := &pbcatalog.Service{
+		Workloads:  selector,
+		Ports:      getServicePorts(service),
+		VirtualIps: r.getServiceVIPs(service),
+	}
+	consulSvcResource := r.getServiceResource(
+		consulSvc,
 		service.Name, // Consul and Kubernetes service name will always match
 		r.getConsulNamespace(service.Namespace),
 		r.getConsulPartition(),
 		getServiceMeta(service),
 	)
 
-	r.Log.Info("registering service with Consul", getLogFieldsForResource(serviceResource.Id)...)
+	r.Log.Info("registering service with Consul", getLogFieldsForResource(consulSvcResource.Id)...)
 	//TODO: Maybe attempt to debounce redundant writes. For now, we blindly rewrite state on each reconcile.
-	_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: serviceResource})
+	_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: consulSvcResource})
 	if err != nil {
-		r.Log.Error(err, "failed to register service", getLogFieldsForResource(serviceResource.Id)...)
+		r.Log.Error(err, fmt.Sprintf("failed to register service: %+v", consulSvc), getLogFieldsForResource(consulSvcResource.Id)...)
 		return err
 	}
 
@@ -254,13 +256,21 @@ func getServicePorts(service corev1.Service) []*pbcatalog.ServicePort {
 	ports := make([]*pbcatalog.ServicePort, 0, len(service.Spec.Ports)+1)
 
 	for _, p := range service.Spec.Ports {
-		ports = append(ports, &pbcatalog.ServicePort{
-			VirtualPort: uint32(p.Port),
-			//TODO: If the value is a number, infer the correct name value based on
-			// the most prevalent endpoint subset for the port (best-effot, inspect a pod).
-			TargetPort: p.TargetPort.String(),
-			Protocol:   common.GetPortProtocol(p.AppProtocol),
-		})
+		// Service mesh only supports TCP as the L4 Protocol (not to be confused w/ L7 AppProtocol).
+		//
+		// This check is necessary to deduplicate VirtualPort values when multiple declared ServicePort values exist
+		// for the same port, which is possible in K8s when e.g. multiplexing TCP and UDP traffic over a single port.
+		//
+		// If we otherwise see repeat port values in a K8s service, we pass along and allow Consul to fail validation.
+		if p.Protocol == corev1.ProtocolTCP {
+			ports = append(ports, &pbcatalog.ServicePort{
+				VirtualPort: uint32(p.Port),
+				//TODO: If the value is a number, infer the correct name value based on
+				// the most prevalent endpoint subset for the port (best-effot, inspect a pod).
+				TargetPort: p.TargetPort.String(),
+				Protocol:   common.GetPortProtocol(p.AppProtocol),
+			})
+		}
 	}
 
 	//TODO: Error check reserved "mesh" target port
