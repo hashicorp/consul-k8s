@@ -549,8 +549,8 @@ func TestReconcile_CreateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 		},
