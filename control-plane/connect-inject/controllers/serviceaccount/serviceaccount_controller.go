@@ -1,0 +1,179 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
+package serviceaccount
+
+import (
+	"context"
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	auth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/go-multierror"
+)
+
+type Controller struct {
+	client.Client
+	// ConsulServerConnMgr is the watcher for the Consul server addresses used to create Consul API v2 clients.
+	ConsulServerConnMgr consul.ServerConnectionManager
+	// K8sNamespaceConfig manages allow/deny Kubernetes namespaces.
+	common.K8sNamespaceConfig
+	// ConsulTenancyConfig manages settings related to Consul namespaces and partitions.
+	common.ConsulTenancyConfig
+
+	Log logr.Logger
+
+	Scheme *runtime.Scheme
+	context.Context
+}
+
+func (r *Controller) Logger(name types.NamespacedName) logr.Logger {
+	return r.Log.WithValues("request", name)
+}
+
+func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&corev1.ServiceAccount{}).
+		Complete(r)
+}
+
+// Reconcile reads the state of a ServiceAccount object for a Kubernetes namespace and reconciles the corresponding
+// Consul WorkloadIdentity.
+func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var errs error
+	var serviceAccount corev1.ServiceAccount
+
+	// Ignore the request if the namespace of the service account is not allowed.
+	if common.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
+		return ctrl.Result{}, nil
+	}
+
+	// Create Consul resource service client for this reconcile.
+	resourceClient, err := consul.NewResourceServiceClient(r.ConsulServerConnMgr)
+	if err != nil {
+		r.Log.Error(err, "failed to create Consul resource client", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+
+	// If the ServiceAccount object has been deleted (and we get an IsNotFound error),
+	// we need to deregister that WorkloadIdentity from Consul.
+	err = r.Client.Get(ctx, req.NamespacedName, &serviceAccount)
+	if k8serrors.IsNotFound(err) {
+		err = r.deregisterWorkloadIdentity(ctx, resourceClient, req.Name, r.getConsulNamespace(req.Namespace), r.getConsulPartition())
+		return ctrl.Result{}, err
+	} else if err != nil {
+		r.Log.Error(err, "failed to get ServiceAccount", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+	r.Log.Info("retrieved ServiceAccount", "name", req.Name, "ns", req.Namespace)
+
+	// Ensure the WorkloadIdentity exists.
+	if err = r.registerWorkloadIdentity(ctx, resourceClient, &serviceAccount); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	return ctrl.Result{}, errs
+}
+
+func (r *Controller) registerWorkloadIdentity(ctx context.Context, resourceClient pbresource.ResourceServiceClient, a *corev1.ServiceAccount) error {
+	workloadIdentityResource := r.getWorkloadIdentityResource(
+		a.Name, // Consul and Kubernetes service account name will always match
+		r.getConsulNamespace(a.Namespace),
+		r.getConsulPartition(),
+		map[string]string{
+			constants.MetaKeyKubeNS:    a.Namespace,
+			constants.MetaKeyManagedBy: constants.ManagedByServiceAccountValue,
+		},
+	)
+
+	r.Log.Info("registering workload identity with Consul", getLogFieldsForResource(workloadIdentityResource.Id)...)
+	// We currently blindly write these records as changes to service accounts and resulting reconciles should be rare,
+	// and there's no data to conflict with in the payload.
+	_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: workloadIdentityResource})
+	if err != nil {
+		r.Log.Error(err, "failed to register workload identity", getLogFieldsForResource(workloadIdentityResource.Id)...)
+		return err
+	}
+
+	return nil
+}
+
+// deregisterWorkloadIdentity deletes the WorkloadIdentity resource corresponding to the given name and namespace from
+// Consul. This operation is idempotent and can be executed for non-existent service accounts.
+func (r *Controller) deregisterWorkloadIdentity(ctx context.Context, resourceClient pbresource.ResourceServiceClient, name, namespace, partition string) error {
+	_, err := resourceClient.Delete(ctx, &pbresource.DeleteRequest{
+		Id: getWorkloadIdentityID(name, namespace, partition),
+	})
+	return err
+}
+
+// getWorkloadIdentityResource converts the given Consul WorkloadIdentity and metadata to a Consul resource API record.
+func (r *Controller) getWorkloadIdentityResource(name, namespace, partition string, meta map[string]string) *pbresource.Resource {
+	return &pbresource.Resource{
+		Id: getWorkloadIdentityID(name, namespace, partition),
+		// WorkloadIdentity is currently an empty message.
+		Data:     common.ToProtoAny(&auth.WorkloadIdentity{}),
+		Metadata: meta,
+	}
+}
+
+func getWorkloadIdentityID(name, namespace, partition string) *pbresource.ID {
+	return &pbresource.ID{
+		Name: name,
+		Type: &pbresource.Type{
+			Group:        "auth",
+			GroupVersion: "v1alpha1",
+			Kind:         "WorkloadIdentity",
+		},
+		Tenancy: &pbresource.Tenancy{
+			Partition: partition,
+			Namespace: namespace,
+			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
+			// At a future point, this will move out of the Tenancy block.
+			PeerName: constants.DefaultConsulPeer,
+		},
+	}
+}
+
+// getConsulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
+// depending on Consul Namespaces being enabled and the value of namespace mirroring.
+func (r *Controller) getConsulNamespace(kubeNamespace string) string {
+	ns := namespaces.ConsulNamespace(
+		kubeNamespace,
+		r.EnableConsulNamespaces,
+		r.ConsulDestinationNamespace,
+		r.EnableNSMirroring,
+		r.NSMirroringPrefix,
+	)
+
+	// TODO: remove this if and when the default namespace of resources is no longer required to be set explicitly.
+	if ns == "" {
+		ns = constants.DefaultConsulNS
+	}
+	return ns
+}
+
+func (r *Controller) getConsulPartition() string {
+	if !r.EnableConsulPartitions || r.ConsulPartition == "" {
+		return constants.DefaultConsulPartition
+	}
+	return r.ConsulPartition
+}
+
+func getLogFieldsForResource(id *pbresource.ID) []any {
+	return []any{
+		"name", id.Name,
+		"ns", id.Tenancy.Namespace,
+		"partition", id.Tenancy.Partition,
+	}
+}

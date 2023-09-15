@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp/cmpopts"
-
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
@@ -17,7 +15,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +53,6 @@ type reconcileCase struct {
 }
 
 // TODO: Allow/deny namespaces for reconcile tests
-// TODO: ConsulDestinationNamespace and EnableNSMirroring +/- prefix
 
 func TestReconcile_CreateService(t *testing.T) {
 	t.Parallel()
@@ -151,8 +147,8 @@ func TestReconcile_CreateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 		},
@@ -268,8 +264,8 @@ func TestReconcile_CreateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 		},
@@ -355,8 +351,8 @@ func TestReconcile_CreateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 		},
@@ -464,8 +460,8 @@ func TestReconcile_CreateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 		},
@@ -654,8 +650,8 @@ func TestReconcile_UpdateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 			expectedResource: &pbresource.Resource{
@@ -697,8 +693,8 @@ func TestReconcile_UpdateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 		},
@@ -802,8 +798,8 @@ func TestReconcile_UpdateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 			expectedResource: &pbresource.Resource{
@@ -844,8 +840,8 @@ func TestReconcile_UpdateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 		},
@@ -895,8 +891,8 @@ func TestReconcile_DeleteService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 		},
@@ -1031,9 +1027,7 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 			resp, err := ep.getWorkloadSelectorFromEndpoints(ctx, &pf, tc.endpoints)
 			require.NoError(t, err)
 
-			// We don't care about order, so configure cmp.Diff to ignore slice order.
-			sorter := func(a, b string) bool { return a < b }
-			if diff := cmp.Diff(tc.expected, resp, protocmp.Transform(), cmpopts.SortSlices(sorter)); diff != "" {
+			if diff := cmp.Diff(tc.expected, resp, test.CmpProtoIgnoreOrder()...); diff != "" {
 				t.Errorf("unexpected difference:\n%v", diff)
 			}
 			tc.mockFn(t, &pf)
@@ -1072,11 +1066,13 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 
 	// Create the Endpoints controller.
 	ep := &Controller{
-		Client:                fakeClient,
-		Log:                   logrtest.New(t),
-		ConsulServerConnMgr:   testClient.Watcher,
-		AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-		DenyK8sNamespacesSet:  mapset.NewSetWith(),
+		Client:              fakeClient,
+		Log:                 logrtest.New(t),
+		ConsulServerConnMgr: testClient.Watcher,
+		K8sNamespaceConfig: common.K8sNamespaceConfig{
+			AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+			DenyK8sNamespacesSet:  mapset.NewSetWith(),
+		},
 	}
 	resourceClient, err := consul.NewResourceServiceClient(ep.ConsulServerConnMgr)
 	require.NoError(t, err)
@@ -1112,7 +1108,6 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	require.False(t, resp.Requeue)
 
 	expectedServiceMatches(t, resourceClient, tc.svcName, tc.targetConsulNs, tc.targetConsulPartition, tc.expectedResource)
-
 }
 
 func expectedServiceMatches(t *testing.T, client pbresource.ResourceServiceClient, name, namespace, partition string, expectedResource *pbresource.Resource) {
@@ -1140,7 +1135,7 @@ func expectedServiceMatches(t *testing.T, client pbresource.ResourceServiceClien
 	err = res.GetResource().GetData().UnmarshalTo(actualService)
 	require.NoError(t, err)
 
-	if diff := cmp.Diff(expectedService, actualService, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(expectedService, actualService, test.CmpProtoIgnoreOrder()...); diff != "" {
 		t.Errorf("unexpected difference:\n%v", diff)
 	}
 }

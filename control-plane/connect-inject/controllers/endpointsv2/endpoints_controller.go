@@ -1,5 +1,6 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
+
 package endpointsv2
 
 import (
@@ -9,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,36 +29,17 @@ import (
 )
 
 const (
-	metaKeyManagedBy = "managed-by"
-	kindReplicaSet   = "ReplicaSet"
+	kindReplicaSet = "ReplicaSet"
 )
 
 type Controller struct {
 	client.Client
 	// ConsulServerConnMgr is the watcher for the Consul server addresses used to create Consul API v2 clients.
 	ConsulServerConnMgr consul.ServerConnectionManager
-	// Only endpoints in the AllowK8sNamespacesSet are reconciled.
-	AllowK8sNamespacesSet mapset.Set
-	// Endpoints in the DenyK8sNamespacesSet are ignored.
-	DenyK8sNamespacesSet mapset.Set
-	// EnableConsulPartitions indicates that a user is running Consul Enterprise.
-	EnableConsulPartitions bool
-	// ConsulPartition is the Consul Partition to which this controller belongs.
-	ConsulPartition string
-	// EnableConsulNamespaces indicates that a user is running Consul Enterprise.
-	EnableConsulNamespaces bool
-	// ConsulDestinationNamespace is the name of the Consul namespace to create
-	// all config entries in. If EnableNSMirroring is true this is ignored.
-	ConsulDestinationNamespace string
-	// EnableNSMirroring causes Consul namespaces to be created to match the
-	// k8s namespace of any config entry custom resource. Config entries will
-	// be created in the matching Consul namespace.
-	EnableNSMirroring bool
-	// NSMirroringPrefix is an optional prefix that can be added to the Consul
-	// namespaces created while mirroring. For example, if it is set to "k8s-",
-	// then the k8s `default` namespace will be mirrored in Consul's
-	// `k8s-default` namespace.
-	NSMirroringPrefix string
+	// K8sNamespaceConfig manages allow/deny Kubernetes namespaces.
+	common.K8sNamespaceConfig
+	// ConsulTenancyConfig manages settings related to Consul namespaces and partitions.
+	common.ConsulTenancyConfig
 
 	Log logr.Logger
 
@@ -227,7 +208,7 @@ func (r *Controller) registerService(ctx context.Context, resourceClient pbresou
 	return nil
 }
 
-// getServiceResource converts the given Consul service and metadata as a Consul resource API record.
+// getServiceResource converts the given Consul service and metadata to a Consul resource API record.
 func (r *Controller) getServiceResource(svc *pbcatalog.Service, name, namespace, partition string, meta map[string]string) *pbresource.Resource {
 	return &pbresource.Resource{
 		Id:       getServiceID(name, namespace, partition),
@@ -247,6 +228,7 @@ func getServiceID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
+			PeerName:  constants.DefaultConsulPeer,
 		},
 	}
 }
@@ -301,8 +283,8 @@ func (r *Controller) getServiceVIPs(service corev1.Service) []string {
 
 func getServiceMeta(service corev1.Service) map[string]string {
 	meta := map[string]string{
-		constants.MetaKeyKubeNS: service.Namespace,
-		metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+		constants.MetaKeyKubeNS:    service.Namespace,
+		constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 	}
 	//TODO: Support arbitrary meta injection via annotation? (see v1)
 	return meta
