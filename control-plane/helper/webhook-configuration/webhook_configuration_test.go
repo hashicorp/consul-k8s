@@ -45,3 +45,27 @@ func TestUpdateWithCABundle_patchesExistingConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, caBundleOne, mwcFetched.Webhooks[0].ClientConfig.CABundle)
 }
+
+func TestUpdateWithCABundle_patchesExistingConfigurationForValidating(t *testing.T) {
+	caBundleOne := []byte("ca-bundle-for-mwc")
+	ctx := context.Background()
+	clientset := fake.NewSimpleClientset()
+
+	mwc := &admissionv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mwc-one",
+		},
+		Webhooks: []admissionv1.ValidatingWebhook{
+			{
+				Name: "webhook-under-test",
+			},
+		},
+	}
+	mwcCreated, err := clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(ctx, mwc, metav1.CreateOptions{})
+	require.NoError(t, err)
+	err = UpdateWithCABundle(ctx, clientset, mwcCreated.Name, caBundleOne)
+	require.NoError(t, err)
+	mwcFetched, err := clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, mwc.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, caBundleOne, mwcFetched.Webhooks[0].ClientConfig.CABundle)
+}

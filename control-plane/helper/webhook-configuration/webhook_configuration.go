@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 
+	admissionv1 "k8s.io/api/admissionregistration/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -18,21 +20,29 @@ import (
 // UpdateWithCABundle iterates over every webhook on the specified webhook configuration and updates
 // their caBundle with the the specified CA.
 func UpdateWithCABundle(ctx context.Context, clientset kubernetes.Interface, webhookConfigName string, caCert []byte) error {
-	if err := updateMutatingWebhooksWithCABundle(ctx, clientset, webhookConfigName, caCert); err != nil {
-		return err
-	}
-	return updateValidatingWebhooksWithCABundle(ctx, clientset, webhookConfigName, caCert)
-}
-
-func updateMutatingWebhooksWithCABundle(ctx context.Context, clientset kubernetes.Interface, webhookConfigName string, caCert []byte) error {
 	if len(caCert) == 0 {
 		return errors.New("no CA certificate in the bundle")
 	}
-	value := base64.StdEncoding.EncodeToString(caCert)
-	webhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigName, metav1.GetOptions{})
+
+	mutatingWebhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigName, metav1.GetOptions{})
+	if err == nil {
+		return updateMutatingWebhooksWithCABundle(ctx, clientset, mutatingWebhookCfg, caCert)
+	}
+
+	if !k8serrors.IsNotFound(err) {
+		return err
+	}
+
+	validatingWebhookCfg, err := clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, webhookConfigName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
+
+	return updateValidatingWebhooksWithCABundle(ctx, clientset, validatingWebhookCfg, caCert)
+}
+
+func updateMutatingWebhooksWithCABundle(ctx context.Context, clientset kubernetes.Interface, webhookCfg *admissionv1.MutatingWebhookConfiguration, caCert []byte) error {
+	value := base64.StdEncoding.EncodeToString(caCert)
 	type patch struct {
 		Op    string `json:"op,omitempty"`
 		Path  string `json:"path,omitempty"`
@@ -52,22 +62,15 @@ func updateMutatingWebhooksWithCABundle(ctx context.Context, clientset kubernete
 		return err
 	}
 
-	if _, err = clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Patch(ctx, webhookConfigName, types.JSONPatchType, patchesJSON, metav1.PatchOptions{}); err != nil {
+	if _, err = clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Patch(ctx, webhookCfg.Name, types.JSONPatchType, patchesJSON, metav1.PatchOptions{}); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func updateValidatingWebhooksWithCABundle(ctx context.Context, clientset kubernetes.Interface, webhookConfigName string, caCert []byte) error {
-	if len(caCert) == 0 {
-		return errors.New("no CA certificate in the bundle")
-	}
+func updateValidatingWebhooksWithCABundle(ctx context.Context, clientset kubernetes.Interface, webhookCfg *admissionv1.ValidatingWebhookConfiguration, caCert []byte) error {
 	value := base64.StdEncoding.EncodeToString(caCert)
-	webhookCfg, err := clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, webhookConfigName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
 	type patch struct {
 		Op    string `json:"op,omitempty"`
 		Path  string `json:"path,omitempty"`
@@ -87,7 +90,7 @@ func updateValidatingWebhooksWithCABundle(ctx context.Context, clientset kuberne
 		return err
 	}
 
-	if _, err = clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Patch(ctx, webhookConfigName, types.JSONPatchType, patchesJSON, metav1.PatchOptions{}); err != nil {
+	if _, err = clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Patch(ctx, webhookCfg.Name, types.JSONPatchType, patchesJSON, metav1.PatchOptions{}); err != nil {
 		return err
 	}
 
