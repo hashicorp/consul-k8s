@@ -176,7 +176,7 @@ func (c *Command) init() {
 		"Docker image for Consul Dataplane.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
-	c.flagSet.BoolVar(&c.flagEnablePeering, "enable-peering", false, "Enable cluster peering controllers.")
+	c.flagSet.BoolVar(&c.flagEnablePeering, "enable-peering", false, "Enable cluster peering config-entries.")
 	c.flagSet.BoolVar(&c.flagEnableFederation, "enable-federation", false, "Enable Consul WAN Federation.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
 		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
@@ -359,7 +359,7 @@ func (c *Command) Run(args []string) int {
 	go watcher.Run()
 
 	// This is a blocking command that is run in order to ensure we only start the
-	// connect-inject controllers only after we have access to the Consul server.
+	// connect-inject config-entries only after we have access to the Consul server.
 	_, err = watcher.State()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to start Consul server watcher: %s", err))
@@ -381,7 +381,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	//Right now we exclusively start controllers for V1 or V2.
+	//Right now we exclusively start config-entries for V1 or V2.
 	//In the future we might add a flag to pick and choose from both.
 	if c.flagResourceAPIs {
 		err = c.configureV2Controllers(ctx, mgr, watcher)
@@ -389,7 +389,7 @@ func (c *Command) Run(args []string) int {
 		err = c.configureV1Controllers(ctx, mgr, watcher)
 	}
 	if err != nil {
-		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))
+		setupLog.Error(err, fmt.Sprintf("could not configure config-entries: %s", err.Error()))
 		return 1
 	}
 
@@ -533,11 +533,11 @@ func (c *Command) Help() string {
 }
 
 const (
-	synopsis = "Inject the proxy sidecar, run endpoints controller and peering controllers."
+	synopsis = "Inject the proxy sidecar, run endpoints controller and peering config-entries."
 	help     = `
 Usage: consul-k8s-control-plane inject-connect [options]
 
   Run the admission webhook server for injecting the sidecar proxy,
-  the endpoints controller, and the peering controllers.
+  the endpoints controller, and the peering config-entries.
 `
 )

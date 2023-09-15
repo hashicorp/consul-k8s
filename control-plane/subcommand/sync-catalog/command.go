@@ -16,6 +16,13 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/go-hclog"
+	"github.com/mitchellh/cli"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+
 	catalogtoconsul "github.com/hashicorp/consul-k8s/control-plane/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/control-plane/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -23,12 +30,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
-	"github.com/hashicorp/go-hclog"
-	"github.com/mitchellh/cli"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 // Command is the command for syncing the K8S and Consul service
@@ -242,7 +243,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// This is a blocking command that is run in order to ensure we only start the
-	// sync-catalog controllers only after we have access to the Consul server.
+	// sync-catalog config-entries only after we have access to the Consul server.
 	_, err := c.connMgr.State()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to start Consul server watcher: %s", err))

@@ -11,9 +11,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	"golang.org/x/time/rate"
 	corev1 "k8s.io/api/core/v1"
@@ -25,6 +22,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 const (
@@ -34,8 +35,8 @@ const (
 	MigrationFailedError         = "MigrationFailedError"
 )
 
-// Controller is implemented by CRD-specific controllers. It is used by
-// ConfigEntryController to abstract CRD-specific controllers.
+// Controller is implemented by CRD-specific config-entries. It is used by
+// ConfigEntryController to abstract CRD-specific config-entries.
 type Controller interface {
 	// Update updates the state of the whole object.
 	Update(context.Context, client.Object, ...client.UpdateOption) error

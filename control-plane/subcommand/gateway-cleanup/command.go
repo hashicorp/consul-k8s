@@ -12,9 +12,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/mitchellh/cli"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,6 +19,10 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 type Command struct {
@@ -178,7 +179,7 @@ Usage: consul-k8s-control-plane gateway-cleanup [options]
   Deletes installed gateway class and gateway class config objects
 	prior to helm uninstallation. This is required due to finalizers
 	existing on the GatewayClassConfig that will leave around a dangling
-	object without deleting these prior to their controllers being deleted.
+	object without deleting these prior to their config-entries being deleted.
 	The job is best effort, so if it fails to successfully delete the
 	objects, it will allow the uninstallation to continue.
 

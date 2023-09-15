@@ -13,10 +13,6 @@ import (
 
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -27,11 +23,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 // NOTE: We're not testing each controller type here because that's mostly done in
 // the OSS tests and it would result in too many permutations. Instead
-// we're only testing with the ServiceDefaults and ProxyDefaults controllers which
+// we're only testing with the ServiceDefaults and ProxyDefaults config-entries which
 // will exercise all the namespaces code for config entries that are namespaced and those that
 // exist in the global namespace.
 // We also test Enterprise only features like SamenessGroups.

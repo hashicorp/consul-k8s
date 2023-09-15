@@ -5,6 +5,7 @@ package common
 
 import (
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/proto-public/pbresource"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,6 +68,34 @@ type ConfigEntryResource interface {
 	DefaultNamespaceFields(consulMeta ConsulMeta)
 
 	// ConfigEntryResource has to implement metav1.Object so that structs
+	// that implement it effectively implement client.Object which is
+	// the interface supported by controller-runtime reconcile-able resources.
+	metav1.Object
+}
+
+type ConfigEntryV2Resource interface {
+	ResourceID(namespace, partition string) *pbresource.ID
+	Resource(namespace, partition string) *pbresource.Resource
+
+	// GetObjectKind should be implemented by the generated code.
+	GetObjectKind() schema.ObjectKind
+	// DeepCopyObject should be implemented by the generated code.
+	DeepCopyObject() runtime.Object
+
+	// MatchesConsul returns true if the resource has the same fields as the Consul
+	// config entry.
+	MatchesConsul(candidate *pbresource.Resource, namespace, partition string) bool
+
+	// SetSyncedCondition updates the synced condition.
+	SetSyncedCondition(status corev1.ConditionStatus, reason, message string)
+	// SetLastSyncedTime updates the last synced time.
+	SetLastSyncedTime(time *metav1.Time)
+	// SyncedCondition gets the synced condition.
+	SyncedCondition() (status corev1.ConditionStatus, reason, message string)
+	// SyncedConditionStatus returns the status of the synced condition.
+	SyncedConditionStatus() corev1.ConditionStatus
+
+	// ConfigEntryV2Resource has to implement metav1.Object so that structs
 	// that implement it effectively implement client.Object which is
 	// the interface supported by controller-runtime reconcile-able resources.
 	metav1.Object

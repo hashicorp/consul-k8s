@@ -1,21 +1,18 @@
 {{- if .Values.connectInject.enabled }}
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: jwtproviders.consul.hashicorp.com
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
-  name: jwtproviders.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -124,61 +121,61 @@ spec:
                           before being activated. \n Default value is false."
                         type: boolean
                       jwksCluster:
-                        description: "JWKSCluster defines how the specified Remote JWKS
-                          URI is to be fetched."
+                        description: JWKSCluster defines how the specified Remote
+                          JWKS URI is to be fetched.
                         properties:
                           connectTimeout:
-                            description: "The timeout for new network connections to hosts
-                              in the cluster. \n If not set, a default value of 5s will be
-                              used."
+                            description: The timeout for new network connections to
+                              hosts in the cluster. If not set, a default value of
+                              5s will be used.
                             format: int64
                             type: integer
                           discoveryType:
-                            description: "DiscoveryType refers to the service discovery type
-                              to use for resolving the cluster. \n Defaults to STRICT_DNS."
+                            description: "DiscoveryType refers to the service discovery
+                              type to use for resolving the cluster. \n This defaults
+                              to STRICT_DNS. Other options include STATIC, LOGICAL_DNS,
+                              EDS or ORIGINAL_DST."
                             type: string
                           tlsCertificates:
                             description: "TLSCertificates refers to the data containing
-                              certificate authority certificates to use in verifying a presented
-                              peer certificate."
+                              certificate authority certificates to use in verifying
+                              a presented peer certificate. If not specified and a
+                              peer certificate is presented it will not be verified.
+                              \n Must be either CaCertificateProviderInstance or TrustedCA."
                             properties:
                               caCertificateProviderInstance:
-                                description: "CaCertificateProviderInstance Certificate provider
-                                  instance for fetching TLS certificates."
+                                description: CaCertificateProviderInstance Certificate
+                                  provider instance for fetching TLS certificates.
                                 properties:
-                                  instanceName:
-                                    description: "InstanceName refers to the certificate provider
-                                      instance name. \n The default value is 'default'."
-                                    type: string
                                   certificateName:
-                                    description: "CertificateName is used to specify certificate 
-                                      instances or types. For example, \"ROOTCA\" to specify a 
-                                      root-certificate (validation context) or \"example.com\" 
-                                      to specify a certificate for a particular domain. \n 
-                                      The default value is the empty string."
+                                    description: "CertificateName is used to specify
+                                      certificate instances or types. For example,
+                                      \"ROOTCA\" to specify a root-certificate (validation
+                                      context) or \"example.com\" to specify a certificate
+                                      for a particular domain. \n The default value
+                                      is the empty string."
+                                    type: string
+                                  instanceName:
+                                    description: "InstanceName refers to the certificate
+                                      provider instance name. \n The default value
+                                      is \"default\"."
                                     type: string
                                 type: object
                               trustedCA:
-                                description: "TrustedCA defines TLS certificate data containing
-                                  certificate authority certificates to use in verifying a presented
-                                  peer certificate. \n Exactly one of Filename, EnvironmentVariable, 
-                                  InlineString or InlineBytes must be specified."
+                                description: "TrustedCA defines TLS certificate data
+                                  containing certificate authority certificates to
+                                  use in verifying a presented peer certificate. \n
+                                  Exactly one of Filename, EnvironmentVariable, InlineString
+                                  or InlineBytes must be specified."
                                 properties:
-                                  filename:
-                                    description: "The name of the file on the local system to use a
-                                      data source for trusted CA certificates."
-                                    type: string
                                   environmentVariable:
-                                    description: "The environment variable on the local system to use
-                                      a data source for trusted CA certificates."
                                     type: string
-                                  inlineString: 
-                                    description: "A string to inline in the configuration for use as 
-                                      a data source for trusted CA certificates."
+                                  filename:
                                     type: string
                                   inlineBytes:
-                                    description: "A sequence of bytes to inline in the configuration 
-                                      for use as a data source for trusted CA certificates."
+                                    format: byte
+                                    type: string
+                                  inlineString:
                                     type: string
                                 type: object
                             type: object
@@ -198,20 +195,20 @@ spec:
                               of 10s. \n Default value is 0."
                             type: integer
                           retryPolicyBackOff:
-                            description: "Backoff policy \n Defaults to Envoy's backoff
-                              policy"
+                            description: "Retry's backoff policy. \n Defaults to Envoy's
+                              backoff policy."
                             properties:
                               baseInterval:
                                 description: "BaseInterval to be used for the next
-                                  back off computation \n The default value from envoy
-                                  is 1s"
+                                  back off computation. \n The default value from
+                                  envoy is 1s."
                                 format: int64
                                 type: integer
                               maxInterval:
                                 description: "MaxInternal to be used to specify the
                                   maximum interval between retries. Optional but should
                                   be greater or equal to BaseInterval. \n Defaults
-                                  to 10 times BaseInterval"
+                                  to 10 times BaseInterval."
                                 format: int64
                                 type: integer
                             type: object

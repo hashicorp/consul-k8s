@@ -20,6 +20,9 @@ const (
 	RouteAuthFilter          string = "routeauthfilter"
 	GatewayPolicy            string = "gatewaypolicy"
 
+	// V2 config entries
+	TrafficPermissions string = "trafficpermissions"
+
 	Global                 string = "global"
 	Mesh                   string = "mesh"
 	DefaultConsulNamespace string = "default"

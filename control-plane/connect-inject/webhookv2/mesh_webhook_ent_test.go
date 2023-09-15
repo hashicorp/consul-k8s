@@ -3,7 +3,7 @@
 
 //go:build enterprise
 
-package webhook_v2
+package webhookv2
 
 import (
 	"context"

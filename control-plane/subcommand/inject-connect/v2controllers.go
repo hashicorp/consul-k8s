@@ -6,11 +6,14 @@ package connectinject
 import (
 	"context"
 
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
+
+	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/config-entries/controllersv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpointsv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
@@ -19,7 +22,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/namespace"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
-	webhookV2 "github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook_v2"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhookv2"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -123,6 +126,27 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	}
 
 	// TODO: V2 Config Controller(s)
+	configEntryReconciler := &controllersv2.ConfigEntryController{
+		ConsulClientConfig:         consulConfig,
+		ConsulServerConnMgr:        watcher,
+		DatacenterName:             c.consul.Datacenter,
+		EnableConsulNamespaces:     c.flagEnableNamespaces,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+		EnableConsulPartitions:     c.flagEnablePartitions,
+		ConsulPartition:            c.consul.Partition,
+	}
+	if err := (&controllersv2.TrafficPermissionsController{
+		ConfigEntryController: configEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.TrafficPermissions),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", apicommon.TrafficPermissions)
+		return err
+	}
 
 	// // Metadata for webhooks
 	//consulMeta := apicommon.ConsulMeta{
@@ -138,7 +162,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
 	mgr.GetWebhookServer().Register("/mutate",
-		&ctrlRuntimeWebhook.Admission{Handler: &webhookV2.MeshWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &webhookv2.MeshWebhook{
 			Clientset:                    c.clientset,
 			ReleaseNamespace:             c.flagReleaseNamespace,
 			ConsulConfig:                 consulConfig,

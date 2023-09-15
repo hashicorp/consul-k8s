@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package webhook_v2
+package webhookv2
 
 import (
 	corev1 "k8s.io/api/core/v1"
