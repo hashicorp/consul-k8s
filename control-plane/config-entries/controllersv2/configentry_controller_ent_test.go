@@ -3,7 +3,7 @@
 
 //go:build enterprise
 
-package controllers
+package controllersv2
 
 import (
 	"context"
@@ -797,7 +797,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
-					return &ServiceIntentionsController{
+					return &TrafficPermissionsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -1042,7 +1042,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 				},
 				ConsulNamespace: c.ExpConsulNS,
 				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
-					return &ServiceIntentionsController{
+					return &TrafficPermissionsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,
@@ -1303,7 +1303,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				},
 				ConsulNamespace: c.ExpConsulNS,
 				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
-					return &ServiceIntentionsController{
+					return &TrafficPermissionsController{
 						Client:                client,
 						Log:                   logger,
 						Scheme:                scheme,

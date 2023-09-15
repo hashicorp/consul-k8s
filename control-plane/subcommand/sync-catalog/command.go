@@ -243,7 +243,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// This is a blocking command that is run in order to ensure we only start the
-	// sync-catalog controllers only after we have access to the Consul server.
+	// sync-catalog config-entries only after we have access to the Consul server.
 	_, err := c.connMgr.State()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to start Consul server watcher: %s", err))

@@ -35,8 +35,8 @@ const (
 	MigrationFailedError         = "MigrationFailedError"
 )
 
-// Controller is implemented by CRD-specific controllers. It is used by
-// ConfigEntryController to abstract CRD-specific controllers.
+// Controller is implemented by CRD-specific config-entries. It is used by
+// ConfigEntryController to abstract CRD-specific config-entries.
 type Controller interface {
 	// Update updates the state of the whole object.
 	Update(context.Context, client.Object, ...client.UpdateOption) error
