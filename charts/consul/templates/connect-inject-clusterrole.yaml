@@ -30,11 +30,14 @@ rules:
   - controlplanerequestlimits
   - routeretryfilters
   - routetimeoutfilters
+  - routeauthfilters
+  - gatewaypolicies
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers
   {{- end }}
   - jwtproviders
+  - routeauthfilters
   verbs:
   - create
   - delete
@@ -63,6 +66,8 @@ rules:
   - peeringdialers/status
   {{- end }}
   - jwtproviders/status
+  - routeauthfilters/status
+  - gatewaypolicies/status
   verbs:
   - get
   - patch
@@ -107,6 +112,7 @@ rules:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
   verbs:
   - get
   - list

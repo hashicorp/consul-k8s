@@ -6,14 +6,15 @@ package binding
 import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 // BinderConfig configures a binder instance with all of the information
@@ -52,6 +53,8 @@ type BinderConfig struct {
 	Pods []corev1.Pod
 	// Service is the deployed service associated with the Gateway deployment.
 	Service *corev1.Service
+	// JWTProviders is the list of all JWTProviders in the cluster
+	JWTProviders []v1alpha1.JWTProvider
 
 	// ConsulGateway is the config entry we've created in Consul.
 	ConsulGateway *api.APIGatewayConfigEntry
@@ -61,6 +64,9 @@ type BinderConfig struct {
 	// Resources is a map containing all service targets to verify
 	// against the routing backends.
 	Resources *common.ResourceMap
+
+	// Policies is a list containing all GatewayPolicies that are part of the Gateway Deployment
+	Policies []v1alpha1.GatewayPolicy
 }
 
 // Binder is used for generating a Snapshot of all operations that should occur both
@@ -116,7 +122,10 @@ func (b *Binder) Snapshot() *Snapshot {
 
 	var gatewayValidation gatewayValidationResult
 	var listenerValidation listenerValidationResults
+	var policyValidation gatewayPolicyValidationResults
+	var authFilterValidation authFilterValidationResults
 
+	authFilters := b.config.Resources.GetExternalAuthFilters()
 	if !isGatewayDeleted {
 		var updated bool
 
@@ -133,6 +142,8 @@ func (b *Binder) Snapshot() *Snapshot {
 		// calculate the status for the gateway
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
 		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, b.config.GatewayClassConfig)
+		policyValidation = validateGatewayPolicies(b.config.Gateway, b.config.Policies, b.config.Resources)
+		authFilterValidation = validateAuthFilters(authFilters, b.config.Resources)
 	}
 
 	// used for tracking how many routes have successfully bound to which listeners
@@ -234,6 +245,36 @@ func (b *Binder) Snapshot() *Snapshot {
 		if !common.GatewayStatusesEqual(status, b.config.Gateway.Status) {
 			b.config.Gateway.Status = status
 			snapshot.Kubernetes.StatusUpdates.Add(&b.config.Gateway)
+		}
+
+		for idx, policy := range b.config.Policies {
+			policy := policy
+
+			var policyStatus v1alpha1.GatewayPolicyStatus
+
+			policyStatus.Conditions = policyValidation.Conditions(policy.Generation, idx)
+			// only mark the policy as needing a status update if there's a diff with its old status
+			if !common.GatewayPolicyStatusesEqual(policyStatus, policy.Status) {
+				b.config.Policies[idx].Status = policyStatus
+				snapshot.Kubernetes.StatusUpdates.Add(&b.config.Policies[idx])
+			}
+		}
+
+		for idx, authFilter := range authFilters {
+			if authFilter == nil {
+				continue
+			}
+			authFilter := authFilter
+
+			var filterStatus v1alpha1.RouteAuthFilterStatus
+
+			filterStatus.Conditions = authFilterValidation.Conditions(authFilter.Generation, idx)
+
+			// only mark the filter as needing a status update if there's a diff with its old status
+			if !common.RouteAuthFilterStatusesEqual(filterStatus, authFilter.Status) {
+				authFilter.Status = filterStatus
+				snapshot.Kubernetes.StatusUpdates.Add(authFilter)
+			}
 		}
 	} else {
 		// if the gateway has been deleted, unset whatever we've set on it

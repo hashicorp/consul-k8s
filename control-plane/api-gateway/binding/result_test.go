@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -65,6 +66,183 @@ func TestBindResults_Condition(t *testing.T) {
 			assert.Equalf(t, tc.Expected.Status, actual.Status, "expected condition with status %q but got %q", tc.Expected.Status, actual.Status)
 			assert.Equalf(t, tc.Expected.Reason, actual.Reason, "expected condition with reason %q but got %q", tc.Expected.Reason, actual.Reason)
 			assert.Equalf(t, tc.Expected.Message, actual.Message, "expected condition with message %q but got %q", tc.Expected.Message, actual.Message)
+		})
+	}
+}
+
+func TestGatewayPolicyValidationResult_Conditions(t *testing.T) {
+	t.Parallel()
+	var generation int64 = 5
+	for name, tc := range map[string]struct {
+		results  gatewayPolicyValidationResult
+		expected []metav1.Condition
+	}{
+		"policy valid": {
+			results: gatewayPolicyValidationResult{},
+			expected: []metav1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             metav1.ConditionTrue,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "Accepted",
+					Message:            "gateway policy accepted",
+				},
+				{
+					Type:               "ResolvedRefs",
+					Status:             metav1.ConditionTrue,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "ResolvedRefs",
+					Message:            "resolved references",
+				},
+			},
+		},
+		"errors with JWT references": {
+			results: gatewayPolicyValidationResult{
+				acceptedErr:      errNotAcceptedDueToInvalidRefs,
+				resolvedRefsErrs: []error{errorForMissingJWTProviders(map[string]struct{}{"okta": {}})},
+			},
+			expected: []metav1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "ReferencesNotValid",
+					Message:            errNotAcceptedDueToInvalidRefs.Error(),
+				},
+				{
+					Type:               "ResolvedRefs",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "MissingJWTProviderReference",
+					Message:            errorForMissingJWTProviders(map[string]struct{}{"okta": {}}).Error(),
+				},
+			},
+		},
+		"errors with listener references": {
+			results: gatewayPolicyValidationResult{
+				acceptedErr:      errNotAcceptedDueToInvalidRefs,
+				resolvedRefsErrs: []error{errorForMissingListener("gw", "l1")},
+			},
+			expected: []metav1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "ReferencesNotValid",
+					Message:            errNotAcceptedDueToInvalidRefs.Error(),
+				},
+				{
+					Type:               "ResolvedRefs",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "MissingListenerReference",
+					Message:            errorForMissingListener("gw", "l1").Error(),
+				},
+			},
+		},
+		"errors with listener and jwt references": {
+			results: gatewayPolicyValidationResult{
+				acceptedErr: errNotAcceptedDueToInvalidRefs,
+				resolvedRefsErrs: []error{
+					errorForMissingJWTProviders(map[string]struct{}{"okta": {}}),
+					errorForMissingListener("gw", "l1"),
+				},
+			},
+			expected: []metav1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "ReferencesNotValid",
+					Message:            errNotAcceptedDueToInvalidRefs.Error(),
+				},
+				{
+					Type:               "ResolvedRefs",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "MissingJWTProviderReference",
+					Message:            errorForMissingJWTProviders(map[string]struct{}{"okta": {}}).Error(),
+				},
+				{
+					Type:               "ResolvedRefs",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "MissingListenerReference",
+					Message:            errorForMissingListener("gw", "l1").Error(),
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.EqualValues(t, tc.expected, tc.results.Conditions(generation))
+		})
+	}
+}
+
+func TestAuthFilterValidationResult_Conditions(t *testing.T) {
+	t.Parallel()
+	var generation int64 = 5
+	for name, tc := range map[string]struct {
+		results  authFilterValidationResult
+		expected []metav1.Condition
+	}{
+		"policy valid": {
+			results: authFilterValidationResult{},
+			expected: []metav1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             metav1.ConditionTrue,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "Accepted",
+					Message:            "route auth filter accepted",
+				},
+				{
+					Type:               "ResolvedRefs",
+					Status:             metav1.ConditionTrue,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "ResolvedRefs",
+					Message:            "resolved references",
+				},
+			},
+		},
+		"errors with JWT references": {
+			results: authFilterValidationResult{
+				acceptedErr:    errNotAcceptedDueToInvalidRefs,
+				resolvedRefErr: fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta"),
+			},
+			expected: []metav1.Condition{
+				{
+					Type:               "Accepted",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "ReferencesNotValid",
+					Message:            errNotAcceptedDueToInvalidRefs.Error(),
+				},
+				{
+					Type:               "ResolvedRefs",
+					Status:             metav1.ConditionFalse,
+					ObservedGeneration: generation,
+					LastTransitionTime: timeFunc(),
+					Reason:             "MissingJWTProviderReference",
+					Message:            fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta").Error(),
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.EqualValues(t, tc.expected, tc.results.Conditions(generation))
 		})
 	}
 }

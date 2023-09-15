@@ -10,12 +10,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"k8s.io/utils/pointer"
 	"math/big"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -28,9 +29,10 @@ import (
 
 	logrtest "github.com/go-logr/logr/testing"
 
+	"github.com/hashicorp/consul/api"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul/api"
 )
 
 type fakeReferenceValidator struct{}
@@ -1201,7 +1203,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								Filters:   api.HTTPFilters{Headers: []api.HTTPHeaderFilter{}},
 								ResponseFilters: api.HTTPResponseFilters{
 									Headers: []api.HTTPHeaderFilter{},
-								}},
+								},
+							},
 							{
 								Name:      "service one",
 								Namespace: "some ns",
@@ -1294,7 +1297,21 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										ExtensionRef: &gwv1beta1.LocalObjectReference{
 											Name:  "test",
 											Kind:  v1alpha1.RouteRetryFilterKind,
-											Group: "consul.hashicorp.com/v1alpha1",
+											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
+										},
+									},
+									{
+										ExtensionRef: &gwv1beta1.LocalObjectReference{
+											Name:  "test-timeout-filter",
+											Kind:  v1alpha1.RouteTimeoutFilterKind,
+											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
+										},
+									},
+									{
+										ExtensionRef: &gwv1beta1.LocalObjectReference{
+											Name:  "test-jwt-filter",
+											Kind:  v1alpha1.RouteAuthFilterKind,
+											Group: gwv1beta1.Group(v1alpha1.GroupVersion.Group),
 										},
 									},
 								},
@@ -1359,6 +1376,47 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							RetryOnConnectFailure: pointer.Bool(true),
 						},
 					},
+
+					&v1alpha1.RouteTimeoutFilter{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.RouteTimeoutFilterKind,
+							APIVersion: "consul.hashicorp.com/v1alpha1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-timeout-filter",
+							Namespace: "k8s-ns",
+						},
+						Spec: v1alpha1.RouteTimeoutFilterSpec{
+							RequestTimeout: 10,
+							IdleTimeout:    30,
+						},
+					},
+
+					&v1alpha1.RouteAuthFilter{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       v1alpha1.RouteAuthFilterKind,
+							APIVersion: "consul.hashicorp.com/v1alpha1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-jwt-filter",
+							Namespace: "k8s-ns",
+						},
+						Spec: v1alpha1.RouteAuthFilterSpec{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
+									{
+										Name: "test-jwt-provider",
+										VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
+											{
+												Path:  []string{"/okta"},
+												Value: "okta",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			want: api.HTTPRouteConfigEntry{
@@ -1374,6 +1432,23 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								RetryOn:               []string{"cancelled"},
 								RetryOnStatusCodes:    []uint32{500, 502},
 								RetryOnConnectFailure: pointer.Bool(false),
+							},
+							TimeoutFilter: &api.TimeoutFilter{
+								RequestTimeout: time.Duration(10 * time.Nanosecond),
+								IdleTimeout:    time.Duration(30 * time.Nanosecond),
+							},
+							JWT: &api.JWTFilter{
+								Providers: []*api.APIGatewayJWTProvider{
+									{
+										Name: "test-jwt-provider",
+										VerifyClaims: []*api.APIGatewayJWTClaimVerification{
+											{
+												Path:  []string{"/okta"},
+												Value: "okta",
+											},
+										},
+									},
+								},
 							},
 						},
 						ResponseFilters: api.HTTPResponseFilters{
@@ -1674,6 +1749,152 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 			requestHeaders, responseHeaders := t.translateHTTPFilters(tt.args.filters, nil, "")
 			assert.Equalf(t1, tt.want, requestHeaders, "translateHTTPFilters(%v)", tt.args.filters)
 			assert.Equalf(t1, tt.wantResponseFilters, responseHeaders, "translateHTTPFilters(%v)", tt.args.filters)
+		})
+	}
+}
+
+func newSectionNamePtr(s string) *gwv1beta1.SectionName {
+	sectionName := gwv1beta1.SectionName(s)
+	return &sectionName
+}
+
+func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
+	type args struct {
+		gateway  gwv1beta1.Gateway
+		listener gwv1beta1.Listener
+		gwcc     *v1alpha1.GatewayClassConfig
+	}
+	tests := []struct {
+		name     string
+		args     args
+		policies []v1alpha1.GatewayPolicy
+		want     api.APIGatewayListener
+		want1    bool
+	}{
+		{
+			name: "listener with jwt auth",
+			policies: []v1alpha1.GatewayPolicy{
+				{
+					Spec: v1alpha1.GatewayPolicySpec{
+						TargetRef: v1alpha1.PolicyTargetReference{
+							Kind:        KindGateway,
+							Name:        "test",
+							Namespace:   "test",
+							SectionName: newSectionNamePtr("test-listener"),
+						},
+						Override: &v1alpha1.GatewayPolicyConfig{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
+									{
+										Name: "override-provider",
+										VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
+											{
+												Path:  []string{"path"},
+												Value: "value",
+											},
+										},
+									},
+								},
+							},
+						},
+						Default: &v1alpha1.GatewayPolicyConfig{JWT: &v1alpha1.GatewayJWTRequirement{
+							Providers: []*v1alpha1.GatewayJWTProvider{
+								{
+									Name: "default-provider",
+									VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
+										{
+											Path:  []string{"path"},
+											Value: "value",
+										},
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
+			args: args{
+				gateway: gwv1beta1.Gateway{
+					TypeMeta: metav1.TypeMeta{
+						Kind: KindGateway,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "test",
+					},
+					Spec: gwv1beta1.GatewaySpec{
+						Listeners: []gwv1beta1.Listener{
+							{
+								Name:     "test-listener",
+								Port:     80,
+								Protocol: "HTTP",
+							},
+						},
+					},
+				},
+				listener: gwv1beta1.Listener{
+					Name:     "test-listener",
+					Port:     80,
+					Protocol: "HTTP",
+				},
+				gwcc: &v1alpha1.GatewayClassConfig{
+					Spec: v1alpha1.GatewayClassConfigSpec{},
+				},
+			},
+			want: api.APIGatewayListener{
+				Name:     "test-listener",
+				Port:     80,
+				Protocol: "http",
+				Override: &api.APIGatewayPolicy{
+					JWT: &api.APIGatewayJWTRequirement{
+						Providers: []*api.APIGatewayJWTProvider{
+							{
+								Name: "override-provider",
+								VerifyClaims: []*api.APIGatewayJWTClaimVerification{
+									{
+										Path:  []string{"path"},
+										Value: "value",
+									},
+								},
+							},
+						},
+					},
+				},
+				Default: &api.APIGatewayPolicy{
+					JWT: &api.APIGatewayJWTRequirement{
+						Providers: []*api.APIGatewayJWTProvider{
+							{
+								Name: "default-provider",
+								VerifyClaims: []*api.APIGatewayJWTClaimVerification{
+									{
+										Path:  []string{"path"},
+										Value: "value",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want1: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t1 *testing.T) {
+			translator := ResourceTranslator{
+				EnableConsulNamespaces: true,
+				ConsulDestNamespace:    "",
+				EnableK8sMirroring:     true,
+				MirroringPrefix:        "",
+			}
+
+			resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+			for _, p := range tt.policies {
+				resources.AddGatewayPolicy(&p)
+			}
+			got, got1 := translator.toAPIGatewayListener(tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
+			assert.Equalf(t, tt.want, got, "toAPIGatewayListener(%v, %v, %v, %v)", tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
+			assert.Equalf(t, tt.want1, got1, "toAPIGatewayListener(%v, %v, %v, %v)", tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
 		})
 	}
 }

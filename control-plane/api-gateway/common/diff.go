@@ -11,12 +11,22 @@ import (
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func GatewayStatusesEqual(a, b gwv1beta1.GatewayStatus) bool {
 	return slices.EqualFunc(a.Addresses, b.Addresses, gatewayStatusesAddressesEqual) &&
 		slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual) &&
 		slices.EqualFunc(a.Listeners, b.Listeners, gatewayStatusesListenersEqual)
+}
+
+func GatewayPolicyStatusesEqual(a, b v1alpha1.GatewayPolicyStatus) bool {
+	return slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
+}
+
+func RouteAuthFilterStatusesEqual(a, b v1alpha1.RouteAuthFilterStatus) bool {
+	return slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
 }
 
 func gatewayStatusesAddressesEqual(a, b gwv1beta1.GatewayAddress) bool {
@@ -103,7 +113,75 @@ func (e entryComparator) apiGatewayListenersEqual(a, b api.APIGatewayListener) b
 		a.Port == b.Port &&
 		// normalize the protocol name
 		strings.EqualFold(a.Protocol, b.Protocol) &&
-		e.apiGatewayListenerTLSConfigurationsEqual(a.TLS, b.TLS)
+		e.apiGatewayListenerTLSConfigurationsEqual(a.TLS, b.TLS) &&
+		e.apiGatewayPoliciesEqual(a.Override, b.Override) &&
+		e.apiGatewayPoliciesEqual(a.Default, b.Default)
+}
+
+func (e entryComparator) apiGatewayPoliciesEqual(a, b *api.APIGatewayPolicy) bool {
+	// if both are nil then return true
+	if a == nil && b == nil {
+		return true
+	}
+
+	// if only one is nil then return false
+	if a == nil || b == nil {
+		return false
+	}
+
+	return e.equalJWTProviders(a.JWT, b.JWT)
+}
+
+func (e entryComparator) equalJWTProviders(a, b *api.APIGatewayJWTRequirement) bool {
+	if a == nil && b == nil {
+		return true
+	}
+
+	if a == nil || b == nil {
+		return false
+	}
+
+	return slices.EqualFunc(a.Providers, b.Providers, providersEqual)
+}
+
+func providersEqual(a, b *api.APIGatewayJWTProvider) bool {
+	if a == nil && b == nil {
+		return true
+	}
+
+	if a == nil || b == nil {
+		return false
+	}
+
+	if a.Name != b.Name {
+		return false
+	}
+
+	return slices.EqualFunc(a.VerifyClaims, b.VerifyClaims, equalClaims)
+}
+
+func equalClaims(a, b *api.APIGatewayJWTClaimVerification) bool {
+	if a == nil && b == nil {
+		return true
+	}
+
+	if a == nil || b == nil {
+		return false
+	}
+
+	if a.Value != b.Value {
+		return false
+	}
+
+	if len(a.Path) != len(b.Path) {
+		return false
+	}
+
+	if !slices.Equal(a.Path, b.Path) {
+		return false
+	}
+
+	return true
 }
 
 func (e entryComparator) apiGatewayListenerTLSConfigurationsEqual(a, b api.APIGatewayTLSConfiguration) bool {
@@ -152,7 +230,8 @@ func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 		slices.EqualFunc(a.Matches, b.Matches, e.httpMatchesEqual) &&
 		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual) &&
 		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual)
+		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual) &&
+		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual)
 }
 
 func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
@@ -201,6 +280,16 @@ func (e entryComparator) retryFiltersEqual(a, b api.RetryFilter) bool {
 
 func (e entryComparator) timeoutFiltersEqual(a, b api.TimeoutFilter) bool {
 	return a.RequestTimeout == b.RequestTimeout && a.IdleTimeout == b.IdleTimeout
+}
+
+// jwtFiltersEqual compares the contents of the list of providers on the JWT filters for a route, returning true if the
+// filters have equal contents.
+func (e entryComparator) jwtFiltersEqual(a, b api.JWTFilter) bool {
+	if len(a.Providers) != len(b.Providers) {
+		return false
+	}
+
+	return slices.EqualFunc(a.Providers, b.Providers, providersEqual)
 }
 
 func tcpRoutesEqual(a, b *api.TCPRouteConfigEntry) bool {

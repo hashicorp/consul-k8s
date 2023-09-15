@@ -4,8 +4,11 @@
 package binding
 
 import (
+	"fmt"
 	"strings"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -15,10 +18,11 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul/api"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/version"
-	"github.com/hashicorp/consul/api"
 )
 
 var (
@@ -161,6 +165,70 @@ func validateGateway(gateway gwv1beta1.Gateway, pods []corev1.Pod, consulGateway
 	return result
 }
 
+func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.GatewayPolicy, resources *common.ResourceMap) gatewayPolicyValidationResults {
+	results := make(gatewayPolicyValidationResults, 0, len(policies))
+
+	for _, policy := range policies {
+		result := gatewayPolicyValidationResult{
+			resolvedRefsErrs: []error{},
+		}
+
+		exists := listenerExistsForPolicy(gateway, policy)
+		if !exists {
+			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingListener(policy.Spec.TargetRef.Name, string(*policy.Spec.TargetRef.SectionName)))
+		}
+
+		missingJWTProviders := make(map[string]struct{})
+		if policy.Spec.Override != nil && policy.Spec.Override.JWT != nil {
+			for _, policyJWTProvider := range policy.Spec.Override.JWT.Providers {
+				_, jwtExists := resources.GetJWTProviderForGatewayJWTProvider(policyJWTProvider)
+				if !jwtExists {
+					missingJWTProviders[policyJWTProvider.Name] = struct{}{}
+				}
+			}
+		}
+
+		if policy.Spec.Default != nil && policy.Spec.Default.JWT != nil {
+			for _, policyJWTProvider := range policy.Spec.Default.JWT.Providers {
+				_, jwtExists := resources.GetJWTProviderForGatewayJWTProvider(policyJWTProvider)
+				if !jwtExists {
+					missingJWTProviders[policyJWTProvider.Name] = struct{}{}
+				}
+			}
+		}
+
+		if len(missingJWTProviders) > 0 {
+			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingJWTProviders(missingJWTProviders))
+		}
+
+		if len(result.resolvedRefsErrs) > 0 {
+			result.acceptedErr = errNotAcceptedDueToInvalidRefs
+		}
+		results = append(results, result)
+
+	}
+	return results
+}
+
+func listenerExistsForPolicy(gateway gwv1beta1.Gateway, policy v1alpha1.GatewayPolicy) bool {
+	return gateway.Name == policy.Spec.TargetRef.Name &&
+		slices.ContainsFunc(gateway.Spec.Listeners, func(l gwv1beta1.Listener) bool { return l.Name == *policy.Spec.TargetRef.SectionName })
+}
+
+func errorForMissingListener(name, listenerName string) error {
+	return fmt.Errorf("%w: gatewayName - %q, listenerName - %q", errPolicyListenerReferenceDoesNotExist, name, listenerName)
+}
+
+func errorForMissingJWTProviders(names map[string]struct{}) error {
+	namesList := make([]string, 0, len(names))
+	for name := range names {
+		namesList = append(namesList, name)
+	}
+	slices.Sort(namesList)
+	mergedNames := strings.Join(namesList, ",")
+	return fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, mergedNames)
+}
+
 // mergedListener associates a listener with its indexed position
 // in the gateway spec, it's used to re-associate a status with
 // a listener after we merge compatible listeners together and then
@@ -224,6 +292,32 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 	}
 
 	return nil, refsErr
+}
+
+func validateJWT(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *common.ResourceMap) error {
+	policy, _ := resources.GetPolicyForGatewayListener(gateway, listener)
+	if policy == nil {
+		return nil
+	}
+
+	if policy.Spec.Override != nil && policy.Spec.Override.JWT != nil {
+		for _, provider := range policy.Spec.Override.JWT.Providers {
+			_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
+			if !ok {
+				return errListenerJWTProviderNotFound
+			}
+		}
+	}
+
+	if policy.Spec.Default != nil && policy.Spec.Default.JWT != nil {
+		for _, provider := range policy.Spec.Default.JWT.Providers {
+			_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
+			if !ok {
+				return errListenerJWTProviderNotFound
+			}
+		}
+	}
+	return nil
 }
 
 func validateCertificateRefs(gateway gwv1beta1.Gateway, refs []gwv1beta1.SecretObjectReference, resources *common.ResourceMap) error {
@@ -336,9 +430,19 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 		var result listenerValidationResult
 
 		err, refErr := validateTLS(gateway, listener.TLS, resources)
-		result.refErr = refErr
+		if refErr != nil {
+			result.refErrs = append(result.refErrs, refErr)
+		}
+
+		jwtErr := validateJWT(gateway, listener, resources)
+		if jwtErr != nil {
+			result.refErrs = append(result.refErrs, jwtErr)
+		}
+
 		if err != nil {
 			result.acceptedErr = err
+		} else if jwtErr != nil {
+			result.acceptedErr = jwtErr
 		} else {
 			_, supported := supportedKindsForProtocol[listener.Protocol]
 			if !supported {
@@ -455,11 +559,49 @@ func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.R
 					return false
 				}
 			}
-
 		}
 	}
 
 	return true
+}
+
+func checkIfReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap, namespace string, invalidFilters map[string]struct{}) {
+	if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef {
+		return
+	}
+	externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
+	if !ok {
+		return
+	}
+	authFilter, ok := externalFilter.(*v1alpha1.RouteAuthFilter)
+	if !ok {
+		return
+	}
+
+	for _, provider := range authFilter.Spec.JWT.Providers {
+		_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
+		if !ok {
+			invalidFilters[fmt.Sprintf("%s/%s", namespace, authFilter.Name)] = struct{}{}
+			return
+		}
+	}
+}
+
+func authFilterReferencesMissingJWTProvider(httproute *gwv1beta1.HTTPRoute, resources *common.ResourceMap) []string {
+	invalidFilters := make(map[string]struct{})
+	for _, rule := range httproute.Spec.Rules {
+		for _, filter := range rule.Filters {
+			checkIfReferencesMissingJWTProvider(filter, resources, httproute.Namespace, invalidFilters)
+		}
+
+		for _, backendRef := range rule.BackendRefs {
+			for _, filter := range backendRef.Filters {
+				checkIfReferencesMissingJWTProvider(filter, resources, httproute.Namespace, invalidFilters)
+			}
+		}
+	}
+
+	return maps.Keys(invalidFilters)
 }
 
 // externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.
@@ -469,7 +611,7 @@ func externalRefsKindAllowedOnRoute(route *gwv1beta1.HTTPRoute) bool {
 			return false
 		}
 
-		//same thing but for backendref
+		// same thing but for backendref
 		for _, backendRef := range rule.BackendRefs {
 			if !filtersAllAllowedType(backendRef.Filters) {
 				return false
@@ -540,6 +682,35 @@ func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRout
 	}
 
 	return routeKindIsAllowedForListener(allowedRoutes.Kinds, gk)
+}
+
+func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *common.ResourceMap) authFilterValidationResults {
+	results := make(authFilterValidationResults, 0, len(authFilters))
+
+	for _, filter := range authFilters {
+		if filter == nil {
+			continue
+		}
+		var result authFilterValidationResult
+		missingJWTProviders := make([]string, 0)
+		for _, provider := range filter.Spec.JWT.Providers {
+			if _, ok := resources.GetJWTProviderForGatewayJWTProvider(provider); !ok {
+				missingJWTProviders = append(missingJWTProviders, provider.Name)
+			}
+		}
+
+		if len(missingJWTProviders) > 0 {
+			mergedNames := strings.Join(missingJWTProviders, ",")
+			result.resolvedRefErr = fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, mergedNames)
+		}
+
+		if result.resolvedRefErr != nil {
+			result.acceptedErr = errNotAcceptedDueToInvalidRefs
+		}
+
+		results = append(results, result)
+	}
+	return results
 }
 
 // toNamespaceSet constructs a list of labels used to match a Namespace.
