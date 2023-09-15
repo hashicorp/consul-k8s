@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: static-client
-          image: docker.mirror.hashicorp.services/buildpack-deps:jammy-curl
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
           command: [ "/bin/sh", "-c", "--" ]
           args: [ "while true; do sleep 30; done;" ]
           env:
