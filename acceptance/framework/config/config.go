@@ -99,10 +99,11 @@ type TestConfig struct {
 	NoCleanup          bool
 	DebugDirectory     string
 
-	UseAKS  bool
-	UseEKS  bool
-	UseGKE  bool
-	UseKind bool
+	UseAKS          bool
+	UseEKS          bool
+	UseGKE          bool
+	UseGKEAutopilot bool
+	UseKind         bool
 
 	helmChartPath string
 }
@@ -153,6 +154,15 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 			// namespace it must be run in a different privileged namespace.
 			setIfNotEmpty(helmValues, "connectInject.cni.namespace", "kube-system")
 		}
+	}
+
+	// UseGKEAutopilot is a temporary hack that we need in place as GKE Autopilot is already installing
+	// Gateway CRDs in the clusters. There are still other CRDs we need to install though (see helm cluster install)
+	if t.UseGKEAutopilot {
+		setIfNotEmpty(helmValues, "global.server.resources.requests.cpu", "500m")
+		setIfNotEmpty(helmValues, "global.server.resources.limits.cpu", "500m")
+		setIfNotEmpty(helmValues, "connectInject.apiGateway.manageExternalCRDs", "false")
+		setIfNotEmpty(helmValues, "connectInject.apiGateway.manageNonStandardCRDs", "true")
 	}
 
 	setIfNotEmpty(helmValues, "connectInject.transparentProxy.defaultEnabled", strconv.FormatBool(t.EnableTransparentProxy))
