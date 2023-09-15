@@ -121,7 +121,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	r.Log.Info("retrieved", "name", pod.Name, "ns", pod.Namespace)
 
-	if hasBeenInjected(pod) {
+	if common.HasBeenMeshInjected(pod) {
 		if err := r.writeProxyConfiguration(ctx, pod); err != nil {
 			errs = multierror.Append(errs, err)
 		}
@@ -147,14 +147,6 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Pod{}).
 		Complete(r)
-}
-
-// hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.
-func hasBeenInjected(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[constants.KeyMeshInjectStatus]; ok && anno == constants.Injected {
-		return true
-	}
-	return false
 }
 
 func (r *Controller) deleteWorkload(ctx context.Context, pod types.NamespacedName) error {

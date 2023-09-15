@@ -177,3 +177,12 @@ func PortValueFromIntOrString(pod corev1.Pod, port intstr.IntOrString) (uint32, 
 	}
 	return uint32(portVal), nil
 }
+
+// HasBeenMeshInjected checks the value of the status annotation and returns true if the Pod has been injected.
+// Does not apply to V1 pods, which use a different key (`constants.KeyInjectStatus`).
+func HasBeenMeshInjected(pod corev1.Pod) bool {
+	if anno, ok := pod.Annotations[constants.KeyMeshInjectStatus]; ok && anno == constants.Injected {
+		return true
+	}
+	return false
+}

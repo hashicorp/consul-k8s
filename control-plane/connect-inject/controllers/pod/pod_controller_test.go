@@ -43,40 +43,6 @@ const (
 	consulNodeAddress      = "127.0.0.1"
 )
 
-func TestHasBeenInjected(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name     string
-		pod      func() corev1.Pod
-		expected bool
-	}{
-		{
-			name: "Pod with injected annotation",
-			pod: func() corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", "foo", true, true)
-				return *pod1
-			},
-			expected: true,
-		},
-		{
-			name: "Pod without injected annotation",
-			pod: func() corev1.Pod {
-				pod1 := createPod("pod1", "1.2.3.4", "foo", false, true)
-				return *pod1
-			},
-			expected: false,
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-
-			actual := hasBeenInjected(tt.pod())
-			require.Equal(t, tt.expected, actual)
-		})
-	}
-}
-
 func TestParseLocality(t *testing.T) {
 	t.Run("no labels", func(t *testing.T) {
 		n := corev1.Node{}
