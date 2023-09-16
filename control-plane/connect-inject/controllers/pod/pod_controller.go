@@ -213,8 +213,10 @@ func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 		},
 		Identity: pod.Spec.ServiceAccountName,
 		Locality: locality,
-		NodeName: common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
-		Ports:    workloadPorts,
+		// health status is unhealthy due to node not existing
+		// TODO: bring this back when node controller is built
+		//NodeName: common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
+		Ports: workloadPorts,
 	}
 	data := common.ToProtoAny(workload)
 
