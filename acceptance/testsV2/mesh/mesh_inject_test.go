@@ -135,7 +135,7 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			// pod to static-server.
 
 			// Deploy static-server.
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/cases/static-server-inject")
 
 			// For outbound connections from the multi port pod, only intentions from the first service in the multiport
 			// pod need to be created, since all upstream connections are made through the first service's envoy proxy.
