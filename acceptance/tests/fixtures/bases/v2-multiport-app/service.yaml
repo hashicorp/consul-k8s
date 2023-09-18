@@ -11,7 +11,9 @@ spec:
   ports:
     - name: web
       port: 8080
-      targetPort: 8080
+      # TODO: ensure this works with numeric target ports also
+      targetPort: web
     - name: admin
       port: 9090
-      targetPort: 9090
+      # TODO: ensure this works with numeric target ports also
+      targetPort: admin
