@@ -30,8 +30,8 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.image":                "ndhanushkodi/consul-dev:multiport12",
-				"global.imageK8S":             "ndhanushkodi/consul-k8s-dev:multiport14",
+				"global.image":                "ndhanushkodi/consul-dev:multiport17",     // core-multiport-fixes
+				"global.imageK8S":             "ndhanushkodi/consul-k8s-dev:multiport16", // this branch
 				"global.imageConsulDataplane": "hashicorppreview/consul-dataplane:1.3-dev",
 				"global.experiments[0]":       "resource-apis",
 				"ui.enabled":                  "false", // temporary while the UI is disabled for V2
