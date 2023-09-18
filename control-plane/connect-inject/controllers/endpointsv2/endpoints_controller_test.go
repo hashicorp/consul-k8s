@@ -136,7 +136,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						{
 							VirtualPort: 10001,
 							TargetPort:  "10001",
-							Protocol:    pbcatalog.Protocol_PROTOCOL_UNSPECIFIED,
+							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
 						},
 						{
 							TargetPort: "mesh",
@@ -250,7 +250,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						{
 							VirtualPort: 10001,
 							TargetPort:  "10001",
-							Protocol:    pbcatalog.Protocol_PROTOCOL_UNSPECIFIED,
+							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
 						},
 						{
 							TargetPort: "mesh",
@@ -537,6 +537,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						{
 							VirtualPort: 8080,
 							TargetPort:  "my-svc-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
 						},
 						{
 							TargetPort: "mesh",
@@ -549,8 +550,8 @@ func TestReconcile_CreateService(t *testing.T) {
 					VirtualIps: []string{"172.18.0.1"},
 				}),
 				Metadata: map[string]string{
-					constants.MetaKeyKubeNS: constants.DefaultConsulNS,
-					metaKeyManagedBy:        constants.ManagedByEndpointsValue,
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
 		},
