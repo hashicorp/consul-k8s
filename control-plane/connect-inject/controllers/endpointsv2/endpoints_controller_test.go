@@ -57,101 +57,102 @@ type reconcileCase struct {
 func TestReconcile_CreateService(t *testing.T) {
 	t.Parallel()
 	cases := []reconcileCase{
-		{
-			// In this test, we expect the same service registration as the "basic"
-			// case, but without any workload selector values due to missing endpoints.
-			name:    "Empty endpoints",
-			svcName: "service-created",
-			k8sObjects: func() []runtime.Object {
-				endpoints := &corev1.Endpoints{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
-						Namespace: "default",
-					},
-					Subsets: []corev1.EndpointSubset{
-						{
-							Addresses: []corev1.EndpointAddress{},
-						},
-					},
-				}
-				service := &corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "service-created",
-						Namespace: "default",
-					},
-					Spec: corev1.ServiceSpec{
-						ClusterIP: "172.18.0.1",
-						Ports: []corev1.ServicePort{
-							{
-								Name:        "public",
-								Port:        8080,
-								Protocol:    "TCP",
-								TargetPort:  intstr.FromString("my-http-port"),
-								AppProtocol: &appProtocolHttp,
-							},
-							{
-								Name:        "api",
-								Port:        9090,
-								Protocol:    "TCP",
-								TargetPort:  intstr.FromString("my-grpc-port"),
-								AppProtocol: &appProtocolGrpc,
-							},
-							{
-								Name:       "other",
-								Port:       10001,
-								Protocol:   "TCP",
-								TargetPort: intstr.FromString("10001"),
-								// no app protocol specified
-							},
-						},
-					},
-				}
-				return []runtime.Object{endpoints, service}
-			},
-			expectedResource: &pbresource.Resource{
-				Id: &pbresource.ID{
-					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
-					Tenancy: &pbresource.Tenancy{
-						Namespace: constants.DefaultConsulNS,
-						Partition: constants.DefaultConsulPartition,
-					},
-				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
-					Ports: []*pbcatalog.ServicePort{
-						{
-							VirtualPort: 8080,
-							TargetPort:  "my-http-port",
-							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
-						},
-						{
-							VirtualPort: 9090,
-							TargetPort:  "my-grpc-port",
-							Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
-						},
-						{
-							VirtualPort: 10001,
-							TargetPort:  "10001",
-							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
-						},
-						{
-							TargetPort: "mesh",
-							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
-						},
-					},
-					Workloads:  &pbcatalog.WorkloadSelector{},
-					VirtualIps: []string{"172.18.0.1"},
-				}),
-				Metadata: map[string]string{
-					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
-					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
-				},
-			},
-		},
+		//TODO: reenable this test as a conditional on global mesh inject flag rather than "any time we see endpoints"
+		//{
+		//	// In this test, we expect the same service registration as the "basic"
+		//	// case, but without any workload selector values due to missing endpoints.
+		//	name:    "Empty endpoints",
+		//	svcName: "service-created",
+		//	k8sObjects: func() []runtime.Object {
+		//		endpoints := &corev1.Endpoints{
+		//			ObjectMeta: metav1.ObjectMeta{
+		//				Name:      "service-created",
+		//				Namespace: "default",
+		//			},
+		//			Subsets: []corev1.EndpointSubset{
+		//				{
+		//					Addresses: []corev1.EndpointAddress{},
+		//				},
+		//			},
+		//		}
+		//		service := &corev1.Service{
+		//			ObjectMeta: metav1.ObjectMeta{
+		//				Name:      "service-created",
+		//				Namespace: "default",
+		//			},
+		//			Spec: corev1.ServiceSpec{
+		//				ClusterIP: "172.18.0.1",
+		//				Ports: []corev1.ServicePort{
+		//					{
+		//						Name:        "public",
+		//						Port:        8080,
+		//						Protocol:    "TCP",
+		//						TargetPort:  intstr.FromString("my-http-port"),
+		//						AppProtocol: &appProtocolHttp,
+		//					},
+		//					{
+		//						Name:        "api",
+		//						Port:        9090,
+		//						Protocol:    "TCP",
+		//						TargetPort:  intstr.FromString("my-grpc-port"),
+		//						AppProtocol: &appProtocolGrpc,
+		//					},
+		//					{
+		//						Name:       "other",
+		//						Port:       10001,
+		//						Protocol:   "TCP",
+		//						TargetPort: intstr.FromString("10001"),
+		//						// no app protocol specified
+		//					},
+		//				},
+		//			},
+		//		}
+		//		return []runtime.Object{endpoints, service}
+		//	},
+		//	expectedResource: &pbresource.Resource{
+		//		Id: &pbresource.ID{
+		//			Name: "service-created",
+		//			Type: &pbresource.Type{
+		//				Group:        "catalog",
+		//				GroupVersion: "v1alpha1",
+		//				Kind:         "Service",
+		//			},
+		//			Tenancy: &pbresource.Tenancy{
+		//				Namespace: constants.DefaultConsulNS,
+		//				Partition: constants.DefaultConsulPartition,
+		//			},
+		//		},
+		//		Data: common.ToProtoAny(&pbcatalog.Service{
+		//			Ports: []*pbcatalog.ServicePort{
+		//				{
+		//					VirtualPort: 8080,
+		//					TargetPort:  "my-http-port",
+		//					Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+		//				},
+		//				{
+		//					VirtualPort: 9090,
+		//					TargetPort:  "my-grpc-port",
+		//					Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
+		//				},
+		//				{
+		//					VirtualPort: 10001,
+		//					TargetPort:  "10001",
+		//					Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
+		//				},
+		//				{
+		//					TargetPort: "mesh",
+		//					Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+		//				},
+		//			},
+		//			Workloads:  &pbcatalog.WorkloadSelector{},
+		//			VirtualIps: []string{"172.18.0.1"},
+		//		}),
+		//		Metadata: map[string]string{
+		//			constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+		//			constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
+		//		},
+		//	},
+		//},
 		{
 			name:    "Basic endpoints",
 			svcName: "service-created",
@@ -554,6 +555,54 @@ func TestReconcile_CreateService(t *testing.T) {
 					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
 			},
+		},
+		{
+			name:    "Services without mesh-injected pods should not be registered",
+			svcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
+				// Clear mesh inject status
+				delete(pod1.Annotations, constants.KeyMeshInjectStatus)
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: addressesForPods(pod1),
+							Ports: []corev1.EndpointPort{
+								{
+									Name:        "public",
+									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
+								},
+							},
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Name:        "public",
+								Port:        8080,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromString("my-http-port"),
+								AppProtocol: &appProtocolHttp,
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoints, service}
+			},
+			// No expected resource
 		},
 	}
 	for _, tc := range cases {
@@ -1013,6 +1062,7 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 				require.Equal(t, len(otherPods), len(pf.calls))
 			},
 		},
+		//TODO: Add cases to cover non-injected pod skipping.
 	}
 
 	for _, tc := range cases {
@@ -1153,6 +1203,7 @@ func createServicePod(ownerKind, ownerName, podId string) *corev1.Pod {
 			Labels:    map[string]string{},
 			Annotations: map[string]string{
 				constants.AnnotationConsulK8sVersion: "1.3.0",
+				constants.KeyMeshInjectStatus:        constants.Injected,
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{

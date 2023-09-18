@@ -101,9 +101,14 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		errs = multierror.Append(errs, err)
 	}
 
-	//TODO: Maybe check service-enable label here on service/deployments/other pod owners
-	if err = r.registerService(ctx, resourceClient, service, workloadSelector); err != nil {
-		errs = multierror.Append(errs, err)
+	// If we have at least one mesh-injected pod targeted by the service, register it in Consul.
+	//TODO: Register service with mesh port added if global flag for inject is true,
+	// even if Endpoints are empty or have no mesh pod, iff. the service has a selector.
+	// This should ensure that we don't target kube or consul (system) services.
+	if workloadSelector != nil {
+		if err = r.registerService(ctx, resourceClient, service, workloadSelector); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
 
 	return ctrl.Result{}, errs
@@ -131,6 +136,12 @@ func (r *Controller) getWorkloadSelectorFromEndpoints(ctx context.Context, pf Po
 					errs = multierror.Append(errs, err)
 					continue
 				}
+
+				// If the pod hasn't been mesh-injected, skip it, as it won't be available as a workload.
+				if !common.HasBeenMeshInjected(*pod) {
+					continue
+				}
+
 				// Add to workload selector values.
 				// Pods can appear more than once in Endpoints subsets, so we use a set for exact names as well.
 				if prefix := getOwnerPrefixFromPod(pod); prefix != "" {
@@ -258,8 +269,6 @@ func getServicePorts(service corev1.Service) []*pbcatalog.ServicePort {
 	//TODO: Error check reserved "mesh" target port
 
 	// Append Consul service mesh port in addition to discovered ports.
-	//TODO: Maybe omit if zero mesh ports present in service endpoints, or if some
-	// use of mesh-inject/other label should cause this to be excluded.
 	ports = append(ports, &pbcatalog.ServicePort{
 		TargetPort: "mesh",
 		Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
@@ -290,7 +299,15 @@ func getServiceMeta(service corev1.Service) map[string]string {
 	return meta
 }
 
+// getWorkloadSelector returns the WorkloadSelector for the given pod name prefixes and exact names.
+// It returns nil if the provided name sets are empty.
 func getWorkloadSelector(podPrefixes, podExactNames map[string]any) *pbcatalog.WorkloadSelector {
+	// If we don't have any values, return nil
+	if len(podPrefixes) == 0 && len(podExactNames) == 0 {
+		return nil
+	}
+
+	// Create the WorkloadSelector
 	workloads := &pbcatalog.WorkloadSelector{}
 	for v := range podPrefixes {
 		workloads.Prefixes = append(workloads.Prefixes, v)
@@ -298,7 +315,8 @@ func getWorkloadSelector(podPrefixes, podExactNames map[string]any) *pbcatalog.W
 	for v := range podExactNames {
 		workloads.Names = append(workloads.Names, v)
 	}
-	// sort for stability
+
+	// Sort for comparison stability
 	sort.Strings(workloads.Prefixes)
 	sort.Strings(workloads.Names)
 

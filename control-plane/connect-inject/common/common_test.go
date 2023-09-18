@@ -399,3 +399,62 @@ func TestGetPortProtocol(t *testing.T) {
 		})
 	}
 }
+
+func TestHasBeenMeshInjected(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		pod      corev1.Pod
+		expected bool
+	}{
+		{
+			name: "Pod with injected annotation",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: metav1.NamespaceDefault,
+					Labels:    map[string]string{},
+					Annotations: map[string]string{
+						constants.KeyMeshInjectStatus: constants.Injected,
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Pod without injected annotation",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: metav1.NamespaceDefault,
+					Labels:    map[string]string{},
+					Annotations: map[string]string{
+						"consul.hashicorp.com/foo": "bar",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Pod with injected annotation but wrong value",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: metav1.NamespaceDefault,
+					Labels:    map[string]string{},
+					Annotations: map[string]string{
+						constants.KeyMeshInjectStatus: "hiya",
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := HasBeenMeshInjected(tt.pod)
+			require.Equal(t, tt.expected, actual)
+		})
+	}
+}
