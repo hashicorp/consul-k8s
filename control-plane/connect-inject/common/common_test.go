@@ -4,20 +4,28 @@
 package common
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 func TestCommonDetermineAndValidatePort(t *testing.T) {
@@ -457,4 +465,107 @@ func TestHasBeenMeshInjected(t *testing.T) {
 			require.Equal(t, tt.expected, actual)
 		})
 	}
+}
+
+func Test_ConsulNamespaceIsNotFound(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name                   string
+		input                  error
+		expectMissingNamespace bool
+	}{
+		{
+			name:                   "nil error",
+			expectMissingNamespace: false,
+		},
+		{
+			name:                   "random error",
+			input:                  fmt.Errorf("namespace resource not found"),
+			expectMissingNamespace: false,
+		},
+		{
+			name:                   "grpc code is not InvalidArgument",
+			input:                  status.Error(codes.NotFound, "namespace resource not found"),
+			expectMissingNamespace: false,
+		},
+		{
+			name:                   "grpc code is InvalidArgument, but the message is not for namespaces",
+			input:                  status.Error(codes.InvalidArgument, "blurg resource not found"),
+			expectMissingNamespace: false,
+		},
+		{
+			name:                   "namespace is missing",
+			input:                  status.Error(codes.InvalidArgument, "namespace resource not found"),
+			expectMissingNamespace: true,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := ConsulNamespaceIsNotFound(tt.input)
+			require.Equal(t, tt.expectMissingNamespace, actual)
+		})
+	}
+}
+
+// Test_ConsulNamespaceIsNotFound_ErrorMsg is an integration test that verifies the error message
+// associated with a missing namespace while creating a resource doesn't drift.
+func Test_ConsulNamespaceIsNotFound_ErrorMsg(t *testing.T) {
+	t.Parallel()
+
+	// Create test consulServer server.
+	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+		c.Experiments = []string{"resource-apis"}
+	})
+	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+	require.NoError(t, err)
+
+	id := &pbresource.ID{
+		Name: "foo",
+		Type: &pbresource.Type{
+			Group:        "catalog",
+			GroupVersion: "v1alpha1",
+			Kind:         "Workload",
+		},
+		Tenancy: &pbresource.Tenancy{
+			Partition: constants.DefaultConsulPartition,
+			Namespace: "i-dont-exist-but-its-ok-we-will-meet-again-someday",
+
+			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
+			// At a future point, this will move out of the Tenancy block.
+			PeerName: constants.DefaultConsulPeer,
+		},
+	}
+
+	workload := &pbcatalog.Workload{
+		Addresses: []*pbcatalog.WorkloadAddress{
+			{Host: "10.0.0.1", Ports: []string{"mesh"}},
+		},
+		Ports: map[string]*pbcatalog.WorkloadPort{
+			"mesh": {
+				Port:     constants.ProxyDefaultInboundPort,
+				Protocol: pbcatalog.Protocol_PROTOCOL_MESH,
+			},
+		},
+		NodeName: "banana",
+		Identity: "foo",
+	}
+
+	data := ToProtoAny(workload)
+
+	resource := &pbresource.Resource{
+		Id:   id,
+		Data: data,
+	}
+
+	_, err = resourceClient.Write(context.Background(), &pbresource.WriteRequest{Resource: resource})
+	require.Error(t, err)
+
+	s, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, codes.InvalidArgument, s.Code())
+	require.Contains(t, s.Message(), "namespace resource not found")
+
+	require.True(t, ConsulNamespaceIsNotFound(err))
 }

@@ -106,11 +106,19 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// even if Endpoints are empty or have no mesh pod, iff. the service has a selector.
 	// This should ensure that we don't target kube or consul (system) services.
 	if workloadSelector != nil {
+		//TODO: Maybe check service-enable label here on service/deployments/other pod owners
 		if err = r.registerService(ctx, resourceClient, service, workloadSelector); err != nil {
+			// We could be racing with the namespace controller.
+			// Requeue (which includes backoff) to try again.
+			if common.ConsulNamespaceIsNotFound(err) {
+				r.Log.Info("Consul namespace not found; re-queueing request",
+					"service", service.GetName(), "ns", req.Namespace,
+					"consul-ns", r.getConsulNamespace(req.Namespace), "err", err.Error())
+				return ctrl.Result{Requeue: true}, nil
+			}
 			errs = multierror.Append(errs, err)
 		}
 	}
-
 	return ctrl.Result{}, errs
 }
 
