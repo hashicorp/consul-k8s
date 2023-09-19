@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -28,13 +27,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
-func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher, logger logr.Logger) error {
-	logger.Info("******** flags v2")
-	logger.Info("******* cert dir", "cert-dir", c.flagCertDir)
-	logger.Info("******* resource api", "resource-api", c.flagResourceAPIs)
-	logger.Info("******* acl", "acl", c.flagACLAuthMethod)
-	logger.Info("******* webhook ca update", "webhookca", c.flagEnableWebhookCAUpdate)
-
+func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
 
