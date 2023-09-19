@@ -16,8 +16,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
-const multiport = "multiport"
-
 // Test that Connect works for an application with multiple ports. The multiport application is a Pod listening on
 // two ports. This tests inbound connections to each port of the multiport app, and outbound connections from the
 // multiport app to static-server.
@@ -32,7 +30,7 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.image":                "ndhanushkodi/consul-dev:multiport35",
+				"global.image":                "ndhanushkodi/consul-dev:multiport36",
 				"global.imageK8S":             "ndhanushkodi/consul-k8s-dev:multiport20",
 				"global.imageConsulDataplane": "hashicorppreview/consul-dataplane:1.3-dev",
 				"global.experiments[0]":       "resource-apis",

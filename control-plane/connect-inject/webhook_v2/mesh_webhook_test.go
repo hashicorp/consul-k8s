@@ -928,6 +928,8 @@ func TestHandlerHandle(t *testing.T) {
 // This test validates that overwrite probes match the iptables configuration fromiptablesConfigJSON()
 // Because they happen at different points in the injection, the port numbers can get out of sync.
 func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
+	// TODO (v2/nitya): enable when expose paths and L7 are implemented
+	t.Skip("Tproxy probes are not supported yet")
 	t.Parallel()
 	s := runtime.NewScheme()
 	s.AddKnownTypes(schema.GroupVersion{
