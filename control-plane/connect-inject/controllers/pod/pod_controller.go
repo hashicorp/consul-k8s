@@ -236,8 +236,6 @@ func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 	}
 	data := inject.ToProtoAny(workload)
 
-	r.Log.Info("****Trying to write the following workload", "workload", workload, "id", getWorkloadID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()))
-
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
 			Id:       getWorkloadID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
