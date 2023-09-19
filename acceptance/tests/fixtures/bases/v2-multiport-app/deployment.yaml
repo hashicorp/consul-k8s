@@ -57,6 +57,7 @@ spec:
           ports:
             - containerPort: 9090
               name: admin
+# TODO: (v2/nitya) add these probes back when expose paths and L7 are supported.
 #          livenessProbe:
 #            httpGet:
 #              port: 9090

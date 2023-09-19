@@ -213,14 +213,13 @@ func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 		},
 		Identity: pod.Spec.ServiceAccountName,
 		Locality: locality,
-		// health status is unhealthy due to node not existing
-		// TODO: bring this back when node controller is built
+		// Adding a node does not currently work because the node doesn't exist so its health status will always be
+		// unhealthy, causing any endpoints on that node to also be unhealthy.
+		// TODO: (v2/nitya) Bring this back when node controller is built.
 		//NodeName: common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
 		Ports: workloadPorts,
 	}
 	data := common.ToProtoAny(workload)
-
-	r.Log.Info("****Trying to write the following workload", "workload", workload, "id", getWorkloadID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()))
 
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
