@@ -18,7 +18,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -72,9 +71,6 @@ type Controller struct {
 
 	MetricsConfig metrics.Config
 	Log           logr.Logger
-
-	Scheme *runtime.Scheme
-	context.Context
 
 	// ResourceClient is a gRPC client for the resource service. It is public for testing purposes
 	ResourceClient pbresource.ResourceServiceClient
