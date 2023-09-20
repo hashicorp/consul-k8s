@@ -772,8 +772,6 @@ func TestUpstreamsWrite(t *testing.T) {
 		pod                     func() *corev1.Pod
 		expected                *pbmesh.Upstreams
 		expErr                  string
-		configEntry             func() api.ConfigEntry
-		consulUnavailable       bool
 		consulNamespacesEnabled bool
 		consulPartitionsEnabled bool
 	}{
@@ -791,10 +789,11 @@ func TestUpstreamsWrite(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -803,6 +802,7 @@ func TestUpstreamsWrite(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -818,6 +818,7 @@ func TestUpstreamsWrite(t *testing.T) {
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234"
 				return pod1
 			},
+			expErr: "error processing upstream annotations: upstream currently does not support peers: myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234",
 			// TODO: uncomment this and remove expErr when peers is supported
 			//expected: &pbmesh.Upstreams{
 			//	Workloads: &pbcatalog.WorkloadSelector{
@@ -826,8 +827,9 @@ func TestUpstreamsWrite(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
+			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
 			//					PeerName:  "peer1",
 			//				},
@@ -838,12 +840,12 @@ func TestUpstreamsWrite(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
 			//	},
 			//},
-			expErr:                  "upstream currently does not support peers: myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234",
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: false,
 		},
@@ -861,10 +863,11 @@ func TestUpstreamsWrite(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
 								Partition: "part1",
 								Namespace: "ns1",
-								PeerName:  "",
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -873,6 +876,7 @@ func TestUpstreamsWrite(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -888,7 +892,7 @@ func TestUpstreamsWrite(t *testing.T) {
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.err:1234"
 				return pod1
 			},
-			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.ns1.ns.part1.err:1234",
+			expErr:                  "error processing upstream annotations: upstream structured incorrectly: myPort.port.upstream1.svc.ns1.ns.part1.err:1234",
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: false,
 		},
@@ -906,10 +910,11 @@ func TestUpstreamsWrite(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -918,6 +923,7 @@ func TestUpstreamsWrite(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -940,10 +946,11 @@ func TestUpstreamsWrite(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
 								Partition: "bar",
 								Namespace: "foo",
-								PeerName:  "",
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -952,6 +959,7 @@ func TestUpstreamsWrite(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -1024,10 +1032,11 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -1036,6 +1045,7 @@ func TestProcessUpstreams(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -1060,10 +1070,11 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//				Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
-			//					Namespace: "",
-			//					PeerName:  "",
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -1072,6 +1083,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
@@ -1096,9 +1108,10 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
-			//					Namespace: "",
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
 			//					PeerName:  "peer1",
 			//				},
 			//				Name: "upstream1",
@@ -1108,6 +1121,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
@@ -1132,8 +1146,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			// 			    Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
+			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
 			//					PeerName:  "peer1",
 			//				},
@@ -1144,6 +1159,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
@@ -1166,10 +1182,11 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
 								Partition: "part1",
 								Namespace: "ns1",
-								PeerName:  "",
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -1178,6 +1195,7 @@ func TestProcessUpstreams(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -1202,10 +1220,11 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
+			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
-			//					PeerName:  "",
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -1214,6 +1233,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
@@ -1224,6 +1244,80 @@ func TestProcessUpstreams(t *testing.T) {
 		},
 		{
 			name: "labeled multiple annotated upstreams",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns:1234, myPort2.port.upstream2.svc:2234, myPort4.port.upstream4.svc.ns1.ns.ap1.ap:4234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream2",
+						},
+						DestinationPort: "myPort2",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(2234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: "ap1",
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream4",
+						},
+						DestinationPort: "myPort4",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(4234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "labeled multiple annotated upstreams with dcs and peers",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234, myPort2.port.upstream2.svc:2234, myPort3.port.upstream3.svc.ns1.ns:3234, myPort4.port.upstream4.svc.ns1.ns.peer1.peer:4234"
@@ -1238,10 +1332,11 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
+			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
-			//					PeerName:  "",
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -1250,15 +1345,17 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
-			//					Namespace: "",
-			//					PeerName:  "",
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream2",
 			//			},
@@ -1267,15 +1364,17 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(2234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
+			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
-			//					PeerName:  "",
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream3",
 			//			},
@@ -1284,13 +1383,15 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(3234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
+			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
 			//					PeerName:  "peer1",
 			//				},
@@ -1301,6 +1402,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(4234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
@@ -1308,49 +1410,6 @@ func TestProcessUpstreams(t *testing.T) {
 			//},
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: true,
-		},
-		{
-			name: "labeled when consul is unavailable, we don't return an error",
-			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream1:1234:dc1"
-				return pod1
-			},
-			configEntry: func() api.ConfigEntry {
-				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
-				pd := ce.(*api.ProxyConfigEntry)
-				pd.MeshGateway.Mode = "remote"
-				return pd
-			},
-			expErr: "upstream currently does not support datacenters: myPort.upstream1:1234:dc1",
-			// TODO: uncomment this and remove expErr when datacenters is supported
-			//expected: &pbmesh.Upstreams{
-			//	Workloads: &pbcatalog.WorkloadSelector{
-			//		Names: []string{podName},
-			//	},
-			//	Upstreams: []*pbmesh.Upstream{
-			//		{
-			//			DestinationRef: &pbresource.Reference{
-			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
-			//					Namespace: "",
-			//					PeerName:  "",
-			//				},
-			//				Name: "upstream1",
-			//			},
-			//			DestinationPort: "myPort",
-			//			Datacenter:      "dc1",
-			//			ListenAddr: &pbmesh.Upstream_IpPort{
-			//				IpPort: &pbmesh.IPPortAddress{
-			//					Port: uint32(1234),
-			//				},
-			//			},
-			//		},
-			//	},
-			//},
-			consulUnavailable:       true,
-			consulNamespacesEnabled: false,
-			consulPartitionsEnabled: false,
 		},
 		{
 			name: "error labeled annotated upstream error: invalid partition/dc/peer",
@@ -1496,6 +1555,80 @@ func TestProcessUpstreams(t *testing.T) {
 			consulPartitionsEnabled: false,
 		},
 		{
+			name: "unlabeled and labeled multiple annotated upstreams",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns:1234, myPort2.upstream2:2234, myPort4.port.upstream4.svc.ns1.ns.ap1.ap:4234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream2",
+						},
+						DestinationPort: "myPort2",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(2234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: "ap1",
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream4",
+						},
+						DestinationPort: "myPort4",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(4234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
 			name: "unlabeled single upstream",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
@@ -1509,10 +1642,11 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -1521,6 +1655,7 @@ func TestProcessUpstreams(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -1543,10 +1678,11 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: "",
+								Partition: getDefaultConsulPartition(""),
 								Namespace: "foo",
-								PeerName:  "",
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -1555,6 +1691,7 @@ func TestProcessUpstreams(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -1577,10 +1714,11 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
 								Partition: "bar",
 								Namespace: "foo",
-								PeerName:  "",
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -1589,6 +1727,7 @@ func TestProcessUpstreams(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -1611,10 +1750,11 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -1623,15 +1763,17 @@ func TestProcessUpstreams(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream2",
 						},
@@ -1640,6 +1782,7 @@ func TestProcessUpstreams(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(2234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -1670,10 +1813,11 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
-			//					Namespace: "",
-			//					PeerName:  "",
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -1682,15 +1826,17 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
+			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "bar",
-			//					PeerName:  "",
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream2",
 			//			},
@@ -1699,15 +1845,17 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(2234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: "baz",
 			//					Namespace: "foo",
-			//					PeerName:  "",
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream3",
 			//			},
@@ -1716,6 +1864,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(3234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
@@ -1746,10 +1895,11 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
-			//					Namespace: "",
-			//					PeerName:  "",
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -1758,15 +1908,17 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
+			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "bar",
-			//					PeerName:  "",
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream2",
 			//			},
@@ -1775,15 +1927,17 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(2234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: "",
+			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "foo",
-			//					PeerName:  "",
+			//					PeerName: getDefaultConsulPeer(""),
 			//				},
 			//				Name: "upstream3",
 			//			},
@@ -1792,6 +1946,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//			ListenAddr: &pbmesh.Upstream_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(3234),
+			//                  Ip:   consulNodeAddress,
 			//				},
 			//			},
 			//		},
@@ -1856,10 +2011,11 @@ func TestUpstreamsDelete(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -1868,6 +2024,7 @@ func TestUpstreamsDelete(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -2328,10 +2485,11 @@ func TestReconcileUpdatePod(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
-								PeerName:  "",
+								PeerName:  getDefaultConsulPeer(""),
 							},
 							Name: "mySVC3",
 						},
@@ -2340,6 +2498,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 						ListenAddr: &pbmesh.Upstream_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
+								Ip:   consulNodeAddress,
 							},
 						},
 					},
@@ -2669,10 +2828,11 @@ func createUpstreams() *pbmesh.Upstreams {
 		Upstreams: []*pbmesh.Upstream{
 			{
 				DestinationRef: &pbresource.Reference{
+					Type: upstreamReferenceType(),
 					Tenancy: &pbresource.Tenancy{
-						Partition: "",
-						Namespace: "",
-						PeerName:  "",
+						Partition: getDefaultConsulPartition(""),
+						Namespace: getDefaultConsulNamespace(""),
+						PeerName:  getDefaultConsulPeer(""),
 					},
 					Name: "mySVC",
 				},
@@ -2681,6 +2841,7 @@ func createUpstreams() *pbmesh.Upstreams {
 				ListenAddr: &pbmesh.Upstream_IpPort{
 					IpPort: &pbmesh.IPPortAddress{
 						Port: uint32(24601),
+						Ip:   consulNodeAddress,
 					},
 				},
 			},

@@ -31,12 +31,13 @@ import (
 
 const (
 	DefaultTelemetryBindSocketDir = "/consul/mesh-inject"
+	consulNodeAddress             = "127.0.0.1"
 )
 
 // Controller watches Pod events and converts them to V2 Workloads and HealthStatus.
 // The translation from Pod to Workload is 1:1 and the HealthStatus object is a representation
 // of the Pod's Status field. Controller is also responsible for generating V2 Upstreams resources
-// when not in transparent proxy mode.
+// when not in transparent proxy mode. ProxyConfiguration is also optionally created.
 type Controller struct {
 	client.Client
 	// ConsulClientConfig is the config for the Consul API client.
@@ -450,13 +451,12 @@ func (r *Controller) writeHealthStatus(ctx context.Context, pod corev1.Pod) erro
 
 // writeUpstreams will write explicit upstreams if pod annotations exist.
 func (r *Controller) writeUpstreams(ctx context.Context, pod corev1.Pod) error {
-	if _, ok := pod.Annotations[constants.AnnotationMeshDestinations]; !ok {
-		return nil
-	}
-
 	uss, err := r.processUpstreams(pod)
 	if err != nil {
-		return err
+		return fmt.Errorf("error processing upstream annotations: %s", err.Error())
+	}
+	if uss == nil {
+		return nil
 	}
 
 	data := common.ToProtoAny(uss)
@@ -485,49 +485,52 @@ func (r *Controller) deleteUpstreams(ctx context.Context, pod types.NamespacedNa
 // objects.
 func (r *Controller) processUpstreams(pod corev1.Pod) (*pbmesh.Upstreams, error) {
 	upstreams := &pbmesh.Upstreams{}
-	if raw, ok := pod.Annotations[constants.AnnotationMeshDestinations]; ok && raw != "" {
-		upstreams.Workloads = &pbcatalog.WorkloadSelector{
-			Names: []string{pod.Name},
+	raw, ok := pod.Annotations[constants.AnnotationMeshDestinations]
+	if !ok || raw == "" {
+		return nil, nil
+	}
+
+	upstreams.Workloads = &pbcatalog.WorkloadSelector{
+		Names: []string{pod.Name},
+	}
+
+	for _, raw := range strings.Split(raw, ",") {
+		var upstream *pbmesh.Upstream
+
+		// Determine the type of processing required unlabeled or labeled
+		// [service-port-name].[service-name].[service-namespace].[service-partition]:[port]:[optional datacenter]
+		// or
+		// [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-peer].peer:[port]
+		// [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
+		// [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port]
+
+		// Scan the string for the annotation keys.
+		// Even if the first key is missing, and the order is unexpected, we should let the processing
+		// provide us with errors
+		labeledFormat := false
+		keys := []string{"port", "svc", "ns", "ap", "peer", "dc"}
+		for _, v := range keys {
+			if strings.Contains(raw, fmt.Sprintf(".%s.", v)) || strings.Contains(raw, fmt.Sprintf(".%s:", v)) {
+				labeledFormat = true
+				break
+			}
 		}
 
-		for _, raw := range strings.Split(raw, ",") {
-			var upstream *pbmesh.Upstream
-
-			// Determine the type of processing required unlabeled or labeled
-			// [service-port-name].[service-name].[service-namespace].[service-partition]:[port]:[optional datacenter]
-			// or
-			// [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-peer].peer:[port]
-			// [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
-			// [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port]
-
-			// Scan the string for the annotation keys.
-			// Even if the first key is missing, and the order is unexpected, we should let the processing
-			// provide us with errors
-			labeledFormat := false
-			keys := []string{"port", "svc", "ns", "ap", "peer", "dc"}
-			for _, v := range keys {
-				if strings.Contains(raw, fmt.Sprintf(".%s.", v)) || strings.Contains(raw, fmt.Sprintf(".%s:", v)) {
-					labeledFormat = true
-					break
-				}
+		if labeledFormat {
+			var err error
+			upstream, err = r.processLabeledUpstream(pod, raw)
+			if err != nil {
+				return &pbmesh.Upstreams{}, err
 			}
-
-			if labeledFormat {
-				var err error
-				upstream, err = r.processLabeledUpstream(pod, raw)
-				if err != nil {
-					return &pbmesh.Upstreams{}, err
-				}
-			} else {
-				var err error
-				upstream, err = r.processUnlabeledUpstream(pod, raw)
-				if err != nil {
-					return &pbmesh.Upstreams{}, err
-				}
+		} else {
+			var err error
+			upstream, err = r.processUnlabeledUpstream(pod, raw)
+			if err != nil {
+				return &pbmesh.Upstreams{}, err
 			}
-
-			upstreams.Upstreams = append(upstreams.Upstreams, upstream)
 		}
+
+		upstreams.Upstreams = append(upstreams.Upstreams, upstream)
 	}
 
 	return upstreams, nil
@@ -538,11 +541,16 @@ func (r *Controller) processUpstreams(pod corev1.Pod) (*pbmesh.Upstreams, error)
 // [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
 // [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port].
 // peer/ap/dc are mutually exclusive. At minimum service-port-name and service-name are required.
+// The ordering matters for labeled as well as unlabeled. The ordering of the labeled parameters should follow
+// the order and requirements of the unlabeled parameters.
 // TODO: enable dc and peer support when ready, currently return errors if set.
 func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) (*pbmesh.Upstream, error) {
 	parts := strings.SplitN(rawUpstream, ":", 3)
 	var port int32
 	port, _ = common.PortValue(pod, strings.TrimSpace(parts[1]))
+	if port <= 0 {
+		return &pbmesh.Upstream{}, fmt.Errorf("port value %d in upstream is invalid: %s", port, rawUpstream)
+	}
 
 	service := parts[0]
 	pieces := strings.Split(service, ".")
@@ -622,25 +630,24 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 		}
 	}
 
-	var upstream pbmesh.Upstream
-	if port > 0 {
-		upstream = pbmesh.Upstream{
-			DestinationRef: &pbresource.Reference{
-				Tenancy: &pbresource.Tenancy{
-					Partition: partition,
-					Namespace: namespace,
-					PeerName:  peer,
-				},
-				Name: svcName,
+	upstream := pbmesh.Upstream{
+		DestinationRef: &pbresource.Reference{
+			Type: upstreamReferenceType(),
+			Tenancy: &pbresource.Tenancy{
+				Partition: getDefaultConsulPartition(partition),
+				Namespace: getDefaultConsulNamespace(namespace),
+				PeerName:  getDefaultConsulPeer(peer),
 			},
-			DestinationPort: portName,
-			Datacenter:      datacenter,
-			ListenAddr: &pbmesh.Upstream_IpPort{
-				IpPort: &pbmesh.IPPortAddress{
-					Port: uint32(port),
-				},
+			Name: svcName,
+		},
+		DestinationPort: portName,
+		Datacenter:      datacenter,
+		ListenAddr: &pbmesh.Upstream_IpPort{
+			IpPort: &pbmesh.IPPortAddress{
+				Port: uint32(port),
+				Ip:   consulNodeAddress,
 			},
-		}
+		},
 	}
 
 	return &upstream, nil
@@ -651,7 +658,7 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 // There is no unlabeled field for peering.
 // TODO: enable dc and peer support when ready, currently return errors if set. We also most likely won't need to return an error at all.
 func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string) (*pbmesh.Upstream, error) {
-	var portName, datacenter, svcName, namespace, partition, peer string
+	var portName, datacenter, svcName, namespace, partition string
 	var port int32
 	var upstream pbmesh.Upstream
 
@@ -690,10 +697,11 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 	if port > 0 {
 		upstream = pbmesh.Upstream{
 			DestinationRef: &pbresource.Reference{
+				Type: upstreamReferenceType(),
 				Tenancy: &pbresource.Tenancy{
-					Partition: partition,
-					Namespace: namespace,
-					PeerName:  peer,
+					Partition: getDefaultConsulPartition(partition),
+					Namespace: getDefaultConsulNamespace(namespace),
+					PeerName:  getDefaultConsulPeer(""),
 				},
 				Name: svcName,
 			},
@@ -702,6 +710,7 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 			ListenAddr: &pbmesh.Upstream_IpPort{
 				IpPort: &pbmesh.IPPortAddress{
 					Port: uint32(port),
+					Ip:   consulNodeAddress,
 				},
 			},
 		}
@@ -893,4 +902,36 @@ func getUpstreamsID(name, namespace, partition string) *pbresource.ID {
 			PeerName: constants.DefaultConsulPeer,
 		},
 	}
+}
+
+func upstreamReferenceType() *pbresource.Type {
+	return &pbresource.Type{
+		Group:        "catalog",
+		GroupVersion: "v1alpha1",
+		Kind:         "Service",
+	}
+}
+
+func getDefaultConsulNamespace(ns string) string {
+	if ns == "" {
+		ns = constants.DefaultConsulNS
+	}
+
+	return ns
+}
+
+func getDefaultConsulPartition(ap string) string {
+	if ap == "" {
+		ap = constants.DefaultConsulPartition
+	}
+
+	return ap
+}
+
+func getDefaultConsulPeer(peer string) string {
+	if peer == "" {
+		peer = constants.DefaultConsulPeer
+	}
+
+	return peer
 }
