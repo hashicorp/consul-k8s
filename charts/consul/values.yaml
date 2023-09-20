@@ -3448,7 +3448,7 @@ telemetryCollector:
   # The name of the Docker image (including any tag) for the containers running
   # the consul-telemetry-collector
   # @type: string
-  image: "hashicorp/consul-telemetry-collector:0.0.1"
+  image: "hashicorp/consul-telemetry-collector:0.0.2"
 
   # The resource settings for consul-telemetry-collector pods.
   # @recurse: false
