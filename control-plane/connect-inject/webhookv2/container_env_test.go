@@ -14,19 +14,17 @@ import (
 )
 
 func TestContainerEnvVars(t *testing.T) {
-	t.Skip()
-	// (TODO: ashwin) make these work once upstreams are fixed
 	cases := []struct {
 		Name     string
 		Upstream string
 	}{
 		{
 			"Upstream with datacenter",
-			"static-server:7890:dc1",
+			"myPort.static-server:7890:dc1",
 		},
 		{
 			"Upstream without datacenter",
-			"static-server:7890",
+			"myPort.static-server:7890",
 		},
 	}
 
@@ -46,10 +44,10 @@ func TestContainerEnvVars(t *testing.T) {
 
 			require.ElementsMatch(envVars, []corev1.EnvVar{
 				{
-					Name:  "STATIC_SERVER_CONNECT_SERVICE_HOST",
+					Name:  "STATIC_SERVER_MYPORT_CONNECT_SERVICE_HOST",
 					Value: "127.0.0.1",
 				}, {
-					Name:  "STATIC_SERVER_CONNECT_SERVICE_PORT",
+					Name:  "STATIC_SERVER_MYPORT_CONNECT_SERVICE_PORT",
 					Value: "7890",
 				},
 			})
