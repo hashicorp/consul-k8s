@@ -25,24 +25,26 @@ import (
 )
 
 const (
-	secretNameHCPClientID     = "consul-hcp-client-id"
-	secretKeyHCPClientID      = "client-id"
-	secretNameHCPClientSecret = "consul-hcp-client-secret"
-	secretKeyHCPClientSecret  = "client-secret"
-	secretNameHCPResourceID   = "consul-hcp-resource-id"
-	secretKeyHCPResourceID    = "resource-id"
-	secretNameHCPAPIHostname  = "consul-hcp-api-host"
-	secretKeyHCPAPIHostname   = "api-hostname"
-	secretNameHCPAuthURL      = "consul-hcp-auth-url"
-	secretKeyHCPAuthURL       = "auth-url"
-	secretNameHCPScadaAddress = "consul-hcp-scada-address"
-	secretKeyHCPScadaAddress  = "scada-address"
-	secretNameGossipKey       = "consul-gossip-key"
-	secretKeyGossipKey        = "key"
-	secretNameBootstrapToken  = "consul-bootstrap-token"
-	secretKeyBootstrapToken   = "token"
-	secretNameServerCA        = "consul-server-ca"
-	secretNameServerCert      = "consul-server-cert"
+	secretNameHCPClientID                  = "consul-hcp-client-id"
+	secretKeyHCPClientID                   = "client-id"
+	secretNameHCPClientSecret              = "consul-hcp-client-secret"
+	secretKeyHCPClientSecret               = "client-secret"
+	secretNameHCPObservabilityClientID     = "consul-hcp-observability-client-id"
+	secretNameHCPObservabilityClientSecret = "consul-hcp-observability-client-secret"
+	secretNameHCPResourceID                = "consul-hcp-resource-id"
+	secretKeyHCPResourceID                 = "resource-id"
+	secretNameHCPAPIHostname               = "consul-hcp-api-host"
+	secretKeyHCPAPIHostname                = "api-hostname"
+	secretNameHCPAuthURL                   = "consul-hcp-auth-url"
+	secretKeyHCPAuthURL                    = "auth-url"
+	secretNameHCPScadaAddress              = "consul-hcp-scada-address"
+	secretKeyHCPScadaAddress               = "scada-address"
+	secretNameGossipKey                    = "consul-gossip-key"
+	secretKeyGossipKey                     = "key"
+	secretNameBootstrapToken               = "consul-bootstrap-token"
+	secretKeyBootstrapToken                = "token"
+	secretNameServerCA                     = "consul-server-ca"
+	secretNameServerCert                   = "consul-server-cert"
 )
 
 // CloudBootstrapConfig represents the response fetched from the agent
@@ -57,12 +59,14 @@ type CloudBootstrapConfig struct {
 // provided by the user in order to make a call to fetch the agent bootstrap
 // config data from the endpoint in HCP.
 type HCPConfig struct {
-	ResourceID   string
-	ClientID     string
-	ClientSecret string
-	AuthURL      string
-	APIHostname  string
-	ScadaAddress string
+	ResourceID                string
+	ClientID                  string
+	ClientSecret              string
+	ObservabilityClientID     string
+	ObservabilityClientSecret string
+	AuthURL                   string
+	APIHostname               string
+	ScadaAddress              string
 }
 
 // ConsulConfig represents 'cluster.consul_config' in the response
@@ -143,10 +147,32 @@ func (c *CloudPreset) fetchAgentBootstrapConfig() (*CloudBootstrapConfig, error)
 		return nil, err
 	}
 
+	obsParams := hcpgnm.NewGetObservabilitySecretParamsWithContext(c.Context).
+		WithID(clusterResource.ID).
+		WithLocationOrganizationID(clusterResource.Organization).
+		WithLocationProjectID(clusterResource.Project).
+		WithHTTPClient(c.HTTPClient)
+
+	obsResp, err := hcpgnmClient.GetObservabilitySecret(obsParams, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	bootstrapConfig := resp.GetPayload()
 	c.UI.Output("HCP configuration successfully fetched.", terminal.WithSuccessStyle())
 
-	return c.parseBootstrapConfigResponse(bootstrapConfig)
+	cloudConfig, err := c.parseBootstrapConfigResponse(bootstrapConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// if we don't have any keys fall back to the cluster credentials. Remove fallback in the future probably
+	if len(obsResp.GetPayload().Keys) != 0 {
+		cloudConfig.HCPConfig.ObservabilityClientID = obsResp.GetPayload().Keys[0].ClientID
+		cloudConfig.HCPConfig.ObservabilityClientSecret = obsResp.GetPayload().Keys[0].ClientSecret
+	}
+
+	return cloudConfig, nil
 }
 
 // parseBootstrapConfigResponse unmarshals the boostrap parseBootstrapConfigResponse
@@ -183,6 +209,16 @@ func (c *CloudPreset) getHelmConfigWithMapSecretNames(cfg *CloudBootstrapConfig)
 	apiHostCfg := getOptionalSecretFromHCPConfig(cfg.HCPConfig.APIHostname, "apiHost", secretNameHCPAPIHostname, secretKeyHCPAPIHostname)
 	authURLCfg := getOptionalSecretFromHCPConfig(cfg.HCPConfig.AuthURL, "authUrl", secretNameHCPAuthURL, secretKeyHCPAuthURL)
 	scadaAddressCfg := getOptionalSecretFromHCPConfig(cfg.HCPConfig.ScadaAddress, "scadaAddress", secretNameHCPScadaAddress, secretKeyHCPScadaAddress)
+
+	var (
+		observabilityClientIDSecretName     = secretNameHCPObservabilityClientID
+		observabilityClientSecretSecretName = secretNameHCPObservabilityClientSecret
+	)
+
+	if cfg.HCPConfig.ObservabilityClientID == "" && cfg.HCPConfig.ObservabilityClientSecret == "" {
+		observabilityClientIDSecretName = secretNameHCPClientID
+		observabilityClientSecretSecretName = secretNameHCPClientSecret
+	}
 
 	// Need to make sure the below has strict spaces and no tabs
 	values := fmt.Sprintf(`
@@ -230,7 +266,7 @@ telemetryCollector:
 server:
   replicas: %d
   affinity: null
-  serverCert: 
+  serverCert:
     secretName: %s
 connectInject:
   enabled: true
@@ -243,8 +279,8 @@ controller:
 		secretNameHCPClientID, secretKeyHCPClientID,
 		secretNameHCPClientSecret, secretKeyHCPClientSecret,
 		apiHostCfg, authURLCfg, scadaAddressCfg,
-		secretNameHCPClientID, secretKeyHCPClientID,
-		secretNameHCPClientSecret, secretKeyHCPClientSecret,
+		observabilityClientIDSecretName, secretKeyHCPClientID,
+		observabilityClientSecretSecretName, secretKeyHCPClientSecret,
 		cfg.BootstrapResponse.Cluster.BootstrapExpect, secretNameServerCert)
 	valuesMap := config.ConvertToMap(values)
 	return valuesMap
@@ -303,6 +339,28 @@ func (c *CloudPreset) saveSecretsFromBootstrapConfig(config *CloudBootstrapConfi
 		}
 		c.UI.Output(fmt.Sprintf("HCP client secret saved in '%s' secret in namespace '%s'.",
 			secretKeyHCPClientSecret, c.KubernetesNamespace), terminal.WithSuccessStyle())
+	}
+
+	if config.HCPConfig.ObservabilityClientID != "" {
+		data := map[string][]byte{
+			secretKeyHCPClientID: []byte(config.HCPConfig.ObservabilityClientID),
+		}
+		if err := c.saveSecret(secretNameHCPObservabilityClientID, data, corev1.SecretTypeOpaque); err != nil {
+			return err
+		}
+		c.UI.Output(fmt.Sprintf("HCP client secret saved in '%s' secret in namespace '%s'.",
+			"observability-"+secretKeyHCPClientID, c.KubernetesNamespace), terminal.WithSuccessStyle())
+	}
+
+	if config.HCPConfig.ObservabilityClientSecret != "" {
+		data := map[string][]byte{
+			secretKeyHCPClientSecret: []byte(config.HCPConfig.ObservabilityClientSecret),
+		}
+		if err := c.saveSecret(secretNameHCPObservabilityClientSecret, data, corev1.SecretTypeOpaque); err != nil {
+			return err
+		}
+		c.UI.Output(fmt.Sprintf("HCP client secret saved in '%s' secret in namespace '%s'.",
+			"observability-"+secretKeyHCPClientSecret, c.KubernetesNamespace), terminal.WithSuccessStyle())
 	}
 
 	// bootstrap token
