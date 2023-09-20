@@ -457,6 +457,17 @@ func TestHasBeenMeshInjected(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "Pod with nil annotations",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: metav1.NamespaceDefault,
+					Labels:    map[string]string{},
+				},
+			},
+			expected: false,
+		},
 	}
 
 	for _, tt := range cases {

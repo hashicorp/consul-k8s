@@ -56,6 +56,8 @@ spec:
             - -listen=:9090
           ports:
             - containerPort: 9090
+              # This name is meant to be used alongside the _numeric_ K8s service target port
+              # to verify that we can still route traffic to the named port when there's a mismatch.
               name: admin
 # TODO: (v2/nitya) add these probes back when expose paths and L7 are supported.
 #          livenessProbe:

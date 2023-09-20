@@ -11,8 +11,8 @@ spec:
   ports:
     - name: web
       port: 8080
-      # TODO: (v2/nitya) ensure this works with numeric target ports also once support for that is merged.
       targetPort: web
     - name: admin
       port: 9090
-      targetPort: admin
+      # Test with a mix of named and numeric target ports.
+      targetPort: 9090
