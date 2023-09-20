@@ -1,3 +1,25 @@
+## 1.1.6 (September 21, 2023)
+
+SECURITY:
+
+* Upgrade to use Go 1.20.8. This resolves CVEs
+[CVE-2023-39320](https://github.com/advisories/GHSA-rxv8-v965-v333) (`cmd/go`),
+[CVE-2023-39318](https://github.com/advisories/GHSA-vq7j-gx56-rxjh) (`html/template`),
+[CVE-2023-39319](https://github.com/advisories/GHSA-vv9m-32rr-3g55) (`html/template`),
+[CVE-2023-39321](https://github.com/advisories/GHSA-9v7r-x7cv-v437) (`crypto/tls`), and
+[CVE-2023-39322](https://github.com/advisories/GHSA-892h-r6cr-53g4) (`crypto/tls`) [[GH-2936](https://github.com/hashicorp/consul-k8s/issues/2936)]
+
+IMPROVEMENTS:
+
+* control-plane: Improve performance for pod deletions by reducing the number of fetched tokens. [[GH-2910](https://github.com/hashicorp/consul-k8s/issues/2910)]
+* vault: Adds `namespace` to `secretsBackend.vault.connectCA` in Helm chart and annotation: "vault.hashicorp.com/namespace: namespace" to
+secretsBackend.vault.agentAnnotations, if "vault.hashicorp.com/namespace" annotation is not present.
+This provides a more convenient way to specify the Vault namespace than nested JSON in `connectCA.additionalConfig`. [[GH-2841](https://github.com/hashicorp/consul-k8s/issues/2841)]
+
+BUG FIXES:
+
+* audit-log: fix parsing error for some audit log configuration fields fail with uncovertible string to integer errors. [[GH-2905](https://github.com/hashicorp/consul-k8s/issues/2905)]
+
 ## 1.1.5 (September 6, 2023)
 
 IMPROVEMENTS:
