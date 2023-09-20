@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.17-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.16.1
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -2138,7 +2138,7 @@ connectInject:
   # [injection annotation](https://developer.hashicorp.com/consul/docs/k8s/connect#consul-hashicorp-com-connect-inject)
   # to opt-in to Connect injection. If this is true, pods can use the same annotation
   # to explicitly opt-out of injection.
-  default: false
+  default: true
 
   # Configures Transparent Proxy for Consul Service mesh services.
   # Using this feature requires Consul 1.10.0-beta1+.
@@ -2272,7 +2272,7 @@ connectInject:
     # If true, then all traffic redirection setup uses the consul-cni plugin.
     # Requires connectInject.enabled to also be true.
     # @type: boolean
-    enabled: false
+    enabled: true
 
     # Log level for the installer and plugin. Overrides global.logLevel
     # @type: string
@@ -2753,6 +2753,27 @@ meshGateway:
     # DNS entry to point to your mesh gateways.
     static: ""
 
+  # This configures the [`PodDisruptionBudget`](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
+  # for the service mesh gateway.
+  disruptionBudget:
+    # This will enable/disable registering a PodDisruptionBudget for the
+    # mesh gateway. If this is enabled, it will only register the budget so long as
+    # the mesh gateway.
+    enabled: true
+
+    # The maximum number of unavailable pods. By default, this will be
+    # automatically computed based on the `connectInject.replicas` value to be `(n/2)-1`.
+    # If you need to set this to `0`, you will need to add a
+    # --set 'meshGateway.disruptionBudget.maxUnavailable=0'` flag to the helm chart installation
+    # command because of a limitation in the Helm templating language.
+    # @type: integer
+    maxUnavailable: null
+
+    # The minimum number of available pods.
+    # Takes precedence over maxUnavailable if set.
+    # @type: integer
+    minAvailable: null
+
   # The service option configures the Service that fronts the Gateway Deployment.
   service:
     # Type of service, ex. LoadBalancer, ClusterIP.
@@ -3097,6 +3118,22 @@ terminatingGateways:
   # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
+
+  # This configures the [`PodDisruptionBudget`](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
+  # for the terminating gateways.
+  disruptionBudget:
+    # Enables registering a PodDisruptionBudget for the terminating gateways
+    # If enabled, it only registers the budget so long as
+    # the terminating gateways is enabled. To disable, set to `false`.
+    enabled: true
+
+    # The maximum number of unavailable pods. By default, this will be
+    # automatically computed based on the `server.replicas` value to be `(n/2)-1`.
+    # If you need to set this to `0`, you will need to add a
+    # --set 'server.terminatingGateways.maxUnavailable=0'` flag to the helm chart installation
+    # command because of a limitation in the Helm templating language.
+    # @type: integer
+    maxUnavailable: null
 
   # Defaults sets default values for all gateway fields. With the exception
   # of annotations, defining any of these values in the `gateways` list

@@ -1,0 +1,34 @@
+{{- if (and .Values.terminatingGateways.disruptionBudget.enabled (or (and (ne (.Values.terminatingGateways.enabled | toString) "-") .Values.terminatingGateways.enabled) (and (eq (.Values.terminatingGateways.enabled | toString) "-") .Values.global.enabled))) }}
+# PodDisruptionBudget to prevent degrading the terminating gateway cluster through
+# voluntary cluster changes.
+{{- $root := . }}
+{{- range .Values.terminatingGateways.gateways }}
+{{- if .Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
+apiVersion: policy/v1
+{{- else }}
+apiVersion: policy/v1beta1
+{{- end }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "consul.fullname" $root }}-{{ .name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ $root.Release.Service }}
+    release: {{ $root.Release.Name }}
+    component: terminating-gateway
+spec:
+  {{- if $root.Values.terminatingGateways.disruptionBudget.minAvailable }}
+  minAvailable: {{ $root.Values.terminatingGateways.disruptionBudget.minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ template "consul.pdb.maxUnavailable" $root }} # using consul.pdb.maxUnavailable, this is common logic for all PDBs' edge cases for non-stateful distributed systems.
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" $root }}
+      release: "{{ $root.Release.Name }}"
+      component: terminating-gateway
+---
+{{- end }}
+{{- end }}

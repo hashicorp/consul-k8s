@@ -1,0 +1,26 @@
+{{- if .Values.connectInject.enabled }}
+# PodDisruptionBudget to prevent degrading the custom gateway cluster through
+# voluntary cluster changes.
+{{- if .Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
+apiVersion: policy/v1
+{{- else }}
+apiVersion: policy/v1beta1
+{{- end }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "consul.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      release: "{{ .Release.Name }}"
+      component: crd
+{{- end }}
