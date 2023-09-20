@@ -72,7 +72,7 @@ func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 				return &SamenessGroupController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
@@ -160,7 +160,7 @@ func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 				return &ControlPlaneRequestLimitController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
@@ -285,7 +285,7 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 				return &SamenessGroupController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
@@ -377,7 +377,7 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 				return &ControlPlaneRequestLimitController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
@@ -519,7 +519,7 @@ func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 				return &SamenessGroupController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
@@ -602,7 +602,7 @@ func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 				return &ControlPlaneRequestLimitController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
@@ -714,7 +714,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 			ConsulKind        string
 			ConsulNamespace   string
 			KubeResource      common.ConfigEntryResource
-			GetController     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler
+			GetController     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler
 			AssertValidConfig func(entry capi.ConfigEntry) bool
 		}{
 			"namespaced": {
@@ -728,12 +728,12 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						Protocol: "http",
 					},
 				},
-				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler {
 					return &ServiceDefaultsController{
-						Client:                client,
-						Log:                   logger,
-						Scheme:                scheme,
-						ConfigEntryController: cont,
+						Client:               client,
+						Log:                  logger,
+						Scheme:               scheme,
+						MeshConfigController: cont,
 					}
 				},
 				AssertValidConfig: func(cfg capi.ConfigEntry) bool {
@@ -758,12 +758,12 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						},
 					},
 				},
-				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler {
 					return &ProxyDefaultsController{
-						Client:                client,
-						Log:                   logger,
-						Scheme:                scheme,
-						ConfigEntryController: cont,
+						Client:               client,
+						Log:                  logger,
+						Scheme:               scheme,
+						MeshConfigController: cont,
 					}
 				},
 				AssertValidConfig: func(cfg capi.ConfigEntry) bool {
@@ -796,12 +796,12 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 						},
 					},
 				},
-				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+				GetController: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler {
 					return &TrafficPermissionsController{
-						Client:                client,
-						Log:                   logger,
-						Scheme:                scheme,
-						ConfigEntryController: cont,
+						Client:               client,
+						Log:                  logger,
+						Scheme:               scheme,
+						MeshConfigController: cont,
 					}
 				},
 				AssertValidConfig: func(cfg capi.ConfigEntry) bool {
@@ -832,7 +832,7 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 					fakeClient,
 					logrtest.NewTestLogger(t),
 					s,
-					&ConfigEntryController{
+					&MeshConfigController{
 						ConsulClientConfig:         testClient.Cfg,
 						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,
@@ -925,7 +925,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 			ConsulKind            string
 			ConsulNamespace       string
 			KubeResource          common.ConfigEntryResource
-			GetControllerFunc     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler
+			GetControllerFunc     func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler
 			AssertValidConfigFunc func(entry capi.ConfigEntry) bool
 			WriteConfigEntryFunc  func(consulClient *capi.Client, namespace string) error
 			UpdateResourceFunc    func(client client.Client, ctx context.Context, in common.ConfigEntryResource) error
@@ -943,12 +943,12 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler {
 					return &ServiceDefaultsController{
-						Client:                client,
-						Log:                   logger,
-						Scheme:                scheme,
-						ConfigEntryController: cont,
+						Client:               client,
+						Log:                  logger,
+						Scheme:               scheme,
+						MeshConfigController: cont,
 					}
 				},
 				WriteConfigEntryFunc: func(consulClient *capi.Client, namespace string) error {
@@ -987,12 +987,12 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: common.DefaultConsulNamespace,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler {
 					return &ProxyDefaultsController{
-						Client:                client,
-						Log:                   logger,
-						Scheme:                scheme,
-						ConfigEntryController: cont,
+						Client:               client,
+						Log:                  logger,
+						Scheme:               scheme,
+						MeshConfigController: cont,
 					}
 				},
 				WriteConfigEntryFunc: func(consulClient *capi.Client, namespace string) error {
@@ -1041,12 +1041,12 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler {
 					return &TrafficPermissionsController{
-						Client:                client,
-						Log:                   logger,
-						Scheme:                scheme,
-						ConfigEntryController: cont,
+						Client:               client,
+						Log:                  logger,
+						Scheme:               scheme,
+						MeshConfigController: cont,
 					}
 				},
 				WriteConfigEntryFunc: func(consulClient *capi.Client, namespace string) error {
@@ -1094,7 +1094,7 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 					fakeClient,
 					logrtest.NewTestLogger(t),
 					s,
-					&ConfigEntryController{
+					&MeshConfigController{
 						ConsulClientConfig:         testClient.Cfg,
 						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,
@@ -1203,7 +1203,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 			ConsulKind           string
 			ConsulNamespace      string
 			KubeResource         common.ConfigEntryResource
-			GetControllerFunc    func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler
+			GetControllerFunc    func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler
 			WriteConfigEntryFunc func(consulClient *capi.Client, namespace string) error
 		}{
 			"namespaced": {
@@ -1222,12 +1222,12 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler {
 					return &ServiceDefaultsController{
-						Client:                client,
-						Log:                   logger,
-						Scheme:                scheme,
-						ConfigEntryController: cont,
+						Client:               client,
+						Log:                  logger,
+						Scheme:               scheme,
+						MeshConfigController: cont,
 					}
 				},
 				WriteConfigEntryFunc: func(consulClient *capi.Client, namespace string) error {
@@ -1257,12 +1257,12 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: common.DefaultConsulNamespace,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler {
 					return &ProxyDefaultsController{
-						Client:                client,
-						Log:                   logger,
-						Scheme:                scheme,
-						ConfigEntryController: cont,
+						Client:               client,
+						Log:                  logger,
+						Scheme:               scheme,
+						MeshConfigController: cont,
 					}
 				},
 				WriteConfigEntryFunc: func(consulClient *capi.Client, namespace string) error {
@@ -1302,12 +1302,12 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					},
 				},
 				ConsulNamespace: c.ExpConsulNS,
-				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *ConfigEntryController) reconcile.Reconciler {
+				GetControllerFunc: func(client client.Client, logger logr.Logger, scheme *runtime.Scheme, cont *MeshConfigController) reconcile.Reconciler {
 					return &TrafficPermissionsController{
-						Client:                client,
-						Log:                   logger,
-						Scheme:                scheme,
-						ConfigEntryController: cont,
+						Client:               client,
+						Log:                  logger,
+						Scheme:               scheme,
+						MeshConfigController: cont,
 					}
 				},
 				WriteConfigEntryFunc: func(consulClient *capi.Client, namespace string) error {
@@ -1343,7 +1343,7 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 					fakeClient,
 					logrtest.NewTestLogger(t),
 					s,
-					&ConfigEntryController{
+					&MeshConfigController{
 						ConsulClientConfig:         testClient.Cfg,
 						ConsulServerConnMgr:        testClient.Watcher,
 						EnableConsulNamespaces:     true,

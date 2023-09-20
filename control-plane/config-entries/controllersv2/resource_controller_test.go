@@ -113,7 +113,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 				return &TrafficPermissionsController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
@@ -248,7 +248,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 				return &TrafficPermissionsController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
@@ -397,7 +397,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 				return &TrafficPermissionsController{
 					Client: client,
 					Log:    logger,
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
@@ -488,7 +488,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
 		Log:    logrtest.New(t),
-		ConfigEntryController: &ConfigEntryController{
+		MeshConfigController: &MeshConfigController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
 			DatacenterName:      datacenterName,
@@ -555,7 +555,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
 		Log:    logrtest.New(t),
-		ConfigEntryController: &ConfigEntryController{
+		MeshConfigController: &MeshConfigController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
 			DatacenterName:      datacenterName,
@@ -647,7 +647,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				reconciler := TrafficPermissionsController{
 					Client: fakeClient,
 					Log:    logrtest.New(t),
-					ConfigEntryController: &ConfigEntryController{
+					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  testClient.Cfg,
 						ConsulServerConnMgr: testClient.Watcher,
 						DatacenterName:      datacenterName,
@@ -710,7 +710,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 			reconciler := &TrafficPermissionsController{
 				Client: fakeClient,
 				Log:    logrtest.New(t),
-				ConfigEntryController: &ConfigEntryController{
+				MeshConfigController: &MeshConfigController{
 					ConsulClientConfig:  testClient.Cfg,
 					ConsulServerConnMgr: testClient.Watcher,
 					DatacenterName:      datacenterName,
@@ -793,7 +793,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	svcDefaultsReconciler := TrafficPermissionsController{
 		Client: fakeClient,
 		Log:    logger,
-		ConfigEntryController: &ConfigEntryController{
+		MeshConfigController: &MeshConfigController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
 			DatacenterName:      datacenterName,
@@ -912,7 +912,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			svcDefaultsReconciler := ServiceDefaultsController{
 				Client: fakeClient,
 				Log:    logger,
-				ConfigEntryController: &ConfigEntryController{
+				MeshConfigController: &MeshConfigController{
 					ConsulClientConfig:  testClient.Cfg,
 					ConsulServerConnMgr: testClient.Watcher,
 					DatacenterName:      datacenterName,

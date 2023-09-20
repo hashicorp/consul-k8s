@@ -8,7 +8,7 @@ metadata:
   name: trafficpermissions-viewer-role
 rules:
 - apiGroups:
-  - consul.hashicorp.com
+  - auth.consul.hashicorp.com
   resources:
   - trafficpermissions
   verbs:
@@ -16,7 +16,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - consul.hashicorp.com
+  - auth.consul.hashicorp.com
   resources:
   - trafficpermissions/status
   verbs:
