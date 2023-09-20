@@ -421,7 +421,7 @@ spec:
                 {{- end }}
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
-                -config-file=/consul/extra-config/locality.json
+                -config-file=/consul/extra-config/locality.json \
                 {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
                 -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
                 {{- end }}

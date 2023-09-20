@@ -5,6 +5,8 @@ package connectinject
 
 import (
 	"context"
+
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -16,13 +18,12 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/namespace"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	webhookV2 "github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook_v2"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 )
 
 func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
-
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
 
@@ -178,6 +179,11 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 			LogLevel:                     c.flagLogLevel,
 			LogJSON:                      c.flagLogJSON,
 		}})
+
+	if err := mgr.AddReadyzCheck("ready", webhook.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
+		setupLog.Error(err, "unable to create readiness check")
+		return err
+	}
 
 	if c.flagEnableWebhookCAUpdate {
 		err := c.updateWebhookCABundle(ctx)

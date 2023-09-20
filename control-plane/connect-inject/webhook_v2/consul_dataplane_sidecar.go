@@ -125,8 +125,13 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				MountPath: "/consul/mesh-inject",
 			},
 		},
-		Args:           args,
-		ReadinessProbe: probe,
+		Args: args,
+	}
+
+	// Omit the readiness probe in transparent proxy mode until expose paths are implemented. Otherwise all probes will fail.
+	// TODO: (v2/nitya) add probes in tproxy mode when expose paths and L7 are supported.
+	if !w.EnableTransparentProxy {
+		container.ReadinessProbe = probe
 	}
 
 	if w.AuthMethod != "" {
