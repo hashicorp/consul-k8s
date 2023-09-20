@@ -818,30 +818,32 @@ func TestUpstreamsWrite(t *testing.T) {
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
-				Workloads: &pbcatalog.WorkloadSelector{
-					Names: []string{podName},
-				},
-				Upstreams: []*pbmesh.Upstream{
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "ns1",
-								PeerName:  "peer1",
-							},
-							Name: "upstream1",
-						},
-						DestinationPort: "myPort",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(1234),
-							},
-						},
-					},
-				},
-			},
+			// TODO: uncomment this and remove expErr when peers is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "ns1",
+			//					PeerName:  "peer1",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
+			expErr:                  "upstream currently does not support peers: myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234",
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: false,
 		},
@@ -1049,30 +1051,32 @@ func TestProcessUpstreams(t *testing.T) {
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.dc1.dc:1234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
-				Workloads: &pbcatalog.WorkloadSelector{
-					Names: []string{podName},
-				},
-				Upstreams: []*pbmesh.Upstream{
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
-							},
-							Name: "upstream1",
-						},
-						DestinationPort: "myPort",
-						Datacenter:      "dc1",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(1234),
-							},
-						},
-					},
-				},
-			},
+			expErr: "upstream currently does not support datacenters: myPort.port.upstream1.svc.dc1.dc:1234",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "dc1",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
 			consulNamespacesEnabled: false,
 			consulPartitionsEnabled: false,
 		},
@@ -1083,30 +1087,32 @@ func TestProcessUpstreams(t *testing.T) {
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.peer1.peer:1234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
-				Workloads: &pbcatalog.WorkloadSelector{
-					Names: []string{podName},
-				},
-				Upstreams: []*pbmesh.Upstream{
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "peer1",
-							},
-							Name: "upstream1",
-						},
-						DestinationPort: "myPort",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(1234),
-							},
-						},
-					},
-				},
-			},
+			expErr: "upstream currently does not support peers: myPort.port.upstream1.svc.peer1.peer:1234",
+			// TODO: uncomment this and remove expErr when peers is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "",
+			//					PeerName:  "peer1",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
 			consulNamespacesEnabled: false,
 			consulPartitionsEnabled: false,
 		},
@@ -1117,30 +1123,32 @@ func TestProcessUpstreams(t *testing.T) {
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
-				Workloads: &pbcatalog.WorkloadSelector{
-					Names: []string{podName},
-				},
-				Upstreams: []*pbmesh.Upstream{
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "ns1",
-								PeerName:  "peer1",
-							},
-							Name: "upstream1",
-						},
-						DestinationPort: "myPort",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(1234),
-							},
-						},
-					},
-				},
-			},
+			expErr: "upstream currently does not support peers: myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234",
+			// TODO: uncomment this and remove expErr when peers is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "ns1",
+			//					PeerName:  "peer1",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: false,
 		},
@@ -1185,30 +1193,32 @@ func TestProcessUpstreams(t *testing.T) {
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
-				Workloads: &pbcatalog.WorkloadSelector{
-					Names: []string{podName},
-				},
-				Upstreams: []*pbmesh.Upstream{
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "ns1",
-								PeerName:  "",
-							},
-							Name: "upstream1",
-						},
-						DestinationPort: "myPort",
-						Datacenter:      "dc1",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(1234),
-							},
-						},
-					},
-				},
-			},
+			expErr: "upstream currently does not support datacenters: myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "ns1",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "dc1",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: false,
 		},
@@ -1219,81 +1229,83 @@ func TestProcessUpstreams(t *testing.T) {
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234, myPort2.port.upstream2.svc:2234, myPort3.port.upstream3.svc.ns1.ns:3234, myPort4.port.upstream4.svc.ns1.ns.peer1.peer:4234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
-				Workloads: &pbcatalog.WorkloadSelector{
-					Names: []string{podName},
-				},
-				Upstreams: []*pbmesh.Upstream{
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "ns1",
-								PeerName:  "",
-							},
-							Name: "upstream1",
-						},
-						DestinationPort: "myPort",
-						Datacenter:      "dc1",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(1234),
-							},
-						},
-					},
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
-							},
-							Name: "upstream2",
-						},
-						DestinationPort: "myPort2",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(2234),
-							},
-						},
-					},
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "ns1",
-								PeerName:  "",
-							},
-							Name: "upstream3",
-						},
-						DestinationPort: "myPort3",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(3234),
-							},
-						},
-					},
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "ns1",
-								PeerName:  "peer1",
-							},
-							Name: "upstream4",
-						},
-						DestinationPort: "myPort4",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(4234),
-							},
-						},
-					},
-				},
-			},
+			expErr: "upstream currently does not support datacenters: myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "ns1",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "dc1",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream2",
+			//			},
+			//			DestinationPort: "myPort2",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(2234),
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "ns1",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream3",
+			//			},
+			//			DestinationPort: "myPort3",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(3234),
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "ns1",
+			//					PeerName:  "peer1",
+			//				},
+			//				Name: "upstream4",
+			//			},
+			//			DestinationPort: "myPort4",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(4234),
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: true,
 		},
@@ -1304,37 +1316,38 @@ func TestProcessUpstreams(t *testing.T) {
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream1:1234:dc1"
 				return pod1
 			},
-			expErr: "",
 			configEntry: func() api.ConfigEntry {
 				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
 				pd := ce.(*api.ProxyConfigEntry)
 				pd.MeshGateway.Mode = "remote"
 				return pd
 			},
-			expected: &pbmesh.Upstreams{
-				Workloads: &pbcatalog.WorkloadSelector{
-					Names: []string{podName},
-				},
-				Upstreams: []*pbmesh.Upstream{
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
-							},
-							Name: "upstream1",
-						},
-						DestinationPort: "myPort",
-						Datacenter:      "dc1",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(1234),
-							},
-						},
-					},
-				},
-			},
+			expErr: "upstream currently does not support datacenters: myPort.upstream1:1234:dc1",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "dc1",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
 			consulUnavailable:       true,
 			consulNamespacesEnabled: false,
 			consulPartitionsEnabled: false,
@@ -1453,10 +1466,10 @@ func TestProcessUpstreams(t *testing.T) {
 			name: "error labeled annotated upstream error: wrong ordering for port and svc with namespace partition disabled",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "upstream1.svc.myPort.port.dc1.dc:1234"
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "upstream1.svc.myPort.port:1234"
 				return pod1
 			},
-			expErr:                  "upstream structured incorrectly: upstream1.svc.myPort.port.dc1.dc:1234",
+			expErr:                  "upstream structured incorrectly: upstream1.svc.myPort.port:1234",
 			consulNamespacesEnabled: false,
 			consulPartitionsEnabled: false,
 		},
@@ -1475,10 +1488,10 @@ func TestProcessUpstreams(t *testing.T) {
 			name: "error labeled annotated upstream error: incorrect key name namespace partition disabled",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.portage.upstream1.svc.dc1.dc:1234"
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.portage.upstream1.svc:1234"
 				return pod1
 			},
-			expErr:                  "upstream structured incorrectly: myPort.portage.upstream1.svc.dc1.dc:1234",
+			expErr:                  "upstream structured incorrectly: myPort.portage.upstream1.svc:1234",
 			consulNamespacesEnabled: false,
 			consulPartitionsEnabled: false,
 		},
@@ -1648,64 +1661,66 @@ func TestProcessUpstreams(t *testing.T) {
 				pd.MeshGateway.Mode = "remote"
 				return pd
 			},
-			expected: &pbmesh.Upstreams{
-				Workloads: &pbcatalog.WorkloadSelector{
-					Names: []string{podName},
-				},
-				Upstreams: []*pbmesh.Upstream{
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
-							},
-							Name: "upstream1",
-						},
-						DestinationPort: "myPort",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(1234),
-							},
-						},
-					},
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "bar",
-								PeerName:  "",
-							},
-							Name: "upstream2",
-						},
-						DestinationPort: "myPort2",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(2234),
-							},
-						},
-					},
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "baz",
-								Namespace: "foo",
-								PeerName:  "",
-							},
-							Name: "upstream3",
-						},
-						DestinationPort: "myPort3",
-						Datacenter:      "dc2",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(3234),
-							},
-						},
-					},
-				},
-			},
+			expErr: "upstream currently does not support datacenters:  myPort3.upstream3.foo.baz:3234:dc2",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "bar",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream2",
+			//			},
+			//			DestinationPort: "myPort2",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(2234),
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "baz",
+			//					Namespace: "foo",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream3",
+			//			},
+			//			DestinationPort: "myPort3",
+			//			Datacenter:      "dc2",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(3234),
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: true,
 		},
@@ -1722,64 +1737,66 @@ func TestProcessUpstreams(t *testing.T) {
 				pd.MeshGateway.Mode = "remote"
 				return pd
 			},
-			expected: &pbmesh.Upstreams{
-				Workloads: &pbcatalog.WorkloadSelector{
-					Names: []string{podName},
-				},
-				Upstreams: []*pbmesh.Upstream{
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "",
-								PeerName:  "",
-							},
-							Name: "upstream1",
-						},
-						DestinationPort: "myPort",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(1234),
-							},
-						},
-					},
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "bar",
-								PeerName:  "",
-							},
-							Name: "upstream2",
-						},
-						DestinationPort: "myPort2",
-						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(2234),
-							},
-						},
-					},
-					{
-						DestinationRef: &pbresource.Reference{
-							Tenancy: &pbresource.Tenancy{
-								Partition: "",
-								Namespace: "foo",
-								PeerName:  "",
-							},
-							Name: "upstream3",
-						},
-						DestinationPort: "myPort3",
-						Datacenter:      "dc2",
-						ListenAddr: &pbmesh.Upstream_IpPort{
-							IpPort: &pbmesh.IPPortAddress{
-								Port: uint32(3234),
-							},
-						},
-					},
-				},
-			},
+			expErr: "upstream currently does not support datacenters:  myPort3.upstream3.foo:3234:dc2",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "bar",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream2",
+			//			},
+			//			DestinationPort: "myPort2",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(2234),
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "",
+			//					Namespace: "foo",
+			//					PeerName:  "",
+			//				},
+			//				Name: "upstream3",
+			//			},
+			//			DestinationPort: "myPort3",
+			//			Datacenter:      "dc2",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(3234),
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
 			consulNamespacesEnabled: true,
 		},
 	}

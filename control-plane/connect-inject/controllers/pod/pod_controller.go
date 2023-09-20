@@ -498,7 +498,7 @@ func (r *Controller) processUpstreams(pod corev1.Pod) (*pbmesh.Upstreams, error)
 			labeledFormat := false
 			keys := []string{"port", "svc", "ns", "ap", "peer", "dc"}
 			for _, v := range keys {
-				if strings.Contains(raw, fmt.Sprintf(".%s.", v)) {
+				if strings.Contains(raw, fmt.Sprintf(".%s.", v)) || strings.Contains(raw, fmt.Sprintf(".%s:", v)) {
 					labeledFormat = true
 					break
 				}
@@ -511,7 +511,11 @@ func (r *Controller) processUpstreams(pod corev1.Pod) (*pbmesh.Upstreams, error)
 					return &pbmesh.Upstreams{}, err
 				}
 			} else {
-				upstream = r.processUnlabeledUpstream(pod, raw)
+				var err error
+				upstream, err = r.processUnlabeledUpstream(pod, raw)
+				if err != nil {
+					return &pbmesh.Upstreams{}, err
+				}
 			}
 
 			upstreams.Upstreams = append(upstreams.Upstreams, upstream)
@@ -526,6 +530,7 @@ func (r *Controller) processUpstreams(pod corev1.Pod) (*pbmesh.Upstreams, error)
 // [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
 // [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port].
 // peer/ap/dc are mutually exclusive. At minimum service-port-name and service-name are required.
+// TODO: enable dc and peer support when ready, currently return errors if set.
 func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) (*pbmesh.Upstream, error) {
 	parts := strings.SplitN(rawUpstream, ":", 3)
 	var port int32
@@ -541,11 +546,15 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 			end := strings.TrimSpace(pieces[7])
 			switch end {
 			case "peer":
-				peer = strings.TrimSpace(pieces[6])
+				// TODO: uncomment and remove error when peers supported
+				//peer = strings.TrimSpace(pieces[6])
+				return &pbmesh.Upstream{}, fmt.Errorf("upstream currently does not support peers: %s", rawUpstream)
 			case "ap":
 				partition = strings.TrimSpace(pieces[6])
 			case "dc":
-				datacenter = strings.TrimSpace(pieces[6])
+				// TODO: uncomment and remove error when datacenters are supported
+				//datacenter = strings.TrimSpace(pieces[6])
+				return &pbmesh.Upstream{}, fmt.Errorf("upstream currently does not support datacenters: %s", rawUpstream)
 			default:
 				return &pbmesh.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
 			}
@@ -577,13 +586,18 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 			end := strings.TrimSpace(pieces[5])
 			switch end {
 			case "peer":
-				peer = strings.TrimSpace(pieces[4])
+				// TODO: uncomment and remove error when peers supported
+				//peer = strings.TrimSpace(pieces[4])
+				return &pbmesh.Upstream{}, fmt.Errorf("upstream currently does not support peers: %s", rawUpstream)
 			case "dc":
-				datacenter = strings.TrimSpace(pieces[4])
+				// TODO: uncomment and remove error when datacenter supported
+				//datacenter = strings.TrimSpace(pieces[4])
+				return &pbmesh.Upstream{}, fmt.Errorf("upstream currently does not support datacenters: %s", rawUpstream)
 			default:
 				return &pbmesh.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
 			}
-			fallthrough
+			// TODO: uncomment and remove error when datacenter and/or peers supported
+			//fallthrough
 		case 4:
 			if strings.TrimSpace(pieces[3]) == "svc" {
 				svcName = strings.TrimSpace(pieces[2])
@@ -627,7 +641,8 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 // processUnlabeledUpstream processes an upstream in the format:
 // [service-port-name].[service-name].[service-namespace].[service-partition]:[port]:[optional datacenter].
 // There is no unlabeled field for peering.
-func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string) *pbmesh.Upstream {
+// TODO: enable dc and peer support when ready, currently return errors if set. We also most likely won't need to return an error at all.
+func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string) (*pbmesh.Upstream, error) {
 	var portName, datacenter, svcName, namespace, partition, peer string
 	var port int32
 	var upstream pbmesh.Upstream
@@ -659,7 +674,9 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 
 	// parse the optional datacenter
 	if len(parts) > 2 {
-		datacenter = strings.TrimSpace(parts[2])
+		// TODO: uncomment and remove error when datacenters supported
+		//datacenter = strings.TrimSpace(parts[2])
+		return &pbmesh.Upstream{}, fmt.Errorf("upstream currently does not support datacenters: %s", rawUpstream)
 	}
 
 	if port > 0 {
@@ -681,7 +698,7 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 			},
 		}
 	}
-	return &upstream
+	return &upstream, nil
 }
 
 // consulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
