@@ -25,7 +25,6 @@ BUG FIXES:
 * control-plane: Fix issue where ACL tokens would have an empty pod name that prevented proper token cleanup. [[GH-2808](https://github.com/hashicorp/consul-k8s/issues/2808)]
 * control-plane: When using transparent proxy or CNI, reduced required permissions by setting privileged to false. Privileged must be true when using OpenShift without CNI. [[GH-2755](https://github.com/hashicorp/consul-k8s/issues/2755)]
 * helm: Update prometheus port and scheme annotations if tls is enabled [[GH-2782](https://github.com/hashicorp/consul-k8s/issues/2782)]
-* ingress-gateway: Adds missing PassiveHealthCheck to IngressGateways CRD and updates missing fields on ServiceDefaults CRD [[GH-2796](https://github.com/hashicorp/consul-k8s/issues/2796)]
 
 ## 1.0.9 (Aug 10, 2023)
 
