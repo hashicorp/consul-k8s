@@ -36,11 +36,13 @@ import (
 )
 
 const (
-	nodeName               = "test-node"
-	localityNodeName       = "test-node-w-locality"
-	consulNodeName         = "test-node-virtual"
-	consulLocalityNodeName = "test-node-w-locality-virtual"
-	consulNodeAddress      = "127.0.0.1"
+	// TODO: (v2/nitya) Bring back any node names once node controller is implemented and assertions for workloads need
+	// node names again.
+	nodeName         = "test-node"
+	localityNodeName = "test-node-w-locality"
+	consulNodeName   = "test-node-virtual"
+	//consulLocalityNodeName = "test-node-w-locality-virtual"
+	consulNodeAddress = "127.0.0.1"
 )
 
 func TestParseLocality(t *testing.T) {
@@ -194,7 +196,6 @@ func TestWorkloadWrite(t *testing.T) {
 						Protocol: pbcatalog.Protocol_PROTOCOL_MESH,
 					},
 				},
-				NodeName: consulNodeName,
 				Identity: "foo",
 			},
 		},
@@ -226,7 +227,6 @@ func TestWorkloadWrite(t *testing.T) {
 					Region: "us-east1",
 					Zone:   "us-east1-b",
 				},
-				NodeName: consulLocalityNodeName,
 				Identity: "foo",
 			},
 		},
@@ -255,7 +255,6 @@ func TestWorkloadWrite(t *testing.T) {
 						Protocol: pbcatalog.Protocol_PROTOCOL_MESH,
 					},
 				},
-				NodeName: consulNodeName,
 				Identity: "foo",
 			},
 		},
@@ -275,7 +274,6 @@ func TestWorkloadWrite(t *testing.T) {
 						Protocol: pbcatalog.Protocol_PROTOCOL_MESH,
 					},
 				},
-				NodeName: consulNodeName,
 				Identity: "foo",
 			},
 		},
@@ -1385,7 +1383,6 @@ func createWorkload() *pbcatalog.Workload {
 				Protocol: pbcatalog.Protocol_PROTOCOL_MESH,
 			},
 		},
-		NodeName: consulNodeName,
 		Identity: "foo",
 	}
 }

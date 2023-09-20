@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package mesh
 
 import (
@@ -16,7 +19,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
-// Test that Connect works for an application with multiple ports. The multiport application is a Pod listening on
+// Test that mesh sidecar proxies work for an application with multiple ports. The multiport application is a Pod listening on
 // two ports. This tests inbound connections to each port of the multiport app, and outbound connections from the
 // multiport app to static-server.
 func TestMeshInject_MultiportService(t *testing.T) {
@@ -26,7 +29,9 @@ func TestMeshInject_MultiportService(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cfg := suite.Config()
 			cfg.SkipWhenOpenshiftAndCNI(t)
-
+			if !cfg.EnableTransparentProxy {
+				t.Skipf("skipping this because -enable-transparent-proxy is not set")
+			}
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
