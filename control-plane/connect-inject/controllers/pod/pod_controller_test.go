@@ -32,7 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"

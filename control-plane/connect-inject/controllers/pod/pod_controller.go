@@ -22,7 +22,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -86,7 +87,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// Strictly speaking, this is not required because the mesh webhook also knows valid namespaces
 	// for injection, but it will somewhat reduce the amount of unnecessary deletions for non-injected
 	// pods
-	if common.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
+	if inject.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
 		return ctrl.Result{}, nil
 	}
 
@@ -127,11 +128,11 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	r.Log.Info("retrieved", "name", pod.Name, "ns", pod.Namespace)
 
-	if common.HasBeenMeshInjected(pod) {
+	if inject.HasBeenMeshInjected(pod) {
 		if err := r.writeProxyConfiguration(ctx, pod); err != nil {
 			// We could be racing with the namespace controller.
 			// Requeue (which includes backoff) to try again.
-			if common.ConsulNamespaceIsNotFound(err) {
+			if inject.ConsulNamespaceIsNotFound(err) {
 				r.Log.Info("Consul namespace not found; re-queueing request",
 					"pod", req.Name, "ns", req.Namespace, "consul-ns",
 					r.getConsulNamespace(req.Namespace), "err", err.Error())
@@ -143,7 +144,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err := r.writeWorkload(ctx, pod); err != nil {
 			// Technically this is not needed, but keeping in case this gets refactored in
 			// a different order
-			if common.ConsulNamespaceIsNotFound(err) {
+			if inject.ConsulNamespaceIsNotFound(err) {
 				r.Log.Info("Consul namespace not found; re-queueing request",
 					"pod", req.Name, "ns", req.Namespace, "consul-ns",
 					r.getConsulNamespace(req.Namespace), "err", err.Error())
@@ -168,7 +169,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err := r.writeHealthStatus(ctx, pod); err != nil {
 			// Technically this is not needed, but keeping in case this gets refactored in
 			// a different order
-			if common.ConsulNamespaceIsNotFound(err) {
+			if inject.ConsulNamespaceIsNotFound(err) {
 				r.Log.Info("Consul namespace not found; re-queueing request",
 					"pod", req.Name, "ns", req.Namespace, "consul-ns",
 					r.getConsulNamespace(req.Namespace), "err", err.Error())
@@ -226,10 +227,10 @@ func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 		// Adding a node does not currently work because the node doesn't exist so its health status will always be
 		// unhealthy, causing any endpoints on that node to also be unhealthy.
 		// TODO: (v2/nitya) Bring this back when node controller is built.
-		//NodeName: common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
+		//NodeName: inject.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
 		Ports: workloadPorts,
 	}
-	data := common.ToProtoAny(workload)
+	data := inject.ToProtoAny(workload)
 
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
@@ -276,7 +277,7 @@ func (r *Controller) writeProxyConfiguration(ctx context.Context, pod corev1.Pod
 		},
 		BootstrapConfig: bootstrapConfig,
 	}
-	data := common.ToProtoAny(pc)
+	data := inject.ToProtoAny(pc)
 
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
@@ -297,7 +298,7 @@ func (r *Controller) getTproxyMode(ctx context.Context, pod corev1.Pod) (pbmesh.
 		return pbmesh.ProxyMode_PROXY_MODE_DEFAULT, fmt.Errorf("could not get namespace info for %s: %w", pod.GetNamespace(), err)
 	}
 
-	tproxyEnabled, err := common.TransparentProxyEnabled(ns, pod, r.EnableTransparentProxy)
+	tproxyEnabled, err := inject.TransparentProxyEnabled(ns, pod, r.EnableTransparentProxy)
 	if err != nil {
 		return pbmesh.ProxyMode_PROXY_MODE_DEFAULT, fmt.Errorf("could not determine if transparent proxy is enabled: %w", err)
 	}
@@ -310,7 +311,7 @@ func (r *Controller) getTproxyMode(ctx context.Context, pod corev1.Pod) (pbmesh.
 
 func (r *Controller) getExposeConfig(pod corev1.Pod) (*pbmesh.ExposeConfig, error) {
 	// Expose k8s probes as Envoy listeners if needed.
-	overwriteProbes, err := common.ShouldOverwriteProbes(pod, r.TProxyOverwriteProbes)
+	overwriteProbes, err := inject.ShouldOverwriteProbes(pod, r.TProxyOverwriteProbes)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine if probes should be overwritten: %w", err)
 	}
@@ -348,7 +349,7 @@ func (r *Controller) getExposeConfig(pod corev1.Pod) (*pbmesh.ExposeConfig, erro
 func getContainerExposePaths(originalPod corev1.Pod, originalContainer, mutatedContainer corev1.Container) ([]*pbmesh.ExposePath, error) {
 	var paths []*pbmesh.ExposePath
 	if mutatedContainer.LivenessProbe != nil && mutatedContainer.LivenessProbe.HTTPGet != nil {
-		originalLivenessPort, err := common.PortValueFromIntOrString(originalPod, originalContainer.LivenessProbe.HTTPGet.Port)
+		originalLivenessPort, err := inject.PortValueFromIntOrString(originalPod, originalContainer.LivenessProbe.HTTPGet.Port)
 		if err != nil {
 			return nil, err
 		}
@@ -361,7 +362,7 @@ func getContainerExposePaths(originalPod corev1.Pod, originalContainer, mutatedC
 		paths = append(paths, newPath)
 	}
 	if mutatedContainer.ReadinessProbe != nil && mutatedContainer.ReadinessProbe.HTTPGet != nil {
-		originalReadinessPort, err := common.PortValueFromIntOrString(originalPod, originalContainer.ReadinessProbe.HTTPGet.Port)
+		originalReadinessPort, err := inject.PortValueFromIntOrString(originalPod, originalContainer.ReadinessProbe.HTTPGet.Port)
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +375,7 @@ func getContainerExposePaths(originalPod corev1.Pod, originalContainer, mutatedC
 		paths = append(paths, newPath)
 	}
 	if mutatedContainer.StartupProbe != nil && mutatedContainer.StartupProbe.HTTPGet != nil {
-		originalStartupPort, err := common.PortValueFromIntOrString(originalPod, originalContainer.StartupProbe.HTTPGet.Port)
+		originalStartupPort, err := inject.PortValueFromIntOrString(originalPod, originalContainer.StartupProbe.HTTPGet.Port)
 		if err != nil {
 			return nil, err
 		}
@@ -429,7 +430,7 @@ func (r *Controller) writeHealthStatus(ctx context.Context, pod corev1.Pod) erro
 		Description: constants.ConsulKubernetesCheckName,
 		Output:      getHealthStatusReason(status, pod),
 	}
-	data := common.ToProtoAny(hs)
+	data := inject.ToProtoAny(hs)
 
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{

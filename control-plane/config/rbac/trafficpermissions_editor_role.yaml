@@ -8,7 +8,7 @@ metadata:
   name: trafficpermissions-editor-role
 rules:
 - apiGroups:
-  - consul.hashicorp.com
+  - auth.consul.hashicorp.com
   resources:
   - trafficpermissions
   verbs:
@@ -20,7 +20,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - consul.hashicorp.com
+  - auth.consul.hashicorp.com
   resources:
   - trafficpermissions/status
   verbs:

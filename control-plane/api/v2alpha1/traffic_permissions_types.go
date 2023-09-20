@@ -5,19 +5,29 @@ package v2alpha1
 
 import (
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
+	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
+const (
+	trafficpermissionsKubeKind = "trafficpermissions"
+)
+
 func init() {
-	SchemeBuilder.Register(&TrafficPermissions{}, &TrafficPermissionsList{})
+	AuthSchemeBuilder.Register(&TrafficPermissions{}, &TrafficPermissionsList{})
 }
+
+var _ common.MeshConfig = &TrafficPermissions{}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
@@ -72,8 +82,14 @@ type Destination struct {
 	// Name is the destination of all intentions defined in this config entry.
 	// This may be set to the wildcard character (*) to match
 	// all services that don't otherwise have intentions defined.
-	IdentityName   string `json:"identityName,omitempty"`
-	IdentityPrefix string `json:"identityPrefix,omitempty"`
+	IdentityName string `json:"identityName,omitempty"`
+}
+
+func (in *Destination) validate(path *field.Path) *field.Error {
+	if in.IdentityName == "" {
+		return field.Required(path.Child("identityName"), `identityName is required`)
+	}
+	return nil
 }
 
 // IntentionAction is the action that the intention represents. This
@@ -85,6 +101,15 @@ const (
 	ActionAllow       IntentionAction = "allow"
 	ActionUnspecified IntentionAction = ""
 )
+
+func (in IntentionAction) validate(path *field.Path) *field.Error {
+	switch in {
+	case ActionDeny, ActionAllow:
+		return nil
+	default:
+		return field.Invalid(path.Child("action"), in, "must be one of \"allow\" or \"deny\"")
+	}
+}
 
 type Permissions []*Permission
 
@@ -186,7 +211,7 @@ func (in *TrafficPermissions) ResourceID(namespace, partition string) *pbresourc
 func (in *TrafficPermissions) Resource(namespace, partition string) *pbresource.Resource {
 	return &pbresource.Resource{
 		Id: in.ResourceID(namespace, partition),
-		Data: common.ToProtoAny(&pbauth.TrafficPermissions{
+		Data: inject.ToProtoAny(&pbauth.TrafficPermissions{
 			Destination: in.Spec.Destination.toProto(),
 			Action:      in.Spec.Action.toProto(),
 			Permissions: in.Spec.Permissions.toProto(),
@@ -198,10 +223,20 @@ func (in *TrafficPermissions) MatchesConsul(candidate *pbresource.Resource, name
 	return cmp.Equal(
 		in.Resource(namespace, partition),
 		candidate,
-		cmpopts.IgnoreFields(pbresource.Resource{}, "Status", "Generation", "Metadata", "Owner", "Version"),
-		cmpopts.IgnoreUnexported(),
-		cmpopts.EquateEmpty(),
+		protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
+		protocmp.Transform(),
+		// TODO(dans): remove this as needed.
+		//cmpopts.IgnoreUnexported(),
+		//cmpopts.EquateEmpty(),
 	)
+}
+
+func (in *TrafficPermissions) KubeKind() string {
+	return trafficpermissionsKubeKind
+}
+
+func (in *TrafficPermissions) KubernetesName() string {
+	return in.ObjectMeta.Name
 }
 
 func (in *TrafficPermissions) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
@@ -234,6 +269,38 @@ func (in *TrafficPermissions) SyncedConditionStatus() corev1.ConditionStatus {
 		return corev1.ConditionUnknown
 	}
 	return condition.Status
+}
+
+func (in *TrafficPermissions) Validate(_ common.ConsulTenancyConfig) error {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+
+	if in.Spec.Action == ActionUnspecified {
+		errs = append(errs, field.Required(path.Child("action"), `action is required`))
+	}
+	errs = append(errs, in.Spec.Action.validate(path))
+
+	// Validate Destinations
+	if in.Spec.Destination == nil {
+		errs = append(errs, field.Required(path.Child("destination"), `destination is required`))
+	}
+	errs = append(errs, in.Spec.Destination.validate(path.Child("destination")))
+
+	// TODO: add validation for permissions
+	// Validate permissions in Consul:
+	// https://github.com/hashicorp/consul/blob/203a36821ef6182b2d2b30c1012ca5a42c7dd8f3/internal/auth/internal/types/traffic_permissions.go#L59-L141
+
+	if len(errs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: AuthGroup, Kind: common.TrafficPermissions},
+			in.KubernetesName(), errs)
+	}
+	return nil
+}
+
+// DefaultNamespaceFields is required as part of the common.MeshConfig interface
+func (in *TrafficPermissions) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {
+	return
 }
 
 func (p Permissions) toProto() []*pbauth.Permission {
@@ -324,15 +391,14 @@ func (h *DestinationRuleHeader) toProto() *pbauth.DestinationRuleHeader {
 
 func (in *Destination) toProto() *pbauth.Destination {
 	return &pbauth.Destination{
-		IdentityName:   in.IdentityName,
-		IdentityPrefix: in.IdentityPrefix,
+		IdentityName: in.IdentityName,
 	}
 }
 
-func (a IntentionAction) toProto() pbauth.Action {
-	if a == ActionAllow {
+func (in IntentionAction) toProto() pbauth.Action {
+	if in == ActionAllow {
 		return pbauth.Action_ACTION_ALLOW
-	} else if a == ActionDeny {
+	} else if in == ActionDeny {
 		return pbauth.Action_ACTION_DENY
 	}
 	return pbauth.Action_ACTION_UNSPECIFIED

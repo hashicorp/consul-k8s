@@ -29,7 +29,8 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-uuid"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -113,7 +114,7 @@ func TestReconcile_CreateService(t *testing.T) {
 		//		}
 		//		return []runtime.Object{endpoints, service}
 		//	},
-		//	expectedResource: &pbresource.Resource{
+		//	expectedResource: &pbresource.MeshConfig{
 		//		Id: &pbresource.ID{
 		//			Name: "service-created",
 		//			Type: &pbresource.Type{
@@ -240,7 +241,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -334,7 +335,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -438,7 +439,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -551,7 +552,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -714,7 +715,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -822,7 +823,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -916,7 +917,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1057,7 +1058,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1099,7 +1100,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1201,7 +1202,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1247,7 +1248,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1304,7 +1305,7 @@ func TestReconcile_DeleteService(t *testing.T) {
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1675,5 +1676,5 @@ func randomKubernetesId() string {
 
 func removeMeshInjectStatus(t *testing.T, pod *corev1.Pod) {
 	delete(pod.Annotations, constants.KeyMeshInjectStatus)
-	require.False(t, common.HasBeenMeshInjected(*pod))
+	require.False(t, inject.HasBeenMeshInjected(*pod))
 }

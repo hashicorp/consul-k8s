@@ -195,7 +195,7 @@ spec:
             - targetRef
             type: object
           status:
-            description: GatewayPolicyStatus defines the observed state of the gateway
+            description: GatewayPolicyStatus defines the observed state of the gateway.
             properties:
               conditions:
                 default:

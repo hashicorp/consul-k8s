@@ -5,9 +5,10 @@ package serviceaccount
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
-	"testing"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
@@ -25,7 +26,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -333,7 +335,7 @@ func expectedWorkloadIdentityMatches(t *testing.T, client pbresource.ResourceSer
 // getWorkloadIdentityData returns a WorkloadIdentity resource payload.
 // This function takes no arguments because WorkloadIdentity is currently an empty proto message.
 func getWorkloadIdentityData() *anypb.Any {
-	return common.ToProtoAny(&pbauth.WorkloadIdentity{})
+	return inject.ToProtoAny(&pbauth.WorkloadIdentity{})
 }
 
 func createServiceAccount(name, namespace string) *corev1.ServiceAccount {

@@ -6,7 +6,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: trafficpermissions.consul.hashicorp.com
+  name: trafficpermissions.auth.consul.hashicorp.com
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -14,7 +14,7 @@ metadata:
     release: {{ .Release.Name }}
     component: crd
 spec:
-  group: consul.hashicorp.com
+  group: auth.consul.hashicorp.com
   names:
     kind: TrafficPermissions
     listKind: TrafficPermissionsList
@@ -76,13 +76,13 @@ spec:
                 description: Destination is a configuration of the destination proxies
                   where these traffic permissions should apply.
                 properties:
-                  name:
+                  identityName:
                     description: Name is the destination of all intentions defined
                       in this config entry. This may be set to the wildcard character
                       (*) to match all services that don't otherwise have intentions
                       defined.
                     type: string
-                  prefix:
+                  identityPrefix:
                     type: string
                 type: object
               permissions:

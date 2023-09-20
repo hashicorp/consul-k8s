@@ -38,7 +38,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: RouteAuthFilter is the Schema for the httpauthfilters API.
+        description: RouteAuthFilter is the Schema for the routeauthfilters API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

@@ -12,9 +12,9 @@ import (
 
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 
-	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v2alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/config-entries/controllersv2"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpointsv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/serviceaccount"
@@ -125,40 +125,21 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		}
 	}
 
-	// TODO: V2 Config Controller(s)
-	configEntryReconciler := &controllersv2.ConfigEntryController{
-		ConsulClientConfig:         consulConfig,
-		ConsulServerConnMgr:        watcher,
-		DatacenterName:             c.consul.Datacenter,
-		EnableConsulNamespaces:     c.flagEnableNamespaces,
-		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
-		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
-		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
-		EnableConsulPartitions:     c.flagEnablePartitions,
-		ConsulPartition:            c.consul.Partition,
+	meshConfigReconciler := &controllersv2.MeshConfigController{
+		ConsulClientConfig:  consulConfig,
+		ConsulServerConnMgr: watcher,
+		ConsulTenancyConfig: consulTenancyConfig,
 	}
 	if err := (&controllersv2.TrafficPermissionsController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.TrafficPermissions),
-		Scheme:                mgr.GetScheme(),
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.TrafficPermissions),
+		Scheme:               mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.TrafficPermissions)
+		setupLog.Error(err, "unable to create controller", "controller", common.TrafficPermissions)
 		return err
 	}
 
-	// // Metadata for webhooks
-	//consulMeta := apicommon.ConsulMeta{
-	//	PartitionsEnabled:    c.flagEnablePartitions,
-	//	Partition:            c.consul.Partition,
-	//	NamespacesEnabled:    c.flagEnableNamespaces,
-	//	DestinationNamespace: c.flagConsulDestinationNamespace,
-	//	Mirroring:            c.flagEnableK8SNSMirroring,
-	//	Prefix:               c.flagK8SNSMirroringPrefix,
-	//}
-
-	// TODO: register webhooks
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
 	mgr.GetWebhookServer().Register("/mutate",
@@ -202,6 +183,13 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 			Log:                          ctrl.Log.WithName("handler").WithName("consul-mesh"),
 			LogLevel:                     c.flagLogLevel,
 			LogJSON:                      c.flagLogJSON,
+		}})
+
+	mgr.GetWebhookServer().Register("/mutate-v2alpha1-trafficpermissions",
+		&ctrlRuntimeWebhook.Admission{Handler: &v2alpha1.TrafficPermissionsWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.TrafficPermissions),
+			ConsulTenancyConfig: consulTenancyConfig,
 		}})
 
 	if err := mgr.AddReadyzCheck("ready", webhook.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {

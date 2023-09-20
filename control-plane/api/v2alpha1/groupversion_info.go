@@ -3,7 +3,7 @@
 
 // Package v2alpha1 contains API Schema definitions for the consul.hashicorp.com v2alpha1 API group
 // +kubebuilder:object:generate=true
-// +groupName=consul.hashicorp.com
+// +groupName=auth.consul.hashicorp.com
 package v2alpha1
 
 import (
@@ -11,15 +11,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
-const ConsulHashicorpGroup string = "consul.hashicorp.com"
-
 var (
-	// GroupVersion is group version used to register these objects.
-	GroupVersion = schema.GroupVersion{Group: "consul.hashicorp.com", Version: "v2alpha1"}
 
-	// SchemeBuilder is used to add go types to the GroupVersionKind scheme.
-	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+	// AUTH group ***********
 
-	// AddToScheme adds the types in this group-version to the given scheme.
-	AddToScheme = SchemeBuilder.AddToScheme
+	AuthGroup = "auth.consul.hashicorp.com"
+
+	// AuthGroupVersion is group version used to register these objects.
+	AuthGroupVersion = schema.GroupVersion{Group: AuthGroup, Version: "v2alpha1"}
+
+	// AuthSchemeBuilder is used to add go types to the GroupVersionKind scheme.
+	AuthSchemeBuilder = &scheme.Builder{GroupVersion: AuthGroupVersion}
+
+	// AddAuthToScheme adds the types in this group-version to the given scheme.
+	AddAuthToScheme = AuthSchemeBuilder.AddToScheme
 )

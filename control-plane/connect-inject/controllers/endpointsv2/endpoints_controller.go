@@ -23,7 +23,8 @@ import (
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -65,7 +66,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var service corev1.Service
 
 	// Ignore the request if the namespace of the endpoint is not allowed.
-	if common.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
+	if inject.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
 		return ctrl.Result{}, nil
 	}
 
@@ -115,7 +116,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err = r.registerService(ctx, resourceClient, service, consulSvc); err != nil {
 		// We could be racing with the namespace controller.
 		// Requeue (which includes backoff) to try again.
-		if common.ConsulNamespaceIsNotFound(err) {
+		if inject.ConsulNamespaceIsNotFound(err) {
 			r.Log.Info("Consul namespace not found; re-queueing request",
 				"service", service.GetName(), "ns", req.Namespace,
 				"consul-ns", r.getConsulNamespace(req.Namespace), "err", err.Error())
@@ -197,7 +198,7 @@ func (r *Controller) getWorkloadDataFromEndpoints(ctx context.Context, pf PodFet
 				// Add pod to workload selector values as appropriate.
 				// Pods can appear more than once in Endpoints subsets, so we use a set for exact names as well.
 				if prefix := getOwnerPrefixFromPod(pod); prefix != "" {
-					if common.HasBeenMeshInjected(*pod) {
+					if inject.HasBeenMeshInjected(*pod) {
 						// Add to the list of pods represented by this prefix. This list is used by
 						// `getEffectiveTargetPort` to determine the most-used target container port name if the
 						// k8s service target port is numeric.
@@ -208,7 +209,7 @@ func (r *Controller) getWorkloadDataFromEndpoints(ctx context.Context, pf PodFet
 						ignoredPodPrefixes[prefix] = true
 					}
 				} else {
-					if common.HasBeenMeshInjected(*pod) {
+					if inject.HasBeenMeshInjected(*pod) {
 						exactNamePods[podName.Name] = &podData
 					}
 					// If the pod hasn't been mesh-injected, ignore it, as it won't be available as a workload.
@@ -288,7 +289,7 @@ func (r *Controller) registerService(ctx context.Context, resourceClient pbresou
 func (r *Controller) getServiceResource(svc *pbcatalog.Service, name, namespace, partition string, meta map[string]string) *pbresource.Resource {
 	return &pbresource.Resource{
 		Id:       getServiceID(name, namespace, partition),
-		Data:     common.ToProtoAny(svc),
+		Data:     inject.ToProtoAny(svc),
 		Metadata: meta,
 	}
 }
@@ -324,7 +325,7 @@ func getServicePorts(service corev1.Service, prefixedPods selectorPodData, exact
 			ports = append(ports, &pbcatalog.ServicePort{
 				VirtualPort: uint32(p.Port),
 				TargetPort:  getEffectiveTargetPort(p.TargetPort, prefixedPods, exactNamePods),
-				Protocol:    common.GetPortProtocol(p.AppProtocol),
+				Protocol:    inject.GetPortProtocol(p.AppProtocol),
 			})
 		}
 	}
