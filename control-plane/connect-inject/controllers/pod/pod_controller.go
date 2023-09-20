@@ -153,6 +153,14 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 		// Create explicit upstreams (if any exist)
 		if err := r.writeUpstreams(ctx, pod); err != nil {
+			// Technically this is not needed, but keeping in case this gets refactored in
+			// a different order
+			if common.ConsulNamespaceIsNotFound(err) {
+				r.Log.Info("Consul namespace not found; re-queueing request",
+					"pod", req.Name, "ns", req.Namespace, "consul-ns",
+					r.getConsulNamespace(req.Namespace), "err", err.Error())
+				return ctrl.Result{Requeue: true}, nil
+			}
 			errs = multierror.Append(errs, err)
 		}
 
