@@ -75,7 +75,7 @@ const (
 
 	// AnnotationUpstreams is a list of upstreams to register with the
 	// proxy in the format of `<service-name>:<local-port>,...`. The
-	// service name should map to a Consul service namd and the local port
+	// service name should map to a Consul service name and the local port
 	// is the local port in the pod that the listener will bind to. It can
 	// be a named port.
 	AnnotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
@@ -235,7 +235,7 @@ const (
 	ManagedByServiceAccountValue = "consul-k8s-service-account-controller"
 
 	// AnnotationMeshDestinations is a list of upstreams to register with the
-	// proxy. The service name should map to a Consul service namd and the local
+	// proxy. The service name should map to a Consul service name and the local
 	// port is the local port in the pod that the listener will bind to. It can
 	// be a named port.
 	AnnotationMeshDestinations = "consul.hashicorp.com/mesh-service-destinations"

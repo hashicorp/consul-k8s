@@ -1164,8 +1164,9 @@ func processPreparedQueryUpstream(pod corev1.Pod, rawUpstream string) api.Upstre
 
 // processUnlabeledUpstream processes an upstream in the format:
 // [service-name].[service-namespace].[service-partition]:[port]:[optional datacenter].
+// There is no unlabeled field for peering.
 func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
-	var datacenter, svcName, namespace, partition, peer string
+	var datacenter, svcName, namespace, partition string
 	var port int32
 	var upstream api.Upstream
 
@@ -1199,7 +1200,7 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 		upstream = api.Upstream{
 			DestinationType:      api.UpstreamDestTypeService,
 			DestinationPartition: partition,
-			DestinationPeer:      peer,
+			DestinationPeer:      "",
 			DestinationNamespace: namespace,
 			DestinationName:      svcName,
 			Datacenter:           datacenter,
