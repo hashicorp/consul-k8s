@@ -1,0 +1,3 @@
+```release-note:bug
+pdb: adding pod disruption budget for all the gateways
+```
