@@ -40,10 +40,9 @@ import (
 const (
 	// TODO: (v2/nitya) Bring back consulLocalityNodeName once node controller is implemented and assertions for
 	// workloads need node names again.
-	nodeName          = "test-node"
-	localityNodeName  = "test-node-w-locality"
-	consulNodeName    = "test-node-virtual"
-	consulNodeAddress = "127.0.0.1"
+	nodeName         = "test-node"
+	localityNodeName = "test-node-w-locality"
+	consulNodeName   = "test-node-virtual"
 )
 
 func TestParseLocality(t *testing.T) {
