@@ -1,4 +1,4 @@
-{{- if (and .Values.apiGateway.disruptionBudget.enabled (or (and (ne (.Values.apiGateway.enabled | toString) "-") .Values.apiGateway.enabled) (and (eq (.Values.apiGateway.enabled | toString) "-") .Values.global.enabled))) }}
+{{- if (and .Values.apiGateway.disruptionBudget.enabled (and (ne (.Values.apiGateway.enabled | toString) "-") .Values.apiGateway.enabled)) }}
 # PodDisruptionBudget to prevent degrading the apiGateway cluster through
 # voluntary cluster changes.
 {{- if .Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
@@ -17,10 +17,10 @@ metadata:
     release: {{ .Release.Name }}
     component: api-gateway-controller
 spec:
-  {{- if .Values.apiGateway.disruptionBudget.minAvailable }}
-  minAvailable: {{ .Values.apiGateway.disruptionBudget.minAvailable }}
+  {{- if .Values.apiGateway.disruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.apiGateway.disruptionBudget.maxUnavailable }}
   {{- else }}
-  maxUnavailable: {{ template "consul.pdb.maxUnavailable" . }} # using consul.pdb.maxUnavailable, this is common logic for all PDBs' edge cases for non-stateful distributed systems.
+  minAvailable: 1
   {{- end }}
   selector:
     matchLabels:

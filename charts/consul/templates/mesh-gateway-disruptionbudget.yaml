@@ -1,4 +1,4 @@
-{{- if (and .Values.meshGateway.disruptionBudget.enabled (or (and (ne (.Values.meshGateway.enabled | toString) "-") .Values.meshGateway.enabled) (and (eq (.Values.meshGateway.enabled | toString) "-") .Values.global.enabled))) }}
+{{- if (and .Values.meshGateway.disruptionBudget.enabled (or (and (ne (.Values.meshGateway.enabled | toString) "-") .Values.meshGateway.enabled) (and (eq (.Values.meshGateway.enabled | toString) "-") .Values.connectInject.enabled))) }}
 # PodDisruptionBudget to prevent degrading the meshGateway through
 # voluntary cluster changes.
 {{- if .Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
@@ -17,10 +17,10 @@ metadata:
     release: {{ .Release.Name }}
     component: mesh-gateway
 spec:
-  {{- if .Values.meshGateway.disruptionBudget.minAvailable }}
-  minAvailable: {{ .Values.meshGateway.disruptionBudget.minAvailable }}
+  {{- if .Values.meshGateway.disruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.meshGateway.disruptionBudget.maxUnavailable }}
   {{- else }}
-  maxUnavailable: {{ template "consul.pdb.maxUnavailable" . }} # using consul.pdb.maxUnavailable, this is common logic for all PDBs' edge cases for non-stateful distributed systems.
+  minAvailable: 1
   {{- end }}
   selector:
     matchLabels:
