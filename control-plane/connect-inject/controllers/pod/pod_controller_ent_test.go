@@ -1,6 +1,8 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
+//go:build enterprise
+
 package pod
 
 import (
@@ -57,14 +59,14 @@ type testCase struct {
 	existingWorkload           *pbcatalog.Workload
 	existingHealthStatus       *pbcatalog.HealthStatus
 	existingProxyConfiguration *pbmesh.ProxyConfiguration
-	//existingUpstreams          *pbmesh.Upstreams
+	existingUpstreams          *pbmesh.Upstreams
 
 	// Expected Consul state.
 	expectedConsulNamespace    string // This namespace will be used to query Consul for the results
 	expectedWorkload           *pbcatalog.Workload
 	expectedHealthStatus       *pbcatalog.HealthStatus
 	expectedProxyConfiguration *pbmesh.ProxyConfiguration
-	//expectedUpstreams          *pbmesh.Upstreams
+	expectedUpstreams          *pbmesh.Upstreams
 
 	// Reconcile loop outputs
 	expErr     string
@@ -171,6 +173,30 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			expectedHealthStatus:    createPassingHealthStatus(),
 		},
 		{
+			name:      "new pod with explicit upstreams, ns and partition",
+			podName:   testPodName,
+			partition: constants.DefaultConsulPartition,
+
+			k8sObjects: func() []runtime.Object {
+				pod := createPod(testPodName, metav1.NamespaceDefault, true, true)
+				addProbesAndOriginalPodAnnotation(pod)
+				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
+				return []runtime.Object{pod}
+			},
+			tproxy:          false,
+			telemetry:       true,
+			metrics:         true,
+			overwriteProbes: true,
+
+			namespaceMirroring: true,
+
+			expectedConsulNamespace:    constants.DefaultConsulNS,
+			expectedWorkload:           createWorkload(),
+			expectedHealthStatus:       createPassingHealthStatus(),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			expectedUpstreams:          createUpstreams(),
+		},
+		{
 			name:         "namespace in Consul does not exist",
 			podName:      testPodName,
 			podNamespace: "bar",
@@ -186,7 +212,6 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			// The equivalent namespace in Consul does not exist, so requeue for backoff.
 			expRequeue: true,
 		},
-		// TODO: explicit upstreams
 	}
 
 	for _, tc := range testCases {
@@ -290,6 +315,26 @@ func TestReconcileDeletePodWithMirrorNamespaces(t *testing.T) {
 			expectedConsulNamespace: "bar",
 		},
 		{
+			name:         "delete pod w/ explicit upstreams",
+			podName:      testPodName,
+			podNamespace: "bar",
+			partition:    testPartition,
+
+			telemetry:       true,
+			metrics:         true,
+			overwriteProbes: true,
+
+			namespaceMirroring: true,
+
+			existingConsulNamespace:    "bar",
+			existingWorkload:           createWorkload(),
+			existingHealthStatus:       createPassingHealthStatus(),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			existingUpstreams:          createUpstreams(),
+
+			expectedConsulNamespace: "bar",
+		},
+		{
 			name:         "delete pod with namespace prefix",
 			podName:      testPodName,
 			podNamespace: "bar",
@@ -331,7 +376,6 @@ func TestReconcileDeletePodWithMirrorNamespaces(t *testing.T) {
 
 			expectedConsulNamespace: "bar",
 		},
-		// TODO: explicit upstreams
 	}
 
 	for _, tc := range testCases {
@@ -371,6 +415,31 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
 			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+		},
+		{
+			name:      "new pod with explicit upstreams, ns and partition",
+			podName:   testPodName,
+			partition: constants.DefaultConsulPartition,
+
+			k8sObjects: func() []runtime.Object {
+				pod := createPod(testPodName, metav1.NamespaceDefault, true, true)
+				addProbesAndOriginalPodAnnotation(pod)
+				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
+				return []runtime.Object{pod}
+			},
+			telemetry:       true,
+			metrics:         true,
+			overwriteProbes: true,
+
+			namespaceDestination: constants.DefaultConsulNS,
+
+			existingConsulNamespace: constants.DefaultConsulNS,
+
+			expectedConsulNamespace:    constants.DefaultConsulNS,
+			expectedWorkload:           createWorkload(),
+			expectedHealthStatus:       createPassingHealthStatus(),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			expectedUpstreams:          createUpstreams(),
 		},
 		{
 			name:         "kitchen sink new pod, non-default ns and partition",
@@ -414,7 +483,6 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			// The equivalent namespace in Consul does not exist, so requeue for backoff.
 			expRequeue: true,
 		},
-		// TODO: explicit upstreams
 	}
 
 	for _, tc := range testCases {
@@ -517,6 +585,26 @@ func TestReconcileDeletePodWithDestinationNamespace(t *testing.T) {
 			expectedConsulNamespace: "a-penguin-walks-into-a-bar",
 		},
 		{
+			name:         "delete pod with explicit upstreams",
+			podName:      testPodName,
+			podNamespace: "bar",
+			partition:    testPartition,
+
+			telemetry:       true,
+			metrics:         true,
+			overwriteProbes: true,
+
+			namespaceDestination: "a-penguin-walks-into-a-bar",
+
+			existingConsulNamespace:    "a-penguin-walks-into-a-bar",
+			existingWorkload:           createWorkload(),
+			existingHealthStatus:       createPassingHealthStatus(),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			existingUpstreams:          createUpstreams(),
+
+			expectedConsulNamespace: "a-penguin-walks-into-a-bar",
+		},
+		{
 			name:         "resources are already gone in Consul",
 			podName:      testPodName,
 			podNamespace: "bar",
@@ -543,7 +631,6 @@ func TestReconcileDeletePodWithDestinationNamespace(t *testing.T) {
 
 			expectedConsulNamespace: "a-penguin-walks-into-a-bar",
 		},
-		// TODO: explicit upstreams
 	}
 
 	for _, tc := range testCases {
@@ -660,8 +747,12 @@ func runControllerTest(t *testing.T, tc testCase) {
 		getProxyConfigurationID(tc.podName, tc.expectedConsulNamespace, tc.partition),
 		tc.existingProxyConfiguration,
 		nil)
-	// TODO: load the existing resources
-	// loadUpstreams
+	loadResource(
+		t,
+		resourceClient,
+		getUpstreamsID(tc.podName, tc.expectedConsulNamespace, tc.partition),
+		tc.existingUpstreams,
+		nil)
 
 	namespacedName := types.NamespacedName{
 		Namespace: podNamespace,
@@ -688,6 +779,6 @@ func runControllerTest(t *testing.T, tc testCase) {
 	pcID := getProxyConfigurationID(tc.podName, tc.expectedConsulNamespace, tc.partition)
 	expectedProxyConfigurationMatches(t, resourceClient, pcID, tc.expectedProxyConfiguration)
 
-	// TODO: compare the following to expected values
-	// expectedUpstreams
+	uID := getUpstreamsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+	expectedUpstreamMatches(t, resourceClient, uID, tc.expectedUpstreams)
 }
