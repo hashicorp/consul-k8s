@@ -54,3 +54,27 @@ const (
 
 	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 )
+
+func GetDefaultConsulNamespace(ns string) string {
+	if ns == "" {
+		ns = DefaultConsulNS
+	}
+
+	return ns
+}
+
+func GetDefaultConsulPartition(ap string) string {
+	if ap == "" {
+		ap = DefaultConsulPartition
+	}
+
+	return ap
+}
+
+func GetDefaultConsulPeer(peer string) string {
+	if peer == "" {
+		peer = DefaultConsulPeer
+	}
+
+	return peer
+}
