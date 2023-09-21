@@ -11,6 +11,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/consul/api"
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/anypb"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,10 +40,9 @@ import (
 const (
 	// TODO: (v2/nitya) Bring back consulLocalityNodeName once node controller is implemented and assertions for
 	// workloads need node names again.
-	nodeName          = "test-node"
-	localityNodeName  = "test-node-w-locality"
-	consulNodeName    = "test-node-virtual"
-	consulNodeAddress = "127.0.0.1"
+	nodeName         = "test-node"
+	localityNodeName = "test-node-w-locality"
+	consulNodeName   = "test-node-virtual"
 )
 
 func TestParseLocality(t *testing.T) {
@@ -747,7 +748,7 @@ func TestProxyConfigurationDelete(t *testing.T) {
 		{
 			name:                       "proxy configuration delete",
 			pod:                        createPod("foo", "10.0.0.1", "foo", true, true),
-			existingProxyConfiguration: createProxyConfiguration(),
+			existingProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 	}
 
@@ -758,11 +759,1318 @@ func TestProxyConfigurationDelete(t *testing.T) {
 	}
 }
 
-// TODO
-// func TestUpstreamsWrite(t *testing.T)
+// TestUpstreamsWrite does a subsampling of tests covered in TestProcessUpstreams to make sure things are hooked up
+// correctly. For the sake of test speed, more exhaustive testing is performed in TestProcessUpstreams.
+func TestUpstreamsWrite(t *testing.T) {
+	t.Parallel()
 
-// TODO
-// func TestUpstreamsDelete(t *testing.T)
+	const podName = "pod1"
+
+	cases := []struct {
+		name                    string
+		pod                     func() *corev1.Pod
+		expected                *pbmesh.Upstreams
+		expErr                  string
+		consulNamespacesEnabled bool
+		consulPartitionsEnabled bool
+	}{
+		{
+			name: "labeled annotated upstream with svc only",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "labeled annotated upstream with svc, ns, and peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234"
+				return pod1
+			},
+			expErr: "error processing upstream annotations: upstream currently does not support peers: myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234",
+			// TODO: uncomment this and remove expErr when peers is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: "ns1",
+			//					PeerName:  "peer1",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "labeled annotated upstream with svc, ns, and partition",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.ap:1234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: "part1",
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "error labeled annotated upstream error: invalid partition/dc/peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.err:1234"
+				return pod1
+			},
+			expErr:                  "error processing upstream annotations: upstream structured incorrectly: myPort.port.upstream1.svc.ns1.ns.part1.err:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "unlabeled single upstream",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream:1234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "unlabeled single upstream with namespace and partition",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream.foo.bar:1234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: "bar",
+								Namespace: "foo",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test consulServer client.
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+				c.Experiments = []string{"resource-apis"}
+			})
+			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+			require.NoError(t, err)
+
+			pc := &Controller{
+				Log: logrtest.New(t),
+				K8sNamespaceConfig: common.K8sNamespaceConfig{
+					AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+					DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				},
+				ConsulTenancyConfig: common.ConsulTenancyConfig{
+					EnableConsulNamespaces: tt.consulNamespacesEnabled,
+					EnableConsulPartitions: tt.consulPartitionsEnabled,
+				},
+				ResourceClient: resourceClient,
+			}
+
+			err = pc.writeUpstreams(context.Background(), *tt.pod())
+
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+				expectedUpstreamMatches(t, resourceClient, tt.pod().Name, tt.expected)
+			}
+		})
+	}
+}
+
+func TestProcessUpstreams(t *testing.T) {
+	t.Parallel()
+
+	const podName = "pod1"
+
+	cases := []struct {
+		name                    string
+		pod                     func() *corev1.Pod
+		expected                *pbmesh.Upstreams
+		expErr                  string
+		configEntry             func() api.ConfigEntry
+		consulUnavailable       bool
+		consulNamespacesEnabled bool
+		consulPartitionsEnabled bool
+	}{
+		{
+			name: "labeled annotated upstream with svc only",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "labeled annotated upstream with svc and dc",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.dc1.dc:1234"
+				return pod1
+			},
+			expErr: "upstream currently does not support datacenters: myPort.port.upstream1.svc.dc1.dc:1234",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//				Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "dc1",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "labeled annotated upstream with svc and peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.peer1.peer:1234"
+				return pod1
+			},
+			expErr: "upstream currently does not support peers: myPort.port.upstream1.svc.peer1.peer:1234",
+			// TODO: uncomment this and remove expErr when peers is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
+			//					PeerName:  "peer1",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "labeled annotated upstream with svc, ns, and peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234"
+				return pod1
+			},
+			expErr: "upstream currently does not support peers: myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234",
+			// TODO: uncomment this and remove expErr when peers is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			// 			    Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: "ns1",
+			//					PeerName:  "peer1",
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "labeled annotated upstream with svc, ns, and partition",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.ap:1234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: "part1",
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "labeled annotated upstream with svc, ns, and dc",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234"
+				return pod1
+			},
+			expErr: "upstream currently does not support datacenters: myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: "ns1",
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "dc1",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "labeled multiple annotated upstreams",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns:1234, myPort2.port.upstream2.svc:2234, myPort4.port.upstream4.svc.ns1.ns.ap1.ap:4234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream2",
+						},
+						DestinationPort: "myPort2",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(2234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: "ap1",
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream4",
+						},
+						DestinationPort: "myPort4",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(4234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "labeled multiple annotated upstreams with dcs and peers",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234, myPort2.port.upstream2.svc:2234, myPort3.port.upstream3.svc.ns1.ns:3234, myPort4.port.upstream4.svc.ns1.ns.peer1.peer:4234"
+				return pod1
+			},
+			expErr: "upstream currently does not support datacenters: myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: "ns1",
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "dc1",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream2",
+			//			},
+			//			DestinationPort: "myPort2",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(2234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: "ns1",
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream3",
+			//			},
+			//			DestinationPort: "myPort3",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(3234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: "ns1",
+			//					PeerName:  "peer1",
+			//				},
+			//				Name: "upstream4",
+			//			},
+			//			DestinationPort: "myPort4",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(4234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "error labeled annotated upstream error: invalid partition/dc/peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.ns1.ns.part1.err:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error labeled annotated upstream with svc and peer, needs ns before peer if namespaces enabled",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.peer1.peer:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.peer1.peer:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error labeled annotated upstream error: invalid namespace",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.ns1.err:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error labeled annotated upstream error: invalid number of pieces in the address",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.err:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error labeled annotated upstream error: invalid peer",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.peer1.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.peer1.err:1234",
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error labeled annotated upstream error: invalid number of pieces in the address without namespaces and partitions",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.err:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.err:1234",
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error labeled annotated upstream error: both peer and partition provided",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.partition.peer1.peer:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.ns1.ns.part1.partition.peer1.peer:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "error labeled annotated upstream error: both peer and dc provided",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer.dc1.dc:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.ns1.ns.peer1.peer.dc1.dc:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error labeled annotated upstream error: both dc and partition provided",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.port.upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "error labeled annotated upstream error: wrong ordering for port and svc with namespace partition enabled",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "upstream1.svc.myPort.port.ns1.ns.part1.partition.dc1.dc:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.myPort.port.ns1.ns.part1.partition.dc1.dc:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "error labeled annotated upstream error: wrong ordering for port and svc with namespace partition disabled",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "upstream1.svc.myPort.port:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc.myPort.port:1234",
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error labeled annotated upstream error: incorrect key name namespace partition enabled",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.portage.upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.portage.upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "error labeled annotated upstream error: incorrect key name namespace partition disabled",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.portage.upstream1.svc:1234"
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: myPort.portage.upstream1.svc:1234",
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "unlabeled and labeled multiple annotated upstreams",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns:1234, myPort2.upstream2:2234, myPort4.port.upstream4.svc.ns1.ns.ap1.ap:4234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream2",
+						},
+						DestinationPort: "myPort2",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(2234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: "ap1",
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream4",
+						},
+						DestinationPort: "myPort4",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(4234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "unlabeled single upstream",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream:1234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "unlabeled single upstream with namespace",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream.foo:1234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: "foo",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "unlabeled single upstream with namespace and partition",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream.foo.bar:1234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: "bar",
+								Namespace: "foo",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "unlabeled multiple upstreams",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream1:1234, myPort2.upstream2:2234"
+				return pod1
+			},
+			expected: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream2",
+						},
+						DestinationPort: "myPort2",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(2234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "unlabeled multiple upstreams with consul namespaces, partitions and datacenters",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream1:1234, myPort2.upstream2.bar:2234, myPort3.upstream3.foo.baz:3234:dc2"
+				return pod1
+			},
+			configEntry: func() api.ConfigEntry {
+				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
+				pd := ce.(*api.ProxyConfigEntry)
+				pd.MeshGateway.Mode = "remote"
+				return pd
+			},
+			expErr: "upstream currently does not support datacenters:  myPort3.upstream3.foo.baz:3234:dc2",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: "bar",
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream2",
+			//			},
+			//			DestinationPort: "myPort2",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(2234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: "baz",
+			//					Namespace: "foo",
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream3",
+			//			},
+			//			DestinationPort: "myPort3",
+			//			Datacenter:      "dc2",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(3234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "unlabeled multiple upstreams with consul namespaces and datacenters",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream1:1234, myPort2.upstream2.bar:2234, myPort3.upstream3.foo:3234:dc2"
+				return pod1
+			},
+			configEntry: func() api.ConfigEntry {
+				ce, _ := api.MakeConfigEntry(api.ProxyDefaults, "global")
+				pd := ce.(*api.ProxyConfigEntry)
+				pd.MeshGateway.Mode = "remote"
+				return pd
+			},
+			expErr: "upstream currently does not support datacenters:  myPort3.upstream3.foo:3234:dc2",
+			// TODO: uncomment this and remove expErr when datacenters is supported
+			//expected: &pbmesh.Upstreams{
+			//	Workloads: &pbcatalog.WorkloadSelector{
+			//		Names: []string{podName},
+			//	},
+			//	Upstreams: []*pbmesh.Upstream{
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: getDefaultConsulNamespace(""),
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream1",
+			//			},
+			//			DestinationPort: "myPort",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(1234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: "bar",
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream2",
+			//			},
+			//			DestinationPort: "myPort2",
+			//			Datacenter:      "",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(2234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//		{
+			//			DestinationRef: &pbresource.Reference{
+			//              Type: upstreamReferenceType(),
+			//				Tenancy: &pbresource.Tenancy{
+			//					Partition: getDefaultConsulPartition(""),
+			//					Namespace: "foo",
+			//					PeerName: getDefaultConsulPeer(""),
+			//				},
+			//				Name: "upstream3",
+			//			},
+			//			DestinationPort: "myPort3",
+			//			Datacenter:      "dc2",
+			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//				IpPort: &pbmesh.IPPortAddress{
+			//					Port: uint32(3234),
+			//                  Ip:   consulNodeAddress,
+			//				},
+			//			},
+			//		},
+			//	},
+			//},
+			consulNamespacesEnabled: true,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			pc := &Controller{
+				Log: logrtest.New(t),
+				K8sNamespaceConfig: common.K8sNamespaceConfig{
+					AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+					DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				},
+				ConsulTenancyConfig: common.ConsulTenancyConfig{
+					EnableConsulNamespaces: tt.consulNamespacesEnabled,
+					EnableConsulPartitions: tt.consulPartitionsEnabled,
+				},
+			}
+
+			upstreams, err := pc.processUpstreams(*tt.pod())
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, upstreams)
+
+				if diff := cmp.Diff(tt.expected, upstreams, protocmp.Transform()); diff != "" {
+					t.Errorf("unexpected difference:\n%v", diff)
+				}
+			}
+		})
+	}
+}
+
+func TestUpstreamsDelete(t *testing.T) {
+	t.Parallel()
+
+	const podName = "pod1"
+
+	cases := []struct {
+		name              string
+		pod               func() *corev1.Pod
+		existingUpstreams *pbmesh.Upstreams
+		expErr            string
+		configEntry       func() api.ConfigEntry
+		consulUnavailable bool
+	}{
+		{
+			name: "labeled annotated upstream with svc only",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
+				return pod1
+			},
+			existingUpstreams: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{podName},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: getDefaultConsulPartition(""),
+								Namespace: getDefaultConsulNamespace(""),
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "upstream1",
+						},
+						DestinationPort: "myPort",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test consulServer server.
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+				c.Experiments = []string{"resource-apis"}
+			})
+			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+			require.NoError(t, err)
+
+			pc := &Controller{
+				Log: logrtest.New(t),
+				K8sNamespaceConfig: common.K8sNamespaceConfig{
+					AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+					DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				},
+				ResourceClient: resourceClient,
+			}
+
+			// Load in the upstream for us to delete and check that it's there
+			loadResource(t,
+				resourceClient,
+				getUpstreamsID(tt.pod().Name, constants.DefaultConsulNS, constants.DefaultConsulPartition),
+				tt.existingUpstreams,
+				nil)
+			expectedUpstreamMatches(t, resourceClient, tt.pod().Name, tt.existingUpstreams)
+
+			// Delete the upstream
+			nn := types.NamespacedName{Name: tt.pod().Name}
+			err = pc.deleteUpstreams(context.Background(), nn)
+
+			// Verify the upstream has been deleted or that an expected error has been returned
+			if tt.expErr != "" {
+				require.EqualError(t, err, tt.expErr)
+			} else {
+				require.NoError(t, err)
+				expectedUpstreamMatches(t, resourceClient, tt.pod().Name, nil)
+			}
+		})
+	}
+}
 
 // TODO
 // func TestDeleteACLTokens(t *testing.T)
@@ -787,7 +2095,7 @@ func TestReconcileCreatePod(t *testing.T) {
 		expectedWorkload           *pbcatalog.Workload
 		expectedHealthStatus       *pbcatalog.HealthStatus
 		expectedProxyConfiguration *pbmesh.ProxyConfiguration
-		//expectedUpstreams          *pbmesh.Upstreams
+		expectedUpstreams          *pbmesh.Upstreams
 
 		tproxy          bool
 		overwriteProbes bool
@@ -859,7 +2167,7 @@ func TestReconcileCreatePod(t *testing.T) {
 		expectedWorkloadMatches(t, resourceClient, tc.podName, tc.expectedWorkload)
 		expectedHealthStatusMatches(t, resourceClient, tc.podName, tc.expectedHealthStatus)
 		expectedProxyConfigurationMatches(t, resourceClient, tc.podName, tc.expectedProxyConfiguration)
-		// expectedUpstreams
+		expectedUpstreamMatches(t, resourceClient, tc.podName, tc.expectedUpstreams)
 	}
 
 	testCases := []testCase{
@@ -878,7 +2186,7 @@ func TestReconcileCreatePod(t *testing.T) {
 			overwriteProbes:            true,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(),
+			expectedProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:      "pod in ignored namespace",
@@ -921,8 +2229,25 @@ func TestReconcileCreatePod(t *testing.T) {
 				return []runtime.Object{pod}
 			},
 		},
+		{
+			name:    "pod with annotations",
+			podName: "foo",
+			k8sObjects: func() []runtime.Object {
+				pod := createPod("foo", "10.0.0.1", "foo", true, true)
+				addProbesAndOriginalPodAnnotation(pod)
+				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
+				return []runtime.Object{pod}
+			},
+			tproxy:                     false,
+			telemetry:                  true,
+			metrics:                    true,
+			overwriteProbes:            true,
+			expectedWorkload:           createWorkload(),
+			expectedHealthStatus:       createPassingHealthStatus(),
+			expectedProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			expectedUpstreams:          createUpstreams(),
+		},
 		// TODO: make sure multi-error accumulates errors
-		// TODO: explicit upstreams
 	}
 
 	for _, tc := range testCases {
@@ -954,12 +2279,12 @@ func TestReconcileUpdatePod(t *testing.T) {
 		existingWorkload           *pbcatalog.Workload
 		existingHealthStatus       *pbcatalog.HealthStatus
 		existingProxyConfiguration *pbmesh.ProxyConfiguration
-		//existingUpstreams          *pbmesh.Upstreams
+		existingUpstreams          *pbmesh.Upstreams
 
 		expectedWorkload           *pbcatalog.Workload
 		expectedHealthStatus       *pbcatalog.HealthStatus
 		expectedProxyConfiguration *pbmesh.ProxyConfiguration
-		//expectedUpstreams          *pbmesh.Upstreams
+		expectedUpstreams          *pbmesh.Upstreams
 
 		tproxy          bool
 		overwriteProbes bool
@@ -1026,9 +2351,11 @@ func TestReconcileUpdatePod(t *testing.T) {
 			getProxyConfigurationID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition),
 			tc.existingProxyConfiguration,
 			nil)
-
-		// TODO: load the existing resources
-		// loadUpstreams
+		loadResource(t,
+			resourceClient,
+			getUpstreamsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition),
+			tc.existingUpstreams,
+			nil)
 
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
@@ -1048,8 +2375,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 		expectedWorkloadMatches(t, resourceClient, tc.podName, tc.expectedWorkload)
 		expectedHealthStatusMatches(t, resourceClient, tc.podName, tc.expectedHealthStatus)
 		expectedProxyConfigurationMatches(t, resourceClient, tc.podName, tc.expectedProxyConfiguration)
-		// TODO: compare the following to expected values
-		// expectedUpstreams
+		expectedUpstreamMatches(t, resourceClient, tc.podName, tc.expectedUpstreams)
 	}
 
 	testCases := []testCase{
@@ -1141,7 +2467,46 @@ func TestReconcileUpdatePod(t *testing.T) {
 				},
 			},
 		},
-		// TODO: update explicit upstreams
+		{
+			name:    "pod update explicit upstreams",
+			podName: "foo",
+			k8sObjects: func() []runtime.Object {
+				pod := createPod("foo", "10.0.0.1", "foo", true, true)
+				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
+				return []runtime.Object{pod}
+			},
+			existingWorkload:     createWorkload(),
+			existingHealthStatus: createPassingHealthStatus(),
+			existingUpstreams: &pbmesh.Upstreams{
+				Workloads: &pbcatalog.WorkloadSelector{
+					Names: []string{"foo"},
+				},
+				Upstreams: []*pbmesh.Upstream{
+					{
+						DestinationRef: &pbresource.Reference{
+							Type: upstreamReferenceType(),
+							Tenancy: &pbresource.Tenancy{
+								Partition: "ap1",
+								Namespace: "ns1",
+								PeerName:  getDefaultConsulPeer(""),
+							},
+							Name: "mySVC3",
+						},
+						DestinationPort: "myPort2",
+						Datacenter:      "",
+						ListenAddr: &pbmesh.Upstream_IpPort{
+							IpPort: &pbmesh.IPPortAddress{
+								Port: uint32(1234),
+								Ip:   consulNodeAddress,
+							},
+						},
+					},
+				},
+			},
+			expectedWorkload:     createWorkload(),
+			expectedHealthStatus: createPassingHealthStatus(),
+			expectedUpstreams:    createUpstreams(),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1171,12 +2536,12 @@ func TestReconcileDeletePod(t *testing.T) {
 		existingWorkload           *pbcatalog.Workload
 		existingHealthStatus       *pbcatalog.HealthStatus
 		existingProxyConfiguration *pbmesh.ProxyConfiguration
-		//existingUpstreams          *pbmesh.Upstreams
+		existingUpstreams          *pbmesh.Upstreams
 
 		expectedWorkload           *pbcatalog.Workload
 		expectedHealthStatus       *pbcatalog.HealthStatus
 		expectedProxyConfiguration *pbmesh.ProxyConfiguration
-		//expectedUpstreams          *pbmesh.Upstreams
+		expectedUpstreams          *pbmesh.Upstreams
 
 		aclsEnabled bool
 
@@ -1235,8 +2600,12 @@ func TestReconcileDeletePod(t *testing.T) {
 			getProxyConfigurationID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition),
 			tc.existingProxyConfiguration,
 			nil)
-		// TODO: load the existing resources
-		// loadUpstreams
+		loadResource(
+			t,
+			resourceClient,
+			getUpstreamsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition),
+			tc.existingUpstreams,
+			nil)
 
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
@@ -1256,8 +2625,7 @@ func TestReconcileDeletePod(t *testing.T) {
 		expectedWorkloadMatches(t, resourceClient, tc.podName, tc.expectedWorkload)
 		expectedHealthStatusMatches(t, resourceClient, tc.podName, tc.expectedHealthStatus)
 		expectedProxyConfigurationMatches(t, resourceClient, tc.podName, tc.expectedProxyConfiguration)
-		// TODO: compare the following to expected values
-		// expectedUpstreams
+		expectedUpstreamMatches(t, resourceClient, tc.podName, tc.expectedUpstreams)
 	}
 
 	testCases := []testCase{
@@ -1266,7 +2634,15 @@ func TestReconcileDeletePod(t *testing.T) {
 			podName:                    "foo",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(),
+			existingProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+		},
+		{
+			name:                       "annotated delete pod",
+			podName:                    "foo",
+			existingWorkload:           createWorkload(),
+			existingHealthStatus:       createPassingHealthStatus(),
+			existingProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			existingUpstreams:          createUpstreams(),
 		},
 		// TODO: enable ACLs and make sure they are deleted
 	}
@@ -1408,13 +2784,13 @@ func createCriticalHealthStatus() *pbcatalog.HealthStatus {
 
 // createProxyConfiguration creates a proxyConfiguration that matches the pod from createPod,
 // assuming that metrics, telemetry, and overwrite probes are enabled separately.
-func createProxyConfiguration() *pbmesh.ProxyConfiguration {
+func createProxyConfiguration(mode pbmesh.ProxyMode) *pbmesh.ProxyConfiguration {
 	return &pbmesh.ProxyConfiguration{
 		Workloads: &pbcatalog.WorkloadSelector{
 			Names: []string{"foo"},
 		},
 		DynamicConfig: &pbmesh.DynamicConfig{
-			Mode: pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT,
+			Mode: mode,
 			ExposeConfig: &pbmesh.ExposeConfig{
 				ExposePaths: []*pbmesh.ExposePath{
 					{
@@ -1438,6 +2814,36 @@ func createProxyConfiguration() *pbmesh.ProxyConfiguration {
 		BootstrapConfig: &pbmesh.BootstrapConfig{
 			PrometheusBindAddr:              "0.0.0.0:1234",
 			TelemetryCollectorBindSocketDir: DefaultTelemetryBindSocketDir,
+		},
+	}
+}
+
+// createCriticalHealthStatus creates a failing HealthStatus that matches the pod from createPod.
+func createUpstreams() *pbmesh.Upstreams {
+	return &pbmesh.Upstreams{
+		Workloads: &pbcatalog.WorkloadSelector{
+			Names: []string{"foo"},
+		},
+		Upstreams: []*pbmesh.Upstream{
+			{
+				DestinationRef: &pbresource.Reference{
+					Type: upstreamReferenceType(),
+					Tenancy: &pbresource.Tenancy{
+						Partition: getDefaultConsulPartition(""),
+						Namespace: getDefaultConsulNamespace(""),
+						PeerName:  getDefaultConsulPeer(""),
+					},
+					Name: "mySVC",
+				},
+				DestinationPort: "myPort",
+				Datacenter:      "",
+				ListenAddr: &pbmesh.Upstream_IpPort{
+					IpPort: &pbmesh.IPPortAddress{
+						Port: uint32(24601),
+						Ip:   consulNodeAddress,
+					},
+				},
+			},
 		},
 	}
 }
@@ -1527,6 +2933,34 @@ func expectedProxyConfigurationMatches(t *testing.T, client pbresource.ResourceS
 	require.NoError(t, err)
 
 	require.True(t, proto.Equal(actualProxyConfiguration, expectedProxyConfiguration))
+}
+
+func expectedUpstreamMatches(t *testing.T, client pbresource.ResourceServiceClient, name string, expectedUpstreams *pbmesh.Upstreams) {
+	req := &pbresource.ReadRequest{Id: getUpstreamsID(name, metav1.NamespaceDefault, constants.DefaultConsulPartition)}
+	res, err := client.Read(context.Background(), req)
+
+	if expectedUpstreams == nil {
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, codes.NotFound, s.Code())
+		return
+	}
+
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	require.Equal(t, name, res.GetResource().GetId().GetName())
+	require.Equal(t, constants.DefaultConsulNS, res.GetResource().GetId().GetTenancy().GetNamespace())
+	require.Equal(t, constants.DefaultConsulPartition, res.GetResource().GetId().GetTenancy().GetPartition())
+
+	require.NotNil(t, res.GetResource().GetData())
+
+	actualUpstreams := &pbmesh.Upstreams{}
+	err = res.GetResource().GetData().UnmarshalTo(actualUpstreams)
+	require.NoError(t, err)
+
+	require.True(t, proto.Equal(actualUpstreams, expectedUpstreams))
 }
 
 func loadResource(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID, proto proto.Message, owner *pbresource.ID) {
