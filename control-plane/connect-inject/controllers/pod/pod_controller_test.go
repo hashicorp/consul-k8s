@@ -6,7 +6,9 @@ package pod
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
@@ -155,12 +157,12 @@ func TestWorkloadWrite(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:             "multi-port single-container",
-			pod:              createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:              createPod("foo", "", true, true),
 			expectedWorkload: createWorkload(),
 		},
 		{
 			name: "multi-port multi-container",
-			pod:  createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:  createPod("foo", "", true, true),
 			podModifier: func(pod *corev1.Pod) {
 				container := corev1.Container{
 					Name: "logger",
@@ -201,7 +203,7 @@ func TestWorkloadWrite(t *testing.T) {
 		},
 		{
 			name: "pod with locality",
-			pod:  createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:  createPod("foo", "", true, true),
 			podModifier: func(pod *corev1.Pod) {
 				pod.Spec.NodeName = localityNodeName
 			},
@@ -232,7 +234,7 @@ func TestWorkloadWrite(t *testing.T) {
 		},
 		{
 			name: "pod with unnamed ports",
-			pod:  createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:  createPod("foo", "", true, true),
 			podModifier: func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Ports[0].Name = ""
 				pod.Spec.Containers[0].Ports[1].Name = ""
@@ -260,7 +262,7 @@ func TestWorkloadWrite(t *testing.T) {
 		},
 		{
 			name: "pod with no ports",
-			pod:  createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:  createPod("foo", "", true, true),
 			podModifier: func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Ports = nil
 			},
@@ -353,7 +355,7 @@ func TestWorkloadDelete(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:             "basic pod delete",
-			pod:              createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:              createPod("foo", "", true, true),
 			existingWorkload: createWorkload(),
 		},
 	}
@@ -440,21 +442,21 @@ func TestHealthStatusWrite(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:                 "ready pod",
-			pod:                  createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:                  createPod("foo", "", true, true),
 			expectedHealthStatus: createPassingHealthStatus(),
 		},
 		{
 			name:                 "not ready pod",
-			pod:                  createPod("foo", "10.0.0.1", "foo", true, false),
-			expectedHealthStatus: createCriticalHealthStatus(),
+			pod:                  createPod("foo", "", true, false),
+			expectedHealthStatus: createCriticalHealthStatus("foo", "default"),
 		},
 		{
 			name: "pod with no condition",
-			pod:  createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:  createPod("foo", "", true, true),
 			podModifier: func(pod *corev1.Pod) {
 				pod.Status.Conditions = []corev1.PodCondition{}
 			},
-			expectedHealthStatus: createCriticalHealthStatus(),
+			expectedHealthStatus: createCriticalHealthStatus("foo", "default"),
 		},
 	}
 
@@ -562,12 +564,12 @@ func TestProxyConfigurationWrite(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:                       "no tproxy, no telemetry, no metrics, no probe overwrite",
-			pod:                        createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:                        createPod("foo", "", true, true),
 			expectedProxyConfiguration: nil,
 		},
 		{
 			name: "kitchen sink - globally enabled",
-			pod:  createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:  createPod("foo", "", true, true),
 			podModifier: func(pod *corev1.Pod) {
 				addProbesAndOriginalPodAnnotation(pod)
 			},
@@ -609,7 +611,7 @@ func TestProxyConfigurationWrite(t *testing.T) {
 		},
 		{
 			name: "tproxy, metrics, and probe overwrite enabled on pod",
-			pod:  createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:  createPod("foo", "", true, true),
 			podModifier: func(pod *corev1.Pod) {
 				pod.Annotations[constants.KeyTransparentProxy] = "true"
 				pod.Annotations[constants.AnnotationTransparentProxyOverwriteProbes] = "true"
@@ -651,7 +653,7 @@ func TestProxyConfigurationWrite(t *testing.T) {
 		},
 		{
 			name: "tproxy enabled on namespace",
-			pod:  createPod("foo", "10.0.0.1", "foo", true, true),
+			pod:  createPod("foo", "", true, true),
 			podModifier: func(pod *corev1.Pod) {
 				pod.Namespace = "tproxy-party"
 			},
@@ -747,8 +749,8 @@ func TestProxyConfigurationDelete(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:                       "proxy configuration delete",
-			pod:                        createPod("foo", "10.0.0.1", "foo", true, true),
-			existingProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			pod:                        createPod("foo", "", true, true),
+			existingProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 	}
 
@@ -777,7 +779,7 @@ func TestUpstreamsWrite(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc only",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
 				return pod1
 			},
@@ -813,7 +815,7 @@ func TestUpstreamsWrite(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc, ns, and peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234"
 				return pod1
 			},
@@ -851,7 +853,7 @@ func TestUpstreamsWrite(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc, ns, and partition",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.ap:1234"
 				return pod1
 			},
@@ -887,7 +889,7 @@ func TestUpstreamsWrite(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: invalid partition/dc/peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.err:1234"
 				return pod1
 			},
@@ -898,7 +900,7 @@ func TestUpstreamsWrite(t *testing.T) {
 		{
 			name: "unlabeled single upstream",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream:1234"
 				return pod1
 			},
@@ -934,7 +936,7 @@ func TestUpstreamsWrite(t *testing.T) {
 		{
 			name: "unlabeled single upstream with namespace and partition",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream.foo.bar:1234"
 				return pod1
 			},
@@ -996,7 +998,8 @@ func TestUpstreamsWrite(t *testing.T) {
 				require.EqualError(t, err, tt.expErr)
 			} else {
 				require.NoError(t, err)
-				expectedUpstreamMatches(t, resourceClient, tt.pod().Name, tt.expected)
+				uID := getUpstreamsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+				expectedUpstreamMatches(t, resourceClient, uID, tt.expected)
 			}
 		})
 	}
@@ -1020,7 +1023,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc only",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
 				return pod1
 			},
@@ -1056,7 +1059,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc and dc",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.dc1.dc:1234"
 				return pod1
 			},
@@ -1094,7 +1097,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc and peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.peer1.peer:1234"
 				return pod1
 			},
@@ -1132,7 +1135,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc, ns, and peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234"
 				return pod1
 			},
@@ -1170,7 +1173,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc, ns, and partition",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.ap:1234"
 				return pod1
 			},
@@ -1206,7 +1209,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc, ns, and dc",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234"
 				return pod1
 			},
@@ -1244,7 +1247,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "labeled multiple annotated upstreams",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns:1234, myPort2.port.upstream2.svc:2234, myPort4.port.upstream4.svc.ns1.ns.ap1.ap:4234"
 				return pod1
 			},
@@ -1318,7 +1321,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "labeled multiple annotated upstreams with dcs and peers",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.dc1.dc:1234, myPort2.port.upstream2.svc:2234, myPort3.port.upstream3.svc.ns1.ns:3234, myPort4.port.upstream4.svc.ns1.ns.peer1.peer:4234"
 				return pod1
 			},
@@ -1413,7 +1416,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: invalid partition/dc/peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.err:1234"
 				return pod1
 			},
@@ -1424,7 +1427,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream with svc and peer, needs ns before peer if namespaces enabled",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.peer1.peer:1234"
 				return pod1
 			},
@@ -1435,7 +1438,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: invalid namespace",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.err:1234"
 				return pod1
 			},
@@ -1446,7 +1449,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: invalid number of pieces in the address",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.err:1234"
 				return pod1
 			},
@@ -1457,7 +1460,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: invalid peer",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.peer1.err:1234"
 				return pod1
 			},
@@ -1468,7 +1471,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: invalid number of pieces in the address without namespaces and partitions",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.err:1234"
 				return pod1
 			},
@@ -1479,7 +1482,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: both peer and partition provided",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.partition.peer1.peer:1234"
 				return pod1
 			},
@@ -1490,7 +1493,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: both peer and dc provided",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer.dc1.dc:1234"
 				return pod1
 			},
@@ -1501,7 +1504,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: both dc and partition provided",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234"
 				return pod1
 			},
@@ -1512,7 +1515,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: wrong ordering for port and svc with namespace partition enabled",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "upstream1.svc.myPort.port.ns1.ns.part1.partition.dc1.dc:1234"
 				return pod1
 			},
@@ -1523,7 +1526,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: wrong ordering for port and svc with namespace partition disabled",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "upstream1.svc.myPort.port:1234"
 				return pod1
 			},
@@ -1534,7 +1537,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: incorrect key name namespace partition enabled",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.portage.upstream1.svc.ns1.ns.part1.partition.dc1.dc:1234"
 				return pod1
 			},
@@ -1545,7 +1548,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "error labeled annotated upstream error: incorrect key name namespace partition disabled",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.portage.upstream1.svc:1234"
 				return pod1
 			},
@@ -1556,7 +1559,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "unlabeled and labeled multiple annotated upstreams",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns:1234, myPort2.upstream2:2234, myPort4.port.upstream4.svc.ns1.ns.ap1.ap:4234"
 				return pod1
 			},
@@ -1630,7 +1633,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "unlabeled single upstream",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream:1234"
 				return pod1
 			},
@@ -1666,7 +1669,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "unlabeled single upstream with namespace",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream.foo:1234"
 				return pod1
 			},
@@ -1702,7 +1705,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "unlabeled single upstream with namespace and partition",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream.foo.bar:1234"
 				return pod1
 			},
@@ -1738,7 +1741,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "unlabeled multiple upstreams",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream1:1234, myPort2.upstream2:2234"
 				return pod1
 			},
@@ -1793,7 +1796,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "unlabeled multiple upstreams with consul namespaces, partitions and datacenters",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream1:1234, myPort2.upstream2.bar:2234, myPort3.upstream3.foo.baz:3234:dc2"
 				return pod1
 			},
@@ -1875,7 +1878,7 @@ func TestProcessUpstreams(t *testing.T) {
 		{
 			name: "unlabeled multiple upstreams with consul namespaces and datacenters",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream1:1234, myPort2.upstream2.bar:2234, myPort3.upstream3.foo:3234:dc2"
 				return pod1
 			},
@@ -1999,7 +2002,7 @@ func TestUpstreamsDelete(t *testing.T) {
 		{
 			name: "labeled annotated upstream with svc only",
 			pod: func() *corev1.Pod {
-				pod1 := createPod(podName, "1.2.3.4", "foo", true, true)
+				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
 				return pod1
 			},
@@ -2055,7 +2058,8 @@ func TestUpstreamsDelete(t *testing.T) {
 				getUpstreamsID(tt.pod().Name, constants.DefaultConsulNS, constants.DefaultConsulPartition),
 				tt.existingUpstreams,
 				nil)
-			expectedUpstreamMatches(t, resourceClient, tt.pod().Name, tt.existingUpstreams)
+			uID := getUpstreamsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+			expectedUpstreamMatches(t, resourceClient, uID, tt.existingUpstreams)
 
 			// Delete the upstream
 			nn := types.NamespacedName{Name: tt.pod().Name}
@@ -2066,7 +2070,8 @@ func TestUpstreamsDelete(t *testing.T) {
 				require.EqualError(t, err, tt.expErr)
 			} else {
 				require.NoError(t, err)
-				expectedUpstreamMatches(t, resourceClient, tt.pod().Name, nil)
+				uID := getUpstreamsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+				expectedUpstreamMatches(t, resourceClient, uID, nil)
 			}
 		})
 	}
@@ -2164,10 +2169,17 @@ func TestReconcileCreatePod(t *testing.T) {
 		}
 		require.False(t, resp.Requeue)
 
-		expectedWorkloadMatches(t, resourceClient, tc.podName, tc.expectedWorkload)
-		expectedHealthStatusMatches(t, resourceClient, tc.podName, tc.expectedHealthStatus)
-		expectedProxyConfigurationMatches(t, resourceClient, tc.podName, tc.expectedProxyConfiguration)
-		expectedUpstreamMatches(t, resourceClient, tc.podName, tc.expectedUpstreams)
+		wID := getWorkloadID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedWorkloadMatches(t, resourceClient, wID, tc.expectedWorkload)
+
+		hsID := getHealthStatusID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedHealthStatusMatches(t, resourceClient, hsID, tc.expectedHealthStatus)
+
+		pcID := getProxyConfigurationID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedProxyConfigurationMatches(t, resourceClient, pcID, tc.expectedProxyConfiguration)
+
+		uID := getUpstreamsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedUpstreamMatches(t, resourceClient, uID, tc.expectedUpstreams)
 	}
 
 	testCases := []testCase{
@@ -2175,7 +2187,7 @@ func TestReconcileCreatePod(t *testing.T) {
 			name:    "vanilla new pod",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", true, true)
+				pod := createPod("foo", "", true, true)
 				addProbesAndOriginalPodAnnotation(pod)
 
 				return []runtime.Object{pod}
@@ -2186,14 +2198,14 @@ func TestReconcileCreatePod(t *testing.T) {
 			overwriteProbes:            true,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:      "pod in ignored namespace",
 			podName:   "foo",
 			namespace: metav1.NamespaceSystem,
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", true, true)
+				pod := createPod("foo", "", true, true)
 				pod.ObjectMeta.Namespace = metav1.NamespaceSystem
 				return []runtime.Object{pod}
 			},
@@ -2202,30 +2214,30 @@ func TestReconcileCreatePod(t *testing.T) {
 			name:    "unhealthy new pod",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", true, false)
+				pod := createPod("foo", "", true, false)
 				return []runtime.Object{pod}
 			},
 			expectedWorkload:     createWorkload(),
-			expectedHealthStatus: createCriticalHealthStatus(),
+			expectedHealthStatus: createCriticalHealthStatus("foo", "default"),
 		},
 		{
 			name:    "return error - pod has no original pod annotation",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", true, false)
+				pod := createPod("foo", "", true, false)
 				return []runtime.Object{pod}
 			},
 			tproxy:               true,
 			overwriteProbes:      true,
 			expectedWorkload:     createWorkload(),
-			expectedHealthStatus: createCriticalHealthStatus(),
+			expectedHealthStatus: createCriticalHealthStatus("foo", "default"),
 			expErr:               "1 error occurred:\n\t* failed to get expose config: failed to get original pod spec: unexpected end of JSON input\n\n",
 		},
 		{
 			name:    "pod has not been injected",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", false, true)
+				pod := createPod("foo", "", false, true)
 				return []runtime.Object{pod}
 			},
 		},
@@ -2233,7 +2245,7 @@ func TestReconcileCreatePod(t *testing.T) {
 			name:    "pod with annotations",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", true, true)
+				pod := createPod("foo", "", true, true)
 				addProbesAndOriginalPodAnnotation(pod)
 				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
 				return []runtime.Object{pod}
@@ -2244,7 +2256,7 @@ func TestReconcileCreatePod(t *testing.T) {
 			overwriteProbes:            true,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			expectedProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			expectedUpstreams:          createUpstreams(),
 		},
 		// TODO: make sure multi-error accumulates errors
@@ -2372,10 +2384,17 @@ func TestReconcileUpdatePod(t *testing.T) {
 		}
 		require.False(t, resp.Requeue)
 
-		expectedWorkloadMatches(t, resourceClient, tc.podName, tc.expectedWorkload)
-		expectedHealthStatusMatches(t, resourceClient, tc.podName, tc.expectedHealthStatus)
-		expectedProxyConfigurationMatches(t, resourceClient, tc.podName, tc.expectedProxyConfiguration)
-		expectedUpstreamMatches(t, resourceClient, tc.podName, tc.expectedUpstreams)
+		wID := getWorkloadID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedWorkloadMatches(t, resourceClient, wID, tc.expectedWorkload)
+
+		hsID := getHealthStatusID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedHealthStatusMatches(t, resourceClient, hsID, tc.expectedHealthStatus)
+
+		pcID := getProxyConfigurationID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedProxyConfigurationMatches(t, resourceClient, pcID, tc.expectedProxyConfiguration)
+
+		uID := getUpstreamsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedUpstreamMatches(t, resourceClient, uID, tc.expectedUpstreams)
 	}
 
 	testCases := []testCase{
@@ -2383,7 +2402,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 			name:    "pod update ports",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", true, true)
+				pod := createPod("foo", "", true, true)
 				return []runtime.Object{pod}
 			},
 			existingHealthStatus: createPassingHealthStatus(),
@@ -2411,19 +2430,19 @@ func TestReconcileUpdatePod(t *testing.T) {
 			name:    "pod healthy to unhealthy",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", true, false)
+				pod := createPod("foo", "", true, false)
 				return []runtime.Object{pod}
 			},
 			existingWorkload:     createWorkload(),
 			existingHealthStatus: createPassingHealthStatus(),
 			expectedWorkload:     createWorkload(),
-			expectedHealthStatus: createCriticalHealthStatus(),
+			expectedHealthStatus: createCriticalHealthStatus("foo", "default"),
 		},
 		{
 			name:    "add metrics, tproxy and probe overwrite to pod",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", true, true)
+				pod := createPod("foo", "", true, true)
 				pod.Annotations[constants.KeyTransparentProxy] = "true"
 				pod.Annotations[constants.AnnotationTransparentProxyOverwriteProbes] = "true"
 				pod.Annotations[constants.AnnotationEnableMetrics] = "true"
@@ -2471,7 +2490,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 			name:    "pod update explicit upstreams",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
-				pod := createPod("foo", "10.0.0.1", "foo", true, true)
+				pod := createPod("foo", "", true, true)
 				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
 				return []runtime.Object{pod}
 			},
@@ -2622,10 +2641,17 @@ func TestReconcileDeletePod(t *testing.T) {
 		}
 		require.False(t, resp.Requeue)
 
-		expectedWorkloadMatches(t, resourceClient, tc.podName, tc.expectedWorkload)
-		expectedHealthStatusMatches(t, resourceClient, tc.podName, tc.expectedHealthStatus)
-		expectedProxyConfigurationMatches(t, resourceClient, tc.podName, tc.expectedProxyConfiguration)
-		expectedUpstreamMatches(t, resourceClient, tc.podName, tc.expectedUpstreams)
+		wID := getWorkloadID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedWorkloadMatches(t, resourceClient, wID, tc.expectedWorkload)
+
+		hsID := getHealthStatusID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedHealthStatusMatches(t, resourceClient, hsID, tc.expectedHealthStatus)
+
+		pcID := getProxyConfigurationID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedProxyConfigurationMatches(t, resourceClient, pcID, tc.expectedProxyConfiguration)
+
+		uID := getUpstreamsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedUpstreamMatches(t, resourceClient, uID, tc.expectedUpstreams)
 	}
 
 	testCases := []testCase{
@@ -2634,14 +2660,14 @@ func TestReconcileDeletePod(t *testing.T) {
 			podName:                    "foo",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:                       "annotated delete pod",
 			podName:                    "foo",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			existingProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			existingUpstreams:          createUpstreams(),
 		},
 		// TODO: enable ACLs and make sure they are deleted
@@ -2654,19 +2680,24 @@ func TestReconcileDeletePod(t *testing.T) {
 	}
 }
 
-// createPod creates a multi-port pod as a base for tests.
-func createPod(name, ip string, identity string, inject bool, ready bool) *corev1.Pod {
+// createPod creates a multi-port pod as a base for tests. If `namespace` is empty,
+// the default Kube namespace will be used.
+func createPod(name, namespace string, inject, ready bool) *corev1.Pod {
+	if namespace == "" {
+		namespace = metav1.NamespaceDefault
+	}
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: metav1.NamespaceDefault,
+			Namespace: namespace,
 			Labels:    map[string]string{},
 			Annotations: map[string]string{
 				constants.AnnotationConsulK8sVersion: "1.3.0",
 			},
 		},
 		Status: corev1.PodStatus{
-			PodIP:  ip,
+			PodIP:  "10.0.0.1",
 			HostIP: consulNodeAddress,
 		},
 		Spec: corev1.PodSpec{
@@ -2712,7 +2743,7 @@ func createPod(name, ip string, identity string, inject bool, ready bool) *corev
 				},
 			},
 			NodeName:           nodeName,
-			ServiceAccountName: identity,
+			ServiceAccountName: name,
 		},
 	}
 	if ready {
@@ -2773,21 +2804,21 @@ func createPassingHealthStatus() *pbcatalog.HealthStatus {
 }
 
 // createCriticalHealthStatus creates a failing HealthStatus that matches the pod from createPod.
-func createCriticalHealthStatus() *pbcatalog.HealthStatus {
+func createCriticalHealthStatus(name string, namespace string) *pbcatalog.HealthStatus {
 	return &pbcatalog.HealthStatus{
 		Type:        constants.ConsulKubernetesCheckType,
 		Status:      pbcatalog.Health_HEALTH_CRITICAL,
-		Output:      "Pod \"default/foo\" is not ready",
+		Output:      fmt.Sprintf("Pod \"%s/%s\" is not ready", namespace, name),
 		Description: constants.ConsulKubernetesCheckName,
 	}
 }
 
 // createProxyConfiguration creates a proxyConfiguration that matches the pod from createPod,
 // assuming that metrics, telemetry, and overwrite probes are enabled separately.
-func createProxyConfiguration(mode pbmesh.ProxyMode) *pbmesh.ProxyConfiguration {
+func createProxyConfiguration(podName string, mode pbmesh.ProxyMode) *pbmesh.ProxyConfiguration {
 	return &pbmesh.ProxyConfiguration{
 		Workloads: &pbcatalog.WorkloadSelector{
-			Names: []string{"foo"},
+			Names: []string{podName},
 		},
 		DynamicConfig: &pbmesh.DynamicConfig{
 			Mode: mode,
@@ -2848,8 +2879,8 @@ func createUpstreams() *pbmesh.Upstreams {
 	}
 }
 
-func expectedWorkloadMatches(t *testing.T, client pbresource.ResourceServiceClient, name string, expectedWorkload *pbcatalog.Workload) {
-	req := &pbresource.ReadRequest{Id: getWorkloadID(name, metav1.NamespaceDefault, constants.DefaultConsulPartition)}
+func expectedWorkloadMatches(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID, expectedWorkload *pbcatalog.Workload) {
+	req := &pbresource.ReadRequest{Id: id}
 
 	res, err := client.Read(context.Background(), req)
 
@@ -2864,9 +2895,7 @@ func expectedWorkloadMatches(t *testing.T, client pbresource.ResourceServiceClie
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
-	require.Equal(t, name, res.GetResource().GetId().GetName())
-	require.Equal(t, constants.DefaultConsulNS, res.GetResource().GetId().GetTenancy().GetNamespace())
-	require.Equal(t, constants.DefaultConsulPartition, res.GetResource().GetId().GetTenancy().GetPartition())
+	requireEqualResourceID(t, id, res.GetResource().GetId())
 
 	require.NotNil(t, res.GetResource().GetData())
 
@@ -2874,28 +2903,29 @@ func expectedWorkloadMatches(t *testing.T, client pbresource.ResourceServiceClie
 	err = res.GetResource().GetData().UnmarshalTo(actualWorkload)
 	require.NoError(t, err)
 
-	require.True(t, proto.Equal(actualWorkload, expectedWorkload))
+	diff := cmp.Diff(expectedWorkload, actualWorkload, test.CmpProtoIgnoreOrder()...)
+	require.Equal(t, "", diff, "Workloads do not match")
 }
 
-func expectedHealthStatusMatches(t *testing.T, client pbresource.ResourceServiceClient, name string, expectedHealthStatus *pbcatalog.HealthStatus) {
-	req := &pbresource.ReadRequest{Id: getHealthStatusID(name, metav1.NamespaceDefault, constants.DefaultConsulPartition)}
+func expectedHealthStatusMatches(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID, expectedHealthStatus *pbcatalog.HealthStatus) {
+	req := &pbresource.ReadRequest{Id: id}
 
 	res, err := client.Read(context.Background(), req)
 
 	if expectedHealthStatus == nil {
-		require.Error(t, err)
-		s, ok := status.FromError(err)
-		require.True(t, ok)
-		require.Equal(t, codes.NotFound, s.Code())
+		// Because HealthStatus is asynchronously garbage-collected, we can retry to make sure it gets cleaned up.
+		require.Eventually(t, func() bool {
+			_, err := client.Read(context.Background(), req)
+			s, ok := status.FromError(err)
+			return ok && codes.NotFound == s.Code()
+		}, 3*time.Second, 500*time.Millisecond)
 		return
 	}
 
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
-	require.Equal(t, name, res.GetResource().GetId().GetName())
-	require.Equal(t, constants.DefaultConsulNS, res.GetResource().GetId().GetTenancy().GetNamespace())
-	require.Equal(t, constants.DefaultConsulPartition, res.GetResource().GetId().GetTenancy().GetPartition())
+	requireEqualResourceID(t, id, res.GetResource().GetId())
 
 	require.NotNil(t, res.GetResource().GetData())
 
@@ -2903,11 +2933,12 @@ func expectedHealthStatusMatches(t *testing.T, client pbresource.ResourceService
 	err = res.GetResource().GetData().UnmarshalTo(actualHealthStatus)
 	require.NoError(t, err)
 
-	require.True(t, proto.Equal(actualHealthStatus, expectedHealthStatus))
+	diff := cmp.Diff(expectedHealthStatus, actualHealthStatus, test.CmpProtoIgnoreOrder()...)
+	require.Equal(t, "", diff, "HealthStatuses do not match")
 }
 
-func expectedProxyConfigurationMatches(t *testing.T, client pbresource.ResourceServiceClient, name string, expectedProxyConfiguration *pbmesh.ProxyConfiguration) {
-	req := &pbresource.ReadRequest{Id: getProxyConfigurationID(name, metav1.NamespaceDefault, constants.DefaultConsulPartition)}
+func expectedProxyConfigurationMatches(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID, expectedProxyConfiguration *pbmesh.ProxyConfiguration) {
+	req := &pbresource.ReadRequest{Id: id}
 
 	res, err := client.Read(context.Background(), req)
 
@@ -2922,9 +2953,7 @@ func expectedProxyConfigurationMatches(t *testing.T, client pbresource.ResourceS
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
-	require.Equal(t, name, res.GetResource().GetId().GetName())
-	require.Equal(t, constants.DefaultConsulNS, res.GetResource().GetId().GetTenancy().GetNamespace())
-	require.Equal(t, constants.DefaultConsulPartition, res.GetResource().GetId().GetTenancy().GetPartition())
+	requireEqualResourceID(t, id, res.GetResource().GetId())
 
 	require.NotNil(t, res.GetResource().GetData())
 
@@ -2932,11 +2961,12 @@ func expectedProxyConfigurationMatches(t *testing.T, client pbresource.ResourceS
 	err = res.GetResource().GetData().UnmarshalTo(actualProxyConfiguration)
 	require.NoError(t, err)
 
-	require.True(t, proto.Equal(actualProxyConfiguration, expectedProxyConfiguration))
+	diff := cmp.Diff(expectedProxyConfiguration, actualProxyConfiguration, test.CmpProtoIgnoreOrder()...)
+	require.Equal(t, "", diff, "ProxyConfigurations do not match")
 }
 
-func expectedUpstreamMatches(t *testing.T, client pbresource.ResourceServiceClient, name string, expectedUpstreams *pbmesh.Upstreams) {
-	req := &pbresource.ReadRequest{Id: getUpstreamsID(name, metav1.NamespaceDefault, constants.DefaultConsulPartition)}
+func expectedUpstreamMatches(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID, expectedUpstreams *pbmesh.Upstreams) {
+	req := &pbresource.ReadRequest{Id: id}
 	res, err := client.Read(context.Background(), req)
 
 	if expectedUpstreams == nil {
@@ -2950,9 +2980,7 @@ func expectedUpstreamMatches(t *testing.T, client pbresource.ResourceServiceClie
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
-	require.Equal(t, name, res.GetResource().GetId().GetName())
-	require.Equal(t, constants.DefaultConsulNS, res.GetResource().GetId().GetTenancy().GetNamespace())
-	require.Equal(t, constants.DefaultConsulPartition, res.GetResource().GetId().GetTenancy().GetPartition())
+	requireEqualResourceID(t, id, res.GetResource().GetId())
 
 	require.NotNil(t, res.GetResource().GetData())
 
@@ -2991,4 +3019,13 @@ func addProbesAndOriginalPodAnnotation(pod *corev1.Pod) {
 	pod.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(20300)
 	pod.Spec.Containers[0].LivenessProbe.HTTPGet.Port = intstr.FromInt(20400)
 	pod.Spec.Containers[0].StartupProbe.HTTPGet.Port = intstr.FromInt(20500)
+}
+
+func requireEqualResourceID(t *testing.T, expected, actual *pbresource.ID) {
+	opts := []cmp.Option{
+		protocmp.IgnoreFields(&pbresource.ID{}, "uid"),
+	}
+	opts = append(opts, test.CmpProtoIgnoreOrder()...)
+	diff := cmp.Diff(expected, actual, opts...)
+	require.Equal(t, "", diff, "resource IDs do not match")
 }
