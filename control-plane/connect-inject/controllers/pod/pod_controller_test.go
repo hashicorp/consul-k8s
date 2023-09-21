@@ -2917,13 +2917,7 @@ func expectedHealthStatusMatches(t *testing.T, client pbresource.ResourceService
 		require.Eventually(t, func() bool {
 			_, err := client.Read(context.Background(), req)
 			s, ok := status.FromError(err)
-			if !ok {
-				return false
-			}
-			if codes.NotFound == s.Code() {
-				return true
-			}
-			return false
+			return ok && codes.NotFound == s.Code()
 		}, 3*time.Second, 500*time.Millisecond)
 		return
 	}
@@ -3033,6 +3027,5 @@ func requireEqualResourceID(t *testing.T, expected, actual *pbresource.ID) {
 	}
 	opts = append(opts, test.CmpProtoIgnoreOrder()...)
 	diff := cmp.Diff(expected, actual, opts...)
-	//diff := cmp.Diff(expected, actual)
 	require.Equal(t, "", diff, "resource IDs do not match")
 }
