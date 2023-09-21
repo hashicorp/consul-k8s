@@ -1,3 +1,91 @@
+## 1.2.2 (September 21, 2023)
+
+SECURITY:
+
+* Upgrade to use Go 1.20.8. This resolves CVEs
+  [CVE-2023-39320](https://github.com/advisories/GHSA-rxv8-v965-v333) (`cmd/go`),
+  [CVE-2023-39318](https://github.com/advisories/GHSA-vq7j-gx56-rxjh) (`html/template`),
+  [CVE-2023-39319](https://github.com/advisories/GHSA-vv9m-32rr-3g55) (`html/template`),
+  [CVE-2023-39321](https://github.com/advisories/GHSA-9v7r-x7cv-v437) (`crypto/tls`), and
+  [CVE-2023-39322](https://github.com/advisories/GHSA-892h-r6cr-53g4) (`crypto/tls`) [[GH-2936](https://github.com/hashicorp/consul-k8s/issues/2936)]
+
+FEATURES:
+
+* Add support for new observability service principal in cloud preset [[GH-2958](https://github.com/hashicorp/consul-k8s/issues/2958)]
+* helm: Add ability to configure resource requests and limits for Gateway API deployments. [[GH-2723](https://github.com/hashicorp/consul-k8s/issues/2723)]
+
+IMPROVEMENTS:
+
+* Add NET_BIND_SERVICE capability to restricted security context used for consul-dataplane [[GH-2787](https://github.com/hashicorp/consul-k8s/issues/2787)]
+* Add new value `global.argocd.enabled`. Set this to `true` when using ArgoCD to deploy this chart. [[GH-2785](https://github.com/hashicorp/consul-k8s/issues/2785)]
+* Add support for running on GKE Autopilot. [[GH-2952](https://github.com/hashicorp/consul-k8s/issues/2952)]
+* api-gateway: reduce log output when disconnecting from consul server [[GH-2880](https://github.com/hashicorp/consul-k8s/issues/2880)]
+* control-plane: Improve performance for pod deletions by reducing the number of fetched tokens. [[GH-2910](https://github.com/hashicorp/consul-k8s/issues/2910)]
+* control-plane: prevent updation of anonymous-token-policy and anonymous-token if anonymous-token-policy is already attached to the anonymous-token [[GH-2790](https://github.com/hashicorp/consul-k8s/issues/2790)]
+* helm: Add `JWKSCluster` field to `JWTProvider` CRD. [[GH-2881](https://github.com/hashicorp/consul-k8s/issues/2881)]
+* vault: Adds `namespace` to `secretsBackend.vault.connectCA` in Helm chart and annotation: "vault.hashicorp.com/namespace: namespace" to
+  secretsBackend.vault.agentAnnotations, if "vault.hashicorp.com/namespace" annotation is not present.
+  This provides a more convenient way to specify the Vault namespace than nested JSON in `connectCA.additionalConfig`. [[GH-2841](https://github.com/hashicorp/consul-k8s/issues/2841)]
+
+BUG FIXES:
+
+* audit-log: fix parsing error for some audit log configuration fields fail with uncovertible string to integer errors. [[GH-2905](https://github.com/hashicorp/consul-k8s/issues/2905)]
+* bug: Remove `global.acls.nodeSelector` and `global.acls.annotations` from Gateway Resources Jobs [[GH-2869](https://github.com/hashicorp/consul-k8s/issues/2869)]
+* control-plane: Fix issue where ACL tokens would have an empty pod name that prevented proper token cleanup. [[GH-2808](https://github.com/hashicorp/consul-k8s/issues/2808)]
+* control-plane: When using transparent proxy or CNI, reduced required permissions by setting privileged to false. Privileged must be true when using OpenShift without CNI. [[GH-2755](https://github.com/hashicorp/consul-k8s/issues/2755)]
+* helm: Update prometheus port and scheme annotations if tls is enabled [[GH-2782](https://github.com/hashicorp/consul-k8s/issues/2782)]
+* ingress-gateway: Adds missing PassiveHealthCheck to IngressGateways CRD and updates missing fields on ServiceDefaults CRD [[GH-2796](https://github.com/hashicorp/consul-k8s/issues/2796)]
+
+## 1.1.6 (September 21, 2023)
+
+SECURITY:
+
+* Upgrade to use Go 1.20.8. This resolves CVEs
+  [CVE-2023-39320](https://github.com/advisories/GHSA-rxv8-v965-v333) (`cmd/go`),
+  [CVE-2023-39318](https://github.com/advisories/GHSA-vq7j-gx56-rxjh) (`html/template`),
+  [CVE-2023-39319](https://github.com/advisories/GHSA-vv9m-32rr-3g55) (`html/template`),
+  [CVE-2023-39321](https://github.com/advisories/GHSA-9v7r-x7cv-v437) (`crypto/tls`), and
+  [CVE-2023-39322](https://github.com/advisories/GHSA-892h-r6cr-53g4) (`crypto/tls`) [[GH-2936](https://github.com/hashicorp/consul-k8s/issues/2936)]
+
+IMPROVEMENTS:
+
+* control-plane: Improve performance for pod deletions by reducing the number of fetched tokens. [[GH-2910](https://github.com/hashicorp/consul-k8s/issues/2910)]
+* vault: Adds `namespace` to `secretsBackend.vault.connectCA` in Helm chart and annotation: "vault.hashicorp.com/namespace: namespace" to
+  secretsBackend.vault.agentAnnotations, if "vault.hashicorp.com/namespace" annotation is not present.
+  This provides a more convenient way to specify the Vault namespace than nested JSON in `connectCA.additionalConfig`. [[GH-2841](https://github.com/hashicorp/consul-k8s/issues/2841)]
+
+BUG FIXES:
+
+* audit-log: fix parsing error for some audit log configuration fields fail with uncovertible string to integer errors. [[GH-2905](https://github.com/hashicorp/consul-k8s/issues/2905)]
+
+## 1.0.10 (September 21, 2023)
+
+SECURITY:
+
+* Upgrade to use Go 1.19.13. This resolves CVEs
+  [CVE-2023-39320](https://github.com/advisories/GHSA-rxv8-v965-v333) (`cmd/go`),
+  [CVE-2023-39318](https://github.com/advisories/GHSA-vq7j-gx56-rxjh) (`html/template`),
+  [CVE-2023-39319](https://github.com/advisories/GHSA-vv9m-32rr-3g55) (`html/template`),
+  [CVE-2023-39321](https://github.com/advisories/GHSA-9v7r-x7cv-v437) (`crypto/tls`), and
+  [CVE-2023-39322](https://github.com/advisories/GHSA-892h-r6cr-53g4) (`crypto/tls`) [[GH-2938](https://github.com/hashicorp/consul-k8s/issues/2938)]
+
+IMPROVEMENTS:
+
+* Add NET_BIND_SERVICE capability to restricted security context used for consul-dataplane [[GH-2787](https://github.com/hashicorp/consul-k8s/issues/2787)]
+* Add new value `global.argocd.enabled`. Set this to `true` when using ArgoCD to deploy this chart. [[GH-2785](https://github.com/hashicorp/consul-k8s/issues/2785)]
+* control-plane: Improve performance for pod deletions by reducing the number of fetched tokens. [[GH-2910](https://github.com/hashicorp/consul-k8s/issues/2910)]
+* control-plane: prevent updation of anonymous-token-policy and anonymous-token if anonymous-token-policy is already attached to the anonymous-token [[GH-2790](https://github.com/hashicorp/consul-k8s/issues/2790)]
+* vault: Adds `namespace` to `secretsBackend.vault.connectCA` in Helm chart and annotation: "vault.hashicorp.com/namespace: namespace" to
+  secretsBackend.vault.agentAnnotations, if "vault.hashicorp.com/namespace" annotation is not present.
+  This provides a more convenient way to specify the Vault namespace than nested JSON in `connectCA.additionalConfig`. [[GH-2841](https://github.com/hashicorp/consul-k8s/issues/2841)]
+
+BUG FIXES:
+
+* audit-log: fix parsing error for some audit log configuration fields fail with uncovertible string to integer errors. [[GH-2905](https://github.com/hashicorp/consul-k8s/issues/2905)]
+* control-plane: Fix issue where ACL tokens would have an empty pod name that prevented proper token cleanup. [[GH-2808](https://github.com/hashicorp/consul-k8s/issues/2808)]
+* control-plane: When using transparent proxy or CNI, reduced required permissions by setting privileged to false. Privileged must be true when using OpenShift without CNI. [[GH-2755](https://github.com/hashicorp/consul-k8s/issues/2755)]
+* helm: Update prometheus port and scheme annotations if tls is enabled [[GH-2782](https://github.com/hashicorp/consul-k8s/issues/2782)]
+
 ## 1.2.1 (Aug 10, 2023)
 BREAKING CHANGES:
 
