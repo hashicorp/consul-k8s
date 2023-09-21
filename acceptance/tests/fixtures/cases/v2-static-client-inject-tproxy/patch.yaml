@@ -10,4 +10,4 @@ spec:
     metadata:
       annotations:
         "consul.hashicorp.com/mesh-inject": "true"
-        "consul.hashicorp.com/mesh-service-destinations": "web.port.static-server.svc.default.ns.dc1.dc:1234"
+        "consul.hashicorp.com/transparent-proxy": "true"

@@ -79,7 +79,6 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			// Check connection from static-client to multiport.
 			if cfg.EnableTransparentProxy {
-				// todo: add an assertion that the traffic is going through the proxy
 				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://multiport:8080")
 			} else {
 				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
