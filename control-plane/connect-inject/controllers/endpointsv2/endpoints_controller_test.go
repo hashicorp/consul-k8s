@@ -35,6 +35,10 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
+const (
+	kindDaemonSet = "DaemonSet"
+)
+
 var (
 	appProtocolHttp  = "http"
 	appProtocolHttp2 = "http2"
@@ -158,7 +162,7 @@ func TestReconcile_CreateService(t *testing.T) {
 			svcName: "service-created",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
-				pod2 := createServicePod("DaemonSet", "service-created-ds", "12345")
+				pod2 := createServicePod(kindDaemonSet, "service-created-ds", "12345")
 				endpoints := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -467,6 +471,385 @@ func TestReconcile_CreateService(t *testing.T) {
 			},
 		},
 		{
+			name:    "Numeric service target port: Named container port gets the pod port name",
+			svcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde",
+					// Named port with container port value matching service target port
+					containerWithPort("named-port", 2345),
+					// Unnamed port with container port value matching service target port
+					containerWithPort("", 6789))
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: addressesForPods(pod1),
+							Ports: []corev1.EndpointPort{
+								{
+									Name:        "public",
+									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
+								},
+								{
+									Name:        "api",
+									Port:        6789,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolGrpc,
+								},
+							},
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Name:        "public",
+								Port:        8080,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromInt(2345), // Numeric target port
+								AppProtocol: &appProtocolHttp,
+							},
+							{
+								Name:        "api",
+								Port:        9090,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromInt(6789), // Numeric target port
+								AppProtocol: &appProtocolGrpc,
+							},
+							{
+								Name:        "unmatched-port",
+								Port:        10010,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromInt(10010), // Numeric target port
+								AppProtocol: &appProtocolHttp,
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoints, service}
+			},
+			expectedResource: &pbresource.Resource{
+				Id: &pbresource.ID{
+					Name: "service-created",
+					Type: &pbresource.Type{
+						Group:        "catalog",
+						GroupVersion: "v1alpha1",
+						Kind:         "Service",
+					},
+					Tenancy: &pbresource.Tenancy{
+						Namespace: constants.DefaultConsulNS,
+						Partition: constants.DefaultConsulPartition,
+					},
+				},
+				Data: common.ToProtoAny(&pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "named-port", // Matches container port name, not service target number
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							VirtualPort: 9090,
+							TargetPort:  "6789", // Matches service target number
+							Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
+						},
+						{
+							VirtualPort: 10010,
+							TargetPort:  "10010", // Matches service target number (unmatched by container ports)
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				}),
+				Metadata: map[string]string{
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
+				},
+			},
+		},
+		{
+			name:    "Numeric service target port: Container port mix gets the name from largest matching pod set",
+			svcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				// Unnamed port matching service target port.
+				// Also has second named port, and is not the most prevalent set for that port.
+				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde",
+					containerWithPort("", 2345),
+					containerWithPort("api-port", 6789))
+
+				// Named port with different name from most prevalent pods.
+				// Also has second unnamed port, and _is_ the most prevalent set for that port.
+				pod2a := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-fghij",
+					containerWithPort("another-port-name", 2345),
+					containerWithPort("", 6789))
+				pod2b := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-fghij",
+					containerWithPort("another-port-name", 2345),
+					containerWithPort("", 6789))
+
+				// Named port with container port value matching service target port.
+				// The most common "set" of pods, so should become the port name for service target port.
+				pod3a := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-klmno",
+					containerWithPort("named-port", 2345))
+				pod3b := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-klmno",
+					containerWithPort("named-port", 2345))
+				pod3c := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-klmno",
+					containerWithPort("named-port", 2345))
+
+				// Named port that does not match service target port.
+				// More common "set" of pods selected by the service, but does not have a target port (value) match.
+				pod4a := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-pqrst",
+					containerWithPort("non-matching-named-port", 5432))
+				pod4b := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-pqrst",
+					containerWithPort("non-matching-named-port", 5432))
+				pod4c := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-pqrst",
+					containerWithPort("non-matching-named-port", 5432))
+				pod4d := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-pqrst",
+					containerWithPort("non-matching-named-port", 5432))
+
+				// Named port from non-injected pods.
+				// More common "set" of pods selected by the service, but should be filtered out.
+				pod5a := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-uvwxy",
+					containerWithPort("ignored-named-port", 2345))
+				pod5b := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-uvwxy",
+					containerWithPort("ignored-named-port", 2345))
+				pod5c := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-uvwxy",
+					containerWithPort("ignored-named-port", 2345))
+				pod5d := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-uvwxy",
+					containerWithPort("ignored-named-port", 2345))
+				for _, p := range []*corev1.Pod{pod5a, pod5b, pod5c, pod5d} {
+					removeMeshInjectStatus(t, p)
+				}
+
+				// Named port with container port value matching service target port.
+				// Single pod from non-ReplicaSet owner. Should not take precedence over set pods.
+				pod6a := createServicePod(kindDaemonSet, "service-created-ds", "12345",
+					containerWithPort("another-port-name", 2345))
+
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: addressesForPods(
+								pod1,
+								pod2a, pod2b,
+								pod3a, pod3b, pod3c,
+								pod4a, pod4b, pod4c, pod4d,
+								pod5a, pod5b, pod5c, pod5d,
+								pod6a),
+							Ports: []corev1.EndpointPort{
+								{
+									Name:        "public",
+									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
+								},
+							},
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Name:        "public",
+								Port:        8080,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromInt(2345), // Numeric target port
+								AppProtocol: &appProtocolHttp,
+							},
+							{
+								Name:        "api",
+								Port:        9090,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromInt(6789), // Numeric target port
+								AppProtocol: &appProtocolGrpc,
+							},
+						},
+					},
+				}
+				return []runtime.Object{
+					pod1,
+					pod2a, pod2b,
+					pod3a, pod3b, pod3c,
+					pod4a, pod4b, pod4c, pod4d,
+					pod5a, pod5b, pod5c, pod5d,
+					pod6a,
+					endpoints, service}
+			},
+			expectedResource: &pbresource.Resource{
+				Id: &pbresource.ID{
+					Name: "service-created",
+					Type: &pbresource.Type{
+						Group:        "catalog",
+						GroupVersion: "v1alpha1",
+						Kind:         "Service",
+					},
+					Tenancy: &pbresource.Tenancy{
+						Namespace: constants.DefaultConsulNS,
+						Partition: constants.DefaultConsulPartition,
+					},
+				},
+				Data: common.ToProtoAny(&pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "named-port", // Matches container port name, not service target number
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							VirtualPort: 9090,
+							TargetPort:  "6789", // Matches service target number due to unnamed being most common
+							Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{
+							"service-created-rs-abcde",
+							"service-created-rs-fghij",
+							"service-created-rs-klmno",
+							"service-created-rs-pqrst",
+						},
+						Names: []string{
+							"service-created-ds-12345",
+						},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				}),
+				Metadata: map[string]string{
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
+				},
+			},
+		},
+		{
+			name:    "Numeric service target port: Most used container port name from exact name pods used when no pod sets present",
+			svcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				// Named port with different name from most prevalent pods.
+				pod1a := createServicePod(kindDaemonSet, "service-created-ds1", "12345",
+					containerWithPort("another-port-name", 2345))
+
+				// Named port with container port value matching service target port.
+				// The most common container port name, so should become the port name for service target port.
+				pod2a := createServicePod(kindDaemonSet, "service-created-ds2", "12345",
+					containerWithPort("named-port", 2345))
+				pod2b := createServicePod(kindDaemonSet, "service-created-ds2", "23456",
+					containerWithPort("named-port", 2345))
+
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: addressesForPods(
+								pod1a,
+								pod2a, pod2b),
+							Ports: []corev1.EndpointPort{
+								{
+									Name:        "public",
+									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
+								},
+							},
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Name:        "public",
+								Port:        8080,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromInt(2345), // Numeric target port
+								AppProtocol: &appProtocolHttp,
+							},
+						},
+					},
+				}
+				return []runtime.Object{
+					pod1a,
+					pod2a, pod2b,
+					endpoints, service}
+			},
+			expectedResource: &pbresource.Resource{
+				Id: &pbresource.ID{
+					Name: "service-created",
+					Type: &pbresource.Type{
+						Group:        "catalog",
+						GroupVersion: "v1alpha1",
+						Kind:         "Service",
+					},
+					Tenancy: &pbresource.Tenancy{
+						Namespace: constants.DefaultConsulNS,
+						Partition: constants.DefaultConsulPartition,
+					},
+				},
+				Data: common.ToProtoAny(&pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "named-port", // Matches container port name, not service target number
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Names: []string{
+							"service-created-ds1-12345",
+							"service-created-ds2-12345",
+							"service-created-ds2-23456",
+						},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				}),
+				Metadata: map[string]string{
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
+				},
+			},
+		},
+		{
 			name:    "Only L4 TCP ports get a Consul Service port when L4 protocols are multiplexed",
 			svcName: "service-created",
 			k8sObjects: func() []runtime.Object {
@@ -561,8 +944,7 @@ func TestReconcile_CreateService(t *testing.T) {
 			svcName: "service-created",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
-				// Clear mesh inject status
-				delete(pod1.Annotations, constants.KeyMeshInjectStatus)
+				removeMeshInjectStatus(t, pod1)
 				endpoints := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -621,8 +1003,8 @@ func TestReconcile_UpdateService(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
 				pod2 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-klmno")
-				pod3 := createServicePod("DaemonSet", "service-created-ds", "12345")
-				pod4 := createServicePod("DaemonSet", "service-created-ds", "34567")
+				pod3 := createServicePod(kindDaemonSet, "service-created-ds", "12345")
+				pod4 := createServicePod(kindDaemonSet, "service-created-ds", "34567")
 				endpoints := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -753,7 +1135,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 			svcName: "service-updated",
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
-				pod2 := createServicePod("DaemonSet", "service-created-ds", "12345")
+				pod2 := createServicePod(kindDaemonSet, "service-created-ds", "12345")
 				endpoints := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -961,7 +1343,7 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 
 	type testCase struct {
 		name      string
-		endpoints *corev1.Endpoints
+		endpoints corev1.Endpoints
 		responses map[types.NamespacedName]*corev1.Pod
 		expected  *pbcatalog.WorkloadSelector
 		mockFn    func(*testing.T, *MockPodFetcher)
@@ -976,13 +1358,19 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 		createServicePod(kindReplicaSet, "svc-rs-fghij", "34567"),
 	}
 	otherPods := []*corev1.Pod{
-		createServicePod("DaemonSet", "svc-ds", "12345"),
-		createServicePod("DaemonSet", "svc-ds", "23456"),
-		createServicePod("DaemonSet", "svc-ds", "34567"),
+		createServicePod(kindDaemonSet, "svc-ds", "12345"),
+		createServicePod(kindDaemonSet, "svc-ds", "23456"),
+		createServicePod(kindDaemonSet, "svc-ds", "34567"),
 		createServicePod("StatefulSet", "svc-ss", "12345"),
 		createServicePod("StatefulSet", "svc-ss", "23456"),
 		createServicePod("StatefulSet", "svc-ss", "34567"),
 	}
+	ignoredPods := []*corev1.Pod{
+		createServicePod(kindReplicaSet, "svc-rs-ignored-klmno", "12345"),
+		createServicePod(kindReplicaSet, "svc-rs-ignored-klmno", "23456"),
+		createServicePod(kindReplicaSet, "svc-rs-ignored-klmno", "34567"),
+	}
+
 	podsByName := make(map[types.NamespacedName]*corev1.Pod)
 	for _, p := range rsPods {
 		podsByName[types.NamespacedName{Name: p.Name, Namespace: p.Namespace}] = p
@@ -990,11 +1378,15 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 	for _, p := range otherPods {
 		podsByName[types.NamespacedName{Name: p.Name, Namespace: p.Namespace}] = p
 	}
+	for _, p := range ignoredPods {
+		removeMeshInjectStatus(t, p)
+		podsByName[types.NamespacedName{Name: p.Name, Namespace: p.Namespace}] = p
+	}
 
 	cases := []testCase{
 		{
 			name: "Pod is fetched once per ReplicaSet",
-			endpoints: &corev1.Endpoints{
+			endpoints: corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "svc",
 					Namespace: "default",
@@ -1015,11 +1407,11 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 			responses: podsByName,
 			expected: getWorkloadSelector(
 				// Selector should consist of prefixes only.
-				map[string]any{
-					"svc-rs-abcde": true,
-					"svc-rs-fghij": true,
+				selectorPodData{
+					"svc-rs-abcde": &podSetData{},
+					"svc-rs-fghij": &podSetData{},
 				},
-				map[string]any{}),
+				selectorPodData{}),
 			mockFn: func(t *testing.T, pf *MockPodFetcher) {
 				// Assert called once per set.
 				require.Equal(t, 2, len(pf.calls))
@@ -1027,7 +1419,7 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 		},
 		{
 			name: "Pod is fetched once per other pod owner type",
-			endpoints: &corev1.Endpoints{
+			endpoints: corev1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "svc",
 					Namespace: "default",
@@ -1048,21 +1440,47 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 			responses: podsByName,
 			expected: getWorkloadSelector(
 				// Selector should consist of exact name matches only.
-				map[string]any{},
-				map[string]any{
-					"svc-ds-12345": true,
-					"svc-ds-23456": true,
-					"svc-ds-34567": true,
-					"svc-ss-12345": true,
-					"svc-ss-23456": true,
-					"svc-ss-34567": true,
+				selectorPodData{},
+				selectorPodData{
+					"svc-ds-12345": &podSetData{},
+					"svc-ds-23456": &podSetData{},
+					"svc-ds-34567": &podSetData{},
+					"svc-ss-12345": &podSetData{},
+					"svc-ss-23456": &podSetData{},
+					"svc-ss-34567": &podSetData{},
 				}),
 			mockFn: func(t *testing.T, pf *MockPodFetcher) {
 				// Assert called once per pod.
 				require.Equal(t, len(otherPods), len(pf.calls))
 			},
 		},
-		//TODO: Add cases to cover non-injected pod skipping.
+		{
+			name: "Pod is ignored if not mesh-injected",
+			endpoints: corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "svc",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: addressesForPods(ignoredPods...),
+						Ports: []corev1.EndpointPort{
+							{
+								Name:        "my-http-port",
+								AppProtocol: &appProtocolHttp,
+								Port:        2345,
+							},
+						},
+					},
+				},
+			},
+			responses: podsByName,
+			expected:  nil,
+			mockFn: func(t *testing.T, pf *MockPodFetcher) {
+				// Assert called once for single set.
+				require.Equal(t, 1, len(pf.calls))
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -1075,10 +1493,11 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 				Log: logrtest.New(t),
 			}
 
-			resp, err := ep.getWorkloadSelectorFromEndpoints(ctx, &pf, tc.endpoints)
+			prefixedPods, exactNamePods, err := ep.getWorkloadDataFromEndpoints(ctx, &pf, tc.endpoints)
 			require.NoError(t, err)
 
-			if diff := cmp.Diff(tc.expected, resp, test.CmpProtoIgnoreOrder()...); diff != "" {
+			ws := getWorkloadSelector(prefixedPods, exactNamePods)
+			if diff := cmp.Diff(tc.expected, ws, test.CmpProtoIgnoreOrder()...); diff != "" {
 				t.Errorf("unexpected difference:\n%v", diff)
 			}
 			tc.mockFn(t, &pf)
@@ -1191,11 +1610,11 @@ func expectedServiceMatches(t *testing.T, client pbresource.ResourceServiceClien
 	}
 }
 
-func createServicePodOwnedBy(ownerKind, ownerName string) *corev1.Pod {
-	return createServicePod(ownerKind, ownerName, randomKubernetesId())
+func createServicePodOwnedBy(ownerKind, ownerName string, containers ...corev1.Container) *corev1.Pod {
+	return createServicePod(ownerKind, ownerName, randomKubernetesId(), containers...)
 }
 
-func createServicePod(ownerKind, ownerName, podId string) *corev1.Pod {
+func createServicePod(ownerKind, ownerName, podId string, containers ...corev1.Container) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s", ownerName, podId),
@@ -1212,8 +1631,23 @@ func createServicePod(ownerKind, ownerName, podId string) *corev1.Pod {
 				},
 			},
 		},
+		Spec: corev1.PodSpec{
+			Containers: containers,
+		},
 	}
 	return pod
+}
+
+func containerWithPort(name string, port int32) corev1.Container {
+	return corev1.Container{
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          name,
+				ContainerPort: port,
+				Protocol:      "TCP",
+			},
+		},
+	}
 }
 
 func addressesForPods(pods ...*corev1.Pod) []corev1.EndpointAddress {
@@ -1237,4 +1671,9 @@ func randomKubernetesId() string {
 		panic(err)
 	}
 	return u[:5]
+}
+
+func removeMeshInjectStatus(t *testing.T, pod *corev1.Pod) {
+	delete(pod.Annotations, constants.KeyMeshInjectStatus)
+	require.False(t, common.HasBeenMeshInjected(*pod))
 }
