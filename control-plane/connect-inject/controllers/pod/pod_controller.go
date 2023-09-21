@@ -811,11 +811,12 @@ func getHealthStatusFromPod(pod corev1.Pod) pbcatalog.Health {
 	}
 
 	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-			return pbcatalog.Health_HEALTH_PASSING
+		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionFalse {
+			return pbcatalog.Health_HEALTH_CRITICAL
 		}
 	}
-	return pbcatalog.Health_HEALTH_CRITICAL
+
+	return pbcatalog.Health_HEALTH_PASSING
 }
 
 // getHealthStatusReason takes Consul's health check status (either passing or critical)
