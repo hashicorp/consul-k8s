@@ -4,584 +4,535 @@
 package v2alpha1
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	capi "github.com/hashicorp/consul/api"
 	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
-func TestServiceIntentions_MatchesConsul(t *testing.T) {
+func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
-		Ours    TrafficPermissions
-		Theirs  pbauth.TrafficPermissions
+		OurConsulNamespace string
+		OurConsulPartition string
+		OurData            TrafficPermissions
+
+		TheirName            string
+		TheirConsulNamespace string
+		TheirConsulPartition string
+		TheirData            *pbauth.TrafficPermissions
+		ResourceOverride     *pbresource.Resource // Used to test that an empty resource of another type will not match
+
 		Matches bool
 	}{
 		"empty fields matches": {
-			Ours: TrafficPermissions{
+			OurConsulNamespace: constants.DefaultConsulNS,
+			OurConsulPartition: constants.DefaultConsulPartition,
+			OurData: TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
 				Spec: TrafficPermissionsSpec{},
 			},
-			Theirs: pbauth.TrafficPermissions{
+			TheirName:            "name",
+			TheirConsulNamespace: constants.DefaultConsulNS,
+			TheirConsulPartition: constants.DefaultConsulPartition,
+			TheirData: &pbauth.TrafficPermissions{
 				Destination: nil,
 				Action:      pbauth.Action_ACTION_UNSPECIFIED,
 				Permissions: nil,
 			},
 			Matches: true,
 		},
-		"namespaces and partitions equate `default` and empty strings": {
-			Ours: TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: TrafficPermissionsSpec{},
-			},
-			Theirs: &capi.ServiceIntentionsConfigEntry{
-				Kind:      capi.ServiceIntentions,
-				Name:      "svc-name",
-				Namespace: "ns1",
-				Sources: []*capi.SourceIntention{
-					{
-						Name:       "svc1",
-						Namespace:  "default",
-						Partition:  "",
-						Action:     "allow",
-						Precedence: 0,
-					},
-				},
-			},
-			Matches: true,
-		},
 		"source namespaces and partitions are compared": {
-			Ours: TrafficPermissions{
+			OurConsulNamespace: "consul-ns",
+			OurConsulPartition: "consul-partition",
+			OurData: TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
+					Name:      "foo",
+					Namespace: "kube-ns",
 				},
 				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "svc-name",
-						Namespace: "test",
+					Destination: &Destination{
+						IdentityName: "destination-identity",
 					},
-					Sources: []*SourceIntention{
+					Action: ActionAllow,
+					Permissions: Permissions{
 						{
-							Name:      "svc1",
-							Namespace: "test",
-							Partition: "test",
-							Action:    "allow",
+							Sources: []*Source{
+								{
+									IdentityName: "source-identity",
+									Namespace:    "the space namespace space",
+								},
+							},
 						},
 					},
 				},
 			},
-			Theirs: &capi.ServiceIntentionsConfigEntry{
-				Kind:      capi.ServiceIntentions,
-				Name:      "svc-name",
-				Namespace: "test",
-				Sources: []*capi.SourceIntention{
+			TheirName:            "foo",
+			TheirConsulNamespace: "consul-ns",
+			TheirConsulPartition: "consul-partition",
+			TheirData: &pbauth.TrafficPermissions{
+				Destination: &pbauth.Destination{
+					IdentityName: "destination-identity",
+				},
+				Action: pbauth.Action_ACTION_ALLOW,
+				Permissions: []*pbauth.Permission{
 					{
-						Name:       "svc1",
-						Namespace:  "not-test",
-						Partition:  "not-test",
-						Action:     "allow",
-						Precedence: 0,
+						Sources: []*pbauth.Source{
+							{
+								IdentityName: "source-identity",
+								Namespace:    "not space namespace",
+							},
+						},
+					},
+				},
+			},
+			Matches: false,
+		},
+		"destination namespaces and partitions are compared": {
+			OurConsulNamespace: "not-consul-ns",
+			OurConsulPartition: "not-consul-partition",
+			OurData: TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "kube-ns",
+				},
+				Spec: TrafficPermissionsSpec{
+					Destination: &Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: ActionAllow,
+					Permissions: Permissions{
+						{
+							Sources: []*Source{
+								{
+									IdentityName: "source-identity",
+								},
+							},
+						},
+					},
+				},
+			},
+			TheirName:            "foo",
+			TheirConsulNamespace: "consul-ns",
+			TheirConsulPartition: "consul-partition",
+			TheirData: &pbauth.TrafficPermissions{
+				Destination: &pbauth.Destination{
+					IdentityName: "destination-identity",
+				},
+				Action: pbauth.Action_ACTION_ALLOW,
+				Permissions: []*pbauth.Permission{
+					{
+						Sources: []*pbauth.Source{
+							{
+								IdentityName: "source-identity",
+							},
+						},
 					},
 				},
 			},
 			Matches: false,
 		},
 		"all fields set matches": {
-			Ours: TrafficPermissions{
+			OurConsulNamespace: "consul-ns",
+			OurConsulPartition: "consul-partition",
+			OurData: TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
+					Name:      "foo",
+					Namespace: "kube-ns",
 				},
 				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "svc-name",
-						Namespace: "test",
+					Destination: &Destination{
+						IdentityName: "destination-identity",
 					},
-					Sources: []*SourceIntention{
+					Action: ActionAllow,
+					Permissions: Permissions{
 						{
-							Name:        "svc1",
-							Namespace:   "test",
-							Partition:   "test",
-							Action:      "allow",
-							Description: "allow access from svc1",
-						},
-						{
-							Name:        "*",
-							Namespace:   "not-test",
-							Partition:   "not-test",
-							Action:      "deny",
-							Description: "disallow access from namespace not-test",
-						},
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Partition: "bar",
-							Permissions: IntentionPermissions{
+							Sources: []*Source{
 								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact:  "/foo",
-										PathPrefix: "/bar",
-										PathRegex:  "/baz",
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:    "header",
-												Present: true,
-												Exact:   "exact",
-												Prefix:  "prefix",
-												Suffix:  "suffix",
-												Regex:   "regex",
-												Invert:  true,
-											},
-										},
-										Methods: []string{
-											"GET",
-											"PUT",
-										},
-									},
-									JWT: &IntentionJWTRequirement{
-										Providers: []*IntentionJWTProvider{
-											{
-												Name: "okta-nested",
-												VerifyClaims: []*IntentionJWTClaimVerification{
-													{
-														Path:  []string{"perms", "role"},
-														Value: "admin-nested",
-													},
-												},
-											},
+									Namespace:     "the space namespace space",
+									Partition:     "space-partition",
+									Peer:          "space-peer",
+									SamenessGroup: "space-group",
+									Exclude: Exclude{
+										{
+											IdentityName:  "not-source-identity",
+											Namespace:     "the space namespace space",
+											Partition:     "space-partition",
+											Peer:          "space-peer",
+											SamenessGroup: "space-group",
 										},
 									},
 								},
+								{
+									IdentityName: "source-identity",
+								},
 							},
-							Description: "an L7 config",
-						},
-					},
-					JWT: &IntentionJWTRequirement{
-						Providers: []*IntentionJWTProvider{
-							{
-								Name: "okta",
-								VerifyClaims: []*IntentionJWTClaimVerification{
-									{
-										Path:  []string{"perms", "role"},
-										Value: "admin",
+							DestinationRules: DestinationRules{
+								{
+									PathExact:  "/hello",
+									PathPrefix: "/world",
+									PathRegex:  "/.*/foo",
+									Header: &DestinationRuleHeader{
+										Name:    "x-consul-test",
+										Present: true,
+										Exact:   "true",
+										Prefix:  "prefix",
+										Suffix:  "suffix",
+										Regex:   "reg.*ex",
+										Invert:  true,
 									},
+									Methods: []string{"GET", "POST"},
+									Exclude: ExcludePermissions{
+										{
+											PathExact:  "/hello",
+											PathPrefix: "/world",
+											PathRegex:  "/.*/foo",
+											Header: &DestinationRuleHeader{
+												Name:    "x-consul-not-test",
+												Present: true,
+												Exact:   "false",
+												Prefix:  "~prefix",
+												Suffix:  "~suffix",
+												Regex:   "~reg.*ex",
+												Invert:  true,
+											},
+											Methods:   []string{"DELETE"},
+											PortNames: []string{"log"},
+										},
+									},
+									PortNames: []string{"web", "admin"},
 								},
 							},
 						},
 					},
 				},
 			},
-			Theirs: &capi.ServiceIntentionsConfigEntry{
-				Kind:      capi.ServiceIntentions,
-				Name:      "svc-name",
-				Namespace: "test",
-				Sources: []*capi.SourceIntention{
+			TheirName:            "foo",
+			TheirConsulNamespace: "consul-ns",
+			TheirConsulPartition: "consul-partition",
+			TheirData: &pbauth.TrafficPermissions{
+				Destination: &pbauth.Destination{
+					IdentityName: "destination-identity",
+				},
+				Action: pbauth.Action_ACTION_ALLOW,
+				Permissions: []*pbauth.Permission{
 					{
-						Name:        "svc1",
-						Namespace:   "test",
-						Partition:   "test",
-						Action:      "allow",
-						Precedence:  0,
-						Description: "allow access from svc1",
-					},
-					{
-						Name:        "*",
-						Namespace:   "not-test",
-						Partition:   "not-test",
-						Action:      "deny",
-						Precedence:  1,
-						Description: "disallow access from namespace not-test",
-					},
-					{
-						Name:      "svc-2",
-						Namespace: "bar",
-						Partition: "bar",
-						Permissions: []*capi.IntentionPermission{
+						Sources: []*pbauth.Source{
+							// These are intentionally in a different order to show that it doesn't matter
 							{
-								Action: "allow",
-								HTTP: &capi.IntentionHTTPPermission{
-									PathExact:  "/foo",
-									PathPrefix: "/bar",
-									PathRegex:  "/baz",
-									Header: []capi.IntentionHTTPHeaderPermission{
-										{
-											Name:    "header",
+								IdentityName: "source-identity",
+							},
+							{
+								Namespace:     "the space namespace space",
+								Partition:     "space-partition",
+								Peer:          "space-peer",
+								SamenessGroup: "space-group",
+								Exclude: []*pbauth.ExcludeSource{
+									{
+										IdentityName:  "not-source-identity",
+										Namespace:     "the space namespace space",
+										Partition:     "space-partition",
+										Peer:          "space-peer",
+										SamenessGroup: "space-group",
+									},
+								},
+							},
+						},
+						DestinationRules: []*pbauth.DestinationRule{
+							{
+								PathExact:  "/hello",
+								PathPrefix: "/world",
+								PathRegex:  "/.*/foo",
+								Header: &pbauth.DestinationRuleHeader{
+									Name:    "x-consul-test",
+									Present: true,
+									Exact:   "true",
+									Prefix:  "prefix",
+									Suffix:  "suffix",
+									Regex:   "reg.*ex",
+									Invert:  true,
+								},
+								Methods: []string{"GET", "POST"},
+								Exclude: []*pbauth.ExcludePermissionRule{
+									{
+										PathExact:  "/hello",
+										PathPrefix: "/world",
+										PathRegex:  "/.*/foo",
+										Header: &pbauth.DestinationRuleHeader{
+											Name:    "x-consul-not-test",
 											Present: true,
-											Exact:   "exact",
-											Prefix:  "prefix",
-											Suffix:  "suffix",
-											Regex:   "regex",
+											Exact:   "false",
+											Prefix:  "~prefix",
+											Suffix:  "~suffix",
+											Regex:   "~reg.*ex",
 											Invert:  true,
 										},
-									},
-									Methods: []string{
-										"GET",
-										"PUT",
+										Methods:   []string{"DELETE"},
+										PortNames: []string{"log"},
 									},
 								},
-								JWT: &capi.IntentionJWTRequirement{
-									Providers: []*capi.IntentionJWTProvider{
-										{
-											Name: "okta-nested",
-											VerifyClaims: []*capi.IntentionJWTClaimVerification{
-												{
-													Path:  []string{"perms", "role"},
-													Value: "admin-nested",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						Description: "an L7 config",
-					},
-				},
-				JWT: &capi.IntentionJWTRequirement{
-					Providers: []*capi.IntentionJWTProvider{
-						{
-							Name: "okta",
-							VerifyClaims: []*capi.IntentionJWTClaimVerification{
-								{
-									Path:  []string{"perms", "role"},
-									Value: "admin",
-								},
+								PortNames: []string{"web", "admin"},
 							},
 						},
 					},
 				},
-				Meta: nil,
 			},
 			Matches: true,
 		},
 		"different types does not match": {
-			Ours: TrafficPermissions{
+			OurConsulNamespace: constants.DefaultConsulNS,
+			OurConsulPartition: constants.DefaultConsulPartition,
+			OurData: TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
 				Spec: TrafficPermissionsSpec{},
 			},
-			Theirs: &capi.ProxyConfigEntry{
-				Name:        "name",
-				Kind:        capi.ServiceIntentions,
-				Namespace:   "foobar",
-				CreateIndex: 1,
-				ModifyIndex: 2,
+			ResourceOverride: &pbresource.Resource{
+				Id: &pbresource.ID{
+					Name: "name",
+					Type: &pbresource.Type{
+						Group:        "mesh",
+						GroupVersion: "v1alpha1",
+						Kind:         "ProxyConfiguration",
+					},
+					Tenancy: &pbresource.Tenancy{
+						Partition: constants.DefaultConsulNS,
+						Namespace: constants.DefaultConsulPartition,
+
+						// Because we are explicitly defining NS/partition, this will not default and must be explicit.
+						// At a future point, this will move out of the Tenancy block.
+						PeerName: constants.DefaultConsulPeer,
+					},
+				},
+				Data: inject.ToProtoAny(&pbmesh.ProxyConfiguration{}),
 			},
 			Matches: false,
-		},
-		"different order of sources matches": {
-			Ours: TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name: "bar",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:   "*",
-							Action: "allow",
-						},
-						{
-							Name:   "foo",
-							Action: "allow",
-						},
-					},
-				},
-			},
-			Theirs: &capi.ServiceIntentionsConfigEntry{
-				Name:        "bar",
-				Kind:        capi.ServiceIntentions,
-				CreateIndex: 1,
-				ModifyIndex: 2,
-				Meta: map[string]string{
-					common.SourceKey:     common.SourceValue,
-					common.DatacenterKey: "datacenter",
-				},
-				Sources: []*capi.SourceIntention{
-					{
-						Name:   "foo",
-						Action: "allow",
-					},
-					{
-						Name:   "*",
-						Action: "allow",
-					},
-				},
-			},
-			Matches: true,
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, c.Matches, c.Ours.MatchesConsul(c.Theirs))
+			consulResource := c.ResourceOverride
+			if c.TheirName != "" {
+				consulResource = constructTrafficPermissionResource(c.TheirData, c.TheirName, c.TheirConsulNamespace, c.TheirConsulPartition)
+			}
+			require.Equal(t, c.Matches, c.OurData.MatchesConsul(consulResource, c.OurConsulNamespace, c.OurConsulPartition))
 		})
 	}
 }
 
-func TestServiceIntentions_ToConsul(t *testing.T) {
+// TestTrafficPermissions_Resource also includes test to verify ResourceID()
+func TestTrafficPermissions_Resource(t *testing.T) {
 	cases := map[string]struct {
-		Ours TrafficPermissions
-		Exp  *capi.ServiceIntentionsConfigEntry
+		Ours            TrafficPermissions
+		ConsulNamespace string
+		ConsulPartition string
+		ExpectedName    string
+		ExpectedData    *pbauth.TrafficPermissions
 	}{
 		"empty fields": {
 			Ours: TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
+					Name: "foo",
 				},
 				Spec: TrafficPermissionsSpec{},
 			},
-			Exp: &capi.ServiceIntentionsConfigEntry{
-				Name: "",
-				Kind: capi.ServiceIntentions,
-				Meta: map[string]string{
-					common.SourceKey:     common.SourceValue,
-					common.DatacenterKey: "datacenter",
-				},
-			},
+			ConsulNamespace: constants.DefaultConsulNS,
+			ConsulPartition: constants.DefaultConsulPartition,
+			ExpectedName:    "foo",
+			ExpectedData:    &pbauth.TrafficPermissions{},
 		},
 		"every field set": {
 			Ours: TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "name",
+					Name:      "foo",
+					Namespace: "kube-ns",
 				},
 				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "svc-name",
-						Namespace: "dest-ns",
+					Destination: &Destination{
+						IdentityName: "destination-identity",
 					},
-					Sources: []*SourceIntention{
+					Action: ActionAllow,
+					Permissions: Permissions{
 						{
-							Name:        "svc1",
-							Namespace:   "test",
-							Partition:   "test",
-							Action:      "allow",
-							Description: "allow access from svc1",
-						},
-						{
-							Name:        "*",
-							Namespace:   "not-test",
-							Partition:   "not-test",
-							Action:      "deny",
-							Description: "disallow access from namespace not-test",
-						},
-						{
-							Name:          "*",
-							Namespace:     "ns1",
-							SamenessGroup: "sg2",
-							Action:        "deny",
-							Description:   "disallow access from namespace ns1",
-						},
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Partition: "bar",
-							Permissions: IntentionPermissions{
+							Sources: []*Source{
 								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact:  "/foo",
-										PathPrefix: "/bar",
-										PathRegex:  "/baz",
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:    "header",
-												Present: true,
-												Exact:   "exact",
-												Prefix:  "prefix",
-												Suffix:  "suffix",
-												Regex:   "regex",
-												Invert:  true,
-											},
-										},
-										Methods: []string{
-											"GET",
-											"PUT",
-										},
-									},
-									JWT: &IntentionJWTRequirement{
-										Providers: []*IntentionJWTProvider{
-											{
-												Name: "okta-nested",
-												VerifyClaims: []*IntentionJWTClaimVerification{
-													{
-														Path:  []string{"perms", "role"},
-														Value: "admin-nested",
-													},
-												},
-											},
+									Namespace:     "the space namespace space",
+									Partition:     "space-partition",
+									Peer:          "space-peer",
+									SamenessGroup: "space-group",
+									Exclude: Exclude{
+										{
+											IdentityName:  "not-source-identity",
+											Namespace:     "the space namespace space",
+											Partition:     "space-partition",
+											Peer:          "space-peer",
+											SamenessGroup: "space-group",
 										},
 									},
 								},
+								{
+									IdentityName: "source-identity",
+								},
 							},
-							Description: "an L7 config",
-						},
-					},
-					JWT: &IntentionJWTRequirement{
-						Providers: []*IntentionJWTProvider{
-							{
-								Name: "okta",
-								VerifyClaims: []*IntentionJWTClaimVerification{
-									{
-										Path:  []string{"perms", "role"},
-										Value: "admin",
+							DestinationRules: DestinationRules{
+								{
+									PathExact:  "/hello",
+									PathPrefix: "/world",
+									PathRegex:  "/.*/foo",
+									Header: &DestinationRuleHeader{
+										Name:    "x-consul-test",
+										Present: true,
+										Exact:   "true",
+										Prefix:  "prefix",
+										Suffix:  "suffix",
+										Regex:   "reg.*ex",
+										Invert:  true,
 									},
+									Methods: []string{"GET", "POST"},
+									Exclude: ExcludePermissions{
+										{
+											PathExact:  "/hello",
+											PathPrefix: "/world",
+											PathRegex:  "/.*/foo",
+											Header: &DestinationRuleHeader{
+												Name:    "x-consul-not-test",
+												Present: true,
+												Exact:   "false",
+												Prefix:  "~prefix",
+												Suffix:  "~suffix",
+												Regex:   "~reg.*ex",
+												Invert:  true,
+											},
+											Methods:   []string{"DELETE"},
+											PortNames: []string{"log"},
+										},
+									},
+									PortNames: []string{"web", "admin"},
 								},
 							},
 						},
 					},
 				},
 			},
-			Exp: &capi.ServiceIntentionsConfigEntry{
-				Kind:      capi.ServiceIntentions,
-				Name:      "svc-name",
-				Namespace: "dest-ns",
-				Sources: []*capi.SourceIntention{
+			ConsulNamespace: "not-default-namespace",
+			ConsulPartition: "not-default-partition",
+			ExpectedName:    "foo",
+			ExpectedData: &pbauth.TrafficPermissions{
+				Destination: &pbauth.Destination{
+					IdentityName: "destination-identity",
+				},
+				Action: pbauth.Action_ACTION_ALLOW,
+				Permissions: []*pbauth.Permission{
 					{
-						Name:        "svc1",
-						Namespace:   "test",
-						Partition:   "test",
-						Action:      "allow",
-						Description: "allow access from svc1",
-					},
-					{
-						Name:        "*",
-						Namespace:   "not-test",
-						Partition:   "not-test",
-						Action:      "deny",
-						Description: "disallow access from namespace not-test",
-					},
-					{
-						Name:          "*",
-						Namespace:     "ns1",
-						SamenessGroup: "sg2",
-						Action:        "deny",
-						Description:   "disallow access from namespace ns1",
-					},
-					{
-						Name:      "svc-2",
-						Namespace: "bar",
-						Partition: "bar",
-						Permissions: []*capi.IntentionPermission{
+						Sources: []*pbauth.Source{
+							// These are intentionally in a different order to show that it doesn't matter
 							{
-								Action: "allow",
-								HTTP: &capi.IntentionHTTPPermission{
-									PathExact:  "/foo",
-									PathPrefix: "/bar",
-									PathRegex:  "/baz",
-									Header: []capi.IntentionHTTPHeaderPermission{
-										{
-											Name:    "header",
+								IdentityName: "source-identity",
+							},
+							{
+								Namespace:     "the space namespace space",
+								Partition:     "space-partition",
+								Peer:          "space-peer",
+								SamenessGroup: "space-group",
+								Exclude: []*pbauth.ExcludeSource{
+									{
+										IdentityName:  "not-source-identity",
+										Namespace:     "the space namespace space",
+										Partition:     "space-partition",
+										Peer:          "space-peer",
+										SamenessGroup: "space-group",
+									},
+								},
+							},
+						},
+						DestinationRules: []*pbauth.DestinationRule{
+							{
+								PathExact:  "/hello",
+								PathPrefix: "/world",
+								PathRegex:  "/.*/foo",
+								Header: &pbauth.DestinationRuleHeader{
+									Name:    "x-consul-test",
+									Present: true,
+									Exact:   "true",
+									Prefix:  "prefix",
+									Suffix:  "suffix",
+									Regex:   "reg.*ex",
+									Invert:  true,
+								},
+								Methods: []string{"GET", "POST"},
+								Exclude: []*pbauth.ExcludePermissionRule{
+									{
+										PathExact:  "/hello",
+										PathPrefix: "/world",
+										PathRegex:  "/.*/foo",
+										Header: &pbauth.DestinationRuleHeader{
+											Name:    "x-consul-not-test",
 											Present: true,
-											Exact:   "exact",
-											Prefix:  "prefix",
-											Suffix:  "suffix",
-											Regex:   "regex",
+											Exact:   "false",
+											Prefix:  "~prefix",
+											Suffix:  "~suffix",
+											Regex:   "~reg.*ex",
 											Invert:  true,
 										},
-									},
-									Methods: []string{
-										"GET",
-										"PUT",
+										Methods:   []string{"DELETE"},
+										PortNames: []string{"log"},
 									},
 								},
-								JWT: &capi.IntentionJWTRequirement{
-									Providers: []*capi.IntentionJWTProvider{
-										{
-											Name: "okta-nested",
-											VerifyClaims: []*capi.IntentionJWTClaimVerification{
-												{
-													Path:  []string{"perms", "role"},
-													Value: "admin-nested",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						Description: "an L7 config",
-					},
-				},
-				JWT: &capi.IntentionJWTRequirement{
-					Providers: []*capi.IntentionJWTProvider{
-						{
-							Name: "okta",
-							VerifyClaims: []*capi.IntentionJWTClaimVerification{
-								{
-									Path:  []string{"perms", "role"},
-									Value: "admin",
-								},
+								PortNames: []string{"web", "admin"},
 							},
 						},
 					},
-				},
-				Meta: map[string]string{
-					common.SourceKey:     common.SourceValue,
-					common.DatacenterKey: "datacenter",
 				},
 			},
 		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			act := c.Ours.ToConsul("datacenter")
-			serviceIntentions, ok := act.(*capi.ServiceIntentionsConfigEntry)
-			require.True(t, ok, "could not cast")
-			require.Equal(t, c.Exp, serviceIntentions)
+			actual := c.Ours.Resource(c.ConsulNamespace, c.ConsulPartition)
+			expected := constructTrafficPermissionResource(c.ExpectedData, c.ExpectedName, c.ConsulNamespace, c.ConsulPartition)
+
+			opts := append([]cmp.Option{protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version")}, test.CmpProtoIgnoreOrder()...)
+			diff := cmp.Diff(expected, actual, opts...)
+			require.Equal(t, "", diff, "TrafficPermissions do not match")
 		})
 	}
 }
 
-func TestServiceIntentions_AddFinalizer(t *testing.T) {
-	serviceIntentions := &TrafficPermissions{}
-	serviceIntentions.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, serviceIntentions.ObjectMeta.Finalizers)
-}
+func TestTrafficPermissions_SetSyncedCondition(t *testing.T) {
+	trafficPermissions := &TrafficPermissions{}
+	trafficPermissions.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-func TestServiceIntentions_RemoveFinalizer(t *testing.T) {
-	serviceIntentions := &TrafficPermissions{
-		ObjectMeta: metav1.ObjectMeta{
-			Finalizers: []string{"f1", "f2"},
-		},
-	}
-	serviceIntentions.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, serviceIntentions.ObjectMeta.Finalizers)
-}
-
-func TestServiceIntentions_SetSyncedCondition(t *testing.T) {
-	serviceIntentions := &TrafficPermissions{}
-	serviceIntentions.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
-
-	require.Equal(t, corev1.ConditionTrue, serviceIntentions.Status.Conditions[0].Status)
-	require.Equal(t, "reason", serviceIntentions.Status.Conditions[0].Reason)
-	require.Equal(t, "message", serviceIntentions.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, trafficPermissions.Status.Conditions[0].Status)
+	require.Equal(t, "reason", trafficPermissions.Status.Conditions[0].Reason)
+	require.Equal(t, "message", trafficPermissions.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, serviceIntentions.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, trafficPermissions.Status.Conditions[0].LastTransitionTime.Before(&now))
 }
 
-func TestServiceIntentions_SetLastSyncedTime(t *testing.T) {
-	serviceIntentions := &TrafficPermissions{}
+func TestTrafficPermissions_SetLastSyncedTime(t *testing.T) {
+	trafficPermissions := &TrafficPermissions{}
 	syncedTime := metav1.NewTime(time.Now())
-	serviceIntentions.SetLastSyncedTime(&syncedTime)
+	trafficPermissions.SetLastSyncedTime(&syncedTime)
 
-	require.Equal(t, &syncedTime, serviceIntentions.Status.LastSyncedTime)
+	require.Equal(t, &syncedTime, trafficPermissions.Status.LastSyncedTime)
 }
 
-func TestServiceIntentions_GetSyncedConditionStatus(t *testing.T) {
+func TestTrafficPermissions_GetSyncedConditionStatus(t *testing.T) {
 	cases := []corev1.ConditionStatus{
 		corev1.ConditionUnknown,
 		corev1.ConditionFalse,
@@ -589,7 +540,7 @@ func TestServiceIntentions_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			serviceIntentions := &TrafficPermissions{
+			trafficPermissions := &TrafficPermissions{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -598,1216 +549,257 @@ func TestServiceIntentions_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, serviceIntentions.SyncedConditionStatus())
+			require.Equal(t, status, trafficPermissions.SyncedConditionStatus())
 		})
 	}
 }
 
-func TestServiceIntentions_GetConditionWhenStatusNil(t *testing.T) {
+func TestTrafficPermissions_GetConditionWhenStatusNil(t *testing.T) {
 	require.Nil(t, (&TrafficPermissions{}).GetCondition(ConditionSynced))
 }
 
-func TestServiceIntentions_SyncedConditionStatusWhenStatusNil(t *testing.T) {
+func TestTrafficPermissions_SyncedConditionStatusWhenStatusNil(t *testing.T) {
 	require.Equal(t, corev1.ConditionUnknown, (&TrafficPermissions{}).SyncedConditionStatus())
 }
 
-func TestServiceIntentions_SyncedConditionWhenStatusNil(t *testing.T) {
+func TestTrafficPermissions_SyncedConditionWhenStatusNil(t *testing.T) {
 	status, reason, message := (&TrafficPermissions{}).SyncedCondition()
 	require.Equal(t, corev1.ConditionUnknown, status)
 	require.Equal(t, "", reason)
 	require.Equal(t, "", message)
 }
 
-func TestServiceIntentions_ConsulKind(t *testing.T) {
-	require.Equal(t, capi.ServiceIntentions, (&TrafficPermissions{}).ConsulKind())
+func TestTrafficPermissions_KubeKind(t *testing.T) {
+	require.Equal(t, "trafficpermissions", (&TrafficPermissions{}).KubeKind())
 }
 
-func TestServiceIntentions_KubeKind(t *testing.T) {
-	require.Equal(t, "serviceintentions", (&TrafficPermissions{}).KubeKind())
-}
-
-func TestServiceIntentions_ConsulName(t *testing.T) {
-	require.Equal(t, "foo", (&TrafficPermissions{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test",
-			Namespace: "bar",
-		},
-		Spec: TrafficPermissionsSpec{
-			Destination: Destination{
-				Name:      "foo",
-				Namespace: "baz",
-			},
-		},
-	}).ConsulName())
-}
-
-func TestServiceIntentions_KubernetesName(t *testing.T) {
+func TestTrafficPermissions_KubernetesName(t *testing.T) {
 	require.Equal(t, "test", (&TrafficPermissions{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",
 			Namespace: "bar",
 		},
 		Spec: TrafficPermissionsSpec{
-			Destination: Destination{
-				Name:      "foo",
-				Namespace: "baz",
+			Destination: &Destination{
+				IdentityName: "foo",
 			},
 		},
 	}).KubernetesName())
 }
 
-func TestServiceIntentions_ConsulNamespace(t *testing.T) {
-	require.Equal(t, "baz", (&TrafficPermissions{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test",
-			Namespace: "bar",
-		},
-		Spec: TrafficPermissionsSpec{
-			Destination: Destination{
-				Name:      "foo",
-				Namespace: "baz",
-			},
-		},
-	}).ConsulMirroringNS())
-}
-
-func TestServiceIntentions_ConsulGlobalResource(t *testing.T) {
-	require.False(t, (&TrafficPermissions{}).ConsulGlobalResource())
-}
-
-func TestServiceIntentions_ConsulNamespaceWithWildcard(t *testing.T) {
-	require.Equal(t, common.WildcardNamespace, (&TrafficPermissions{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test",
-			Namespace: "bar",
-		},
-		Spec: TrafficPermissionsSpec{
-			Destination: Destination{
-				Name:      "foo",
-				Namespace: "*",
-			},
-		},
-	}).ConsulMirroringNS())
-}
-
-func TestServiceIntentions_ObjectMeta(t *testing.T) {
+func TestTrafficPermissions_ObjectMeta(t *testing.T) {
 	meta := metav1.ObjectMeta{
 		Name:      "name",
 		Namespace: "namespace",
 	}
-	serviceIntentions := &TrafficPermissions{
+	trafficPermissions := &TrafficPermissions{
 		ObjectMeta: meta,
 	}
-	require.Equal(t, meta, serviceIntentions.GetObjectMeta())
+	require.Equal(t, &meta, trafficPermissions.GetObjectMeta())
 }
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
-func TestServiceIntentions_DefaultNamespaceFields(t *testing.T) {
-	namespaceConfig := map[string]struct {
-		consulMeta          common.ConsulMeta
-		expectedDestination string
-	}{
-		"disabled": {
-			consulMeta: common.ConsulMeta{
-				NamespacesEnabled:    false,
-				DestinationNamespace: "",
-				Mirroring:            false,
-				Prefix:               "",
-			},
-			expectedDestination: "",
-		},
-		"destinationNS": {
-			consulMeta: common.ConsulMeta{
-				NamespacesEnabled:    true,
-				DestinationNamespace: "foo",
-				Mirroring:            false,
-				Prefix:               "",
-			},
-			expectedDestination: "foo",
-		},
-		"mirroringEnabledWithoutPrefix": {
-			consulMeta: common.ConsulMeta{
-				NamespacesEnabled:    true,
-				DestinationNamespace: "",
-				Mirroring:            true,
-				Prefix:               "",
-			},
-			expectedDestination: "bar",
-		},
-		"mirroringWithPrefix": {
-			consulMeta: common.ConsulMeta{
-				NamespacesEnabled:    true,
-				DestinationNamespace: "",
-				Mirroring:            true,
-				Prefix:               "ns-",
-			},
-			expectedDestination: "ns-bar",
-		},
-	}
+// TODO: add when implemented
+//func TestTrafficPermissions_DefaultNamespaceFields(t *testing.T)
 
-	for name, s := range namespaceConfig {
-		t.Run(name, func(t *testing.T) {
-			input := &TrafficPermissions{
+func TestTrafficPermissions_Validate(t *testing.T) {
+	cases := []struct {
+		name            string
+		input           *TrafficPermissions
+		expectedErrMsgs []string
+	}{
+		{
+			name: "kitchen sink OK",
+			input: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
-					Namespace: "bar",
+					Namespace: "kube-ns",
 				},
 				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name: "bar",
+					Destination: &Destination{
+						IdentityName: "destination-identity",
 					},
-				},
-			}
-			output := &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "bar",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "bar",
-						Namespace: s.expectedDestination,
-					},
-				},
-			}
-			input.DefaultNamespaceFields(s.consulMeta)
-			require.True(t, cmp.Equal(input, output))
-		})
-	}
-}
-
-func TestServiceIntentions_Validate(t *testing.T) {
-	longDescription := strings.Repeat("x", metaValueMaxLength+1)
-
-	cases := map[string]struct {
-		input             *TrafficPermissions
-		namespacesEnabled bool
-		partitionsEnabled bool
-		expectedErrMsgs   []string
-	}{
-		"partitions enabled: valid": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
+					Action: ActionAllow,
+					Permissions: Permissions{
 						{
-							Name:      "web",
-							Namespace: "web",
-							Partition: "web",
-							Action:    "allow",
-						},
-						{
-							Name:      "db",
-							Namespace: "db",
-							Partition: "db",
-							Action:    "deny",
-						},
-						{
-							Name:      "bar",
-							Namespace: "bar",
-							Partition: "bar",
-							Permissions: IntentionPermissions{
+							Sources: []*Source{
 								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact: "/foo",
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:    "header",
+									Namespace:     "the space namespace space",
+									Partition:     "space-partition",
+									Peer:          "space-peer",
+									SamenessGroup: "space-group",
+									Exclude: Exclude{
+										{
+											IdentityName:  "not-source-identity",
+											Namespace:     "the space namespace space",
+											Partition:     "space-partition",
+											Peer:          "space-peer",
+											SamenessGroup: "space-group",
+										},
+									},
+								},
+								{
+									IdentityName: "source-identity",
+								},
+							},
+							DestinationRules: DestinationRules{
+								{
+									PathExact:  "/hello",
+									PathPrefix: "/world",
+									PathRegex:  "/.*/foo",
+									Header: &DestinationRuleHeader{
+										Name:    "x-consul-test",
+										Present: true,
+										Exact:   "true",
+										Prefix:  "prefix",
+										Suffix:  "suffix",
+										Regex:   "reg.*ex",
+										Invert:  true,
+									},
+									Methods: []string{"GET", "POST"},
+									Exclude: ExcludePermissions{
+										{
+											PathExact:  "/hello",
+											PathPrefix: "/world",
+											PathRegex:  "/.*/foo",
+											Header: &DestinationRuleHeader{
+												Name:    "x-consul-not-test",
 												Present: true,
+												Exact:   "false",
+												Prefix:  "~prefix",
+												Suffix:  "~suffix",
+												Regex:   "~reg.*ex",
 												Invert:  true,
 											},
-										},
-										Methods: []string{
-											"GET",
-											"PUT",
+											Methods:   []string{"DELETE"},
+											PortNames: []string{"log"},
 										},
 									},
-									JWT: &IntentionJWTRequirement{
-										Providers: []*IntentionJWTProvider{
-											{
-												Name: "okta-nested",
-												VerifyClaims: []*IntentionJWTClaimVerification{
-													{
-														Path:  []string{"perms", "role"},
-														Value: "admin-nested",
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-							Description: "an L7 config",
-						},
-					},
-					JWT: &IntentionJWTRequirement{
-						Providers: []*IntentionJWTProvider{
-							{
-								Name: "okta",
-								VerifyClaims: []*IntentionJWTClaimVerification{
-									{
-										Path:  []string{"perms", "role"},
-										Value: "admin",
-									},
+									PortNames: []string{"web", "admin"},
 								},
 							},
 						},
 					},
 				},
 			},
-			namespacesEnabled: true,
-			partitionsEnabled: true,
-			expectedErrMsgs:   nil,
+			expectedErrMsgs: nil,
 		},
-		"namespaces enabled: valid": {
+		{
+			name: "must have an action",
 			input: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
 				},
 				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Namespace: "web",
-							Action:    "allow",
-						},
-						{
-							Name:      "db",
-							Namespace: "db",
-							Action:    "deny",
-						},
-						{
-							Name:      "bar",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact: "/foo",
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:    "header",
-												Present: true,
-												Invert:  true,
-											},
-										},
-										Methods: []string{
-											"GET",
-											"PUT",
-										},
-									},
-								},
-							},
-							Description: "an L7 config",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			partitionsEnabled: false,
-			expectedErrMsgs:   nil,
-		},
-		"namespaces disabled: valid": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name: "dest-service",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:   "web",
-							Action: "allow",
-						},
-						{
-							Name:   "db",
-							Action: "deny",
-						},
-						{
-							Name: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathRegex: "/baz",
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:   "header",
-												Regex:  "regex",
-												Invert: true,
-											},
-										},
-										Methods: []string{
-											"GET",
-											"PUT",
-										},
-									},
-								},
-							},
-							Description: "an L7 config",
-						},
-					},
-				},
-			},
-			namespacesEnabled: false,
-			partitionsEnabled: false,
-			expectedErrMsgs:   nil,
-		},
-		"no sources": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources: Required value: at least one source must be specified`,
-			},
-		},
-		"invalid action": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Namespace: "web",
-							Action:    "foo",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].action: Invalid value: "foo": must be one of "allow", "deny"`,
-			},
-		},
-		"invalid permissions.http.pathPrefix": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathPrefix: "bar",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathPrefix: Invalid value: "bar": must begin with a '/'`,
-			},
-		},
-		"invalid permissions.http pathPrefix,pathExact specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathPrefix: "/bar",
-										PathExact:  "/foo",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathExact\":\"/foo\",\"pathPrefix\":\"/bar\"}": at most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
-			},
-		},
-		"invalid permissions.http pathPrefix,pathRegex specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathPrefix: "/bar",
-										PathRegex:  "foo",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathPrefix\":\"/bar\",\"pathRegex\":\"foo\"}": at most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
-			},
-		},
-		"invalid permissions.http pathRegex,pathExact specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathRegex: "bar",
-										PathExact: "/foo",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0]: Invalid value: "{\"pathExact\":\"/foo\",\"pathRegex\":\"bar\"}": at most only one of pathExact, pathPrefix, or pathRegex may be configured.`,
-			},
-		},
-		"invalid permissions.http.pathExact": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact: "bar",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].pathExact: Invalid value: "bar": must begin with a '/'`,
-			},
-		},
-		"invalid permissions.http.methods": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										Methods: []string{
-											"FOO",
-											"GET",
-											"BAR",
-											"GET",
-											"POST",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: [spec.sources[0].permissions[0].methods[0]: Invalid value: "FOO": must be one of "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE", spec.sources[0].permissions[0].methods[2]: Invalid value: "BAR": must be one of "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS", "TRACE", spec.sources[0].permissions[0].methods[3]: Invalid value: "GET": method listed more than once.`,
-			},
-		},
-		"invalid permissions.http.header": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										Header: IntentionHTTPHeaderPermissions{
-											{
-												Name:    "exact-present",
-												Present: true,
-												Exact:   "foobar",
-											},
-											{
-												Name:   "prefix-exact",
-												Exact:  "foobar",
-												Prefix: "barfood",
-											},
-											{
-												Name:   "suffix-prefix",
-												Prefix: "foo",
-												Suffix: "bar",
-											},
-											{
-												Name:   "suffix-regex",
-												Suffix: "bar",
-												Regex:  "foo",
-											},
-											{
-												Name:    "regex-present",
-												Present: true,
-												Regex:   "foobar",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`spec.sources[0].permissions[0].header[0]: Invalid value: "{\"name\":\"exact-present\",\"present\":true,\"exact\":\"foobar\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
-				`spec.sources[0].permissions[0].header[1]: Invalid value: "{\"name\":\"prefix-exact\",\"exact\":\"foobar\",\"prefix\":\"barfood\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
-				`spec.sources[0].permissions[0].header[2]: Invalid value: "{\"name\":\"suffix-prefix\",\"prefix\":\"foo\",\"suffix\":\"bar\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
-				`spec.sources[0].permissions[0].header[3]: Invalid value: "{\"name\":\"suffix-regex\",\"suffix\":\"bar\",\"regex\":\"foo\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
-				`spec.sources[0].permissions[0].header[4]: Invalid value: "{\"name\":\"regex-present\",\"present\":true,\"regex\":\"foobar\"}": at most only one of exact, prefix, suffix, regex, or present may be configured.`,
-			},
-		},
-		"invalid permissions.action": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "foobar",
-									HTTP: &IntentionHTTPPermission{
-										PathExact: "/bar",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].permissions[0].action: Invalid value: "foobar": must be one of "allow", "deny"`,
-			},
-		},
-		"both action and permissions specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "svc-2",
-							Namespace: "bar",
-							Action:    "deny",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									HTTP: &IntentionHTTPPermission{
-										PathExact: "/bar",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0]: Invalid value: "{\"name\":\"svc-2\",\"namespace\":\"bar\",\"action\":\"deny\",\"permissions\":[{\"action\":\"allow\",\"http\":{\"pathExact\":\"/bar\"}}]}": action and permissions are mutually exclusive and only one of them can be specified`,
-			},
-		},
-		"name not specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Namespace: "bar",
-							Action:    "deny",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].name: Required value: name is required.`,
-			},
-		},
-		"description is too long": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:        "foo",
-							Namespace:   "bar",
-							Action:      "deny",
-							Description: longDescription,
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0]: Invalid value: "": description exceeds maximum length 512`,
-			},
-		},
-		"namespaces disabled: destination namespace specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace-a",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:   "web",
-							Action: "allow",
-						},
-					},
-				},
-			},
-			namespacesEnabled: false,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.destination.namespace: Invalid value: "namespace-a": Consul Enterprise namespaces must be enabled to set destination.namespace`,
-			},
-		},
-		"namespaces disabled: single source namespace specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name: "dest-service",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "namespace-a",
-						},
-					},
-				},
-			},
-			namespacesEnabled: false,
-			expectedErrMsgs: []string{
-				`serviceintentions.consul.hashicorp.com "does-not-matter" is invalid: spec.sources[0].namespace: Invalid value: "namespace-a": Consul Enterprise namespaces must be enabled to set source.namespace`,
-			},
-		},
-		"namespaces disabled: multiple source namespaces specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name: "dest-service",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "namespace-a",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "namespace-b",
-						},
-						{
-							Name:      "bar",
-							Namespace: "namespace-c",
-						},
-					},
-				},
-			},
-			namespacesEnabled: false,
-			expectedErrMsgs: []string{
-				`spec.sources[0].namespace: Invalid value: "namespace-a": Consul Enterprise namespaces must be enabled to set source.namespace`,
-				`spec.sources[1].namespace: Invalid value: "namespace-b": Consul Enterprise namespaces must be enabled to set source.namespace`,
-				`spec.sources[2].namespace: Invalid value: "namespace-c": Consul Enterprise namespaces must be enabled to set source.namespace`,
-			},
-		},
-		"namespaces disabled: destination and multiple source namespaces specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace-a",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "namespace-b",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "namespace-c",
-						},
-						{
-							Name:      "bar",
-							Namespace: "namespace-d",
-						},
-					},
-				},
-			},
-			namespacesEnabled: false,
-			expectedErrMsgs: []string{
-				`spec.destination.namespace: Invalid value: "namespace-a": Consul Enterprise namespaces must be enabled to set destination.namespace`,
-				`spec.sources[0].namespace: Invalid value: "namespace-b": Consul Enterprise namespaces must be enabled to set source.namespace`,
-				`spec.sources[1].namespace: Invalid value: "namespace-c": Consul Enterprise namespaces must be enabled to set source.namespace`,
-				`spec.sources[2].namespace: Invalid value: "namespace-d": Consul Enterprise namespaces must be enabled to set source.namespace`,
-			},
-		},
-		"partitions disabled: single source partition specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace-a",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "namespace-b",
-							Partition: "partition-other",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "namespace-c",
-						},
-						{
-							Name:      "bar",
-							Namespace: "namespace-d",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			partitionsEnabled: false,
-			expectedErrMsgs: []string{
-				`spec.sources[0].partition: Invalid value: "partition-other": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
-			},
-		},
-		"partitions disabled: multiple source partition specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace-a",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "namespace-b",
-							Partition: "partition-other",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "namespace-c",
-							Partition: "partition-first",
-						},
-						{
-							Name:      "bar",
-							Namespace: "namespace-d",
-							Partition: "partition-foo",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			partitionsEnabled: false,
-			expectedErrMsgs: []string{
-				`spec.sources[0].partition: Invalid value: "partition-other": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
-				`spec.sources[1].partition: Invalid value: "partition-first": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
-				`spec.sources[2].partition: Invalid value: "partition-foo": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
-			},
-		},
-		"single source peer and partition specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace-a",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "namespace-b",
-							Partition: "partition-other",
-							Peer:      "peer-other",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "namespace-c",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			partitionsEnabled: true,
-			expectedErrMsgs: []string{
-				`cannot set peer and partition at the same time.`,
-			},
-		},
-		"single source samenessgroup and partition specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace-a",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:          "web",
-							Action:        "allow",
-							Namespace:     "namespace-b",
-							Partition:     "partition-other",
-							SamenessGroup: "sg2",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "namespace-c",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			partitionsEnabled: true,
-			expectedErrMsgs: []string{
-				`cannot set samenessgroup and partition at the same time.`,
-			},
-		},
-		"single source samenessgroup and peer specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace-a",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:          "web",
-							Action:        "allow",
-							Namespace:     "namespace-b",
-							Peer:          "p2",
-							SamenessGroup: "sg2",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "namespace-c",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			partitionsEnabled: true,
-			expectedErrMsgs: []string{
-				`cannot set samenessgroup and peer at the same time.`,
-			},
-		},
-		"multiple source peer and partition specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace-a",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "namespace-b",
-							Partition: "partition-other",
-							Peer:      "peer-other",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "namespace-c",
-							Partition: "partition-2",
-							Peer:      "peer-2",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			partitionsEnabled: true,
-			expectedErrMsgs: []string{
-				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", SamenessGroup:"", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: cannot set peer and partition at the same time.`,
-				`spec.sources[1]: Invalid value: v1alpha1.SourceIntention{Name:"db", Namespace:"namespace-c", Peer:"peer-2", Partition:"partition-2", SamenessGroup:"", Action:"deny", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: cannot set peer and partition at the same time.`,
-			},
-		},
-		"multiple errors: wildcard peer and partition and samenessgroup specified": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name:      "dest-service",
-						Namespace: "namespace-a",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:      "web",
-							Action:    "allow",
-							Namespace: "namespace-b",
-							Partition: "*",
-						},
-						{
-							Name:      "db",
-							Action:    "deny",
-							Namespace: "namespace-c",
-							Peer:      "*",
-						},
-						{
-							Name:          "db2",
-							Action:        "deny",
-							Namespace:     "namespace-d",
-							SamenessGroup: "*",
-						},
-					},
-				},
-			},
-			namespacesEnabled: true,
-			partitionsEnabled: true,
-			expectedErrMsgs: []string{
-				`partition cannot use or contain wildcard '*'`,
-				`peer cannot use or contain wildcard '*'`,
-				`samenessgroup cannot use or contain wildcard '*'`,
-			},
-		},
-		"invalid empty jwt provider name at top-level": {
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name: "dest-service",
-					},
-					Sources: SourceIntentions{
-						{
-							Name:   "bar",
-							Action: "allow",
-						},
-					},
-					JWT: &IntentionJWTRequirement{
-						Providers: []*IntentionJWTProvider{
-							{
-								Name: "",
-							},
-						},
+					Destination: &Destination{
+						IdentityName: "dest-service",
 					},
 				},
 			},
 			expectedErrMsgs: []string{
-				`spec.jwt.providers[0].name: Invalid value: "": JWT provider name is required`,
+				"spec.action: Required value: action is required",
+				"spec.action: Invalid value: \"\": must be one of \"allow\" or \"deny\"",
 			},
 		},
-		"invalid empty jwt provider name in permissions": {
+		{
+			name: "action must be valid",
 			input: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-matter",
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
 				},
 				Spec: TrafficPermissionsSpec{
-					Destination: Destination{
-						Name: "dest-service",
+					Destination: &Destination{
+						IdentityName: "dest-service",
 					},
-					Sources: SourceIntentions{
-						{
-							Name: "bar",
-							Permissions: IntentionPermissions{
-								{
-									Action: "allow",
-									JWT: &IntentionJWTRequirement{
-										Providers: []*IntentionJWTProvider{
-											{
-												Name: "",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
+					Action: "blurg",
 				},
 			},
 			expectedErrMsgs: []string{
-				`spec.sources[0].permissions[0].jwt.providers[0].name: Invalid value: "": JWT provider name is required`,
+				"spec.action: Invalid value: \"blurg\": must be one of \"allow\" or \"deny\"",
+			},
+		},
+		{
+			name: "destination is required",
+			input: &TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
+				},
+				Spec: TrafficPermissionsSpec{
+					Action: "allow",
+				},
+			},
+			expectedErrMsgs: []string{
+				"spec.destination: Required value: destination and destination.identityName are required",
+			},
+		},
+		{
+			name: "destination.identityName is required",
+			input: &TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
+				},
+				Spec: TrafficPermissionsSpec{
+					Action:      "allow",
+					Destination: &Destination{},
+				},
+			},
+			expectedErrMsgs: []string{
+				"spec.destination.identityName: Required value: identityName is required",
 			},
 		},
 	}
-	for name, testCase := range cases {
-		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionsEnabled})
-			if len(testCase.expectedErrMsgs) != 0 {
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.input.Validate(common.ConsulTenancyConfig{})
+			if len(tc.expectedErrMsgs) != 0 {
 				require.Error(t, err)
-				for _, s := range testCase.expectedErrMsgs {
+				for _, s := range tc.expectedErrMsgs {
 					require.Contains(t, err.Error(), s)
 				}
 			} else {
 				require.NoError(t, err)
 			}
 		})
+	}
+}
+
+func constructTrafficPermissionResource(tp *pbauth.TrafficPermissions, name, namespace, partition string) *pbresource.Resource {
+	data := inject.ToProtoAny(tp)
+
+	id := &pbresource.ID{
+		Name: name,
+		Type: &pbresource.Type{
+			Group:        "auth",
+			GroupVersion: "v1alpha1",
+			Kind:         "TrafficPermissions",
+		},
+		Tenancy: &pbresource.Tenancy{
+			Partition: partition,
+			Namespace: namespace,
+
+			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
+			// At a future point, this will move out of the Tenancy block.
+			PeerName: constants.DefaultConsulPeer,
+		},
+	}
+
+	return &pbresource.Resource{
+		Id:   id,
+		Data: data,
+
+		// We add the fields below to prove that they are not used in the Match when comparing the CRD to Consul.
+		Version:    "123456",
+		Generation: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		Status: map[string]*pbresource.Status{
+			"knock": {
+				ObservedGeneration: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+				Conditions:         make([]*pbresource.Condition, 0),
+				UpdatedAt:          timestamppb.Now(),
+			},
+		},
 	}
 }

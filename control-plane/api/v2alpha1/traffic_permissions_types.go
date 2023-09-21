@@ -4,7 +4,10 @@
 package v2alpha1
 
 import (
+	"fmt"
+
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -86,6 +89,9 @@ type Destination struct {
 }
 
 func (in *Destination) validate(path *field.Path) *field.Error {
+	if in == nil {
+		return field.Required(path, `destination and destination.identityName are required`)
+	}
 	if in.IdentityName == "" {
 		return field.Required(path.Child("identityName"), `identityName is required`)
 	}
@@ -225,9 +231,7 @@ func (in *TrafficPermissions) MatchesConsul(candidate *pbresource.Resource, name
 		candidate,
 		protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
 		protocmp.Transform(),
-		// TODO(dans): remove this as needed.
-		//cmpopts.IgnoreUnexported(),
-		//cmpopts.EquateEmpty(),
+		cmpopts.SortSlices(func(a, b any) bool { return fmt.Sprintf("%v", a) < fmt.Sprintf("%v", b) }),
 	)
 }
 
@@ -278,13 +282,14 @@ func (in *TrafficPermissions) Validate(_ common.ConsulTenancyConfig) error {
 	if in.Spec.Action == ActionUnspecified {
 		errs = append(errs, field.Required(path.Child("action"), `action is required`))
 	}
-	errs = append(errs, in.Spec.Action.validate(path))
+	if err := in.Spec.Action.validate(path); err != nil {
+		errs = append(errs, err)
+	}
 
 	// Validate Destinations
-	if in.Spec.Destination == nil {
-		errs = append(errs, field.Required(path.Child("destination"), `destination is required`))
+	if err := in.Spec.Destination.validate(path.Child("destination")); err != nil {
+		errs = append(errs, err)
 	}
-	errs = append(errs, in.Spec.Destination.validate(path.Child("destination")))
 
 	// TODO: add validation for permissions
 	// Validate permissions in Consul:
@@ -390,6 +395,9 @@ func (h *DestinationRuleHeader) toProto() *pbauth.DestinationRuleHeader {
 }
 
 func (in *Destination) toProto() *pbauth.Destination {
+	if in == nil {
+		return nil
+	}
 	return &pbauth.Destination{
 		IdentityName: in.IdentityName,
 	}

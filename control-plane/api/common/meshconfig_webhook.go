@@ -36,7 +36,7 @@ func ValidateMeshConfig(
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	// On create we need to validate that there isn't already a resource with
-	// the same name in a different namespace if we're need to mapping all Kube
+	// the same name in a different namespace if we're mapping all Kube
 	// resources to a single Consul namespace. The only case where we're not
 	// mapping all kube resources to a single Consul namespace is when we
 	// are running Consul enterprise with namespace mirroring.

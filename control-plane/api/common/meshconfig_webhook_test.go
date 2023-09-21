@@ -46,7 +46,7 @@ func TestValidateMeshConfig(t *testing.T) {
 		},
 		"no duplicates, invalid": {
 			existingResources: nil,
-			newResource: &mockConfigEntry{
+			newResource: &mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: otherNS,
 				Valid:         false,
@@ -55,11 +55,11 @@ func TestValidateMeshConfig(t *testing.T) {
 			expErrMessage: "invalid",
 		},
 		"duplicate name": {
-			existingResources: []ConfigEntryResource{&mockConfigEntry{
+			existingResources: []MeshConfig{&mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: "default",
 			}},
-			newResource: &mockConfigEntry{
+			newResource: &mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: otherNS,
 				Valid:         true,
@@ -68,11 +68,11 @@ func TestValidateMeshConfig(t *testing.T) {
 			expErrMessage: "mockkind resource with name \"foo\" is already defined – all mockkind resources must have unique names across namespaces",
 		},
 		"duplicate name, namespaces enabled": {
-			existingResources: []ConfigEntryResource{&mockConfigEntry{
+			existingResources: []MeshConfig{&mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: "default",
 			}},
-			newResource: &mockConfigEntry{
+			newResource: &mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: otherNS,
 				Valid:         true,
@@ -82,11 +82,11 @@ func TestValidateMeshConfig(t *testing.T) {
 			expErrMessage:    "mockkind resource with name \"foo\" is already defined – all mockkind resources must have unique names across namespaces",
 		},
 		"duplicate name, namespaces enabled, mirroring enabled": {
-			existingResources: []ConfigEntryResource{&mockConfigEntry{
+			existingResources: []MeshConfig{&mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: "default",
 			}},
-			newResource: &mockConfigEntry{
+			newResource: &mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: otherNS,
 				Valid:         true,
@@ -102,10 +102,10 @@ func TestValidateMeshConfig(t *testing.T) {
 			marshalledRequestObject, err := json.Marshal(c.newResource)
 			require.NoError(t, err)
 
-			lister := &mockConfigEntryLister{
+			lister := &mockMeshConfigLister{
 				Resources: c.existingResources,
 			}
-			response := ValidateConfigEntry(ctx, admission.Request{
+			response := ValidateMeshConfig(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
@@ -118,11 +118,11 @@ func TestValidateMeshConfig(t *testing.T) {
 				logrtest.New(t),
 				lister,
 				c.newResource,
-				ConsulMeta{
-					NamespacesEnabled:    c.enableNamespaces,
-					DestinationNamespace: c.consulDestinationNS,
-					Mirroring:            c.nsMirroring,
-					Prefix:               c.nsMirroringPrefix,
+				ConsulTenancyConfig{
+					EnableConsulNamespaces:     c.enableNamespaces,
+					ConsulDestinationNamespace: c.consulDestinationNS,
+					EnableNSMirroring:          c.nsMirroring,
+					NSMirroringPrefix:          c.nsMirroringPrefix,
 				})
 			require.Equal(t, c.expAllow, response.Allowed)
 			if c.expErrMessage != "" {
@@ -132,14 +132,14 @@ func TestValidateMeshConfig(t *testing.T) {
 	}
 }
 
-func TestDefaultingPatches(t *testing.T) {
-	cfgEntry := &mockConfigEntry{
+func TestMeshConfigDefaultingPatches(t *testing.T) {
+	meshConfig := &mockMeshConfig{
 		MockName: "test",
 		Valid:    true,
 	}
 
 	// This test validates that DefaultingPatches invokes DefaultNamespaceFields on the Config Entry.
-	patches, err := DefaultingPatches(cfgEntry, ConsulMeta{})
+	patches, err := MeshConfigDefaultingPatches(meshConfig, ConsulTenancyConfig{})
 	require.NoError(t, err)
 
 	require.Equal(t, []jsonpatch.Operation{
@@ -169,13 +169,11 @@ type mockMeshConfig struct {
 
 var _ MeshConfig = &mockMeshConfig{}
 
-// TODO(dan): implement
-func (in *mockMeshConfig) ResourceID(namespace, partition string) *pbresource.ID {
+func (in *mockMeshConfig) ResourceID(_, _ string) *pbresource.ID {
 	return nil
 }
 
-// TODO(dan): implement
-func (in *mockMeshConfig) Resource(namespace, partition string) *pbresource.Resource {
+func (in *mockMeshConfig) Resource(_, _ string) *pbresource.Resource {
 	return nil
 }
 
@@ -283,10 +281,6 @@ func (in *mockMeshConfig) KubernetesName() string {
 	return in.MockName
 }
 
-//func (in *mockMeshConfig) ConsulMirroringNS() string {
-//	return in.MockNamespace
-//}
-
 func (in *mockMeshConfig) GetObjectMeta() metav1.ObjectMeta {
 	return metav1.ObjectMeta{}
 }
@@ -299,10 +293,6 @@ func (in *mockMeshConfig) DeepCopyObject() runtime.Object {
 	return in
 }
 
-//func (in *mockMeshConfig) ConsulGlobalResource() bool {
-//	return false
-//}
-
 func (in *mockMeshConfig) AddFinalizer(_ string) {}
 
 func (in *mockMeshConfig) RemoveFinalizer(_ string) {}
@@ -311,18 +301,9 @@ func (in *mockMeshConfig) Finalizers() []string {
 	return nil
 }
 
-//func (in *mockMeshConfig) ConsulKind() string {
-//	return "mock-kind"
-//}
-
 func (in *mockMeshConfig) KubeKind() string {
 	return "mockkind"
 }
-
-// TODO(dans): clean up unused methods
-//func (in *mockMeshConfig) ConsulName() string {
-//	return in.MockName
-//}
 
 func (in *mockMeshConfig) SetSyncedCondition(_ corev1.ConditionStatus, _ string, _ string) {}
 
@@ -335,10 +316,6 @@ func (in *mockMeshConfig) SyncedCondition() (status corev1.ConditionStatus, reas
 func (in *mockMeshConfig) SyncedConditionStatus() corev1.ConditionStatus {
 	return corev1.ConditionTrue
 }
-
-//func (in *mockMeshConfig) ToConsul(string) capi.ConfigEntry {
-//	return &capi.ServiceConfigEntry{}
-//}
 
 func (in *mockMeshConfig) Validate(_ ConsulTenancyConfig) error {
 	if !in.Valid {
