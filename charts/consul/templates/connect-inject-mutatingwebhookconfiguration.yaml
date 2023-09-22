@@ -333,6 +333,7 @@ webhooks:
       resources:
         - samenessgroups
   sideEffects: None
+{{- if (mustHas "resource-apis" .Values.global.experiments) }}
 - admissionReviewVersions:
     - v1beta1
     - v1
@@ -354,6 +355,7 @@ webhooks:
       resources:
         - trafficpermissions
   sideEffects: None
+{{- end }}
 {{- end }}
 - admissionReviewVersions:
   - v1beta1
