@@ -12,7 +12,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
+	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -60,11 +60,7 @@ func TestReconcile_CreateWorkloadIdentity(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "default",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -89,11 +85,7 @@ func TestReconcile_CreateWorkloadIdentity(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -118,11 +110,7 @@ func TestReconcile_CreateWorkloadIdentity(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -137,11 +125,7 @@ func TestReconcile_CreateWorkloadIdentity(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -176,11 +160,7 @@ func TestReconcile_DeleteWorkloadIdentity(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -206,11 +186,7 @@ func TestReconcile_DeleteWorkloadIdentity(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,

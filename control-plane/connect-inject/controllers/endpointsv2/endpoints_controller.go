@@ -11,6 +11,9 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,10 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/go-multierror"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -297,11 +296,7 @@ func (r *Controller) getServiceResource(svc *pbcatalog.Service, name, namespace,
 func getServiceID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "catalog",
-			GroupVersion: "v1alpha1",
-			Kind:         "Service",
-		},
+		Type: pbcatalog.ServiceType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,

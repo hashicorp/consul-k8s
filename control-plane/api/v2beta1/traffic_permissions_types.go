@@ -1,14 +1,14 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package v2alpha1
+package v2beta1
 
 import (
 	"fmt"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
+	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
@@ -198,11 +198,7 @@ type ExcludePermissionRule struct {
 func (in *TrafficPermissions) ResourceID(namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: in.Name,
-		Type: &pbresource.Type{
-			Group:        "auth",
-			GroupVersion: "v1alpha1",
-			Kind:         "TrafficPermissions",
-		},
+		Type: pbauth.TrafficPermissionsType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,

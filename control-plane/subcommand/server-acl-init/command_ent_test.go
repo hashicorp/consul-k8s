@@ -15,9 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -26,6 +23,10 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 // Test the auth method and acl binding rule created when namespaces are enabled

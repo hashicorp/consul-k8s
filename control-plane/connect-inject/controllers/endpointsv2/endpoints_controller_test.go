@@ -11,6 +11,10 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -23,11 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/consul/sdk/testutil"
-	"github.com/hashicorp/go-uuid"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -114,14 +113,10 @@ func TestReconcile_CreateService(t *testing.T) {
 		//		}
 		//		return []runtime.Object{endpoints, service}
 		//	},
-		//	expectedResource: &pbresource.MeshConfig{
+		//	expectedResource: &pbresource.Resource{
 		//		Id: &pbresource.ID{
 		//			Name: "service-created",
-		//			Type: &pbresource.Type{
-		//				Group:        "catalog",
-		//				GroupVersion: "v1alpha1",
-		//				Kind:         "Service",
-		//			},
+		//			Type: pbcatalog.ServiceType,
 		//			Tenancy: &pbresource.Tenancy{
 		//				Namespace: constants.DefaultConsulNS,
 		//				Partition: constants.DefaultConsulPartition,
@@ -231,11 +226,7 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -325,11 +316,7 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -429,11 +416,7 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -542,11 +525,7 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -705,11 +684,7 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -813,11 +788,7 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -907,11 +878,7 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -1048,11 +1015,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -1090,11 +1053,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -1192,11 +1151,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-updated",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -1238,11 +1193,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-updated",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -1295,11 +1246,7 @@ func TestReconcile_DeleteService(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,

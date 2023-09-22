@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 func TestAgentRules(t *testing.T) {

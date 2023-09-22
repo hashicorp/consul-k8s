@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package v2alpha1
+package v2beta1
 
 import (
 	"context"
@@ -35,7 +35,7 @@ var _ common.MeshConfigLister = &TrafficPermissionsWebhook{}
 //
 // NOTE: The below line cannot be combined with any other comment. If it is it will break the code generation.
 //
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v2alpha1-trafficpermissions,mutating=true,failurePolicy=fail,groups=auth.consul.hashicorp.com,resources=trafficpermissions,versions=v2alpha1,name=mutate-trafficpermissions.auth.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v2beta1-trafficpermissions,mutating=true,failurePolicy=fail,groups=auth.consul.hashicorp.com,resources=trafficpermissions,versions=v2beta1,name=mutate-trafficpermissions.auth.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
 func (v *TrafficPermissionsWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var resource TrafficPermissions

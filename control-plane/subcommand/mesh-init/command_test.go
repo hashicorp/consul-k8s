@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -315,11 +315,7 @@ func loadResource(t *testing.T, client pbresource.ResourceServiceClient, id *pbr
 func getWorkloadID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "catalog",
-			GroupVersion: "v1alpha1",
-			Kind:         "Workload",
-		},
+		Type: pbcatalog.WorkloadType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
@@ -360,11 +356,7 @@ func getWorkload() *pbcatalog.Workload {
 func getProxyConfigurationID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "mesh",
-			GroupVersion: "v1alpha1",
-			Kind:         "ProxyConfiguration",
-		},
+		Type: pbmesh.ProxyConfigurationType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,

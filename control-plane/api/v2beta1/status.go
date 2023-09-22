@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package v2alpha1
+package v2beta1
 
 import (
 	corev1 "k8s.io/api/core/v1"

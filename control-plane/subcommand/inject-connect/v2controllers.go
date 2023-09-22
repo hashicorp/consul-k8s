@@ -6,14 +6,13 @@ package connectinject
 import (
 	"context"
 
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v2alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/config-entries/controllersv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpointsv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
@@ -185,8 +184,8 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 			LogJSON:                      c.flagLogJSON,
 		}})
 
-	mgr.GetWebhookServer().Register("/mutate-v2alpha1-trafficpermissions",
-		&ctrlRuntimeWebhook.Admission{Handler: &v2alpha1.TrafficPermissionsWebhook{
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-trafficpermissions",
+		&ctrlRuntimeWebhook.Admission{Handler: &v2beta1.TrafficPermissionsWebhook{
 			Client:              mgr.GetClient(),
 			Logger:              ctrl.Log.WithName("webhooks").WithName(common.TrafficPermissions),
 			ConsulTenancyConfig: consulTenancyConfig,

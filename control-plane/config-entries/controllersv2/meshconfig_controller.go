@@ -265,7 +265,7 @@ func (r *MeshConfigController) syncUnknownWithError(ctx context.Context,
 	return ctrl.Result{}, err
 }
 
-// isNotFoundErr checks the grpc response code for "NotFound"
+// isNotFoundErr checks the grpc response code for "NotFound".
 func isNotFoundErr(err error) bool {
 	if err == nil {
 		return false

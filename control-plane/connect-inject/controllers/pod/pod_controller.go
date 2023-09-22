@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/protobuf/proto"
@@ -633,7 +633,7 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 
 	upstream := pbmesh.Upstream{
 		DestinationRef: &pbresource.Reference{
-			Type: upstreamReferenceType(),
+			Type: pbcatalog.ServiceType,
 			Tenancy: &pbresource.Tenancy{
 				Partition: getDefaultConsulPartition(partition),
 				Namespace: getDefaultConsulNamespace(namespace),
@@ -698,7 +698,7 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 	if port > 0 {
 		upstream = pbmesh.Upstream{
 			DestinationRef: &pbresource.Reference{
-				Type: upstreamReferenceType(),
+				Type: pbcatalog.ServiceType,
 				Tenancy: &pbresource.Tenancy{
 					Partition: getDefaultConsulPartition(partition),
 					Namespace: getDefaultConsulNamespace(namespace),
@@ -833,11 +833,7 @@ func getHealthStatusReason(state pbcatalog.Health, pod corev1.Pod) string {
 func getWorkloadID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "catalog",
-			GroupVersion: "v1alpha1",
-			Kind:         "Workload",
-		},
+		Type: pbcatalog.WorkloadType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
@@ -852,11 +848,7 @@ func getWorkloadID(name, namespace, partition string) *pbresource.ID {
 func getProxyConfigurationID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "mesh",
-			GroupVersion: "v1alpha1",
-			Kind:         "ProxyConfiguration",
-		},
+		Type: pbmesh.ProxyConfigurationType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
@@ -871,11 +863,7 @@ func getProxyConfigurationID(name, namespace, partition string) *pbresource.ID {
 func getHealthStatusID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "catalog",
-			GroupVersion: "v1alpha1",
-			Kind:         "HealthStatus",
-		},
+		Type: pbcatalog.HealthStatusType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
@@ -890,11 +878,7 @@ func getHealthStatusID(name, namespace, partition string) *pbresource.ID {
 func getUpstreamsID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "mesh",
-			GroupVersion: "v1alpha1",
-			Kind:         "Upstreams",
-		},
+		Type: pbmesh.UpstreamsType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
@@ -903,14 +887,6 @@ func getUpstreamsID(name, namespace, partition string) *pbresource.ID {
 			// At a future point, this will move out of the Tenancy block.
 			PeerName: constants.DefaultConsulPeer,
 		},
-	}
-}
-
-func upstreamReferenceType() *pbresource.Type {
-	return &pbresource.Type{
-		Group:        "catalog",
-		GroupVersion: "v1alpha1",
-		Kind:         "Service",
 	}
 }
 

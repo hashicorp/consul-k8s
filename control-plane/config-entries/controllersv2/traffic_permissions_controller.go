@@ -12,7 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	consulv2alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v2alpha1"
+	consulv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/v2beta1"
 )
 
 // TrafficPermissionsController reconciles a TrafficPermissions object.
@@ -27,7 +27,7 @@ type TrafficPermissionsController struct {
 // +kubebuilder:rbac:groups=auth.consul.hashicorp.com,resources=trafficpermissions/status,verbs=get;update;patch
 
 func (r *TrafficPermissionsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.MeshConfigController.ReconcileEntry(ctx, r, req, &consulv2alpha1.TrafficPermissions{})
+	return r.MeshConfigController.ReconcileEntry(ctx, r, req, &consulv2beta1.TrafficPermissions{})
 }
 
 func (r *TrafficPermissionsController) Logger(name types.NamespacedName) logr.Logger {
@@ -39,5 +39,5 @@ func (r *TrafficPermissionsController) UpdateStatus(ctx context.Context, obj cli
 }
 
 func (r *TrafficPermissionsController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &consulv2alpha1.TrafficPermissions{}, r)
+	return setupWithManager(mgr, &consulv2beta1.TrafficPermissions{}, r)
 }

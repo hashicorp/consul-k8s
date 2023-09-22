@@ -179,7 +179,7 @@ Usage: consul-k8s-control-plane gateway-cleanup [options]
   Deletes installed gateway class and gateway class config objects
 	prior to helm uninstallation. This is required due to finalizers
 	existing on the GatewayClassConfig that will leave around a dangling
-	object without deleting these prior to their config-entries being deleted.
+	object without deleting these prior to their controllers being deleted.
 	The job is best effort, so if it fails to successfully delete the
 	objects, it will allow the uninstallation to continue.
 

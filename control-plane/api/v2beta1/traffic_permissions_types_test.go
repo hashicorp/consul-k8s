@@ -1,15 +1,15 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package v2alpha1
+package v2beta1
 
 import (
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -305,11 +305,7 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 			ResourceOverride: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "name",
-					Type: &pbresource.Type{
-						Group:        "mesh",
-						GroupVersion: "v1alpha1",
-						Kind:         "ProxyConfiguration",
-					},
+					Type: pbmesh.ProxyConfigurationType,
 					Tenancy: &pbresource.Tenancy{
 						Partition: constants.DefaultConsulNS,
 						Namespace: constants.DefaultConsulPartition,
@@ -336,7 +332,7 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 	}
 }
 
-// TestTrafficPermissions_Resource also includes test to verify ResourceID()
+// TestTrafficPermissions_Resource also includes test to verify ResourceID().
 func TestTrafficPermissions_Resource(t *testing.T) {
 	cases := map[string]struct {
 		Ours            TrafficPermissions
@@ -776,11 +772,7 @@ func constructTrafficPermissionResource(tp *pbauth.TrafficPermissions, name, nam
 
 	id := &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "auth",
-			GroupVersion: "v1alpha1",
-			Kind:         "TrafficPermissions",
-		},
+		Type: pbauth.TrafficPermissionsType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,

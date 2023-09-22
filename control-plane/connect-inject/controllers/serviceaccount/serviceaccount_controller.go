@@ -7,16 +7,15 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	auth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/go-multierror"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -125,7 +124,7 @@ func (r *Controller) getWorkloadIdentityResource(name, namespace, partition stri
 	return &pbresource.Resource{
 		Id: getWorkloadIdentityID(name, namespace, partition),
 		// WorkloadIdentity is currently an empty message.
-		Data:     inject.ToProtoAny(&auth.WorkloadIdentity{}),
+		Data:     inject.ToProtoAny(&pbauth.WorkloadIdentity{}),
 		Metadata: meta,
 	}
 }
@@ -133,11 +132,7 @@ func (r *Controller) getWorkloadIdentityResource(name, namespace, partition stri
 func getWorkloadIdentityID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "auth",
-			GroupVersion: "v1alpha1",
-			Kind:         "WorkloadIdentity",
-		},
+		Type: pbauth.WorkloadIdentityType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,

@@ -7,11 +7,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	apiv1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 const SecretsBackendTypeKubernetes SecretsBackendType = "kubernetes"

@@ -12,7 +12,7 @@ import (
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
-	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
+	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -28,7 +28,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v2alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -51,19 +51,19 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 	}{
 		{
 			name: "TrafficPermissions",
-			meshConfig: &v2alpha1.TrafficPermissions{
+			meshConfig: &v2beta1.TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-traffic-permission",
 					Namespace: metav1.NamespaceDefault,
 				},
-				Spec: v2alpha1.TrafficPermissionsSpec{
-					Destination: &v2alpha1.Destination{
+				Spec: v2beta1.TrafficPermissionsSpec{
+					Destination: &v2beta1.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: v2alpha1.ActionAllow,
-					Permissions: v2alpha1.Permissions{
+					Action: v2beta1.ActionAllow,
+					Permissions: v2beta1.Permissions{
 						{
-							Sources: v2alpha1.Sources{
+							Sources: v2beta1.Sources{
 								{
 									Namespace: "the space namespace space",
 								},
@@ -71,7 +71,7 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: v2alpha1.DestinationRules{
+							DestinationRules: v2beta1.DestinationRules{
 								{
 									PathExact: "/hello",
 									Methods:   []string{"GET", "POST"},
@@ -132,7 +132,7 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v2alpha1.AuthGroupVersion, c.meshConfig)
+			s.AddKnownTypes(v2beta1.AuthGroupVersion, c.meshConfig)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.meshConfig).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
@@ -187,19 +187,19 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 	}{
 		{
 			name: "TrafficPermissions",
-			meshConfig: &v2alpha1.TrafficPermissions{
+			meshConfig: &v2beta1.TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-traffic-permission",
 					Namespace: metav1.NamespaceDefault,
 				},
-				Spec: v2alpha1.TrafficPermissionsSpec{
-					Destination: &v2alpha1.Destination{
+				Spec: v2beta1.TrafficPermissionsSpec{
+					Destination: &v2beta1.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: v2alpha1.ActionAllow,
-					Permissions: v2alpha1.Permissions{
+					Action: v2beta1.ActionAllow,
+					Permissions: v2beta1.Permissions{
 						{
-							Sources: v2alpha1.Sources{
+							Sources: v2beta1.Sources{
 								{
 									Namespace: "the space namespace space",
 								},
@@ -207,7 +207,7 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: v2alpha1.DestinationRules{
+							DestinationRules: v2beta1.DestinationRules{
 								{
 									PathExact: "/hello",
 									Methods:   []string{"GET", "POST"},
@@ -251,7 +251,7 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 				}
 			},
 			updateF: func(resource common.MeshConfig) {
-				trafficPermissions := resource.(*v2alpha1.TrafficPermissions)
+				trafficPermissions := resource.(*v2beta1.TrafficPermissions)
 				trafficPermissions.Spec.Action = "deny"
 				trafficPermissions.Spec.Permissions[0].Sources = trafficPermissions.Spec.Permissions[0].Sources[:1]
 			},
@@ -334,21 +334,21 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 	}{
 		{
 			name: "TrafficPermissions",
-			MeshConfigWithDeletion: &v2alpha1.TrafficPermissions{
+			MeshConfigWithDeletion: &v2beta1.TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-name",
 					Namespace:         metav1.NamespaceDefault,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v2alpha1.TrafficPermissionsSpec{
-					Destination: &v2alpha1.Destination{
+				Spec: v2beta1.TrafficPermissionsSpec{
+					Destination: &v2beta1.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: v2alpha1.ActionAllow,
-					Permissions: v2alpha1.Permissions{
+					Action: v2beta1.ActionAllow,
+					Permissions: v2beta1.Permissions{
 						{
-							Sources: v2alpha1.Sources{
+							Sources: v2beta1.Sources{
 								{
 									Namespace: "the space namespace space",
 								},
@@ -356,7 +356,7 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: v2alpha1.DestinationRules{
+							DestinationRules: v2beta1.DestinationRules{
 								{
 									PathExact: "/hello",
 									Methods:   []string{"GET", "POST"},
@@ -385,7 +385,7 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v2alpha1.AuthGroupVersion, c.MeshConfigWithDeletion)
+			s.AddKnownTypes(v2beta1.AuthGroupVersion, c.MeshConfigWithDeletion)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.MeshConfigWithDeletion).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
@@ -431,19 +431,19 @@ func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 
 	req := require.New(t)
 	ctx := context.Background()
-	trafficpermissions := &v2alpha1.TrafficPermissions{
+	trafficpermissions := &v2beta1.TrafficPermissions{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: v2alpha1.TrafficPermissionsSpec{
-			Destination: &v2alpha1.Destination{
+		Spec: v2beta1.TrafficPermissionsSpec{
+			Destination: &v2beta1.Destination{
 				IdentityName: "destination-identity",
 			},
-			Action: v2alpha1.ActionAllow,
-			Permissions: v2alpha1.Permissions{
+			Action: v2beta1.ActionAllow,
+			Permissions: v2beta1.Permissions{
 				{
-					Sources: v2alpha1.Sources{
+					Sources: v2beta1.Sources{
 						{
 							IdentityName: "source-identity",
 						},
@@ -454,7 +454,7 @@ func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 	}
 
 	s := runtime.NewScheme()
-	s.AddKnownTypes(v2alpha1.AuthGroupVersion, trafficpermissions)
+	s.AddKnownTypes(v2beta1.AuthGroupVersion, trafficpermissions)
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissions).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
@@ -507,19 +507,19 @@ func TestMeshConfigController_setsSyncedToTrue(t *testing.T) {
 	ctx := context.Background()
 	s := runtime.NewScheme()
 
-	trafficpermissions := &v2alpha1.TrafficPermissions{
+	trafficpermissions := &v2beta1.TrafficPermissions{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: v2alpha1.TrafficPermissionsSpec{
-			Destination: &v2alpha1.Destination{
+		Spec: v2beta1.TrafficPermissionsSpec{
+			Destination: &v2beta1.Destination{
 				IdentityName: "destination-identity",
 			},
-			Action: v2alpha1.ActionAllow,
-			Permissions: v2alpha1.Permissions{
+			Action: v2beta1.ActionAllow,
+			Permissions: v2beta1.Permissions{
 				{
-					Sources: v2alpha1.Sources{
+					Sources: v2beta1.Sources{
 						{
 							IdentityName: "source-identity",
 						},
@@ -527,16 +527,16 @@ func TestMeshConfigController_setsSyncedToTrue(t *testing.T) {
 				},
 			},
 		},
-		Status: v2alpha1.Status{
-			Conditions: v2alpha1.Conditions{
+		Status: v2beta1.Status{
+			Conditions: v2beta1.Conditions{
 				{
-					Type:   v2alpha1.ConditionSynced,
+					Type:   v2beta1.ConditionSynced,
 					Status: corev1.ConditionUnknown,
 				},
 			},
 		},
 	}
-	s.AddKnownTypes(v2alpha1.AuthGroupVersion, trafficpermissions)
+	s.AddKnownTypes(v2beta1.AuthGroupVersion, trafficpermissions)
 
 	// The config entry exists in kube but its status will be nil.
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissions).Build()
@@ -589,19 +589,19 @@ func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
 	ctx := context.Background()
 
 	s := runtime.NewScheme()
-	trafficpermissions := &v2alpha1.TrafficPermissions{
+	trafficpermissions := &v2beta1.TrafficPermissions{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: v2alpha1.TrafficPermissionsSpec{
-			Destination: &v2alpha1.Destination{
+		Spec: v2beta1.TrafficPermissionsSpec{
+			Destination: &v2beta1.Destination{
 				IdentityName: "destination-identity",
 			},
-			Action: v2alpha1.ActionAllow,
-			Permissions: v2alpha1.Permissions{
+			Action: v2beta1.ActionAllow,
+			Permissions: v2beta1.Permissions{
 				{
-					Sources: v2alpha1.Sources{
+					Sources: v2beta1.Sources{
 						{
 							IdentityName: "source-identity",
 						},
@@ -610,7 +610,7 @@ func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
 			},
 		},
 	}
-	s.AddKnownTypes(v2alpha1.AuthGroupVersion, trafficpermissions)
+	s.AddKnownTypes(v2beta1.AuthGroupVersion, trafficpermissions)
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissions).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
@@ -687,21 +687,21 @@ func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
 	ctx := context.Background()
 	s := runtime.NewScheme()
 
-	trafficpermissionsWithDeletion := &v2alpha1.TrafficPermissions{
+	trafficpermissionsWithDeletion := &v2beta1.TrafficPermissions{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "foo",
 			Namespace:         metav1.NamespaceDefault,
 			DeletionTimestamp: &metav1.Time{Time: time.Now()},
 			Finalizers:        []string{FinalizerName},
 		},
-		Spec: v2alpha1.TrafficPermissionsSpec{
-			Destination: &v2alpha1.Destination{
+		Spec: v2beta1.TrafficPermissionsSpec{
+			Destination: &v2beta1.Destination{
 				IdentityName: "destination-identity",
 			},
-			Action: v2alpha1.ActionAllow,
-			Permissions: v2alpha1.Permissions{
+			Action: v2beta1.ActionAllow,
+			Permissions: v2beta1.Permissions{
 				{
-					Sources: v2alpha1.Sources{
+					Sources: v2beta1.Sources{
 						{
 							IdentityName: "source-identity",
 						},
@@ -710,7 +710,7 @@ func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
 			},
 		},
 	}
-	s.AddKnownTypes(v2alpha1.AuthGroupVersion, trafficpermissionsWithDeletion)
+	s.AddKnownTypes(v2beta1.AuthGroupVersion, trafficpermissionsWithDeletion)
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissionsWithDeletion).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
@@ -765,7 +765,7 @@ func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
 		require.Equal(t, "", diff, "TrafficPermissions do not match")
 
 		// Check that the resource is deleted from cluster.
-		tp := &v2alpha1.TrafficPermissions{}
+		tp := &v2beta1.TrafficPermissions{}
 		_ = fakeClient.Get(ctx, namespacedName, tp)
 		require.Empty(t, tp.Finalizers())
 	}

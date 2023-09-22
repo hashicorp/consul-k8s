@@ -19,7 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -534,11 +534,7 @@ func Test_ConsulNamespaceIsNotFound_ErrorMsg(t *testing.T) {
 
 	id := &pbresource.ID{
 		Name: "foo",
-		Type: &pbresource.Type{
-			Group:        "catalog",
-			GroupVersion: "v1alpha1",
-			Kind:         "Workload",
-		},
+		Type: pbcatalog.WorkloadType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: constants.DefaultConsulPartition,
 			Namespace: "i-dont-exist-but-its-ok-we-will-meet-again-someday",
