@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetDefaultConsulNamespace(t *testing.T) {
+func TestGetNormalizedConsulNamespace(t *testing.T) {
 	tests := []struct {
 		name   string
 		value  string
@@ -34,7 +34,7 @@ func TestGetDefaultConsulNamespace(t *testing.T) {
 	}
 }
 
-func TestGetDefaultConsulPartition(t *testing.T) {
+func TestGetNormalizedConsulPartition(t *testing.T) {
 	tests := []struct {
 		name   string
 		value  string
@@ -59,7 +59,7 @@ func TestGetDefaultConsulPartition(t *testing.T) {
 	}
 }
 
-func TestGetDefaultConsulPeer(t *testing.T) {
+func TestGetNormalizedConsulPeer(t *testing.T) {
 	tests := []struct {
 		name   string
 		value  string
