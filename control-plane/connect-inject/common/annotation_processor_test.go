@@ -9,8 +9,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/api"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -46,7 +46,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -83,7 +83,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//				Type: UpstreamReferenceType(),
+			//				Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -120,7 +120,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -157,7 +157,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			// 			    Type: UpstreamReferenceType(),
+			// 			    Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
@@ -192,7 +192,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "part1",
 								Namespace: "ns1",
@@ -229,7 +229,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
@@ -264,7 +264,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: "ns1",
@@ -283,7 +283,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -302,7 +302,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
@@ -339,7 +339,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
@@ -358,7 +358,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -377,7 +377,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
@@ -396,7 +396,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
@@ -561,7 +561,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: "ns1",
@@ -580,7 +580,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -599,7 +599,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
@@ -634,7 +634,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -669,7 +669,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: "foo",
@@ -704,7 +704,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "bar",
 								Namespace: "foo",
@@ -739,7 +739,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -758,7 +758,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: UpstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -801,7 +801,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -820,7 +820,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "bar",
@@ -839,7 +839,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: "baz",
 			//					Namespace: "foo",
@@ -882,7 +882,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: constants.GetNormalizedConsulNamespace(""),
@@ -901,7 +901,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "bar",
@@ -920,7 +920,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: UpstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "foo",
@@ -957,16 +957,6 @@ func TestProcessUpstreams(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestUpstreamRefrenceType(t *testing.T) {
-	expect := &pbresource.Type{
-		Group:        "catalog",
-		GroupVersion: "v1alpha1",
-		Kind:         "Service",
-	}
-	actual := UpstreamReferenceType()
-	require.Equal(t, actual, expect)
 }
 
 // createPod creates a multi-port pod as a base for tests.

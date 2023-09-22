@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -169,7 +169,7 @@ func processPodLabeledUpstream(pod corev1.Pod, rawUpstream string, enablePartiti
 
 	upstream := pbmesh.Upstream{
 		DestinationRef: &pbresource.Reference{
-			Type: UpstreamReferenceType(),
+			Type: pbcatalog.ServiceType,
 			Tenancy: &pbresource.Tenancy{
 				Partition: constants.GetNormalizedConsulPartition(partition),
 				Namespace: constants.GetNormalizedConsulNamespace(namespace),
@@ -239,7 +239,7 @@ func processPodUnlabeledUpstream(pod corev1.Pod, rawUpstream string, enableParti
 	if port > 0 {
 		upstream = pbmesh.Upstream{
 			DestinationRef: &pbresource.Reference{
-				Type: UpstreamReferenceType(),
+				Type: pbcatalog.ServiceType,
 				Tenancy: &pbresource.Tenancy{
 					Partition: constants.GetNormalizedConsulPartition(partition),
 					Namespace: constants.GetNormalizedConsulNamespace(namespace),
@@ -258,12 +258,4 @@ func processPodUnlabeledUpstream(pod corev1.Pod, rawUpstream string, enableParti
 		}
 	}
 	return &upstream, nil
-}
-
-func UpstreamReferenceType() *pbresource.Type {
-	return &pbresource.Type{
-		Group:        "catalog",
-		GroupVersion: "v1alpha1",
-		Kind:         "Service",
-	}
 }
