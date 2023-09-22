@@ -171,7 +171,6 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 	}
 }
 
-// DONE
 func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 	t.Parallel()
 
@@ -322,7 +321,6 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 	}
 }
 
-// DONE
 func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 	t.Parallel()
 
@@ -424,7 +422,6 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 	}
 }
 
-// DONE
 func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 	t.Parallel()
 
@@ -498,7 +495,6 @@ func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 	req.Contains(errMsg, expErr)
 }
 
-// DONE
 // TestMeshConfigController_setsSyncedToTrue tests that if the resource hasn't changed in
 // Consul but our resource's synced status isn't set to true, then we update its status.
 func TestMeshConfigController_setsSyncedToTrue(t *testing.T) {
@@ -581,7 +577,6 @@ func TestMeshConfigController_setsSyncedToTrue(t *testing.T) {
 	require.Equal(t, corev1.ConditionTrue, trafficpermissions.SyncedConditionStatus())
 }
 
-// DONE
 // TestMeshConfigController_doesNotCreateUnownedMeshConfig test that if the resource
 // exists in Consul but is not managed by the controller, creating/updating the resource fails.
 func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
