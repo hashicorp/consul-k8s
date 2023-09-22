@@ -31,6 +31,7 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -155,10 +156,15 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
+
+	// V2 resources
+	utilruntime.Must(v2beta1.AddAuthToScheme(scheme))
+
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -381,8 +387,8 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	//Right now we exclusively start controllers for V1 or V2.
-	//In the future we might add a flag to pick and choose from both.
+	// Right now we exclusively start controllers for V1 or V2.
+	// In the future we might add a flag to pick and choose from both.
 	if c.flagResourceAPIs {
 		err = c.configureV2Controllers(ctx, mgr, watcher)
 	} else {

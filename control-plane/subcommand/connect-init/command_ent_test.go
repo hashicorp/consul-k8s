@@ -12,11 +12,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 func TestRun_WithNamespaces(t *testing.T) {

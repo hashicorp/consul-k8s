@@ -27,6 +27,26 @@ rules:
   verbs:
   - get
 - apiGroups:
+  - auth.consul.hashicorp.com
+  resources:
+  - trafficpermissions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - auth.consul.hashicorp.com
+  resources:
+  - trafficpermissions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - consul.hashicorp.com
   resources:
   - controlplanerequestlimits

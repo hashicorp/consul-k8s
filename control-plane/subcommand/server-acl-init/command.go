@@ -16,11 +16,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
@@ -31,6 +26,12 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 type Command struct {

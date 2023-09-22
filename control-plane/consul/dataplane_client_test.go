@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package consul
 
 import (
@@ -7,9 +10,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbdataplane"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-hclog"
@@ -109,11 +112,7 @@ func createWorkload(t *testing.T, watcher ServerConnectionManager, name string) 
 
 	id := &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "catalog",
-			GroupVersion: "v1alpha1",
-			Kind:         "Workload",
-		},
+		Type: pbcatalog.WorkloadType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: "default",
 			Namespace: "default",
@@ -154,11 +153,7 @@ func createProxyConfiguration(t *testing.T, watcher ServerConnectionManager, nam
 
 	id := &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "mesh",
-			GroupVersion: "v1alpha1",
-			Kind:         "ProxyConfiguration",
-		},
+		Type: pbmesh.ProxyConfigurationType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: "default",
 			Namespace: "default",

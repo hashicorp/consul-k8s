@@ -13,12 +13,13 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/go-logr/logr"
-	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 )
 
 const (

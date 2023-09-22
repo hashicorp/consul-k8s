@@ -5,13 +5,14 @@ package serviceaccount
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
-	"testing"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
+	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -58,11 +60,7 @@ func TestReconcile_CreateWorkloadIdentity(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "default",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -87,11 +85,7 @@ func TestReconcile_CreateWorkloadIdentity(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -116,11 +110,7 @@ func TestReconcile_CreateWorkloadIdentity(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -135,11 +125,7 @@ func TestReconcile_CreateWorkloadIdentity(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -174,11 +160,7 @@ func TestReconcile_DeleteWorkloadIdentity(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -204,11 +186,7 @@ func TestReconcile_DeleteWorkloadIdentity(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "my-svc-account",
-					Type: &pbresource.Type{
-						Group:        "auth",
-						GroupVersion: "v1alpha1",
-						Kind:         "WorkloadIdentity",
-					},
+					Type: pbauth.WorkloadIdentityType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
@@ -333,7 +311,7 @@ func expectedWorkloadIdentityMatches(t *testing.T, client pbresource.ResourceSer
 // getWorkloadIdentityData returns a WorkloadIdentity resource payload.
 // This function takes no arguments because WorkloadIdentity is currently an empty proto message.
 func getWorkloadIdentityData() *anypb.Any {
-	return common.ToProtoAny(&pbauth.WorkloadIdentity{})
+	return inject.ToProtoAny(&pbauth.WorkloadIdentity{})
 }
 
 func createServiceAccount(name, namespace string) *corev1.ServiceAccount {

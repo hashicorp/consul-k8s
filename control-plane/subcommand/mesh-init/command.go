@@ -19,7 +19,7 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/proto-public/pbdataplane"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"

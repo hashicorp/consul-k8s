@@ -14,8 +14,8 @@ import (
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/consul/api"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -32,7 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -790,7 +790,7 @@ func TestUpstreamsWrite(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: getDefaultConsulNamespace(""),
@@ -828,7 +828,7 @@ func TestUpstreamsWrite(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
@@ -864,7 +864,7 @@ func TestUpstreamsWrite(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "part1",
 								Namespace: "ns1",
@@ -911,7 +911,7 @@ func TestUpstreamsWrite(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: getDefaultConsulNamespace(""),
@@ -947,7 +947,7 @@ func TestUpstreamsWrite(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "bar",
 								Namespace: "foo",
@@ -1034,7 +1034,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: getDefaultConsulNamespace(""),
@@ -1072,7 +1072,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//				Type: upstreamReferenceType(),
+			//				Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: getDefaultConsulNamespace(""),
@@ -1110,7 +1110,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: getDefaultConsulNamespace(""),
@@ -1148,7 +1148,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			// 			    Type: upstreamReferenceType(),
+			// 			    Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
@@ -1184,7 +1184,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "part1",
 								Namespace: "ns1",
@@ -1222,7 +1222,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
@@ -1258,7 +1258,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: "ns1",
@@ -1277,7 +1277,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: getDefaultConsulNamespace(""),
@@ -1296,7 +1296,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
@@ -1334,7 +1334,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
@@ -1353,7 +1353,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: getDefaultConsulNamespace(""),
@@ -1372,7 +1372,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
@@ -1391,7 +1391,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "ns1",
@@ -1570,7 +1570,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: "ns1",
@@ -1589,7 +1589,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: getDefaultConsulNamespace(""),
@@ -1608,7 +1608,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
@@ -1644,7 +1644,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: getDefaultConsulNamespace(""),
@@ -1680,7 +1680,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: "foo",
@@ -1716,7 +1716,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "bar",
 								Namespace: "foo",
@@ -1752,7 +1752,7 @@ func TestProcessUpstreams(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: getDefaultConsulNamespace(""),
@@ -1771,7 +1771,7 @@ func TestProcessUpstreams(t *testing.T) {
 					},
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: getDefaultConsulNamespace(""),
@@ -1815,7 +1815,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: getDefaultConsulNamespace(""),
@@ -1834,7 +1834,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "bar",
@@ -1853,7 +1853,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: "baz",
 			//					Namespace: "foo",
@@ -1897,7 +1897,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//	Upstreams: []*pbmesh.Upstream{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: getDefaultConsulNamespace(""),
@@ -1916,7 +1916,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "bar",
@@ -1935,7 +1935,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//		},
 			//		{
 			//			DestinationRef: &pbresource.Reference{
-			//              Type: upstreamReferenceType(),
+			//              Type: pbcatalog.ServiceType,
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: getDefaultConsulPartition(""),
 			//					Namespace: "foo",
@@ -2013,7 +2013,7 @@ func TestUpstreamsDelete(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: getDefaultConsulPartition(""),
 								Namespace: getDefaultConsulNamespace(""),
@@ -2503,7 +2503,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 				Upstreams: []*pbmesh.Upstream{
 					{
 						DestinationRef: &pbresource.Reference{
-							Type: upstreamReferenceType(),
+							Type: pbcatalog.ServiceType,
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
@@ -2858,7 +2858,7 @@ func createUpstreams() *pbmesh.Upstreams {
 		Upstreams: []*pbmesh.Upstream{
 			{
 				DestinationRef: &pbresource.Reference{
-					Type: upstreamReferenceType(),
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Partition: getDefaultConsulPartition(""),
 						Namespace: getDefaultConsulNamespace(""),

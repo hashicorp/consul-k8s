@@ -5,7 +5,11 @@ package serviceaccount
 
 import (
 	"context"
+
 	"github.com/go-logr/logr"
+	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -13,13 +17,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	auth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/go-multierror"
 )
 
 type Controller struct {
@@ -54,7 +56,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var serviceAccount corev1.ServiceAccount
 
 	// Ignore the request if the namespace of the service account is not allowed.
-	if common.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
+	if inject.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
 		return ctrl.Result{}, nil
 	}
 
@@ -122,7 +124,7 @@ func (r *Controller) getWorkloadIdentityResource(name, namespace, partition stri
 	return &pbresource.Resource{
 		Id: getWorkloadIdentityID(name, namespace, partition),
 		// WorkloadIdentity is currently an empty message.
-		Data:     common.ToProtoAny(&auth.WorkloadIdentity{}),
+		Data:     inject.ToProtoAny(&pbauth.WorkloadIdentity{}),
 		Metadata: meta,
 	}
 }
@@ -130,11 +132,7 @@ func (r *Controller) getWorkloadIdentityResource(name, namespace, partition stri
 func getWorkloadIdentityID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "auth",
-			GroupVersion: "v1alpha1",
-			Kind:         "WorkloadIdentity",
-		},
+		Type: pbauth.WorkloadIdentityType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,

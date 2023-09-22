@@ -11,6 +11,10 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,12 +28,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/consul/sdk/testutil"
-	"github.com/hashicorp/go-uuid"
-
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -116,11 +116,7 @@ func TestReconcile_CreateService(t *testing.T) {
 		//	expectedResource: &pbresource.Resource{
 		//		Id: &pbresource.ID{
 		//			Name: "service-created",
-		//			Type: &pbresource.Type{
-		//				Group:        "catalog",
-		//				GroupVersion: "v1alpha1",
-		//				Kind:         "Service",
-		//			},
+		//			Type: pbcatalog.ServiceType,
 		//			Tenancy: &pbresource.Tenancy{
 		//				Namespace: constants.DefaultConsulNS,
 		//				Partition: constants.DefaultConsulPartition,
@@ -230,17 +226,13 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -324,17 +316,13 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -428,17 +416,13 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -541,17 +525,13 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -704,17 +684,13 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -812,17 +788,13 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -906,17 +878,13 @@ func TestReconcile_CreateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1047,17 +1015,13 @@ func TestReconcile_UpdateService(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1089,17 +1053,13 @@ func TestReconcile_UpdateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1191,17 +1151,13 @@ func TestReconcile_UpdateService(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-updated",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1237,17 +1193,13 @@ func TestReconcile_UpdateService(t *testing.T) {
 			expectedResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-updated",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1294,17 +1246,13 @@ func TestReconcile_DeleteService(t *testing.T) {
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: "service-created",
-					Type: &pbresource.Type{
-						Group:        "catalog",
-						GroupVersion: "v1alpha1",
-						Kind:         "Service",
-					},
+					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
 						Partition: constants.DefaultConsulPartition,
 					},
 				},
-				Data: common.ToProtoAny(&pbcatalog.Service{
+				Data: inject.ToProtoAny(&pbcatalog.Service{
 					Ports: []*pbcatalog.ServicePort{
 						{
 							VirtualPort: 8080,
@@ -1675,5 +1623,5 @@ func randomKubernetesId() string {
 
 func removeMeshInjectStatus(t *testing.T, pod *corev1.Pod) {
 	delete(pod.Annotations, constants.KeyMeshInjectStatus)
-	require.False(t, common.HasBeenMeshInjected(*pod))
+	require.False(t, inject.HasBeenMeshInjected(*pod))
 }

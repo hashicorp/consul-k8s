@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -16,8 +17,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )

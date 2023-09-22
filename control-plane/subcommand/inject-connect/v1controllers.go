@@ -17,12 +17,12 @@ import (
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/config-entries/controllers"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
-	"github.com/hashicorp/consul-k8s/control-plane/controllers"
 	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
