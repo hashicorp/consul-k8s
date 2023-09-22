@@ -815,6 +815,7 @@ func getHealthStatusFromPod(pod corev1.Pod) pbcatalog.Health {
 			return pbcatalog.Health_HEALTH_PASSING
 		}
 	}
+
 	return pbcatalog.Health_HEALTH_CRITICAL
 }
 
