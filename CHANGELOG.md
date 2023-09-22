@@ -1,9 +1,3 @@
-## Unplanned Release
-
-BUG FIXES:
-* Added support for disruption budget for terminating gateway, mesh gateway and api gateway. With support to configure maxUnavailable and minAvailable. [[[NET-4144](https://hashicorp.atlassian.net/browse/NET-4144)]]
-* Added support for custom gateways, with minAvailable = 1 as [maxUnavailable is not supported yet](https://kubernetes.io/docs/tasks/run-application/configure-pdb/#arbitrary-controllers-and-selectors) for custom resources. [[[NET-4144](https://hashicorp.atlassian.net/browse/NET-4144)]]
-
 ## 1.2.1 (Aug 10, 2023)
 BREAKING CHANGES:
 

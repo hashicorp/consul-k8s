@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.16.1
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.17-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -2138,7 +2138,7 @@ connectInject:
   # [injection annotation](https://developer.hashicorp.com/consul/docs/k8s/connect#consul-hashicorp-com-connect-inject)
   # to opt-in to Connect injection. If this is true, pods can use the same annotation
   # to explicitly opt-out of injection.
-  default: true
+  default: false
 
   # Configures Transparent Proxy for Consul Service mesh services.
   # Using this feature requires Consul 1.10.0-beta1+.
@@ -2272,7 +2272,7 @@ connectInject:
     # If true, then all traffic redirection setup uses the consul-cni plugin.
     # Requires connectInject.enabled to also be true.
     # @type: boolean
-    enabled: true
+    enabled: false
 
     # Log level for the installer and plugin. Overrides global.logLevel
     # @type: string
@@ -2761,11 +2761,9 @@ meshGateway:
     # the mesh gateway.
     enabled: true
 
-    # The maximum number of unavailable pods. By default, this will be
-    # automatically computed based on the `connectInject.replicas` value to be `(n/2)-1`.
-    # If you need to set this to `0`, you will need to add a
+    # The maximum number of unavailable pods. By default, minAvailable will be set to 1
+    # If you need to set this to some value, you will need to add a
     # --set 'meshGateway.disruptionBudget.maxUnavailable=0'` flag to the helm chart installation
-    # command because of a limitation in the Helm templating language.
     # @type: integer
     maxUnavailable: null
 
@@ -3127,11 +3125,9 @@ terminatingGateways:
     # the terminating gateways is enabled. To disable, set to `false`.
     enabled: true
 
-    # The maximum number of unavailable pods. By default, this will be
-    # automatically computed based on the `server.replicas` value to be `(n/2)-1`.
-    # If you need to set this to `0`, you will need to add a
-    # --set 'server.terminatingGateways.maxUnavailable=0'` flag to the helm chart installation
-    # command because of a limitation in the Helm templating language.
+    # The maximum number of unavailable pods. By default, minAvailable will be set to 1
+    # If you need to set this to some value, you will need to add a
+    # --set 'terminatingGateways.disruptionBudget.maxUnavailable=<value>'` flag to the helm chart installation
     # @type: integer
     maxUnavailable: null
 
@@ -3276,6 +3272,18 @@ apiGateway:
   # ~> **Note:** Using API Gateway <= 0.4 with external servers requires setting `client.enabled: true`.
   # @type: string
   image: null
+
+  disruptionBudget:
+    # Enables registering a PodDisruptionBudget for the apiGateway
+    # cluster. If enabled, it only registers the budget so long as
+    # the server cluster is enabled. To disable, set to `false`.
+    enabled: true
+
+    # The maximum number of unavailable pods. By default, minAvailable will be set to 1
+    # If you need to set this to some value, you will need to add a
+    # --set 'apiGateway.disruptionBudget.maxUnavailable=0'` flag to the helm chart installation
+    # @type: integer
+    maxUnavailable: null
 
   # The name (and tag) of the Envoy Docker image used for the
   # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
