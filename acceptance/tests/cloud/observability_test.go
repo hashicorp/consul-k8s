@@ -122,13 +122,6 @@ func TestObservabilityCloud(t *testing.T) {
 		"global.cloud.scadaAddress.secretKey":  scadaAddressSecretKey,
 		"connectInject.default":                "true",
 
-		// TODO: Follow up with this bug
-		"global.acls.manageSystemACLs":         "false",
-		"global.gossipEncryption.autoGenerate": "false",
-		"global.tls.enabled":                   "true",
-		"global.tls.enableAutoEncrypt":         "true",
-		// TODO: Take this out
-
 		"telemetryCollector.enabled":                   "true",
 		"telemetryCollector.image":                     cfg.ConsulCollectorImage,
 		"telemetryCollector.cloud.clientId.secretName": clientIDSecretName,
@@ -159,47 +152,52 @@ func TestObservabilityCloud(t *testing.T) {
 	t.Log("Finished deployment. Validating expected conditions now")
 
 	for name, tc := range map[string]struct {
-		refresh    *modifyTelemetryConfigBody
-		validation *validationBody
-		timeout    time.Duration
-		wait       time.Duration
+		refresh     *modifyTelemetryConfigBody
+		refreshTime int64
+		recordsPath string
+		timeout     time.Duration
+		wait        time.Duration
+		validations *metricValidations
 	}{
 		"collectorExportsMetrics": {
-			validation: &validationBody{
-				Path:                 validationPathCollector,
-				ExpectedLabelKeys:    []string{"service_name", "service_instance_id"},
-				ExpectedMetricName:   "otelcol_receiver_accepted_metric_points",
-				DisallowedMetricName: "server.memory_heap_size",
+			recordsPath: recordsPathCollector,
+			//  High timeout as Collector metrics scraped every 1 minute (https://github.com/hashicorp/consul-telemetry-collector/blob/dfdbf51b91d502a18f3b143a94ab4d50cdff10b8/internal/otel/config/helpers/receivers/prometheus_receiver.go#L54)
+			timeout: 5 * time.Minute,
+			wait:    1 * time.Second,
+			validations: &metricValidations{
+				expectedLabelKeys:    []string{"service_name", "service_instance_id"},
+				expectedMetricName:   "otelcol_receiver_accepted_metric_points",
+				disallowedMetricName: "server.memory_heap_size",
 			},
-			timeout: 1 * time.Minute,
-			wait:    10 * time.Second,
 		},
 		"consulPeriodicRefreshUpdateConfig": {
 			refresh: &modifyTelemetryConfigBody{
 				Filters: []string{"consul.state"},
 				Labels:  map[string]string{"new_label": "testLabel"},
-			}, validation: &validationBody{
-				Path:                 validationPathConsul,
-				ExpectedLabelKeys:    []string{"node_id", "node_name", "new_label"},
-				ExpectedMetricName:   "consul.state.services",
-				DisallowedMetricName: "consul.fsm",
 			},
+			recordsPath: recordsPathConsul,
 			//  High timeout as Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
 			timeout: 3 * time.Minute,
 			wait:    30 * time.Second,
+			validations: &metricValidations{
+				expectedLabelKeys:    []string{"node_id", "node_name", "new_label"},
+				expectedMetricName:   "consul.state.services",
+				disallowedMetricName: "consul.fsm",
+			},
 		},
 		"consulPeriodicRefreshDisabled": {
 			refresh: &modifyTelemetryConfigBody{
 				Filters:  []string{"consul.state"},
 				Labels:   map[string]string{"new_label": "testLabel"},
 				Disabled: true,
-			}, validation: &validationBody{
-				Path:            validationPathConsul,
-				MetricsDisabled: true,
 			},
+			recordsPath: recordsPathConsul,
 			// High timeout as Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
 			timeout: 3 * time.Minute,
 			wait:    30 * time.Second,
+			validations: &metricValidations{
+				disabled: true,
+			},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -209,14 +207,15 @@ func TestObservabilityCloud(t *testing.T) {
 				err := fsClient.modifyTelemetryConfig(tc.refresh)
 				require.NoError(t, err)
 				// Add 10 seconds (2 * periodic refresh interval in fakeserver) to allow a periodic refresh from Consul side to take place.
-				tc.validation.FilterRecordsSince = refreshTime.Add(10 * time.Second).UnixNano()
+				tc.refreshTime = refreshTime.Add(10 * time.Second).UnixNano()
 			}
 
-			// Validate that exported metrics are correct using fakeserver's /validation endpoint, which records metric exports that occured.
-			// We need to use retry as we wait for Consul or the Collector to export metrics. This is the best we can do to avoid flakiness.
+			// Validate metrics are correct using fakeserver's /records endpoint to retrieve metric exports that occured from Consul/Collector to fakeserver.
+			// We use retry as we wait for Consul or the Collector to export metrics. This is the best we can do to avoid flakiness.
 			retry.RunWith(&retry.Timer{Timeout: tc.timeout, Wait: tc.wait}, t, func(r *retry.R) {
-				err := fsClient.validateMetrics(tc.validation)
+				records, err := fsClient.getRecordsForPath(tc.recordsPath, tc.refreshTime)
 				require.NoError(r, err)
+				validateMetrics(r, records, tc.validations, tc.refreshTime)
 			})
 		})
 	}
