@@ -237,6 +237,24 @@ func (in *TrafficPermissions) MatchesConsul(candidate *pbresource.Resource, name
 	)
 }
 
+func (in *TrafficPermissions) AddFinalizer(f string) {
+	in.ObjectMeta.Finalizers = append(in.Finalizers(), f)
+}
+
+func (in *TrafficPermissions) RemoveFinalizer(f string) {
+	var newFinalizers []string
+	for _, oldF := range in.Finalizers() {
+		if oldF != f {
+			newFinalizers = append(newFinalizers, oldF)
+		}
+	}
+	in.ObjectMeta.Finalizers = newFinalizers
+}
+
+func (in *TrafficPermissions) Finalizers() []string {
+	return in.ObjectMeta.Finalizers
+}
+
 func (in *TrafficPermissions) KubeKind() string {
 	return trafficpermissionsKubeKind
 }
@@ -305,10 +323,8 @@ func (in *TrafficPermissions) Validate(_ common.ConsulTenancyConfig) error {
 	return nil
 }
 
-// DefaultNamespaceFields is required as part of the common.MeshConfig interface
-func (in *TrafficPermissions) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {
-	return
-}
+// DefaultNamespaceFields is required as part of the common.MeshConfig interface.
+func (in *TrafficPermissions) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
 
 func (p Permissions) toProto() []*pbauth.Permission {
 	var perms []*pbauth.Permission

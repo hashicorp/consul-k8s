@@ -13,7 +13,7 @@ import (
 
 var (
 
-	// AUTH group ***********
+	// AUTH group.
 
 	AuthGroup = "auth.consul.hashicorp.com"
 
