@@ -15,7 +15,7 @@ import (
 func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) ([]corev1.EnvVar, error) {
 	upstreams, err := common.ProcessPodUpstreams(pod, true, true)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error processing the upstream for container environment variable creation: %s", err.Error())
 	}
 	if upstreams == nil {
 		return nil, nil
