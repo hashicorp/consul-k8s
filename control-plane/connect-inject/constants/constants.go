@@ -55,9 +55,9 @@ const (
 	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 )
 
-// GetDefaultConsulNamespace returns the default namespace if the passed namespace
+// GetNormalizedConsulNamespace returns the default namespace if the passed namespace
 // is empty, otherwise returns back the passed in namespace.
-func GetDefaultConsulNamespace(ns string) string {
+func GetNormalizedConsulNamespace(ns string) string {
 	if ns == "" {
 		ns = DefaultConsulNS
 	}
@@ -65,9 +65,9 @@ func GetDefaultConsulNamespace(ns string) string {
 	return ns
 }
 
-// GetDefaultConsulPartition returns the default partition if the passed partition
+// GetNormalizedConsulPartition returns the default partition if the passed partition
 // is empty, otherwise returns back the passed in partition.
-func GetDefaultConsulPartition(ap string) string {
+func GetNormalizedConsulPartition(ap string) string {
 	if ap == "" {
 		ap = DefaultConsulPartition
 	}
@@ -75,9 +75,9 @@ func GetDefaultConsulPartition(ap string) string {
 	return ap
 }
 
-// GetDefaultConsulPeer returns the default peer if the passed peer
+// GetNormalizedConsulPeer returns the default peer if the passed peer
 // is empty, otherwise returns back the passed in peer.
-func GetDefaultConsulPeer(peer string) string {
+func GetNormalizedConsulPeer(peer string) string {
 	if peer == "" {
 		peer = DefaultConsulPeer
 	}

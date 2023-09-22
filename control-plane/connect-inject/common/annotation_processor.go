@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package common
 
 import (
@@ -15,23 +18,9 @@ const (
 	ConsulNodeAddress = "127.0.0.1"
 )
 
-// PodAnnotationProcessor processes a pod annotation into pbmesh.Upstreams.
-type PodAnnotationProcessor struct {
-	enablePartitions bool
-	enableNamespaces bool
-}
-
-// NewPodAnnotationProcessor constructs a PodAnnotationProcessor for processing pod annotations into pbmesh.Upsreams.
-func NewPodAnnotationProcessor(enablePartitions, enableNamespaces bool) PodAnnotationProcessor {
-	return PodAnnotationProcessor{
-		enablePartitions: enablePartitions,
-		enableNamespaces: enableNamespaces,
-	}
-}
-
-// ProcessUpstreams reads the list of upstreams from the Pod annotation and converts them into a pbmesh.Upstreams
+// ProcessPodUpstreams reads the list of upstreams from the Pod annotation and converts them into a pbmesh.Upstreams
 // object.
-func (p PodAnnotationProcessor) ProcessUpstreams(pod corev1.Pod) (*pbmesh.Upstreams, error) {
+func ProcessPodUpstreams(pod corev1.Pod, enablePartitions, enableNamespaces bool) (*pbmesh.Upstreams, error) {
 	upstreams := &pbmesh.Upstreams{}
 	raw, ok := pod.Annotations[constants.AnnotationMeshDestinations]
 	if !ok || raw == "" {
@@ -66,13 +55,13 @@ func (p PodAnnotationProcessor) ProcessUpstreams(pod corev1.Pod) (*pbmesh.Upstre
 
 		if labeledFormat {
 			var err error
-			upstream, err = p.processLabeledUpstream(pod, raw)
+			upstream, err = processPodLabeledUpstream(pod, raw, enablePartitions, enableNamespaces)
 			if err != nil {
 				return &pbmesh.Upstreams{}, err
 			}
 		} else {
 			var err error
-			upstream, err = p.processUnlabeledUpstream(pod, raw)
+			upstream, err = processPodUnlabeledUpstream(pod, raw, enablePartitions, enableNamespaces)
 			if err != nil {
 				return &pbmesh.Upstreams{}, err
 			}
@@ -84,7 +73,7 @@ func (p PodAnnotationProcessor) ProcessUpstreams(pod corev1.Pod) (*pbmesh.Upstre
 	return upstreams, nil
 }
 
-// processLabeledUpstream processes an upstream in the format:
+// processPodLabeledUpstream processes an upstream in the format:
 // [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-peer].peer:[port]
 // [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
 // [service-port-name].port.[service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port].
@@ -92,7 +81,7 @@ func (p PodAnnotationProcessor) ProcessUpstreams(pod corev1.Pod) (*pbmesh.Upstre
 // The ordering matters for labeled as well as unlabeled. The ordering of the labeled parameters should follow
 // the order and requirements of the unlabeled parameters.
 // TODO: enable dc and peer support when ready, currently return errors if set.
-func (p PodAnnotationProcessor) processLabeledUpstream(pod corev1.Pod, rawUpstream string) (*pbmesh.Upstream, error) {
+func processPodLabeledUpstream(pod corev1.Pod, rawUpstream string, enablePartitions, enableNamespaces bool) (*pbmesh.Upstream, error) {
 	parts := strings.SplitN(rawUpstream, ":", 3)
 	var port int32
 	port, _ = PortValue(pod, strings.TrimSpace(parts[1]))
@@ -104,7 +93,7 @@ func (p PodAnnotationProcessor) processLabeledUpstream(pod corev1.Pod, rawUpstre
 	pieces := strings.Split(service, ".")
 
 	var portName, datacenter, svcName, namespace, partition, peer string
-	if p.enablePartitions || p.enableNamespaces {
+	if enablePartitions || enableNamespaces {
 		switch len(pieces) {
 		case 8:
 			end := strings.TrimSpace(pieces[7])
@@ -182,9 +171,9 @@ func (p PodAnnotationProcessor) processLabeledUpstream(pod corev1.Pod, rawUpstre
 		DestinationRef: &pbresource.Reference{
 			Type: UpstreamReferenceType(),
 			Tenancy: &pbresource.Tenancy{
-				Partition: constants.GetDefaultConsulPartition(partition),
-				Namespace: constants.GetDefaultConsulNamespace(namespace),
-				PeerName:  constants.GetDefaultConsulPeer(peer),
+				Partition: constants.GetNormalizedConsulPartition(partition),
+				Namespace: constants.GetNormalizedConsulNamespace(namespace),
+				PeerName:  constants.GetNormalizedConsulPeer(peer),
 			},
 			Name: svcName,
 		},
@@ -201,11 +190,11 @@ func (p PodAnnotationProcessor) processLabeledUpstream(pod corev1.Pod, rawUpstre
 	return &upstream, nil
 }
 
-// processUnlabeledUpstream processes an upstream in the format:
+// processPodUnlabeledUpstream processes an upstream in the format:
 // [service-port-name].[service-name].[service-namespace].[service-partition]:[port]:[optional datacenter].
 // There is no unlabeled field for peering.
-// TODO: enable dc and peer support when ready, currently return errors if set. We also most likely won't need to return an error at all.
-func (p PodAnnotationProcessor) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string) (*pbmesh.Upstream, error) {
+// TODO: enable dc and peer support when ready, currently return errors if set.
+func processPodUnlabeledUpstream(pod corev1.Pod, rawUpstream string, enablePartitions, enableNamespaces bool) (*pbmesh.Upstream, error) {
 	var portName, datacenter, svcName, namespace, partition string
 	var port int32
 	var upstream pbmesh.Upstream
@@ -216,7 +205,7 @@ func (p PodAnnotationProcessor) processUnlabeledUpstream(pod corev1.Pod, rawUpst
 
 	// If Consul Namespaces or Admin Partitions are enabled, attempt to parse the
 	// upstream for a namespace.
-	if p.enableNamespaces || p.enablePartitions {
+	if enableNamespaces || enablePartitions {
 		pieces := strings.SplitN(parts[0], ".", 4)
 		switch len(pieces) {
 		case 4:
@@ -225,12 +214,17 @@ func (p PodAnnotationProcessor) processUnlabeledUpstream(pod corev1.Pod, rawUpst
 		case 3:
 			namespace = strings.TrimSpace(pieces[2])
 			fallthrough
-		default:
+		case 2:
 			svcName = strings.TrimSpace(pieces[1])
 			portName = strings.TrimSpace(pieces[0])
+		default:
+			return &pbmesh.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
 		}
 	} else {
 		pieces := strings.SplitN(parts[0], ".", 2)
+		if len(pieces) < 2 {
+			return &pbmesh.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+		}
 		svcName = strings.TrimSpace(pieces[1])
 		portName = strings.TrimSpace(pieces[0])
 	}
@@ -247,9 +241,9 @@ func (p PodAnnotationProcessor) processUnlabeledUpstream(pod corev1.Pod, rawUpst
 			DestinationRef: &pbresource.Reference{
 				Type: UpstreamReferenceType(),
 				Tenancy: &pbresource.Tenancy{
-					Partition: constants.GetDefaultConsulPartition(partition),
-					Namespace: constants.GetDefaultConsulNamespace(namespace),
-					PeerName:  constants.GetDefaultConsulPeer(""),
+					Partition: constants.GetNormalizedConsulPartition(partition),
+					Namespace: constants.GetNormalizedConsulNamespace(namespace),
+					PeerName:  constants.GetNormalizedConsulPeer(""),
 				},
 				Name: svcName,
 			},

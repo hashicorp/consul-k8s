@@ -28,7 +28,7 @@ func TestGetDefaultConsulNamespace(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := GetDefaultConsulNamespace(tc.value)
+			actual := GetNormalizedConsulNamespace(tc.value)
 			require.Equal(t, actual, tc.expect)
 		})
 	}
@@ -53,7 +53,7 @@ func TestGetDefaultConsulPartition(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := GetDefaultConsulPartition(tc.value)
+			actual := GetNormalizedConsulPartition(tc.value)
 			require.Equal(t, actual, tc.expect)
 		})
 	}
@@ -78,7 +78,7 @@ func TestGetDefaultConsulPeer(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := GetDefaultConsulPeer(tc.value)
+			actual := GetNormalizedConsulPeer(tc.value)
 			require.Equal(t, actual, tc.expect)
 		})
 	}

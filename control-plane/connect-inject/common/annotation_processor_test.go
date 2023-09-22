@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package common
 
 import (
@@ -45,9 +48,9 @@ func TestProcessUpstreams(t *testing.T) {
 						DestinationRef: &pbresource.Reference{
 							Type: UpstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: constants.GetDefaultConsulPartition(""),
-								Namespace: constants.GetDefaultConsulNamespace(""),
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								Partition: constants.GetNormalizedConsulPartition(""),
+								Namespace: constants.GetNormalizedConsulNamespace(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -82,9 +85,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//				Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
-			//					Namespace: constants.GetDefaultConsulNamespace(""),
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
+			//					Namespace: constants.GetNormalizedConsulNamespace(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -119,8 +122,8 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
-			//					Namespace: constants.GetDefaultConsulNamespace(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
+			//					Namespace: constants.GetNormalizedConsulNamespace(""),
 			//					PeerName:  "peer1",
 			//				},
 			//				Name: "upstream1",
@@ -156,7 +159,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			// 			    Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
 			//					PeerName:  "peer1",
 			//				},
@@ -193,7 +196,7 @@ func TestProcessUpstreams(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "part1",
 								Namespace: "ns1",
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -228,9 +231,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -263,9 +266,9 @@ func TestProcessUpstreams(t *testing.T) {
 						DestinationRef: &pbresource.Reference{
 							Type: UpstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: constants.GetDefaultConsulPartition(""),
+								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: "ns1",
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -282,9 +285,9 @@ func TestProcessUpstreams(t *testing.T) {
 						DestinationRef: &pbresource.Reference{
 							Type: UpstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: constants.GetDefaultConsulPartition(""),
-								Namespace: constants.GetDefaultConsulNamespace(""),
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								Partition: constants.GetNormalizedConsulPartition(""),
+								Namespace: constants.GetNormalizedConsulNamespace(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream2",
 						},
@@ -303,7 +306,7 @@ func TestProcessUpstreams(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream4",
 						},
@@ -338,9 +341,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -357,9 +360,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
-			//					Namespace: constants.GetDefaultConsulNamespace(""),
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
+			//					Namespace: constants.GetNormalizedConsulNamespace(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream2",
 			//			},
@@ -376,9 +379,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream3",
 			//			},
@@ -395,7 +398,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "ns1",
 			//					PeerName:  "peer1",
 			//				},
@@ -560,9 +563,9 @@ func TestProcessUpstreams(t *testing.T) {
 						DestinationRef: &pbresource.Reference{
 							Type: UpstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: constants.GetDefaultConsulPartition(""),
+								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: "ns1",
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -579,9 +582,9 @@ func TestProcessUpstreams(t *testing.T) {
 						DestinationRef: &pbresource.Reference{
 							Type: UpstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: constants.GetDefaultConsulPartition(""),
-								Namespace: constants.GetDefaultConsulNamespace(""),
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								Partition: constants.GetNormalizedConsulPartition(""),
+								Namespace: constants.GetNormalizedConsulNamespace(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream2",
 						},
@@ -600,7 +603,7 @@ func TestProcessUpstreams(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream4",
 						},
@@ -633,9 +636,9 @@ func TestProcessUpstreams(t *testing.T) {
 						DestinationRef: &pbresource.Reference{
 							Type: UpstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: constants.GetDefaultConsulPartition(""),
-								Namespace: constants.GetDefaultConsulNamespace(""),
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								Partition: constants.GetNormalizedConsulPartition(""),
+								Namespace: constants.GetNormalizedConsulNamespace(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -668,9 +671,9 @@ func TestProcessUpstreams(t *testing.T) {
 						DestinationRef: &pbresource.Reference{
 							Type: UpstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: constants.GetDefaultConsulPartition(""),
+								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: "foo",
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -705,7 +708,7 @@ func TestProcessUpstreams(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "bar",
 								Namespace: "foo",
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -738,9 +741,9 @@ func TestProcessUpstreams(t *testing.T) {
 						DestinationRef: &pbresource.Reference{
 							Type: UpstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: constants.GetDefaultConsulPartition(""),
-								Namespace: constants.GetDefaultConsulNamespace(""),
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								Partition: constants.GetNormalizedConsulPartition(""),
+								Namespace: constants.GetNormalizedConsulNamespace(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -757,9 +760,9 @@ func TestProcessUpstreams(t *testing.T) {
 						DestinationRef: &pbresource.Reference{
 							Type: UpstreamReferenceType(),
 							Tenancy: &pbresource.Tenancy{
-								Partition: constants.GetDefaultConsulPartition(""),
-								Namespace: constants.GetDefaultConsulNamespace(""),
-								PeerName:  constants.GetDefaultConsulPeer(""),
+								Partition: constants.GetNormalizedConsulPartition(""),
+								Namespace: constants.GetNormalizedConsulNamespace(""),
+								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream2",
 						},
@@ -800,9 +803,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
-			//					Namespace: constants.GetDefaultConsulNamespace(""),
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
+			//					Namespace: constants.GetNormalizedConsulNamespace(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -819,9 +822,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "bar",
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream2",
 			//			},
@@ -840,7 +843,7 @@ func TestProcessUpstreams(t *testing.T) {
 			//				Tenancy: &pbresource.Tenancy{
 			//					Partition: "baz",
 			//					Namespace: "foo",
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream3",
 			//			},
@@ -881,9 +884,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
-			//					Namespace: constants.GetDefaultConsulNamespace(""),
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
+			//					Namespace: constants.GetNormalizedConsulNamespace(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream1",
 			//			},
@@ -900,9 +903,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "bar",
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream2",
 			//			},
@@ -919,9 +922,9 @@ func TestProcessUpstreams(t *testing.T) {
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: UpstreamReferenceType(),
 			//				Tenancy: &pbresource.Tenancy{
-			//					Partition: constants.GetDefaultConsulPartition(""),
+			//					Partition: constants.GetNormalizedConsulPartition(""),
 			//					Namespace: "foo",
-			//					PeerName: constants.GetDefaultConsulPeer(""),
+			//					PeerName: constants.GetNormalizedConsulPeer(""),
 			//				},
 			//				Name: "upstream3",
 			//			},
@@ -941,8 +944,7 @@ func TestProcessUpstreams(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			p := NewPodAnnotationProcessor(tt.consulNamespacesEnabled, tt.consulPartitionsEnabled)
-			upstreams, err := p.ProcessUpstreams(*tt.pod())
+			upstreams, err := ProcessPodUpstreams(*tt.pod(), tt.consulNamespacesEnabled, tt.consulPartitionsEnabled)
 			if tt.expErr != "" {
 				require.EqualError(t, err, tt.expErr)
 			} else {
