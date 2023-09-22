@@ -1,0 +1,11 @@
+```release-note:feature
+:tada: This release previews Consul's V2 Catalog and Resource API.
+The new model supports multi-port application deployments with only a single Envoy proxy.
+Not all Consul features are available with the preview.
+See the [V2 Catalog and Resource API documentation](https://developer.hashicorp.com/consul/docs/k8s/multiport) for more infomation.
+This feature is beta and should not be used in production. 
+[[GH-2868]](https://github.com/hashicorp/consul-k8s/pull/2868)
+[[GH-2883]](https://github.com/hashicorp/consul-k8s/pull/2883)
+[[GH-2930]](https://github.com/hashicorp/consul-k8s/pull/2930)
+[[GH-2967]](https://github.com/hashicorp/consul-k8s/pull/2967)
+```
