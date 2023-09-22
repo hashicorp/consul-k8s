@@ -333,6 +333,27 @@ webhooks:
       resources:
         - samenessgroups
   sideEffects: None
+- admissionReviewVersions:
+    - v1beta1
+    - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v2alpha1-trafficpermissions
+  failurePolicy: Fail
+  name: mutate-trafficpermissions.auth.consul.hashicorp.com
+  rules:
+    - apiGroups:
+        - auth.consul.hashicorp.com
+      apiVersions:
+        - v2alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - trafficpermissions
+  sideEffects: None
 {{- end }}
 - admissionReviewVersions:
   - v1beta1

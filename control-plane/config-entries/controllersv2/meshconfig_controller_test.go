@@ -12,9 +12,12 @@ import (
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	capi "github.com/hashicorp/consul/api"
+	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v1alpha1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,85 +28,80 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v2alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
-
-const datacenterName = "datacenter"
 
 type testReconciler interface {
 	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 }
 
-func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
+// TestMeshConfigController_createsMeshConfig validated resources are created in Consul from kube objects.
+func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 	t.Parallel()
-	kubeNS := "default"
 
 	cases := []struct {
-		kubeKind            string
-		consulKind          string
-		consulPrereqs       []capi.ConfigEntry
-		configEntryResource common.ConfigEntryResource
-		reconciler          func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
-		compare             func(t *testing.T, consul capi.ConfigEntry)
+		name       string
+		meshConfig common.MeshConfig
+		expected   *pbauth.TrafficPermissions
+		reconciler func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
+		unmarshal  func(t *testing.T, consul *pbresource.Resource) proto.Message
 	}{
 		{
-			kubeKind:   "ServiceIntentions",
-			consulKind: capi.ServiceIntentions,
-			consulPrereqs: []capi.ConfigEntry{
-				&capi.ServiceConfigEntry{
-					Kind:     capi.ServiceDefaults,
-					Name:     "foo",
-					Protocol: "http",
+			name: "TrafficPermissions",
+			meshConfig: &v2alpha1.TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-traffic-permission",
+					Namespace: metav1.NamespaceDefault,
 				},
-				&capi.ServiceConfigEntry{
-					Kind:     capi.ServiceDefaults,
-					Name:     "bar",
-					Protocol: "http",
-				},
-				&capi.ServiceConfigEntry{
-					Kind:     capi.ServiceDefaults,
-					Name:     "baz",
-					Protocol: "http",
+				Spec: v2alpha1.TrafficPermissionsSpec{
+					Destination: &v2alpha1.Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: v2alpha1.ActionAllow,
+					Permissions: v2alpha1.Permissions{
+						{
+							Sources: v2alpha1.Sources{
+								{
+									Namespace: "the space namespace space",
+								},
+								{
+									IdentityName: "source-identity",
+								},
+							},
+							DestinationRules: v2alpha1.DestinationRules{
+								{
+									PathExact: "/hello",
+									Methods:   []string{"GET", "POST"},
+									PortNames: []string{"web", "admin"},
+								},
+							},
+						},
+					},
 				},
 			},
-			configEntryResource: &v1alpha1.ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "some-name",
-					Namespace: kubeNS,
+			expected: &pbauth.TrafficPermissions{
+				Destination: &pbauth.Destination{
+					IdentityName: "destination-identity",
 				},
-				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.IntentionDestination{
-						Name: "foo",
-					},
-					Sources: v1alpha1.SourceIntentions{
-						&v1alpha1.SourceIntention{
-							Name:   "bar",
-							Action: "allow",
+				Action: pbauth.Action_ACTION_ALLOW,
+				Permissions: []*pbauth.Permission{
+					{
+						Sources: []*pbauth.Source{
+							{
+								IdentityName: "source-identity",
+							},
+							{
+								Namespace: "the space namespace space",
+							},
 						},
-						&v1alpha1.SourceIntention{
-							Name:   "baz",
-							Action: "deny",
-						},
-						&v1alpha1.SourceIntention{
-							Name: "bax",
-							Permissions: v1alpha1.IntentionPermissions{
-								&v1alpha1.IntentionPermission{
-									Action: "allow",
-									HTTP: &v1alpha1.IntentionHTTPPermission{
-										PathExact: "/path",
-										Header: v1alpha1.IntentionHTTPHeaderPermissions{
-											v1alpha1.IntentionHTTPHeaderPermission{
-												Name:    "auth",
-												Present: true,
-											},
-										},
-										Methods: []string{
-											"PUT",
-											"GET",
-										},
-									},
-								},
+						DestinationRules: []*pbauth.DestinationRule{
+							{
+								PathExact: "/hello",
+								Methods:   []string{"GET", "POST"},
+								PortNames: []string{"web", "admin"},
 							},
 						},
 					},
@@ -116,129 +114,125 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
-						DatacenterName:      datacenterName,
 					},
 				}
 			},
-			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
-				svcIntentions, ok := consulEntry.(*capi.ServiceIntentionsConfigEntry)
-				require.True(t, ok, "cast error")
-				require.Equal(t, "foo", svcIntentions.Name)
-				require.Equal(t, "bar", svcIntentions.Sources[0].Name)
-				require.Equal(t, capi.IntentionActionAllow, svcIntentions.Sources[0].Action)
-				require.Equal(t, "baz", svcIntentions.Sources[1].Name)
-				require.Equal(t, capi.IntentionActionDeny, svcIntentions.Sources[1].Action)
-				require.Equal(t, "bax", svcIntentions.Sources[2].Name)
-				require.Equal(t, capi.IntentionActionAllow, svcIntentions.Sources[2].Permissions[0].Action)
-				require.Equal(t, "/path", svcIntentions.Sources[2].Permissions[0].HTTP.PathExact)
+			unmarshal: func(t *testing.T, resource *pbresource.Resource) proto.Message {
+				data := resource.Data
+
+				trafficPermission := &pbauth.TrafficPermissions{}
+				require.NoError(t, data.UnmarshalTo(trafficPermission))
+				return trafficPermission
 			},
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.kubeKind, func(t *testing.T) {
-			req := require.New(t)
+		t.Run(c.name, func(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+			s.AddKnownTypes(v2alpha1.AuthGroupVersion, c.meshConfig)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.meshConfig).Build()
 
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			testClient.TestServer.WaitForServiceIntentions(t)
-			consulClient := testClient.APIClient
-
-			for _, configEntry := range c.consulPrereqs {
-				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
-				req.NoError(err)
-				req.True(written)
-			}
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+				c.Experiments = []string{"resource-apis"}
+			})
+			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+			require.NoError(t, err)
 
 			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 			namespacedName := types.NamespacedName{
-				Namespace: kubeNS,
-				Name:      c.configEntryResource.KubernetesName(),
+				Namespace: metav1.NamespaceDefault,
+				Name:      c.meshConfig.KubernetesName(),
 			}
 			resp, err := r.Reconcile(ctx, ctrl.Request{
 				NamespacedName: namespacedName,
 			})
-			req.NoError(err)
-			req.False(resp.Requeue)
+			require.NoError(t, err)
+			require.False(t, resp.Requeue)
 
-			cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
-			req.NoError(err)
-			req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
-			c.compare(t, cfg)
+			req := &pbresource.ReadRequest{Id: c.meshConfig.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
+			res, err := resourceClient.Read(ctx, req)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			require.Equal(t, c.meshConfig.GetName(), res.GetResource().GetId().GetName())
+
+			actual := c.unmarshal(t, res.GetResource())
+			opts := append([]cmp.Option{protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version")}, test.CmpProtoIgnoreOrder()...)
+			diff := cmp.Diff(c.expected, actual, opts...)
+			require.Equal(t, "", diff, "TrafficPermissions do not match")
 
 			// Check that the status is "synced".
-			err = fakeClient.Get(ctx, namespacedName, c.configEntryResource)
-			req.NoError(err)
-			req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
+			err = fakeClient.Get(ctx, namespacedName, c.meshConfig)
+			require.NoError(t, err)
+			require.Equal(t, corev1.ConditionTrue, c.meshConfig.SyncedConditionStatus())
 		})
 	}
 }
 
-func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
+// DONE
+func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 	t.Parallel()
-	kubeNS := "default"
 
 	cases := []struct {
-		kubeKind            string
-		consulKind          string
-		consulPrereqs       []capi.ConfigEntry
-		configEntryResource common.ConfigEntryResource
-		reconciler          func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
-		updateF             func(common.ConfigEntryResource)
-		compare             func(t *testing.T, consul capi.ConfigEntry)
+		name       string
+		meshConfig common.MeshConfig
+		expected   *pbauth.TrafficPermissions
+		reconciler func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
+		updateF    func(config common.MeshConfig)
+		unmarshal  func(t *testing.T, consul *pbresource.Resource) proto.Message
 	}{
 		{
-			kubeKind:   "ServiceIntentions",
-			consulKind: capi.ServiceIntentions,
-			consulPrereqs: []capi.ConfigEntry{
-				&capi.ServiceConfigEntry{
-					Kind:     capi.ServiceDefaults,
-					Name:     "foo",
-					Protocol: "http",
+			name: "TrafficPermissions",
+			meshConfig: &v2alpha1.TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-traffic-permission",
+					Namespace: metav1.NamespaceDefault,
 				},
-				&capi.ServiceConfigEntry{
-					Kind:     capi.ServiceDefaults,
-					Name:     "bar",
-					Protocol: "http",
+				Spec: v2alpha1.TrafficPermissionsSpec{
+					Destination: &v2alpha1.Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: v2alpha1.ActionAllow,
+					Permissions: v2alpha1.Permissions{
+						{
+							Sources: v2alpha1.Sources{
+								{
+									Namespace: "the space namespace space",
+								},
+								{
+									IdentityName: "source-identity",
+								},
+							},
+							DestinationRules: v2alpha1.DestinationRules{
+								{
+									PathExact: "/hello",
+									Methods:   []string{"GET", "POST"},
+									PortNames: []string{"web", "admin"},
+								},
+							},
+						},
+					},
 				},
 			},
-			configEntryResource: &v1alpha1.ServiceIntentions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-name",
-					Namespace: kubeNS,
+			expected: &pbauth.TrafficPermissions{
+				Destination: &pbauth.Destination{
+					IdentityName: "destination-identity",
 				},
-				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.IntentionDestination{
-						Name: "foo",
-					},
-					Sources: v1alpha1.SourceIntentions{
-						&v1alpha1.SourceIntention{
-							Name:   "bar",
-							Action: "allow",
+				Action: pbauth.Action_ACTION_DENY,
+				Permissions: []*pbauth.Permission{
+					{
+						Sources: []*pbauth.Source{
+							{
+								Namespace: "the space namespace space",
+							},
 						},
-						&v1alpha1.SourceIntention{
-							Name: "baz",
-							Permissions: v1alpha1.IntentionPermissions{
-								&v1alpha1.IntentionPermission{
-									Action: "allow",
-									HTTP: &v1alpha1.IntentionHTTPPermission{
-										PathExact: "/path",
-										Header: v1alpha1.IntentionHTTPHeaderPermissions{
-											v1alpha1.IntentionHTTPHeaderPermission{
-												Name:    "auth",
-												Present: true,
-											},
-										},
-										Methods: []string{
-											"PUT",
-											"GET",
-										},
-									},
-								},
+						DestinationRules: []*pbauth.DestinationRule{
+							{
+								PathExact: "/hello",
+								Methods:   []string{"GET", "POST"},
+								PortNames: []string{"web", "admin"},
 							},
 						},
 					},
@@ -251,142 +245,120 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
-						DatacenterName:      datacenterName,
 					},
 				}
 			},
-			updateF: func(resource common.ConfigEntryResource) {
-				svcIntentions := resource.(*v1alpha1.ServiceIntentions)
-				svcIntentions.Spec.Sources[0].Action = "deny"
-				svcIntentions.Spec.Sources[1].Permissions[0].Action = "deny"
+			updateF: func(resource common.MeshConfig) {
+				trafficPermissions := resource.(*v2alpha1.TrafficPermissions)
+				trafficPermissions.Spec.Action = "deny"
+				trafficPermissions.Spec.Permissions[0].Sources = trafficPermissions.Spec.Permissions[0].Sources[:1]
 			},
-			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
-				configEntry, ok := consulEntry.(*capi.ServiceIntentionsConfigEntry)
-				require.True(t, ok, "cast error")
-				require.Equal(t, capi.IntentionActionDeny, configEntry.Sources[0].Action)
-				require.Equal(t, capi.IntentionActionDeny, configEntry.Sources[1].Permissions[0].Action)
+			unmarshal: func(t *testing.T, resource *pbresource.Resource) proto.Message {
+				data := resource.Data
+
+				trafficPermission := &pbauth.TrafficPermissions{}
+				require.NoError(t, data.UnmarshalTo(trafficPermission))
+				return trafficPermission
 			},
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.kubeKind, func(t *testing.T) {
-			req := require.New(t)
+		t.Run(c.name, func(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.meshConfig)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.meshConfig).Build()
 
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			testClient.TestServer.WaitForServiceIntentions(t)
-			consulClient := testClient.APIClient
-
-			// Create any prereqs.
-			for _, configEntry := range c.consulPrereqs {
-				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
-				req.NoError(err)
-				req.True(written)
-			}
-
-			// We haven't run reconcile yet so we must create the config entry
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+				c.Experiments = []string{"resource-apis"}
+			})
+			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+			require.NoError(t, err)
+			// We haven't run reconcile yet, so we must create the MeshConfig
 			// in Consul ourselves.
 			{
-				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResource.ToConsul(datacenterName), nil)
-				req.NoError(err)
-				req.True(written)
+				resource := c.meshConfig.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
+				req := &pbresource.WriteRequest{Resource: resource}
+				_, err := resourceClient.Write(ctx, req)
+				require.NoError(t, err)
 			}
 
 			// Now run reconcile which should update the entry in Consul.
 			{
 				namespacedName := types.NamespacedName{
-					Namespace: kubeNS,
-					Name:      c.configEntryResource.KubernetesName(),
+					Namespace: metav1.NamespaceDefault,
+					Name:      c.meshConfig.KubernetesName(),
 				}
-				// First get it so we have the latest revision number.
-				err := fakeClient.Get(ctx, namespacedName, c.configEntryResource)
-				req.NoError(err)
+				// First get it, so we have the latest revision number.
+				err := fakeClient.Get(ctx, namespacedName, c.meshConfig)
+				require.NoError(t, err)
 
 				// Update the entry in Kube and run reconcile.
-				c.updateF(c.configEntryResource)
-				err = fakeClient.Update(ctx, c.configEntryResource)
-				req.NoError(err)
+				c.updateF(c.meshConfig)
+				err = fakeClient.Update(ctx, c.meshConfig)
+				require.NoError(t, err)
 				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 				resp, err := r.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
-				req.NoError(err)
-				req.False(resp.Requeue)
+				require.NoError(t, err)
+				require.False(t, resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
-				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
-				req.NoError(err)
-				req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
-				c.compare(t, cfg)
+				req := &pbresource.ReadRequest{Id: c.meshConfig.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
+				res, err := resourceClient.Read(ctx, req)
+				require.NoError(t, err)
+				require.NotNil(t, res)
+				require.Equal(t, c.meshConfig.GetName(), res.GetResource().GetId().GetName())
+
+				actual := c.unmarshal(t, res.GetResource())
+				opts := append([]cmp.Option{protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version")}, test.CmpProtoIgnoreOrder()...)
+				diff := cmp.Diff(c.expected, actual, opts...)
+				require.Equal(t, "", diff, "TrafficPermissions do not match")
 			}
 		})
 	}
 }
 
-func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
+// DONE
+func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 	t.Parallel()
-	kubeNS := "default"
 
 	cases := []struct {
-		kubeKind                        string
-		consulKind                      string
-		consulPrereq                    []capi.ConfigEntry
-		configEntryResourceWithDeletion common.ConfigEntryResource
-		reconciler                      func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
+		name                   string
+		MeshConfigWithDeletion common.MeshConfig
+		reconciler             func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
 	}{
 		{
-			kubeKind:   "ServiceIntentions",
-			consulKind: capi.ServiceIntentions,
-			consulPrereq: []capi.ConfigEntry{
-				&capi.ServiceConfigEntry{
-					Kind:     capi.ServiceDefaults,
-					Name:     "foo",
-					Protocol: "http",
-				},
-				&capi.ServiceConfigEntry{
-					Kind:     capi.ServiceDefaults,
-					Name:     "bar",
-					Protocol: "http",
-				},
-			},
-			configEntryResourceWithDeletion: &v1alpha1.ServiceIntentions{
+			name: "TrafficPermissions",
+			MeshConfigWithDeletion: &v2alpha1.TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-name",
-					Namespace:         kubeNS,
+					Namespace:         metav1.NamespaceDefault,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 				},
-				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.IntentionDestination{
-						Name: "foo",
+				Spec: v2alpha1.TrafficPermissionsSpec{
+					Destination: &v2alpha1.Destination{
+						IdentityName: "destination-identity",
 					},
-					Sources: v1alpha1.SourceIntentions{
-						&v1alpha1.SourceIntention{
-							Name:   "bar",
-							Action: "allow",
-						},
-						&v1alpha1.SourceIntention{
-							Name: "baz",
-							Permissions: v1alpha1.IntentionPermissions{
-								&v1alpha1.IntentionPermission{
-									Action: "allow",
-									HTTP: &v1alpha1.IntentionHTTPPermission{
-										PathExact: "/path",
-										Header: v1alpha1.IntentionHTTPHeaderPermissions{
-											v1alpha1.IntentionHTTPHeaderPermission{
-												Name:    "auth",
-												Present: true,
-											},
-										},
-										Methods: []string{
-											"PUT",
-											"GET",
-										},
-									},
+					Action: v2alpha1.ActionAllow,
+					Permissions: v2alpha1.Permissions{
+						{
+							Sources: v2alpha1.Sources{
+								{
+									Namespace: "the space namespace space",
+								},
+								{
+									IdentityName: "source-identity",
+								},
+							},
+							DestinationRules: v2alpha1.DestinationRules{
+								{
+									PathExact: "/hello",
+									Methods:   []string{"GET", "POST"},
+									PortNames: []string{"web", "admin"},
 								},
 							},
 						},
@@ -400,7 +372,6 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					MeshConfigController: &MeshConfigController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
-						DatacenterName:      datacenterName,
 					},
 				}
 			},
@@ -408,79 +379,89 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.kubeKind, func(t *testing.T) {
-			req := require.New(t)
+		t.Run(c.name, func(t *testing.T) {
+			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResourceWithDeletion).Build()
+			s.AddKnownTypes(v2alpha1.AuthGroupVersion, c.MeshConfigWithDeletion)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.MeshConfigWithDeletion).Build()
 
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			testClient.TestServer.WaitForServiceIntentions(t)
-			consulClient := testClient.APIClient
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+				c.Experiments = []string{"resource-apis"}
+			})
+			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+			require.NoError(t, err)
 
-			// Create any prereqs.
-			for _, configEntry := range c.consulPrereq {
-				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
-				req.NoError(err)
-				req.True(written)
-			}
-
-			// We haven't run reconcile yet so we must create the config entry
+			// We haven't run reconcile yet, so we must create the config entry
 			// in Consul ourselves.
 			{
-				written, _, err := consulClient.ConfigEntries().Set(c.configEntryResourceWithDeletion.ToConsul(datacenterName), nil)
-				req.NoError(err)
-				req.True(written)
+				resource := c.MeshConfigWithDeletion.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
+				req := &pbresource.WriteRequest{Resource: resource}
+				_, err := resourceClient.Write(ctx, req)
+				require.NoError(t, err)
 			}
 
 			// Now run reconcile. It's marked for deletion so this should delete it.
 			{
 				namespacedName := types.NamespacedName{
-					Namespace: kubeNS,
-					Name:      c.configEntryResourceWithDeletion.KubernetesName(),
+					Namespace: metav1.NamespaceDefault,
+					Name:      c.MeshConfigWithDeletion.KubernetesName(),
 				}
 				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 				resp, err := r.Reconcile(context.Background(), ctrl.Request{
 					NamespacedName: namespacedName,
 				})
-				req.NoError(err)
-				req.False(resp.Requeue)
+				require.NoError(t, err)
+				require.False(t, resp.Requeue)
 
-				_, _, err = consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResourceWithDeletion.ConsulName(), nil)
-				req.EqualError(err,
-					fmt.Sprintf("Unexpected response code: 404 (Config entry not found for %q / %q)",
-						c.consulKind, c.configEntryResourceWithDeletion.ConsulName()))
+				// Now check that the object in Consul is as expected.
+				req := &pbresource.ReadRequest{Id: c.MeshConfigWithDeletion.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
+				_, err = resourceClient.Read(ctx, req)
+				require.Error(t, err)
+				require.True(t, isNotFoundErr(err))
 			}
 		})
 	}
 }
 
-func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
+// DONE
+func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 	t.Parallel()
-	kubeNS := "default"
 
 	req := require.New(t)
 	ctx := context.Background()
-	svcDefaults := &v1alpha1.ServiceDefaults{
+	trafficpermissions := &v2alpha1.TrafficPermissions{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: kubeNS,
+			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: v1alpha1.ServiceDefaultsSpec{
-			Protocol: "http",
+		Spec: v2alpha1.TrafficPermissionsSpec{
+			Destination: &v2alpha1.Destination{
+				IdentityName: "destination-identity",
+			},
+			Action: v2alpha1.ActionAllow,
+			Permissions: v2alpha1.Permissions{
+				{
+					Sources: v2alpha1.Sources{
+						{
+							IdentityName: "source-identity",
+						},
+					},
+				},
+			},
 		},
 	}
 
 	s := runtime.NewScheme()
-	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
+	s.AddKnownTypes(v2alpha1.AuthGroupVersion, trafficpermissions)
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissions).Build()
 
-	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-	testClient.TestServer.WaitForServiceIntentions(t)
+	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+		c.Experiments = []string{"resource-apis"}
+	})
 
 	// Get watcher state to make sure we can get a healthy address.
-	_, err := testClient.Watcher.State()
+	state, err := testClient.Watcher.State()
 	require.NoError(t, err)
 	// Stop the server before calling reconcile imitating a server that's not running.
 	_ = testClient.TestServer.Stop()
@@ -491,479 +472,299 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 		MeshConfigController: &MeshConfigController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
-			DatacenterName:      datacenterName,
 		},
 	}
 
 	// ReconcileEntry should result in an error.
 	namespacedName := types.NamespacedName{
-		Namespace: kubeNS,
-		Name:      svcDefaults.KubernetesName(),
+		Namespace: metav1.NamespaceDefault,
+		Name:      trafficpermissions.KubernetesName(),
 	}
 	resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 		NamespacedName: namespacedName,
 	})
 	req.Error(err)
 
-	expErr := fmt.Sprintf("Get \"http://127.0.0.1:%d/v1/config/%s/%s\": dial tcp 127.0.0.1:%d: connect: connection refused",
-		testClient.Cfg.HTTPPort, capi.ServiceDefaults, svcDefaults.ConsulName(), testClient.Cfg.HTTPPort)
+	expErr := fmt.Sprintf("connection error: desc = \"transport: Error while dialing: dial tcp 127.0.0.1:%d: connect: connection refused\"", state.Address.Port)
 	req.Contains(err.Error(), expErr)
 	req.False(resp.Requeue)
 
 	// Check that the status is "synced=false".
-	err = fakeClient.Get(ctx, namespacedName, svcDefaults)
+	err = fakeClient.Get(ctx, namespacedName, trafficpermissions)
 	req.NoError(err)
-	status, reason, errMsg := svcDefaults.SyncedCondition()
+	status, reason, errMsg := trafficpermissions.SyncedCondition()
 	req.Equal(corev1.ConditionFalse, status)
 	req.Equal("ConsulAgentError", reason)
 	req.Contains(errMsg, expErr)
 }
 
-// Test that if the config entry hasn't changed in Consul but our resource
-// synced status isn't set to true then we update its status.
-func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
+// DONE
+// TestMeshConfigController_setsSyncedToTrue tests that if the resource hasn't changed in
+// Consul but our resource's synced status isn't set to true, then we update its status.
+func TestMeshConfigController_setsSyncedToTrue(t *testing.T) {
 	t.Parallel()
-	kubeNS := "default"
-	req := require.New(t)
+
 	ctx := context.Background()
 	s := runtime.NewScheme()
-	svcDefaults := &v1alpha1.ServiceDefaults{
+
+	trafficpermissions := &v2alpha1.TrafficPermissions{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: kubeNS,
+			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: v1alpha1.ServiceDefaultsSpec{
-			Protocol: "http",
-		},
-		Status: v1alpha1.Status{
-			Conditions: v1alpha1.Conditions{
+		Spec: v2alpha1.TrafficPermissionsSpec{
+			Destination: &v2alpha1.Destination{
+				IdentityName: "destination-identity",
+			},
+			Action: v2alpha1.ActionAllow,
+			Permissions: v2alpha1.Permissions{
 				{
-					Type:   v1alpha1.ConditionSynced,
+					Sources: v2alpha1.Sources{
+						{
+							IdentityName: "source-identity",
+						},
+					},
+				},
+			},
+		},
+		Status: v2alpha1.Status{
+			Conditions: v2alpha1.Conditions{
+				{
+					Type:   v2alpha1.ConditionSynced,
 					Status: corev1.ConditionUnknown,
 				},
 			},
 		},
 	}
-	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
+	s.AddKnownTypes(v2alpha1.AuthGroupVersion, trafficpermissions)
 
 	// The config entry exists in kube but its status will be nil.
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissions).Build()
 
-	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-	testClient.TestServer.WaitForServiceIntentions(t)
-	consulClient := testClient.APIClient
+	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+		c.Experiments = []string{"resource-apis"}
+	})
+	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+	require.NoError(t, err)
+
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
 		Log:    logrtest.New(t),
 		MeshConfigController: &MeshConfigController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
-			DatacenterName:      datacenterName,
 		},
 	}
 
 	// Create the resource in Consul to mimic that it was created
 	// successfully (but its status hasn't been updated).
-	_, _, err := consulClient.ConfigEntries().Set(svcDefaults.ToConsul(datacenterName), nil)
-	require.NoError(t, err)
+	{
+		resource := trafficpermissions.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
+		req := &pbresource.WriteRequest{Resource: resource}
+		_, err := resourceClient.Write(ctx, req)
+		require.NoError(t, err)
+	}
 
 	namespacedName := types.NamespacedName{
-		Namespace: kubeNS,
-		Name:      svcDefaults.KubernetesName(),
+		Namespace: metav1.NamespaceDefault,
+		Name:      trafficpermissions.KubernetesName(),
 	}
 	resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 		NamespacedName: namespacedName,
 	})
-	req.NoError(err)
-	req.False(resp.Requeue)
+	require.NoError(t, err)
+	require.False(t, resp.Requeue)
 
 	// Check that the status is now "synced".
-	err = fakeClient.Get(ctx, namespacedName, svcDefaults)
-	req.NoError(err)
-	req.Equal(corev1.ConditionTrue, svcDefaults.SyncedConditionStatus())
+	err = fakeClient.Get(ctx, namespacedName, trafficpermissions)
+	require.NoError(t, err)
+	require.Equal(t, corev1.ConditionTrue, trafficpermissions.SyncedConditionStatus())
 }
 
-// Test that if the config entry exists in Consul but is not managed by the
-// controller, creating/updating the resource fails.
-func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
+// DONE
+// TestMeshConfigController_doesNotCreateUnownedMeshConfig test that if the resource
+// exists in Consul but is not managed by the controller, creating/updating the resource fails.
+func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
 	t.Parallel()
-	kubeNS := "default"
 
-	cases := []struct {
-		datacenterAnnotation string
-		expErr               string
-	}{
-		{
-			datacenterAnnotation: "",
-			expErr:               "config entry already exists in Consul",
-		},
-		{
-			datacenterAnnotation: "other-datacenter",
-			expErr:               "config entry managed in different datacenter: \"other-datacenter\"",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(fmt.Sprintf("datacenter: %q", c.datacenterAnnotation), func(t *testing.T) {
-			req := require.New(t)
-			ctx := context.Background()
-
-			s := runtime.NewScheme()
-			svcDefaults := &v1alpha1.ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: kubeNS,
-				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
-					Protocol: "http",
-				},
-			}
-			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
-
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			testClient.TestServer.WaitForServiceIntentions(t)
-			consulClient := testClient.APIClient
-
-			// We haven't run reconcile yet. We must create the config entry
-			// in Consul ourselves in a different datacenter.
-			{
-				written, _, err := consulClient.ConfigEntries().Set(svcDefaults.ToConsul(c.datacenterAnnotation), nil)
-				req.NoError(err)
-				req.True(written)
-			}
-
-			// Now run reconcile which should **not** update the entry in Consul.
-			{
-				namespacedName := types.NamespacedName{
-					Namespace: kubeNS,
-					Name:      svcDefaults.KubernetesName(),
-				}
-				// First get it so we have the latest revision number.
-				err := fakeClient.Get(ctx, namespacedName, svcDefaults)
-				req.NoError(err)
-
-				// Attempt to create the entry in Kube and run reconcile.
-				reconciler := TrafficPermissionsController{
-					Client: fakeClient,
-					Log:    logrtest.New(t),
-					MeshConfigController: &MeshConfigController{
-						ConsulClientConfig:  testClient.Cfg,
-						ConsulServerConnMgr: testClient.Watcher,
-						DatacenterName:      datacenterName,
-					},
-				}
-				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
-					NamespacedName: namespacedName,
-				})
-				req.EqualError(err, c.expErr)
-				req.False(resp.Requeue)
-
-				// Now check that the object in Consul is as expected.
-				cfg, _, err := consulClient.ConfigEntries().Get(capi.ServiceDefaults, svcDefaults.ConsulName(), nil)
-				req.NoError(err)
-				req.Equal(cfg.GetMeta()[common.DatacenterKey], c.datacenterAnnotation)
-
-				// Check that the status is "synced=false".
-				err = fakeClient.Get(ctx, namespacedName, svcDefaults)
-				req.NoError(err)
-				status, reason, errMsg := svcDefaults.SyncedCondition()
-				req.Equal(corev1.ConditionFalse, status)
-				req.Equal("ExternallyManagedConfigError", reason)
-				req.Equal(errMsg, c.expErr)
-			}
-		})
-	}
-}
-
-// Test that if the config entry exists in Consul but is not managed by the
-// controller, deleting the resource does not delete the Consul config entry.
-func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
-	t.Parallel()
-	kubeNS := "default"
-
-	// Test against the metadata being empty or set. Both should not trigger
-	// deletion in Consul.
-	cases := []string{"", "other-datacenter"}
-	for _, datacenter := range cases {
-		t.Run(datacenter, func(t *testing.T) {
-			req := require.New(t)
-			ctx := context.Background()
-
-			s := runtime.NewScheme()
-			svcDefaultsWithDeletion := &v1alpha1.ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "foo",
-					Namespace:         kubeNS,
-					DeletionTimestamp: &metav1.Time{Time: time.Now()},
-				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
-					Protocol: "http",
-				},
-			}
-			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaultsWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaultsWithDeletion).Build()
-
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			testClient.TestServer.WaitForServiceIntentions(t)
-			consulClient := testClient.APIClient
-			reconciler := &TrafficPermissionsController{
-				Client: fakeClient,
-				Log:    logrtest.New(t),
-				MeshConfigController: &MeshConfigController{
-					ConsulClientConfig:  testClient.Cfg,
-					ConsulServerConnMgr: testClient.Watcher,
-					DatacenterName:      datacenterName,
-				},
-			}
-
-			// We haven't run reconcile yet so we must create the config entry
-			// in Consul ourselves.
-			{
-				// Create the resource with different datacenter on metadata
-				written, _, err := consulClient.ConfigEntries().Set(svcDefaultsWithDeletion.ToConsul(datacenter), nil)
-				req.NoError(err)
-				req.True(written)
-			}
-
-			// Now run reconcile. It's marked for deletion so this should delete the kubernetes resource
-			// but not the consul config entry.
-			{
-				namespacedName := types.NamespacedName{
-					Namespace: kubeNS,
-					Name:      svcDefaultsWithDeletion.KubernetesName(),
-				}
-				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
-					NamespacedName: namespacedName,
-				})
-				req.NoError(err)
-				req.False(resp.Requeue)
-
-				entry, _, err := consulClient.ConfigEntries().Get(capi.ServiceDefaults, svcDefaultsWithDeletion.ConsulName(), nil)
-				req.NoError(err)
-				req.Equal(entry.GetMeta()[common.DatacenterKey], datacenter)
-
-				// Check that the resource is deleted from cluster.
-				svcDefault := &v1alpha1.ServiceDefaults{}
-				_ = fakeClient.Get(ctx, namespacedName, svcDefault)
-			}
-		})
-	}
-}
-
-func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	ctx := context.Background()
-	kubeNS := "default"
 
 	s := runtime.NewScheme()
-	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{}, &v1alpha1.ServiceSplitter{})
-
-	defaults := &v1alpha1.ServiceDefaults{
+	trafficpermissions := &v2alpha1.TrafficPermissions{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "service",
-			Namespace: "default",
+			Name:      "foo",
+			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: v1alpha1.ServiceDefaultsSpec{
-			Protocol: "http",
-		},
-	}
-
-	splitter := &v1alpha1.ServiceSplitter{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "service",
-			Namespace: "default",
-		},
-		Spec: v1alpha1.ServiceSplitterSpec{
-			Splits: v1alpha1.ServiceSplits{
+		Spec: v2alpha1.TrafficPermissionsSpec{
+			Destination: &v2alpha1.Destination{
+				IdentityName: "destination-identity",
+			},
+			Action: v2alpha1.ActionAllow,
+			Permissions: v2alpha1.Permissions{
 				{
-					Weight:  100,
-					Service: "service",
+					Sources: v2alpha1.Sources{
+						{
+							IdentityName: "source-identity",
+						},
+					},
 				},
 			},
 		},
 	}
+	s.AddKnownTypes(v2alpha1.AuthGroupVersion, trafficpermissions)
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissions).Build()
 
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(defaults, splitter).Build()
+	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+		c.Experiments = []string{"resource-apis"}
+	})
+	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+	require.NoError(t, err)
 
-	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-	testClient.TestServer.WaitForServiceIntentions(t)
+	unmanagedResource := trafficpermissions.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
+	unmanagedResource.Metadata = make(map[string]string) // Zero out the metadata
 
-	logger := logrtest.New(t)
+	// We haven't run reconcile yet. We must create the resource
+	// in Consul ourselves, without the metadata indicating it is owned by the controller.
+	{
+		req := &pbresource.WriteRequest{Resource: unmanagedResource}
+		_, err := resourceClient.Write(ctx, req)
+		require.NoError(t, err)
+	}
 
-	svcDefaultsReconciler := TrafficPermissionsController{
+	// Now run reconcile which should **not** update the entry in Consul.
+	{
+		namespacedName := types.NamespacedName{
+			Namespace: metav1.NamespaceDefault,
+			Name:      trafficpermissions.KubernetesName(),
+		}
+		// First get it, so we have the latest revision number.
+		err := fakeClient.Get(ctx, namespacedName, trafficpermissions)
+		require.NoError(t, err)
+
+		// Attempt to create the entry in Kube and run reconcile.
+		reconciler := TrafficPermissionsController{
+			Client: fakeClient,
+			Log:    logrtest.New(t),
+			MeshConfigController: &MeshConfigController{
+				ConsulClientConfig:  testClient.Cfg,
+				ConsulServerConnMgr: testClient.Watcher,
+			},
+		}
+		resp, err := reconciler.Reconcile(ctx, ctrl.Request{
+			NamespacedName: namespacedName,
+		})
+		require.EqualError(t, err, "resource already exists in Consul")
+		require.False(t, resp.Requeue)
+
+		// Now check that the object in Consul is as expected.
+		req := &pbresource.ReadRequest{Id: trafficpermissions.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
+		readResp, err := resourceClient.Read(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, readResp.GetResource())
+		opts := append([]cmp.Option{
+			protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
+			protocmp.IgnoreFields(&pbresource.ID{}, "uid")},
+			test.CmpProtoIgnoreOrder()...)
+		diff := cmp.Diff(unmanagedResource, readResp.GetResource(), opts...)
+		require.Equal(t, "", diff, "TrafficPermissions do not match")
+
+		// Check that the status is "synced=false".
+		err = fakeClient.Get(ctx, namespacedName, trafficpermissions)
+		require.NoError(t, err)
+		status, reason, errMsg := trafficpermissions.SyncedCondition()
+		require.Equal(t, corev1.ConditionFalse, status)
+		require.Equal(t, "ExternallyManagedConfigError", reason)
+		require.Equal(t, errMsg, "resource already exists in Consul")
+	}
+
+}
+
+// TestMeshConfigController_doesNotDeleteUnownedConfig tests that if the resource
+// exists in Consul but is not managed by the controller, deleting the resource does
+// not delete the Consul resource.
+func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	s := runtime.NewScheme()
+
+	trafficpermissionsWithDeletion := &v2alpha1.TrafficPermissions{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "foo",
+			Namespace:         metav1.NamespaceDefault,
+			DeletionTimestamp: &metav1.Time{Time: time.Now()},
+		},
+		Spec: v2alpha1.TrafficPermissionsSpec{
+			Destination: &v2alpha1.Destination{
+				IdentityName: "destination-identity",
+			},
+			Action: v2alpha1.ActionAllow,
+			Permissions: v2alpha1.Permissions{
+				{
+					Sources: v2alpha1.Sources{
+						{
+							IdentityName: "source-identity",
+						},
+					},
+				},
+			},
+		},
+	}
+	s.AddKnownTypes(v2alpha1.AuthGroupVersion, trafficpermissionsWithDeletion)
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissionsWithDeletion).Build()
+
+	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+		c.Experiments = []string{"resource-apis"}
+	})
+	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+	require.NoError(t, err)
+
+	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
-		Log:    logger,
+		Log:    logrtest.New(t),
 		MeshConfigController: &MeshConfigController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
-			DatacenterName:      datacenterName,
 		},
 	}
 
-	defaultsNamespacedName := types.NamespacedName{
-		Namespace: kubeNS,
-		Name:      defaults.Name,
+	unmanagedResource := trafficpermissionsWithDeletion.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
+	unmanagedResource.Metadata = make(map[string]string) // Zero out the metadata
+
+	// We haven't run reconcile yet. We must create the resource
+	// in Consul ourselves, without the metadata indicating it is owned by the controller.
+	{
+		req := &pbresource.WriteRequest{Resource: unmanagedResource}
+		_, err := resourceClient.Write(ctx, req)
+		require.NoError(t, err)
 	}
 
-	// Create config entries for service-defaults and service-splitter.
-	resp, err := svcDefaultsReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: defaultsNamespacedName})
-	require.NoError(t, err)
-	require.False(t, resp.Requeue)
-
-	err = fakeClient.Get(ctx, defaultsNamespacedName, defaults)
-	require.NoError(t, err)
-
-	// Update service-defaults with deletion timestamp so that it attempts deletion on reconcile.
-	defaults.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	err = fakeClient.Update(ctx, defaults)
-	require.NoError(t, err)
-
-	// Reconcile should fail as the service-splitter still required the service-defaults causing the delete operation on Consul to fail.
-	resp, err = svcDefaultsReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: defaultsNamespacedName})
-	require.EqualError(t, err, "deleting config entry from consul: Unexpected response code: 500 (discovery chain \"service\" uses a protocol \"tcp\" that does not permit advanced routing or splitting behavior)")
-	require.False(t, resp.Requeue)
-
-	err = fakeClient.Get(ctx, defaultsNamespacedName, defaults)
-	require.NoError(t, err)
-
-	// Ensure the status of the resource is updated to display failure reason.
-	syncCondition := defaults.GetCondition(v1alpha1.ConditionSynced)
-	expectedCondition := &v1alpha1.Condition{
-		Type:    v1alpha1.ConditionSynced,
-		Status:  corev1.ConditionFalse,
-		Reason:  ConsulAgentError,
-		Message: "deleting config entry from consul: Unexpected response code: 500 (discovery chain \"service\" uses a protocol \"tcp\" that does not permit advanced routing or splitting behavior)",
-	}
-	require.True(t, cmp.Equal(syncCondition, expectedCondition, cmpopts.IgnoreFields(v1alpha1.Condition{}, "LastTransitionTime")))
-}
-
-// Test that if the resource already exists in Consul but the Kube resource
-// has the "migrate-entry" annotation then we let the Kube resource sync to Consul.
-func TestConfigEntryController_Migration(t *testing.T) {
-	kubeNS := "default"
-	protocol := "http"
-	cfgEntryName := "service"
-
-	cases := map[string]struct {
-		KubeResource   v1alpha1.ServiceDefaults
-		ConsulResource capi.ServiceConfigEntry
-		ExpErr         string
-	}{
-		"identical resources should be migrated successfully": {
-			KubeResource: v1alpha1.ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      cfgEntryName,
-					Namespace: kubeNS,
-					Annotations: map[string]string{
-						common.MigrateEntryKey: "true",
-					},
-				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
-					Protocol: protocol,
-				},
-			},
-			ConsulResource: capi.ServiceConfigEntry{
-				Kind:     capi.ServiceDefaults,
-				Name:     cfgEntryName,
-				Protocol: protocol,
-			},
-		},
-		"different resources (protocol) should not be migrated": {
-			KubeResource: v1alpha1.ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      cfgEntryName,
-					Namespace: kubeNS,
-					Annotations: map[string]string{
-						common.MigrateEntryKey: "true",
-					},
-				},
-				Spec: v1alpha1.ServiceDefaultsSpec{
-					Protocol: "tcp",
-				},
-			},
-			ConsulResource: capi.ServiceConfigEntry{
-				Kind:     capi.ServiceDefaults,
-				Name:     cfgEntryName,
-				Protocol: protocol,
-			},
-			ExpErr: "migration failed: Kubernetes resource does not match existing Consul config entry",
-		},
-	}
-
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			ctx := context.Background()
-
-			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{})
-
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(&c.KubeResource).Build()
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			testClient.TestServer.WaitForServiceIntentions(t)
-			consulClient := testClient.APIClient
-
-			// Create the service-defaults in Consul.
-			success, _, err := consulClient.ConfigEntries().Set(&c.ConsulResource, nil)
-			require.NoError(t, err)
-			require.True(t, success, "config entry was not created")
-
-			// Set up the reconciler.
-			logger := logrtest.New(t)
-			svcDefaultsReconciler := ServiceDefaultsController{
-				Client: fakeClient,
-				Log:    logger,
-				MeshConfigController: &MeshConfigController{
-					ConsulClientConfig:  testClient.Cfg,
-					ConsulServerConnMgr: testClient.Watcher,
-					DatacenterName:      datacenterName,
-				},
-			}
-
-			defaultsNamespacedName := types.NamespacedName{
-				Namespace: kubeNS,
-				Name:      cfgEntryName,
-			}
-
-			// Trigger the reconciler.
-			resp, err := svcDefaultsReconciler.Reconcile(ctx, ctrl.Request{NamespacedName: defaultsNamespacedName})
-			if c.ExpErr != "" {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), c.ExpErr)
-			} else {
-				require.NoError(t, err)
-				require.False(t, resp.Requeue)
-			}
-
-			entryAfterReconcile := &v1alpha1.ServiceDefaults{}
-			err = fakeClient.Get(ctx, defaultsNamespacedName, entryAfterReconcile)
-			require.NoError(t, err)
-
-			syncCondition := entryAfterReconcile.GetCondition(v1alpha1.ConditionSynced)
-			if c.ExpErr != "" {
-				// Ensure the status of the resource is migration failed.
-				require.Equal(t, corev1.ConditionFalse, syncCondition.Status)
-				require.Equal(t, MigrationFailedError, syncCondition.Reason)
-				require.Contains(t, syncCondition.Message, c.ExpErr)
-
-				// Check that the Consul resource hasn't changed.
-				entry, _, err := consulClient.ConfigEntries().Get(capi.ServiceDefaults, cfgEntryName, nil)
-				require.NoError(t, err)
-				require.NotContains(t, entry.GetMeta(), common.DatacenterKey)
-				require.Equal(t, protocol, entry.(*capi.ServiceConfigEntry).Protocol)
-			} else {
-				// Ensure the status of the resource is synced.
-				expectedCondition := &v1alpha1.Condition{
-					Type:   v1alpha1.ConditionSynced,
-					Status: corev1.ConditionTrue,
-				}
-				require.True(t, cmp.Equal(syncCondition, expectedCondition, cmpopts.IgnoreFields(v1alpha1.Condition{}, "LastTransitionTime")))
-
-				// Ensure the Consul resource has the expected metadata.
-				entry, _, err := consulClient.ConfigEntries().Get(capi.ServiceDefaults, cfgEntryName, nil)
-				require.NoError(t, err)
-				require.Contains(t, entry.GetMeta(), common.DatacenterKey)
-				require.Equal(t, "datacenter", entry.GetMeta()[common.DatacenterKey])
-			}
+	// Now run reconcile. It's marked for deletion so this should delete the kubernetes resource
+	// but not the consul config entry.
+	{
+		namespacedName := types.NamespacedName{
+			Namespace: metav1.NamespaceDefault,
+			Name:      trafficpermissionsWithDeletion.KubernetesName(),
+		}
+		resp, err := reconciler.Reconcile(ctx, ctrl.Request{
+			NamespacedName: namespacedName,
 		})
+		require.NoError(t, err)
+		require.False(t, resp.Requeue)
+
+		// Now check that the object in Consul is as expected.
+		req := &pbresource.ReadRequest{Id: trafficpermissionsWithDeletion.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
+		readResp, err := resourceClient.Read(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, readResp.GetResource())
+		opts := append([]cmp.Option{
+			protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
+			protocmp.IgnoreFields(&pbresource.ID{}, "uid")},
+			test.CmpProtoIgnoreOrder()...)
+		diff := cmp.Diff(unmanagedResource, readResp.GetResource(), opts...)
+		require.Equal(t, "", diff, "TrafficPermissions do not match")
+
+		// Check that the resource is deleted from cluster.
+		// TODO: add this back in when finalizers are added.
 	}
 }

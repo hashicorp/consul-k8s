@@ -319,7 +319,8 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 						PeerName: constants.DefaultConsulPeer,
 					},
 				},
-				Data: inject.ToProtoAny(&pbmesh.ProxyConfiguration{}),
+				Data:     inject.ToProtoAny(&pbmesh.ProxyConfiguration{}),
+				Metadata: meshConfigMeta(),
 			},
 			Matches: false,
 		},
@@ -506,7 +507,10 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 			actual := c.Ours.Resource(c.ConsulNamespace, c.ConsulPartition)
 			expected := constructTrafficPermissionResource(c.ExpectedData, c.ExpectedName, c.ConsulNamespace, c.ConsulPartition)
 
-			opts := append([]cmp.Option{protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version")}, test.CmpProtoIgnoreOrder()...)
+			opts := append([]cmp.Option{
+				protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
+				protocmp.IgnoreFields(&pbresource.ID{}, "uid"),
+			}, test.CmpProtoIgnoreOrder()...)
 			diff := cmp.Diff(expected, actual, opts...)
 			require.Equal(t, "", diff, "TrafficPermissions do not match")
 		})
@@ -785,11 +789,13 @@ func constructTrafficPermissionResource(tp *pbauth.TrafficPermissions, name, nam
 			// At a future point, this will move out of the Tenancy block.
 			PeerName: constants.DefaultConsulPeer,
 		},
+		Uid: "ABCD", // We add this to show it does not factor into the comparison
 	}
 
 	return &pbresource.Resource{
-		Id:   id,
-		Data: data,
+		Id:       id,
+		Data:     data,
+		Metadata: meshConfigMeta(),
 
 		// We add the fields below to prove that they are not used in the Match when comparing the CRD to Consul.
 		Version:    "123456",

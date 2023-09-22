@@ -31,7 +31,8 @@ import (
 )
 
 const (
-	ConsulAgentError = "ConsulAgentError"
+	ConsulAgentError             = "ConsulAgentError"
+	ExternallyManagedConfigError = "ExternallyManagedConfigError"
 )
 
 // Controller is implemented by CRD-specific config-entries. It is used by
@@ -69,9 +70,9 @@ type MeshConfigController struct {
 // CRD-specific controller should pass themselves in as updater since we
 // need to call back into their own update methods to ensure they update their
 // internal state.
-func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Controller, req ctrl.Request, resource common.MeshConfig) (ctrl.Result, error) {
+func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Controller, req ctrl.Request, meshConfig common.MeshConfig) (ctrl.Result, error) {
 	logger := crdCtrl.Logger(req.NamespacedName)
-	err := crdCtrl.Get(ctx, req.NamespacedName, resource)
+	err := crdCtrl.Get(ctx, req.NamespacedName, meshConfig)
 	if k8serr.IsNotFound(err) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	} else if err != nil {
@@ -86,25 +87,34 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 		return ctrl.Result{}, err
 	}
 
-	if !resource.GetDeletionTimestamp().IsZero() {
+	// TODO: add finalizers
+
+	if !meshConfig.GetDeletionTimestamp().IsZero() {
 		// The object is being deleted
 		logger.Info("deletion event")
 		// Check to see if consul has config entry with the same name
-		_, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: resource.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+		res, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 
 		// Ignore the error where the resource isn't found in Consul.
 		// It is indicative of desired state.
 		if err != nil && !isNotFoundErr(err) {
 			return ctrl.Result{}, fmt.Errorf("getting resource from Consul: %w", err)
-		} else if err == nil {
-			_, err := resourceClient.Delete(ctx, &pbresource.DeleteRequest{Id: resource.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+		}
+
+		// In the case this resource was created outside of consul, skip the deletion process and continue
+		if !managedByMeshController(res.GetResource()) {
+			logger.Info("resource in Consul was created outside of kubernetes - skipping delete from Consul")
+		}
+
+		if err == nil && managedByMeshController(res.GetResource()) {
+			_, err := resourceClient.Delete(ctx, &pbresource.DeleteRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 			if err != nil {
-				return r.syncFailed(ctx, logger, crdCtrl, resource, ConsulAgentError,
+				return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ConsulAgentError,
 					fmt.Errorf("deleting config entry from consul: %w", err))
 			}
 			logger.Info("deletion from Consul successful")
 		}
-		if err := crdCtrl.Update(ctx, resource); err != nil {
+		if err := crdCtrl.Update(ctx, meshConfig); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -113,7 +123,7 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 	}
 
 	// Check to see if consul has config entry with the same name
-	entry, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: resource.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+	res, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 
 	// In the case the namespace doesn't exist in Consul yet, assume we are racing with the namespace controller
 	// and requeue.
@@ -129,33 +139,39 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 		logger.Info("resource not found in consul")
 
 		// Create the config entry
-		_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: resource.Resource(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+		_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: meshConfig.Resource(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 		if err != nil {
-			return r.syncFailed(ctx, logger, crdCtrl, resource, ConsulAgentError,
+			return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ConsulAgentError,
 				fmt.Errorf("writing resource to consul: %w", err))
 		}
 
 		logger.Info("resource created")
-		return r.syncSuccessful(ctx, crdCtrl, resource)
+		return r.syncSuccessful(ctx, crdCtrl, meshConfig)
 	}
 
 	// If there is an error when trying to get the resource from the api server,
 	// fail the reconcile.
 	if err != nil {
-		return r.syncFailed(ctx, logger, crdCtrl, resource, ConsulAgentError, err)
+		return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ConsulAgentError, err)
 	}
 
-	if !resource.MatchesConsul(entry.Resource, r.consulNamespace(req.Namespace), r.getConsulPartition()) {
+	// TODO: consider the case where we want to migrate a resource existing into Consul to a CRD with an annotation
+	if !managedByMeshController(res.Resource) {
+		return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ExternallyManagedConfigError,
+			fmt.Errorf("resource already exists in Consul"))
+	}
+
+	if !meshConfig.MatchesConsul(res.Resource, r.consulNamespace(req.Namespace), r.getConsulPartition()) {
 		logger.Info("resource does not match Consul")
-		_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: resource.Resource(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+		_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: meshConfig.Resource(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 		if err != nil {
-			return r.syncUnknownWithError(ctx, logger, crdCtrl, resource, ConsulAgentError,
+			return r.syncUnknownWithError(ctx, logger, crdCtrl, meshConfig, ConsulAgentError,
 				fmt.Errorf("updating resource in Consul: %w", err))
 		}
 		logger.Info("config entry updated")
-		return r.syncSuccessful(ctx, crdCtrl, resource)
-	} else if resource.SyncedConditionStatus() != corev1.ConditionTrue {
-		return r.syncSuccessful(ctx, crdCtrl, resource)
+		return r.syncSuccessful(ctx, crdCtrl, meshConfig)
+	} else if meshConfig.SyncedConditionStatus() != corev1.ConditionTrue {
+		return r.syncSuccessful(ctx, crdCtrl, meshConfig)
 	}
 
 	return ctrl.Result{}, nil
@@ -265,4 +281,20 @@ func (r *MeshConfigController) getConsulPartition() string {
 		return constants.DefaultConsulPartition
 	}
 	return r.ConsulPartition
+}
+
+func managedByMeshController(resource *pbresource.Resource) bool {
+	if resource == nil {
+		return false
+	}
+
+	consulMeta := resource.GetMetadata()
+	if consulMeta == nil {
+		return false
+	}
+
+	if val, ok := consulMeta[common.SourceKey]; ok && val == common.SourceValue {
+		return true
+	}
+	return false
 }

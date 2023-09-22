@@ -222,6 +222,7 @@ func (in *TrafficPermissions) Resource(namespace, partition string) *pbresource.
 			Action:      in.Spec.Action.toProto(),
 			Permissions: in.Spec.Permissions.toProto(),
 		}),
+		Metadata: meshConfigMeta(),
 	}
 }
 
@@ -230,6 +231,7 @@ func (in *TrafficPermissions) MatchesConsul(candidate *pbresource.Resource, name
 		in.Resource(namespace, partition),
 		candidate,
 		protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
+		protocmp.IgnoreFields(&pbresource.ID{}, "uid"),
 		protocmp.Transform(),
 		cmpopts.SortSlices(func(a, b any) bool { return fmt.Sprintf("%v", a) < fmt.Sprintf("%v", b) }),
 	)

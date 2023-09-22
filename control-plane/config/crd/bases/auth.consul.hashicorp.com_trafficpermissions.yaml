@@ -78,8 +78,6 @@ spec:
                       (*) to match all services that don't otherwise have intentions
                       defined.
                     type: string
-                  identityPrefix:
-                    type: string
                 type: object
               permissions:
                 description: Permissions is a list of permissions to match on. They
