@@ -13,8 +13,7 @@ import (
 )
 
 func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) ([]corev1.EnvVar, error) {
-	p := common.NewPodAnnotationProcessor(true, true)
-	upstreams, err := p.ProcessUpstreams(pod)
+	upstreams, err := common.ProcessPodUpstreams(pod, true, true)
 	if err != nil {
 		return nil, err
 	}
