@@ -193,7 +193,7 @@ const (
 	LabelServiceIgnore = "consul.hashicorp.com/service-ignore"
 
 	// LabelPeeringToken is a label that can be added to a secret to allow it to be watched
-	// by the peering config-entries.
+	// by the peering controllers.
 	LabelPeeringToken = "consul.hashicorp.com/peering-token"
 
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.

@@ -32,7 +32,7 @@ import (
 
 // NOTE: We're not testing each controller type here because that's mostly done in
 // the OSS tests and it would result in too many permutations. Instead
-// we're only testing with the ServiceDefaults and ProxyDefaults config-entries which
+// we're only testing with the ServiceDefaults and ProxyDefaults controllers which
 // will exercise all the namespaces code for config entries that are namespaced and those that
 // exist in the global namespace.
 // We also test Enterprise only features like SamenessGroups.
