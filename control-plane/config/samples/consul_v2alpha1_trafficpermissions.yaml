@@ -6,4 +6,9 @@ kind: TrafficPermissions
 metadata:
   name: trafficpermissions-sample
 spec:
-  # TODO(user): Add fields here
+  destination:
+    identityName: destination-identity
+  action: allow
+  permissions:
+  - sources:
+    - identityName: source-identity
