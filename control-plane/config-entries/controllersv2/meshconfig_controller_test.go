@@ -92,9 +92,14 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 						Sources: []*pbauth.Source{
 							{
 								IdentityName: "source-identity",
+								Namespace:    common.DefaultConsulNamespace,
+								Partition:    common.DefaultConsulPartition,
+								Peer:         constants.DefaultConsulPeer,
 							},
 							{
 								Namespace: "the space namespace space",
+								Partition: common.DefaultConsulPartition,
+								Peer:      constants.DefaultConsulPeer,
 							},
 						},
 						DestinationRules: []*pbauth.DestinationRule{
@@ -228,6 +233,8 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 						Sources: []*pbauth.Source{
 							{
 								Namespace: "the space namespace space",
+								Partition: common.DefaultConsulPartition,
+								Peer:      constants.DefaultConsulPeer,
 							},
 						},
 						DestinationRules: []*pbauth.DestinationRule{
@@ -604,6 +611,9 @@ func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
 					Sources: v2beta1.Sources{
 						{
 							IdentityName: "source-identity",
+							Namespace:    common.DefaultConsulNamespace,
+							Partition:    common.DefaultConsulPartition,
+							Peer:         constants.DefaultConsulPeer,
 						},
 					},
 				},
@@ -704,6 +714,9 @@ func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
 					Sources: v2beta1.Sources{
 						{
 							IdentityName: "source-identity",
+							Namespace:    common.DefaultConsulNamespace,
+							Partition:    common.DefaultConsulPartition,
+							Peer:         constants.DefaultConsulPeer,
 						},
 					},
 				},
