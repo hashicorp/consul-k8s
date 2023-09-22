@@ -93,7 +93,7 @@ type ControlPlaneRequestLimitSpec struct {
 	Intention            *ReadWriteRatesConfig `json:"intention,omitempty"`
 	KV                   *ReadWriteRatesConfig `json:"kv,omitempty"`
 	Tenancy              *ReadWriteRatesConfig `json:"tenancy,omitempty"`
-	PreparedQuery        *ReadWriteRatesConfig `json:"perparedQuery,omitempty"`
+	PreparedQuery        *ReadWriteRatesConfig `json:"preparedQuery,omitempty"`
 	Session              *ReadWriteRatesConfig `json:"session,omitempty"`
 	Txn                  *ReadWriteRatesConfig `json:"txn,omitempty"`
 }
