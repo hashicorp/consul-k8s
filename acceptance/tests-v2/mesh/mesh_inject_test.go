@@ -38,7 +38,7 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			helmValues := map[string]string{
 				"global.image":                "ndhanushkodi/consul-dev:multiport37",
-				"global.imageK8S":             "ndhanushkodi/consul-k8s-dev:multiport23",
+				"global.imageK8S":             "ndhanushkodi/consul-k8s-dev:multiport25",
 				"global.imageConsulDataplane": "hashicorppreview/consul-dataplane:1.3-dev",
 				"global.experiments[0]":       "resource-apis",
 				// The UI is not supported for v2 in 1.17, so for now it must be disabled.
