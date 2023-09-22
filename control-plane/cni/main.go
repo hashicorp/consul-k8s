@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	// These annotations are duplicated from control-plane/connect-inject/annotations_and_labels.go in
+	// A change These annotations are duplicated from control-plane/connect-inject/annotations_and_labels.go in
 	// order to prevent pulling in dependencies.
 
 	// keyInjectStatus is the key of the annotation that is added to
