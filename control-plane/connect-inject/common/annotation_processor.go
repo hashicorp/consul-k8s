@@ -15,13 +15,13 @@ const (
 	ConsulNodeAddress = "127.0.0.1"
 )
 
-// PodAnnotationProcessor processes a pod annotation into pbmesh.Upstreams
+// PodAnnotationProcessor processes a pod annotation into pbmesh.Upstreams.
 type PodAnnotationProcessor struct {
 	enablePartitions bool
 	enableNamespaces bool
 }
 
-// NewPodAnnotationProcessor constructs a PodAnnotationProcessor for processing pod annotations into pbmesh.Upsreams
+// NewPodAnnotationProcessor constructs a PodAnnotationProcessor for processing pod annotations into pbmesh.Upsreams.
 func NewPodAnnotationProcessor(enablePartitions, enableNamespaces bool) PodAnnotationProcessor {
 	return PodAnnotationProcessor{
 		enablePartitions: enablePartitions,

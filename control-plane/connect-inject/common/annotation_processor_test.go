@@ -964,7 +964,7 @@ func TestUpstreamRefrenceType(t *testing.T) {
 		Kind:         "Service",
 	}
 	actual := UpstreamReferenceType()
-	require.Equal(t, *actual, *expect)
+	require.Equal(t, actual, expect)
 }
 
 // createPod creates a multi-port pod as a base for tests.

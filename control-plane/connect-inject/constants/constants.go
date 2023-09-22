@@ -56,7 +56,7 @@ const (
 )
 
 // GetDefaultConsulNamespace returns the default namespace if the passed namespace
-// is empty, otherwise returns back the passed in namespace
+// is empty, otherwise returns back the passed in namespace.
 func GetDefaultConsulNamespace(ns string) string {
 	if ns == "" {
 		ns = DefaultConsulNS
@@ -66,7 +66,7 @@ func GetDefaultConsulNamespace(ns string) string {
 }
 
 // GetDefaultConsulPartition returns the default partition if the passed partition
-// is empty, otherwise returns back the passed in partition
+// is empty, otherwise returns back the passed in partition.
 func GetDefaultConsulPartition(ap string) string {
 	if ap == "" {
 		ap = DefaultConsulPartition
@@ -76,7 +76,7 @@ func GetDefaultConsulPartition(ap string) string {
 }
 
 // GetDefaultConsulPeer returns the default peer if the passed peer
-// is empty, otherwise returns back the passed in peer
+// is empty, otherwise returns back the passed in peer.
 func GetDefaultConsulPeer(peer string) string {
 	if peer == "" {
 		peer = DefaultConsulPeer
