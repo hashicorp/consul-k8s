@@ -7,6 +7,7 @@ package common
 import mapset "github.com/deckarep/golang-set"
 
 const (
+	// V1 config entries.
 	ServiceDefaults          string = "servicedefaults"
 	ProxyDefaults            string = "proxydefaults"
 	ServiceResolver          string = "serviceresolver"
@@ -22,7 +23,7 @@ const (
 	RouteAuthFilter          string = "routeauthfilter"
 	GatewayPolicy            string = "gatewaypolicy"
 
-	// V2 config entries
+	// V2 config entries.
 	TrafficPermissions string = "trafficpermissions"
 
 	Global                 string = "global"

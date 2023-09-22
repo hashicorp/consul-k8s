@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -31,6 +32,7 @@ import (
 )
 
 const (
+	FinalizerName                = "finalizers.consul.hashicorp.com"
 	ConsulAgentError             = "ConsulAgentError"
 	ExternallyManagedConfigError = "ExternallyManagedConfigError"
 )
@@ -87,35 +89,50 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 		return ctrl.Result{}, err
 	}
 
-	// TODO: add finalizers
+	if meshConfig.GetDeletionTimestamp().IsZero() {
+		// The object is not being deleted, so if it does not have our finalizer,
+		// then let's add the finalizer and update the object. This is equivalent
+		// registering our finalizer.
+		if !slices.Contains(meshConfig.GetFinalizers(), FinalizerName) {
+			meshConfig.AddFinalizer(FinalizerName)
+			if err := r.syncUnknown(ctx, crdCtrl, meshConfig); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	}
 
 	if !meshConfig.GetDeletionTimestamp().IsZero() {
-		// The object is being deleted
-		logger.Info("deletion event")
-		// Check to see if consul has config entry with the same name
-		res, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+		if slices.Contains(meshConfig.GetFinalizers(), FinalizerName) {
+			// The object is being deleted
+			logger.Info("deletion event")
+			// Check to see if consul has config entry with the same name
+			res, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 
-		// Ignore the error where the resource isn't found in Consul.
-		// It is indicative of desired state.
-		if err != nil && !isNotFoundErr(err) {
-			return ctrl.Result{}, fmt.Errorf("getting resource from Consul: %w", err)
-		}
-
-		// In the case this resource was created outside of consul, skip the deletion process and continue
-		if !managedByMeshController(res.GetResource()) {
-			logger.Info("resource in Consul was created outside of kubernetes - skipping delete from Consul")
-		}
-
-		if err == nil && managedByMeshController(res.GetResource()) {
-			_, err := resourceClient.Delete(ctx, &pbresource.DeleteRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
-			if err != nil {
-				return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ConsulAgentError,
-					fmt.Errorf("deleting config entry from consul: %w", err))
+			// Ignore the error where the resource isn't found in Consul.
+			// It is indicative of desired state.
+			if err != nil && !isNotFoundErr(err) {
+				return ctrl.Result{}, fmt.Errorf("getting resource from Consul: %w", err)
 			}
-			logger.Info("deletion from Consul successful")
-		}
-		if err := crdCtrl.Update(ctx, meshConfig); err != nil {
-			return ctrl.Result{}, err
+
+			// In the case this resource was created outside of consul, skip the deletion process and continue
+			if !managedByMeshController(res.GetResource()) {
+				logger.Info("resource in Consul was created outside of kubernetes - skipping delete from Consul")
+			}
+
+			if err == nil && managedByMeshController(res.GetResource()) {
+				_, err := resourceClient.Delete(ctx, &pbresource.DeleteRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+				if err != nil {
+					return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ConsulAgentError,
+						fmt.Errorf("deleting config entry from consul: %w", err))
+				}
+				logger.Info("deletion from Consul successful")
+			}
+			// remove our finalizer from the list and update it.
+			meshConfig.RemoveFinalizer(FinalizerName)
+			if err := crdCtrl.Update(ctx, meshConfig); err != nil {
+				return ctrl.Result{}, err
+			}
+			logger.Info("finalizer removed")
 		}
 
 		// Stop reconciliation as the item is being deleted

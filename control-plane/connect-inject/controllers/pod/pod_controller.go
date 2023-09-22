@@ -157,7 +157,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err := r.writeUpstreams(ctx, pod); err != nil {
 			// Technically this is not needed, but keeping in case this gets refactored in
 			// a different order
-			if common.ConsulNamespaceIsNotFound(err) {
+			if inject.ConsulNamespaceIsNotFound(err) {
 				r.Log.Info("Consul namespace not found; re-queueing request",
 					"pod", req.Name, "ns", req.Namespace, "consul-ns",
 					r.getConsulNamespace(req.Namespace), "err", err.Error())
@@ -460,7 +460,7 @@ func (r *Controller) writeUpstreams(ctx context.Context, pod corev1.Pod) error {
 		return nil
 	}
 
-	data := common.ToProtoAny(uss)
+	data := inject.ToProtoAny(uss)
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
 			Id:       getUpstreamsID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
@@ -548,7 +548,7 @@ func (r *Controller) processUpstreams(pod corev1.Pod) (*pbmesh.Upstreams, error)
 func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) (*pbmesh.Upstream, error) {
 	parts := strings.SplitN(rawUpstream, ":", 3)
 	var port int32
-	port, _ = common.PortValue(pod, strings.TrimSpace(parts[1]))
+	port, _ = inject.PortValue(pod, strings.TrimSpace(parts[1]))
 	if port <= 0 {
 		return &pbmesh.Upstream{}, fmt.Errorf("port value %d in upstream is invalid: %s", port, rawUpstream)
 	}
@@ -665,7 +665,7 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 
 	parts := strings.SplitN(rawUpstream, ":", 3)
 
-	port, _ = common.PortValue(pod, strings.TrimSpace(parts[1]))
+	port, _ = inject.PortValue(pod, strings.TrimSpace(parts[1]))
 
 	// If Consul Namespaces or Admin Partitions are enabled, attempt to parse the
 	// upstream for a namespace.

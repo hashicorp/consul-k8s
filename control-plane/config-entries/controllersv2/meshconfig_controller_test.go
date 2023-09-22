@@ -167,6 +167,9 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 			err = fakeClient.Get(ctx, namespacedName, c.meshConfig)
 			require.NoError(t, err)
 			require.Equal(t, corev1.ConditionTrue, c.meshConfig.SyncedConditionStatus())
+
+			// Check that the finalizer is added.
+			require.Contains(t, c.meshConfig.Finalizers(), FinalizerName)
 		})
 	}
 }
@@ -336,6 +339,7 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 					Name:              "test-name",
 					Namespace:         metav1.NamespaceDefault,
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v2alpha1.TrafficPermissionsSpec{
 					Destination: &v2alpha1.Destination{
@@ -688,6 +692,7 @@ func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
 			Name:              "foo",
 			Namespace:         metav1.NamespaceDefault,
 			DeletionTimestamp: &metav1.Time{Time: time.Now()},
+			Finalizers:        []string{FinalizerName},
 		},
 		Spec: v2alpha1.TrafficPermissionsSpec{
 			Destination: &v2alpha1.Destination{
@@ -760,6 +765,8 @@ func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
 		require.Equal(t, "", diff, "TrafficPermissions do not match")
 
 		// Check that the resource is deleted from cluster.
-		// TODO: add this back in when finalizers are added.
+		tp := &v2alpha1.TrafficPermissions{}
+		_ = fakeClient.Get(ctx, namespacedName, tp)
+		require.Empty(t, tp.Finalizers())
 	}
 }

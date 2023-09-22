@@ -20,6 +20,13 @@ type MeshConfig interface {
 	// DeepCopyObject should be implemented by the generated code.
 	DeepCopyObject() runtime.Object
 
+	// AddFinalizer adds a finalizer to the list of finalizers.
+	AddFinalizer(name string)
+	// RemoveFinalizer removes this finalizer from the list.
+	RemoveFinalizer(name string)
+	// Finalizers returns the list of finalizers for this object.
+	Finalizers() []string
+
 	// MatchesConsul returns true if the resource has the same fields as the Consul
 	// config entry.
 	MatchesConsul(candidate *pbresource.Resource, namespace, partition string) bool
