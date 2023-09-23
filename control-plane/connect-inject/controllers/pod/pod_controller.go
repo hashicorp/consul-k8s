@@ -110,8 +110,8 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 		// TODO: clean up ACL Tokens
 
-		// Delete upstreams, if any exist
-		if err := r.deleteUpstreams(ctx, req.NamespacedName); err != nil {
+		// Delete destinations, if any exist
+		if err := r.deleteDestinations(ctx, req.NamespacedName); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 
@@ -152,8 +152,8 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			errs = multierror.Append(errs, err)
 		}
 
-		// Create explicit upstreams (if any exist)
-		if err := r.writeUpstreams(ctx, pod); err != nil {
+		// Create explicit destinations (if any exist)
+		if err := r.writeDestinations(ctx, pod); err != nil {
 			// Technically this is not needed, but keeping in case this gets refactored in
 			// a different order
 			if inject.ConsulNamespaceIsNotFound(err) {
@@ -449,11 +449,11 @@ func (r *Controller) writeHealthStatus(ctx context.Context, pod corev1.Pod) erro
 // has been configured with and will only delete tokens for the provided podName.
 // func (r *Controller) deleteACLTokensForWorkload(apiClient *api.Client, svc *api.AgentService, k8sNS, podName string) error {
 
-// writeUpstreams will write explicit upstreams if pod annotations exist.
-func (r *Controller) writeUpstreams(ctx context.Context, pod corev1.Pod) error {
-	uss, err := inject.ProcessPodUpstreams(pod, r.EnableConsulPartitions, r.EnableConsulNamespaces)
+// writeDestinations will write explicit destinations if pod annotations exist.
+func (r *Controller) writeDestinations(ctx context.Context, pod corev1.Pod) error {
+	uss, err := inject.ProcessPodDestinations(pod, r.EnableConsulPartitions, r.EnableConsulNamespaces)
 	if err != nil {
-		return fmt.Errorf("error processing upstream annotations: %s", err.Error())
+		return fmt.Errorf("error processing destination annotations: %s", err.Error())
 	}
 	if uss == nil {
 		return nil
@@ -462,7 +462,7 @@ func (r *Controller) writeUpstreams(ctx context.Context, pod corev1.Pod) error {
 	data := inject.ToProtoAny(uss)
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
-			Id:       getUpstreamsID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
+			Id:       getDestinationsID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
 			Metadata: metaFromPod(pod),
 			Data:     data,
 		},
@@ -472,9 +472,9 @@ func (r *Controller) writeUpstreams(ctx context.Context, pod corev1.Pod) error {
 	return err
 }
 
-func (r *Controller) deleteUpstreams(ctx context.Context, pod types.NamespacedName) error {
+func (r *Controller) deleteDestinations(ctx context.Context, pod types.NamespacedName) error {
 	req := &pbresource.DeleteRequest{
-		Id: getUpstreamsID(pod.Name, r.getConsulNamespace(pod.Namespace), r.getPartition()),
+		Id: getDestinationsID(pod.Name, r.getConsulNamespace(pod.Namespace), r.getPartition()),
 	}
 
 	_, err := r.ResourceClient.Delete(ctx, req)
@@ -637,10 +637,10 @@ func getHealthStatusID(name, namespace, partition string) *pbresource.ID {
 	}
 }
 
-func getUpstreamsID(name, namespace, partition string) *pbresource.ID {
+func getDestinationsID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: pbmesh.UpstreamsType,
+		Type: pbmesh.DestinationsType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,

@@ -761,9 +761,9 @@ func TestProxyConfigurationDelete(t *testing.T) {
 	}
 }
 
-// TestUpstreamsWrite does a subsampling of tests covered in TestProcessUpstreams to make sure things are hooked up
+// TestDestinationsWrite does a subsampling of tests covered in TestProcessUpstreams to make sure things are hooked up
 // correctly. For the sake of test speed, more exhaustive testing is performed in TestProcessUpstreams.
-func TestUpstreamsWrite(t *testing.T) {
+func TestDestinationsWrite(t *testing.T) {
 	t.Parallel()
 
 	const podName = "pod1"
@@ -771,23 +771,23 @@ func TestUpstreamsWrite(t *testing.T) {
 	cases := []struct {
 		name                    string
 		pod                     func() *corev1.Pod
-		expected                *pbmesh.Upstreams
+		expected                *pbmesh.Destinations
 		expErr                  string
 		consulNamespacesEnabled bool
 		consulPartitionsEnabled bool
 	}{
 		{
-			name: "labeled annotated upstream with svc only",
+			name: "labeled annotated destination with svc only",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
+			expected: &pbmesh.Destinations{
 				Workloads: &pbcatalog.WorkloadSelector{
 					Names: []string{podName},
 				},
-				Upstreams: []*pbmesh.Upstream{
+				Destinations: []*pbmesh.Destination{
 					{
 						DestinationRef: &pbresource.Reference{
 							Type: pbcatalog.ServiceType,
@@ -800,7 +800,7 @@ func TestUpstreamsWrite(t *testing.T) {
 						},
 						DestinationPort: "myPort",
 						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
+						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
 								Ip:   consulNodeAddress,
@@ -813,19 +813,19 @@ func TestUpstreamsWrite(t *testing.T) {
 			consulPartitionsEnabled: false,
 		},
 		{
-			name: "labeled annotated upstream with svc, ns, and peer",
+			name: "labeled annotated destination with svc, ns, and peer",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234"
 				return pod1
 			},
-			expErr: "error processing upstream annotations: upstream currently does not support peers: myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234",
+			expErr: "error processing destination annotations: destination currently does not support peers: myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234",
 			// TODO: uncomment this and remove expErr when peers is supported
-			//expected: &pbmesh.Upstreams{
+			//expected: &pbmesh.Destinations{
 			//	Workloads: &pbcatalog.WorkloadSelector{
 			//		Names: []string{podName},
 			//	},
-			//	Upstreams: []*pbmesh.Upstream{
+			//	Destinations: []*pbmesh.Destination{
 			//		{
 			//			DestinationRef: &pbresource.Reference{
 			//              Type: pbcatalog.ServiceType,
@@ -838,7 +838,7 @@ func TestUpstreamsWrite(t *testing.T) {
 			//			},
 			//			DestinationPort: "myPort",
 			//			Datacenter:      "",
-			//			ListenAddr: &pbmesh.Upstream_IpPort{
+			//			ListenAddr: &pbmesh.Destination_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
 			//					Port: uint32(1234),
 			//                  Ip:   consulNodeAddress,
@@ -851,17 +851,17 @@ func TestUpstreamsWrite(t *testing.T) {
 			consulPartitionsEnabled: false,
 		},
 		{
-			name: "labeled annotated upstream with svc, ns, and partition",
+			name: "labeled annotated destination with svc, ns, and partition",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.ap:1234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
+			expected: &pbmesh.Destinations{
 				Workloads: &pbcatalog.WorkloadSelector{
 					Names: []string{podName},
 				},
-				Upstreams: []*pbmesh.Upstream{
+				Destinations: []*pbmesh.Destination{
 					{
 						DestinationRef: &pbresource.Reference{
 							Type: pbcatalog.ServiceType,
@@ -874,7 +874,7 @@ func TestUpstreamsWrite(t *testing.T) {
 						},
 						DestinationPort: "myPort",
 						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
+						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
 								Ip:   consulNodeAddress,
@@ -887,28 +887,28 @@ func TestUpstreamsWrite(t *testing.T) {
 			consulPartitionsEnabled: true,
 		},
 		{
-			name: "error labeled annotated upstream error: invalid partition/dc/peer",
+			name: "error labeled annotated destination error: invalid partition/dc/peer",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.err:1234"
 				return pod1
 			},
-			expErr:                  "error processing upstream annotations: upstream structured incorrectly: myPort.port.upstream1.svc.ns1.ns.part1.err:1234",
+			expErr:                  "error processing destination annotations: destination structured incorrectly: myPort.port.upstream1.svc.ns1.ns.part1.err:1234",
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: false,
 		},
 		{
-			name: "unlabeled single upstream",
+			name: "unlabeled single destination",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream:1234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
+			expected: &pbmesh.Destinations{
 				Workloads: &pbcatalog.WorkloadSelector{
 					Names: []string{podName},
 				},
-				Upstreams: []*pbmesh.Upstream{
+				Destinations: []*pbmesh.Destination{
 					{
 						DestinationRef: &pbresource.Reference{
 							Type: pbcatalog.ServiceType,
@@ -921,7 +921,7 @@ func TestUpstreamsWrite(t *testing.T) {
 						},
 						DestinationPort: "myPort",
 						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
+						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
 								Ip:   consulNodeAddress,
@@ -934,17 +934,17 @@ func TestUpstreamsWrite(t *testing.T) {
 			consulPartitionsEnabled: false,
 		},
 		{
-			name: "unlabeled single upstream with namespace and partition",
+			name: "unlabeled single destination with namespace and partition",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream.foo.bar:1234"
 				return pod1
 			},
-			expected: &pbmesh.Upstreams{
+			expected: &pbmesh.Destinations{
 				Workloads: &pbcatalog.WorkloadSelector{
 					Names: []string{podName},
 				},
-				Upstreams: []*pbmesh.Upstream{
+				Destinations: []*pbmesh.Destination{
 					{
 						DestinationRef: &pbresource.Reference{
 							Type: pbcatalog.ServiceType,
@@ -957,7 +957,7 @@ func TestUpstreamsWrite(t *testing.T) {
 						},
 						DestinationPort: "myPort",
 						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
+						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
 								Ip:   consulNodeAddress,
@@ -992,44 +992,44 @@ func TestUpstreamsWrite(t *testing.T) {
 				ResourceClient: resourceClient,
 			}
 
-			err = pc.writeUpstreams(context.Background(), *tt.pod())
+			err = pc.writeDestinations(context.Background(), *tt.pod())
 
 			if tt.expErr != "" {
 				require.EqualError(t, err, tt.expErr)
 			} else {
 				require.NoError(t, err)
-				uID := getUpstreamsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-				expectedUpstreamMatches(t, resourceClient, uID, tt.expected)
+				uID := getDestinationsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+				expectedDestinationMatches(t, resourceClient, uID, tt.expected)
 			}
 		})
 	}
 }
 
-func TestUpstreamsDelete(t *testing.T) {
+func TestDestinationsDelete(t *testing.T) {
 	t.Parallel()
 
 	const podName = "pod1"
 
 	cases := []struct {
-		name              string
-		pod               func() *corev1.Pod
-		existingUpstreams *pbmesh.Upstreams
-		expErr            string
-		configEntry       func() api.ConfigEntry
-		consulUnavailable bool
+		name                 string
+		pod                  func() *corev1.Pod
+		existingDestinations *pbmesh.Destinations
+		expErr               string
+		configEntry          func() api.ConfigEntry
+		consulUnavailable    bool
 	}{
 		{
-			name: "labeled annotated upstream with svc only",
+			name: "labeled annotated destination with svc only",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
 				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
 				return pod1
 			},
-			existingUpstreams: &pbmesh.Upstreams{
+			existingDestinations: &pbmesh.Destinations{
 				Workloads: &pbcatalog.WorkloadSelector{
 					Names: []string{podName},
 				},
-				Upstreams: []*pbmesh.Upstream{
+				Destinations: []*pbmesh.Destination{
 					{
 						DestinationRef: &pbresource.Reference{
 							Type: pbcatalog.ServiceType,
@@ -1042,7 +1042,7 @@ func TestUpstreamsDelete(t *testing.T) {
 						},
 						DestinationPort: "myPort",
 						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
+						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
 								Ip:   consulNodeAddress,
@@ -1074,23 +1074,23 @@ func TestUpstreamsDelete(t *testing.T) {
 			// Load in the upstream for us to delete and check that it's there
 			loadResource(t,
 				resourceClient,
-				getUpstreamsID(tt.pod().Name, constants.DefaultConsulNS, constants.DefaultConsulPartition),
-				tt.existingUpstreams,
+				getDestinationsID(tt.pod().Name, constants.DefaultConsulNS, constants.DefaultConsulPartition),
+				tt.existingDestinations,
 				nil)
-			uID := getUpstreamsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-			expectedUpstreamMatches(t, resourceClient, uID, tt.existingUpstreams)
+			uID := getDestinationsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+			expectedDestinationMatches(t, resourceClient, uID, tt.existingDestinations)
 
 			// Delete the upstream
 			nn := types.NamespacedName{Name: tt.pod().Name}
-			err = pc.deleteUpstreams(context.Background(), nn)
+			err = pc.deleteDestinations(context.Background(), nn)
 
 			// Verify the upstream has been deleted or that an expected error has been returned
 			if tt.expErr != "" {
 				require.EqualError(t, err, tt.expErr)
 			} else {
 				require.NoError(t, err)
-				uID := getUpstreamsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-				expectedUpstreamMatches(t, resourceClient, uID, nil)
+				uID := getDestinationsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+				expectedDestinationMatches(t, resourceClient, uID, nil)
 			}
 		})
 	}
@@ -1119,7 +1119,7 @@ func TestReconcileCreatePod(t *testing.T) {
 		expectedWorkload           *pbcatalog.Workload
 		expectedHealthStatus       *pbcatalog.HealthStatus
 		expectedProxyConfiguration *pbmesh.ProxyConfiguration
-		expectedUpstreams          *pbmesh.Upstreams
+		expectedDestinations       *pbmesh.Destinations
 
 		tproxy          bool
 		overwriteProbes bool
@@ -1197,8 +1197,8 @@ func TestReconcileCreatePod(t *testing.T) {
 		pcID := getProxyConfigurationID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
 		expectedProxyConfigurationMatches(t, resourceClient, pcID, tc.expectedProxyConfiguration)
 
-		uID := getUpstreamsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedUpstreamMatches(t, resourceClient, uID, tc.expectedUpstreams)
+		uID := getDestinationsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedDestinationMatches(t, resourceClient, uID, tc.expectedDestinations)
 	}
 
 	testCases := []testCase{
@@ -1276,7 +1276,7 @@ func TestReconcileCreatePod(t *testing.T) {
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
 			expectedProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
-			expectedUpstreams:          createUpstreams(),
+			expectedDestinations:       createDestinations(),
 		},
 		// TODO: make sure multi-error accumulates errors
 	}
@@ -1310,12 +1310,12 @@ func TestReconcileUpdatePod(t *testing.T) {
 		existingWorkload           *pbcatalog.Workload
 		existingHealthStatus       *pbcatalog.HealthStatus
 		existingProxyConfiguration *pbmesh.ProxyConfiguration
-		existingUpstreams          *pbmesh.Upstreams
+		existingDestinations       *pbmesh.Destinations
 
 		expectedWorkload           *pbcatalog.Workload
 		expectedHealthStatus       *pbcatalog.HealthStatus
 		expectedProxyConfiguration *pbmesh.ProxyConfiguration
-		expectedUpstreams          *pbmesh.Upstreams
+		expectedDestinations       *pbmesh.Destinations
 
 		tproxy          bool
 		overwriteProbes bool
@@ -1384,8 +1384,8 @@ func TestReconcileUpdatePod(t *testing.T) {
 			nil)
 		loadResource(t,
 			resourceClient,
-			getUpstreamsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition),
-			tc.existingUpstreams,
+			getDestinationsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition),
+			tc.existingDestinations,
 			nil)
 
 		namespacedName := types.NamespacedName{
@@ -1412,8 +1412,8 @@ func TestReconcileUpdatePod(t *testing.T) {
 		pcID := getProxyConfigurationID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
 		expectedProxyConfigurationMatches(t, resourceClient, pcID, tc.expectedProxyConfiguration)
 
-		uID := getUpstreamsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedUpstreamMatches(t, resourceClient, uID, tc.expectedUpstreams)
+		uID := getDestinationsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedDestinationMatches(t, resourceClient, uID, tc.expectedDestinations)
 	}
 
 	testCases := []testCase{
@@ -1506,7 +1506,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 			},
 		},
 		{
-			name:    "pod update explicit upstreams",
+			name:    "pod update explicit destination",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
 				pod := createPod("foo", "", true, true)
@@ -1515,11 +1515,11 @@ func TestReconcileUpdatePod(t *testing.T) {
 			},
 			existingWorkload:     createWorkload(),
 			existingHealthStatus: createPassingHealthStatus(),
-			existingUpstreams: &pbmesh.Upstreams{
+			existingDestinations: &pbmesh.Destinations{
 				Workloads: &pbcatalog.WorkloadSelector{
 					Names: []string{"foo"},
 				},
-				Upstreams: []*pbmesh.Upstream{
+				Destinations: []*pbmesh.Destination{
 					{
 						DestinationRef: &pbresource.Reference{
 							Type: pbcatalog.ServiceType,
@@ -1532,7 +1532,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 						},
 						DestinationPort: "myPort2",
 						Datacenter:      "",
-						ListenAddr: &pbmesh.Upstream_IpPort{
+						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
 								Port: uint32(1234),
 								Ip:   consulNodeAddress,
@@ -1543,7 +1543,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 			},
 			expectedWorkload:     createWorkload(),
 			expectedHealthStatus: createPassingHealthStatus(),
-			expectedUpstreams:    createUpstreams(),
+			expectedDestinations: createDestinations(),
 		},
 	}
 
@@ -1574,12 +1574,12 @@ func TestReconcileDeletePod(t *testing.T) {
 		existingWorkload           *pbcatalog.Workload
 		existingHealthStatus       *pbcatalog.HealthStatus
 		existingProxyConfiguration *pbmesh.ProxyConfiguration
-		existingUpstreams          *pbmesh.Upstreams
+		existingDestinations       *pbmesh.Destinations
 
 		expectedWorkload           *pbcatalog.Workload
 		expectedHealthStatus       *pbcatalog.HealthStatus
 		expectedProxyConfiguration *pbmesh.ProxyConfiguration
-		expectedUpstreams          *pbmesh.Upstreams
+		expectedDestinations       *pbmesh.Destinations
 
 		aclsEnabled bool
 
@@ -1641,8 +1641,8 @@ func TestReconcileDeletePod(t *testing.T) {
 		loadResource(
 			t,
 			resourceClient,
-			getUpstreamsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition),
-			tc.existingUpstreams,
+			getDestinationsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition),
+			tc.existingDestinations,
 			nil)
 
 		namespacedName := types.NamespacedName{
@@ -1669,8 +1669,8 @@ func TestReconcileDeletePod(t *testing.T) {
 		pcID := getProxyConfigurationID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
 		expectedProxyConfigurationMatches(t, resourceClient, pcID, tc.expectedProxyConfiguration)
 
-		uID := getUpstreamsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedUpstreamMatches(t, resourceClient, uID, tc.expectedUpstreams)
+		uID := getDestinationsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+		expectedDestinationMatches(t, resourceClient, uID, tc.expectedDestinations)
 	}
 
 	testCases := []testCase{
@@ -1687,7 +1687,7 @@ func TestReconcileDeletePod(t *testing.T) {
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
 			existingProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
-			existingUpstreams:          createUpstreams(),
+			existingDestinations:       createDestinations(),
 		},
 		// TODO: enable ACLs and make sure they are deleted
 	}
@@ -1869,12 +1869,12 @@ func createProxyConfiguration(podName string, mode pbmesh.ProxyMode) *pbmesh.Pro
 }
 
 // createCriticalHealthStatus creates a failing HealthStatus that matches the pod from createPod.
-func createUpstreams() *pbmesh.Upstreams {
-	return &pbmesh.Upstreams{
+func createDestinations() *pbmesh.Destinations {
+	return &pbmesh.Destinations{
 		Workloads: &pbcatalog.WorkloadSelector{
 			Names: []string{"foo"},
 		},
-		Upstreams: []*pbmesh.Upstream{
+		Destinations: []*pbmesh.Destination{
 			{
 				DestinationRef: &pbresource.Reference{
 					Type: pbcatalog.ServiceType,
@@ -1887,7 +1887,7 @@ func createUpstreams() *pbmesh.Upstreams {
 				},
 				DestinationPort: "myPort",
 				Datacenter:      "",
-				ListenAddr: &pbmesh.Upstream_IpPort{
+				ListenAddr: &pbmesh.Destination_IpPort{
 					IpPort: &pbmesh.IPPortAddress{
 						Port: uint32(24601),
 						Ip:   consulNodeAddress,
@@ -1984,7 +1984,7 @@ func expectedProxyConfigurationMatches(t *testing.T, client pbresource.ResourceS
 	require.Equal(t, "", diff, "ProxyConfigurations do not match")
 }
 
-func expectedUpstreamMatches(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID, expectedUpstreams *pbmesh.Upstreams) {
+func expectedDestinationMatches(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID, expectedUpstreams *pbmesh.Destinations) {
 	req := &pbresource.ReadRequest{Id: id}
 	res, err := client.Read(context.Background(), req)
 
@@ -2003,7 +2003,7 @@ func expectedUpstreamMatches(t *testing.T, client pbresource.ResourceServiceClie
 
 	require.NotNil(t, res.GetResource().GetData())
 
-	actualUpstreams := &pbmesh.Upstreams{}
+	actualUpstreams := &pbmesh.Destinations{}
 	err = res.GetResource().GetData().UnmarshalTo(actualUpstreams)
 	require.NoError(t, err)
 
