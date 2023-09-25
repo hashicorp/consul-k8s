@@ -13,8 +13,7 @@ import (
 
 var (
 
-	// AUTH group.
-
+	// AuthGroup is a collection of auth resources.
 	AuthGroup = "auth.consul.hashicorp.com"
 
 	// AuthGroupVersion is group version used to register these objects.

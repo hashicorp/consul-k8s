@@ -11,8 +11,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/config-entries/controllersv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpointsv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"

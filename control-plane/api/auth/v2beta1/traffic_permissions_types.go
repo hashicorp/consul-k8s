@@ -30,8 +30,6 @@ func init() {
 	AuthSchemeBuilder.Register(&TrafficPermissions{}, &TrafficPermissionsList{})
 }
 
-var _ common.MeshConfig = &TrafficPermissions{}
-
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
