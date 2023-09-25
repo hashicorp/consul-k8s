@@ -14,28 +14,43 @@ import (
 )
 
 func TestContainerEnvVars(t *testing.T) {
-	t.Skip()
-	// (TODO: ashwin) make these work once upstreams are fixed
 	cases := []struct {
-		Name     string
-		Upstream string
+		Name        string
+		Upstream    string
+		ExpectError bool
 	}{
 		{
-			"Upstream with datacenter",
-			"static-server:7890:dc1",
+			// TODO: This will not error out when dcs are supported
+			Name:        "Upstream with datacenter",
+			Upstream:    "myPort.static-server:7890:dc1",
+			ExpectError: true,
 		},
 		{
-			"Upstream without datacenter",
-			"static-server:7890",
+			Name:     "Upstream without datacenter",
+			Upstream: "myPort.static-server:7890",
+		},
+		{
+			// TODO: This will not error out when dcs are supported
+			Name:        "Upstream with labels and datacenter",
+			Upstream:    "myPort.port.static-server.svc.dc1.dc:7890",
+			ExpectError: true,
+		},
+		{
+			Name:     "Upstream with labels and no datacenter",
+			Upstream: "myPort.port.static-server.svc:7890",
+		},
+		{
+			Name:        "Error expected, wrong order",
+			Upstream:    "static-server.svc.myPort.port:7890",
+			ExpectError: true,
 		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
-
 			var w MeshWebhook
-			envVars := w.containerEnvVars(corev1.Pod{
+			envVars, err := w.containerEnvVars(corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						constants.AnnotationService:          "foo",
@@ -44,15 +59,20 @@ func TestContainerEnvVars(t *testing.T) {
 				},
 			})
 
-			require.ElementsMatch(envVars, []corev1.EnvVar{
-				{
-					Name:  "STATIC_SERVER_CONNECT_SERVICE_HOST",
-					Value: "127.0.0.1",
-				}, {
-					Name:  "STATIC_SERVER_CONNECT_SERVICE_PORT",
-					Value: "7890",
-				},
-			})
+			if !tt.ExpectError {
+				require.NoError(err)
+				require.ElementsMatch(envVars, []corev1.EnvVar{
+					{
+						Name:  "STATIC_SERVER_MYPORT_CONNECT_SERVICE_HOST",
+						Value: "127.0.0.1",
+					}, {
+						Name:  "STATIC_SERVER_MYPORT_CONNECT_SERVICE_PORT",
+						Value: "7890",
+					},
+				})
+			} else {
+				require.Error(err)
+			}
 		})
 	}
 }

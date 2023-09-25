@@ -270,7 +270,11 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// Add the upstream services as environment variables for easy
 	// service discovery.
-	containerEnvVars := w.containerEnvVars(pod)
+	containerEnvVars, err := w.containerEnvVars(pod)
+	if err != nil {
+		w.Log.Error(err, "error creating the port environment variables based on pod annotations", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error creating the port environment variables based on pod annotations: %s", err))
+	}
 	for i := range pod.Spec.InitContainers {
 		pod.Spec.InitContainers[i].Env = append(pod.Spec.InitContainers[i].Env, containerEnvVars...)
 	}

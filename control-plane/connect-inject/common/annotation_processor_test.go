@@ -549,6 +549,26 @@ func TestProcessUpstreams(t *testing.T) {
 			consulPartitionsEnabled: false,
 		},
 		{
+			name: "error labeled missing port name",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "upstream1.svc:1234")
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc:1234",
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error labeled missing port name namespace partition enabled",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "upstream1.svc:1234")
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1.svc:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
 			name: "unlabeled and labeled multiple annotated upstreams",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "myPort.port.upstream1.svc.ns1.ns:1234, myPort2.upstream2:2234, myPort4.port.upstream4.svc.ns1.ns.ap1.ap:4234")
@@ -940,6 +960,26 @@ func TestProcessUpstreams(t *testing.T) {
 			//	},
 			//},
 			consulNamespacesEnabled: true,
+		},
+		{
+			name: "error unlabeled missing port name with namespace and partition disabled",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "upstream1:1234")
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1:1234",
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "error unlabeled missing port name with namespace and partition enabled",
+			pod: func() *corev1.Pod {
+				pod1 := createPod(podName, "upstream1:1234")
+				return pod1
+			},
+			expErr:                  "upstream structured incorrectly: upstream1:1234",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
 		},
 	}
 	for _, tt := range cases {
