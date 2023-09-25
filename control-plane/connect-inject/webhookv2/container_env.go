@@ -8,12 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 )
 
 func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) ([]corev1.EnvVar, error) {
-	upstreams, err := common.ProcessPodUpstreams(pod, true, true)
+	upstreams, err := common.ProcessPodUpstreamsForMeshWebhook(pod)
 	if err != nil {
 		return nil, fmt.Errorf("error processing the upstream for container environment variable creation: %s", err.Error())
 	}

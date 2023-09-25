@@ -7,16 +7,23 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
 	ConsulNodeAddress = "127.0.0.1"
 )
+
+// ProcessPodUpstreamsForMeshWebhook reads the list of upstreams from the Pod annotation and converts them into a pbmesh.Upstreams
+// object.
+func ProcessPodUpstreamsForMeshWebhook(pod corev1.Pod) (*pbmesh.Upstreams, error) {
+	return ProcessPodUpstreams(pod, true, true)
+}
 
 // ProcessPodUpstreams reads the list of upstreams from the Pod annotation and converts them into a pbmesh.Upstreams
 // object.
