@@ -18,9 +18,11 @@ const (
 )
 
 var (
+	errEncodingPayload = errors.New("failed to encode payload")
 	errCreatingRequest = errors.New("failed to create HTTP request")
 	errMakingRequest   = errors.New("failed to make request")
 	errReadingBody     = errors.New("failed to read body")
+	errClosingBody     = errors.New("failed to close body")
 	errParsingBody     = errors.New("failed to parse body")
 )
 
@@ -95,7 +97,11 @@ func (f *fakeServerClient) requestToken() (string, error) {
 func (f *fakeServerClient) modifyTelemetryConfig(payload *modifyTelemetryConfigBody) error {
 	url := fmt.Sprintf("https://%s/modify_telemetry_config", f.tunnel)
 	payloadBuf := new(bytes.Buffer)
-	json.NewEncoder(payloadBuf).Encode(payload)
+
+	err := json.NewEncoder(payloadBuf).Encode(payload)
+	if err != nil {
+		return fmt.Errorf("%w:%w", errEncodingPayload, err)
+	}
 
 	req, err := http.NewRequest("POST", url, payloadBuf)
 	if err != nil {
@@ -139,9 +145,11 @@ func (f *fakeServerClient) handleRequest(req *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w : %w", errMakingRequest, err)
 	}
-	defer resp.Body.Close()
-
 	body, err := io.ReadAll(resp.Body)
+	cErr := resp.Body.Close()
+	if cErr != nil {
+		return nil, fmt.Errorf("%w : %w", errClosingBody, err)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w : %w", errReadingBody, err)
 	}
