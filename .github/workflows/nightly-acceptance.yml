@@ -6,7 +6,7 @@ on:
     # Run nightly at 12AM UTC/8PM EST/5PM PST
     - cron:  '0 0 * * *'
 
-# these should be the only settings that you will ever need to change
+# a change these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.ref_name }}
   CONTEXT: "nightly"
