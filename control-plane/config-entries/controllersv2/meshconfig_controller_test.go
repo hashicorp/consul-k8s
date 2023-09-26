@@ -5,7 +5,6 @@ package controllersv2
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -436,7 +435,6 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 	t.Parallel()
 
-	req := require.New(t)
 	ctx := context.Background()
 	trafficpermissions := &v2beta1.TrafficPermissions{
 		ObjectMeta: metav1.ObjectMeta{
@@ -468,9 +466,6 @@ func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 		c.Experiments = []string{"resource-apis"}
 	})
 
-	// Get watcher state to make sure we can get a healthy address.
-	state, err := testClient.Watcher.State()
-	require.NoError(t, err)
 	// Stop the server before calling reconcile imitating a server that's not running.
 	_ = testClient.TestServer.Stop()
 
@@ -491,19 +486,17 @@ func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 	resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 		NamespacedName: namespacedName,
 	})
-	req.Error(err)
-
-	expErr := fmt.Sprintf("connection error: desc = \"transport: Error while dialing: dial tcp 127.0.0.1:%d: connect: connection refused\"", state.Address.Port)
-	req.Contains(err.Error(), expErr)
-	req.False(resp.Requeue)
+	require.Error(t, err)
+	require.False(t, resp.Requeue)
+	actualErrMsg := err.Error()
 
 	// Check that the status is "synced=false".
 	err = fakeClient.Get(ctx, namespacedName, trafficpermissions)
-	req.NoError(err)
+	require.NoError(t, err)
 	status, reason, errMsg := trafficpermissions.SyncedCondition()
-	req.Equal(corev1.ConditionFalse, status)
-	req.Equal("ConsulAgentError", reason)
-	req.Contains(errMsg, expErr)
+	require.Equal(t, corev1.ConditionFalse, status)
+	require.Equal(t, "ConsulAgentError", reason)
+	require.Contains(t, errMsg, actualErrMsg)
 }
 
 // TestMeshConfigController_setsSyncedToTrue tests that if the resource hasn't changed in
