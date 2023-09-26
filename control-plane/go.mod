@@ -16,11 +16,11 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/google/go-cmp v0.5.9
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230825213844-4ea04860c5ed
+	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230926214846-f014fc76a8ec
 	github.com/hashicorp/consul-server-connection-manager v0.1.4
-	github.com/hashicorp/consul/api v1.10.1-0.20230914174054-e5808d85f751
-	github.com/hashicorp/consul/proto-public v0.4.1
-	github.com/hashicorp/consul/sdk v0.14.1
+	github.com/hashicorp/consul/api v1.4.0
+	github.com/hashicorp/consul/proto-public v0.1.2-0.20230926184023-55db0db655a7
+	github.com/hashicorp/consul/sdk v0.13.1
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
 	github.com/hashicorp/go-hclog v1.5.0
