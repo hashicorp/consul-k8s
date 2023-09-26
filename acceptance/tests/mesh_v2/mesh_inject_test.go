@@ -34,10 +34,7 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.image":                "thisisnotashwin/consul:foo",
-				"global.imageK8S":             "thisisnotashwin/consul-k8s:foo",
-				"global.imageConsulDataplane": "jmurrethc/consul-dataplane-dev",
-				"global.experiments[0]":       "resource-apis",
+				"global.experiments[0]": "resource-apis",
 				// The UI is not supported for v2 in 1.17, so for now it must be disabled.
 				"ui.enabled":            "false",
 				"connectInject.enabled": "true",
@@ -79,16 +76,19 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			{
 				// TODO: once ACLs are implemented, only run this block when secure=true and delete the below line and fixture since the default is deny when secure is true.
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/cases/trafficpermissions-deny")
+				k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../../tests/fixtures/cases/trafficpermissions-deny")
 				// Now test that traffic is denied between the source and the destination.
 				if cfg.EnableTransparentProxy {
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://multiport:8080")
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://multiport:9090")
 				} else {
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
-					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://multiport:2345")
+					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2345")
 				}
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/bases/trafficpermissions")
+				k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../../tests/fixtures/bases/trafficpermissions")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../../tests/fixtures/bases/trafficpermissions")
+				})
 			}
 
 			// Check connection from static-client to multiport.
