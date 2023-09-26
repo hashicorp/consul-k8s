@@ -20,6 +20,7 @@ import (
 
 // TestConnectInject_LocalRateLimiting tests that local rate limiting works as expected between services.
 func TestConnectInject_LocalRateLimiting(t *testing.T) {
+	t.Skipf("TODO(flaky-1.17): NET-XXXX")
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 

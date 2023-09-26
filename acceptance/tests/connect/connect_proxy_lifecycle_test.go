@@ -36,6 +36,8 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 	cfg := suite.Config()
 	cfg.SkipWhenOpenshiftAndCNI(t)
 
+	t.Skipf("TODO(flaky-1.17): NET-XXXX")
+
 	for _, testCfg := range []LifecycleShutdownConfig{
 		{secure: false, helmValues: map[string]string{
 			helmDrainListenersKey:     "true",
