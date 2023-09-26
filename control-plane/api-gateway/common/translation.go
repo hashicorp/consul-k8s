@@ -159,8 +159,8 @@ func (t ResourceTranslator) translateRouteRetryFilter(routeRetryFilter *v1alpha1
 
 func (t ResourceTranslator) translateRouteTimeoutFilter(routeTimeoutFilter *v1alpha1.RouteTimeoutFilter) *api.TimeoutFilter {
 	return &api.TimeoutFilter{
-		RequestTimeout: routeTimeoutFilter.Spec.RequestTimeout,
-		IdleTimeout:    routeTimeoutFilter.Spec.IdleTimeout,
+		RequestTimeout: routeTimeoutFilter.Spec.RequestTimeout.Duration,
+		IdleTimeout:    routeTimeoutFilter.Spec.IdleTimeout.Duration,
 	}
 }
 

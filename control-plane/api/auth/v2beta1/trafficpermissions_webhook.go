@@ -54,7 +54,7 @@ func (v *TrafficPermissionsWebhook) List(ctx context.Context) ([]common.MeshConf
 	}
 	var entries []common.MeshConfig
 	for _, item := range resourceList.Items {
-		entries = append(entries, common.MeshConfig(&item))
+		entries = append(entries, common.MeshConfig(item))
 	}
 	return entries, nil
 }

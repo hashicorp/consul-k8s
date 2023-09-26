@@ -814,7 +814,7 @@ func TestDestinationsWrite(t *testing.T) {
 			name: "labeled annotated destination with svc only",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "destination.port.upstream1.svc:1234"
 				return pod1
 			},
 			expected: &pbmesh.Destinations{
@@ -832,7 +832,7 @@ func TestDestinationsWrite(t *testing.T) {
 							},
 							Name: "upstream1",
 						},
-						DestinationPort: "myPort",
+						DestinationPort: "destination",
 						Datacenter:      "",
 						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
@@ -850,10 +850,10 @@ func TestDestinationsWrite(t *testing.T) {
 			name: "labeled annotated destination with svc, ns, and peer",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234"
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "destination.port.upstream1.svc.ns1.ns.peer1.peer:1234"
 				return pod1
 			},
-			expErr: "error processing destination annotations: destination currently does not support peers: myPort.port.upstream1.svc.ns1.ns.peer1.peer:1234",
+			expErr: "error processing destination annotations: destination currently does not support peers: destination.port.upstream1.svc.ns1.ns.peer1.peer:1234",
 			// TODO: uncomment this and remove expErr when peers is supported
 			//expected: &pbmesh.Destinations{
 			//	Workloads: &pbcatalog.WorkloadSelector{
@@ -870,7 +870,7 @@ func TestDestinationsWrite(t *testing.T) {
 			//				},
 			//				Name: "upstream1",
 			//			},
-			//			DestinationPort: "myPort",
+			//			DestinationPort: "destination",
 			//			Datacenter:      "",
 			//			ListenAddr: &pbmesh.Destination_IpPort{
 			//				IpPort: &pbmesh.IPPortAddress{
@@ -888,7 +888,7 @@ func TestDestinationsWrite(t *testing.T) {
 			name: "labeled annotated destination with svc, ns, and partition",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.ap:1234"
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "destination.port.upstream1.svc.ns1.ns.part1.ap:1234"
 				return pod1
 			},
 			expected: &pbmesh.Destinations{
@@ -906,7 +906,7 @@ func TestDestinationsWrite(t *testing.T) {
 							},
 							Name: "upstream1",
 						},
-						DestinationPort: "myPort",
+						DestinationPort: "destination",
 						Datacenter:      "",
 						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
@@ -924,10 +924,10 @@ func TestDestinationsWrite(t *testing.T) {
 			name: "error labeled annotated destination error: invalid partition/dc/peer",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc.ns1.ns.part1.err:1234"
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "destination.port.upstream1.svc.ns1.ns.part1.err:1234"
 				return pod1
 			},
-			expErr:                  "error processing destination annotations: destination structured incorrectly: myPort.port.upstream1.svc.ns1.ns.part1.err:1234",
+			expErr:                  "error processing destination annotations: destination structured incorrectly: destination.port.upstream1.svc.ns1.ns.part1.err:1234",
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: false,
 		},
@@ -935,7 +935,7 @@ func TestDestinationsWrite(t *testing.T) {
 			name: "unlabeled single destination",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream:1234"
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "destination.upstream:1234"
 				return pod1
 			},
 			expected: &pbmesh.Destinations{
@@ -953,7 +953,7 @@ func TestDestinationsWrite(t *testing.T) {
 							},
 							Name: "upstream",
 						},
-						DestinationPort: "myPort",
+						DestinationPort: "destination",
 						Datacenter:      "",
 						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
@@ -971,7 +971,7 @@ func TestDestinationsWrite(t *testing.T) {
 			name: "unlabeled single destination with namespace and partition",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.upstream.foo.bar:1234"
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "destination.upstream.foo.bar:1234"
 				return pod1
 			},
 			expected: &pbmesh.Destinations{
@@ -989,7 +989,7 @@ func TestDestinationsWrite(t *testing.T) {
 							},
 							Name: "upstream",
 						},
-						DestinationPort: "myPort",
+						DestinationPort: "destination",
 						Datacenter:      "",
 						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
@@ -1061,7 +1061,7 @@ func TestDestinationsDelete(t *testing.T) {
 			name: "labeled annotated destination with svc only",
 			pod: func() *corev1.Pod {
 				pod1 := createPod(podName, "", true, true)
-				pod1.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.upstream1.svc:1234"
+				pod1.Annotations[constants.AnnotationMeshDestinations] = "destination.port.upstream1.svc:1234"
 				return pod1
 			},
 			existingDestinations: &pbmesh.Destinations{
@@ -1079,7 +1079,7 @@ func TestDestinationsDelete(t *testing.T) {
 							},
 							Name: "upstream1",
 						},
-						DestinationPort: "myPort",
+						DestinationPort: "destination",
 						Datacenter:      "",
 						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
@@ -1315,7 +1315,7 @@ func TestReconcileCreatePod(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod := createPod("foo", "", true, true)
 				addProbesAndOriginalPodAnnotation(pod)
-				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
+				pod.Annotations[constants.AnnotationMeshDestinations] = "destination.port.mySVC.svc:24601"
 				return []runtime.Object{pod}
 			},
 			tproxy:                     false,
@@ -1567,7 +1567,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
 				pod := createPod("foo", "", true, true)
-				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
+				pod.Annotations[constants.AnnotationMeshDestinations] = "destination.port.mySVC.svc:24601"
 				return []runtime.Object{pod}
 			},
 			existingWorkload:     createWorkload(),
@@ -1587,7 +1587,7 @@ func TestReconcileUpdatePod(t *testing.T) {
 							},
 							Name: "mySVC3",
 						},
-						DestinationPort: "myPort2",
+						DestinationPort: "destination2",
 						Datacenter:      "",
 						ListenAddr: &pbmesh.Destination_IpPort{
 							IpPort: &pbmesh.IPPortAddress{
@@ -1955,7 +1955,7 @@ func createDestinations() *pbmesh.Destinations {
 					},
 					Name: "mySVC",
 				},
-				DestinationPort: "myPort",
+				DestinationPort: "destination",
 				Datacenter:      "",
 				ListenAddr: &pbmesh.Destination_IpPort{
 					IpPort: &pbmesh.IPPortAddress{

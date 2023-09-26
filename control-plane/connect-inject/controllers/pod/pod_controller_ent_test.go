@@ -181,7 +181,7 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod := createPod(testPodName, metav1.NamespaceDefault, true, true)
 				addProbesAndOriginalPodAnnotation(pod)
-				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
+				pod.Annotations[constants.AnnotationMeshDestinations] = "destination.port.mySVC.svc:24601"
 				return []runtime.Object{pod}
 			},
 			tproxy:          false,
@@ -425,7 +425,7 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod := createPod(testPodName, metav1.NamespaceDefault, true, true)
 				addProbesAndOriginalPodAnnotation(pod)
-				pod.Annotations[constants.AnnotationMeshDestinations] = "myPort.port.mySVC.svc:24601"
+				pod.Annotations[constants.AnnotationMeshDestinations] = "destination.port.mySVC.svc:24601"
 				return []runtime.Object{pod}
 			},
 			telemetry:       true,

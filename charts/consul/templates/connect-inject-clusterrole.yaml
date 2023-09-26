@@ -93,6 +93,32 @@ rules:
     - get
     - patch
     - update
+- apiGroups:
+    - mesh.consul.hashicorp.com
+  resources:
+    - grpcroutes
+    - httproutes
+    - tcproutes
+    - proxyconfigurations
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - mesh.consul.hashicorp.com
+  resources:
+    - grpcroutes/status
+    - httproutes/status
+    - tcproutes/status
+    - proxyconfigurations/status
+  verbs:
+    - get
+    - patch
+    - update
 {{- end }}
 - apiGroups: [ "" ]
   resources: [ "secrets", "serviceaccounts", "endpoints", "services", "namespaces", "nodes" ]

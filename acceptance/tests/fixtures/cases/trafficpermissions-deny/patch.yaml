@@ -6,4 +6,4 @@ kind: TrafficPermissions
 metadata:
   name: client-to-server
 spec:
-  action: deny
+  action: ACTION_DENY

@@ -27,7 +27,7 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 	cases := map[string]struct {
 		OurConsulNamespace string
 		OurConsulPartition string
-		OurData            TrafficPermissions
+		OurData            *TrafficPermissions
 
 		TheirName            string
 		TheirConsulNamespace string
@@ -40,11 +40,11 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 		"empty fields matches": {
 			OurConsulNamespace: constants.DefaultConsulNS,
 			OurConsulPartition: constants.DefaultConsulPartition,
-			OurData: TrafficPermissions{
+			OurData: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
-				Spec: TrafficPermissionsSpec{},
+				Spec: pbauth.TrafficPermissions{},
 			},
 			TheirName:            "name",
 			TheirConsulNamespace: constants.DefaultConsulNS,
@@ -59,19 +59,19 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 		"source namespaces and partitions are compared": {
 			OurConsulNamespace: "consul-ns",
 			OurConsulPartition: "consul-partition",
-			OurData: TrafficPermissions{
+			OurData: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "kube-ns",
 				},
-				Spec: TrafficPermissionsSpec{
-					Destination: &Destination{
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: ActionAllow,
-					Permissions: Permissions{
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
 						{
-							Sources: []*Source{
+							Sources: []*pbauth.Source{
 								{
 									IdentityName: "source-identity",
 									Namespace:    "the space namespace space",
@@ -105,19 +105,19 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 		"destination namespaces and partitions are compared": {
 			OurConsulNamespace: "not-consul-ns",
 			OurConsulPartition: "not-consul-partition",
-			OurData: TrafficPermissions{
+			OurData: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "kube-ns",
 				},
-				Spec: TrafficPermissionsSpec{
-					Destination: &Destination{
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: ActionAllow,
-					Permissions: Permissions{
+					Action: pbauth.Action_ACTION_DENY,
+					Permissions: []*pbauth.Permission{
 						{
-							Sources: []*Source{
+							Sources: []*pbauth.Source{
 								{
 									IdentityName: "source-identity",
 								},
@@ -149,25 +149,25 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 		"all fields set matches": {
 			OurConsulNamespace: "consul-ns",
 			OurConsulPartition: "consul-partition",
-			OurData: TrafficPermissions{
+			OurData: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "kube-ns",
 				},
-				Spec: TrafficPermissionsSpec{
-					Destination: &Destination{
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: ActionAllow,
-					Permissions: Permissions{
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
 						{
-							Sources: []*Source{
+							Sources: []*pbauth.Source{
 								{
 									Namespace:     "the space namespace space",
 									Partition:     "space-partition",
 									Peer:          "space-peer",
 									SamenessGroup: "space-group",
-									Exclude: Exclude{
+									Exclude: []*pbauth.ExcludeSource{
 										{
 											IdentityName:  "not-source-identity",
 											Namespace:     "the space namespace space",
@@ -181,12 +181,12 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: DestinationRules{
+							DestinationRules: []*pbauth.DestinationRule{
 								{
 									PathExact:  "/hello",
 									PathPrefix: "/world",
 									PathRegex:  "/.*/foo",
-									Header: &DestinationRuleHeader{
+									Header: &pbauth.DestinationRuleHeader{
 										Name:    "x-consul-test",
 										Present: true,
 										Exact:   "true",
@@ -196,12 +196,12 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 										Invert:  true,
 									},
 									Methods: []string{"GET", "POST"},
-									Exclude: ExcludePermissions{
+									Exclude: []*pbauth.ExcludePermissionRule{
 										{
 											PathExact:  "/hello",
 											PathPrefix: "/world",
 											PathRegex:  "/.*/foo",
-											Header: &DestinationRuleHeader{
+											Header: &pbauth.DestinationRuleHeader{
 												Name:    "x-consul-not-test",
 												Present: true,
 												Exact:   "false",
@@ -296,11 +296,11 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 		"different types does not match": {
 			OurConsulNamespace: constants.DefaultConsulNS,
 			OurConsulPartition: constants.DefaultConsulPartition,
-			OurData: TrafficPermissions{
+			OurData: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
-				Spec: TrafficPermissionsSpec{},
+				Spec: pbauth.TrafficPermissions{},
 			},
 			ResourceOverride: &pbresource.Resource{
 				Id: &pbresource.ID{
@@ -335,18 +335,18 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 // TestTrafficPermissions_Resource also includes test to verify ResourceID().
 func TestTrafficPermissions_Resource(t *testing.T) {
 	cases := map[string]struct {
-		Ours            TrafficPermissions
+		Ours            *TrafficPermissions
 		ConsulNamespace string
 		ConsulPartition string
 		ExpectedName    string
 		ExpectedData    *pbauth.TrafficPermissions
 	}{
 		"empty fields": {
-			Ours: TrafficPermissions{
+			Ours: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: TrafficPermissionsSpec{},
+				Spec: pbauth.TrafficPermissions{},
 			},
 			ConsulNamespace: constants.DefaultConsulNS,
 			ConsulPartition: constants.DefaultConsulPartition,
@@ -354,25 +354,25 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 			ExpectedData:    &pbauth.TrafficPermissions{},
 		},
 		"every field set": {
-			Ours: TrafficPermissions{
+			Ours: &TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "kube-ns",
 				},
-				Spec: TrafficPermissionsSpec{
-					Destination: &Destination{
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: ActionAllow,
-					Permissions: Permissions{
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
 						{
-							Sources: []*Source{
+							Sources: []*pbauth.Source{
 								{
 									Namespace:     "the space namespace space",
 									Partition:     "space-partition",
 									Peer:          "space-peer",
 									SamenessGroup: "space-group",
-									Exclude: Exclude{
+									Exclude: []*pbauth.ExcludeSource{
 										{
 											IdentityName:  "not-source-identity",
 											Namespace:     "the space namespace space",
@@ -386,12 +386,12 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: DestinationRules{
+							DestinationRules: []*pbauth.DestinationRule{
 								{
 									PathExact:  "/hello",
 									PathPrefix: "/world",
 									PathRegex:  "/.*/foo",
-									Header: &DestinationRuleHeader{
+									Header: &pbauth.DestinationRuleHeader{
 										Name:    "x-consul-test",
 										Present: true,
 										Exact:   "true",
@@ -401,12 +401,12 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 										Invert:  true,
 									},
 									Methods: []string{"GET", "POST"},
-									Exclude: ExcludePermissions{
+									Exclude: []*pbauth.ExcludePermissionRule{
 										{
 											PathExact:  "/hello",
 											PathPrefix: "/world",
 											PathRegex:  "/.*/foo",
-											Header: &DestinationRuleHeader{
+											Header: &pbauth.DestinationRuleHeader{
 												Name:    "x-consul-not-test",
 												Present: true,
 												Exact:   "false",
@@ -579,8 +579,8 @@ func TestTrafficPermissions_KubernetesName(t *testing.T) {
 			Name:      "test",
 			Namespace: "bar",
 		},
-		Spec: TrafficPermissionsSpec{
-			Destination: &Destination{
+		Spec: pbauth.TrafficPermissions{
+			Destination: &pbauth.Destination{
 				IdentityName: "foo",
 			},
 		},
@@ -615,39 +615,34 @@ func TestTrafficPermissions_Validate(t *testing.T) {
 					Name:      "foo",
 					Namespace: "kube-ns",
 				},
-				Spec: TrafficPermissionsSpec{
-					Destination: &Destination{
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: ActionAllow,
-					Permissions: Permissions{
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
 						{
-							Sources: []*Source{
+							Sources: []*pbauth.Source{
 								{
-									Namespace:     "the space namespace space",
-									Partition:     "space-partition",
-									Peer:          "space-peer",
-									SamenessGroup: "space-group",
-									Exclude: Exclude{
+									Namespace: "the space namespace space",
+									Partition: "space-partition",
+									Exclude: []*pbauth.ExcludeSource{
 										{
 											IdentityName:  "not-source-identity",
 											Namespace:     "the space namespace space",
-											Partition:     "space-partition",
-											Peer:          "space-peer",
 											SamenessGroup: "space-group",
 										},
 									},
 								},
 								{
 									IdentityName: "source-identity",
+									Namespace:    "another-namespace",
 								},
 							},
-							DestinationRules: DestinationRules{
+							DestinationRules: []*pbauth.DestinationRule{
 								{
-									PathExact:  "/hello",
-									PathPrefix: "/world",
-									PathRegex:  "/.*/foo",
-									Header: &DestinationRuleHeader{
+									PathExact: "/hello",
+									Header: &pbauth.DestinationRuleHeader{
 										Name:    "x-consul-test",
 										Present: true,
 										Exact:   "true",
@@ -657,12 +652,10 @@ func TestTrafficPermissions_Validate(t *testing.T) {
 										Invert:  true,
 									},
 									Methods: []string{"GET", "POST"},
-									Exclude: ExcludePermissions{
+									Exclude: []*pbauth.ExcludePermissionRule{
 										{
-											PathExact:  "/hello",
 											PathPrefix: "/world",
-											PathRegex:  "/.*/foo",
-											Header: &DestinationRuleHeader{
+											Header: &pbauth.DestinationRuleHeader{
 												Name:    "x-consul-not-test",
 												Present: true,
 												Exact:   "false",
@@ -691,33 +684,14 @@ func TestTrafficPermissions_Validate(t *testing.T) {
 					Name:      "does-not-matter",
 					Namespace: "not-default-ns",
 				},
-				Spec: TrafficPermissionsSpec{
-					Destination: &Destination{
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
 						IdentityName: "dest-service",
 					},
 				},
 			},
 			expectedErrMsgs: []string{
-				"spec.action: Required value: action is required",
-				"spec.action: Invalid value: \"\": must be one of \"allow\" or \"deny\"",
-			},
-		},
-		{
-			name: "action must be valid",
-			input: &TrafficPermissions{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "does-not-matter",
-					Namespace: "not-default-ns",
-				},
-				Spec: TrafficPermissionsSpec{
-					Destination: &Destination{
-						IdentityName: "dest-service",
-					},
-					Action: "blurg",
-				},
-			},
-			expectedErrMsgs: []string{
-				"spec.action: Invalid value: \"blurg\": must be one of \"allow\" or \"deny\"",
+				`trafficpermissions.auth.consul.hashicorp.com "does-not-matter" is invalid: spec.action: Invalid value: ACTION_UNSPECIFIED: action must be either allow or deny`,
 			},
 		},
 		{
@@ -727,12 +701,12 @@ func TestTrafficPermissions_Validate(t *testing.T) {
 					Name:      "does-not-matter",
 					Namespace: "not-default-ns",
 				},
-				Spec: TrafficPermissionsSpec{
-					Action: "allow",
+				Spec: pbauth.TrafficPermissions{
+					Action: pbauth.Action_ACTION_ALLOW,
 				},
 			},
 			expectedErrMsgs: []string{
-				"spec.destination: Required value: destination and destination.identityName are required",
+				`trafficpermissions.auth.consul.hashicorp.com "does-not-matter" is invalid: spec.destination: Invalid value: "null": cannot be empty`,
 			},
 		},
 		{
@@ -742,13 +716,272 @@ func TestTrafficPermissions_Validate(t *testing.T) {
 					Name:      "does-not-matter",
 					Namespace: "not-default-ns",
 				},
-				Spec: TrafficPermissionsSpec{
-					Action:      "allow",
-					Destination: &Destination{},
+				Spec: pbauth.TrafficPermissions{
+					Action:      pbauth.Action_ACTION_ALLOW,
+					Destination: &pbauth.Destination{},
 				},
 			},
 			expectedErrMsgs: []string{
-				"spec.destination.identityName: Required value: identityName is required",
+				`trafficpermissions.auth.consul.hashicorp.com "does-not-matter" is invalid: spec.destination: Invalid value: authv2beta1.Destination{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), IdentityName:""}: cannot be empty`,
+			},
+		},
+		{
+			name: "permission.sources: partitions, peers, and sameness_groups",
+			input: &TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
+				},
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
+						{
+							Sources: []*pbauth.Source{
+								{
+									Namespace: "the space namespace space",
+									Partition: "space-partition",
+									Peer:      "space-peer",
+								},
+								{
+									Namespace:     "the space namespace space",
+									Partition:     "space-partition",
+									SamenessGroup: "space-sameness",
+								},
+								{
+									Namespace:     "the space namespace space",
+									Peer:          "space-peer",
+									SamenessGroup: "space-sameness",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.permissions[0].sources[0]: Invalid value: authv2beta1.Source{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), IdentityName:"", Namespace:"the space namespace space", Partition:"space-partition", Peer:"space-peer", SamenessGroup:"", Exclude:[]*authv2beta1.ExcludeSource(nil)}: permission sources may not specify partitions, peers, and sameness_groups together`,
+				`spec.permissions[0].sources[1]: Invalid value: authv2beta1.Source{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), IdentityName:"", Namespace:"the space namespace space", Partition:"space-partition", Peer:"", SamenessGroup:"space-sameness", Exclude:[]*authv2beta1.ExcludeSource(nil)}: permission sources may not specify partitions, peers, and sameness_groups together`,
+				`spec.permissions[0].sources[2]: Invalid value: authv2beta1.Source{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), IdentityName:"", Namespace:"the space namespace space", Partition:"", Peer:"space-peer", SamenessGroup:"space-sameness", Exclude:[]*authv2beta1.ExcludeSource(nil)}: permission sources may not specify partitions, peers, and sameness_groups together`,
+			},
+		},
+		{
+			name: "permission.sources: identity name without namespace",
+			input: &TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
+				},
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
+						{
+							Sources: []*pbauth.Source{
+								{
+									IdentityName: "false-identity",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.permissions[0].sources[0]: Invalid value: authv2beta1.Source{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), IdentityName:"false-identity", Namespace:"", Partition:"", Peer:"", SamenessGroup:"", Exclude:[]*authv2beta1.ExcludeSource(nil)}: permission sources may not have wildcard namespaces and explicit names`,
+			},
+		},
+		{
+			name: "permission.sources: identity name with excludes",
+			input: &TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
+				},
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
+						{
+							Sources: []*pbauth.Source{
+								{
+									Namespace:    "default-namespace",
+									IdentityName: "false-identity",
+									Exclude: []*pbauth.ExcludeSource{
+										{
+											IdentityName: "not-source-identity",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`must be defined on wildcard sources`,
+			},
+		},
+		{
+			name: "permission.sources.exclude: incompatible tenancies",
+			input: &TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
+				},
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
+						{
+							Sources: []*pbauth.Source{
+								{
+									Namespace: "default-namespace",
+									Exclude: []*pbauth.ExcludeSource{
+										{
+											Namespace: "the space namespace space",
+											Partition: "space-partition",
+											Peer:      "space-peer",
+										},
+										{
+											Namespace:     "the space namespace space",
+											Partition:     "space-partition",
+											SamenessGroup: "space-sameness",
+										},
+										{
+											Namespace:     "the space namespace space",
+											Peer:          "space-peer",
+											SamenessGroup: "space-sameness",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.permissions[0].sources[0].exclude[0]: Invalid value: authv2beta1.ExcludeSource{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), IdentityName:"", Namespace:"the space namespace space", Partition:"space-partition", Peer:"space-peer", SamenessGroup:""}: permissions sources may not specify partitions, peers, and sameness_groups together`,
+				`spec.permissions[0].sources[0].exclude[1]: Invalid value: authv2beta1.ExcludeSource{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), IdentityName:"", Namespace:"the space namespace space", Partition:"space-partition", Peer:"", SamenessGroup:"space-sameness"}: permissions sources may not specify partitions, peers, and sameness_groups together`,
+				`spec.permissions[0].sources[0].exclude[2]: Invalid value: authv2beta1.ExcludeSource{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), IdentityName:"", Namespace:"the space namespace space", Partition:"", Peer:"space-peer", SamenessGroup:"space-sameness"}: permissions sources may not specify partitions, peers, and sameness_groups together`,
+			},
+		},
+		{
+			name: "permission.sources.exclude: identity name without namespace",
+			input: &TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
+				},
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
+						{
+							Sources: []*pbauth.Source{
+								{
+									Namespace: "default-namespace",
+									Exclude: []*pbauth.ExcludeSource{
+										{
+											IdentityName: "false-identity",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.permissions[0].sources[0].exclude[0]: Invalid value: authv2beta1.ExcludeSource{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), IdentityName:"false-identity", Namespace:"", Partition:"", Peer:"", SamenessGroup:""}: permission sources may not have wildcard namespaces and explicit names`,
+			},
+		},
+		{
+			name: "permission.destinationRules: incompatible destination rules",
+			input: &TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
+				},
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
+						{
+							DestinationRules: []*pbauth.DestinationRule{
+								{
+									PathExact:  "/hello",
+									PathPrefix: "foobar",
+								},
+								{
+									PathExact: "/hello",
+									PathRegex: "path-regex",
+								},
+								{
+									PathPrefix: "foobar",
+									PathRegex:  "path-regex",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.permissions[0].destinationRules[0]: Invalid value: authv2beta1.DestinationRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"foobar", PathRegex:"", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil), Exclude:[]*authv2beta1.ExcludePermissionRule(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[1]: Invalid value: authv2beta1.DestinationRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"", PathRegex:"path-regex", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil), Exclude:[]*authv2beta1.ExcludePermissionRule(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[2]: Invalid value: authv2beta1.DestinationRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"", PathPrefix:"foobar", PathRegex:"path-regex", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil), Exclude:[]*authv2beta1.ExcludePermissionRule(nil)}: prefix values, regex values, and explicit names must not combined`,
+			},
+		},
+		{
+			name: "permission.destinationRules.exclude: incompatible destination rules",
+			input: &TrafficPermissions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "does-not-matter",
+					Namespace: "not-default-ns",
+				},
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
+						IdentityName: "destination-identity",
+					},
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
+						{
+							DestinationRules: []*pbauth.DestinationRule{
+								{
+									Exclude: []*pbauth.ExcludePermissionRule{
+										{
+											PathExact:  "/hello",
+											PathPrefix: "foobar",
+										},
+										{
+											PathExact: "/hello",
+											PathRegex: "path-regex",
+										},
+										{
+											PathPrefix: "foobar",
+											PathRegex:  "path-regex",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.permissions[0].destinationRules[0].exclude[0]: Invalid value: authv2beta1.ExcludePermissionRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"foobar", PathRegex:"", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[0].exclude[1]: Invalid value: authv2beta1.ExcludePermissionRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"", PathRegex:"path-regex", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[0].exclude[2]: Invalid value: authv2beta1.ExcludePermissionRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"", PathPrefix:"foobar", PathRegex:"path-regex", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil)}: prefix values, regex values, and explicit names must not combined`,
 			},
 		},
 	}

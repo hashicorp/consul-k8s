@@ -42,7 +42,7 @@ type TrafficPermissions struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   TrafficPermissionsSpec `json:"spec,omitempty"`
+	Spec   pbauth.TrafficPermissions `json:"spec,omitempty"`
 	Status `json:"status,omitempty"`
 }
 
@@ -52,145 +52,7 @@ type TrafficPermissions struct {
 type TrafficPermissionsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []TrafficPermissions `json:"items"`
-}
-
-// TrafficPermissionsSpec defines the desired state of TrafficPermissions.
-type TrafficPermissionsSpec struct {
-	// Destination is a configuration of the destination proxies
-	// where these traffic permissions should apply.
-	Destination *Destination `json:"destination,omitempty"`
-	// Action can be either allow or deny for the entire object. It will default to allow.
-	//
-	// If action is allow,
-	// we will allow the connection if one of the rules in Rules matches, in other words, we will deny
-	// all requests except for the ones that match Rules. If Consul is in default allow mode, then allow
-	// actions have no effect without a deny permission as everything is allowed by default.
-	//
-	// If action is deny,
-	// we will deny the connection if one of the rules in Rules match, in other words,
-	// we will allow all requests except for the ones that match Rules. If Consul is default deny mode,
-	// then deny permissions have no effect without an allow permission as everything is denied by default.
-	//
-	// Action unspecified is reserved for compatibility with the addition of future actions.
-	Action IntentionAction `json:"action,omitempty"`
-	// Permissions is a list of permissions to match on.
-	// They are applied using OR semantics.
-	Permissions Permissions `json:"permissions,omitempty"`
-}
-
-type Destination struct {
-	// Name is the destination of all intentions defined in this config entry.
-	// This may be set to the wildcard character (*) to match
-	// all services that don't otherwise have intentions defined.
-	IdentityName string `json:"identityName,omitempty"`
-}
-
-func (in *Destination) validate(path *field.Path) *field.Error {
-	if in == nil {
-		return field.Required(path, `destination and destination.identityName are required`)
-	}
-	if in.IdentityName == "" {
-		return field.Required(path.Child("identityName"), `identityName is required`)
-	}
-	return nil
-}
-
-// IntentionAction is the action that the intention represents. This
-// can be "allow" or "deny" to allowlist or denylist intentions.
-type IntentionAction string
-
-const (
-	ActionDeny        IntentionAction = "deny"
-	ActionAllow       IntentionAction = "allow"
-	ActionUnspecified IntentionAction = ""
-)
-
-func (in IntentionAction) validate(path *field.Path) *field.Error {
-	switch in {
-	case ActionDeny, ActionAllow:
-		return nil
-	default:
-		return field.Invalid(path.Child("action"), in, "must be one of \"allow\" or \"deny\"")
-	}
-}
-
-type Permissions []*Permission
-
-type Permission struct {
-	// sources is a list of sources in this traffic permission.
-	Sources Sources `json:"sources,omitempty"`
-	// destinationRules is a list of rules to apply for matching sources in this Permission.
-	// These rules are specific to the request or connection that is going to the destination(s)
-	// selected by the TrafficPermissions resource.
-	DestinationRules DestinationRules `json:"destinationRules,omitempty"`
-}
-
-type Sources []*Source
-
-type DestinationRules []*DestinationRule
-
-// Source represents the source identity.
-// To specify any of the wildcard sources, the specific fields need to be omitted.
-// For example, for a wildcard namespace, identityName should be omitted.
-type Source struct {
-	IdentityName  string `json:"identityName,omitempty"`
-	Namespace     string `json:"namespace,omitempty"`
-	Partition     string `json:"partition,omitempty"`
-	Peer          string `json:"peer,omitempty"`
-	SamenessGroup string `json:"samenessGroup,omitempty"`
-	// exclude is a list of sources to exclude from this source.
-	Exclude Exclude `json:"exclude,omitempty"`
-}
-
-// DestinationRule contains rules to apply to the incoming connection.
-type DestinationRule struct {
-	PathExact  string `json:"pathExact,omitempty"`
-	PathPrefix string `json:"pathPrefix,omitempty"`
-	PathRegex  string `json:"pathRegex,omitempty"`
-	// methods is the list of HTTP methods. If no methods are specified,
-	// this rule will apply to all methods.
-	Methods   []string               `json:"methods,omitempty"`
-	Header    *DestinationRuleHeader `json:"header,omitempty"`
-	PortNames []string               `json:"portNames,omitempty"`
-	// exclude contains a list of rules to exclude when evaluating rules for the incoming connection.
-	Exclude ExcludePermissions `json:"exclude,omitempty"`
-}
-
-type Exclude []*ExcludeSource
-
-// ExcludeSource is almost the same as source but it prevents the addition of
-// matchiing sources.
-type ExcludeSource struct {
-	IdentityName  string `json:"identityName,omitempty"`
-	Namespace     string `json:"namespace,omitempty"`
-	Partition     string `json:"partition,omitempty"`
-	Peer          string `json:"peer,omitempty"`
-	SamenessGroup string `json:"samenessGroup,omitempty"`
-}
-
-type DestinationRuleHeader struct {
-	Name    string `json:"name,omitempty"`
-	Present bool   `json:"present,omitempty"`
-	Exact   string `json:"exact,omitempty"`
-	Prefix  string `json:"prefix,omitempty"`
-	Suffix  string `json:"suffix,omitempty"`
-	Regex   string `json:"regex,omitempty"`
-	Invert  bool   `json:"invert,omitempty"`
-}
-
-type ExcludePermissions []*ExcludePermissionRule
-
-type ExcludePermissionRule struct {
-	PathExact  string `json:"pathExact,omitempty"`
-	PathPrefix string `json:"pathPrefix,omitempty"`
-	PathRegex  string `json:"pathRegex,omitempty"`
-	// methods is the list of HTTP methods.
-	Methods []string               `json:"methods,omitempty"`
-	Header  *DestinationRuleHeader `json:"header,omitempty"`
-	// portNames is a list of workload ports to apply this rule to. The ports specified here
-	// must be the ports used in the connection.
-	PortNames []string `json:"portNames,omitempty"`
+	Items           []*TrafficPermissions `json:"items"`
 }
 
 func (in *TrafficPermissions) ResourceID(namespace, partition string) *pbresource.ID {
@@ -210,12 +72,8 @@ func (in *TrafficPermissions) ResourceID(namespace, partition string) *pbresourc
 
 func (in *TrafficPermissions) Resource(namespace, partition string) *pbresource.Resource {
 	return &pbresource.Resource{
-		Id: in.ResourceID(namespace, partition),
-		Data: inject.ToProtoAny(&pbauth.TrafficPermissions{
-			Destination: in.Spec.Destination.toProto(),
-			Action:      in.Spec.Action.toProto(),
-			Permissions: in.Spec.Permissions.toProto(),
-		}),
+		Id:       in.ResourceID(namespace, partition),
+		Data:     inject.ToProtoAny(&in.Spec),
 		Metadata: meshConfigMeta(),
 	}
 }
@@ -289,26 +147,33 @@ func (in *TrafficPermissions) SyncedConditionStatus() corev1.ConditionStatus {
 	return condition.Status
 }
 
-func (in *TrafficPermissions) Validate(_ common.ConsulTenancyConfig) error {
+func (in *TrafficPermissions) Validate(tenancy common.ConsulTenancyConfig) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
-
-	if in.Spec.Action == ActionUnspecified {
-		errs = append(errs, field.Required(path.Child("action"), `action is required`))
-	}
-	if err := in.Spec.Action.validate(path); err != nil {
-		errs = append(errs, err)
+	var tp pbauth.TrafficPermissions
+	res := in.Resource(tenancy.ConsulDestinationNamespace, tenancy.ConsulPartition)
+	if err := res.Data.UnmarshalTo(&tp); err != nil {
+		return fmt.Errorf("error parsing resource data as type %q: %s", &tp, err)
 	}
 
-	// Validate Destinations
-	if err := in.Spec.Destination.validate(path.Child("destination")); err != nil {
-		errs = append(errs, err)
+	switch tp.Action {
+	case pbauth.Action_ACTION_ALLOW:
+	case pbauth.Action_ACTION_DENY:
+	case pbauth.Action_ACTION_UNSPECIFIED:
+		fallthrough
+	default:
+		errs = append(errs, field.Invalid(path.Child("action"), tp.Action, "action must be either allow or deny"))
 	}
 
-	// TODO: add validation for permissions
-	// Validate permissions in Consul:
-	// https://github.com/hashicorp/consul/blob/203a36821ef6182b2d2b30c1012ca5a42c7dd8f3/internal/auth/internal/types/traffic_permissions.go#L59-L141
-
+	if tp.Destination == nil || (len(tp.Destination.IdentityName) == 0) {
+		errs = append(errs, field.Invalid(path.Child("destination"), tp.Destination, "cannot be empty"))
+	}
+	// Validate permissions
+	for i, permission := range tp.Permissions {
+		if err := validatePermission(permission, path.Child("permissions").Index(i)); err != nil {
+			errs = append(errs, err...)
+		}
+	}
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: AuthGroup, Kind: common.TrafficPermissions},
@@ -317,109 +182,61 @@ func (in *TrafficPermissions) Validate(_ common.ConsulTenancyConfig) error {
 	return nil
 }
 
+func validatePermission(p *pbauth.Permission, path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	for s, src := range p.Sources {
+		if sourceHasIncompatibleTenancies(src) {
+			errs = append(errs, field.Invalid(path.Child("sources").Index(s), src, "permission sources may not specify partitions, peers, and sameness_groups together"))
+		}
+
+		if src.Namespace == "" && src.IdentityName != "" {
+			errs = append(errs, field.Invalid(path.Child("sources").Index(s), src, "permission sources may not have wildcard namespaces and explicit names"))
+		}
+
+		// Excludes are only valid for wildcard sources.
+		if src.IdentityName != "" && len(src.Exclude) > 0 {
+			errs = append(errs, field.Invalid(path.Child("sources").Index(s), src, "must be defined on wildcard sources"))
+			continue
+		}
+
+		for e, d := range src.Exclude {
+			if sourceHasIncompatibleTenancies(d) {
+				errs = append(errs, field.Invalid(path.Child("sources").Index(s).Child("exclude").Index(e), d, "permissions sources may not specify partitions, peers, and sameness_groups together"))
+			}
+
+			if d.Namespace == "" && d.IdentityName != "" {
+				errs = append(errs, field.Invalid(path.Child("sources").Index(s).Child("exclude").Index(e), d, "permission sources may not have wildcard namespaces and explicit names"))
+			}
+		}
+	}
+	for d, dest := range p.DestinationRules {
+		if (len(dest.PathExact) > 0 && len(dest.PathPrefix) > 0) ||
+			(len(dest.PathRegex) > 0 && len(dest.PathExact) > 0) ||
+			(len(dest.PathRegex) > 0 && len(dest.PathPrefix) > 0) {
+			errs = append(errs, field.Invalid(path.Child("destinationRules").Index(d), dest, "prefix values, regex values, and explicit names must not combined"))
+		}
+		if len(dest.Exclude) > 0 {
+			for e, excl := range dest.Exclude {
+				if (len(excl.PathExact) > 0 && len(excl.PathPrefix) > 0) ||
+					(len(excl.PathRegex) > 0 && len(excl.PathExact) > 0) ||
+					(len(excl.PathRegex) > 0 && len(excl.PathPrefix) > 0) {
+					errs = append(errs, field.Invalid(path.Child("destinationRules").Index(d).Child("exclude").Index(e), excl, "prefix values, regex values, and explicit names must not combined"))
+				}
+			}
+		}
+	}
+
+	return errs
+}
+
+func sourceHasIncompatibleTenancies(src pbauth.SourceToSpiffe) bool {
+	peerSet := src.GetPeer() != common.DefaultPeerName && src.GetPeer() != ""
+	apSet := src.GetPartition() != common.DefaultPartitionName && src.GetPartition() != ""
+	sgSet := src.GetSamenessGroup() != ""
+
+	return (apSet && peerSet) || (apSet && sgSet) || (peerSet && sgSet)
+}
+
 // DefaultNamespaceFields is required as part of the common.MeshConfig interface.
 func (in *TrafficPermissions) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
-
-func (p Permissions) toProto() []*pbauth.Permission {
-	var perms []*pbauth.Permission
-	for _, permission := range p {
-		perms = append(perms, &pbauth.Permission{
-			Sources:          permission.Sources.toProto(),
-			DestinationRules: permission.DestinationRules.toProto(),
-		})
-	}
-	return perms
-}
-
-func (s Sources) toProto() []*pbauth.Source {
-	var srcs []*pbauth.Source
-	for _, source := range s {
-		srcs = append(srcs, &pbauth.Source{
-			IdentityName:  source.IdentityName,
-			Namespace:     source.Namespace,
-			Partition:     source.Partition,
-			Peer:          source.Peer,
-			SamenessGroup: source.SamenessGroup,
-			Exclude:       source.Exclude.toProto(),
-		})
-	}
-	return srcs
-}
-
-func (r DestinationRules) toProto() []*pbauth.DestinationRule {
-	var dstnRules []*pbauth.DestinationRule
-	for _, rule := range r {
-		dstnRules = append(dstnRules, &pbauth.DestinationRule{
-			PathExact:  rule.PathExact,
-			PathPrefix: rule.PathPrefix,
-			PathRegex:  rule.PathRegex,
-			Methods:    rule.Methods,
-			Header:     rule.Header.toProto(),
-			PortNames:  rule.PortNames,
-			Exclude:    rule.Exclude.toProto(),
-		})
-	}
-	return dstnRules
-}
-
-func (e Exclude) toProto() []*pbauth.ExcludeSource {
-	var exSrcs []*pbauth.ExcludeSource
-	for _, source := range e {
-		exSrcs = append(exSrcs, &pbauth.ExcludeSource{
-			IdentityName:  source.IdentityName,
-			Namespace:     source.Namespace,
-			Partition:     source.Partition,
-			Peer:          source.Peer,
-			SamenessGroup: source.SamenessGroup,
-		})
-	}
-	return exSrcs
-}
-
-func (p ExcludePermissions) toProto() []*pbauth.ExcludePermissionRule {
-	var exclPerms []*pbauth.ExcludePermissionRule
-	for _, rule := range p {
-		exclPerms = append(exclPerms, &pbauth.ExcludePermissionRule{
-			PathExact:  rule.PathExact,
-			PathPrefix: rule.PathPrefix,
-			PathRegex:  rule.PathRegex,
-			Methods:    rule.Methods,
-			Header:     rule.Header.toProto(),
-			PortNames:  rule.PortNames,
-		})
-	}
-	return exclPerms
-}
-
-func (h *DestinationRuleHeader) toProto() *pbauth.DestinationRuleHeader {
-	if h == nil {
-		return nil
-	}
-	return &pbauth.DestinationRuleHeader{
-		Name:    h.Name,
-		Present: h.Present,
-		Exact:   h.Exact,
-		Prefix:  h.Prefix,
-		Suffix:  h.Suffix,
-		Regex:   h.Regex,
-		Invert:  h.Invert,
-	}
-}
-
-func (in *Destination) toProto() *pbauth.Destination {
-	if in == nil {
-		return nil
-	}
-	return &pbauth.Destination{
-		IdentityName: in.IdentityName,
-	}
-}
-
-func (in IntentionAction) toProto() pbauth.Action {
-	if in == ActionAllow {
-		return pbauth.Action_ACTION_ALLOW
-	} else if in == ActionDeny {
-		return pbauth.Action_ACTION_DENY
-	}
-	return pbauth.Action_ACTION_UNSPECIFIED
-}
