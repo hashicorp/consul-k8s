@@ -210,7 +210,7 @@ func TestHandlerHandle(t *testing.T) {
 			},
 		},
 		{
-			"pod with upstreams specified",
+			"pod with destinations specified",
 			MeshWebhook{
 				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
@@ -268,7 +268,7 @@ func TestHandlerHandle(t *testing.T) {
 			},
 		},
 		{
-			"error pod with incorrect upstreams specified",
+			"error pod with incorrect destinations specified",
 			MeshWebhook{
 				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),

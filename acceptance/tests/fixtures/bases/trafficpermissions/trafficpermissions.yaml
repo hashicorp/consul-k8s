@@ -9,5 +9,6 @@ spec:
   destination:
     identityName: multiport
   action: allow
-  sources:
-    - identityName: static-client
+  permissions:
+    - sources:
+        - identityName: static-client

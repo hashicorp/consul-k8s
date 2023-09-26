@@ -14,27 +14,27 @@ import (
 )
 
 func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) ([]corev1.EnvVar, error) {
-	upstreams, err := common.ProcessPodUpstreamsForMeshWebhook(pod)
+	destinations, err := common.ProcessPodDestinationsForMeshWebhook(pod)
 	if err != nil {
-		return nil, fmt.Errorf("error processing the upstream for container environment variable creation: %s", err.Error())
+		return nil, fmt.Errorf("error processing the destination for container environment variable creation: %s", err.Error())
 	}
-	if upstreams == nil {
+	if destinations == nil {
 		return nil, nil
 	}
 
 	var result []corev1.EnvVar
-	for _, upstream := range upstreams.Upstreams {
-		serviceName := strings.TrimSpace(upstream.DestinationRef.Name)
+	for _, destination := range destinations.Destinations {
+		serviceName := strings.TrimSpace(destination.DestinationRef.Name)
 		serviceName = strings.ToUpper(strings.Replace(serviceName, "-", "_", -1))
-		portName := strings.TrimSpace(upstream.DestinationPort)
+		portName := strings.TrimSpace(destination.DestinationPort)
 		portName = strings.ToUpper(strings.Replace(portName, "-", "_", -1))
 
 		result = append(result, corev1.EnvVar{
 			Name:  fmt.Sprintf("%s_%s_CONNECT_SERVICE_HOST", serviceName, portName),
-			Value: upstream.GetIpPort().Ip,
+			Value: destination.GetIpPort().Ip,
 		}, corev1.EnvVar{
 			Name:  fmt.Sprintf("%s_%s_CONNECT_SERVICE_PORT", serviceName, portName),
-			Value: strconv.Itoa(int(upstream.GetIpPort().Port)),
+			Value: strconv.Itoa(int(destination.GetIpPort().Port)),
 		})
 	}
 

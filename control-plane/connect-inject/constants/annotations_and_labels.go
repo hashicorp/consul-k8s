@@ -234,7 +234,7 @@ const (
 	// of resources.
 	ManagedByServiceAccountValue = "consul-k8s-service-account-controller"
 
-	// AnnotationMeshDestinations is a list of upstreams to register with the
+	// AnnotationMeshDestinations is a list of destinations to register with the
 	// proxy. The service name should map to a Consul service name and the local
 	// port is the local port in the pod that the listener will bind to. It can
 	// be a named port.

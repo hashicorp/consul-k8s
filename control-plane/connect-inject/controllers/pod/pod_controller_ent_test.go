@@ -59,14 +59,14 @@ type testCase struct {
 	existingWorkload           *pbcatalog.Workload
 	existingHealthStatus       *pbcatalog.HealthStatus
 	existingProxyConfiguration *pbmesh.ProxyConfiguration
-	existingUpstreams          *pbmesh.Upstreams
+	existingDestinations       *pbmesh.Destinations
 
 	// Expected Consul state.
 	expectedConsulNamespace    string // This namespace will be used to query Consul for the results
 	expectedWorkload           *pbcatalog.Workload
 	expectedHealthStatus       *pbcatalog.HealthStatus
 	expectedProxyConfiguration *pbmesh.ProxyConfiguration
-	expectedUpstreams          *pbmesh.Upstreams
+	expectedDestinations       *pbmesh.Destinations
 
 	// Reconcile loop outputs
 	expErr     string
@@ -173,7 +173,7 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			expectedHealthStatus:    createPassingHealthStatus(),
 		},
 		{
-			name:      "new pod with explicit upstreams, ns and partition",
+			name:      "new pod with explicit destinations, ns and partition",
 			podName:   testPodName,
 			partition: constants.DefaultConsulPartition,
 
@@ -194,7 +194,7 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
 			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
-			expectedUpstreams:          createUpstreams(),
+			expectedDestinations:       createDestinations(),
 		},
 		{
 			name:         "namespace in Consul does not exist",
@@ -315,7 +315,7 @@ func TestReconcileDeletePodWithMirrorNamespaces(t *testing.T) {
 			expectedConsulNamespace: "bar",
 		},
 		{
-			name:         "delete pod w/ explicit upstreams",
+			name:         "delete pod w/ explicit destinations",
 			podName:      testPodName,
 			podNamespace: "bar",
 			partition:    testPartition,
@@ -330,7 +330,7 @@ func TestReconcileDeletePodWithMirrorNamespaces(t *testing.T) {
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
 			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
-			existingUpstreams:          createUpstreams(),
+			existingDestinations:       createDestinations(),
 
 			expectedConsulNamespace: "bar",
 		},
@@ -417,7 +417,7 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
-			name:      "new pod with explicit upstreams, ns and partition",
+			name:      "new pod with explicit destinations, ns and partition",
 			podName:   testPodName,
 			partition: constants.DefaultConsulPartition,
 
@@ -439,7 +439,7 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
 			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
-			expectedUpstreams:          createUpstreams(),
+			expectedDestinations:       createDestinations(),
 		},
 		{
 			name:         "kitchen sink new pod, non-default ns and partition",
@@ -585,7 +585,7 @@ func TestReconcileDeletePodWithDestinationNamespace(t *testing.T) {
 			expectedConsulNamespace: "a-penguin-walks-into-a-bar",
 		},
 		{
-			name:         "delete pod with explicit upstreams",
+			name:         "delete pod with explicit destinations",
 			podName:      testPodName,
 			podNamespace: "bar",
 			partition:    testPartition,
@@ -600,7 +600,7 @@ func TestReconcileDeletePodWithDestinationNamespace(t *testing.T) {
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
 			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
-			existingUpstreams:          createUpstreams(),
+			existingDestinations:       createDestinations(),
 
 			expectedConsulNamespace: "a-penguin-walks-into-a-bar",
 		},
@@ -750,8 +750,8 @@ func runControllerTest(t *testing.T, tc testCase) {
 	loadResource(
 		t,
 		resourceClient,
-		getUpstreamsID(tc.podName, tc.expectedConsulNamespace, tc.partition),
-		tc.existingUpstreams,
+		getDestinationsID(tc.podName, tc.expectedConsulNamespace, tc.partition),
+		tc.existingDestinations,
 		nil)
 
 	namespacedName := types.NamespacedName{
@@ -779,6 +779,6 @@ func runControllerTest(t *testing.T, tc testCase) {
 	pcID := getProxyConfigurationID(tc.podName, tc.expectedConsulNamespace, tc.partition)
 	expectedProxyConfigurationMatches(t, resourceClient, pcID, tc.expectedProxyConfiguration)
 
-	uID := getUpstreamsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-	expectedUpstreamMatches(t, resourceClient, uID, tc.expectedUpstreams)
+	uID := getDestinationsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
+	expectedDestinationMatches(t, resourceClient, uID, tc.expectedDestinations)
 }
