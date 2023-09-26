@@ -34,6 +34,8 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
+				"global.image": "ishustava/consul:tenancy-fix@sha256:6ddc9abbf7f697deea6b9d6b7f1151786554aaa28617fa15b4ea98266d59d7ea",
+				//"global.imageK8S":       "ishustava/consul-k8s-control-plane:multiport-test@sha256:ac89c3701153b8ef795ed297d2d372ff1dc39d4be91afb33f00eb81ffe5aea68",
 				"global.experiments[0]": "resource-apis",
 				// The UI is not supported for v2 in 1.17, so for now it must be disabled.
 				"ui.enabled":            "false",
