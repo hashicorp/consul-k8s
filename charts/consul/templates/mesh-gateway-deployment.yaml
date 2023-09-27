@@ -12,7 +12,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ template "consul.fullname" . }}-mesh-gateway
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -231,7 +231,7 @@ spec:
         {{- if .Values.externalServers.enabled }}
         - -addresses={{ .Values.externalServers.hosts | first }}
         {{- else }}
-        - -addresses={{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+        - -addresses={{ template "consul.fullname" . }}-server.${NAMESPACE}.svc
         {{- end }}
         {{- if .Values.externalServers.enabled }}
         - -grpc-port={{ .Values.externalServers.grpcPort }}

@@ -17,5 +17,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ template "consul.fullname" . }}-sync-catalog
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ template "consul.namespace" . }}
 {{- end }}

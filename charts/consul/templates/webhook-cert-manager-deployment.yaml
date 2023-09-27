@@ -4,7 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ template "consul.fullname" . }}-webhook-cert-manager
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -40,7 +40,12 @@ spec:
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/webhook-cert-manager-configmap.yaml") . | sha256sum }}
     spec:
       containers:
-      - command:
+      - env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        command:
         - "/bin/sh"
         - "-ec"
         - |
@@ -49,7 +54,7 @@ spec:
             -log-json={{ .Values.global.logJSON }} \
             -config-file=/bootstrap/config/webhook-config.json \
             -deployment-name={{ template "consul.fullname" . }}-webhook-cert-manager \
-            -deployment-namespace={{ .Release.Namespace }}
+            -deployment-namespace=${NAMESPACE}
         image: {{ .Values.global.imageK8S }}
         name: webhook-cert-manager
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}

@@ -5,7 +5,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ template "consul.fullname" . }}-enterprise-license
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app.kubernetes.io/managed-by: {{.Release.Service | quote }}
     app.kubernetes.io/instance: {{.Release.Name | quote }}
@@ -125,13 +125,18 @@ spec:
       initContainers:
       - name: ent-license-acl-init
         image: {{ .Values.global.imageK8S }}
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         command:
           - "/bin/sh"
           - "-ec"
           - |
             consul-k8s-control-plane acl-init \
               -secret-name="{{ template "consul.fullname" . }}-enterprise-license-acl-token" \
-              -k8s-namespace={{ .Release.Namespace }} \
+              -k8s-namespace=${NAMESPACE} \
               -consul-api-timeout={{ .Values.global.consulAPITimeout }}
         resources:
           requests:

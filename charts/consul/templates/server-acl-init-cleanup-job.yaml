@@ -16,7 +16,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ template "consul.fullname" . }}-server-acl-init-cleanup
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -61,6 +61,11 @@ spec:
       containers:
         - name: server-acl-init-cleanup
           image: {{ .Values.global.imageK8S }}
+          env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
           {{- if not .Values.server.containerSecurityContext.aclInit }}
           {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           {{- end }}
@@ -70,7 +75,7 @@ spec:
             - delete-completed-job
             - -log-level={{ default .Values.global.logLevel .Values.global.acls.logLevel }}
             - -log-json={{ .Values.global.logJSON }}
-            - -k8s-namespace={{ .Release.Namespace }}
+            - -k8s-namespace=${NAMESPACE}
             - {{ template "consul.fullname" . }}-server-acl-init
           {{- if .Values.global.acls.resources }}
           resources:

@@ -16,5 +16,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ template "consul.fullname" . }}-cni
-  namespace: {{ default .Release.Namespace .Values.connectInject.cni.namespace }}
+  namespace: {{ default (include "consul.namespace" .) .Values.connectInject.cni.namespace }}
 {{- end }}

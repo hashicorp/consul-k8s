@@ -6,7 +6,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ template "consul.fullname" . }}-server-config
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -50,7 +50,7 @@ data:
         "serf_lan": {{ .Values.server.ports.serflan.port }}
       },
       "recursors": {{ .Values.global.recursors | toJson }},
-      "retry_join": ["{{template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:{{ .Values.server.ports.serflan.port }}"],
+      "retry_join": ["{{template "consul.fullname" . }}-server.{{ template "consul.namespace" . }}.svc:{{ .Values.server.ports.serflan.port }}"],
       {{- if .Values.global.peering.enabled }}
       "peering": {
         "enabled": true

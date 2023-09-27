@@ -4,7 +4,7 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ template "consul.fullname" . }}-connect-injector
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -15,7 +15,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-proxydefaults
   failurePolicy: Fail
   admissionReviewVersions:
@@ -36,7 +36,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-mesh
   failurePolicy: Fail
   admissionReviewVersions:
@@ -57,7 +57,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-servicedefaults
   failurePolicy: Fail
   admissionReviewVersions:
@@ -78,7 +78,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-serviceresolver
   failurePolicy: Fail
   admissionReviewVersions:
@@ -99,7 +99,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-servicerouter
   failurePolicy: Fail
   admissionReviewVersions:
@@ -120,7 +120,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-servicesplitter
   failurePolicy: Fail
   admissionReviewVersions:
@@ -141,7 +141,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-serviceintentions
   failurePolicy: Fail
   admissionReviewVersions:
@@ -162,7 +162,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-ingressgateway
   failurePolicy: Fail
   admissionReviewVersions:
@@ -183,7 +183,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-terminatinggateway
   failurePolicy: Fail
   admissionReviewVersions:
@@ -204,7 +204,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-exportedservices
   failurePolicy: Fail
   admissionReviewVersions:
@@ -225,7 +225,7 @@ webhooks:
 - clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-controlplanerequestlimits
   failurePolicy: Fail
   admissionReviewVersions:
@@ -258,7 +258,7 @@ webhooks:
   clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: "/mutate"
   rules:
   - operations: [ "CREATE" ]
@@ -274,7 +274,7 @@ webhooks:
   clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: "/mutate-v1alpha1-peeringacceptors"
   rules:
   - apiGroups:
@@ -295,7 +295,7 @@ webhooks:
   clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: "/mutate-v1alpha1-peeringdialers"
   rules:
   - apiGroups:
@@ -318,7 +318,7 @@ webhooks:
   clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-samenessgroup
   failurePolicy: Fail
   name: mutate-samenessgroup.consul.hashicorp.com
@@ -340,7 +340,7 @@ webhooks:
   clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v2beta1-trafficpermissions
   failurePolicy: Fail
   name: mutate-trafficpermissions.auth.consul.hashicorp.com
@@ -363,7 +363,7 @@ webhooks:
   clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
-      namespace: {{ .Release.Namespace }}
+      namespace: {{ template "consul.namespace" . }}
       path: /mutate-v1alpha1-jwtprovider
   failurePolicy: Fail
   name: mutate-jwtprovider.consul.hashicorp.com

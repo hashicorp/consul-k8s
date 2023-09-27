@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ template "consul.fullname" . }}-webhook-cert-manager-config
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -18,12 +18,12 @@ data:
         "name": "{{ template "consul.fullname" . }}-connect-injector",
         "tlsAutoHosts": [
           "{{ template "consul.fullname" . }}-connect-injector",
-          "{{ template "consul.fullname" . }}-connect-injector.{{ .Release.Namespace }}",
-          "{{ template "consul.fullname" . }}-connect-injector.{{ .Release.Namespace }}.svc",
-          "{{ template "consul.fullname" . }}-connect-injector.{{ .Release.Namespace }}.svc.cluster.local"
+          "{{ template "consul.fullname" . }}-connect-injector.{{ template "consul.namespace" . }}",
+          "{{ template "consul.fullname" . }}-connect-injector.{{ template "consul.namespace" . }}.svc",
+          "{{ template "consul.fullname" . }}-connect-injector.{{ template "consul.namespace" . }}.svc.cluster.local"
         ],
         "secretName": "{{ template "consul.fullname" . }}-connect-inject-webhook-cert",
-        "secretNamespace": "{{ .Release.Namespace }}"
+        "secretNamespace": "{{ template "consul.namespace" . }}"
       }
     ]
   {{- end }}

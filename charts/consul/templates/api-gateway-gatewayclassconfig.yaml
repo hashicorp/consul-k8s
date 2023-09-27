@@ -31,7 +31,7 @@ spec:
       We have local network connectivity between deployments and the internal cluster, this
       should be supported in all versions of api-gateway
     */}}
-    address: {{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+    address: {{ template "consul.fullname" . }}-server.{{ template "consul.namespace" . }}.svc
     {{- end }}
     authentication:
       {{- if .Values.global.acls.manageSystemACLs }}

@@ -17,7 +17,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ template "consul.fullname" . }}-connect-injector
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -148,7 +148,7 @@ spec:
                 -consul-dataplane-image="{{ .Values.global.imageConsulDataplane }}" \
                 -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \
                 -release-name="{{ .Release.Name }}" \
-                -release-namespace="{{ .Release.Namespace }}" \
+                -release-namespace="${NAMESPACE}" \
                 -resource-prefix={{ template "consul.fullname" . }} \
                 -listen=:8080 \
                 {{- if (mustHas "resource-apis" .Values.global.experiments) }}

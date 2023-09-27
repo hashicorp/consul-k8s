@@ -16,5 +16,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ template "consul.fullname" . }}-mesh-gateway
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ template "consul.namespace" . }}
 {{- end }}

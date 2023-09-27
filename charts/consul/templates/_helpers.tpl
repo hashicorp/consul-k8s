@@ -15,6 +15,10 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.namespace" -}}
+{{ default .Release.Namespace .Values.namespaceOverride }}
+{{- end -}}
+
 {{- define "consul.restrictedSecurityContext" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
 securityContext:
@@ -100,7 +104,7 @@ and consul-k8s-control-plane images.
 
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
-{{- $ns := .Release.Namespace -}}
+{{- $ns := include "consul.namespace" . -}}
 {{ printf "localhost,%s-server,*.%s-server,*.%s-server.%s,%s-server.%s,*.%s-server.%s.svc,%s-server.%s.svc,*.server.%s.%s" $name $name $name $ns $name $ns $name $ns $name $ns (.Values.global.datacenter ) (.Values.global.domain) }}{{ include "consul.serverAdditionalDNSSANs" . }}
 {{- end -}}
 
@@ -114,7 +118,7 @@ and consul-k8s-control-plane images.
 
 {{- define "consul.connectInjectorTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
-{{- $ns := .Release.Namespace -}}
+{{- $ns := include "consul.namespace" . -}}
 {{ printf "%s-connect-injector,%s-connect-injector.%s,%s-connect-injector.%s.svc,%s-connect-injector.%s.svc.cluster.local" $name $name $ns $name $ns $name $ns}}
 {{- end -}}
 
@@ -311,7 +315,7 @@ Consul server environment variables for consul-k8s commands.
   {{- if .Values.externalServers.enabled }}
   value: {{ .Values.externalServers.hosts | first }}
   {{- else }}
-  value: {{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+  value: {{ template "consul.fullname" . }}-server.{{ template "consul.namespace" . }}.svc
   {{- end }}
 - name: CONSUL_GRPC_PORT
   {{- if .Values.externalServers.enabled }}

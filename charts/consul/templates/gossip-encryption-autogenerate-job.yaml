@@ -7,7 +7,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -49,13 +49,18 @@ spec:
       containers:
         - name: gossip-encryption-autogen
           image: "{{ .Values.global.imageK8S }}"
+          env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
           {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           command:
             - "/bin/sh"
             - "-ec"
             - |
               consul-k8s-control-plane gossip-encryption-autogenerate \
-                -namespace={{ .Release.Namespace }} \
+                -namespace=${NAMESPACE} \
                 -secret-name={{ template "consul.fullname" . }}-gossip-encryption-key \
                 -secret-key="key" \
                 -log-level={{ default .Values.global.logLevel .Values.global.gossipEncryption.logLevel }} \

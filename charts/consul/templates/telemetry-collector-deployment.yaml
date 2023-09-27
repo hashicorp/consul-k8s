@@ -9,7 +9,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ template "consul.fullname" . }}-telemetry-collector
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -254,7 +254,7 @@ spec:
           {{- if .Values.externalServers.enabled }}
           - -addresses={{ .Values.externalServers.hosts | first }}
           {{- else }}
-          - -addresses={{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+          - -addresses={{ template "consul.fullname" . }}-server.${NAMESPACE}.svc
           {{- end }}
           # grpc
           {{- if .Values.externalServers.enabled }}

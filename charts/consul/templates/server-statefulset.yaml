@@ -24,7 +24,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ template "consul.fullname" . }}-server
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -429,7 +429,7 @@ spec:
                 -hcl="experiments=[\"resource-apis\"]"
                 {{- end }}
           volumeMounts:
-            - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
+            - name: data-{{ (include "consul.namespace" .) | trunc 58 | trimSuffix "-" }}
               mountPath: /consul/data
             - name: config
               mountPath: /consul/config
@@ -637,7 +637,7 @@ spec:
       {{- end }}
   volumeClaimTemplates:
     - metadata:
-        name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
+        name: data-{{ (include "consul.namespace" .) | trunc 58 | trimSuffix "-" }}
       spec:
         accessModes:
           - ReadWriteOnce
