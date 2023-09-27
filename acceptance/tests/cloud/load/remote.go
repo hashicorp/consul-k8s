@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// GetDomainSuffix gets the suffix
+// GetDomainSuffix gets the suffix.
 func GetDomainSuffix(env string) (string, error) {
 	suffix, ok := map[string]string{
 		"dev-remote": "hcp.dev",
