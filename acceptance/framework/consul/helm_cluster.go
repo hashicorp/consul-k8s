@@ -46,6 +46,10 @@ type HelmCluster struct {
 	// if there are any previous installations of this Helm chart in the cluster.
 	SkipCheckForPreviousInstallations bool
 
+	// ChartPath is an option field that allows consumers to change the default
+	// chart path if so desired
+	ChartPath string
+
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
 	releaseName        string
@@ -143,7 +147,9 @@ func (h *HelmCluster) Create(t *testing.T) {
 			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
 		}
 	}
-
+	if h.ChartPath != "" {
+		chartName = h.ChartPath
+	}
 	helm.Install(t, h.helmOptions, chartName, h.releaseName)
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
