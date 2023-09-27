@@ -83,6 +83,7 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 	}
 
 	// Create Consul resource service client for this reconcile.
+	// Some change.
 	resourceClient, err := consul.NewResourceServiceClient(r.ConsulServerConnMgr)
 	if err != nil {
 		logger.Error(err, "failed to create Consul resource client", "name", req.Name, "ns", req.Namespace)
