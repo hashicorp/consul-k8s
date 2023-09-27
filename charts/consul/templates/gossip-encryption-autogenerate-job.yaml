@@ -7,7 +7,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ default .Release.Namespace .Values.namespaceOverride }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -55,7 +55,7 @@ spec:
             - "-ec"
             - |
               consul-k8s-control-plane gossip-encryption-autogenerate \
-                -namespace={{ .Release.Namespace }} \
+                -namespace={{ default .Release.Namespace .Values.namespaceOverride }} \
                 -secret-name={{ template "consul.fullname" . }}-gossip-encryption-key \
                 -secret-key="key" \
                 -log-level={{ default .Values.global.logLevel .Values.global.gossipEncryption.logLevel }} \

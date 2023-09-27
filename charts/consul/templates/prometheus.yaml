@@ -12,7 +12,7 @@ metadata:
     chart: prometheus-13.2.1
     heritage: Helm
   name: prometheus-server
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ default .Release.Namespace .Values.namespaceOverride }}
   annotations:
     {}
 ---
@@ -27,7 +27,7 @@ metadata:
     chart: prometheus-13.2.1
     heritage: Helm
   name: prometheus-server
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ default .Release.Namespace .Values.namespaceOverride }}
 data:
   alerting_rules.yml: |
     {}
@@ -357,7 +357,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: prometheus-server
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ default .Release.Namespace .Values.namespaceOverride }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -374,7 +374,7 @@ metadata:
     chart: prometheus-13.2.1
     heritage: Helm
   name: prometheus-server
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ default .Release.Namespace .Values.namespaceOverride }}
 spec:
   ports:
     - name: http
@@ -399,7 +399,7 @@ metadata:
     chart: prometheus-13.2.1
     heritage: Helm
   name: prometheus-server
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ default .Release.Namespace .Values.namespaceOverride }}
 spec:
   selector:
     matchLabels:

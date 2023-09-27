@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ template "consul.fullname" . }}-server
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ default .Release.Namespace .Values.namespaceOverride }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
