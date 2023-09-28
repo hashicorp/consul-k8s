@@ -18,9 +18,9 @@ annotations:
     - name: consul
       image: wilko1989/consul:latest
     - name: consul-k8s-control-plane
-      image: wilko1989/consul-k8s-control-plane-dev@sha256:ed692cbd1452dc26d65674637d8e48c6a7f8d7235b8eb3301d996a4a44762229
+      image: wilko1989/consul-k8s-control-plane-dev:latest
     - name: consul-dataplane
-      image: wilko1989/consul-dataplane@sha256:63e3dd069e767d764907e97f90e25dc2fa27ecec189f8d249a3dfadf0f8700d5
+      image: wilko1989/consul-dataplane:latest
     - name: envoy
       image: envoyproxy/envoy:v1.26.2
   artifacthub.io/license: MPL-2.0

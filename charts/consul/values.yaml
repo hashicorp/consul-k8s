@@ -86,7 +86,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: wilko1989/consul-k8s-control-plane-dev@sha256:ed692cbd1452dc26d65674637d8e48c6a7f8d7235b8eb3301d996a4a44762229
+  imageK8S: wilko1989/consul-k8s-control-plane-dev:latest
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -639,7 +639,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: wilko1989/consul-dataplane@sha256:63e3dd069e767d764907e97f90e25dc2fa27ecec189f8d249a3dfadf0f8700d5
+  imageConsulDataplane: wilko1989/consul-dataplane:latest
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
