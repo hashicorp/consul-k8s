@@ -16,11 +16,11 @@ annotations:
   artifacthub.io/prerelease: true
   artifacthub.io/images: |
     - name: consul
-      image: docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.17-dev
+      image: wilko1989/consul:latest
     - name: consul-k8s-control-plane
-      image: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.3.0-dev
+      image: wilko1989/consul-k8s-control-plane-dev@sha256:ed692cbd1452dc26d65674637d8e48c6a7f8d7235b8eb3301d996a4a44762229
     - name: consul-dataplane
-      image: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.3-dev
+      image: wilko1989/consul-dataplane@sha256:63e3dd069e767d764907e97f90e25dc2fa27ecec189f8d249a3dfadf0f8700d5
     - name: envoy
       image: envoyproxy/envoy:v1.26.2
   artifacthub.io/license: MPL-2.0
