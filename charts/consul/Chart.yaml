@@ -16,11 +16,11 @@ annotations:
   artifacthub.io/prerelease: true
   artifacthub.io/images: |
     - name: consul
-      image: wilko1989/consul:latest
+      image: wilko1989/consul:ci
     - name: consul-k8s-control-plane
-      image: wilko1989/consul-k8s-control-plane-dev:latest
+      image: wilko1989/consul-k8s-control-plane-dev:ci
     - name: consul-dataplane
-      image: wilko1989/consul-dataplane:latest
+      image: wilko1989/consul-dataplane:ci
     - name: envoy
       image: envoyproxy/envoy:v1.26.2
   artifacthub.io/license: MPL-2.0
