@@ -175,6 +175,15 @@ func TestSkipTrafficRedirection(t *testing.T) {
 			expectedSkip: false,
 		},
 		{
+			name: "Pod with v2 annotations correctly set",
+			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[keyMeshInjectStatus] = "foo"
+				pod.Annotations[keyTransparentProxyStatus] = "bar"
+				return pod
+			},
+			expectedSkip: false,
+		},
+		{
 			name: "Pod without annotations, will timeout waiting",
 			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
