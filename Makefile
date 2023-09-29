@@ -268,6 +268,23 @@ endif
 
 prepare-release: prepare-release-script check-preview-containers
 
+prepare-rc-script: ## Sets the versions, updates changelog to prepare this repository to release
+ifndef CONSUL_K8S_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
+endif
+ifndef CONSUL_K8S_RELEASE_DATE
+	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+endif
+ifndef CONSUL_K8S_LAST_RELEASE_GIT_TAG
+	$(error CONSUL_K8S_LAST_RELEASE_GIT_TAG is required)
+endif
+ifndef CONSUL_K8S_CONSUL_VERSION
+	$(error CONSUL_K8S_CONSUL_VERSION is required)
+endif
+	@source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_rc_branch $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION); \
+
+prepare-rc-branch: prepare-rc-script
+
 prepare-dev:
 ifndef CONSUL_K8S_RELEASE_VERSION
 	$(error CONSUL_K8S_RELEASE_VERSION is required)
