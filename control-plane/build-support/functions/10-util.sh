@@ -785,19 +785,19 @@ function prepare_release {
 }
 
 function prepare_rc_branch {
-	# Arguments:
-	#   $1 - Path to top level Consul source
-	#   $2 - The version of the release
-	#   $3 - The release date
-	#   $4 - The last release git tag for this branch (eg. v1.1.0)
+  # Arguments:
+  #   $1 - Path to top level Consul source
+  #   $2 - The version of the release
+  #   $3 - The release date
+  #   $4 - The last release git tag for this branch (eg. v1.1.0)
   #   $5 - The consul version
-	#   $6 - The consul-dataplane version
+  #   $6 - The consul-dataplane version
   #   $7 - The pre-release version
-	#
-	#
-	# Returns:
-	#   0 - success
-	#   * - error
+  #
+  #
+  # Returns:
+  #   0 - success
+  #   * - error
 
   local curDir=$1
   local version=$2
