@@ -4,10 +4,10 @@
 FILE=$1
 VERSION=$(yq .global.image $FILE)
 
-if [[ !"${VERSION}" == *"hashicorppreview/consul:"* ]]; then
-	VERSION=$(echo ${VERSION} | sed "s/consul:/consul-enterprise:/g")
-elif [[ !"${VERSION}" == *"hashicorp/consul:"* ]]; then
+if [[ !"${VERSION}" == *"hashicorp/consul:"* ]]; then
 	VERSION=$(echo ${VERSION} | sed "s/consul:/consul-enterprise:/g" | sed "s/$/-ent/g")
+else
+  VERSION=$(echo ${VERSION} | sed "s/consul:/consul-enterprise:/g")
 fi
 
 echo "${VERSION}"
