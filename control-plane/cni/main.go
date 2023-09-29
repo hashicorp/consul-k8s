@@ -33,6 +33,10 @@ const (
 	// a pod after an injection is done.
 	keyInjectStatus = "consul.hashicorp.com/connect-inject-status"
 
+	// keyMeshInjectStatus is the mesh v2 key of the annotation that is added to
+	// a pod after an injection is done.
+	keyMeshInjectStatus = "consul.hashicorp.com/mesh-inject-status"
+
 	// keyTransparentProxyStatus is the key of the annotation that is added to
 	// a pod when transparent proxy is done.
 	keyTransparentProxyStatus = "consul.hashicorp.com/transparent-proxy-status"
@@ -246,11 +250,15 @@ func main() {
 }
 
 // skipTrafficRedirection looks for annotations on the pod and determines if it should skip traffic redirection.
-// The absence of the annotations is the equivalent of "disabled" because it means that the connect inject mutating
+// The absence of the annotations is the equivalent of "disabled" because it means that the connect-inject mutating
 // webhook did not run against the pod.
 func skipTrafficRedirection(pod corev1.Pod) bool {
+	// If keyInjectStatus exists, then we are dealing with a mesh v1 pod
+	// else we have a mesh v2 pod. We need to check for both before we can skip.
 	if anno, ok := pod.Annotations[keyInjectStatus]; !ok || anno == "" {
-		return true
+		if anno, ok := pod.Annotations[keyMeshInjectStatus]; !ok || anno == "" {
+			return true
+		}
 	}
 
 	if anno, ok := pod.Annotations[keyTransparentProxyStatus]; !ok || anno == "" {
