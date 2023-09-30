@@ -16,7 +16,7 @@ as well as the global.name setting.
 {{- end -}}
 
 {{- define "consul.namespace" -}}
-{{ default .Release.Namespace .Values.namespaceOverride }}
+{{ default .Release.Namespace .Values.global.namespace }}
 {{- end -}}
 
 {{- define "consul.restrictedSecurityContext" -}}

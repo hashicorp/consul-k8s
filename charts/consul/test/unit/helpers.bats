@@ -120,6 +120,22 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# template consul.namespace
+#
+# This test ensures that we use {{ template "consul.namespace" }} everywhere instead of
+# {{ .Release.Namespace }} because that's required in order to support the namespace
+# override setting global.namespace.
+#
+# If this test fails, you're likely using {{ .Release.Namespace }} where you should
+# be using {{ template "consul.namespace" }}
+@test "helper/consul.namespace: template used everywhere" {
+  cd `chart_dir`
+  # Grep for uses of .Release.Namespace.
+  local actual=$(grep -r '{{ .Release.Namespace }}' templates/*.yaml | tee /dev/stderr )
+  [ "${actual}" = '' ]
+}
+
+#--------------------------------------------------------------------
 # component label
 #
 # This test ensures that we set a "component: <blah>" in every file.
