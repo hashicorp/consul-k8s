@@ -56,12 +56,12 @@ type reconcileCase struct {
 	expErr                string
 }
 
-// TODO: Allow/deny namespaces for reconcile tests
+// TODO(NET-5716): Allow/deny namespaces for reconcile tests
 
 func TestReconcile_CreateService(t *testing.T) {
 	t.Parallel()
 	cases := []reconcileCase{
-		//TODO: reenable this test as a conditional on global mesh inject flag rather than "any time we see endpoints"
+		//TODO(5704): reenable this test as a conditional on global mesh inject flag rather than "any time we see endpoints"
 		//{
 		//	// In this test, we expect the same service registration as the "basic"
 		//	// case, but without any workload selector values due to missing endpoints.

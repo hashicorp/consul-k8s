@@ -103,7 +103,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	// If we don't have at least one mesh-injected pod targeted by the service, do not register the service.
-	//TODO: Register service with mesh port added if global flag for inject is true,
+	//TODO(NET-5704): Register service with mesh port added if global flag for inject is true,
 	// even if Endpoints are empty or have no mesh pod, iff. the service has a selector.
 	// This should ensure that we don't target kube or consul (system) services.
 	if consulSvc.Workloads == nil {
@@ -111,7 +111,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	// Register the service in Consul.
-	//TODO: Maybe check service-enable label here on service/deployments/other pod owners
+	//TODO(NET-5704): Check service-enable label here on service/deployments/other pod owners
 	if err = r.registerService(ctx, resourceClient, service, consulSvc); err != nil {
 		// We could be racing with the namespace controller.
 		// Requeue (which includes backoff) to try again.
@@ -274,7 +274,7 @@ func (r *Controller) registerService(ctx context.Context, resourceClient pbresou
 	)
 
 	r.Log.Info("registering service with Consul", getLogFieldsForResource(consulSvcResource.Id)...)
-	//TODO: Maybe attempt to debounce redundant writes. For now, we blindly rewrite state on each reconcile.
+	//TODO(NET-5681): Maybe attempt to debounce redundant writes. For now, we blindly rewrite state on each reconcile.
 	_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: consulSvcResource})
 	if err != nil {
 		r.Log.Error(err, fmt.Sprintf("failed to register service: %+v", consulSvc), getLogFieldsForResource(consulSvcResource.Id)...)
@@ -325,7 +325,7 @@ func getServicePorts(service corev1.Service, prefixedPods selectorPodData, exact
 		}
 	}
 
-	//TODO: Error check reserved "mesh" target port
+	//TODO(NET-5705): Error check reserved "mesh" target port
 
 	// Append Consul service mesh port in addition to discovered ports.
 	ports = append(ports, &pbcatalog.ServicePort{
@@ -358,10 +358,10 @@ func getEffectiveTargetPort(targetPort intstr.IntOrString, prefixedPods selector
 	// very expensive operation to repeat every time endpoints change, and we don't expect the target port to change
 	// often if ever across pod/deployment lifecycles.
 	//
-	//TODO in GA, we intend to change port selection to allow for Consul TargetPort to be numeric. If we retain the
-	// port selection model used here beyond GA, we should consider updating it to also consider pod health, s.t. when
-	// the selected port name changes between deployments of a ReplicaSet, we route traffic to ports belonging to the
-	// set most able to serve traffic, rather than simply the largest one.
+	//TODO(NET-5706) in GA, we intend to change port selection to allow for Consul TargetPort to be numeric. If we
+	// retain the port selection model used here beyond GA, we should consider updating it to also consider pod health,
+	// s.t. when the selected port name changes between deployments of a ReplicaSet, we route traffic to ports
+	// belonging to the set most able to serve traffic, rather than simply the largest one.
 	targetPortInt := int32(targetPort.IntValue())
 	var mostPrevalentContainerPort *corev1.ContainerPort
 	maxCount := 0
@@ -450,7 +450,6 @@ func getServiceMeta(service corev1.Service) map[string]string {
 		constants.MetaKeyKubeNS:    service.Namespace,
 		constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 	}
-	//TODO: Support arbitrary meta injection via annotation? (see v1)
 	return meta
 }
 
@@ -498,7 +497,7 @@ func (r *Controller) getConsulNamespace(kubeNamespace string) string {
 		r.NSMirroringPrefix,
 	)
 
-	// TODO: remove this if and when the default namespace of resources is no longer required to be set explicitly.
+	// TODO(NET-5652): remove this if and when the default namespace of resources is no longer required to be set explicitly.
 	if ns == "" {
 		ns = constants.DefaultConsulNS
 	}
