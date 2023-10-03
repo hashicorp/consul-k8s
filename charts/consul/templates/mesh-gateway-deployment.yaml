@@ -231,7 +231,7 @@ spec:
         {{- if .Values.externalServers.enabled }}
         - -addresses={{ .Values.externalServers.hosts | first }}
         {{- else }}
-        - -addresses={{ template "consul.fullname" . }}-server.${NAMESPACE}.svc
+        - -addresses={{ template "consul.fullname" . }}-server.{{ template "consul.namespace" . }}.svc
         {{- end }}
         {{- if .Values.externalServers.enabled }}
         - -grpc-port={{ .Values.externalServers.grpcPort }}

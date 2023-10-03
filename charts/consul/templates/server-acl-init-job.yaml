@@ -185,7 +185,7 @@ spec:
             -log-level={{ default .Values.global.logLevel .Values.global.acls.logLevel}} \
             -log-json={{ .Values.global.logJSON }} \
             -resource-prefix=${CONSUL_FULLNAME} \
-            -k8s-namespace=${NAMESPACE} \
+            -k8s-namespace={{ template "consul.namespace" . }} \
             -set-server-tokens={{ $serverEnabled }} \
             {{- if .Values.global.secretsBackend.vault.enabled }}
             -secrets-backend=vault \

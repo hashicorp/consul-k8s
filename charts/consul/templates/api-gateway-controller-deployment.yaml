@@ -66,10 +66,6 @@ spec:
           name: sds
           protocol: TCP
         env:
-        - name: NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
         {{- if or (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) .Values.client.enabled }}
         {{- if .Values.global.tls.enabled }}
         - name: CONSUL_CACERT
@@ -148,8 +144,8 @@ spec:
         - "-ec"
         - |
           consul-api-gateway server \
-            -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.${NAMESPACE}.svc \
-            -k8s-namespace ${NAMESPACE} \
+            -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ template "consul.namespace" . }}.svc \
+            -k8s-namespace {{ template "consul.namespace" . }} \
             {{- if .Values.global.enableConsulNamespaces }}
             {{- if .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
             -consul-destination-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }} \
