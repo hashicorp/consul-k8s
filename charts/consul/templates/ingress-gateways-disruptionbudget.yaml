@@ -1,0 +1,30 @@
+{{- if (and  .Values.ingressGateways.disruptionBudget.enabled (or (and (ne ( .Values.ingressGateways.enabled | toString) "-")  .Values.ingressGateways.enabled) (and (eq ( .Values.ingressGateways.enabled | toString) "-") .Values.connectInject.enabled))) }}
+# PodDisruptionBudget to prevent degrading the ingress gateway cluster through
+# voluntary cluster changes.
+{{- $root := . }}
+{{- range .Values.ingressGateways.gateways }}
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "consul.fullname" $root }}-{{ .name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" $root }}
+    chart: {{ template "consul.chart" $root }}
+    heritage: {{ $root.Release.Service }}
+    release: {{ $root.Release.Name }}
+    component: ingress-gateway
+spec:
+  {{- if $root.Values.ingressGateways.disruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ $root.Values.ingressGateways.disruptionBudget.maxUnavailable }}
+  {{- else }}
+  minAvailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" $root }}
+      release: "{{ $root.Release.Name }}"
+      component: terminating-gateway
+---
+{{- end }}
+{{- end }}
