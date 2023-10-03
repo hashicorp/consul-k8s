@@ -784,6 +784,33 @@ function prepare_release {
 	set_changelog "${curDir}" "${version}" "${releaseDate}" "${lastGitTag}" "${prereleaseVersion}"
 }
 
+function prepare_rc_branch {
+  # Arguments:
+  #   $1 - Path to top level Consul source
+  #   $2 - The version of the release
+  #   $3 - The release date
+  #   $4 - The last release git tag for this branch (eg. v1.1.0)
+  #   $5 - The consul version
+  #   $6 - The consul-dataplane version
+  #   $7 - The pre-release version
+  #
+  #
+  # Returns:
+  #   0 - success
+  #   * - error
+
+  local curDir=$1
+  local version=$2
+  local releaseDate=$3
+  local lastGitTag=$4
+  local consulVersion=$5
+  local consulDataplaneVersion=$6
+  local prereleaseVersion=$7
+
+	echo "prepare_rc: dir:${curDir} consul-k8s:${version} consul:${consulVersion} consul-dataplane:${consulDataplaneVersion} date:"${releaseDate}" git tag:${lastGitTag}"
+	set_version "${curDir}" "${version}" "${releaseDate}" "${prereleaseVersion}" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-k8s-control-plane:" "${consulVersion}" "docker.mirror.hashicorp.services\/hashicorppreview\/consul" "${consulDataplaneVersion}" "docker.mirror.hashicorp.services\/hashicorppreview\/consul-dataplane"
+}
+
 function prepare_dev {
 	# Arguments:
 	#   $1 - Path to top level Consul source
