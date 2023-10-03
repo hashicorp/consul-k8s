@@ -9,7 +9,6 @@ import (
 	"github.com/go-logr/logr"
 	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,7 +51,6 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 // Reconcile reads the state of a ServiceAccount object for a Kubernetes namespace and reconciles the corresponding
 // Consul WorkloadIdentity.
 func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var errs error
 	var serviceAccount corev1.ServiceAccount
 
 	// Ignore the request if the namespace of the service account is not allowed.
@@ -80,20 +78,12 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	r.Log.Info("retrieved ServiceAccount", "name", req.Name, "ns", req.Namespace)
 
 	// Ensure the WorkloadIdentity exists.
-	if err = r.registerWorkloadIdentity(ctx, resourceClient, &serviceAccount); err != nil {
-		errs = multierror.Append(errs, err)
-	}
-
-	return ctrl.Result{}, errs
-}
-
-func (r *Controller) registerWorkloadIdentity(ctx context.Context, resourceClient pbresource.ResourceServiceClient, a *corev1.ServiceAccount) error {
 	workloadIdentityResource := r.getWorkloadIdentityResource(
-		a.Name, // Consul and Kubernetes service account name will always match
-		r.getConsulNamespace(a.Namespace),
+		serviceAccount.Name, // Consul and Kubernetes service account name will always match
+		r.getConsulNamespace(serviceAccount.Namespace),
 		r.getConsulPartition(),
 		map[string]string{
-			constants.MetaKeyKubeNS:    a.Namespace,
+			constants.MetaKeyKubeNS:    serviceAccount.Namespace,
 			constants.MetaKeyManagedBy: constants.ManagedByServiceAccountValue,
 		},
 	)
@@ -101,13 +91,21 @@ func (r *Controller) registerWorkloadIdentity(ctx context.Context, resourceClien
 	r.Log.Info("registering workload identity with Consul", getLogFieldsForResource(workloadIdentityResource.Id)...)
 	// We currently blindly write these records as changes to service accounts and resulting reconciles should be rare,
 	// and there's no data to conflict with in the payload.
-	_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: workloadIdentityResource})
-	if err != nil {
+	if _, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: workloadIdentityResource}); err != nil {
+		// We could be racing with the namespace controller.
+		// Requeue (which includes backoff) to try again.
+		if inject.ConsulNamespaceIsNotFound(err) {
+			r.Log.Info("Consul namespace not found; re-queueing request",
+				"service-account", serviceAccount.Name, "ns", serviceAccount.Namespace,
+				"consul-ns", workloadIdentityResource.GetId().GetTenancy().GetNamespace(), "err", err.Error())
+			return ctrl.Result{Requeue: true}, nil
+		}
+
 		r.Log.Error(err, "failed to register workload identity", getLogFieldsForResource(workloadIdentityResource.Id)...)
-		return err
+		return ctrl.Result{}, err
 	}
 
-	return nil
+	return ctrl.Result{}, nil
 }
 
 // deregisterWorkloadIdentity deletes the WorkloadIdentity resource corresponding to the given name and namespace from

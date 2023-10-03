@@ -44,7 +44,7 @@ type reconcileCase struct {
 	expErr                string
 }
 
-// TODO: Allow/deny namespaces for reconcile tests
+// TODO(NET-5719): Allow/deny namespaces for reconcile tests
 
 // TestReconcile_CreateWorkloadIdentity ensures that a new ServiceAccount is reconciled
 // to a Consul WorkloadIdentity.
