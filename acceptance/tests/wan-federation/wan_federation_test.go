@@ -424,6 +424,7 @@ func serviceFailoverCheck(t *testing.T, options *terratestK8s.KubectlOptions, po
 	var err error
 
 	// Retry until we get the response we expect, sometimes you get back the previous server until things stabalize
+	logger.Log(t, "Initial failover check")
 	retry.RunWith(timer, t, func(r *retry.R) {
 		resp, err = k8s.RunKubectlAndGetOutputE(t, options, "exec", "-i",
 			staticClientDeployment, "-c", connhelper.StaticClientName, "--", "curl", fmt.Sprintf("localhost:%s", port))
@@ -432,12 +433,18 @@ func serviceFailoverCheck(t *testing.T, options *terratestK8s.KubectlOptions, po
 	})
 
 	// Try again to rule out load-balancing. Errors can still happen so retry
-	retry.RunWith(timer, t, func(r *retry.R) {
-		resp, err = k8s.RunKubectlAndGetOutputE(t, options, "exec", "-i",
-			staticClientDeployment, "-c", connhelper.StaticClientName, "--", "curl", fmt.Sprintf("localhost:%s", port))
-		assert.NoError(r, err)
-	})
-	require.Contains(t, resp, expectedName)
+	logger.Log(t, "Check failover again to rule out load balancing")
+	for i := 0; i < 10; i++ {
+		time.Sleep(500 * time.Millisecond)
+		resp = ""
+		retry.RunWith(timer, t, func(r *retry.R) {
+			resp, err = k8s.RunKubectlAndGetOutputE(t, options, "exec", "-i",
+				staticClientDeployment, "-c", connhelper.StaticClientName, "--", "curl", fmt.Sprintf("localhost:%s", port))
+			assert.NoError(r, err)
+		})
+		require.Contains(t, resp, expectedName)
+	}
+
 	logger.Log(t, resp)
 }
 
