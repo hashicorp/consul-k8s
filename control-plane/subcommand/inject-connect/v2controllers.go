@@ -79,12 +79,14 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
+	endpointsLogger := ctrl.Log.WithName("controller").WithName("endpoints")
 	if err := (&endpointsv2.Controller{
 		Client:              mgr.GetClient(),
 		ConsulServerConnMgr: watcher,
 		K8sNamespaceConfig:  k8sNsConfig,
 		ConsulTenancyConfig: consulTenancyConfig,
-		Log:                 ctrl.Log.WithName("controller").WithName("endpoints"),
+		WriteCache:          endpointsv2.NewWriteCache(endpointsLogger),
+		Log:                 endpointsLogger,
 		Scheme:              mgr.GetScheme(),
 		Context:             ctx,
 	}).SetupWithManager(mgr); err != nil {

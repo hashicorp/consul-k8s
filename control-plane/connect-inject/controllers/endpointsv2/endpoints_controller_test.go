@@ -6,17 +6,21 @@ package endpointsv2
 import (
 	"context"
 	"fmt"
-	"testing"
-
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-uuid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -27,12 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"testing"
 )
 
 const (
@@ -54,9 +53,11 @@ type reconcileCase struct {
 	targetConsulNs        string
 	targetConsulPartition string
 	expErr                string
+	caseFn                func(*testing.T, *reconcileCase, *Controller, pbresource.ResourceServiceClient)
 }
 
 // TODO(NET-5716): Allow/deny namespaces for reconcile tests
+// TODO(NET-5932): Add tests for consistently sorting repeated output fields (getConsulService, getServicePorts)
 
 func TestReconcile_CreateService(t *testing.T) {
 	t.Parallel()
@@ -1325,12 +1326,521 @@ func TestReconcile_UpdateService(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    "Redundant reconcile does not write to Consul unless resource was modified",
+			svcName: "service-updated",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
+				pod2 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: addressesForPods(pod1, pod2),
+							Ports: []corev1.EndpointPort{
+								{
+									Name:        "my-http-port",
+									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
+								},
+								{
+									Name:        "my-grpc-port",
+									Port:        6789,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolGrpc,
+								},
+								{
+									Name:     "other",
+									Port:     10001,
+									Protocol: "TCP",
+								},
+							},
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-updated",
+						Namespace: "default",
+						UID:       types.UID(randomUid()),
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Name:        "public",
+								Port:        8080,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromString("my-http-port"),
+								AppProtocol: &appProtocolHttp,
+							},
+							{
+								Name:        "api",
+								Port:        9090,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromString("my-grpc-port"),
+								AppProtocol: &appProtocolGrpc,
+							},
+							{
+								Name:       "other",
+								Port:       10001,
+								Protocol:   "TCP",
+								TargetPort: intstr.FromString("10001"),
+								// no app protocol specified
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, pod2, endpoints, service}
+			},
+			expectedResource: &pbresource.Resource{
+				Id: &pbresource.ID{
+					Name: "service-updated",
+					Type: pbcatalog.ServiceType,
+					Tenancy: &pbresource.Tenancy{
+						Namespace: constants.DefaultConsulNS,
+						Partition: constants.DefaultConsulPartition,
+					},
+				},
+				Data: inject.ToProtoAny(&pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							VirtualPort: 9090,
+							TargetPort:  "my-grpc-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
+						},
+						{
+							VirtualPort: 10001,
+							TargetPort:  "10001",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				}),
+				Metadata: map[string]string{
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
+				},
+			},
+			caseFn: func(t *testing.T, tc *reconcileCase, ep *Controller, resourceClient pbresource.ResourceServiceClient) {
+				runReconcile := func() {
+					r, err := ep.Reconcile(context.Background(), ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      tc.svcName,
+							Namespace: tc.targetConsulNs,
+						}})
+					require.False(t, r.Requeue)
+					require.NoError(t, err)
+				}
+
+				// Get resource before additional reconcile
+				beforeResource := getAndValidateResource(t, resourceClient, tc.expectedResource.Id)
+
+				// Run several additional reconciles, expecting no writes to Consul
+				for i := 0; i < 5; i++ {
+					runReconcile()
+					require.Equal(t, beforeResource.GetGeneration(),
+						getAndValidateResource(t, resourceClient, tc.expectedResource.Id).GetGeneration(),
+						"wanted same version for before and after resources following repeat reconcile")
+				}
+
+				// Modify resource external to controller
+				modified := proto.Clone(beforeResource).(*pbresource.Resource)
+				modified.Metadata = map[string]string{"foo": "bar"}
+				modified.Version = ""
+				modified.Generation = ""
+				_, err := resourceClient.Write(context.Background(), &pbresource.WriteRequest{
+					Resource: modified,
+				})
+				require.NoError(t, err)
+
+				// Get resource after additional reconcile, now expecting a new write to occur
+				runReconcile()
+
+				require.NotEqual(t, beforeResource.GetGeneration(),
+					getAndValidateResource(t, resourceClient, tc.expectedResource.Id).GetGeneration(),
+					"wanted different version for before and after resources following modification and reconcile")
+
+				// Get resource before additional reconcile
+				beforeResource = getAndValidateResource(t, resourceClient, tc.expectedResource.Id)
+
+				// Run several additional reconciles, expecting no writes to Consul
+				for i := 0; i < 5; i++ {
+					runReconcile()
+					require.Equal(t, beforeResource.GetGeneration(),
+						getAndValidateResource(t, resourceClient, tc.expectedResource.Id).GetGeneration(),
+						"wanted same version for before and after resources following repeat reconcile")
+				}
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			runReconcileCase(t, tc)
 		})
 	}
+}
+
+func TestEnsureService(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		k8sUid    string
+		meta      map[string]string
+		consulSvc *pbcatalog.Service
+	}
+
+	uuid1 := randomUid()
+	uuid2 := randomUid()
+	meta1 := getServiceMeta(corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+		}})
+	meta2 := getServiceMeta(corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+		}})
+	meta2["some-other-key"] = "value"
+
+	id := getServiceID(
+		"my-svc",
+		constants.DefaultConsulNS,
+		constants.DefaultConsulPartition)
+
+	cases := []struct {
+		name              string
+		beforeArgs        args
+		afterArgs         args
+		readFn            func(context.Context, *pbresource.ReadRequest) (*pbresource.ReadResponse, error)
+		writeFn           func(context.Context, *pbresource.WriteRequest) (*pbresource.WriteResponse, error)
+		expectWrite       bool
+		expectAlwaysWrite bool
+		expectErr         string
+		caseFn            func(t *testing.T, ep *Controller)
+	}{
+		{
+			name: "Identical args writes once",
+			beforeArgs: args{
+				k8sUid: uuid1,
+				meta:   meta1,
+				consulSvc: &pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				},
+			},
+			// Identical to before
+			afterArgs: args{
+				k8sUid: uuid1,
+				meta:   meta1,
+				consulSvc: &pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				},
+			},
+			expectWrite: false,
+		},
+		{
+			name: "Changed service payload updates resource",
+			beforeArgs: args{
+				k8sUid: uuid1,
+				meta:   meta1,
+				consulSvc: &pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				},
+			},
+			afterArgs: args{
+				k8sUid: uuid1,
+				meta:   meta1,
+				consulSvc: &pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						// Different workload selector
+						Prefixes: []string{"service-created-rs-fghij"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				},
+			},
+			expectWrite: true,
+		},
+		{
+			name: "Changed service meta updates resource",
+			beforeArgs: args{
+				k8sUid: uuid1,
+				meta:   meta1,
+				consulSvc: &pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				},
+			},
+			afterArgs: args{
+				k8sUid: uuid1,
+				meta:   meta2, // Updated meta
+				consulSvc: &pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				},
+			},
+			expectWrite: true,
+		},
+		{
+			name: "Changed k8s UID updates resource",
+			beforeArgs: args{
+				k8sUid: uuid1,
+				consulSvc: &pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				},
+			},
+			// Identical to before except K8s UID, indicating delete and rewrite of K8s service
+			afterArgs: args{
+				k8sUid: uuid2,
+				consulSvc: &pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				},
+			},
+			expectWrite: true,
+		},
+		{
+			name: "Read not found fails open and writes update",
+			readFn: func(context.Context, *pbresource.ReadRequest) (*pbresource.ReadResponse, error) {
+				return nil, status.Error(codes.NotFound, "not found")
+			},
+			expectWrite:       true,
+			expectAlwaysWrite: true,
+		},
+		{
+			name: "Read error fails open and writes update",
+			readFn: func(context.Context, *pbresource.ReadRequest) (*pbresource.ReadResponse, error) {
+				return nil, status.Error(codes.PermissionDenied, "not allowed")
+			},
+			expectWrite:       true,
+			expectAlwaysWrite: true,
+		},
+		{
+			name: "Write error does not prevent future writes (cache not updated)",
+			writeFn: func(ctx context.Context, request *pbresource.WriteRequest) (*pbresource.WriteResponse, error) {
+				return nil, status.Error(codes.Internal, "oops")
+			},
+			expectErr: "rpc error: code = Internal desc = oops",
+			caseFn: func(t *testing.T, ep *Controller) {
+				require.Empty(t, ep.WriteCache.(*writeCache).data)
+			},
+		},
+	}
+
+	// Create test Consul server.
+	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+		c.Experiments = []string{"resource-apis"}
+	})
+
+	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
+	require.NoError(t, err)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create the Endpoints controller.
+			ep := &Controller{
+				Client:              fake.NewClientBuilder().WithRuntimeObjects().Build(), // No k8s fetches should be needed
+				WriteCache:          NewWriteCache(logrtest.New(t)),
+				Log:                 logrtest.New(t),
+				ConsulServerConnMgr: testClient.Watcher,
+				K8sNamespaceConfig: common.K8sNamespaceConfig{
+					AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+					DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				},
+			}
+
+			// Set up test resourceReadWriter
+			rw := struct{ testReadWriter }{}
+			defaultRw := defaultResourceReadWriter{resourceClient}
+			rw.readFn = defaultRw.Read
+			rw.writeFn = defaultRw.Write
+			if tc.readFn != nil {
+				rw.readFn = tc.readFn
+			}
+			if tc.writeFn != nil {
+				rw.writeFn = tc.writeFn
+			}
+
+			// Ensure caseFn runs if provided, regardless of whether error is expected
+			if tc.caseFn != nil {
+				defer tc.caseFn(t, ep)
+			}
+
+			// Call first time
+			err := ep.ensureService(context.Background(), &rw, tc.beforeArgs.k8sUid, id, tc.beforeArgs.meta, tc.beforeArgs.consulSvc)
+			if tc.expectErr != "" {
+				require.Contains(t, err.Error(), tc.expectErr)
+				return
+			}
+			require.NoError(t, err)
+
+			// Get written resource before additional calls
+			beforeResource := getAndValidateResource(t, resourceClient, id)
+
+			// Call a second time
+			err = ep.ensureService(context.Background(), &rw, tc.afterArgs.k8sUid, id, tc.afterArgs.meta, tc.afterArgs.consulSvc)
+			require.NoError(t, err)
+
+			// Check for change on second call to ensureService
+			if tc.expectWrite {
+				require.NotEqual(t, beforeResource.GetGeneration(), getAndValidateResource(t, resourceClient, id).GetGeneration(),
+					"wanted different version for before and after resources following modification and reconcile")
+			} else {
+				require.Equal(t, beforeResource.GetGeneration(), getAndValidateResource(t, resourceClient, id).GetGeneration(),
+					"wanted same version for before and after resources following repeat reconcile")
+			}
+
+			// Call several additional times
+			for i := 0; i < 5; i++ {
+				// Get written resource before each additional call
+				beforeResource = getAndValidateResource(t, resourceClient, id)
+
+				err := ep.ensureService(context.Background(), &rw, tc.afterArgs.k8sUid, id, tc.afterArgs.meta, tc.afterArgs.consulSvc)
+				require.NoError(t, err)
+
+				if tc.expectAlwaysWrite {
+					require.NotEqual(t, beforeResource.GetGeneration(), getAndValidateResource(t, resourceClient, id).GetGeneration(),
+						"wanted different version for before and after resources following modification and reconcile")
+				} else {
+					require.Equal(t, beforeResource.GetGeneration(), getAndValidateResource(t, resourceClient, id).GetGeneration(),
+						"wanted same version for before and after resources following repeat reconcile")
+				}
+			}
+		})
+	}
+}
+
+type testReadWriter struct {
+	readFn  func(context.Context, *pbresource.ReadRequest) (*pbresource.ReadResponse, error)
+	writeFn func(context.Context, *pbresource.WriteRequest) (*pbresource.WriteResponse, error)
+}
+
+func (rw *testReadWriter) Read(ctx context.Context, req *pbresource.ReadRequest) (*pbresource.ReadResponse, error) {
+	return rw.readFn(ctx, req)
+}
+
+func (rw *testReadWriter) Write(ctx context.Context, req *pbresource.WriteRequest) (*pbresource.WriteResponse, error) {
+	return rw.writeFn(ctx, req)
 }
 
 func TestReconcile_DeleteService(t *testing.T) {
@@ -1370,6 +1880,10 @@ func TestReconcile_DeleteService(t *testing.T) {
 					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
 					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
 				},
+			},
+			caseFn: func(t *testing.T, _ *reconcileCase, ep *Controller, _ pbresource.ResourceServiceClient) {
+				// Ensure cache was also cleared
+				require.Empty(t, ep.WriteCache.(*writeCache).data)
 			},
 		},
 		{
@@ -1634,7 +2148,8 @@ func TestGetWorkloadSelectorFromEndpoints(t *testing.T) {
 
 			// Create the Endpoints controller.
 			ep := &Controller{
-				Log: logrtest.New(t),
+				WriteCache: NewWriteCache(logrtest.New(t)),
+				Log:        logrtest.New(t),
 			}
 
 			prefixedPods, exactNamePods, err := ep.getWorkloadDataFromEndpoints(ctx, &pf, tc.endpoints)
@@ -1681,6 +2196,7 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	// Create the Endpoints controller.
 	ep := &Controller{
 		Client:              fakeClient,
+		WriteCache:          NewWriteCache(logrtest.New(t)),
 		Log:                 logrtest.New(t),
 		ConsulServerConnMgr: testClient.Watcher,
 		K8sNamespaceConfig: common.K8sNamespaceConfig{
@@ -1722,6 +2238,10 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	require.False(t, resp.Requeue)
 
 	expectedServiceMatches(t, resourceClient, tc.svcName, tc.targetConsulNs, tc.targetConsulPartition, tc.expectedResource)
+
+	if tc.caseFn != nil {
+		tc.caseFn(t, &tc, ep, resourceClient)
+	}
 }
 
 func expectedServiceMatches(t *testing.T, client pbresource.ResourceServiceClient, name, namespace, partition string, expectedResource *pbresource.Resource) {
@@ -1817,7 +2337,30 @@ func randomKubernetesId() string {
 	return u[:5]
 }
 
+func randomUid() string {
+	u, err := uuid.GenerateUUID()
+	if err != nil {
+		panic(err)
+	}
+	return u
+}
+
 func removeMeshInjectStatus(t *testing.T, pod *corev1.Pod) {
 	delete(pod.Annotations, constants.KeyMeshInjectStatus)
 	require.False(t, inject.HasBeenMeshInjected(*pod))
+}
+
+func getAndValidateResource(t *testing.T, resourceClient pbresource.ResourceServiceClient, id *pbresource.ID) *pbresource.Resource {
+	resp, err := resourceClient.Read(metadata.NewOutgoingContext(
+		context.Background(),
+		// Read with strong consistency to avoid race conditions
+		metadata.New(map[string]string{"x-consul-consistency-mode": "consistent"}),
+	), &pbresource.ReadRequest{
+		Id: id,
+	})
+	require.NoError(t, err)
+	r := resp.GetResource()
+	require.NotNil(t, r)
+	require.NotEmpty(t, r.GetGeneration())
+	return r
 }
