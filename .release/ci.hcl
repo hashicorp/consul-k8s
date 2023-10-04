@@ -14,6 +14,7 @@ project "consul-k8s" {
     release_branches = [
       "main",
       "release/**",
+      "crt-move-to-prepare-workflow",
     ]
   }
 }
