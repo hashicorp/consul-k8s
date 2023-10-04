@@ -102,16 +102,15 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	// If we don't have at least one mesh-injected pod targeted by the service, do not register the service.
-	//TODO(NET-5704): Register service with mesh port added if global flag for inject is true,
-	// even if Endpoints are empty or have no mesh pod, iff. the service has a selector.
-	// This should ensure that we don't target kube or consul (system) services.
+	// If we don't have at least one mesh-injected pod selected by the service, don't register.
+	// Note that we only _delete_ services when they're deleted from K8s, not when endpoints or
+	// workload selectors are empty. This ensures that failover can occur normally when targeting
+	// the existing VIP (ClusterIP) assigned to the service.
 	if consulSvc.Workloads == nil {
 		return ctrl.Result{}, nil
 	}
 
 	// Register the service in Consul.
-	//TODO(NET-5704): Check service-enable label here on service/deployments/other pod owners
 	if err = r.registerService(ctx, resourceClient, service, consulSvc); err != nil {
 		// We could be racing with the namespace controller.
 		// Requeue (which includes backoff) to try again.

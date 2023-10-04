@@ -61,98 +61,110 @@ type reconcileCase struct {
 func TestReconcile_CreateService(t *testing.T) {
 	t.Parallel()
 	cases := []reconcileCase{
-		//TODO(5704): reenable this test as a conditional on global mesh inject flag rather than "any time we see endpoints"
-		//{
-		//	// In this test, we expect the same service registration as the "basic"
-		//	// case, but without any workload selector values due to missing endpoints.
-		//	name:    "Empty endpoints",
-		//	svcName: "service-created",
-		//	k8sObjects: func() []runtime.Object {
-		//		endpoints := &corev1.Endpoints{
-		//			ObjectMeta: metav1.ObjectMeta{
-		//				Name:      "service-created",
-		//				Namespace: "default",
-		//			},
-		//			Subsets: []corev1.EndpointSubset{
-		//				{
-		//					Addresses: []corev1.EndpointAddress{},
-		//				},
-		//			},
-		//		}
-		//		service := &corev1.Service{
-		//			ObjectMeta: metav1.ObjectMeta{
-		//				Name:      "service-created",
-		//				Namespace: "default",
-		//			},
-		//			Spec: corev1.ServiceSpec{
-		//				ClusterIP: "172.18.0.1",
-		//				Ports: []corev1.ServicePort{
-		//					{
-		//						Name:        "public",
-		//						Port:        8080,
-		//						Protocol:    "TCP",
-		//						TargetPort:  intstr.FromString("my-http-port"),
-		//						AppProtocol: &appProtocolHttp,
-		//					},
-		//					{
-		//						Name:        "api",
-		//						Port:        9090,
-		//						Protocol:    "TCP",
-		//						TargetPort:  intstr.FromString("my-grpc-port"),
-		//						AppProtocol: &appProtocolGrpc,
-		//					},
-		//					{
-		//						Name:       "other",
-		//						Port:       10001,
-		//						Protocol:   "TCP",
-		//						TargetPort: intstr.FromString("10001"),
-		//						// no app protocol specified
-		//					},
-		//				},
-		//			},
-		//		}
-		//		return []runtime.Object{endpoints, service}
-		//	},
-		//	expectedResource: &pbresource.Resource{
-		//		Id: &pbresource.ID{
-		//			Name: "service-created",
-		//			Type: pbcatalog.ServiceType,
-		//			Tenancy: &pbresource.Tenancy{
-		//				Namespace: constants.DefaultConsulNS,
-		//				Partition: constants.DefaultConsulPartition,
-		//			},
-		//		},
-		//		Data: common.ToProtoAny(&pbcatalog.Service{
-		//			Ports: []*pbcatalog.ServicePort{
-		//				{
-		//					VirtualPort: 8080,
-		//					TargetPort:  "my-http-port",
-		//					Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
-		//				},
-		//				{
-		//					VirtualPort: 9090,
-		//					TargetPort:  "my-grpc-port",
-		//					Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
-		//				},
-		//				{
-		//					VirtualPort: 10001,
-		//					TargetPort:  "10001",
-		//					Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
-		//				},
-		//				{
-		//					TargetPort: "mesh",
-		//					Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
-		//				},
-		//			},
-		//			Workloads:  &pbcatalog.WorkloadSelector{},
-		//			VirtualIps: []string{"172.18.0.1"},
-		//		}),
-		//		Metadata: map[string]string{
-		//			constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
-		//			constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
-		//		},
-		//	},
-		//},
+		{
+			name:    "Empty endpoints do not get registered",
+			svcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{},
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Name:        "public",
+								Port:        8080,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromString("my-http-port"),
+								AppProtocol: &appProtocolHttp,
+							},
+							{
+								Name:        "api",
+								Port:        9090,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromString("my-grpc-port"),
+								AppProtocol: &appProtocolGrpc,
+							},
+							{
+								Name:       "other",
+								Port:       10001,
+								Protocol:   "TCP",
+								TargetPort: intstr.FromString("10001"),
+								// no app protocol specified
+							},
+						},
+					},
+				}
+				return []runtime.Object{endpoints, service}
+			},
+		},
+		{
+			name:    "Endpoints without injected pods do not get registered",
+			svcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
+				pod2 := createServicePod(kindDaemonSet, "service-created-ds", "12345")
+				removeMeshInjectStatus(t, pod1)
+				removeMeshInjectStatus(t, pod2)
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: addressesForPods(pod1, pod2),
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Name:        "public",
+								Port:        8080,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromString("my-http-port"),
+								AppProtocol: &appProtocolHttp,
+							},
+							{
+								Name:        "api",
+								Port:        9090,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromString("my-grpc-port"),
+								AppProtocol: &appProtocolGrpc,
+							},
+							{
+								Name:       "other",
+								Port:       10001,
+								Protocol:   "TCP",
+								TargetPort: intstr.FromString("10001"),
+								// no app protocol specified
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, pod2, endpoints, service}
+			},
+		},
 		{
 			name:    "Basic endpoints",
 			svcName: "service-created",
@@ -954,6 +966,90 @@ func TestReconcile_CreateService(t *testing.T) {
 			},
 			// No expected resource
 		},
+		{
+			name:    "Services with mix of injected and non-injected pods registered with only injected selectors",
+			svcName: "service-created",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-abcde")
+				pod2 := createServicePodOwnedBy(kindReplicaSet, "service-created-rs-fghij")
+				pod3 := createServicePod(kindDaemonSet, "service-created-ds", "12345")
+				pod4 := createServicePod(kindDaemonSet, "service-created-ds", "23456")
+				removeMeshInjectStatus(t, pod1)
+				removeMeshInjectStatus(t, pod3)
+				// Retain status of second pod
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: addressesForPods(pod1, pod2, pod3, pod4),
+							Ports: []corev1.EndpointPort{
+								{
+									Name:        "public",
+									Port:        2345,
+									Protocol:    "TCP",
+									AppProtocol: &appProtocolHttp,
+								},
+							},
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Name:        "public",
+								Port:        8080,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromString("my-http-port"),
+								AppProtocol: &appProtocolHttp,
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, pod2, pod3, pod4, endpoints, service}
+			},
+			expectedResource: &pbresource.Resource{
+				Id: &pbresource.ID{
+					Name: "service-created",
+					Type: pbcatalog.ServiceType,
+					Tenancy: &pbresource.Tenancy{
+						Namespace: constants.DefaultConsulNS,
+						Partition: constants.DefaultConsulPartition,
+					},
+				},
+				Data: inject.ToProtoAny(&pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						// Selector only contains values for injected pods
+						Prefixes: []string{"service-created-rs-fghij"},
+						Names:    []string{"service-created-ds-23456"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				}),
+				Metadata: map[string]string{
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
+				},
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1241,11 +1337,111 @@ func TestReconcile_DeleteService(t *testing.T) {
 	t.Parallel()
 	cases := []reconcileCase{
 		{
-			name:    "Basic Endpoints not found (service deleted)",
+			name:    "Basic Endpoints not found (service deleted) deregisters service",
 			svcName: "service-deleted",
 			existingResource: &pbresource.Resource{
 				Id: &pbresource.ID{
-					Name: "service-created",
+					Name: "service-deleted",
+					Type: pbcatalog.ServiceType,
+					Tenancy: &pbresource.Tenancy{
+						Namespace: constants.DefaultConsulNS,
+						Partition: constants.DefaultConsulPartition,
+					},
+				},
+				Data: inject.ToProtoAny(&pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+						Names:    []string{"service-created-ds-12345"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				}),
+				Metadata: map[string]string{
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
+				},
+			},
+		},
+		{
+			name:    "Empty endpoints does not cause deregistration of existing service",
+			svcName: "service-deleted",
+			k8sObjects: func() []runtime.Object {
+				endpoints := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-deleted",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{},
+						},
+					},
+				}
+				service := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-deleted",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						ClusterIP: "172.18.0.1",
+						Ports: []corev1.ServicePort{
+							{
+								Name:        "public",
+								Port:        8080,
+								Protocol:    "TCP",
+								TargetPort:  intstr.FromString("my-http-port"),
+								AppProtocol: &appProtocolHttp,
+							},
+						},
+					},
+				}
+				return []runtime.Object{endpoints, service}
+			},
+			existingResource: &pbresource.Resource{
+				Id: &pbresource.ID{
+					Name: "service-deleted",
+					Type: pbcatalog.ServiceType,
+					Tenancy: &pbresource.Tenancy{
+						Namespace: constants.DefaultConsulNS,
+						Partition: constants.DefaultConsulPartition,
+					},
+				},
+				Data: inject.ToProtoAny(&pbcatalog.Service{
+					Ports: []*pbcatalog.ServicePort{
+						{
+							VirtualPort: 8080,
+							TargetPort:  "my-http-port",
+							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
+						},
+						{
+							TargetPort: "mesh",
+							Protocol:   pbcatalog.Protocol_PROTOCOL_MESH,
+						},
+					},
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{"service-created-rs-abcde"},
+						Names:    []string{"service-created-ds-12345"},
+					},
+					VirtualIps: []string{"172.18.0.1"},
+				}),
+				Metadata: map[string]string{
+					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
+					constants.MetaKeyManagedBy: constants.ManagedByEndpointsValue,
+				},
+			},
+			expectedResource: &pbresource.Resource{
+				Id: &pbresource.ID{
+					Name: "service-deleted",
 					Type: pbcatalog.ServiceType,
 					Tenancy: &pbresource.Tenancy{
 						Namespace: constants.DefaultConsulNS,
