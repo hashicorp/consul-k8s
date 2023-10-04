@@ -91,6 +91,11 @@ func TestPartitions_Connect(t *testing.T) {
 				"global.enableConsulNamespaces":  "true",
 				"global.logLevel":                "debug",
 
+				// Currently there is a bug with xds limits being reached for a single server, so need to increase
+				// the server replicas to 3
+				// TODO: remove when NET-5819 is fixed
+				"global.replicas": "3",
+
 				"global.tls.enabled":   "true",
 				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
 
