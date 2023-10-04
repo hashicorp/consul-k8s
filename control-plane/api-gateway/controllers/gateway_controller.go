@@ -5,13 +5,11 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
-
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 
 	"github.com/go-logr/logr"
@@ -31,14 +29,13 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/hashicorp/consul/api"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/binding"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/gatekeeper"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul/api"
 )
 
 // GatewayControllerConfig holds the values necessary for configuring the GatewayController.
@@ -169,19 +166,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	// get all gatewaypolicies referencing this gateway
-	policies, err := r.getRelatedGatewayPolicies(ctx, req.NamespacedName, resources)
-	if err != nil {
-		log.Error(err, "unable to list gateway policies")
-		return ctrl.Result{}, err
-	}
-
-	_, err = r.getJWTProviders(ctx, resources)
-	if err != nil {
-		log.Error(err, "unable to list JWT providers")
-		return ctrl.Result{}, err
-	}
-
 	// fetch the rest of the consul objects from cache
 	consulServices := r.getConsulServices(consulKey)
 	consulGateway := r.getConsulGateway(consulKey)
@@ -203,7 +187,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Resources:             resources,
 		ConsulGateway:         consulGateway,
 		ConsulGatewayServices: consulServices,
-		Policies:              policies,
 	})
 
 	updates := binder.Snapshot()
@@ -473,29 +456,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			// Subscribe to changes from Consul for InlineCertificates
 			&source.Channel{Source: c.Subscribe(ctx, api.InlineCertificate, r.transformConsulInlineCertificate(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
-		).
-		Watches(
-			&source.Channel{Source: c.Subscribe(ctx, api.JWTProvider, r.transformConsulJWTProvider(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
-		).
-		Watches(
-			source.NewKindWithCache((&v1alpha1.GatewayPolicy{}), mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformGatewayPolicy(ctx)),
-		).
-		Watches(
-			source.NewKindWithCache((&v1alpha1.RouteRetryFilter{}), mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformRouteRetryFilter(ctx)),
-		).
-		Watches(
-			source.NewKindWithCache((&v1alpha1.RouteTimeoutFilter{}), mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformRouteTimeoutFilter(ctx)),
-		).
-		Watches(
-			// Subscribe to changes in RouteAuthFilter custom resources referenced by HTTPRoutes.
-			source.NewKindWithCache((&v1alpha1.RouteAuthFilter{}), mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformRouteAuthFilter(ctx)),
-		).
-		Complete(r)
+		).Complete(r)
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
@@ -611,46 +572,6 @@ func (r *GatewayController) transformConsulHTTPRoute(ctx context.Context) func(e
 	}
 }
 
-// transformGatewayPolicy will return a list of all gateways that need to be reconcilled.
-func (r *GatewayController) transformGatewayPolicy(ctx context.Context) func(object client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
-		gwNamespace := gatewayPolicy.Spec.TargetRef.Namespace
-		if gwNamespace == "" {
-			gwNamespace = gatewayPolicy.Namespace
-		}
-		gatewayRef := types.NamespacedName{
-			Namespace: gwNamespace,
-			Name:      gatewayPolicy.Spec.TargetRef.Name,
-		}
-		return []reconcile.Request{
-			{
-				NamespacedName: gatewayRef,
-			},
-		}
-	}
-}
-
-// transformRouteRetryFilter will return a list of routes that need to be reconciled.
-func (r *GatewayController) transformRouteRetryFilter(ctx context.Context) func(object client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteRetryFilterIndex, client.ObjectKeyFromObject(o).String())
-	}
-}
-
-// transformTimeoutRetryFilter will return a list of routes that need to be reconciled.
-func (r *GatewayController) transformRouteTimeoutFilter(ctx context.Context) func(object client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteTimeoutFilterIndex, client.ObjectKeyFromObject(o).String())
-	}
-}
-
-func (r *GatewayController) transformRouteAuthFilter(ctx context.Context) func(object client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteAuthFilterIndex, client.ObjectKeyFromObject(o).String())
-	}
-}
-
 func (r *GatewayController) transformConsulTCPRoute(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
 	return func(entry api.ConfigEntry) []types.NamespacedName {
 		parents := mapset.NewSet()
@@ -690,42 +611,6 @@ func (r *GatewayController) transformConsulInlineCertificate(ctx context.Context
 			}
 		}
 
-		return gateways
-	}
-}
-
-func (r *GatewayController) transformConsulJWTProvider(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
-	return func(entry api.ConfigEntry) []types.NamespacedName {
-		var gateways []types.NamespacedName
-
-		jwtEntry := entry.(*api.JWTProviderConfigEntry)
-		r.Log.Info("gatewaycontroller", "gateway items", r.cache.List(api.APIGateway))
-		for _, gwEntry := range r.cache.List(api.APIGateway) {
-			gateway := gwEntry.(*api.APIGatewayConfigEntry)
-		LISTENER_LOOP:
-			for _, listener := range gateway.Listeners {
-
-				r.Log.Info("override names", "listener", fmt.Sprintf("%#v", listener))
-				if listener.Override != nil && listener.Override.JWT != nil {
-					for _, provider := range listener.Override.JWT.Providers {
-						r.Log.Info("override names", "provider", provider.Name, "entry", jwtEntry.Name)
-						if provider.Name == jwtEntry.Name {
-							gateways = append(gateways, common.EntryToNamespacedName(gateway))
-							continue LISTENER_LOOP
-						}
-					}
-				}
-
-				if listener.Default != nil && listener.Default.JWT != nil {
-					for _, provider := range listener.Default.JWT.Providers {
-						if provider.Name == jwtEntry.Name {
-							gateways = append(gateways, common.EntryToNamespacedName(gateway))
-							continue LISTENER_LOOP
-						}
-					}
-				}
-			}
-		}
 		return gateways
 	}
 }
@@ -775,17 +660,15 @@ func (r *GatewayController) transformEndpoints(ctx context.Context) func(o clien
 func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tcpIndex, httpIndex, key string) []reconcile.Request {
 	requestSet := make(map[types.NamespacedName]struct{})
 
-	if tcpIndex != "" {
-		tcpRouteList := &gwv1alpha2.TCPRouteList{}
-		if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(tcpIndex, key),
-		}); err != nil {
-			r.Log.Error(err, "unable to list TCPRoutes")
-		}
-		for _, route := range tcpRouteList.Items {
-			for _, ref := range common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs) {
-				requestSet[ref] = struct{}{}
-			}
+	tcpRouteList := &gwv1alpha2.TCPRouteList{}
+	if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(tcpIndex, key),
+	}); err != nil {
+		r.Log.Error(err, "unable to list TCPRoutes")
+	}
+	for _, route := range tcpRouteList.Items {
+		for _, ref := range common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs) {
+			requestSet[ref] = struct{}{}
 		}
 	}
 
@@ -894,109 +777,6 @@ func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway ty
 
 	for _, route := range list.Items {
 		resources.ReferenceCountHTTPRoute(route)
-
-		_, err := c.getExternalFiltersForHTTPRoute(ctx, route, resources)
-		if err != nil {
-			c.Log.Error(err, "unable to list HTTPRoute ExternalFilters")
-			return nil, err
-		}
-	}
-
-	return list.Items, nil
-}
-
-func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, route gwv1beta1.HTTPRoute, resources *common.ResourceMap) ([]interface{}, error) {
-	var externalFilters []interface{}
-	for _, rule := range route.Spec.Rules {
-		ruleFilters, err := c.filterFiltersForExternalRefs(ctx, route, rule.Filters, resources)
-		if err != nil {
-			return nil, err
-		}
-		externalFilters = append(externalFilters, ruleFilters...)
-
-		for _, backendRef := range rule.BackendRefs {
-			backendRefFilter, err := c.filterFiltersForExternalRefs(ctx, route, backendRef.Filters, resources)
-			if err != nil {
-				return nil, err
-			}
-
-			externalFilters = append(externalFilters, backendRefFilter...)
-		}
-	}
-
-	return externalFilters, nil
-}
-
-func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, route gwv1beta1.HTTPRoute, filters []gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap) ([]interface{}, error) {
-	var externalFilters []interface{}
-
-	for _, filter := range filters {
-		var externalFilter client.Object
-
-		// check to see if we need to grab this filter
-		if filter.ExtensionRef == nil {
-			continue
-		}
-		switch kind := filter.ExtensionRef.Kind; kind {
-		case v1alpha1.RouteRetryFilterKind:
-			externalFilter = &v1alpha1.RouteRetryFilter{}
-		case v1alpha1.RouteTimeoutFilterKind:
-			externalFilter = &v1alpha1.RouteTimeoutFilter{}
-		case v1alpha1.RouteAuthFilterKind:
-			externalFilter = &v1alpha1.RouteAuthFilter{}
-		default:
-			continue
-		}
-
-		// get object from API
-		err := c.Client.Get(ctx, client.ObjectKey{
-			Name:      string(filter.ExtensionRef.Name),
-			Namespace: route.Namespace,
-		}, externalFilter)
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				c.Log.Info(fmt.Sprintf("externalref %s:%s not found: %v", filter.ExtensionRef.Kind, filter.ExtensionRef.Name, err))
-				// ignore, the validation call should mark this route as error
-				continue
-			} else {
-				return nil, err
-			}
-		}
-
-		// add external ref (or error) to resource map for this route
-		resources.AddExternalFilter(externalFilter)
-		externalFilters = append(externalFilters, externalFilter)
-	}
-	return externalFilters, nil
-}
-
-func (c *GatewayController) getRelatedGatewayPolicies(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]v1alpha1.GatewayPolicy, error) {
-	var list v1alpha1.GatewayPolicyList
-
-	if err := c.Client.List(ctx, &list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(Gatewaypolicy_GatewayIndex, gateway.String()),
-	}); err != nil {
-		return nil, err
-	}
-
-	// add all policies to the resourcemap
-	for _, policy := range list.Items {
-		resources.AddGatewayPolicy(&policy)
-	}
-
-	return list.Items, nil
-}
-
-func (c *GatewayController) getJWTProviders(ctx context.Context, resources *common.ResourceMap) ([]v1alpha1.JWTProvider, error) {
-	var list v1alpha1.JWTProviderList
-
-	if err := c.Client.List(ctx, &list, &client.ListOptions{}); err != nil {
-		return nil, err
-	}
-
-	// add all policies to the resourcemap
-	for _, provider := range list.Items {
-		resources.AddJWTProvider(&provider)
 	}
 
 	return list.Items, nil
@@ -1192,7 +972,6 @@ func (c *GatewayController) fetchServicesForEndpoints(ctx context.Context, resou
 				}
 
 				resources.AddService(key, serviceName(pod, endpoints))
-
 			}
 		}
 	}

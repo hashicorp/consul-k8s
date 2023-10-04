@@ -85,7 +85,6 @@ cni-plugin-lint:
 	cd control-plane/cni; golangci-lint run -c ../../.golangci.yml
 
 ctrl-generate: get-controller-gen ## Run CRD code generation.
-	make ensure-controller-gen-version
 	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
 
 # Perform a terraform fmt check but don't change anything
@@ -172,7 +171,6 @@ lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance di
 	for p in control-plane cli acceptance;  do cd $$p; golangci-lint run --path-prefix $$p -c ../.golangci.yml; cd ..; done
 
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
-	make ensure-controller-gen-version
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	make copy-crds-to-chart
 	make generate-external-crds
@@ -185,21 +183,12 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
-endif
-
-ensure-controller-gen-version: ## Ensure controller-gen version is v0.8.0.
-ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.8.0))
-	@echo "controller-gen version is not v0.8.0, uninstall the binary and install the correct version with 'make get-controller-gen'."
-	@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
-	@exit 1
-else
-	@echo "Found correct version: $(shell $(CONTROLLER_GEN) --version)"
 endif
 
 add-copyright-header: ## Add copyright header to all files in the project
@@ -267,23 +256,6 @@ endif
 	@source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION); \
 
 prepare-release: prepare-release-script check-preview-containers
-
-prepare-rc-script: ## Sets the versions, updates changelog to prepare this repository to release
-ifndef CONSUL_K8S_RELEASE_VERSION
-	$(error CONSUL_K8S_RELEASE_VERSION is required)
-endif
-ifndef CONSUL_K8S_RELEASE_DATE
-	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
-endif
-ifndef CONSUL_K8S_LAST_RELEASE_GIT_TAG
-	$(error CONSUL_K8S_LAST_RELEASE_GIT_TAG is required)
-endif
-ifndef CONSUL_K8S_CONSUL_VERSION
-	$(error CONSUL_K8S_CONSUL_VERSION is required)
-endif
-	@source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_rc_branch $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION); \
-
-prepare-rc-branch: prepare-rc-script
 
 prepare-dev:
 ifndef CONSUL_K8S_RELEASE_VERSION

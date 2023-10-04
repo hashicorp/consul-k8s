@@ -149,10 +149,6 @@ target=templates/gateway-resources-job.yaml
   local actual=$(helm template \
         -s $target \
         . | tee /dev/stderr |
-        yq -r '.spec.template.metadata.annotations |
-        del(."consul.hashicorp.com/connect-inject") |
-        del(."consul.hashicorp.com/mesh-inject") |
-        del(."consul.hashicorp.com/config-checksum")' |
-        tee /dev/stderr)
+        yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
     [ "${actual}" = "{}" ]
 }

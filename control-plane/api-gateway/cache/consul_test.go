@@ -21,12 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/hashicorp/consul/api"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul/api"
 )
 
 func Test_resourceCache_diff(t *testing.T) {
@@ -1323,7 +1322,7 @@ func TestCache_Write(t *testing.T) {
 					GRPCPort:        port,
 					APITimeout:      0,
 				},
-				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 				NamespacesEnabled:   false,
 				Logger:              logrtest.NewTestLogger(t),
 			})
@@ -1543,10 +1542,6 @@ func Test_Run(t *testing.T) {
 	inlineCert := setupInlineCertificate()
 	certs := []*api.InlineCertificateConfigEntry{inlineCert}
 
-	// setup jwt providers
-	jwtProvider := setupJWTProvider()
-	providers := []*api.JWTProviderConfigEntry{jwtProvider}
-
 	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/config/http-route":
@@ -1581,14 +1576,6 @@ func Test_Run(t *testing.T) {
 				return
 			}
 			fmt.Fprintln(w, string(val))
-		case "/v1/config/jwt-provider":
-			val, err := json.Marshal(providers)
-			if err != nil {
-				w.WriteHeader(500)
-				fmt.Fprintln(w, err)
-				return
-			}
-			fmt.Fprintln(w, string(val))
 		case "/v1/catalog/services":
 			fmt.Fprintln(w, `{}`)
 		case "/v1/peerings":
@@ -1613,7 +1600,7 @@ func Test_Run(t *testing.T) {
 			GRPCPort:        port,
 			APITimeout:      0,
 		},
-		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 		NamespacesEnabled:   false,
 		Logger:              logrtest.NewTestLogger(t),
 	})
@@ -1627,7 +1614,7 @@ func Test_Run(t *testing.T) {
 	}
 
 	expectedCache := loadedReferenceMaps([]api.ConfigEntry{
-		gw, tcpRoute, httpRouteOne, httpRouteTwo, inlineCert, jwtProvider,
+		gw, tcpRoute, httpRouteOne, httpRouteTwo, inlineCert,
 	})
 
 	ctx, cancelFn := context.WithCancel(context.Background())
@@ -1687,16 +1674,6 @@ func Test_Run(t *testing.T) {
 		}
 	})
 
-	jwtProviderNsn := types.NamespacedName{
-		Name:      jwtProvider.Name,
-		Namespace: jwtProvider.Namespace,
-	}
-
-	jwtSubscriber := c.Subscribe(ctx, api.JWTProvider, func(cfe api.ConfigEntry) []types.NamespacedName {
-		return []types.NamespacedName{
-			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
-		}
-	})
 	// mark this subscription as ended
 	canceledSub.Cancel()
 
@@ -1707,10 +1684,9 @@ func Test_Run(t *testing.T) {
 	gwExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(gwNsn)}
 	tcpExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(tcpRouteNsn)}
 	certExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(certNsn)}
-	jwtProviderExpectedEvent := event.GenericEvent{Object: newConfigEntryObject(jwtProviderNsn)}
 
-	// 2 http routes + 1 gw + 1 tcp route + 1 cert + 1 jwtProvider = 6
-	i := 6
+	// 2 http routes + 1 gw + 1 tcp route + 1 cert = 5
+	i := 5
 	for {
 		if i == 0 {
 			break
@@ -1724,8 +1700,6 @@ func Test_Run(t *testing.T) {
 			require.Equal(t, tcpExpectedEvent, actualTCPRouteEvent)
 		case actualCertExpectedEvent := <-certSubscriber.Events():
 			require.Equal(t, certExpectedEvent, actualCertExpectedEvent)
-		case actualJWTExpectedEvent := <-jwtSubscriber.Events():
-			require.Equal(t, jwtProviderExpectedEvent, actualJWTExpectedEvent)
 		}
 		i -= 1
 	}
@@ -1981,13 +1955,6 @@ func setupInlineCertificate() *api.InlineCertificateConfigEntry {
 	}
 }
 
-func setupJWTProvider() *api.JWTProviderConfigEntry {
-	return &api.JWTProviderConfigEntry{
-		Kind: api.JWTProvider,
-		Name: "okta",
-	}
-}
-
 func TestCache_Delete(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
@@ -2034,7 +2001,7 @@ func TestCache_Delete(t *testing.T) {
 					GRPCPort:        port,
 					APITimeout:      0,
 				},
-				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 				NamespacesEnabled:   false,
 				Logger:              logrtest.NewTestLogger(t),
 			})

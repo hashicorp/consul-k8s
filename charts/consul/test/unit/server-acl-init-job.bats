@@ -1081,7 +1081,6 @@ load _helpers
 
   local expected=$(echo '{
     "consul.hashicorp.com/connect-inject": "false",
-    "consul.hashicorp.com/mesh-inject": "false",
     "vault.hashicorp.com/agent-inject": "true",
     "vault.hashicorp.com/agent-pre-populate": "true",
     "vault.hashicorp.com/agent-pre-populate-only": "false",
@@ -2357,11 +2356,7 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject") |
-      del(."consul.hashicorp.com/config-checksum")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 

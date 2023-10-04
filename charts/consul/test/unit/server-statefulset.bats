@@ -627,11 +627,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject") |
-      del(."consul.hashicorp.com/config-checksum")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -1983,13 +1979,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject") |
-      del(."consul.hashicorp.com/config-checksum") |
-      del(."vault.hashicorp.com/agent-inject") |
-      del(."vault.hashicorp.com/role")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -3006,33 +2996,5 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'server.snapshotAgent.interval=10h34m5s' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[1].command[2] | contains("-interval=10h34m5s")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# global.experiments=["resource-apis"]
-
-@test "server/StatefulSet: experiments=[\"resource-apis\"] is not set in command when global.experiments is empty" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      . | tee /dev/stderr)
-
-  # Test the flag is set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"experiments=[\\\"resource-apis\\\"]\""))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/StatefulSet: experiments=[\"resource-apis\"] is set in command when global.experiments contains \"resource-apis\"" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'ui.enabled=false' \
-      . | tee /dev/stderr)
-
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"experiments=[\\\"resource-apis\\\"]\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }

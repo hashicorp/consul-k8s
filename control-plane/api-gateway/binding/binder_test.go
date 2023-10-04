@@ -23,10 +23,9 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/hashicorp/consul/api"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
 )
 
 func init() {
@@ -62,8 +61,6 @@ type resourceMapResources struct {
 	tcpRoutes                []gwv1alpha2.TCPRoute
 	meshServices             []v1alpha1.MeshService
 	services                 []types.NamespacedName
-	jwtProviders             []*v1alpha1.JWTProvider
-	gatewayPolicies          []*v1alpha1.GatewayPolicy
 	consulInlineCertificates []api.InlineCertificateConfigEntry
 	consulHTTPRoutes         []api.HTTPRouteConfigEntry
 	consulTCPRoutes          []api.TCPRouteConfigEntry
@@ -95,12 +92,6 @@ func newTestResourceMap(t *testing.T, resources resourceMapResources) *common.Re
 	}
 	for _, r := range resources.consulTCPRoutes {
 		resourceMap.ReferenceCountConsulTCPRoute(r)
-	}
-	for _, r := range resources.gatewayPolicies {
-		resourceMap.AddGatewayPolicy(r)
-	}
-	for _, r := range resources.jwtProviders {
-		resourceMap.AddJWTProvider(r)
 	}
 	return resourceMap
 }
@@ -256,7 +247,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 									Type:    "ResolvedRefs",
 									Status:  metav1.ConditionTrue,
 									Reason:  "ResolvedRefs",
-									Message: "resolved references",
+									Message: "resolved certificate references",
 								},
 							},
 						}},
