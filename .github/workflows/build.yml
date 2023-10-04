@@ -10,7 +10,6 @@ on:
       - main
       # Push events to branches matching refs/heads/release/**
       - "release/**"
-      - "crt-move-to-prepare-workflow"
 
 env:
   PKG_NAME: "consul-k8s"
