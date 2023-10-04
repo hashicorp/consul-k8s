@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package partitions
 
 import (
@@ -195,13 +192,13 @@ func TestPartitions_Sync(t *testing.T) {
 
 			logger.Logf(t, "creating namespaces %s in servers cluster", staticServerNamespace)
 			k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
 			logger.Logf(t, "creating namespaces %s in clients cluster", staticServerNamespace)
 			k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
@@ -241,13 +238,13 @@ func TestPartitions_Sync(t *testing.T) {
 
 			logger.Log(t, "creating a static-server with a service")
 			// create service in default partition.
-			k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
 			// create service in secondary partition.
-			k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			logger.Log(t, "checking that the service has been synced to Consul")
 			var services map[string][]string
-			counter := &retry.Counter{Count: 30, Wait: 30 * time.Second}
+			counter := &retry.Counter{Count: 20, Wait: 30 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var err error
 				// list services in default partition catalog.

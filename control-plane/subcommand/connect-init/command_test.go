@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package connectinit
 
 import (
@@ -14,14 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
-
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 const nodeName = "test-node"
@@ -616,7 +612,7 @@ func TestRun_Gateways_Errors(t *testing.T) {
 				"-pod-name", testPodName,
 				"-pod-namespace", testPodNamespace,
 				"-proxy-id-file", proxyFile,
-				"-consul-api-timeout", "10s",
+				"-consul-api-timeout", "5s",
 				"-consul-node-name", nodeName,
 			}
 
@@ -730,7 +726,7 @@ func TestRun_InvalidProxyFile(t *testing.T) {
 		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 		"-proxy-id-file", randFileName,
-		"-consul-api-timeout", "10s",
+		"-consul-api-timeout", "5s",
 	}
 	code := cmd.Run(flags)
 	require.Equal(t, 1, code)

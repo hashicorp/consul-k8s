@@ -13,6 +13,9 @@ import (
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -24,16 +27,65 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 const (
 	nodeName       = "test-node"
 	consulNodeName = "test-node-virtual"
 )
+
+func TestShouldIgnore(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name      string
+		namespace string
+		denySet   mapset.Set
+		allowSet  mapset.Set
+		expected  bool
+	}{
+		{
+			name:      "system namespace",
+			namespace: "kube-system",
+			denySet:   mapset.NewSetWith(),
+			allowSet:  mapset.NewSetWith("*"),
+			expected:  true,
+		},
+		{
+			name:      "other system namespace",
+			namespace: "local-path-storage",
+			denySet:   mapset.NewSetWith(),
+			allowSet:  mapset.NewSetWith("*"),
+			expected:  true,
+		},
+		{
+			name:      "any namespace allowed",
+			namespace: "foo",
+			denySet:   mapset.NewSetWith(),
+			allowSet:  mapset.NewSetWith("*"),
+			expected:  false,
+		},
+		{
+			name:      "in deny list",
+			namespace: "foo",
+			denySet:   mapset.NewSetWith("foo"),
+			allowSet:  mapset.NewSetWith("*"),
+			expected:  true,
+		},
+		{
+			name:      "not in allow list",
+			namespace: "foo",
+			denySet:   mapset.NewSetWith(),
+			allowSet:  mapset.NewSetWith("bar"),
+			expected:  true,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := shouldIgnore(tt.namespace, tt.denySet, tt.allowSet)
+			require.Equal(t, tt.expected, actual)
+		})
+	}
+}
 
 func TestHasBeenInjected(t *testing.T) {
 	t.Parallel()
@@ -787,37 +839,37 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 					CheckID:     "default/pod1-web",
 					ServiceName: "web",
 					ServiceID:   "pod1-web",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-web-sidecar-proxy",
 					ServiceName: "web-sidecar-proxy",
 					ServiceID:   "pod1-web-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-web-admin",
 					ServiceName: "web-admin",
 					ServiceID:   "pod1-web-admin",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-web-admin-sidecar-proxy",
 					ServiceName: "web-admin-sidecar-proxy",
 					ServiceID:   "pod1-web-admin-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -1045,19 +1097,19 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/pod1-service-created",
 					ServiceName: "service-created",
 					ServiceID:   "pod1-service-created",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-service-created-sidecar-proxy",
 					ServiceName: "service-created-sidecar-proxy",
 					ServiceID:   "pod1-service-created-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -1130,10 +1182,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/mesh-gateway",
 					ServiceName: "mesh-gateway",
 					ServiceID:   "mesh-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -1202,10 +1254,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/mesh-gateway",
 					ServiceName: "mesh-gateway",
 					ServiceID:   "mesh-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 			metricsEnabled: true,
@@ -1275,10 +1327,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/mesh-gateway",
 					ServiceName: "mesh-gateway",
 					ServiceID:   "mesh-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 			metricsEnabled: true,
@@ -1338,10 +1390,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/terminating-gateway",
 					ServiceName: "terminating-gateway",
 					ServiceID:   "terminating-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -1404,10 +1456,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/terminating-gateway",
 					ServiceName: "terminating-gateway",
 					ServiceID:   "terminating-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -1504,10 +1556,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/ingress-gateway",
 					ServiceName: "ingress-gateway",
 					ServiceID:   "ingress-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -1606,10 +1658,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/ingress-gateway",
 					ServiceName: "ingress-gateway",
 					ServiceID:   "ingress-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -1707,37 +1759,37 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/pod1-service-created",
 					ServiceName: "service-created",
 					ServiceID:   "pod1-service-created",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-service-created-sidecar-proxy",
 					ServiceName: "service-created-sidecar-proxy",
 					ServiceID:   "pod1-service-created-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod2-service-created",
 					ServiceName: "service-created",
 					ServiceID:   "pod2-service-created",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod2-service-created-sidecar-proxy",
 					ServiceName: "service-created-sidecar-proxy",
 					ServiceID:   "pod2-service-created-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -1848,28 +1900,28 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/pod1-service-created",
 					ServiceName: "service-created",
 					ServiceID:   "pod1-service-created",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-service-created-sidecar-proxy",
 					ServiceName: "service-created-sidecar-proxy",
 					ServiceID:   "pod1-service-created-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod2-service-created-sidecar-proxy",
 					ServiceName: "service-created-sidecar-proxy",
 					ServiceID:   "pod2-service-created-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 			expErr: "1 error occurred:\n\t* pods \"pod3\" not found\n\n",
@@ -1889,17 +1941,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				pod1.Annotations[constants.AnnotationUpstreams] = "upstream1:1234"
 				pod1.Annotations[constants.AnnotationEnableMetrics] = "true"
 				pod1.Annotations[constants.AnnotationPrometheusScrapePort] = "12345"
-				pod1.Spec.NodeName = "my-node"
-				node := &corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my-node",
-						Namespace: "default",
-						Labels: map[string]string{
-							corev1.LabelTopologyRegion: "us-west-1",
-							corev1.LabelTopologyZone:   "us-west-1a",
-						},
-					},
-				}
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -1920,7 +1961,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 					},
 				}
-				return []runtime.Object{pod1, node, endpoint}
+				return []runtime.Object{pod1, endpoint}
 			},
 			expectedConsulSvcInstances: []*api.CatalogService{
 				{
@@ -1940,10 +1981,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					},
 					ServiceTags:  []string{"abc,123", "pod1"},
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
-					ServiceLocality: &api.Locality{
-						Region: "us-west-1",
-						Zone:   "us-west-1a",
-					},
 				},
 			},
 			expectedProxySvcInstances: []*api.CatalogService{
@@ -1969,10 +2006,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 							"envoy_telemetry_collector_bind_socket_dir": "/consul/connect-inject",
 						},
 					},
-					ServiceLocality: &api.Locality{
-						Region: "us-west-1",
-						Zone:   "us-west-1a",
-					},
 					ServiceMeta: map[string]string{
 						"name":                   "abc",
 						"version":                "2",
@@ -1991,19 +2024,19 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/pod1-different-consul-svc-name",
 					ServiceName: "different-consul-svc-name",
 					ServiceID:   "pod1-different-consul-svc-name",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-different-consul-svc-name-sidecar-proxy",
 					ServiceName: "different-consul-svc-name-sidecar-proxy",
 					ServiceID:   "pod1-different-consul-svc-name-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -2082,19 +2115,19 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					CheckID:     "default/pod1-service-created",
 					ServiceName: "service-created",
 					ServiceID:   "pod1-service-created",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-service-created-sidecar-proxy",
 					ServiceName: "service-created-sidecar-proxy",
 					ServiceID:   "pod1-service-created-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -2160,7 +2193,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServicePort, instance.ServicePort)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTags, instance.ServiceTags)
-				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceLocality, instance.ServiceLocality)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTaggedAddresses, instance.ServiceTaggedAddresses)
 				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceProxy, instance.ServiceProxy)
 				if tt.nodeMeta != nil {
@@ -2177,7 +2209,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServicePort, instance.ServicePort)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceMeta, instance.ServiceMeta)
 				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceTags, instance.ServiceTags)
-				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceLocality, instance.ServiceLocality)
 				if tt.nodeMeta != nil {
 					require.Equal(t, tt.expectedProxySvcInstances[i].NodeMeta, instance.NodeMeta)
 				}
@@ -2206,36 +2237,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestParseLocality(t *testing.T) {
-	t.Run("no labels", func(t *testing.T) {
-		n := corev1.Node{}
-		require.Nil(t, parseLocality(n))
-	})
-
-	t.Run("zone only", func(t *testing.T) {
-		n := corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					corev1.LabelTopologyZone: "us-west-1a",
-				},
-			},
-		}
-		require.Nil(t, parseLocality(n))
-	})
-
-	t.Run("everything", func(t *testing.T) {
-		n := corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					corev1.LabelTopologyRegion: "us-west-1",
-					corev1.LabelTopologyZone:   "us-west-1a",
-				},
-			},
-		}
-		require.Equal(t, &api.Locality{Region: "us-west-1", Zone: "us-west-1a"}, parseLocality(n))
-	})
 }
 
 // Tests updating an Endpoints object.
@@ -2307,8 +2308,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 					Check: &api.AgentCheck{
 						CheckID:     "default/pod1-service-updated",
-						Name:        constants.ConsulKubernetesCheckName,
-						Type:        constants.ConsulKubernetesCheckType,
+						Name:        consulKubernetesCheckName,
+						Type:        consulKubernetesCheckType,
 						Status:      api.HealthCritical,
 						ServiceID:   "pod1-service-updated",
 						ServiceName: "service-updated",
@@ -2334,8 +2335,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 					Check: &api.AgentCheck{
 						CheckID:     "default/pod1-service-updated-sidecar-proxy",
-						Name:        constants.ConsulKubernetesCheckName,
-						Type:        constants.ConsulKubernetesCheckType,
+						Name:        consulKubernetesCheckName,
+						Type:        consulKubernetesCheckType,
 						Status:      api.HealthCritical,
 						ServiceID:   "pod1-service-updated-sidecar-proxy",
 						ServiceName: "service-updated-sidecar-proxy",
@@ -2359,19 +2360,19 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					CheckID:     "default/pod1-service-updated",
 					ServiceName: "service-updated",
 					ServiceID:   "pod1-service-updated",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-service-updated-sidecar-proxy",
 					ServiceName: "service-updated-sidecar-proxy",
 					ServiceID:   "pod1-service-updated-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -2418,8 +2419,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 					Check: &api.AgentCheck{
 						CheckID:     "default/pod1-service-updated",
-						Name:        constants.ConsulKubernetesCheckName,
-						Type:        constants.ConsulKubernetesCheckType,
+						Name:        consulKubernetesCheckName,
+						Type:        consulKubernetesCheckType,
 						Status:      api.HealthPassing,
 						ServiceName: "service-updated",
 						ServiceID:   "pod1-service-updated",
@@ -2445,8 +2446,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					},
 					Check: &api.AgentCheck{
 						CheckID:     "default/pod1-service-updated-sidecar-proxy",
-						Name:        constants.ConsulKubernetesCheckName,
-						Type:        constants.ConsulKubernetesCheckType,
+						Name:        consulKubernetesCheckName,
+						Type:        consulKubernetesCheckType,
 						Status:      api.HealthPassing,
 						ServiceName: "service-updated-sidecar-proxy",
 						ServiceID:   "pod1-service-updated-sidecar-proxy",
@@ -2470,19 +2471,19 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					CheckID:     "default/pod1-service-updated",
 					ServiceName: "service-updated",
 					ServiceID:   "pod1-service-updated",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthCritical,
 					Output:      "Pod \"default/pod1\" is not ready",
-					Type:        constants.ConsulKubernetesCheckType,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-service-updated-sidecar-proxy",
 					ServiceName: "service-updated-sidecar-proxy",
 					ServiceID:   "pod1-service-updated-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthCritical,
 					Output:      "Pod \"default/pod1\" is not ready",
-					Type:        constants.ConsulKubernetesCheckType,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -2756,37 +2757,37 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 					CheckID:     "default/pod1-service-updated",
 					ServiceName: "service-updated",
 					ServiceID:   "pod1-service-updated",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod1-service-updated-sidecar-proxy",
 					ServiceName: "service-updated-sidecar-proxy",
 					ServiceID:   "pod1-service-updated-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod2-service-updated",
 					ServiceName: "service-updated",
 					ServiceID:   "pod2-service-updated",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 				{
 					CheckID:     "default/pod2-service-updated-sidecar-proxy",
 					ServiceName: "service-updated-sidecar-proxy",
 					ServiceID:   "pod2-service-updated-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 				},
 			},
 		},
@@ -3663,7 +3664,7 @@ func TestReconcileUpdateEndpoint_LegacyService(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Status.HostIP = "127.0.0.1"
-				pod1.Annotations[constants.LegacyAnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
+				pod1.Annotations[constants.AnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -3728,7 +3729,7 @@ func TestReconcileUpdateEndpoint_LegacyService(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
 				pod1.Status.HostIP = "127.0.0.1"
-				pod1.Annotations[constants.LegacyAnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
+				pod1.Annotations[constants.AnnotationConsulK8sVersion] = "0.99.0" // We want a version less than 1.0.0.
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-updated",
@@ -6572,7 +6573,7 @@ func createServicePod(name, ip string, inject bool, managedByEndpointsController
 			Namespace: "default",
 			Labels:    map[string]string{},
 			Annotations: map[string]string{
-				constants.LegacyAnnotationConsulK8sVersion: "1.0.0",
+				constants.AnnotationConsulK8sVersion: "1.0.0",
 			},
 		},
 		Status: corev1.PodStatus{
@@ -6621,55 +6622,4 @@ func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Po
 		},
 	}
 	return pod
-}
-
-func TestReconcileAssignServiceVirtualIP(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	cases := []struct {
-		name      string
-		service   *api.AgentService
-		expectErr bool
-	}{
-		{
-			name: "valid service",
-			service: &api.AgentService{
-				ID:      "",
-				Service: "foo",
-				Port:    80,
-				Address: "1.2.3.4",
-				TaggedAddresses: map[string]api.ServiceAddress{
-					"virtual": {
-						Address: "1.2.3.4",
-						Port:    80,
-					},
-				},
-				Meta: map[string]string{constants.MetaKeyKubeNS: "default"},
-			},
-			expectErr: false,
-		},
-		{
-			name: "service missing IP should not error",
-			service: &api.AgentService{
-				ID:      "",
-				Service: "bar",
-				Meta:    map[string]string{constants.MetaKeyKubeNS: "default"},
-			},
-			expectErr: false,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-
-			// Create test consulServer server.
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			apiClient := testClient.APIClient
-			err := assignServiceVirtualIP(ctx, apiClient, c.service)
-			if err != nil {
-				require.True(t, c.expectErr)
-			} else {
-				require.False(t, c.expectErr)
-			}
-		})
-	}
 }

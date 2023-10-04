@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package partition_init
 
 import (
@@ -11,14 +8,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
-
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 type Command struct {
@@ -172,7 +168,6 @@ func (c *Command) validateFlags() error {
 	if c.consul.APITimeout <= 0 {
 		return errors.New("-api-timeout must be set to a value greater than 0")
 	}
-
 	return nil
 }
 

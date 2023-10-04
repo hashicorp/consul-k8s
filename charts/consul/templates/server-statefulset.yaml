@@ -115,7 +115,6 @@ spec:
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/server-config-configmap.yaml") . | sha256sum }}
         {{- if .Values.server.annotations }}
           {{- tpl .Values.server.annotations . | nindent 8 }}
@@ -232,27 +231,9 @@ spec:
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
       {{- end }}
-      initContainers:
-      - name: locality-init
-        image: {{ .Values.global.imageK8S }}
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        command:
-          - "/bin/sh"
-          - "-ec"
-          - |
-            consul-k8s-control-plane fetch-server-region -node-name "$NODE_NAME" -output-file /consul/extra-config/locality.json
-        volumeMounts:
-          - name: extra-config
-            mountPath: /consul/extra-config
-        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image }}"
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
@@ -420,13 +401,9 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
-                -config-file=/consul/extra-config/extra-from-values.json \
-                -config-file=/consul/extra-config/locality.json \
+                -config-file=/consul/extra-config/extra-from-values.json
                 {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
                 -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
-                {{- end }}
-                {{- if (mustHas "resource-apis" .Values.global.experiments) }}
-                -hcl="experiments=[\"resource-apis\"]"
                 {{- end }}
           volumeMounts:
             - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
