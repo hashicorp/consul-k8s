@@ -25,17 +25,24 @@ func UpdateWithCABundle(ctx context.Context, clientset kubernetes.Interface, web
 	}
 
 	mutatingWebhookCfg, err := clientset.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, webhookConfigName, metav1.GetOptions{})
-	if err == nil {
-		return updateMutatingWebhooksWithCABundle(ctx, clientset, mutatingWebhookCfg, caCert)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return err
 	}
 
 	if !k8serrors.IsNotFound(err) {
-		return err
+		err = updateMutatingWebhooksWithCABundle(ctx, clientset, mutatingWebhookCfg, caCert)
+		if err != nil {
+			return err
+		}
 	}
 
 	validatingWebhookCfg, err := clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, webhookConfigName, metav1.GetOptions{})
-	if err != nil {
+	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
+	}
+
+	if k8serrors.IsNotFound(err) {
+		return nil
 	}
 
 	return updateValidatingWebhooksWithCABundle(ctx, clientset, validatingWebhookCfg, caCert)
