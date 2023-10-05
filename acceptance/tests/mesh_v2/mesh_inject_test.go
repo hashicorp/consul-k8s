@@ -103,6 +103,7 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			// Check connection from static-client to multiport-admin.
 			if cfg.EnableTransparentProxy {
+				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "hello world from 9090 admin", "http://google.com:80")
 				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "hello world from 9090 admin", "http://multiport:9090")
 			} else {
 				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "hello world from 9090 admin", "http://localhost:2345")
