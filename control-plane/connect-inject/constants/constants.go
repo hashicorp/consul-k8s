@@ -4,8 +4,13 @@
 package constants
 
 const (
+	// LegacyConsulCAFile is the location of the Consul CA file inside the injected pod.
+	// This is used with the V1 API.
+	LegacyConsulCAFile = "/consul/connect-inject/consul-ca.pem"
+
 	// ConsulCAFile is the location of the Consul CA file inside the injected pod.
-	ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
+	// This is used with the V2 API.
+	ConsulCAFile = "/consul/mesh-inject/consul-ca.pem"
 
 	// DefaultConsulNS is the default Consul namespace name.
 	DefaultConsulNS = "default"

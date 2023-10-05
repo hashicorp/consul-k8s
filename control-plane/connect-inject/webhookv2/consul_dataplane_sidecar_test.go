@@ -77,7 +77,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulTLSServerName = "server.dc1.consul"
 				w.ConsulCACert = "consul-ca-cert"
 			},
-			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -ca-certs=/consul/connect-inject/consul-ca.pem -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -ca-certs=/consul/mesh-inject/consul-ca.pem -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with TLS and no CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
