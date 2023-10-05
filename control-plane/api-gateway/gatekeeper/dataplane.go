@@ -10,11 +10,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -162,7 +163,7 @@ func getDataplaneArgs(namespace string, config common.HelmConfig, bearerTokenFil
 			args = append(args, "-tls-server-name="+config.ConsulTLSServerName)
 		}
 		if config.ConsulCACert != "" {
-			args = append(args, "-ca-certs="+constants.ConsulCAFile)
+			args = append(args, "-ca-certs="+constants.LegacyConsulCAFile)
 		}
 	} else {
 		args = append(args, "-tls-disabled")

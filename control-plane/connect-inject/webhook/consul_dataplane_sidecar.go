@@ -10,12 +10,13 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -255,7 +256,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 			args = append(args, "-tls-server-name="+w.ConsulTLSServerName)
 		}
 		if w.ConsulCACert != "" {
-			args = append(args, "-ca-certs="+constants.ConsulCAFile)
+			args = append(args, "-ca-certs="+constants.LegacyConsulCAFile)
 		}
 	} else {
 		args = append(args, "-tls-disabled")
