@@ -1560,8 +1560,8 @@ func TestValidateAuthFilters(t *testing.T) {
 			}}),
 			expected: authFilterValidationResults{
 				authFilterValidationResult{
-					acceptedErr:    errNotAcceptedDueToInvalidRefs,
-					resolvedRefErr: fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "auth0"),
+					acceptedErr:    errRouteFilterNotAcceptedDueToInvalidRefs,
+					resolvedRefErr: fmt.Errorf("%w: missingProviderNames: %s", errRouteFilterJWTProvidersReferenceDoesNotExist, "auth0"),
 				},
 			},
 		},

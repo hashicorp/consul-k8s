@@ -701,11 +701,11 @@ func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *com
 
 		if len(missingJWTProviders) > 0 {
 			mergedNames := strings.Join(missingJWTProviders, ",")
-			result.resolvedRefErr = fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, mergedNames)
+			result.resolvedRefErr = fmt.Errorf("%w: missingProviderNames: %s", errRouteFilterJWTProvidersReferenceDoesNotExist, mergedNames)
 		}
 
 		if result.resolvedRefErr != nil {
-			result.acceptedErr = errNotAcceptedDueToInvalidRefs
+			result.acceptedErr = errRouteFilterNotAcceptedDueToInvalidRefs
 		}
 
 		results = append(results, result)
