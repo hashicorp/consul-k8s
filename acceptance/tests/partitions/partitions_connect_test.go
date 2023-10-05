@@ -87,9 +87,9 @@ func TestPartitions_Connect(t *testing.T) {
 			secondaryPartitionClusterContext := env.Context(t, 1)
 
 			commonHelmValues := map[string]string{
-				"sglobal.adminPartitions.enabled": "true",
-				"global.enableConsulNamespaces":   "true",
-				"global.logLevel":                 "debug",
+				"global.adminPartitions.enabled": "true",
+				"global.enableConsulNamespaces":  "true",
+				"global.logLevel":                "debug",
 
 				// Currently there is a bug with xds limits being reached for a single server, so need to increase
 				// the server replicas to 3
