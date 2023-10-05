@@ -287,8 +287,13 @@ func (b *Binder) Snapshot() *Snapshot {
 				Namespace: service.Namespace,
 			})
 		}
+
 		if common.RemoveFinalizer(&b.config.Gateway) {
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
+			for _, policy := range b.config.Policies {
+				policy.Status = v1alpha1.GatewayPolicyStatus{}
+				snapshot.Kubernetes.StatusUpdates.Add(&policy)
+			}
 		}
 	}
 
