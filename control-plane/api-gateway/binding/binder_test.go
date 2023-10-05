@@ -769,6 +769,154 @@ func TestBinder_Lifecycle(t *testing.T) {
 				{Kind: api.APIGateway, Name: "gateway-deleted"},
 			},
 		},
+		"gateway deletion policies": {
+			config: controlledBinder(BinderConfig{
+				Gateway: gwv1beta1.Gateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "gateway-deleted",
+						DeletionTimestamp: deletionTimestamp,
+						Finalizers:        []string{common.GatewayFinalizer},
+					},
+					Spec: gwv1beta1.GatewaySpec{
+						GatewayClassName: testGatewayClassName,
+						Listeners: []gwv1beta1.Listener{
+							{
+								Name: gwv1beta1.SectionName("l1"),
+							},
+							{
+								Name: gwv1beta1.SectionName("l2"),
+							},
+						},
+					},
+				},
+				Policies: []v1alpha1.GatewayPolicy{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "p1",
+						},
+						Spec: v1alpha1.GatewayPolicySpec{
+							TargetRef: v1alpha1.PolicyTargetReference{
+								Kind:        "Gateway",
+								Name:        "gateway-deleted",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							},
+						},
+						Status: v1alpha1.GatewayPolicyStatus{
+							Conditions: []metav1.Condition{
+								{
+									Type:               "Accepted",
+									Status:             metav1.ConditionTrue,
+									Reason:             "Accepted",
+									ObservedGeneration: 5,
+									Message:            "gateway policy accepted",
+								},
+								{
+									Type:               "ResolvedRefs",
+									Status:             metav1.ConditionTrue,
+									Reason:             "ResolvedRefs",
+									ObservedGeneration: 5,
+									Message:            "resolved references",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "p2",
+						},
+						Spec: v1alpha1.GatewayPolicySpec{
+							TargetRef: v1alpha1.PolicyTargetReference{
+								Kind:        "Gateway",
+								Name:        "gateway-deleted",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l2")),
+							},
+						},
+						Status: v1alpha1.GatewayPolicyStatus{
+							Conditions: []metav1.Condition{
+								{
+									Type:               "Accepted",
+									Status:             metav1.ConditionTrue,
+									Reason:             "Accepted",
+									ObservedGeneration: 5,
+									Message:            "gateway policy accepted",
+								},
+								{
+									Type:               "ResolvedRefs",
+									Status:             metav1.ConditionTrue,
+									Reason:             "ResolvedRefs",
+									ObservedGeneration: 5,
+									Message:            "resolved references",
+								},
+							},
+						},
+					},
+				},
+			}),
+			resources: resourceMapResources{
+				gateways: []gwv1beta1.Gateway{
+					gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+						Listeners: []gwv1beta1.Listener{
+							{
+								Name: "l1",
+							},
+							{
+								Name: "l2",
+							},
+						},
+					}),
+				},
+			},
+			expectedStatusUpdates: []client.Object{
+				&v1alpha1.GatewayPolicy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "p1",
+					},
+					Spec: v1alpha1.GatewayPolicySpec{
+						TargetRef: v1alpha1.PolicyTargetReference{
+							Kind:        "Gateway",
+							Name:        "gateway-deleted",
+							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+						},
+					},
+				},
+				&v1alpha1.GatewayPolicy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "p2",
+					},
+					Spec: v1alpha1.GatewayPolicySpec{
+						TargetRef: v1alpha1.PolicyTargetReference{
+							Kind:        "Gateway",
+							Name:        "gateway-deleted",
+							SectionName: common.PointerTo(gwv1beta1.SectionName("l2")),
+						},
+					},
+				},
+			},
+			expectedUpdates: []client.Object{
+				addClassConfig(gwv1beta1.Gateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "gateway-deleted",
+						DeletionTimestamp: deletionTimestamp,
+						Finalizers:        []string{},
+					},
+					Spec: gwv1beta1.GatewaySpec{
+						GatewayClassName: testGatewayClassName,
+						Listeners: []gwv1beta1.Listener{
+							{
+								Name: "l1",
+							},
+							{
+								Name: "l2",
+							},
+						},
+					},
+				}),
+			},
+			expectedConsulUpdates: []api.ConfigEntry{},
+			expectedConsulDeletions: []api.ResourceReference{
+				{Kind: api.APIGateway, Name: "gateway-deleted"},
+			},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tt.resources.gateways = append(tt.resources.gateways, tt.config.Gateway)
