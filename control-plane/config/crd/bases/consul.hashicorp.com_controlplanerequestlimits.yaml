@@ -114,7 +114,7 @@ spec:
                 type: object
               mode:
                 type: string
-              perparedQuery:
+              preparedQuery:
                 properties:
                   readRate:
                     type: number
