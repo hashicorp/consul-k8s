@@ -17,11 +17,11 @@ Limitations
 
 Known Issues
 * When using the v2 API with transparent proxy, Kubernetes pods cannot use L7 liveness, readiness, or startup probes.
-
-[[GH-2868]](https://github.com/hashicorp/consul-k8s/pull/2868)
-[[GH-2883]](https://github.com/hashicorp/consul-k8s/pull/2883)
-[[GH-2930]](https://github.com/hashicorp/consul-k8s/pull/2930)
-[[GH-2967]](https://github.com/hashicorp/consul-k8s/pull/2967) [[GH-2941](https://github.com/hashicorp/consul-k8s/issues/2941)]
+  * [[GH-2868]](https://github.com/hashicorp/consul-k8s/pull/2868)
+  * [[GH-2883]](https://github.com/hashicorp/consul-k8s/pull/2883)
+  * [[GH-2930]](https://github.com/hashicorp/consul-k8s/pull/2930)
+  * [[GH-2967]](https://github.com/hashicorp/consul-k8s/pull/2967) 
+  * [[GH-2941](https://github.com/hashicorp/consul-k8s/issues/2941)]
 * Add the `PrioritizeByLocality` field to the `ServiceResolver` and `ProxyDefaults` CRDs. [[GH-2784](https://github.com/hashicorp/consul-k8s/issues/2784)]
 * Set locality on services registered with connect-inject. [[GH-2346](https://github.com/hashicorp/consul-k8s/issues/2346)]
 * api-gateway: Add support for response header modifiers in HTTPRoute filters [[GH-2904](https://github.com/hashicorp/consul-k8s/issues/2904)]
