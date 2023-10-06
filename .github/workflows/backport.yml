@@ -13,11 +13,15 @@ jobs:
   backport:
     if: github.event.pull_request.merged
     runs-on: ubuntu-latest
-    container: hashicorpdev/backport-assistant:0.3.4
+    container: hashicorpdev/backport-assistant:0.3.5
     steps:
       - name: Run Backport Assistant
         run: backport-assistant backport -merge-method=squash -gh-automerge
         env:
           BACKPORT_LABEL_REGEXP: "backport/(?P<target>\\d+\\.\\d+\\.x)"
           BACKPORT_TARGET_TEMPLATE: "release/{{.target}}"
+          # This forces the backport assistant to backport the merged commit
+          # instead of each commit individually. The environment variable
+          # just needs to exist for this to happen.
+          BACKPORT_MERGE_COMMIT: true
           GITHUB_TOKEN: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
