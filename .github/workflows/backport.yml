@@ -23,5 +23,5 @@ jobs:
           # This forces the backport assistant to backport the merged commit
           # instead of each commit individually. The environment variable
           # just needs to exist for this to happen.
-          BACKPORT_MERGE_COMMIT: false
+          BACKPORT_MERGE_COMMIT: true
           GITHUB_TOKEN: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
