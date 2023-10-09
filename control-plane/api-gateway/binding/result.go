@@ -680,7 +680,7 @@ type authFilterValidationResult struct {
 
 var (
 	errRouteFilterJWTProvidersReferenceDoesNotExist = errors.New("route filter references one or more jwt providers that do not exist")
-	errRouteFilterNotAcceptedDueToInvalidRefs                  = errors.New("route filter is not accepted due to errors with references")
+	errRouteFilterNotAcceptedDueToInvalidRefs       = errors.New("route filter is not accepted due to errors with references")
 )
 
 func (g authFilterValidationResults) Conditions(generation int64, idx int) []metav1.Condition {
