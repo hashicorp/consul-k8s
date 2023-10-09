@@ -53,6 +53,21 @@ func TestBindResults_Condition(t *testing.T) {
 			Expected: metav1.Condition{Type: "Accepted", Status: "False", Reason: "NoMatchingParent", Message: "no matching parent"},
 		},
 		{
+			Name:     "external filter ref not found",
+			Results:  bindResults{{section: "", err: errExternalRefNotFound}},
+			Expected: metav1.Condition{Type: "Accepted", Status: "False", Reason: "FilterNotFound", Message: "ref not found"},
+		},
+		{
+			Name:     "jwt provider referenced by external filter is not found",
+			Results:  bindResults{{section: "", err: errFilterInvalid}},
+			Expected: metav1.Condition{Type: "Accepted", Status: "False", Reason: "JWTProviderNotFound", Message: "filter invalid"},
+		},
+		{
+			Name:     "route references invalid filter type",
+			Results:  bindResults{{section: "", err: errInvalidExternalRefType}},
+			Expected: metav1.Condition{Type: "Accepted", Status: "False", Reason: "UnsupportedValue", Message: "invalid externalref filter kind"},
+		},
+		{
 			Name:     "unhandled error type",
 			Results:  bindResults{{section: "abc", err: errors.New("you don't know me")}},
 			Expected: metav1.Condition{Type: "Accepted", Status: "False", Reason: "NotAllowedByListeners", Message: "abc: you don't know me"},
