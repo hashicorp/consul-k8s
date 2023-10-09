@@ -64,6 +64,7 @@ type resourceMapResources struct {
 	services                 []types.NamespacedName
 	jwtProviders             []*v1alpha1.JWTProvider
 	gatewayPolicies          []*v1alpha1.GatewayPolicy
+	externalAuthFilters      []*v1alpha1.RouteAuthFilter
 	consulInlineCertificates []api.InlineCertificateConfigEntry
 	consulHTTPRoutes         []api.HTTPRouteConfigEntry
 	consulTCPRoutes          []api.TCPRouteConfigEntry
@@ -102,6 +103,11 @@ func newTestResourceMap(t *testing.T, resources resourceMapResources) *common.Re
 	for _, r := range resources.jwtProviders {
 		resourceMap.AddJWTProvider(r)
 	}
+
+	for _, r := range resources.externalAuthFilters {
+		resourceMap.AddExternalFilter(r)
+	}
+
 	return resourceMap
 }
 
@@ -915,6 +921,646 @@ func TestBinder_Lifecycle(t *testing.T) {
 			expectedConsulUpdates: []api.ConfigEntry{},
 			expectedConsulDeletions: []api.ResourceReference{
 				{Kind: api.APIGateway, Name: "gateway-deleted"},
+			},
+		},
+		"gateway http route references missing external ref": {
+			resources: resourceMapResources{
+				gateways: []gwv1beta1.Gateway{gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{{
+						Name:     "l1",
+						Protocol: "HTTP",
+					}},
+				})},
+				httpRoutes: []gwv1beta1.HTTPRoute{},
+				jwtProviders: []*v1alpha1.JWTProvider{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "okta",
+						},
+					},
+				},
+				externalAuthFilters: []*v1alpha1.RouteAuthFilter{},
+			},
+			config: controlledBinder(BinderConfig{
+				ConsulGateway: &api.APIGatewayConfigEntry{
+					Name: "gateway",
+					Kind: "api-gateway",
+					Listeners: []api.APIGatewayListener{
+						{
+							Name:     "l1",
+							Protocol: "HTTP",
+						},
+					},
+					Meta: map[string]string{"k8s-name": "gateway", "k8s-namespace": "default"},
+				},
+				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name:     "l1",
+							Protocol: gwv1beta1.HTTPProtocolType,
+						},
+					},
+				}),
+				HTTPRoutes: []gwv1beta1.HTTPRoute{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:       "h1",
+							Finalizers: []string{common.GatewayFinalizer},
+						},
+						Spec: gwv1beta1.HTTPRouteSpec{
+							CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+								ParentRefs: []gwv1beta1.ParentReference{
+									{
+										Group:       (*gwv1beta1.Group)(&common.BetaGroup),
+										Kind:        common.PointerTo(gwv1beta1.Kind("Gateway")),
+										Namespace:   common.PointerTo(gwv1beta1.Namespace("default")),
+										Name:        "gateway",
+										SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+									},
+								},
+							},
+							Rules: []gwv1beta1.HTTPRouteRule{
+								{
+									Filters: []gwv1beta1.HTTPRouteFilter{{
+										Type: "ExtensionRef",
+										ExtensionRef: &gwv1beta1.LocalObjectReference{
+											Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+											Kind:  "RouteAuthFilter",
+											Name:  "route-auth",
+										},
+									}},
+								},
+							},
+						},
+					},
+					testHTTPRoute("http-route-2", []string{"gateway"}, nil),
+				},
+			}),
+			expectedStatusUpdates: []client.Object{
+				&gwv1beta1.HTTPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "h1",
+						Finalizers: []string{common.GatewayFinalizer},
+					},
+					Spec: gwv1beta1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+							ParentRefs: []gwv1beta1.ParentReference{
+								{
+									Group:       (*gwv1beta1.Group)(&common.BetaGroup),
+									Kind:        common.PointerTo(gwv1beta1.Kind("Gateway")),
+									Namespace:   common.PointerTo(gwv1beta1.Namespace("default")),
+									Name:        "gateway",
+									SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+								},
+							},
+						},
+						Rules: []gwv1beta1.HTTPRouteRule{
+							{
+								Filters: []gwv1beta1.HTTPRouteFilter{{
+									Type: "ExtensionRef",
+									ExtensionRef: &gwv1beta1.LocalObjectReference{
+										Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+										Kind:  "RouteAuthFilter",
+										Name:  "route-auth",
+									},
+								}},
+							},
+						},
+					},
+					Status: gwv1beta1.HTTPRouteStatus{
+						RouteStatus: gwv1beta1.RouteStatus{
+							Parents: []gwv1beta1.RouteParentStatus{
+								{
+									ParentRef: gwv1beta1.ParentReference{
+										Group:       (*gwv1beta1.Group)(&common.BetaGroup),
+										Kind:        common.PointerTo(gwv1beta1.Kind("Gateway")),
+										Name:        "gateway",
+										Namespace:   common.PointerTo(gwv1beta1.Namespace("default")),
+										SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+									},
+									ControllerName: testControllerName,
+									Conditions: []metav1.Condition{
+										{
+											Type:    "ResolvedRefs",
+											Status:  metav1.ConditionTrue,
+											Reason:  "ResolvedRefs",
+											Message: "resolved backend references",
+										},
+										{
+											Type:    "Accepted",
+											Status:  metav1.ConditionFalse,
+											Reason:  "FilterNotFound",
+											Message: "ref not found",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				common.PointerTo(testHTTPRoute("http-route-2", []string{"gateway"}, nil)),
+				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name:     "l1",
+							Protocol: gwv1beta1.HTTPProtocolType,
+						},
+					},
+				}, gwv1beta1.GatewayStatus{
+					Addresses: []gwv1beta1.GatewayAddress{},
+					Conditions: []metav1.Condition{{
+						Type:    "Accepted",
+						Status:  metav1.ConditionTrue,
+						Reason:  "Accepted",
+						Message: "gateway accepted",
+					}, {
+						Type:    "Programmed",
+						Status:  metav1.ConditionFalse,
+						Reason:  "Pending",
+						Message: "gateway pods are still being scheduled",
+					}},
+					Listeners: []gwv1beta1.ListenerStatus{
+						{
+							Name:           "l1",
+							SupportedKinds: []gwv1beta1.RouteGroupKind{{Group: (*gwv1beta1.Group)(&common.BetaGroup), Kind: "HTTPRoute"}},
+							Conditions: []metav1.Condition{
+								{
+									Type:    "Accepted",
+									Status:  "True",
+									Reason:  "Accepted",
+									Message: "listener accepted",
+								},
+								{
+									Type:    "Programmed",
+									Status:  "True",
+									Reason:  "Programmed",
+									Message: "listener programmed",
+								},
+								{
+									Type:    "Conflicted",
+									Status:  "False",
+									Reason:  "NoConflicts",
+									Message: "listener has no conflicts",
+								},
+								{
+									Type:    "ResolvedRefs",
+									Status:  "True",
+									Reason:  "ResolvedRefs",
+									Message: "resolved references",
+								},
+							},
+						},
+					},
+				})),
+			},
+			expectedUpdates:         []client.Object{},
+			expectedConsulDeletions: []api.ResourceReference{},
+			expectedConsulUpdates: []api.ConfigEntry{
+				&api.APIGatewayConfigEntry{
+					Kind:      "api-gateway",
+					Name:      "gateway",
+					Meta:      map[string]string{"k8s-name": "gateway", "k8s-namespace": "default"},
+					Listeners: []api.APIGatewayListener{{Name: "l1", Protocol: "http"}},
+				},
+			},
+		},
+		"gateway http route route auth filter references missing jwt provider": {
+			resources: resourceMapResources{
+				gateways: []gwv1beta1.Gateway{gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{{
+						Name:     "l1",
+						Protocol: "HTTP",
+					}},
+				})},
+				httpRoutes:   []gwv1beta1.HTTPRoute{},
+				jwtProviders: []*v1alpha1.JWTProvider{},
+				externalAuthFilters: []*v1alpha1.RouteAuthFilter{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind: v1alpha1.RouteAuthFilterKind,
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "route-auth",
+							Namespace: "default",
+						},
+						Spec: v1alpha1.RouteAuthFilterSpec{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
+									{
+										Name: "okta",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			config: controlledBinder(BinderConfig{
+				ConsulGateway: &api.APIGatewayConfigEntry{
+					Name: "gateway",
+					Kind: "api-gateway",
+					Listeners: []api.APIGatewayListener{
+						{
+							Name:     "l1",
+							Protocol: "HTTP",
+						},
+					},
+					Meta: map[string]string{"k8s-name": "gateway", "k8s-namespace": "default"},
+				},
+				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name:     "l1",
+							Protocol: gwv1beta1.HTTPProtocolType,
+						},
+					},
+				}),
+				HTTPRoutes: []gwv1beta1.HTTPRoute{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:       "h1",
+							Finalizers: []string{common.GatewayFinalizer},
+							Namespace:  "default",
+						},
+						Spec: gwv1beta1.HTTPRouteSpec{
+							CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+								ParentRefs: []gwv1beta1.ParentReference{
+									{
+										Group:       (*gwv1beta1.Group)(&common.BetaGroup),
+										Kind:        common.PointerTo(gwv1beta1.Kind("Gateway")),
+										Namespace:   common.PointerTo(gwv1beta1.Namespace("default")),
+										Name:        "gateway",
+										SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+									},
+								},
+							},
+							Rules: []gwv1beta1.HTTPRouteRule{
+								{
+									Filters: []gwv1beta1.HTTPRouteFilter{{
+										Type: "ExtensionRef",
+										ExtensionRef: &gwv1beta1.LocalObjectReference{
+											Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+											Kind:  v1alpha1.RouteAuthFilterKind,
+											Name:  "route-auth",
+										},
+									}},
+								},
+							},
+						},
+					},
+					testHTTPRoute("http-route-2", []string{"gateway"}, nil),
+				},
+			}),
+			expectedStatusUpdates: []client.Object{
+				&gwv1beta1.HTTPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "h1",
+						Finalizers: []string{common.GatewayFinalizer},
+						Namespace:  "default",
+					},
+					Spec: gwv1beta1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+							ParentRefs: []gwv1beta1.ParentReference{
+								{
+									Group:       (*gwv1beta1.Group)(&common.BetaGroup),
+									Kind:        common.PointerTo(gwv1beta1.Kind("Gateway")),
+									Namespace:   common.PointerTo(gwv1beta1.Namespace("default")),
+									Name:        "gateway",
+									SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+								},
+							},
+						},
+						Rules: []gwv1beta1.HTTPRouteRule{
+							{
+								Filters: []gwv1beta1.HTTPRouteFilter{{
+									Type: "ExtensionRef",
+									ExtensionRef: &gwv1beta1.LocalObjectReference{
+										Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+										Kind:  "RouteAuthFilter",
+										Name:  "route-auth",
+									},
+								}},
+							},
+						},
+					},
+					Status: gwv1beta1.HTTPRouteStatus{
+						RouteStatus: gwv1beta1.RouteStatus{
+							Parents: []gwv1beta1.RouteParentStatus{
+								{
+									ParentRef: gwv1beta1.ParentReference{
+										Group:       (*gwv1beta1.Group)(&common.BetaGroup),
+										Kind:        common.PointerTo(gwv1beta1.Kind("Gateway")),
+										Name:        "gateway",
+										Namespace:   common.PointerTo(gwv1beta1.Namespace("default")),
+										SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+									},
+									ControllerName: testControllerName,
+									Conditions: []metav1.Condition{
+										{
+											Type:    "ResolvedRefs",
+											Status:  metav1.ConditionTrue,
+											Reason:  "ResolvedRefs",
+											Message: "resolved backend references",
+										},
+										{
+											Type:    "Accepted",
+											Status:  metav1.ConditionFalse,
+											Reason:  "JWTProviderNotFound",
+											Message: "filter invalid: default/route-auth",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				common.PointerTo(testHTTPRoute("http-route-2", []string{"gateway"}, nil)),
+				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name:     "l1",
+							Protocol: gwv1beta1.HTTPProtocolType,
+						},
+					},
+				}, gwv1beta1.GatewayStatus{
+					Addresses: []gwv1beta1.GatewayAddress{},
+					Conditions: []metav1.Condition{{
+						Type:    "Accepted",
+						Status:  metav1.ConditionTrue,
+						Reason:  "Accepted",
+						Message: "gateway accepted",
+					}, {
+						Type:    "Programmed",
+						Status:  metav1.ConditionFalse,
+						Reason:  "Pending",
+						Message: "gateway pods are still being scheduled",
+					}},
+					Listeners: []gwv1beta1.ListenerStatus{
+						{
+							Name:           "l1",
+							SupportedKinds: []gwv1beta1.RouteGroupKind{{Group: (*gwv1beta1.Group)(&common.BetaGroup), Kind: "HTTPRoute"}},
+							Conditions: []metav1.Condition{
+								{
+									Type:    "Accepted",
+									Status:  "True",
+									Reason:  "Accepted",
+									Message: "listener accepted",
+								},
+								{
+									Type:    "Programmed",
+									Status:  "True",
+									Reason:  "Programmed",
+									Message: "listener programmed",
+								},
+								{
+									Type:    "Conflicted",
+									Status:  "False",
+									Reason:  "NoConflicts",
+									Message: "listener has no conflicts",
+								},
+								{
+									Type:    "ResolvedRefs",
+									Status:  "True",
+									Reason:  "ResolvedRefs",
+									Message: "resolved references",
+								},
+							},
+						},
+					},
+				})),
+				&v1alpha1.RouteAuthFilter{
+					TypeMeta:   metav1.TypeMeta{Kind: "RouteAuthFilter"},
+					ObjectMeta: metav1.ObjectMeta{Name: "route-auth", Namespace: "default"},
+					Spec: v1alpha1.RouteAuthFilterSpec{
+						JWT: &v1alpha1.GatewayJWTRequirement{
+							Providers: []*v1alpha1.GatewayJWTProvider{
+								{
+									Name: "okta",
+								},
+							},
+						},
+					},
+					Status: v1alpha1.RouteAuthFilterStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:    "Accepted",
+								Status:  "False",
+								Reason:  "ReferencesNotValid",
+								Message: "route filter is not accepted due to errors with references",
+							},
+							{
+								Type:    "ResolvedRefs",
+								Status:  "False",
+								Reason:  "MissingJWTProviderReference",
+								Message: "route filter references one or more jwt providers that do not exist: missingProviderNames: okta",
+							},
+						},
+					},
+				},
+			},
+			expectedUpdates:         []client.Object{},
+			expectedConsulDeletions: []api.ResourceReference{},
+			expectedConsulUpdates: []api.ConfigEntry{
+				&api.APIGatewayConfigEntry{
+					Kind:      "api-gateway",
+					Name:      "gateway",
+					Meta:      map[string]string{"k8s-name": "gateway", "k8s-namespace": "default"},
+					Listeners: []api.APIGatewayListener{{Name: "l1", Protocol: "http"}},
+				},
+			},
+		},
+		"gateway http route route references invalid external ref type": {
+			resources: resourceMapResources{
+				gateways: []gwv1beta1.Gateway{gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{{
+						Name:     "l1",
+						Protocol: "HTTP",
+					}},
+				})},
+			},
+			config: controlledBinder(BinderConfig{
+				ConsulGateway: &api.APIGatewayConfigEntry{
+					Name: "gateway",
+					Kind: "api-gateway",
+					Listeners: []api.APIGatewayListener{
+						{
+							Name:     "l1",
+							Protocol: "HTTP",
+						},
+					},
+					Meta: map[string]string{"k8s-name": "gateway", "k8s-namespace": "default"},
+				},
+				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name:     "l1",
+							Protocol: gwv1beta1.HTTPProtocolType,
+						},
+					},
+				}),
+				HTTPRoutes: []gwv1beta1.HTTPRoute{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:       "h1",
+							Finalizers: []string{common.GatewayFinalizer},
+							Namespace:  "default",
+						},
+						Spec: gwv1beta1.HTTPRouteSpec{
+							CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+								ParentRefs: []gwv1beta1.ParentReference{
+									{
+										Group:       (*gwv1beta1.Group)(&common.BetaGroup),
+										Kind:        common.PointerTo(gwv1beta1.Kind("Gateway")),
+										Namespace:   common.PointerTo(gwv1beta1.Namespace("default")),
+										Name:        "gateway",
+										SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+									},
+								},
+							},
+							Rules: []gwv1beta1.HTTPRouteRule{
+								{
+									Filters: []gwv1beta1.HTTPRouteFilter{{
+										Type: "ExtensionRef",
+										ExtensionRef: &gwv1beta1.LocalObjectReference{
+											Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+											Kind:  "OhNoThisIsInvalid",
+											Name:  "route-auth",
+										},
+									}},
+								},
+							},
+						},
+					},
+					testHTTPRoute("http-route-2", []string{"gateway"}, nil),
+				},
+			}),
+			expectedStatusUpdates: []client.Object{
+				&gwv1beta1.HTTPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "h1",
+						Finalizers: []string{common.GatewayFinalizer},
+						Namespace:  "default",
+					},
+					Spec: gwv1beta1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+							ParentRefs: []gwv1beta1.ParentReference{
+								{
+									Group:       (*gwv1beta1.Group)(&common.BetaGroup),
+									Kind:        common.PointerTo(gwv1beta1.Kind("Gateway")),
+									Namespace:   common.PointerTo(gwv1beta1.Namespace("default")),
+									Name:        "gateway",
+									SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+								},
+							},
+						},
+						Rules: []gwv1beta1.HTTPRouteRule{
+							{
+								Filters: []gwv1beta1.HTTPRouteFilter{{
+									Type: "ExtensionRef",
+									ExtensionRef: &gwv1beta1.LocalObjectReference{
+										Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+										Kind:  "OhNoThisIsInvalid",
+										Name:  "route-auth",
+									},
+								}},
+							},
+						},
+					},
+					Status: gwv1beta1.HTTPRouteStatus{
+						RouteStatus: gwv1beta1.RouteStatus{
+							Parents: []gwv1beta1.RouteParentStatus{
+								{
+									ParentRef: gwv1beta1.ParentReference{
+										Group:       (*gwv1beta1.Group)(&common.BetaGroup),
+										Kind:        common.PointerTo(gwv1beta1.Kind("Gateway")),
+										Name:        "gateway",
+										Namespace:   common.PointerTo(gwv1beta1.Namespace("default")),
+										SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+									},
+									ControllerName: testControllerName,
+									Conditions: []metav1.Condition{
+										{
+											Type:    "ResolvedRefs",
+											Status:  metav1.ConditionTrue,
+											Reason:  "ResolvedRefs",
+											Message: "resolved backend references",
+										},
+										{
+											Type:    "Accepted",
+											Status:  metav1.ConditionFalse,
+											Reason:  "UnsupportedValue",
+											Message: "invalid externalref filter kind",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				common.PointerTo(testHTTPRoute("http-route-2", []string{"gateway"}, nil)),
+				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name:     "l1",
+							Protocol: gwv1beta1.HTTPProtocolType,
+						},
+					},
+				}, gwv1beta1.GatewayStatus{
+					Addresses: []gwv1beta1.GatewayAddress{},
+					Conditions: []metav1.Condition{{
+						Type:    "Accepted",
+						Status:  metav1.ConditionTrue,
+						Reason:  "Accepted",
+						Message: "gateway accepted",
+					}, {
+						Type:    "Programmed",
+						Status:  metav1.ConditionFalse,
+						Reason:  "Pending",
+						Message: "gateway pods are still being scheduled",
+					}},
+					Listeners: []gwv1beta1.ListenerStatus{
+						{
+							Name:           "l1",
+							SupportedKinds: []gwv1beta1.RouteGroupKind{{Group: (*gwv1beta1.Group)(&common.BetaGroup), Kind: "HTTPRoute"}},
+							Conditions: []metav1.Condition{
+								{
+									Type:    "Accepted",
+									Status:  "True",
+									Reason:  "Accepted",
+									Message: "listener accepted",
+								},
+								{
+									Type:    "Programmed",
+									Status:  "True",
+									Reason:  "Programmed",
+									Message: "listener programmed",
+								},
+								{
+									Type:    "Conflicted",
+									Status:  "False",
+									Reason:  "NoConflicts",
+									Message: "listener has no conflicts",
+								},
+								{
+									Type:    "ResolvedRefs",
+									Status:  "True",
+									Reason:  "ResolvedRefs",
+									Message: "resolved references",
+								},
+							},
+						},
+					},
+				})),
+			},
+			expectedUpdates:         []client.Object{},
+			expectedConsulDeletions: []api.ResourceReference{},
+			expectedConsulUpdates: []api.ConfigEntry{
+				&api.APIGatewayConfigEntry{
+					Kind:      "api-gateway",
+					Name:      "gateway",
+					Meta:      map[string]string{"k8s-name": "gateway", "k8s-namespace": "default"},
+					Listeners: []api.APIGatewayListener{{Name: "l1", Protocol: "http"}},
+				},
 			},
 		},
 	} {
