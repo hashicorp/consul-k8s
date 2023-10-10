@@ -1,3 +1,42 @@
+## 1.3.0-rc1 (October 10, 2023)
+
+FEATURE PREVIEW: **Catalog v2**
+
+* :tada: This release provides the ability to preview Consul's v2 Catalog and Resource API if enabled.
+The new model supports multi-port application deployments with only a single Envoy proxy.
+Note that the v1 and v2 catalogs are not cross compatible, and not all Consul features are available within this v2 feature preview.
+See the [v2 Catalog and Resource API documentation](https://developer.hashicorp.com/consul/docs/k8s/multiport) for more information.
+The v2 Catalog and Resources API should be considered a feature preview within this release and should not be used in production environments.
+
+Limitations
+* The v1 and v2 catalog APIs cannot run concurrently.
+* The Consul UI must be disabled. It does not support multi-port services or the v2 catalog API in this release.
+* HCP Consul does not support multi-port services or the v2 catalog API in this release.
+* The v2 API only supports transparent proxy mode where services that have permissions to connect to each other can use
+  Kube DNS to connect.
+
+Known Issues
+* When using the v2 API with transparent proxy, Kubernetes pods cannot use L7 liveness, readiness, or startup probes.
+  * [[GH-2868]](https://github.com/hashicorp/consul-k8s/pull/2868)
+  * [[GH-2883]](https://github.com/hashicorp/consul-k8s/pull/2883)
+  * [[GH-2930]](https://github.com/hashicorp/consul-k8s/pull/2930)
+  * [[GH-2967]](https://github.com/hashicorp/consul-k8s/pull/2967) 
+  * [[GH-2941](https://github.com/hashicorp/consul-k8s/issues/2941)]
+* Add the `PrioritizeByLocality` field to the `ServiceResolver` and `ProxyDefaults` CRDs. [[GH-2784](https://github.com/hashicorp/consul-k8s/issues/2784)]
+* Set locality on services registered with connect-inject. [[GH-2346](https://github.com/hashicorp/consul-k8s/issues/2346)]
+* api-gateway: Add support for response header modifiers in HTTPRoute filters [[GH-2904](https://github.com/hashicorp/consul-k8s/issues/2904)]
+* api-gateway: add RouteRetryFilter and RouteTimeoutFilter CRDs [[GH-2735](https://github.com/hashicorp/consul-k8s/issues/2735)]
+* helm: (Consul Enterprise) Adds rate limiting config to serviceDefaults CRD [[GH-2844](https://github.com/hashicorp/consul-k8s/issues/2844)]
+
+IMPROVEMENTS:
+
+* (Consul Enterprise) Add support to provide inputs via helm for audit log related configuration [[GH-2265](https://github.com/hashicorp/consul-k8s/issues/2265)]
+* control-plane: Changed the container ordering in connect-inject to insert consul-dataplane container first if lifecycle is enabled. Container ordering is unchanged if lifecycle is disabled. [[GH-2743](https://github.com/hashicorp/consul-k8s/issues/2743)]
+
+BUG FIXES:
+
+* control-plane: Set locality on sidecar proxies in addition to services when registering with connect-inject. [[GH-2748](https://github.com/hashicorp/consul-k8s/issues/2748)]
+
 ## 1.2.2 (September 21, 2023)
 
 SECURITY:
