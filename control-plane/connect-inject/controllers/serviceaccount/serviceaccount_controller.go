@@ -83,8 +83,9 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		r.getConsulNamespace(serviceAccount.Namespace),
 		r.getConsulPartition(),
 		map[string]string{
-			constants.MetaKeyKubeNS:    serviceAccount.Namespace,
-			constants.MetaKeyManagedBy: constants.ManagedByServiceAccountValue,
+			constants.MetaKeyKubeNS:                 serviceAccount.Namespace,
+			constants.MetaKeyKubeServiceAccountName: serviceAccount.Name,
+			constants.MetaKeyManagedBy:              constants.ManagedByServiceAccountValue,
 		},
 	)
 
