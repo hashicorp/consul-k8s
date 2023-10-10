@@ -42,6 +42,10 @@ const (
 	// MetaKeyKubeServiceName is the meta key name for Kubernetes service name used for the Consul services.
 	MetaKeyKubeServiceName = "k8s-service-name"
 
+	// MetaKeyKubeServiceAccountName is the meta key name for Kubernetes service account name used for the Consul
+	// v2 workload identity.
+	MetaKeyKubeServiceAccountName = "k8s-service-account-name"
+
 	// MetaKeyPodName is the meta key name for Kubernetes pod name used for the Consul services.
 	MetaKeyPodName = "pod-name"
 
