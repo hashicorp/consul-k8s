@@ -54,7 +54,7 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	t.Cleanup(func() {
 		_ = consulServer.Stop()
 	})
-	consulServer.WaitForSerfCheck(t)
+	consulServer.WaitForLeader(t)
 
 	consulConfig := &consul.Config{
 		APIClientConfig: &api.Config{Address: consulServer.HTTPAddr},

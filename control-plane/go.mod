@@ -5,7 +5,7 @@ replace (
 	// This replace directive is needed because `api` requires 0.4.1 of proto-public but we need an unreleased version
 	github.com/hashicorp/consul/proto-public v0.4.1 => github.com/hashicorp/consul/proto-public v0.1.2-0.20230929231147-632fd65c091c
 	// This replace directive is needed because `api` requires 0.14.1 of `sdk` but we need an unreleased version
-	github.com/hashicorp/consul/sdk v0.14.1 => github.com/hashicorp/consul/sdk v0.4.1-0.20230911164019-a69e901660bd
+	github.com/hashicorp/consul/sdk v0.14.1 => github.com/hashicorp/consul/sdk v0.4.1-0.20231011203909-c26d5cf62cb9
 )
 
 require (

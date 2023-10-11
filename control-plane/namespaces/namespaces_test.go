@@ -40,7 +40,7 @@ func TestEnsureExists_AlreadyExists(tt *testing.T) {
 			})
 			req.NoError(err)
 			defer consul.Stop()
-			consul.WaitForSerfCheck(t)
+			consul.WaitForLeader(t)
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
 				Token:   masterToken,
