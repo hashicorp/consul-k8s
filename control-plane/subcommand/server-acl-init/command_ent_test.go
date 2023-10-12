@@ -33,6 +33,9 @@ import (
 // and there's a single consul destination namespace.
 func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 	t.Parallel()
+
+	//TODO(dans) make sure this test case runs
+
 	consulDestNamespaces := []string{"default", "destination"}
 	for _, consulDestNamespace := range consulDestNamespaces {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
