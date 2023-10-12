@@ -5,6 +5,7 @@ package endpointsv2
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"net"
 	"sort"
@@ -14,6 +15,10 @@ import (
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/go-multierror"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +47,13 @@ type Controller struct {
 	// ConsulTenancyConfig manages settings related to Consul namespaces and partitions.
 	common.ConsulTenancyConfig
 
+	// WriteCache keeps track of records already written to Consul in order to enable debouncing of writes.
+	// This is useful in particular for this controller which will see potentially many more reconciles due to
+	// endpoint changes (e.g. pod health) than changes to service data written to Consul.
+	// It is intentionally simple and best-effort, and does not guarantee against all redundant writes.
+	// It is not persistent across restarts of the controller process.
+	WriteCache WriteCache
+
 	Log logr.Logger
 
 	Scheme *runtime.Scheme
@@ -53,6 +65,9 @@ func (r *Controller) Logger(name types.NamespacedName) logr.Logger {
 }
 
 func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
+	if r.WriteCache == nil {
+		return fmt.Errorf("WriteCache was not configured for Controller")
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Endpoints{}).
 		Complete(r)
@@ -80,7 +95,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// we need to deregister that service from Consul.
 	err = r.Client.Get(ctx, req.NamespacedName, &endpoints)
 	if k8serrors.IsNotFound(err) {
-		err = r.deregisterService(ctx, resourceClient, req.Name, r.getConsulNamespace(req.Namespace), r.getConsulPartition())
+		err = r.deregisterService(ctx, resourceClient, req)
 		return ctrl.Result{}, err
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Endpoints", "name", req.Name, "ns", req.Namespace)
@@ -111,7 +126,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	// Register the service in Consul.
-	if err = r.registerService(ctx, resourceClient, service, consulSvc); err != nil {
+	id := getServiceID(
+		service.Name, // Consul and Kubernetes service name will always match
+		r.getConsulNamespace(service.Namespace),
+		r.getConsulPartition())
+	meta := getServiceMeta(service)
+	k8sUid := string(service.UID)
+	if err = r.ensureService(ctx, &defaultResourceReadWriter{resourceClient}, k8sUid, id, meta, consulSvc); err != nil {
 		// We could be racing with the namespace controller.
 		// Requeue (which includes backoff) to try again.
 		if inject.ConsulNamespaceIsNotFound(err) {
@@ -262,34 +283,79 @@ func getOwnerPrefixFromPod(pod *corev1.Pod) string {
 	return ""
 }
 
-// registerService creates a Consul service registration from the provided Kuberetes service and endpoint information.
-func (r *Controller) registerService(ctx context.Context, resourceClient pbresource.ResourceServiceClient, k8sService corev1.Service, consulSvc *pbcatalog.Service) error {
-	consulSvcResource := r.getServiceResource(
-		consulSvc,
-		k8sService.Name, // Consul and Kubernetes service name will always match
-		r.getConsulNamespace(k8sService.Namespace),
-		r.getConsulPartition(),
-		getServiceMeta(k8sService),
-	)
-
-	r.Log.Info("registering service with Consul", getLogFieldsForResource(consulSvcResource.Id)...)
-	//TODO(NET-5681): Maybe attempt to debounce redundant writes. For now, we blindly rewrite state on each reconcile.
-	_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: consulSvcResource})
-	if err != nil {
-		r.Log.Error(err, fmt.Sprintf("failed to register service: %+v", consulSvc), getLogFieldsForResource(consulSvcResource.Id)...)
+// ensureService upserts a Consul service resource if an identical write has not already been made to Consul since this
+// controller was started. If the check for a previous write fails, the resource is written anyway.
+func (r *Controller) ensureService(ctx context.Context, rw resourceReadWriter, k8sUid string, id *pbresource.ID, meta map[string]string, consulSvc *pbcatalog.Service) error {
+	// Use Marshal w/ Deterministic option to ensure write hash generated from Data is consistent.
+	data := new(anypb.Any)
+	if err := anypb.MarshalFrom(data, consulSvc, proto.MarshalOptions{Deterministic: true}); err != nil {
 		return err
 	}
+
+	// Use the locally-created Resource and ID (without Uid and Version) when writing so that it
+	// behaves as an upsert rather than CAS.
+	consulSvcResource := &pbresource.Resource{
+		Id:       id,
+		Data:     data,
+		Metadata: meta,
+	}
+
+	writeHash, err := getWriteHash(consulSvcResource)
+	if err != nil {
+		r.Log.Error(err, "failed to get write hash for service; assuming it is out of sync",
+			getLogFieldsForResource(id)...)
+	}
+	key := getWriteCacheKey(types.NamespacedName{Name: id.Name, Namespace: id.Tenancy.Namespace})
+	generationFetchFn := func() string {
+		// Check for whether a matching service already exists in Consul.
+		// Gracefully fail on error. This allows us to make a best-effort write attempt in
+		// case of a persistent read error or permissions issue that does not impact writing.
+		resp, err := rw.Read(ctx, &pbresource.ReadRequest{Id: id})
+		if s, ok := status.FromError(err); !ok || (s.Code() != codes.OK && s.Code() != codes.NotFound) {
+			r.Log.Error(err, "failed to read existing service resource from Consul; assuming it is out of sync",
+				append(getLogFieldsForResource(id), "code", s.Code(), "message", s.Message())...)
+			return ""
+		}
+		return resp.GetResource().GetGeneration()
+	}
+	if r.WriteCache.hasMatch(key, writeHash, generationFetchFn, k8sUid) {
+		r.Log.V(1).Info("skipping service write due to matching write hash")
+		return nil
+	}
+
+	r.Log.Info("writing service to Consul", getLogFieldsForResource(consulSvcResource.Id)...)
+	resp, err := rw.Write(ctx, &pbresource.WriteRequest{Resource: consulSvcResource})
+	if err != nil {
+		r.Log.Error(err, fmt.Sprintf("failed to write service: %+v", consulSvc),
+			getLogFieldsForResource(consulSvcResource.Id)...)
+		return err
+	}
+
+	generation := resp.GetResource().GetGeneration()
+	r.Log.Info("caching service write to Consul", "hash", writeHash, "generation", generation,
+		"k8sUid", k8sUid)
+	r.WriteCache.update(key, writeHash, generation, k8sUid)
 
 	return nil
 }
 
-// getServiceResource converts the given Consul service and metadata to a Consul resource API record.
-func (r *Controller) getServiceResource(svc *pbcatalog.Service, name, namespace, partition string, meta map[string]string) *pbresource.Resource {
-	return &pbresource.Resource{
-		Id:       getServiceID(name, namespace, partition),
-		Data:     inject.ToProtoAny(svc),
-		Metadata: meta,
-	}
+// resourceReadWriter wraps pbresource.ResourceServiceClient for testing purposes.
+// The default implementation is a passthrough used outside of tests.
+type resourceReadWriter interface {
+	Read(context.Context, *pbresource.ReadRequest) (*pbresource.ReadResponse, error)
+	Write(context.Context, *pbresource.WriteRequest) (*pbresource.WriteResponse, error)
+}
+
+type defaultResourceReadWriter struct {
+	client pbresource.ResourceServiceClient
+}
+
+func (c *defaultResourceReadWriter) Read(ctx context.Context, req *pbresource.ReadRequest) (*pbresource.ReadResponse, error) {
+	return c.client.Read(ctx, req)
+}
+
+func (c *defaultResourceReadWriter) Write(ctx context.Context, req *pbresource.WriteRequest) (*pbresource.WriteResponse, error) {
+	return c.client.Write(ctx, req)
 }
 
 func getServiceID(name, namespace, partition string) *pbresource.ID {
@@ -316,6 +382,7 @@ func getServicePorts(service corev1.Service, prefixedPods selectorPodData, exact
 		//
 		// If we otherwise see repeat port values in a K8s service, we pass along and allow Consul to fail validation.
 		if p.Protocol == corev1.ProtocolTCP {
+			//TODO(NET-5705): Error check reserved "mesh" target port
 			ports = append(ports, &pbcatalog.ServicePort{
 				VirtualPort: uint32(p.Port),
 				TargetPort:  getEffectiveTargetPort(p.TargetPort, prefixedPods, exactNamePods),
@@ -324,7 +391,10 @@ func getServicePorts(service corev1.Service, prefixedPods selectorPodData, exact
 		}
 	}
 
-	//TODO(NET-5705): Error check reserved "mesh" target port
+	// Sort for comparison stability during write deduplication.
+	sort.Slice(ports, func(i, j int) bool {
+		return ports[i].VirtualPort < ports[j].VirtualPort
+	})
 
 	// Append Consul service mesh port in addition to discovered ports.
 	ports = append(ports, &pbcatalog.ServicePort{
@@ -441,6 +511,9 @@ func (r *Controller) getServiceVIPs(service corev1.Service) []string {
 		r.Log.Info("skipping service registration virtual IP assignment due to invalid or unset ClusterIP", "name", service.Name, "ns", service.Namespace, "ip", service.Spec.ClusterIP)
 		return nil
 	}
+
+	// Note: This slice needs to be sorted for stable comparison during write deduplication.
+	// If additional values are added in the future, the output order should be consistent.
 	return []string{service.Spec.ClusterIP}
 }
 
@@ -469,7 +542,7 @@ func getWorkloadSelector(prefixedPods selectorPodData, exactNamePods selectorPod
 		workloads.Names = append(workloads.Names, v)
 	}
 
-	// Sort for comparison stability
+	// Sort for comparison stability during write deduplication
 	sort.Strings(workloads.Prefixes)
 	sort.Strings(workloads.Names)
 
@@ -478,9 +551,12 @@ func getWorkloadSelector(prefixedPods selectorPodData, exactNamePods selectorPod
 
 // deregisterService deletes the service resource corresponding to the given name and namespace from Consul.
 // This operation is idempotent and can be executed for non-existent services.
-func (r *Controller) deregisterService(ctx context.Context, resourceClient pbresource.ResourceServiceClient, name, namespace, partition string) error {
+func (r *Controller) deregisterService(ctx context.Context, resourceClient pbresource.ResourceServiceClient, req ctrl.Request) error {
+	// Regardless of whether we get an error on delete, remove the resource from the cache as we intend for it
+	// to be deleted and the record is no longer valid for preventing writes.
+	r.WriteCache.remove(getWriteCacheKey(req.NamespacedName))
 	_, err := resourceClient.Delete(ctx, &pbresource.DeleteRequest{
-		Id: getServiceID(name, namespace, partition),
+		Id: getServiceID(req.Name, r.getConsulNamespace(req.Namespace), r.getConsulPartition()),
 	})
 	return err
 }
@@ -508,6 +584,31 @@ func (r *Controller) getConsulPartition() string {
 		return constants.DefaultConsulPartition
 	}
 	return r.ConsulPartition
+}
+
+// getWriteCacheKey gets a key to track syncronization of a K8s service to deduplicate writes to Consul.
+// See also WriteCache.hasMatch.
+func getWriteCacheKey(serviceName types.NamespacedName) string {
+	return serviceName.String()
+}
+
+// getWriteHash gets a hash of the given resource to deduplicate writes to Consul.
+//
+// This hash is not intended to be cryptographically secure, only deterministic and collision-resistent
+// for tens of thousands of values.
+//
+// If an error occurs marshalling the resource for the hash, returns a nil hash value and the error.
+// error will be returned.
+func getWriteHash(r *pbresource.Resource) ([]byte, error) {
+	// We Marshal the entire resource (not just its own Data, which is already serialized)
+	// in order to take advantage of the deterministic marshal offered by proto and include
+	// fields like Meta, which are not part of the resource Data.
+	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+	h := sha256.Sum256(data)
+	return h[:], nil
 }
 
 func getLogFieldsForResource(id *pbresource.ID) []any {
