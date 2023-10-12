@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	allCapabilities              = "all"
+	allCapabilities              = "ALL"
 	netBindCapability            = "NET_BIND_SERVICE"
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
