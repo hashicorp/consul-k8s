@@ -8,9 +8,8 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
-
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -19,7 +18,7 @@ import (
 )
 
 const (
-	allCapabilities              = "all"
+	allCapabilities              = "ALL"
 	netBindCapability            = "NET_BIND_SERVICE"
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
@@ -106,21 +105,18 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 		container.Resources = *gcc.Spec.DeploymentSpec.Resources
 	}
 
-	// If not running in an OpenShift environment,
-	// skip setting the security context and let OpenShift set it for us.
+	// If running in vanilla K8s, run as root to allow binding to privileged ports;
+	// otherwise, allow the user to be assigned by OpenShift.
+	container.SecurityContext = &corev1.SecurityContext{
+		ReadOnlyRootFilesystem: pointer.Bool(true),
+		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
+		Capabilities: &corev1.Capabilities{
+			Add:  []corev1.Capability{netBindCapability},
+			Drop: []corev1.Capability{allCapabilities},
+		},
+	}
 	if !config.EnableOpenShift {
-		container.SecurityContext = &corev1.SecurityContext{
-			ReadOnlyRootFilesystem: pointer.Bool(true),
-			// We have to run as root if we want to bind to any
-			// sort of privileged ports. The drop "all" is intended
-			// to drop any Linux capabilities you'd get as root
-			// other than NET_BIND_SERVICE.
-			RunAsUser: pointer.Int64(0),
-			Capabilities: &corev1.Capabilities{
-				Add:  []corev1.Capability{netBindCapability},
-				Drop: []corev1.Capability{allCapabilities},
-			},
-		}
+		container.SecurityContext.RunAsUser = pointer.Int64(0)
 	}
 
 	return container, nil
