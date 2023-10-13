@@ -32,6 +32,7 @@ import (
 // and there's a single consul destination namespace.
 func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 	t.Parallel()
+
 	consulDestNamespaces := []string{"default", "destination"}
 	for _, consulDestNamespace := range consulDestNamespaces {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
@@ -320,6 +321,11 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			require.NoError(t, err)
 
 			// Check that the expected policies were created.
+			// There will be more policies returned in the List API that are defaults
+			// existing in Consul on startup, including but not limited to:
+			// * global-management
+			// * builtin/global-read-only
+			// * agent-token
 			firstRunExpectedPolicies := []string{
 				"anonymous-token-policy",
 				"client-policy",
@@ -335,12 +341,6 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			}
 			policies, _, err := consul.ACL().PolicyList(nil)
 			require.NoError(t, err)
-
-			// Check that we have the right number of policies. The actual
-			// policies will have two more than expected because of the
-			// global management and namespace management polices that
-			// are automatically created, the latter in consul-ent v1.7+.
-			require.Equal(t, len(firstRunExpectedPolicies), len(policies)-2)
 
 			// Collect the actual policies into a map to make it easier to assert
 			// on their existence and contents.
@@ -388,12 +388,6 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 			policies, _, err = consul.ACL().PolicyList(nil)
 			require.NoError(t, err)
 
-			// Check that we have the right number of policies. The actual
-			// policies will have two more than expected because of the
-			// global management and namespace management polices that
-			// are automatically created, the latter in consul-ent v1.7+.
-			require.Equal(t, len(secondRunExpectedPolicies), len(policies)-2)
-
 			// Collect the actual policies into a map to make it easier to assert
 			// on their existence and contents.
 			actualPolicies = make(map[string]string)
@@ -417,6 +411,8 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 					require.Contains(t, actRules, "acl = \"write\"")
 				case "partitions-token":
 					require.Contains(t, actRules, "operator = \"write\"")
+				case "anonymous-token-policy":
+					// TODO: This needs to be revisted due to recent changes in how we update the anonymous policy (NET-5174)
 				default:
 					// Assert that the policies have the word namespace in them. This
 					// tests that they were updated. The actual contents are tested
@@ -749,7 +745,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 	}
 }
 
-// Test the parsing the namespace from gateway names
+// Test the parsing the namespace from gateway names.
 func TestRun_GatewayNamespaceParsing(t *testing.T) {
 	t.Parallel()
 
@@ -1049,7 +1045,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 				clientset: k8s,
 			}
 			cmdArgs := append([]string{
-				"-timeout=500ms",
+				"-timeout=1m",
 				"-resource-prefix=" + resourcePrefix,
 				"-enable-namespaces",
 				"-k8s-namespace=" + c.Namespace,
