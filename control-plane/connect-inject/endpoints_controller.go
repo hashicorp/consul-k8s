@@ -127,6 +127,9 @@ type EndpointsController struct {
 
 	Scheme *runtime.Scheme
 	context.Context
+
+	// startTime of a Reconcile loop, will reset on each reconcile loop.
+	startTime time.Time
 }
 
 // Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
@@ -134,6 +137,8 @@ type EndpointsController struct {
 func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
 	var serviceEndpoints corev1.Endpoints
+
+	r.startTime = time.Now()
 
 	// Ignore the request if the namespace of the endpoint is not allowed.
 	if shouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
@@ -807,6 +812,7 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Clie
 		// Only delete tokens that:
 		// * have been created with the auth method configured for this endpoints controller
 		// * have a single service identity whose service name is the same as 'serviceName'
+		// * created before start time of current reconcile loop
 		if token.AuthMethod == r.AuthMethod &&
 			len(token.ServiceIdentities) == 1 &&
 			token.ServiceIdentities[0].ServiceName == serviceName {
@@ -819,6 +825,10 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Clie
 
 			// If we can't find token's pod, delete it.
 			if tokenPodName == podName {
+				if r.startTime.Before(token.CreateTime) {
+					r.Log.Info("token created after start time of current reconcile loop, skipping deletion...", "start_time", r.startTime, "accessor_id", token.AccessorID, "create_time", token.CreateTime)
+					continue
+				}
 				r.Log.Info("deleting ACL token for pod", "name", podName)
 				_, err = client.ACL().TokenDelete(token.AccessorID, nil)
 				if err != nil {
