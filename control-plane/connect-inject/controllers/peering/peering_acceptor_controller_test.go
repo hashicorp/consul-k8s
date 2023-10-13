@@ -11,9 +11,6 @@ import (
 	"time"
 
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -26,6 +23,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 // TestReconcile_CreateUpdatePeeringAcceptor creates a peering acceptor.
@@ -508,6 +509,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			// Create test consul server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			if tt.initialConsulPeerName != "" {
 				// Add the initial peerings into Consul by calling the Generate token endpoint.
@@ -631,6 +633,7 @@ func TestReconcile_DeletePeeringAcceptor(t *testing.T) {
 	// Create test consul server.
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	consulClient := testClient.APIClient
+	testClient.TestServer.WaitForActiveCARoot(t)
 
 	// Add the initial peerings into Consul by calling the Generate token endpoint.
 	_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-deleted"}, nil)
@@ -777,6 +780,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 			// Create test consul server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-created"}, nil)
 			require.NoError(t, err)

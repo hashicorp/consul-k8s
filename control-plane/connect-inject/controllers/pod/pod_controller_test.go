@@ -121,6 +121,11 @@ func TestWorkloadWrite(t *testing.T) {
 		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 		require.NoError(t, err)
 
+		require.Eventually(t, func() bool {
+			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+			return err == nil
+		}, 5*time.Second, 500*time.Millisecond)
+
 		// Create the pod controller.
 		pc := &Controller{
 			Client:              fakeClient,
@@ -307,6 +312,11 @@ func TestWorkloadDelete(t *testing.T) {
 		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 		require.NoError(t, err)
 
+		require.Eventually(t, func() bool {
+			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+			return err == nil
+		}, 5*time.Second, 500*time.Millisecond)
+
 		// Create the pod controller.
 		pc := &Controller{
 			Client:              fakeClient,
@@ -390,6 +400,11 @@ func TestHealthStatusWrite(t *testing.T) {
 		})
 		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 		require.NoError(t, err)
+
+		require.Eventually(t, func() bool {
+			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+			return err == nil
+		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -507,6 +522,11 @@ func TestProxyConfigurationWrite(t *testing.T) {
 		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 		require.NoError(t, err)
 
+		require.Eventually(t, func() bool {
+			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+			return err == nil
+		}, 5*time.Second, 500*time.Millisecond)
+
 		// Create the pod controller.
 		pc := &Controller{
 			Client:              fakeClient,
@@ -602,6 +622,9 @@ func TestProxyConfigurationWrite(t *testing.T) {
 							},
 						},
 					},
+					TransparentProxy: &pbmesh.TransparentProxy{
+						OutboundListenerPort: 15001,
+					},
 				},
 				BootstrapConfig: &pbmesh.BootstrapConfig{
 					PrometheusBindAddr:              "0.0.0.0:5678",
@@ -645,6 +668,9 @@ func TestProxyConfigurationWrite(t *testing.T) {
 							},
 						},
 					},
+					TransparentProxy: &pbmesh.TransparentProxy{
+						OutboundListenerPort: 15001,
+					},
 				},
 				BootstrapConfig: &pbmesh.BootstrapConfig{
 					PrometheusBindAddr: "0.0.0.0:21234",
@@ -663,6 +689,9 @@ func TestProxyConfigurationWrite(t *testing.T) {
 				},
 				DynamicConfig: &pbmesh.DynamicConfig{
 					Mode: pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT,
+					TransparentProxy: &pbmesh.TransparentProxy{
+						OutboundListenerPort: 15001,
+					},
 				},
 			},
 		},
@@ -699,6 +728,11 @@ func TestProxyConfigurationDelete(t *testing.T) {
 		})
 		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 		require.NoError(t, err)
+
+		require.Eventually(t, func() bool {
+			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+			return err == nil
+		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -979,6 +1013,11 @@ func TestDestinationsWrite(t *testing.T) {
 			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 			require.NoError(t, err)
 
+			require.Eventually(t, func() bool {
+				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond)
+
 			pc := &Controller{
 				Log: logrtest.New(t),
 				K8sNamespaceConfig: common.K8sNamespaceConfig{
@@ -1061,6 +1100,11 @@ func TestDestinationsDelete(t *testing.T) {
 			})
 			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 			require.NoError(t, err)
+
+			require.Eventually(t, func() bool {
+				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond)
 
 			pc := &Controller{
 				Log: logrtest.New(t),
@@ -1146,6 +1190,11 @@ func TestReconcileCreatePod(t *testing.T) {
 		})
 		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 		require.NoError(t, err)
+
+		require.Eventually(t, func() bool {
+			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+			return err == nil
+		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -1343,6 +1392,11 @@ func TestReconcileUpdatePod(t *testing.T) {
 		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 		require.NoError(t, err)
 
+		require.Eventually(t, func() bool {
+			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+			return err == nil
+		}, 5*time.Second, 500*time.Millisecond)
+
 		// Create the pod controller.
 		pc := &Controller{
 			Client:              fakeClient,
@@ -1499,6 +1553,9 @@ func TestReconcileUpdatePod(t *testing.T) {
 							},
 						},
 					},
+					TransparentProxy: &pbmesh.TransparentProxy{
+						OutboundListenerPort: 15001,
+					},
 				},
 				BootstrapConfig: &pbmesh.BootstrapConfig{
 					PrometheusBindAddr: "0.0.0.0:21234",
@@ -1603,6 +1660,11 @@ func TestReconcileDeletePod(t *testing.T) {
 		})
 		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 		require.NoError(t, err)
+
+		require.Eventually(t, func() bool {
+			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+			return err == nil
+		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -1835,7 +1897,7 @@ func createCriticalHealthStatus(name string, namespace string) *pbcatalog.Health
 // createProxyConfiguration creates a proxyConfiguration that matches the pod from createPod,
 // assuming that metrics, telemetry, and overwrite probes are enabled separately.
 func createProxyConfiguration(podName string, mode pbmesh.ProxyMode) *pbmesh.ProxyConfiguration {
-	return &pbmesh.ProxyConfiguration{
+	mesh := &pbmesh.ProxyConfiguration{
 		Workloads: &pbcatalog.WorkloadSelector{
 			Names: []string{podName},
 		},
@@ -1866,6 +1928,14 @@ func createProxyConfiguration(podName string, mode pbmesh.ProxyMode) *pbmesh.Pro
 			TelemetryCollectorBindSocketDir: DefaultTelemetryBindSocketDir,
 		},
 	}
+
+	if mode == pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT {
+		mesh.DynamicConfig.TransparentProxy = &pbmesh.TransparentProxy{
+			OutboundListenerPort: 15001,
+		}
+	}
+
+	return mesh
 }
 
 // createCriticalHealthStatus creates a failing HealthStatus that matches the pod from createPod.

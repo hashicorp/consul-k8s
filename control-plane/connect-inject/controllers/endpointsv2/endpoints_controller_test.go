@@ -6,14 +6,12 @@ package endpointsv2
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -31,7 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 const (
@@ -2192,6 +2195,11 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
 	})
+
+	require.Eventually(t, func() bool {
+		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
 
 	// Create the Endpoints controller.
 	ep := &Controller{
