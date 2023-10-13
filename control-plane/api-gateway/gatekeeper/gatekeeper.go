@@ -54,6 +54,10 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 		return err
 	}
 
+	if err := g.upsertPodDisruptionBudget(ctx, gateway, gcc, config); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -79,6 +83,10 @@ func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedNam
 	}
 
 	if err := g.deleteRole(ctx, gatewayName); err != nil {
+		return err
+	}
+
+	if err := g.deletePodDisruptionBudget(ctx, gatewayName); err != nil {
 		return err
 	}
 

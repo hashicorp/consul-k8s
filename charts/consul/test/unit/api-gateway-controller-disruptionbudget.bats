@@ -33,7 +33,7 @@ load _helpers
 #--------------------------------------------------------------------
 # minAvailable
 
-@test "apiGateway/DisruptionBudget: correct minAvailable with replicas=1" {
+@test "apiGateway/DisruptionBudget: minAvailable taking precedence over maxUnavailable" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/api-gateway-controller-disruptionbudget.yaml  \
@@ -41,9 +41,11 @@ load _helpers
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.disruptionBudget.enabled=true' \
       --set 'apiGateway.image=something' \
-      . | tee /dev/stderr |
-      yq '.spec.minAvailable' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+      --set 'apiGateway.disruptionBudget.maxUnavailable=2' \
+      --set 'apiGateway.disruptionBudget.minAvailable=1' \
+     . | tee /dev/stderr)
+  [ $(echo "$actual" | yq '.spec.minAvailable') = "1" ]
+  [ $(echo "$actual" | yq '.spec.maxUnavailable') = "null" ]
 }
 
 @test "apiGateway/DisruptionBudget: correct minAvailable with replicas=3" {
@@ -54,6 +56,8 @@ load _helpers
       --set 'apiGateway.enabled=true' \
       --set 'apiGateway.disruptionBudget.enabled=true' \
       --set 'apiGateway.image=something' \
+      --set 'apiGateway.disruptionBudget.maxUnavailable=2' \
+      --set 'apiGateway.disruptionBudget.minAvailable=1' \
       . | tee /dev/stderr |
       yq '.spec.minAvailable' | tee /dev/stderr)
   [ "${actual}" = "1" ]

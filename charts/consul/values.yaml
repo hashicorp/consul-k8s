@@ -987,6 +987,11 @@ server:
     # @type: integer
     maxUnavailable: null
 
+    # The minimum number of available pods.
+    # Takes precedence over maxUnavailable if set.
+    # @type: integer
+    minAvailable: null
+
   # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
   # servers. This will be saved as-is into a ConfigMap that is read by the Consul
   # server agents. This can be used to add additional configuration that
@@ -2946,27 +2951,31 @@ ingressGateways:
   # @type: string
   logLevel: ""
 
-  # This configures the [`PodDisruptionBudget`](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
-  # for the ingress gateways.
-  disruptionBudget:
-    # Enables registering a PodDisruptionBudget for the ingress gateways
-    # If enabled, it only registers the budget so long as
-    # the ingress gateways is enabled. To disable, set to `false`.
-    enabled: true
-
-    # The maximum number of unavailable pods. By default, minAvailable will be set to 1
-    # If you need to set this to some value, you will need to add a
-    # --set 'ingressGateways.disruptionBudget.maxUnavailable=<value>'` flag to the helm chart installation
-    # @type: integer
-    maxUnavailable: null
-
-
   # Defaults sets default values for all gateway fields. With the exception
   # of annotations, defining any of these values in the `gateways` list
   # will override the default values provided here. Annotations will
   # include both the default annotations and any additional ones defined
   # for a specific gateway.
   defaults:
+    # This configures the [`PodDisruptionBudget`](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
+    # for the ingress gateways.
+    disruptionBudget:
+      # Enables registering a PodDisruptionBudget for the ingress gateways
+      # If enabled, it only registers the budget so long as
+      # the ingress gateways is enabled. To disable, set to `false`.
+      enabled: true
+
+      # The maximum number of unavailable pods. By default, minAvailable will be set to 1
+      # If you need to set this to some value, you will need to add a
+      # --set 'ingressGateways.disruptionBudget.maxUnavailable=<value>'` flag to the helm chart installation
+      # @type: integer
+      maxUnavailable: null
+
+      # The minimum number of available pods.
+      # Takes precedence over maxUnavailable if set.
+      # @type: integer
+      minAvailable: null
+
     # Number of replicas for each ingress gateway defined.
     replicas: 1
 
@@ -3132,26 +3141,32 @@ terminatingGateways:
   # @type: string
   logLevel: ""
 
-  # This configures the [`PodDisruptionBudget`](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
-  # for the terminating gateways.
-  disruptionBudget:
-    # Enables registering a PodDisruptionBudget for the terminating gateways
-    # If enabled, it only registers the budget so long as
-    # the terminating gateways is enabled. To disable, set to `false`.
-    enabled: true
-
-    # The maximum number of unavailable pods. By default, minAvailable will be set to 1
-    # If you need to set this to some value, you will need to add a
-    # --set 'terminatingGateways.disruptionBudget.maxUnavailable=<value>'` flag to the helm chart installation
-    # @type: integer
-    maxUnavailable: null
-
   # Defaults sets default values for all gateway fields. With the exception
   # of annotations, defining any of these values in the `gateways` list
   # will override the default values provided here. Annotations will
   # include both the default annotations and any additional ones defined
   # for a specific gateway.
   defaults:
+
+    # This configures the [`PodDisruptionBudget`](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
+    # for the terminating gateways.
+    disruptionBudget:
+      # Enables registering a PodDisruptionBudget for the terminating gateways
+      # If enabled, it only registers the budget so long as
+      # the terminating gateways is enabled. To disable, set to `false`.
+      enabled: true
+
+      # The maximum number of unavailable pods. By default, minAvailable will be set to 1
+      # If you need to set this to some value, you will need to add a
+      # --set 'terminatingGateways.disruptionBudget.maxUnavailable=<value>'` flag to the helm chart installation
+      # @type: integer
+      maxUnavailable: null
+
+      # The minimum number of available pods.
+      # Takes precedence over maxUnavailable if set.
+      # @type: integer
+      minAvailable: null
+
     # Number of replicas for each terminating gateway defined.
     replicas: 1
 
@@ -3299,6 +3314,11 @@ apiGateway:
     # --set 'apiGateway.disruptionBudget.maxUnavailable=0'` flag to the helm chart installation
     # @type: integer
     maxUnavailable: null
+
+    # The minimum number of available pods.
+    # Takes precedence over maxUnavailable if set.
+    # @type: integer
+    minAvailable: null
 
   # The name (and tag) of the Envoy Docker image used for the
   # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.

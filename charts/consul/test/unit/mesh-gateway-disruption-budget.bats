@@ -45,16 +45,18 @@ load _helpers
 #--------------------------------------------------------------------
 # minAvailable
 
-@test "meshGateway/DisruptionBudget: correct minAvailable with replicas=1" {
+@test "meshGateway/DisruptionBudget: minAvailable taking precedence over maxUnavailable" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/mesh-gateway-disruptionbudget.yaml  \
       --set 'meshGateway.replicas=1' \
        --set 'meshGateway.enabled=true' \
       --set 'meshGateway.disruptionBudget.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.minAvailable' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+      --set 'meshGateway.disruptionBudget.maxUnavailable=2' \
+      --set 'meshGateway.disruptionBudget.minAvailable=1' \
+      . | tee /dev/stderr)
+  [ $(echo "$actual" | yq '.spec.minAvailable') = "1" ]
+  [ $(echo "$actual" | yq '.spec.maxUnavailable') = "null" ]
 }
 
 @test "meshGateway/DisruptionBudget: correct minAvailable with replicas=3" {
@@ -64,6 +66,8 @@ load _helpers
       --set 'meshGateway.replicas=3' \
        --set 'meshGateway.enabled=true' \
       --set 'meshGateway.disruptionBudget.enabled=true' \
+      --set 'meshGateway.disruptionBudget.maxUnavailable=2' \
+      --set 'meshGateway.disruptionBudget.minAvailable=1' \
       . | tee /dev/stderr |
       yq '.spec.minAvailable' | tee /dev/stderr)
   [ "${actual}" = "1" ]

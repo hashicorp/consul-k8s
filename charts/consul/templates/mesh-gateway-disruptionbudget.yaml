@@ -17,10 +17,10 @@ metadata:
     release: {{ .Release.Name }}
     component: mesh-gateway
 spec:
-  {{- if .Values.meshGateway.disruptionBudget.maxUnavailable }}
+  {{- if .Values.meshGateway.disruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.meshGateway.disruptionBudget.minAvailable }}
+  {{- else if .Values.meshGateway.disruptionBudget.maxUnavailable }}
   maxUnavailable: {{ .Values.meshGateway.disruptionBudget.maxUnavailable }}
-  {{- else }}
-  minAvailable: 1
   {{- end }}
   selector:
     matchLabels:

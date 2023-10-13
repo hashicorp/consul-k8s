@@ -17,10 +17,10 @@ metadata:
     release: {{ .Release.Name }}
     component: api-gateway-controller
 spec:
-  {{- if .Values.apiGateway.disruptionBudget.maxUnavailable }}
+  {{- if .Values.apiGateway.disruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.apiGateway.disruptionBudget.minAvailable }}
+  {{- else if .Values.apiGateway.disruptionBudget.maxUnavailable }}
   maxUnavailable: {{ .Values.apiGateway.disruptionBudget.maxUnavailable }}
-  {{- else }}
-  minAvailable: 1
   {{- end }}
   selector:
     matchLabels:
