@@ -8,6 +8,7 @@ package pod
 import (
 	"context"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
@@ -673,6 +674,11 @@ func runControllerTest(t *testing.T, tc testCase) {
 
 	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
 
 	// Create the partition in Consul.
 	if tc.partition != "" {

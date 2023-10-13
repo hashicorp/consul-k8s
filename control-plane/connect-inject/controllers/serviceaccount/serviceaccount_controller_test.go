@@ -6,6 +6,7 @@ package serviceaccount
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
@@ -242,6 +243,11 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	}
 	resourceClient, err := consul.NewResourceServiceClient(sa.ConsulServerConnMgr)
 	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
 
 	// Default ns and partition if not specified in test.
 	if tc.targetConsulNs == "" {

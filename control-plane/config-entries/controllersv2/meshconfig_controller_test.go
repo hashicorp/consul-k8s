@@ -145,6 +145,11 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 			require.NoError(t, err)
 
+			require.Eventually(t, func() bool {
+				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond)
+
 			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 			namespacedName := types.NamespacedName{
 				Namespace: metav1.NamespaceDefault,
@@ -284,6 +289,12 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 			})
 			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 			require.NoError(t, err)
+
+			require.Eventually(t, func() bool {
+				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond)
+
 			// We haven't run reconcile yet, so we must create the MeshConfig
 			// in Consul ourselves.
 			{
@@ -400,6 +411,11 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 			require.NoError(t, err)
 
+			require.Eventually(t, func() bool {
+				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+				return err == nil
+			}, 5*time.Second, 500*time.Millisecond)
+
 			// We haven't run reconcile yet, so we must create the config entry
 			// in Consul ourselves.
 			{
@@ -465,6 +481,11 @@ func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
 	})
+
+	require.Eventually(t, func() bool {
+		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
 
 	// Stop the server before calling reconcile imitating a server that's not running.
 	_ = testClient.TestServer.Stop()
@@ -547,6 +568,11 @@ func TestMeshConfigController_setsSyncedToTrue(t *testing.T) {
 	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 	require.NoError(t, err)
 
+	require.Eventually(t, func() bool {
+		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
+
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
 		Log:    logrtest.New(t),
@@ -621,6 +647,11 @@ func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
 	})
 	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
 
 	unmanagedResource := trafficpermissions.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
 	unmanagedResource.Metadata = make(map[string]string) // Zero out the metadata
@@ -724,6 +755,11 @@ func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
 	})
 	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
 
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,

@@ -294,13 +294,13 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 			},
 			updateF: func(resource common.ConfigEntryResource) {
 				sg := resource.(*v1alpha1.SamenessGroup)
-				sg.Spec.IncludeLocal = false
+				sg.Spec.DefaultForFailover = false
 			},
 			compare: func(t *testing.T, consulEntry capi.ConfigEntry) {
 				resource, ok := consulEntry.(*capi.SamenessGroupConfigEntry)
 				require.True(t, ok, "cast error")
-				require.Equal(t, true, resource.DefaultForFailover)
-				require.Equal(t, false, resource.IncludeLocal)
+				require.Equal(t, false, resource.DefaultForFailover)
+				require.Equal(t, true, resource.IncludeLocal)
 				require.Equal(t, "dc1", resource.Members[0].Peer)
 				require.Equal(t, "", resource.Members[0].Partition)
 			},
