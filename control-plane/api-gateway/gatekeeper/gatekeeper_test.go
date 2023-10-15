@@ -6,7 +6,6 @@ package gatekeeper
 import (
 	"context"
 	"fmt"
-	v1 "k8s.io/api/policy/v1"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
@@ -15,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,7 +73,7 @@ type resources struct {
 	roleBindings    []*rbac.RoleBinding
 	services        []*corev1.Service
 	serviceAccounts []*corev1.ServiceAccount
-	pdbs            []*v1.PodDisruptionBudget
+	pdbs            []*policyv1.PodDisruptionBudget
 }
 
 func TestUpsert(t *testing.T) {
@@ -738,14 +738,14 @@ func TestUpsert(t *testing.T) {
 						DefaultInstances: common.PointerTo(int32(3)),
 						MaxInstances:     common.PointerTo(int32(3)),
 						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:        true,
+							MinAvailable:   &intstr.IntOrString{IntVal: 1},
+							MaxUnavailable: &intstr.IntOrString{IntVal: 2},
+						},
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
-					PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
-						Enabled:        true,
-						MinAvailable:   &intstr.IntOrString{IntVal: 1},
-						MaxUnavailable: &intstr.IntOrString{IntVal: 2},
-					},
 				},
 			},
 			helmConfig:       common.HelmConfig{},
@@ -757,8 +757,8 @@ func TestUpsert(t *testing.T) {
 				roles:           []*rbac.Role{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
-				pdbs: []*v1.PodDisruptionBudget{
-					configurePodDisruptionBudget(name, namespace, labels, &intstr.IntOrString{IntVal: 1}, &intstr.IntOrString{IntVal: 2}, "1"),
+				pdbs: []*policyv1.PodDisruptionBudget{
+					configurePodDisruptionBudget(name, namespace, labels, &intstr.IntOrString{IntVal: 1}, nil, "1"),
 				},
 			},
 		},
@@ -781,13 +781,13 @@ func TestUpsert(t *testing.T) {
 						DefaultInstances: common.PointerTo(int32(3)),
 						MaxInstances:     common.PointerTo(int32(3)),
 						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:      true,
+							MinAvailable: &intstr.IntOrString{IntVal: 1},
+						},
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
-					PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
-						Enabled:      true,
-						MinAvailable: &intstr.IntOrString{IntVal: 1},
-					},
 				},
 			},
 			helmConfig:       common.HelmConfig{},
@@ -799,7 +799,7 @@ func TestUpsert(t *testing.T) {
 				roles:           []*rbac.Role{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
-				pdbs: []*v1.PodDisruptionBudget{
+				pdbs: []*policyv1.PodDisruptionBudget{
 					configurePodDisruptionBudget(name, namespace, labels, &intstr.IntOrString{IntVal: 1}, nil, "1"),
 				},
 			},
@@ -823,13 +823,13 @@ func TestUpsert(t *testing.T) {
 						DefaultInstances: common.PointerTo(int32(3)),
 						MaxInstances:     common.PointerTo(int32(3)),
 						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:        true,
+							MaxUnavailable: &intstr.IntOrString{IntVal: 1},
+						},
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
-					PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
-						Enabled:        true,
-						MaxUnavailable: &intstr.IntOrString{IntVal: 1},
-					},
 				},
 			},
 			helmConfig:       common.HelmConfig{},
@@ -841,7 +841,7 @@ func TestUpsert(t *testing.T) {
 				roles:           []*rbac.Role{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
-				pdbs: []*v1.PodDisruptionBudget{
+				pdbs: []*policyv1.PodDisruptionBudget{
 					configurePodDisruptionBudget(name, namespace, labels, nil, &intstr.IntOrString{IntVal: 1}, "1"),
 				},
 			},
@@ -865,14 +865,14 @@ func TestUpsert(t *testing.T) {
 						DefaultInstances: common.PointerTo(int32(3)),
 						MaxInstances:     common.PointerTo(int32(3)),
 						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:        true,
+							MinAvailable:   nil,
+							MaxUnavailable: nil,
+						},
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
-					PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
-						Enabled:        true,
-						MinAvailable:   nil,
-						MaxUnavailable: nil,
-					},
 				},
 			},
 			helmConfig:       common.HelmConfig{},
@@ -884,7 +884,7 @@ func TestUpsert(t *testing.T) {
 				roles:           []*rbac.Role{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
-				pdbs: []*v1.PodDisruptionBudget{
+				pdbs: []*policyv1.PodDisruptionBudget{
 					configurePodDisruptionBudget(name, namespace, labels, nil, nil, "1"),
 				},
 			},
@@ -908,12 +908,12 @@ func TestUpsert(t *testing.T) {
 						DefaultInstances: common.PointerTo(int32(3)),
 						MaxInstances:     common.PointerTo(int32(3)),
 						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled: false,
+						},
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
-					PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
-						Enabled: false,
-					},
 				},
 			},
 			helmConfig:       common.HelmConfig{},
@@ -925,7 +925,7 @@ func TestUpsert(t *testing.T) {
 				roles:           []*rbac.Role{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
-				pdbs:            []*v1.PodDisruptionBudget{},
+				pdbs:            []*policyv1.PodDisruptionBudget{},
 			},
 		},
 	}
@@ -938,7 +938,7 @@ func TestUpsert(t *testing.T) {
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
-			require.NoError(t, v1.AddToScheme(s))
+			require.NoError(t, policyv1.AddToScheme(s))
 
 			log := logrtest.New(t)
 
@@ -1129,14 +1129,14 @@ func TestDelete(t *testing.T) {
 						DefaultInstances: common.PointerTo(int32(3)),
 						MaxInstances:     common.PointerTo(int32(3)),
 						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:        true,
+							MinAvailable:   &intstr.IntOrString{IntVal: 1},
+							MaxUnavailable: &intstr.IntOrString{IntVal: 2},
+						},
 					},
 					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
-					PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
-						Enabled:        true,
-						MinAvailable:   &intstr.IntOrString{IntVal: 1},
-						MaxUnavailable: &intstr.IntOrString{IntVal: 2},
-					},
 				},
 			},
 			helmConfig: common.HelmConfig{},
@@ -1144,7 +1144,7 @@ func TestDelete(t *testing.T) {
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
-				pdbs: []*v1.PodDisruptionBudget{
+				pdbs: []*policyv1.PodDisruptionBudget{
 					configurePodDisruptionBudget(name, namespace, labels, &intstr.IntOrString{IntVal: 1}, &intstr.IntOrString{IntVal: 2}, "1"),
 				},
 			},
@@ -1153,7 +1153,7 @@ func TestDelete(t *testing.T) {
 				roles:           []*rbac.Role{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
-				pdbs:            []*v1.PodDisruptionBudget{},
+				pdbs:            []*policyv1.PodDisruptionBudget{},
 			},
 		},
 	}
@@ -1166,7 +1166,7 @@ func TestDelete(t *testing.T) {
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
-			require.NoError(t, v1.AddToScheme(s))
+			require.NoError(t, policyv1.AddToScheme(s))
 
 			log := logrtest.New(t)
 
@@ -1308,7 +1308,7 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 	}
 
 	for _, expected := range resources.pdbs {
-		actual := &v1.PodDisruptionBudget{}
+		actual := &policyv1.PodDisruptionBudget{}
 		err := client.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1391,7 +1391,7 @@ func validateResourcesAreDeleted(t *testing.T, k8sClient client.Client, resource
 	}
 
 	for _, expected := range resources.pdbs {
-		actual := &v1.PodDisruptionBudget{}
+		actual := &policyv1.PodDisruptionBudget{}
 		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1591,8 +1591,8 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 	}
 }
 
-func configurePodDisruptionBudget(name, namespace string, labels map[string]string, minAvailable, maxUnavailable *intstr.IntOrString, resourceVersion string) *v1.PodDisruptionBudget {
-	return &v1.PodDisruptionBudget{
+func configurePodDisruptionBudget(name, namespace string, labels map[string]string, minAvailable, maxUnavailable *intstr.IntOrString, resourceVersion string) *policyv1.PodDisruptionBudget {
+	return &policyv1.PodDisruptionBudget{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "policy/v1",
 			Kind:       "PodDisruptionBudget",
@@ -1612,7 +1612,7 @@ func configurePodDisruptionBudget(name, namespace string, labels map[string]stri
 				},
 			},
 		},
-		Spec: v1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable:   minAvailable,
 			MaxUnavailable: maxUnavailable,
 			Selector: &metav1.LabelSelector{

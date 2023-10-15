@@ -2,80 +2,60 @@ package gatekeeper
 
 import (
 	"context"
+	"errors"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	v1 "k8s.io/api/policy/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
+	policyv1 "k8s.io/api/policy/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 func (g *Gatekeeper) upsertPodDisruptionBudget(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
-	if gcc.Spec.PodDisruptionBudgetSpec == nil || !gcc.Spec.PodDisruptionBudgetSpec.Enabled {
+	if gcc.Spec.DeploymentSpec.PodDisruptionBudgetSpec == nil || !gcc.Spec.DeploymentSpec.PodDisruptionBudgetSpec.Enabled {
 		return g.deletePodDisruptionBudget(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
-	pdb := g.podDisruptionBudget(ctx, gateway, gcc, config)
-	mutated := pdb.DeepCopy()
-	mutator := newPodDisruptionBudgetMutator(pdb, mutated, gateway, g.Client.Scheme())
+	pdb := &policyv1.PodDisruptionBudget{}
+	exists := false
 
-	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
-	if err != nil {
+	// Get PDB if it exists.
+	err := g.Client.Get(ctx, g.namespacedName(gateway), pdb)
+	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
+	} else if k8serrors.IsNotFound(err) {
+		exists = false
+	} else {
+		exists = true
 	}
 
-	switch result {
-	case controllerutil.OperationResultCreated:
-		g.Log.V(1).Info("Created Service")
-	case controllerutil.OperationResultUpdated:
-		g.Log.V(1).Info("Updated Service")
-	case controllerutil.OperationResultNone:
-		g.Log.V(1).Info("No change to service")
+	if exists {
+		// Ensure we own the PDB.
+		for _, ref := range pdb.GetOwnerReferences() {
+			if ref.UID == gateway.GetUID() && ref.Name == gateway.GetName() {
+				// We found ourselves!
+				return nil
+			}
+		}
+		return errors.New("PDB not owned by controller")
+	}
+
+	// Create the PDB.
+	pdb = g.podDisruptionBudget(gateway, gcc)
+	if err := ctrl.SetControllerReference(&gateway, pdb, g.Client.Scheme()); err != nil {
+		return err
+	}
+	if err := g.Client.Create(ctx, pdb); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func mergePDB(from, to *v1.PodDisruptionBudget) *v1.PodDisruptionBudget {
-	if arePDBsEqual(from, to) {
-		return to
-	}
-
-	to.ObjectMeta.Name = from.ObjectMeta.Name
-	to.ObjectMeta.Namespace = from.ObjectMeta.Namespace
-	to.Spec.Selector = from.Spec.Selector
-	to.Spec.MinAvailable = from.Spec.MinAvailable
-	to.Spec.MaxUnavailable = from.Spec.MaxUnavailable
-
-	return to
-}
-
-func arePDBsEqual(a, b *v1.PodDisruptionBudget) bool {
-	if a.ObjectMeta.GetName() != b.ObjectMeta.GetName() ||
-		a.ObjectMeta.GetNamespace() != b.ObjectMeta.GetNamespace() ||
-		!equality.Semantic.DeepEqual(a.Spec.Selector, b.Spec.Selector) ||
-		a.Spec.MinAvailable != b.Spec.MinAvailable ||
-		a.Spec.MaxUnavailable != b.Spec.MaxUnavailable {
-		return false
-	}
-
-	return true
-}
-
-func newPodDisruptionBudgetMutator(pdb, mutated *v1.PodDisruptionBudget, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
-	return func() error {
-		mutated = mergePDB(pdb, mutated)
-		return ctrl.SetControllerReference(&gateway, mutated, scheme)
-	}
-}
-
 func (g *Gatekeeper) deletePodDisruptionBudget(ctx context.Context, gwName types.NamespacedName) error {
-	if err := g.Client.Delete(ctx, &v1.PodDisruptionBudget{ObjectMeta: metav1.ObjectMeta{Name: gwName.Name, Namespace: gwName.Namespace}}); err != nil {
+	if err := g.Client.Delete(ctx, &policyv1.PodDisruptionBudget{ObjectMeta: metav1.ObjectMeta{Name: gwName.Name, Namespace: gwName.Namespace}}); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
 		}
@@ -86,8 +66,8 @@ func (g *Gatekeeper) deletePodDisruptionBudget(ctx context.Context, gwName types
 }
 
 // https://kubernetes.io/docs/reference/kubernetes-api/policy-resources/pod-disruption-budget-v1/#PodDisruptionBudgetSpec
-func (g *Gatekeeper) podDisruptionBudget(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) *v1.PodDisruptionBudget {
-	pdb := &v1.PodDisruptionBudget{
+func (g *Gatekeeper) podDisruptionBudget(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) *policyv1.PodDisruptionBudget {
+	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      gateway.Name,
 			Namespace: gateway.Namespace,
@@ -95,18 +75,17 @@ func (g *Gatekeeper) podDisruptionBudget(ctx context.Context, gateway gwv1beta1.
 		},
 	}
 
-	pdb.Spec = v1.PodDisruptionBudgetSpec{
+	pdb.Spec = policyv1.PodDisruptionBudgetSpec{
 		Selector: &metav1.LabelSelector{
 			MatchLabels: common.LabelsForGateway(&gateway),
 		},
 	}
 
-	if gcc.Spec.PodDisruptionBudgetSpec.MinAvailable != nil {
-		pdb.Spec.MinAvailable = gcc.Spec.PodDisruptionBudgetSpec.MinAvailable
-	}
-
-	if gcc.Spec.PodDisruptionBudgetSpec.MaxUnavailable != nil {
-		pdb.Spec.MaxUnavailable = gcc.Spec.PodDisruptionBudgetSpec.MaxUnavailable
+	// if both minAvailable and maxUnavailable are set, minAvailable takes precedence
+	if gcc.Spec.DeploymentSpec.PodDisruptionBudgetSpec.MinAvailable != nil {
+		pdb.Spec.MinAvailable = gcc.Spec.DeploymentSpec.PodDisruptionBudgetSpec.MinAvailable
+	} else if gcc.Spec.DeploymentSpec.PodDisruptionBudgetSpec.MaxUnavailable != nil {
+		pdb.Spec.MaxUnavailable = gcc.Spec.DeploymentSpec.PodDisruptionBudgetSpec.MaxUnavailable
 	}
 
 	return pdb

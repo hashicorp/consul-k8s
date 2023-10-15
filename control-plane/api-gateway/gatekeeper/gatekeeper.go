@@ -66,6 +66,11 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedName) error {
 	g.Log.V(1).Info(fmt.Sprintf("Delete Gateway Deployment %s/%s", gatewayName.Namespace, gatewayName.Name))
 
+	// Delete pdb first, otherwise the respective apps won't get deleted
+	if err := g.deletePodDisruptionBudget(ctx, gatewayName); err != nil {
+		return err
+	}
+
 	if err := g.deleteDeployment(ctx, gatewayName); err != nil {
 		return err
 	}
@@ -83,10 +88,6 @@ func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedNam
 	}
 
 	if err := g.deleteRole(ctx, gatewayName); err != nil {
-		return err
-	}
-
-	if err := g.deletePodDisruptionBudget(ctx, gatewayName); err != nil {
 		return err
 	}
 

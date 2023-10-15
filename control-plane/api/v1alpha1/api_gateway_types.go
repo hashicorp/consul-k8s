@@ -66,9 +66,6 @@ type GatewayClassConfigSpec struct {
 
 	// The value to add to privileged ports ( ports < 1024) for gateway containers
 	MapPrivilegedContainerPorts int32 `json:"mapPrivilegedContainerPorts,omitempty"`
-
-	// The value to add pod disruption budgets, will prevent gateway pods from being evicted all at once.
-	PodDisruptionBudgetSpec *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 }
 
 type PodDisruptionBudgetSpec struct {
@@ -98,6 +95,9 @@ type DeploymentSpec struct {
 
 	// Resources defines the resource requirements for the gateway.
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// The value to add pod disruption budgets, will prevent gateway pods from being evicted all at once.
+	PodDisruptionBudgetSpec *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 }
 
 //+kubebuilder:object:generate=true
