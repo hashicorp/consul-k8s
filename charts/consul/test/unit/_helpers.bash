@@ -3,7 +3,7 @@
 
 # chart_dir returns the directory for the chart
 chart_dir() {
-    echo /Users/kumarkavish/consul-k8s/charts/consul/
+    echo ${BATS_TEST_DIRNAME}/../..
 }
 
 # Usage: assert_empty helm template -s <template> [flags] .
