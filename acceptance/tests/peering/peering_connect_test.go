@@ -19,8 +19,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Test that Connect works in installations for X-Peers networking.
-func TestPeering_Connect(t *testing.T) {
+// This test validates that service mesh works properly across two peered clusters.
+// It deploys a static client in one cluster and a static server in another and checks that requests from the client
+// can reach the server. It also deploys a static server pod that is not connected to the mesh, but added as a
+// destination for a terminating gateway. It checks that requests from the client can reach this server through the
+// terminating gateway via the mesh gateways.
+func TestPeering_Connect2(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -32,6 +36,9 @@ func TestPeering_Connect(t *testing.T) {
 
 	const staticServerPeer = "server"
 	const staticClientPeer = "client"
+
+	const externalServerNamespace = "external"
+
 	cases := []struct {
 		name        string
 		ACLsEnabled bool
@@ -69,7 +76,9 @@ func TestPeering_Connect(t *testing.T) {
 			}
 
 			staticServerPeerHelmValues := map[string]string{
-				"global.datacenter": staticServerPeer,
+				"global.datacenter":            staticServerPeer,
+				"terminatingGateways.enabled":  "true",
+				"terminatingGateways.replicas": "1",
 			}
 
 			if !cfg.UseKind {
@@ -176,26 +185,36 @@ func TestPeering_Connect(t *testing.T) {
 				ConfigPath:  staticServerPeerClusterContext.KubectlOptions(t).ConfigPath,
 				Namespace:   staticServerNamespace,
 			}
+			externalServerOpts := &terratestk8s.KubectlOptions{
+				ContextName: staticServerPeerClusterContext.KubectlOptions(t).ContextName,
+				ConfigPath:  staticServerPeerClusterContext.KubectlOptions(t).ConfigPath,
+				Namespace:   externalServerNamespace,
+			}
 			staticClientOpts := &terratestk8s.KubectlOptions{
 				ContextName: staticClientPeerClusterContext.KubectlOptions(t).ContextName,
 				ConfigPath:  staticClientPeerClusterContext.KubectlOptions(t).ConfigPath,
 				Namespace:   staticClientNamespace,
 			}
 
-			logger.Logf(t, "creating namespaces %s in server peer", staticServerNamespace)
+			logger.Logf(t, "creating namespace %s in server peer", staticServerNamespace)
 			k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
-			logger.Logf(t, "creating namespaces %s in client peer", staticClientNamespace)
+			logger.Logf(t, "creating namespace %s in server peer", externalServerNamespace)
+			k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", externalServerNamespace)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", externalServerNamespace)
+			})
+
+			logger.Logf(t, "creating namespace %s in client peer", staticClientNamespace)
 			k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "create", "ns", staticClientNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
-			// Create a ProxyDefaults resource to configure services to use the mesh
-			// gateways.
+			// Create a ProxyDefaults resource to configure services to use the mesh gateways.
 			logger.Log(t, "creating proxy-defaults config")
 			kustomizeDir := "../fixtures/bases/mesh-gateway"
 
@@ -249,6 +268,12 @@ func TestPeering_Connect(t *testing.T) {
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default")
 			})
+
+			// Create the external server in the server Kubernetes cluster, outside the mesh.
+			logger.Log(t, "creating external-server in server peer")
+			k8s.DeployKustomize(t, externalServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+
+			// Add a service default to set the external server as a destination for the terminating gateway.
 
 			if c.ACLsEnabled {
 				logger.Log(t, "checking that the connection is not successful because there's no allow intention")
