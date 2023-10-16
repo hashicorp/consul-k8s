@@ -17,7 +17,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type TrafficPermissionsWebhook struct {
+type GRPCRouteWebhook struct {
 	Logger logr.Logger
 
 	// ConsulTenancyConfig contains the injector's namespace and partition configuration.
@@ -27,7 +27,7 @@ type TrafficPermissionsWebhook struct {
 	client.Client
 }
 
-var _ common.MeshConfigLister = &TrafficPermissionsWebhook{}
+var _ common.MeshConfigLister = &GRPCRouteWebhook{}
 
 // NOTE: The path value in the below line is the path to the webhook.
 // If it is updated, run code-gen, update subcommand/inject-connect/command.go
@@ -35,10 +35,10 @@ var _ common.MeshConfigLister = &TrafficPermissionsWebhook{}
 //
 // NOTE: The below line cannot be combined with any other comment. If it is it will break the code generation.
 //
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v2beta1-trafficpermissions,mutating=true,failurePolicy=fail,groups=auth.consul.hashicorp.com,resources=trafficpermissions,versions=v2beta1,name=mutate-trafficpermissions.auth.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v2beta1-grpcroute,mutating=true,failurePolicy=fail,groups=auth.consul.hashicorp.com,resources=grpcroute,versions=v2beta1,name=mutate-grpcroute.auth.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
-func (v *TrafficPermissionsWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
-	var resource TrafficPermissions
+func (v *GRPCRouteWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
+	var resource GRPCRoute
 	err := v.decoder.Decode(req, &resource)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
@@ -47,19 +47,19 @@ func (v *TrafficPermissionsWebhook) Handle(ctx context.Context, req admission.Re
 	return common.ValidateMeshConfig(ctx, req, v.Logger, v, &resource, v.ConsulTenancyConfig)
 }
 
-func (v *TrafficPermissionsWebhook) List(ctx context.Context) ([]common.MeshConfig, error) {
-	var resourceList TrafficPermissionsList
+func (v *GRPCRouteWebhook) List(ctx context.Context) ([]common.MeshConfig, error) {
+	var resourceList GRPCRouteList
 	if err := v.Client.List(ctx, &resourceList); err != nil {
 		return nil, err
 	}
 	var entries []common.MeshConfig
 	for _, item := range resourceList.Items {
-		entries = append(entries, common.MeshConfig(&item))
+		entries = append(entries, common.MeshConfig(item))
 	}
 	return entries, nil
 }
 
-func (v *TrafficPermissionsWebhook) InjectDecoder(d *admission.Decoder) error {
+func (v *GRPCRouteWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }

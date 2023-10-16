@@ -1,13 +1,11 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: jwtproviders.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
@@ -107,8 +105,7 @@ spec:
                       cacheDuration:
                         description: "CacheDuration is the duration after which cached
                           keys should be expired. \n Default value is 5 minutes."
-                        format: int64
-                        type: integer
+                        type: string
                       fetchAsynchronously:
                         description: "FetchAsynchronously indicates that the JWKS
                           should be fetched when a client request arrives. Client
@@ -124,8 +121,7 @@ spec:
                             description: The timeout for new network connections to
                               hosts in the cluster. If not set, a default value of
                               5s will be used.
-                            format: int64
-                            type: integer
+                            type: string
                           discoveryType:
                             description: "DiscoveryType refers to the service discovery
                               type to use for resolving the cluster. \n This defaults
@@ -198,15 +194,13 @@ spec:
                                 description: "BaseInterval to be used for the next
                                   back off computation. \n The default value from
                                   envoy is 1s."
-                                format: int64
-                                type: integer
+                                type: string
                               maxInterval:
                                 description: "MaxInternal to be used to specify the
                                   maximum interval between retries. Optional but should
                                   be greater or equal to BaseInterval. \n Defaults
                                   to 10 times BaseInterval."
-                                format: int64
-                                type: integer
+                                type: string
                             type: object
                         type: object
                       uri:
@@ -312,9 +306,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

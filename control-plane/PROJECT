@@ -149,6 +149,6 @@ resources:
   domain: consul.hashicorp.com
   group: auth
   kind: TrafficPermissions
-  path: github.com/hashicorp/consul-k8s/control-plane/api/v2beta1
+  path: github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1
   version: v2beta1
 version: "3"

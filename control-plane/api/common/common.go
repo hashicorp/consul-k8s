@@ -25,6 +25,10 @@ const (
 
 	// V2 config entries.
 	TrafficPermissions string = "trafficpermissions"
+	GRPCRoute          string = "grpcroute"
+	HTTPRoute          string = "httproute"
+	TCPRoute           string = "tcproute"
+	ProxyConfiguration string = "proxyconfiguration"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"
@@ -37,6 +41,10 @@ const (
 	MigrateEntryKey  string = "consul.hashicorp.com/migrate-entry"
 	MigrateEntryTrue string = "true"
 	SourceValue      string = "kubernetes"
+
+	DefaultPartitionName = "default"
+	DefaultNamespaceName = "default"
+	DefaultPeerName      = "local"
 )
 
 // ConsulTenancyConfig manages settings related to Consul namespaces and partitions.

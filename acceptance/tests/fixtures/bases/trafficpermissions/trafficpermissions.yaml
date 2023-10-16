@@ -8,7 +8,7 @@ metadata:
 spec:
   destination:
     identityName: multiport
-  action: allow
+  action: ACTION_ALLOW
   permissions:
     - sources:
         - identityName: static-client

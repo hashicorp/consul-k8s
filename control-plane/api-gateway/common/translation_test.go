@@ -1387,8 +1387,8 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							Namespace: "k8s-ns",
 						},
 						Spec: v1alpha1.RouteTimeoutFilterSpec{
-							RequestTimeout: 10,
-							IdleTimeout:    30,
+							RequestTimeout: metav1.Duration{Duration: 10},
+							IdleTimeout:    metav1.Duration{Duration: 30},
 						},
 					},
 

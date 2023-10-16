@@ -25,9 +25,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -55,14 +55,14 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 					Name:      "my-traffic-permission",
 					Namespace: metav1.NamespaceDefault,
 				},
-				Spec: v2beta1.TrafficPermissionsSpec{
-					Destination: &v2beta1.Destination{
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: v2beta1.ActionAllow,
-					Permissions: v2beta1.Permissions{
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
 						{
-							Sources: v2beta1.Sources{
+							Sources: []*pbauth.Source{
 								{
 									Namespace: "the space namespace space",
 								},
@@ -70,7 +70,7 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: v2beta1.DestinationRules{
+							DestinationRules: []*pbauth.DestinationRule{
 								{
 									PathExact: "/hello",
 									Methods:   []string{"GET", "POST"},
@@ -201,14 +201,14 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 					Name:      "my-traffic-permission",
 					Namespace: metav1.NamespaceDefault,
 				},
-				Spec: v2beta1.TrafficPermissionsSpec{
-					Destination: &v2beta1.Destination{
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: v2beta1.ActionAllow,
-					Permissions: v2beta1.Permissions{
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
 						{
-							Sources: v2beta1.Sources{
+							Sources: []*pbauth.Source{
 								{
 									Namespace: "the space namespace space",
 								},
@@ -216,7 +216,7 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: v2beta1.DestinationRules{
+							DestinationRules: []*pbauth.DestinationRule{
 								{
 									PathExact: "/hello",
 									Methods:   []string{"GET", "POST"},
@@ -263,7 +263,7 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 			},
 			updateF: func(resource common.MeshConfig) {
 				trafficPermissions := resource.(*v2beta1.TrafficPermissions)
-				trafficPermissions.Spec.Action = "deny"
+				trafficPermissions.Spec.Action = pbauth.Action_ACTION_DENY
 				trafficPermissions.Spec.Permissions[0].Sources = trafficPermissions.Spec.Permissions[0].Sources[:1]
 			},
 			unmarshal: func(t *testing.T, resource *pbresource.Resource) proto.Message {
@@ -358,14 +358,14 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 					Finalizers:        []string{FinalizerName},
 				},
-				Spec: v2beta1.TrafficPermissionsSpec{
-					Destination: &v2beta1.Destination{
+				Spec: pbauth.TrafficPermissions{
+					Destination: &pbauth.Destination{
 						IdentityName: "destination-identity",
 					},
-					Action: v2beta1.ActionAllow,
-					Permissions: v2beta1.Permissions{
+					Action: pbauth.Action_ACTION_ALLOW,
+					Permissions: []*pbauth.Permission{
 						{
-							Sources: v2beta1.Sources{
+							Sources: []*pbauth.Source{
 								{
 									Namespace: "the space namespace space",
 								},
@@ -373,7 +373,7 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: v2beta1.DestinationRules{
+							DestinationRules: []*pbauth.DestinationRule{
 								{
 									PathExact: "/hello",
 									Methods:   []string{"GET", "POST"},
@@ -457,14 +457,14 @@ func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: v2beta1.TrafficPermissionsSpec{
-			Destination: &v2beta1.Destination{
+		Spec: pbauth.TrafficPermissions{
+			Destination: &pbauth.Destination{
 				IdentityName: "destination-identity",
 			},
-			Action: v2beta1.ActionAllow,
-			Permissions: v2beta1.Permissions{
+			Action: pbauth.Action_ACTION_ALLOW,
+			Permissions: []*pbauth.Permission{
 				{
-					Sources: v2beta1.Sources{
+					Sources: []*pbauth.Source{
 						{
 							IdentityName: "source-identity",
 						},
@@ -533,14 +533,14 @@ func TestMeshConfigController_setsSyncedToTrue(t *testing.T) {
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: v2beta1.TrafficPermissionsSpec{
-			Destination: &v2beta1.Destination{
+		Spec: pbauth.TrafficPermissions{
+			Destination: &pbauth.Destination{
 				IdentityName: "destination-identity",
 			},
-			Action: v2beta1.ActionAllow,
-			Permissions: v2beta1.Permissions{
+			Action: pbauth.Action_ACTION_ALLOW,
+			Permissions: []*pbauth.Permission{
 				{
-					Sources: v2beta1.Sources{
+					Sources: []*pbauth.Source{
 						{
 							IdentityName: "source-identity",
 						},
@@ -620,14 +620,14 @@ func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: v2beta1.TrafficPermissionsSpec{
-			Destination: &v2beta1.Destination{
+		Spec: pbauth.TrafficPermissions{
+			Destination: &pbauth.Destination{
 				IdentityName: "destination-identity",
 			},
-			Action: v2beta1.ActionAllow,
-			Permissions: v2beta1.Permissions{
+			Action: pbauth.Action_ACTION_ALLOW,
+			Permissions: []*pbauth.Permission{
 				{
-					Sources: v2beta1.Sources{
+					Sources: []*pbauth.Source{
 						{
 							IdentityName: "source-identity",
 							Namespace:    common.DefaultConsulNamespace,
@@ -728,14 +728,14 @@ func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
 			DeletionTimestamp: &metav1.Time{Time: time.Now()},
 			Finalizers:        []string{FinalizerName},
 		},
-		Spec: v2beta1.TrafficPermissionsSpec{
-			Destination: &v2beta1.Destination{
+		Spec: pbauth.TrafficPermissions{
+			Destination: &pbauth.Destination{
 				IdentityName: "destination-identity",
 			},
-			Action: v2beta1.ActionAllow,
-			Permissions: v2beta1.Permissions{
+			Action: pbauth.Action_ACTION_ALLOW,
+			Permissions: []*pbauth.Permission{
 				{
-					Sources: v2beta1.Sources{
+					Sources: []*pbauth.Source{
 						{
 							IdentityName: "source-identity",
 							Namespace:    common.DefaultConsulNamespace,

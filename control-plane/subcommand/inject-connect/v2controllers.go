@@ -11,8 +11,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v2beta1"
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/config-entries/controllersv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpointsv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
@@ -140,6 +141,42 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.TrafficPermissions)
 		return err
 	}
+	if err := (&controllersv2.GRPCRouteController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.GRPCRoute),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.GRPCRoute)
+		return err
+	}
+	if err := (&controllersv2.HTTPRouteController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.HTTPRoute),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.HTTPRoute)
+		return err
+	}
+	if err := (&controllersv2.TCPRouteController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.TCPRoute),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.TCPRoute)
+		return err
+	}
+	if err := (&controllersv2.ProxyConfigurationController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.ProxyConfiguration),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.ProxyConfiguration)
+		return err
+	}
 
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
@@ -187,9 +224,33 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		}})
 
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-trafficpermissions",
-		&ctrlRuntimeWebhook.Admission{Handler: &v2beta1.TrafficPermissionsWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &authv2beta1.TrafficPermissionsWebhook{
 			Client:              mgr.GetClient(),
 			Logger:              ctrl.Log.WithName("webhooks").WithName(common.TrafficPermissions),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-proxyconfigurations",
+		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.ProxyConfigurationWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.ProxyConfiguration),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-httproute",
+		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.HTTPRouteWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.HTTPRoute),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-grpcroute",
+		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.GRPCRouteWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.GRPCRoute),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-tcproute",
+		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.TCPRouteWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.TCPRoute),
 			ConsulTenancyConfig: consulTenancyConfig,
 		}})
 
