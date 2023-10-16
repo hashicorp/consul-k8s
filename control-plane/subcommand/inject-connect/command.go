@@ -234,7 +234,7 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 	c.flagSet.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
-		"Enable of disable Consul V2 Resource APIs.")
+		"Enable or disable Consul V2 Resource APIs.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")

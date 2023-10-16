@@ -2228,7 +2228,7 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 		writeReq := &pbresource.WriteRequest{Resource: tc.existingResource}
 		_, err = resourceClient.Write(context.Background(), writeReq)
 		require.NoError(t, err)
-		test.ResourceHasPersisted(t, resourceClient, tc.existingResource.Id)
+		test.ResourceHasPersisted(t, context.Background(), resourceClient, tc.existingResource.Id)
 	}
 
 	// Run actual reconcile and verify results.

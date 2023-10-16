@@ -309,7 +309,7 @@ func loadResource(t *testing.T, client pbresource.ResourceServiceClient, id *pbr
 	req := &pbresource.WriteRequest{Resource: resource}
 	_, err = client.Write(context.Background(), req)
 	require.NoError(t, err)
-	test.ResourceHasPersisted(t, client, id)
+	test.ResourceHasPersisted(t, context.Background(), client, id)
 }
 
 func getWorkloadID(name, namespace, partition string) *pbresource.ID {

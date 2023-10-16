@@ -69,15 +69,29 @@ func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client, aut
 		return err
 	}
 
-	c.log.Info("creating inject binding rule")
-	// Create the binding rule.
-	abr := api.ACLBindingRule{
-		Description: "Kubernetes binding rule",
-		AuthMethod:  authMethodName,
-		BindType:    api.BindingRuleBindTypeService,
-		BindName:    "${serviceaccount.name}",
-		Selector:    c.flagBindingRuleSelector,
+	var abr api.ACLBindingRule
+	if c.flagResourceAPIs {
+		c.log.Info("creating consul binding rule for WorkloadIdentityName")
+		abr = api.ACLBindingRule{
+			Description: "Kubernetes binding rule",
+			AuthMethod:  authMethodName,
+			BindType:    api.BindingRuleBindTypeTemplatedPolicy,
+			BindName:    api.ACLTemplatedPolicyWorkloadIdentityName,
+			BindVars: &api.ACLTemplatedPolicyVariables{
+				Name: "${serviceaccount.name}",
+			},
+			Selector: c.flagBindingRuleSelector,
+		}
+	} else {
+		abr = api.ACLBindingRule{
+			Description: "Kubernetes binding rule",
+			AuthMethod:  authMethodName,
+			BindType:    api.BindingRuleBindTypeService,
+			BindName:    "${serviceaccount.name}",
+			Selector:    c.flagBindingRuleSelector,
+		}
 	}
+
 	return c.createConnectBindingRule(consulClient, authMethodName, &abr)
 }
 

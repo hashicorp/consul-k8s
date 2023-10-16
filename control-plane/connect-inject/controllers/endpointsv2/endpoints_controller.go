@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -89,6 +90,15 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		r.Log.Error(err, "failed to create Consul resource client", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
+	}
+
+	state, err := r.ConsulServerConnMgr.State()
+	if err != nil {
+		r.Log.Error(err, "failed to query Consul client state", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+	if state.Token != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-consul-token", state.Token)
 	}
 
 	// If the Endpoints object has been deleted (and we get an IsNotFound error),
