@@ -289,7 +289,7 @@ endif
 
 prepare-rc-branch: prepare-rc-script
 
-prepare-dev:
+prepare-main-dev:
 ifndef CONSUL_K8S_RELEASE_VERSION
 	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
@@ -306,6 +306,24 @@ ifndef CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION
 	$(error CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION is required)
 endif
 	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" "" $(CONSUL_K8S_NEXT_RELEASE_VERSION) $(CONSUL_K8S_NEXT_CONSUL_VERSION) $(CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION)
+
+prepare-release-dev:
+ifndef CONSUL_K8S_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
+endif
+ifndef CONSUL_K8S_RELEASE_DATE
+	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+endif
+ifndef CONSUL_K8S_NEXT_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
+endif
+ifndef CONSUL_K8S_CONSUL_VERSION
+	$(error CONSUL_K8S_CONSUL_VERSION is required)
+endif
+ifndef CONSUL_K8S_CONSUL_DATAPLANE_VERSION
+	$(error CONSUL_K8S_CONSUL_DATAPLANE_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" "" $(CONSUL_K8S_NEXT_RELEASE_VERSION) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION)
 
 # ===========> Makefile config
 .DEFAULT_GOAL := help
