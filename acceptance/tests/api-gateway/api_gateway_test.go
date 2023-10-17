@@ -13,12 +13,13 @@ import (
 
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -299,7 +300,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	helmValues := map[string]string{
 		"connectInject.enabled":                       "true",
 		"connectInject.consulNamespaces.mirroringK8S": "true",
-		"global.acls.manageSystemACLs":                "true", // acls must be enabled for JWT auth to take place
+		"global.acls.manageSystemACLs":                "true",
 		"global.tls.enabled":                          "true",
 		"global.logLevel":                             "trace",
 	}
@@ -309,8 +310,10 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 
 	consulCluster.Create(t)
 
+	// this is necesary when running tests with ACLs enabled
+	runTestsAsSecure := true
 	// Override the default proxy config settings for this test
-	consulClient, _ := consulCluster.SetupConsulClient(t, true)
+	consulClient, _ := consulCluster.SetupConsulClient(t, runTestsAsSecure)
 	_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
 		Kind: api.ProxyDefaults,
 		Name: api.ProxyConfigGlobal,

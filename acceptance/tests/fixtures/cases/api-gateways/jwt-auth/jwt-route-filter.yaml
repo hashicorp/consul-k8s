@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 apiVersion: consul.hashicorp.com/v1alpha1
-kind: HTTPRouteAuthFilter
+kind: RouteAuthFilter
 metadata:
   name: example-route-jwt-filter
 spec:
