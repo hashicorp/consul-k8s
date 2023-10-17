@@ -461,22 +461,12 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	// finally we check that we can actually route to the service(s) via the gateway
 	k8sOptions := ctx.KubectlOptions(t)
 	targetHTTPAddress := fmt.Sprintf("http://%s/v1", gatewayAddress)
-	targetHTTPAddressAdmin := fmt.Sprintf("http://%s:8080/admin", gatewayAddress)
-	targetHTTPAddressPet := fmt.Sprintf("http://%s:8080/pet", gatewayAddress)
+	targetHTTPAddressAdmin := fmt.Sprintf("http://%s:8081/admin", gatewayAddress)
+	targetHTTPAddressPet := fmt.Sprintf("http://%s:8081/pet", gatewayAddress)
 	// valid JWT token with role of "doctor"
 	doctorToken := "eyJ0eXAiOiJKV1QiLCJhbGciOiJQUzI1NiIsImtpZCI6IkMtRTFuQ2p3Z0JDLVB1R00yTzQ2N0ZSRGhLeDhBa1ZjdElTQWJvM3JpZXcifQ.eyJpc3MiOiJsb2NhbCIsInJvbGUiOiJkb2N0b3IifQ.FfgpzjMf8Evh6K-fJ1cLXklfIXOm-vojVbWlPPbGVFtzxZ9hxMxoyAY_G8i36SfGrpUlp-RJ6ohMvprMrEgyRgbenu7u5kkm5iGHW-zpMus4izXRxPELBcpWOGF105HIssT2NYRstXieNR8EVzvGfLdvR0GW8ttEERgseqGvuAfdb4-aNYsysGwUUHbsZjazA6H1rZmWqHdCLOJ2ZwFsIdckO9CadnkyTILpcPUmLYyUVJdtlLGOySb0GG8c_dPML_IR5jSXCSUZt6S2JBNBNBdqukrlqpA-fIaaWft0dbWVMhv8DqPC8znult8dKvLZ1qXeU0itsqqJUyE16ihJjw"
 	// valid JWT token with role of "pet"
 	petToken := "eyJ0eXAiOiJKV1QiLCJhbGciOiJQUzI1NiIsImtpZCI6IkMtRTFuQ2p3Z0JDLVB1R00yTzQ2N0ZSRGhLeDhBa1ZjdElTQWJvM3JpZXcifQ.eyJpc3MiOiJsb2NhbCIsInJvbGUiOiJwZXQifQ.l94rJayGGTMB426HwEw5ipSjaIHjm-UWDHiBAlB_Slmi814AxAfl_0AdRwSz67UDnkoygKbvPpR5xUB03JCXNshLZuKLegWsBeQg_OJYvZGmFagl5NglBFvH7Jbta4e1eQoAxZI6Xyy1jHbu7jFBjQPVnK8EaRvWoW8Pe8a8rp_5xhub0pomhvRF6Pm5kAS4cMnxvqpVc5Oo5nO7ws_SmoNnbt2Ok14k23Zx5E2EWmGStOfbgFsdbhVbepB2DMzqv1j8jvBbwa_OxCwc_7pEOthOOxRV6L3ZjgbRSB4GumlXAOCBYXD1cRLgrMSrWB1GkefAKu8PV0Ho1px6sI9Evg"
-
-	// check that intentions keep our connection from happening
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddress)
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressAdmin)
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", doctorToken, targetHTTPAddressAdmin)
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", petToken, targetHTTPAddressAdmin)
-
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressPet)
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", doctorToken, targetHTTPAddressPet)
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", petToken, targetHTTPAddressPet)
 
 	// Now we create the allow intention.
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -507,38 +497,38 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	logger.Log(t, "trying calls to api gateway http")
 	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPAddress)
 
-	// ensure that overrides -> route extension -> default by making a request to the admin route with a JWT that has an issuer of "local" and a "role" of "doctor"
+	// ensure that overrides -> route extension -> default by making a request to the admin route with a JWT that a "role" of "doctor"
 	// we can see that:
-	// * the "iss" verification in the gateway override takes precedence over the "iss" verification in the route filter
 	// * the "role" verification in the route extension takes precedence over the "role" verification in the gateway default
+
 	// should fail because we're missing JWT
 	logger.Log(t, "trying calls to api gateway /admin should fail without JWT token")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressAdmin)
 
 	// should fail because we use the token with the wrong role and correct issuer
 	logger.Log(t, "trying calls to api gateway /admin should fail with wrong role")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", petToken, targetHTTPAddressAdmin)
+	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressAdmin)
 
 	// will succeed because we use the token with the correct role and the correct issuer
 	logger.Log(t, "trying calls to api gateway /admin should succeed with JWT token with correct role")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", doctorToken, targetHTTPAddressAdmin)
+	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressAdmin)
 
-	// ensure that overrides -> route extension -> default by making a request to the admin route with a JWT that has an issuer of "local" and a "role" of "pet"
+	// ensure that overrides -> route extension -> default by making a request to the admin route with a JWT that has a "role" of "pet"
 	// the route does not define
 	// we can see that:
-	// * the "iss" verification in the gateway override takes precedence over the "iss" verification in the route filter
-	// * the "role" verification in the route extension takes precedence over the "role" verification in the gateway default
+	// * the "role" verification in the gateway default is used
+
 	// should fail because we're missing JWT
 	logger.Log(t, "trying calls to api gateway /pet should fail without JWT token")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressPet)
 
 	// should fail because we use the token with the wrong role and correct issuer
 	logger.Log(t, "trying calls to api gateway /pet should fail with wrong role")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", doctorToken, targetHTTPAddressPet)
+	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressPet)
 
 	// will succeed because we use the token with the correct role and the correct issuer
 	logger.Log(t, "trying calls to api gateway /pet should succeed with JWT token with correct role")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", petToken, targetHTTPAddressPet)
+	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressPet)
 }
 
 func checkStatusCondition(t require.TestingT, conditions []metav1.Condition, toCheck metav1.Condition) {

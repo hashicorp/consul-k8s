@@ -8,6 +8,8 @@ resources:
 - ../../static-server-inject
 - httproute-auth.yaml
 - jwt-provider.yaml
+- jwt-route-filter.yaml
+- gateway-policy.yaml
 
 
 patches:
