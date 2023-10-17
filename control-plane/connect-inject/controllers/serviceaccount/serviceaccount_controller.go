@@ -9,6 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
+	"google.golang.org/grpc/metadata"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,6 +22,10 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+)
+
+const (
+	defaultServiceAccountName = "default"
 )
 
 type Controller struct {
@@ -63,6 +68,21 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		r.Log.Error(err, "failed to create Consul resource client", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
+	}
+
+	state, err := r.ConsulServerConnMgr.State()
+	if err != nil {
+		r.Log.Error(err, "failed to query Consul client state", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+	if state.Token != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-consul-token", state.Token)
+	}
+
+	// We don't allow the default service account synced to prevent unintended TrafficPermissions
+	if req.Name == defaultServiceAccountName {
+		r.Log.Info("Not syncing default Kubernetes service account", "namespace", req.Namespace)
+		return ctrl.Result{}, nil
 	}
 
 	// If the ServiceAccount object has been deleted (and we get an IsNotFound error),

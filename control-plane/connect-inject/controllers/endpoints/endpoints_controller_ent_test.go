@@ -1544,7 +1544,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							} else {
 								writeOpts.Namespace = ts.ExpConsulNS
 							}
-							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service.Service, svc.Service.Meta[constants.MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix)
+							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service.Service, svc.Service.Meta[constants.MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix, false)
 							token, _, err := consulClient.ACL().Login(&api.ACLLoginParams{
 								AuthMethod:  test.AuthMethod,
 								BearerToken: test.ServiceAccountJWTToken,
@@ -1855,7 +1855,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 						} else {
 							writeOpts.Namespace = ts.ExpConsulNS
 						}
-						test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[constants.MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix)
+						test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[constants.MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix, false)
 						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
 							AuthMethod:  test.AuthMethod,
 							BearerToken: test.ServiceAccountJWTToken,
@@ -2153,7 +2153,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 							writeOpts.Namespace = ts.ConsulNS
 						}
 
-						test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[constants.MetaKeyKubeNS], writeOpts.Namespace, false, "")
+						test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[constants.MetaKeyKubeNS], writeOpts.Namespace, false, "", false)
 						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
 							AuthMethod:  test.AuthMethod,
 							BearerToken: test.ServiceAccountJWTToken,

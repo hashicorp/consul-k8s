@@ -219,7 +219,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			}
 			require.Equal(t, expectedProbe, container.ReadinessProbe)
 			require.Nil(t, container.StartupProbe)
-			require.Len(t, container.Env, 7)
+			require.Len(t, container.Env, 6)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
 			require.Equal(t, container.Env[0].Value, "/consul/mesh-inject")
 			require.Equal(t, container.Env[2].Name, "POD_NAME")
@@ -228,8 +228,6 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			require.Equal(t, container.Env[4].Value, "$(POD_NAME)")
 			require.Equal(t, container.Env[5].Name, "DP_CREDENTIAL_LOGIN_META")
 			require.Equal(t, container.Env[5].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
-			require.Equal(t, container.Env[6].Name, "DP_CREDENTIAL_LOGIN_META1")
-			require.Equal(t, container.Env[6].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
 		})
 	}
 }

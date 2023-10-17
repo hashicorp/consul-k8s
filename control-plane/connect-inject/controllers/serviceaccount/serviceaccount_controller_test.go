@@ -53,25 +53,10 @@ func TestReconcile_CreateWorkloadIdentity(t *testing.T) {
 	t.Parallel()
 	cases := []reconcileCase{
 		{
-			name:           "Default ServiceAccount",
+			name:           "Default ServiceAccount not synced",
 			svcAccountName: "default",
 			k8sObjects: func() []runtime.Object {
 				return []runtime.Object{createServiceAccount("default", "default")}
-			},
-			expectedResource: &pbresource.Resource{
-				Id: &pbresource.ID{
-					Name: "default",
-					Type: pbauth.WorkloadIdentityType,
-					Tenancy: &pbresource.Tenancy{
-						Namespace: constants.DefaultConsulNS,
-						Partition: constants.DefaultConsulPartition,
-					},
-				},
-				Data: getWorkloadIdentityData(),
-				Metadata: map[string]string{
-					constants.MetaKeyKubeNS:    constants.DefaultConsulNS,
-					constants.MetaKeyManagedBy: constants.ManagedByServiceAccountValue,
-				},
 			},
 		},
 		{
@@ -262,7 +247,7 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 		writeReq := &pbresource.WriteRequest{Resource: tc.existingResource}
 		_, err = resourceClient.Write(context.Background(), writeReq)
 		require.NoError(t, err)
-		test.ResourceHasPersisted(t, resourceClient, tc.existingResource.Id)
+		test.ResourceHasPersisted(t, context.Background(), resourceClient, tc.existingResource.Id)
 	}
 
 	// Run actual reconcile and verify results.

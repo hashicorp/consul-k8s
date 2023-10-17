@@ -7,13 +7,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul/api"
 	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/go-multierror"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,6 +36,7 @@ import (
 const (
 	DefaultTelemetryBindSocketDir = "/consul/mesh-inject"
 	consulNodeAddress             = "127.0.0.1"
+	tokenMetaPodNameKey           = "pod"
 )
 
 // Controller watches Pod events and converts them to V2 Workloads and HealthStatus.
@@ -97,6 +102,16 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 	r.ResourceClient = rc
 
+	apiClient, err := consul.NewClientFromConnMgr(r.ConsulClientConfig, r.ConsulServerConnMgr)
+	if err != nil {
+		r.Log.Error(err, "failed to create Consul API client", "name", req.Name)
+		return ctrl.Result{}, err
+	}
+
+	if r.ConsulClientConfig.APIClientConfig.Token != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-consul-token", r.ConsulClientConfig.APIClientConfig.Token)
+	}
+
 	err = r.Client.Get(ctx, req.NamespacedName, &pod)
 
 	// If the pod object has been deleted (and we get an IsNotFound error),
@@ -108,8 +123,6 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			errs = multierror.Append(errs, err)
 		}
 
-		// TODO: clean up ACL Tokens
-
 		// Delete destinations, if any exist
 		if err := r.deleteDestinations(ctx, req.NamespacedName); err != nil {
 			errs = multierror.Append(errs, err)
@@ -117,6 +130,15 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 		if err := r.deleteProxyConfiguration(ctx, req.NamespacedName); err != nil {
 			errs = multierror.Append(errs, err)
+		}
+
+		if r.AuthMethod != "" {
+			r.Log.Info("deleting ACL tokens for pod", "name", req.Name, "ns", req.Namespace)
+			err := r.deleteACLTokensForPod(apiClient, req.NamespacedName)
+			if err != nil {
+				r.Log.Error(err, "failed to delete ACL tokens for pod", "name", req.Name, "ns", req.Namespace)
+				errs = multierror.Append(errs, err)
+			}
 		}
 
 		return ctrl.Result{}, errs
@@ -203,6 +225,75 @@ func (r *Controller) deleteProxyConfiguration(ctx context.Context, pod types.Nam
 
 	_, err := r.ResourceClient.Delete(ctx, req)
 	return err
+}
+
+// deleteACLTokensForPod finds the ACL tokens that belongs to the pod and delete them from Consul.
+// It will only check for ACL tokens that have been created with the auth method this controller
+// has been configured with and will only delete tokens for the provided pod Name.
+func (r *Controller) deleteACLTokensForPod(apiClient *api.Client, pod types.NamespacedName) error {
+	// Skip if name is empty.
+	if pod.Name == "" {
+		return nil
+	}
+
+	// Use the V1 logic for getting a compatible namespace
+	consulNamespace := namespaces.ConsulNamespace(
+		pod.Namespace,
+		r.EnableConsulNamespaces,
+		r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix,
+	)
+
+	// TODO: create an index for the workloadidentity in Consul, which will also require
+	// the identity to be attached to the token for templated-policies.
+	tokens, _, err := apiClient.ACL().TokenListFiltered(
+		api.ACLTokenFilterOptions{
+			AuthMethod: r.AuthMethod,
+		},
+		&api.QueryOptions{
+			Namespace: consulNamespace,
+		})
+	if err != nil {
+		return fmt.Errorf("failed to get a list of tokens from Consul: %s", err)
+	}
+
+	// We iterate through each token in the auth method, which is terribly inefficient.
+	// See discussion above about optimizing the token list query.
+	for _, token := range tokens {
+		tokenMeta, err := getTokenMetaFromDescription(token.Description)
+		if err != nil {
+			return fmt.Errorf("failed to parse token metadata: %s", err)
+		}
+
+		tokenPodName := strings.TrimPrefix(tokenMeta[tokenMetaPodNameKey], pod.Namespace+"/")
+
+		// If we can't find token's pod, delete it.
+		if tokenPodName == pod.Name {
+			r.Log.Info("deleting ACL token", "name", pod.Name, "namespace", pod.Namespace, "ID", token.AccessorID)
+			if _, err := apiClient.ACL().TokenDelete(token.AccessorID, &api.WriteOptions{Namespace: consulNamespace}); err != nil {
+				return fmt.Errorf("failed to delete token from Consul: %s", err)
+			}
+		}
+	}
+	return nil
+}
+
+// getTokenMetaFromDescription parses JSON metadata from token's description.
+func getTokenMetaFromDescription(description string) (map[string]string, error) {
+	re := regexp.MustCompile(`.*({.+})`)
+
+	matches := re.FindStringSubmatch(description)
+	if len(matches) != 2 {
+		return nil, fmt.Errorf("failed to extract token metadata from description: %s", description)
+	}
+	tokenMetaJSON := matches[1]
+
+	var tokenMeta map[string]string
+	err := json.Unmarshal([]byte(tokenMetaJSON), &tokenMeta)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal token metadata '%s': %s", tokenMetaJSON, err)
+	}
+
+	return tokenMeta, nil
 }
 
 func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {

@@ -44,6 +44,8 @@ type Command struct {
 	flagResourcePrefix string
 	flagK8sNamespace   string
 
+	flagResourceAPIs bool // Use V2 APIs
+
 	flagAllowDNS bool
 
 	flagSetServerTokens bool
@@ -130,6 +132,9 @@ func (c *Command) init() {
 		"Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
 
 	c.flags.BoolVar(&c.flagSetServerTokens, "set-server-tokens", true, "Toggle for setting agent tokens for the servers.")
+
+	c.flags.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
+		"Enable or disable Consul V2 Resource APIs. This will affect the binding rule used for Kubernetes auth (Service vs. WorkloadIdentity)")
 
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")

@@ -219,13 +219,19 @@ func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, service
 // SetupK8sAuthMethod create a k8s auth method and a binding rule in Consul for the
 // given k8s service and namespace.
 func SetupK8sAuthMethod(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS string) {
-	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "")
+	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "", false)
+}
+
+// SetupK8sAuthMethodV2 create a k8s auth method and a binding rule in Consul for the
+// given k8s service and namespace.
+func SetupK8sAuthMethodV2(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS string) {
+	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "", true)
 }
 
 // SetupK8sAuthMethodWithNamespaces creates a k8s auth method and binding rule
 // in Consul for the k8s service name and namespace. It sets up the auth method and the binding
 // rule so that it works with consul namespaces.
-func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS, consulNS string, mirrorNS bool, nsPrefix string) {
+func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS, consulNS string, mirrorNS bool, nsPrefix string, useV2 bool) {
 	t.Helper()
 	// Start the mock k8s server.
 	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -262,14 +268,30 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	require.NoError(t, err)
 
 	// Create the binding rule.
-	aclBindingRule := api.ACLBindingRule{
-		Description: "Kubernetes binding rule",
-		AuthMethod:  AuthMethod,
-		BindType:    api.BindingRuleBindTypeService,
-		BindName:    "${serviceaccount.name}",
-		Selector:    "serviceaccount.name!=default",
-		Namespace:   consulNS,
+	var aclBindingRule api.ACLBindingRule
+	if useV2 {
+		aclBindingRule = api.ACLBindingRule{
+			Description: "Kubernetes binding rule",
+			AuthMethod:  AuthMethod,
+			BindType:    api.BindingRuleBindTypeTemplatedPolicy,
+			BindName:    api.ACLTemplatedPolicyWorkloadIdentityName,
+			BindVars: &api.ACLTemplatedPolicyVariables{
+				Name: "${serviceaccount.name}",
+			},
+			Selector:  "serviceaccount.name!=default",
+			Namespace: consulNS,
+		}
+	} else {
+		aclBindingRule = api.ACLBindingRule{
+			Description: "Kubernetes binding rule",
+			AuthMethod:  AuthMethod,
+			BindType:    api.BindingRuleBindTypeService,
+			BindName:    "${serviceaccount.name}",
+			Selector:    "serviceaccount.name!=default",
+			Namespace:   consulNS,
+		}
 	}
+
 	if mirrorNS {
 		aclBindingRule.Namespace = "default"
 	}
@@ -281,11 +303,11 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 // ResourceHasPersisted checks that a recently written resource exists in the Consul
 // state store with a valid version. This must be true before a resource is overwritten
 // or deleted.
-func ResourceHasPersisted(t *testing.T, client pbresource.ResourceServiceClient, id *pbresource.ID) {
+func ResourceHasPersisted(t *testing.T, ctx context.Context, client pbresource.ResourceServiceClient, id *pbresource.ID) {
 	req := &pbresource.ReadRequest{Id: id}
 
 	require.Eventually(t, func() bool {
-		res, err := client.Read(context.Background(), req)
+		res, err := client.Read(ctx, req)
 		if err != nil {
 			return false
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -87,6 +88,15 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 	if err != nil {
 		logger.Error(err, "failed to create Consul resource client", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
+	}
+
+	state, err := r.ConsulServerConnMgr.State()
+	if err != nil {
+		logger.Error(err, "failed to query Consul client state", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+	if state.Token != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-consul-token", state.Token)
 	}
 
 	if meshConfig.GetDeletionTimestamp().IsZero() {

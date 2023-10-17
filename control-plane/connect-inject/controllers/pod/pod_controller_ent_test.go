@@ -740,25 +740,10 @@ func runControllerTest(t *testing.T, tc testCase) {
 	}
 
 	workloadID := getWorkloadID(tc.podName, tc.expectedConsulNamespace, tc.partition)
-	loadResource(t, resourceClient, workloadID, tc.existingWorkload, nil)
-	loadResource(
-		t,
-		resourceClient,
-		getHealthStatusID(tc.podName, tc.expectedConsulNamespace, tc.partition),
-		tc.existingHealthStatus,
-		workloadID)
-	loadResource(
-		t,
-		resourceClient,
-		getProxyConfigurationID(tc.podName, tc.expectedConsulNamespace, tc.partition),
-		tc.existingProxyConfiguration,
-		nil)
-	loadResource(
-		t,
-		resourceClient,
-		getDestinationsID(tc.podName, tc.expectedConsulNamespace, tc.partition),
-		tc.existingDestinations,
-		nil)
+	loadResource(t, context.Background(), resourceClient, workloadID, tc.existingWorkload, nil)
+	loadResource(t, context.Background(), resourceClient, getHealthStatusID(tc.podName, tc.expectedConsulNamespace, tc.partition), tc.existingHealthStatus, workloadID)
+	loadResource(t, context.Background(), resourceClient, getProxyConfigurationID(tc.podName, tc.expectedConsulNamespace, tc.partition), tc.existingProxyConfiguration, nil)
+	loadResource(t, context.Background(), resourceClient, getDestinationsID(tc.podName, tc.expectedConsulNamespace, tc.partition), tc.existingDestinations, nil)
 
 	namespacedName := types.NamespacedName{
 		Namespace: podNamespace,
@@ -777,14 +762,14 @@ func runControllerTest(t *testing.T, tc testCase) {
 	require.Equal(t, tc.expRequeue, resp.Requeue)
 
 	wID := getWorkloadID(tc.podName, tc.expectedConsulNamespace, tc.partition)
-	expectedWorkloadMatches(t, resourceClient, wID, tc.expectedWorkload)
+	expectedWorkloadMatches(t, context.Background(), resourceClient, wID, tc.expectedWorkload)
 
 	hsID := getHealthStatusID(tc.podName, tc.expectedConsulNamespace, tc.partition)
-	expectedHealthStatusMatches(t, resourceClient, hsID, tc.expectedHealthStatus)
+	expectedHealthStatusMatches(t, context.Background(), resourceClient, hsID, tc.expectedHealthStatus)
 
 	pcID := getProxyConfigurationID(tc.podName, tc.expectedConsulNamespace, tc.partition)
-	expectedProxyConfigurationMatches(t, resourceClient, pcID, tc.expectedProxyConfiguration)
+	expectedProxyConfigurationMatches(t, context.Background(), resourceClient, pcID, tc.expectedProxyConfiguration)
 
 	uID := getDestinationsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-	expectedDestinationMatches(t, resourceClient, uID, tc.expectedDestinations)
+	expectedDestinationMatches(t, context.Background(), resourceClient, uID, tc.expectedDestinations)
 }

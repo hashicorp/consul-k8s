@@ -192,6 +192,10 @@ spec:
             {{- else }}
             -secrets-backend=kubernetes \
             {{- end }}
+          
+            {{- if (mustHas "resource-apis" .Values.global.experiments) }}
+            -enable-resource-apis=true \
+            {{- end }}
 
             {{- if .Values.global.acls.bootstrapToken.secretName }}
             -bootstrap-token-secret-name={{ .Values.global.acls.bootstrapToken.secretName }} \
