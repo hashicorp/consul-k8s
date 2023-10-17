@@ -7,10 +7,6 @@ import (
 	"time"
 
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -25,6 +21,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 // TestReconcile_CreateUpdatePeeringDialer creates a peering dialer.
@@ -260,6 +261,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			require.NoError(t, err)
 			defer acceptorPeerServer.Stop()
 			acceptorPeerServer.WaitForServiceIntentions(t)
+			acceptorPeerServer.WaitForActiveCARoot(t)
 
 			cfg := &api.Config{
 				Address: acceptorPeerServer.HTTPAddr,
@@ -295,6 +297,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			// Create test consul server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			dialerClient := testClient.APIClient
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			// If the peering is supposed to already exist in Consul, then establish a peering with the existing token, so the peering will exist on the dialing side.
 			if tt.peeringExists {
@@ -440,6 +443,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			require.NoError(t, err)
 			defer acceptorPeerServer.Stop()
 			acceptorPeerServer.WaitForServiceIntentions(t)
+			acceptorPeerServer.WaitForActiveCARoot(t)
 
 			cfg := &api.Config{
 				Address: acceptorPeerServer.HTTPAddr,
@@ -495,6 +499,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			require.NoError(t, err)
 			defer dialerPeerServer.Stop()
 			dialerPeerServer.WaitForServiceIntentions(t)
+			dialerPeerServer.WaitForActiveCARoot(t)
 
 			consulConfig := &consul.Config{
 				APIClientConfig: &api.Config{Address: dialerPeerServer.HTTPAddr},
@@ -751,6 +756,7 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 	// Create test consul server.
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	consulClient := testClient.APIClient
+	testClient.TestServer.WaitForActiveCARoot(t)
 
 	// Add the initial peerings into Consul by calling the Generate token endpoint.
 	_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "dialer-deleted"}, nil)
