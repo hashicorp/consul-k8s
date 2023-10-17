@@ -35,7 +35,7 @@ const (
 )
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
-func T2estAPIGateway_Basic(t *testing.T) {
+func TestAPIGateway_Basic(t *testing.T) {
 	cases := []struct {
 		secure bool
 	}{
