@@ -3,6 +3,7 @@ package peering
 import (
 	"context"
 	"fmt"
+	terminatinggateway "github.com/hashicorp/consul-k8s/acceptance/tests/terminating-gateway"
 	"strconv"
 	"testing"
 	"time"
@@ -24,7 +25,7 @@ import (
 // can reach the server. It also deploys a static server pod that is not connected to the mesh, but added as a
 // destination for a terminating gateway. It checks that requests from the client can reach this server through the
 // terminating gateway via the mesh gateways.
-func TestPeering_Connect2(t *testing.T) {
+func TestPeering_Connect(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -76,9 +77,10 @@ func TestPeering_Connect2(t *testing.T) {
 			}
 
 			staticServerPeerHelmValues := map[string]string{
-				"global.datacenter":            staticServerPeer,
-				"terminatingGateways.enabled":  "true",
-				"terminatingGateways.replicas": "1",
+				"global.datacenter":                        staticServerPeer,
+				"terminatingGateways.enabled":              "true",
+				"terminatingGateways.gateways[0].name":     "terminating-gateway",
+				"terminatingGateways.gateways[0].replicas": "1",
 			}
 
 			if !cfg.UseKind {
@@ -309,6 +311,16 @@ func TestPeering_Connect2(t *testing.T) {
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
 
+			// Check that requests can reach the external static-server from the static client cluster
+			if cfg.EnableTransparentProxy {
+				if c.ACLsEnabled { // I may just need acls enabled for all of this.
+					terminatingGatewayRules := `service_prefix "static-server" {policy = "write"}`
+					terminatinggateway.UpdateTerminatingGatewayRole(t, staticServerPeerClient, terminatingGatewayRules)
+				}
+			}
+
+			logger.Log(t, "All done! Sleeping now kthxbai")
+			time.Sleep(24 * time.Hour)
 		})
 	}
 }

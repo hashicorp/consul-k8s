@@ -60,11 +60,11 @@ func TestTerminatingGateway(t *testing.T) {
 			// with service:write permissions to the static-server service
 			// so that it can request Connect certificates for it.
 			if c.secure {
-				updateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
+				UpdateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
 			}
 
 			// Create the config entry for the terminating gateway.
-			createTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerName)
+			CreateTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerName)
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
@@ -79,7 +79,7 @@ func TestTerminatingGateway(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, staticServerLocalAddress)
 
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				addIntention(t, consulClient, "", staticClientName, "", staticServerName)
+				AddIntention(t, consulClient, "", staticClientName, "", staticServerName)
 			}
 
 			// Test that we can make a call to the terminating gateway.
