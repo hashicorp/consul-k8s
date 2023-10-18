@@ -79,7 +79,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			// with service:write permissions to the static-server service
 			// so that it can request Connect certificates for it.
 			if c.secure {
-				updateTerminatingGatewayRole(t, consulClient, terminatingGatewayRules)
+				UpdateTerminatingGatewayRole(t, consulClient, terminatingGatewayRules)
 			}
 
 			// Since we are using the transparent kube DNS, disable the ability
@@ -87,7 +87,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			createMeshConfigEntry(t, consulClient, "")
 
 			// Create the config entry for the terminating gateway.
-			createTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerHostnameID, staticServerIPID)
+			CreateTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerHostnameID, staticServerIPID)
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
@@ -115,8 +115,8 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
 
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				addIntention(t, consulClient, "", staticClientName, "", staticServerHostnameID)
-				addIntention(t, consulClient, "", staticClientName, "", staticServerIPID)
+				AddIntention(t, consulClient, "", staticClientName, "", staticServerHostnameID)
+				AddIntention(t, consulClient, "", staticClientName, "", staticServerIPID)
 			}
 
 			// Test that we can make a call to the terminating gateway.
