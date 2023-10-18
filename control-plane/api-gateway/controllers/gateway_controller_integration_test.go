@@ -54,6 +54,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 		httpRouteFn      func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway, *v1alpha1.RouteAuthFilter) *gwv1beta1.HTTPRoute
 		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway) *v1alpha2.TCPRoute
 		externalFilterFn func(*testing.T, context.Context, client.WithWatch, string) *v1alpha1.RouteAuthFilter
+		policyFn         func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway, string)
 	}{
 		"all fields set": {
 			namespace:   "consul",
@@ -64,6 +65,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			externalFilterFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ string) *v1alpha1.RouteAuthFilter {
 				return nil
 			},
+			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1beta1.Gateway, _ string) {},
 		},
 		"minimal fields set": {
 			namespace:   "",
@@ -74,6 +76,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			externalFilterFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ string) *v1alpha1.RouteAuthFilter {
 				return nil
 			},
+			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1beta1.Gateway, _ string) {},
 		},
 		"funky casing to test normalization doesnt cause infinite reconciliation": {
 			namespace:   "",
@@ -84,6 +87,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			externalFilterFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ string) *v1alpha1.RouteAuthFilter {
 				return nil
 			},
+			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1beta1.Gateway, _ string) {},
 		},
 		"http route with JWT auth": {
 			namespace:        "",
@@ -92,6 +96,18 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			httpRouteFn:      createJWTAuthHTTPRoute,
 			tcpRouteFn:       createFunkyCasingFieldsTCPRoute,
 			externalFilterFn: createRouteAuthFilter,
+			policyFn:         func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1beta1.Gateway, _ string) {},
+		},
+		"policy attached to gateway": {
+			namespace:   "",
+			certFn:      createCert,
+			gwFn:        createAllFieldsSetAPIGW,
+			httpRouteFn: createAllFieldsSetHTTPRoute,
+			tcpRouteFn:  createFunkyCasingFieldsTCPRoute,
+			externalFilterFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ string) *v1alpha1.RouteAuthFilter {
+				return nil
+			},
+			policyFn: createGWPolicy,
 		},
 	}
 
@@ -162,6 +178,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			authFilterObj := tc.externalFilterFn(t, ctx, k8sClient, jwtProvider.Name)
 			httpRouteObj := tc.httpRouteFn(t, ctx, k8sClient, k8sGWObj, authFilterObj)
 			tcpRouteObj := tc.tcpRouteFn(t, ctx, k8sClient, k8sGWObj)
+			tc.policyFn(t, ctx, k8sClient, k8sGWObj, jwtProvider.Name)
 
 			// reconcile again so that we get the route bound to the gateway
 			_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
@@ -1576,4 +1593,45 @@ func createJWTProvider(t *testing.T, ctx context.Context, k8sClient client.WithW
 	require.NoError(t, err)
 
 	return provider
+}
+
+func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway, providerName string) {
+	policy := &v1alpha1.GatewayPolicy{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "GatewayPolicy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gw-policy",
+		},
+		Spec: v1alpha1.GatewayPolicySpec{
+			TargetRef: v1alpha1.PolicyTargetReference{
+				Group:       gw.GroupVersionKind().Group,
+				Kind:        gw.GroupVersionKind().Kind,
+				Name:        gw.Name,
+				Namespace:   gw.Namespace,
+				SectionName: &gw.Spec.Listeners[0].Name,
+			},
+			Override: &v1alpha1.GatewayPolicyConfig{
+				JWT: &v1alpha1.GatewayJWTRequirement{
+					Providers: []*v1alpha1.GatewayJWTProvider{
+						{
+							Name: providerName,
+						},
+					},
+				},
+			},
+			Default: &v1alpha1.GatewayPolicyConfig{
+				JWT: &v1alpha1.GatewayJWTRequirement{
+					Providers: []*v1alpha1.GatewayJWTProvider{
+						{
+							Name: providerName,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err := k8sClient.Create(ctx, policy)
+	require.NoError(t, err)
 }
