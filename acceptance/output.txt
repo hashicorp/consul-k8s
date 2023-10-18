@@ -1,0 +1,1240 @@
+=== RUN   TestPeering_ConnectNamespaces
+--- PASS: TestPeering_ConnectNamespaces (0.00s)
+=== RUN   TestPeering_Connect
+=== RUN   TestPeering_Connect/secure_installation
+    command.go:100: 2023-10-20T18:12:11-04:00 Running command helm with args [list --kube-context kind-dc1 --output json]
+    command.go:179: 2023-10-20T18:12:11-04:00 []
+    command.go:100: 2023-10-20T18:12:11-04:00 Running command helm with args [install --kube-context kind-dc1 --timeout 15m --namespace default --version ../../../charts/consul --set client.extraConfig="{\"log_level\": \"TRACE\"}" --set connectInject.enabled=true --set connectInject.transparentProxy.defaultEnabled=true --set dns.enableRedirection=true --set dns.enabled=true --set global.acls.manageSystemACLs=true --set global.datacenter=server --set global.enterpriseLicense.secretKey=key --set global.enterpriseLicense.secretName=license --set global.image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.17-dev --set global.logLevel=debug --set global.peering.enabled=true --set global.tls.enabled=true --set global.tls.httpsOnly=true --set meshGateway.enabled=true --set meshGateway.replicas=1 --set meshGateway.service.nodePort=30100 --set meshGateway.service.type=NodePort --set server.exposeGossipAndRPCPorts=true --set server.extraConfig="{\"log_level\": \"TRACE\"}" --set server.replicas=1 --set terminatingGateways.enabled=true --set terminatingGateways.gateways[0].name=terminating-gateway --set terminatingGateways.gateways[0].replicas=1 test-wtqy0j /Users/thomaseckert/Repos/consul-k8s/charts/consul]
+    command.go:179: 2023-10-20T18:13:26-04:00 NAME: test-wtqy0j
+    command.go:179: 2023-10-20T18:13:26-04:00 LAST DEPLOYED: Fri Oct 20 18:12:11 2023
+    command.go:179: 2023-10-20T18:13:26-04:00 NAMESPACE: default
+    command.go:179: 2023-10-20T18:13:26-04:00 STATUS: deployed
+    command.go:179: 2023-10-20T18:13:26-04:00 REVISION: 1
+    command.go:179: 2023-10-20T18:13:26-04:00 NOTES:
+    command.go:179: 2023-10-20T18:13:26-04:00 Thank you for installing HashiCorp Consul!
+    command.go:179: 2023-10-20T18:13:26-04:00 
+    command.go:179: 2023-10-20T18:13:26-04:00 Your release is named test-wtqy0j.
+    command.go:179: 2023-10-20T18:13:26-04:00 
+    command.go:179: 2023-10-20T18:13:26-04:00 To learn more about the release, run:
+    command.go:179: 2023-10-20T18:13:26-04:00 
+    command.go:179: 2023-10-20T18:13:26-04:00   $ helm status test-wtqy0j --namespace default
+    command.go:179: 2023-10-20T18:13:26-04:00   $ helm get all test-wtqy0j --namespace default
+    command.go:179: 2023-10-20T18:13:26-04:00 
+    command.go:179: 2023-10-20T18:13:26-04:00 Consul on Kubernetes Documentation:
+    command.go:179: 2023-10-20T18:13:26-04:00 https://www.consul.io/docs/platform/k8s
+    command.go:179: 2023-10-20T18:13:26-04:00 
+    command.go:179: 2023-10-20T18:13:26-04:00 Consul on Kubernetes CLI Reference:
+    command.go:179: 2023-10-20T18:13:26-04:00 https://www.consul.io/docs/k8s/k8s-cli
+    command.go:179: 2023-10-20T18:13:26-04:00 Warning: Defining server extraConfig potentially disrupts the automatic ACL
+    command.go:179: 2023-10-20T18:13:26-04:00          bootstrapping required settings. This may cause future issues if
+    command.go:179: 2023-10-20T18:13:26-04:00          there are conflicts.
+    peering_connect_test.go:107: 2023-10-20T18:13:26-04:00 Waiting for pods with label "release=test-wtqy0j" to be ready.
+    peering_connect_test.go:107: 2023-10-20T18:14:19-04:00 Finished waiting for pods to be ready.
+    command.go:100: 2023-10-20T18:14:19-04:00 Running command helm with args [list --kube-context kind-dc2 --output json]
+    command.go:179: 2023-10-20T18:14:19-04:00 []
+    command.go:100: 2023-10-20T18:14:19-04:00 Running command helm with args [install --kube-context kind-dc2 --timeout 15m --namespace default --version ../../../charts/consul --set client.extraConfig="{\"log_level\": \"TRACE\"}" --set connectInject.enabled=true --set connectInject.transparentProxy.defaultEnabled=true --set dns.enableRedirection=true --set dns.enabled=true --set global.acls.manageSystemACLs=true --set global.datacenter=client --set global.enterpriseLicense.secretKey=key --set global.enterpriseLicense.secretName=license --set global.image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.17-dev --set global.logLevel=debug --set global.peering.enabled=true --set global.tls.enabled=true --set global.tls.httpsOnly=true --set meshGateway.enabled=true --set meshGateway.replicas=1 --set meshGateway.service.nodePort=30100 --set meshGateway.service.type=NodePort --set server.exposeGossipAndRPCPorts=true --set server.extraConfig="{\"log_level\": \"TRACE\"}" --set server.replicas=1 test-wtqy0j /Users/thomaseckert/Repos/consul-k8s/charts/consul]
+    command.go:179: 2023-10-20T18:15:47-04:00 NAME: test-wtqy0j
+    command.go:179: 2023-10-20T18:15:47-04:00 LAST DEPLOYED: Fri Oct 20 18:14:19 2023
+    command.go:179: 2023-10-20T18:15:47-04:00 NAMESPACE: default
+    command.go:179: 2023-10-20T18:15:47-04:00 STATUS: deployed
+    command.go:179: 2023-10-20T18:15:47-04:00 REVISION: 1
+    command.go:179: 2023-10-20T18:15:47-04:00 NOTES:
+    command.go:179: 2023-10-20T18:15:47-04:00 Thank you for installing HashiCorp Consul!
+    command.go:179: 2023-10-20T18:15:47-04:00 
+    command.go:179: 2023-10-20T18:15:47-04:00 Your release is named test-wtqy0j.
+    command.go:179: 2023-10-20T18:15:47-04:00 
+    command.go:179: 2023-10-20T18:15:47-04:00 To learn more about the release, run:
+    command.go:179: 2023-10-20T18:15:47-04:00 
+    command.go:179: 2023-10-20T18:15:47-04:00   $ helm status test-wtqy0j --namespace default
+    command.go:179: 2023-10-20T18:15:47-04:00   $ helm get all test-wtqy0j --namespace default
+    command.go:179: 2023-10-20T18:15:47-04:00 
+    command.go:179: 2023-10-20T18:15:47-04:00 Consul on Kubernetes Documentation:
+    command.go:179: 2023-10-20T18:15:47-04:00 https://www.consul.io/docs/platform/k8s
+    command.go:179: 2023-10-20T18:15:47-04:00 
+    command.go:179: 2023-10-20T18:15:47-04:00 Consul on Kubernetes CLI Reference:
+    command.go:179: 2023-10-20T18:15:47-04:00 https://www.consul.io/docs/k8s/k8s-cli
+    command.go:179: 2023-10-20T18:15:47-04:00 Warning: Defining server extraConfig potentially disrupts the automatic ACL
+    command.go:179: 2023-10-20T18:15:47-04:00          bootstrapping required settings. This may cause future issues if
+    command.go:179: 2023-10-20T18:15:47-04:00          there are conflicts.
+    peering_connect_test.go:127: 2023-10-20T18:15:47-04:00 Waiting for pods with label "release=test-wtqy0j" to be ready.
+    peering_connect_test.go:127: 2023-10-20T18:16:18-04:00 Finished waiting for pods to be ready.
+    peering_connect_test.go:130: 2023-10-20T18:16:18-04:00 creating mesh config
+    command.go:100: 2023-10-20T18:16:18-04:00 Running command kubectl with args [--context kind-dc1 --namespace default apply -k ../fixtures/bases/mesh-peering]
+    command.go:179: 2023-10-20T18:16:20-04:00 mesh.consul.hashicorp.com/mesh created
+    command.go:100: 2023-10-20T18:16:20-04:00 Running command kubectl with args [--context kind-dc2 --namespace default apply -k ../fixtures/bases/mesh-peering]
+    command.go:179: 2023-10-20T18:16:22-04:00 mesh.consul.hashicorp.com/mesh created
+    tunnel.go:153: 2023-10-20T18:16:22-04:00 Creating a port forwarding tunnel for resource pod/test-wtqy0j-consul-server-0 routing local port 63054 to remote port 8501
+TestPeering_Connect/secure_installation 2023-10-20T18:16:22-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc1
+    tunnel.go:185: 2023-10-20T18:16:22-04:00 Selected pod test-wtqy0j-consul-server-0 to open port forward to
+    tunnel.go:198: 2023-10-20T18:16:22-04:00 Using URL https://127.0.0.1:58880/api/v1/namespaces/default/pods/test-wtqy0j-consul-server-0/portforward to create portforward
+    tunnel.go:247: 2023-10-20T18:16:22-04:00 Successfully created port forwarding tunnel
+    tunnel.go:153: 2023-10-20T18:16:22-04:00 Creating a port forwarding tunnel for resource pod/test-wtqy0j-consul-server-0 routing local port 63056 to remote port 8501
+TestPeering_Connect/secure_installation 2023-10-20T18:16:22-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc2
+    tunnel.go:185: 2023-10-20T18:16:22-04:00 Selected pod test-wtqy0j-consul-server-0 to open port forward to
+    tunnel.go:198: 2023-10-20T18:16:22-04:00 Using URL https://127.0.0.1:58933/api/v1/namespaces/default/pods/test-wtqy0j-consul-server-0/portforward to create portforward
+    tunnel.go:247: 2023-10-20T18:16:22-04:00 Successfully created port forwarding tunnel
+    command.go:100: 2023-10-20T18:16:22-04:00 Running command kubectl with args [--context kind-dc2 --namespace default apply -f ../fixtures/bases/peering/peering-acceptor.yaml]
+    command.go:179: 2023-10-20T18:16:23-04:00 peeringacceptor.consul.hashicorp.com/server created
+    command.go:100: 2023-10-20T18:16:24-04:00 Running command kubectl with args [--context kind-dc2 --namespace default get peeringacceptor server -o jsonpath={.status.secret.name}]
+    command.go:179: 2023-10-20T18:16:24-04:00 api-token
+    command.go:100: 2023-10-20T18:16:24-04:00 Running command kubectl with args [--context kind-dc1 --namespace default apply -f ../fixtures/bases/peering/peering-dialer.yaml]
+    command.go:179: 2023-10-20T18:16:25-04:00 peeringdialer.consul.hashicorp.com/client created
+    peering_connect_test.go:198: 2023-10-20T18:16:25-04:00 creating namespace ns1 in server peer
+    command.go:100: 2023-10-20T18:16:25-04:00 Running command kubectl with args [--context kind-dc1 --namespace default create ns ns1]
+    command.go:179: 2023-10-20T18:16:25-04:00 namespace/ns1 created
+    peering_connect_test.go:204: 2023-10-20T18:16:25-04:00 creating namespace ns2 in client peer
+    command.go:100: 2023-10-20T18:16:25-04:00 Running command kubectl with args [--context kind-dc2 --namespace default create ns ns2]
+    command.go:179: 2023-10-20T18:16:25-04:00 namespace/ns2 created
+    peering_connect_test.go:211: 2023-10-20T18:16:25-04:00 creating proxy-defaults config
+    command.go:100: 2023-10-20T18:16:25-04:00 Running command kubectl with args [--context kind-dc1 --namespace default apply -k ../fixtures/bases/mesh-gateway]
+    command.go:179: 2023-10-20T18:16:26-04:00 proxydefaults.consul.hashicorp.com/global created
+    command.go:100: 2023-10-20T18:16:26-04:00 Running command kubectl with args [--context kind-dc2 --namespace default apply -k ../fixtures/bases/mesh-gateway]
+    command.go:179: 2023-10-20T18:16:27-04:00 proxydefaults.consul.hashicorp.com/global created
+    peering_connect_test.go:224: 2023-10-20T18:16:27-04:00 creating static-server in server peer
+    command.go:100: 2023-10-20T18:16:27-04:00 Running command kubectl with args [--context kind-dc1 --namespace ns1 apply -k ../fixtures/cases/static-server-inject]
+    command.go:179: 2023-10-20T18:16:27-04:00 serviceaccount/static-server created
+    command.go:179: 2023-10-20T18:16:27-04:00 rolebinding.rbac.authorization.k8s.io/static-server created
+    command.go:179: 2023-10-20T18:16:28-04:00 rolebinding.rbac.authorization.k8s.io/static-server-openshift-anyuid created
+    command.go:179: 2023-10-20T18:16:28-04:00 rolebinding.rbac.authorization.k8s.io/static-server-openshift-privileged created
+    command.go:179: 2023-10-20T18:16:28-04:00 service/static-server created
+    command.go:179: 2023-10-20T18:16:28-04:00 deployment.apps/static-server created
+    command.go:100: 2023-10-20T18:16:28-04:00 Running command kubectl with args [--context kind-dc1 --namespace ns1 kustomize ../fixtures/cases/static-server-inject]
+    command.go:179: 2023-10-20T18:16:28-04:00 apiVersion: v1
+    command.go:179: 2023-10-20T18:16:28-04:00 kind: ServiceAccount
+    command.go:179: 2023-10-20T18:16:28-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:28-04:00   name: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00 ---
+    command.go:179: 2023-10-20T18:16:28-04:00 apiVersion: rbac.authorization.k8s.io/v1
+    command.go:179: 2023-10-20T18:16:28-04:00 kind: RoleBinding
+    command.go:179: 2023-10-20T18:16:28-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:28-04:00   name: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00 roleRef:
+    command.go:179: 2023-10-20T18:16:28-04:00   apiGroup: rbac.authorization.k8s.io
+    command.go:179: 2023-10-20T18:16:28-04:00   kind: ClusterRole
+    command.go:179: 2023-10-20T18:16:28-04:00   name: test-psp
+    command.go:179: 2023-10-20T18:16:28-04:00 subjects:
+    command.go:179: 2023-10-20T18:16:28-04:00 - kind: ServiceAccount
+    command.go:179: 2023-10-20T18:16:28-04:00   name: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00 ---
+    command.go:179: 2023-10-20T18:16:28-04:00 apiVersion: rbac.authorization.k8s.io/v1
+    command.go:179: 2023-10-20T18:16:28-04:00 kind: RoleBinding
+    command.go:179: 2023-10-20T18:16:28-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:28-04:00   name: static-server-openshift-anyuid
+    command.go:179: 2023-10-20T18:16:28-04:00 roleRef:
+    command.go:179: 2023-10-20T18:16:28-04:00   apiGroup: rbac.authorization.k8s.io
+    command.go:179: 2023-10-20T18:16:28-04:00   kind: ClusterRole
+    command.go:179: 2023-10-20T18:16:28-04:00   name: system:openshift:scc:anyuid
+    command.go:179: 2023-10-20T18:16:28-04:00 subjects:
+    command.go:179: 2023-10-20T18:16:28-04:00 - kind: ServiceAccount
+    command.go:179: 2023-10-20T18:16:28-04:00   name: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00 ---
+    command.go:179: 2023-10-20T18:16:28-04:00 apiVersion: rbac.authorization.k8s.io/v1
+    command.go:179: 2023-10-20T18:16:28-04:00 kind: RoleBinding
+    command.go:179: 2023-10-20T18:16:28-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:28-04:00   name: static-server-openshift-privileged
+    command.go:179: 2023-10-20T18:16:28-04:00 roleRef:
+    command.go:179: 2023-10-20T18:16:28-04:00   apiGroup: rbac.authorization.k8s.io
+    command.go:179: 2023-10-20T18:16:28-04:00   kind: ClusterRole
+    command.go:179: 2023-10-20T18:16:28-04:00   name: system:openshift:scc:privileged
+    command.go:179: 2023-10-20T18:16:28-04:00 subjects:
+    command.go:179: 2023-10-20T18:16:28-04:00 - kind: ServiceAccount
+    command.go:179: 2023-10-20T18:16:28-04:00   name: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00 ---
+    command.go:179: 2023-10-20T18:16:28-04:00 apiVersion: v1
+    command.go:179: 2023-10-20T18:16:28-04:00 kind: Service
+    command.go:179: 2023-10-20T18:16:28-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:28-04:00   name: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00 spec:
+    command.go:179: 2023-10-20T18:16:28-04:00   ports:
+    command.go:179: 2023-10-20T18:16:28-04:00   - name: http
+    command.go:179: 2023-10-20T18:16:28-04:00     port: 80
+    command.go:179: 2023-10-20T18:16:28-04:00     targetPort: 8080
+    command.go:179: 2023-10-20T18:16:28-04:00   selector:
+    command.go:179: 2023-10-20T18:16:28-04:00     app: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00 ---
+    command.go:179: 2023-10-20T18:16:28-04:00 apiVersion: apps/v1
+    command.go:179: 2023-10-20T18:16:28-04:00 kind: Deployment
+    command.go:179: 2023-10-20T18:16:28-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:28-04:00   name: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00 spec:
+    command.go:179: 2023-10-20T18:16:28-04:00   replicas: 1
+    command.go:179: 2023-10-20T18:16:28-04:00   selector:
+    command.go:179: 2023-10-20T18:16:28-04:00     matchLabels:
+    command.go:179: 2023-10-20T18:16:28-04:00       app: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00   template:
+    command.go:179: 2023-10-20T18:16:28-04:00     metadata:
+    command.go:179: 2023-10-20T18:16:28-04:00       annotations:
+    command.go:179: 2023-10-20T18:16:28-04:00         consul.hashicorp.com/connect-inject: "true"
+    command.go:179: 2023-10-20T18:16:28-04:00       labels:
+    command.go:179: 2023-10-20T18:16:28-04:00         app: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00       name: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00     spec:
+    command.go:179: 2023-10-20T18:16:28-04:00       containers:
+    command.go:179: 2023-10-20T18:16:28-04:00       - args:
+    command.go:179: 2023-10-20T18:16:28-04:00         - -text="hello world"
+    command.go:179: 2023-10-20T18:16:28-04:00         - -listen=:8080
+    command.go:179: 2023-10-20T18:16:28-04:00         image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
+    command.go:179: 2023-10-20T18:16:28-04:00         livenessProbe:
+    command.go:179: 2023-10-20T18:16:28-04:00           failureThreshold: 1
+    command.go:179: 2023-10-20T18:16:28-04:00           httpGet:
+    command.go:179: 2023-10-20T18:16:28-04:00             port: 8080
+    command.go:179: 2023-10-20T18:16:28-04:00           initialDelaySeconds: 1
+    command.go:179: 2023-10-20T18:16:28-04:00           periodSeconds: 1
+    command.go:179: 2023-10-20T18:16:28-04:00         name: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00         ports:
+    command.go:179: 2023-10-20T18:16:28-04:00         - containerPort: 8080
+    command.go:179: 2023-10-20T18:16:28-04:00           name: http
+    command.go:179: 2023-10-20T18:16:28-04:00         readinessProbe:
+    command.go:179: 2023-10-20T18:16:28-04:00           exec:
+    command.go:179: 2023-10-20T18:16:28-04:00             command:
+    command.go:179: 2023-10-20T18:16:28-04:00             - sh
+    command.go:179: 2023-10-20T18:16:28-04:00             - -c
+    command.go:179: 2023-10-20T18:16:28-04:00             - test ! -f /tmp/unhealthy
+    command.go:179: 2023-10-20T18:16:28-04:00           failureThreshold: 1
+    command.go:179: 2023-10-20T18:16:28-04:00           initialDelaySeconds: 1
+    command.go:179: 2023-10-20T18:16:28-04:00           periodSeconds: 1
+    command.go:179: 2023-10-20T18:16:28-04:00         startupProbe:
+    command.go:179: 2023-10-20T18:16:28-04:00           failureThreshold: 30
+    command.go:179: 2023-10-20T18:16:28-04:00           httpGet:
+    command.go:179: 2023-10-20T18:16:28-04:00             port: 8080
+    command.go:179: 2023-10-20T18:16:28-04:00           initialDelaySeconds: 1
+    command.go:179: 2023-10-20T18:16:28-04:00           periodSeconds: 1
+    command.go:179: 2023-10-20T18:16:28-04:00       serviceAccountName: static-server
+    command.go:179: 2023-10-20T18:16:28-04:00       terminationGracePeriodSeconds: 0
+    command.go:100: 2023-10-20T18:16:28-04:00 Running command kubectl with args [--context kind-dc1 --namespace ns1 wait --for=condition=available --timeout=5m deploy/static-server]
+    command.go:179: 2023-10-20T18:16:44-04:00 deployment.apps/static-server condition met
+    peering_connect_test.go:227: 2023-10-20T18:16:44-04:00 creating static-client deployments in client peer
+    command.go:100: 2023-10-20T18:16:44-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 apply -k ../fixtures/cases/static-client-tproxy]
+    command.go:179: 2023-10-20T18:16:45-04:00 serviceaccount/static-client created
+    command.go:179: 2023-10-20T18:16:45-04:00 rolebinding.rbac.authorization.k8s.io/static-client created
+    command.go:179: 2023-10-20T18:16:45-04:00 rolebinding.rbac.authorization.k8s.io/static-client-openshift-anyuid created
+    command.go:179: 2023-10-20T18:16:45-04:00 rolebinding.rbac.authorization.k8s.io/static-client-openshift-privileged created
+    command.go:179: 2023-10-20T18:16:45-04:00 service/static-client created
+    command.go:179: 2023-10-20T18:16:45-04:00 deployment.apps/static-client created
+    command.go:100: 2023-10-20T18:16:45-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 kustomize ../fixtures/cases/static-client-tproxy]
+    command.go:179: 2023-10-20T18:16:46-04:00 apiVersion: v1
+    command.go:179: 2023-10-20T18:16:46-04:00 kind: ServiceAccount
+    command.go:179: 2023-10-20T18:16:46-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:46-04:00   name: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00 ---
+    command.go:179: 2023-10-20T18:16:46-04:00 apiVersion: rbac.authorization.k8s.io/v1
+    command.go:179: 2023-10-20T18:16:46-04:00 kind: RoleBinding
+    command.go:179: 2023-10-20T18:16:46-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:46-04:00   name: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00 roleRef:
+    command.go:179: 2023-10-20T18:16:46-04:00   apiGroup: rbac.authorization.k8s.io
+    command.go:179: 2023-10-20T18:16:46-04:00   kind: ClusterRole
+    command.go:179: 2023-10-20T18:16:46-04:00   name: test-psp
+    command.go:179: 2023-10-20T18:16:46-04:00 subjects:
+    command.go:179: 2023-10-20T18:16:46-04:00 - kind: ServiceAccount
+    command.go:179: 2023-10-20T18:16:46-04:00   name: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00 ---
+    command.go:179: 2023-10-20T18:16:46-04:00 apiVersion: rbac.authorization.k8s.io/v1
+    command.go:179: 2023-10-20T18:16:46-04:00 kind: RoleBinding
+    command.go:179: 2023-10-20T18:16:46-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:46-04:00   name: static-client-openshift-anyuid
+    command.go:179: 2023-10-20T18:16:46-04:00 roleRef:
+    command.go:179: 2023-10-20T18:16:46-04:00   apiGroup: rbac.authorization.k8s.io
+    command.go:179: 2023-10-20T18:16:46-04:00   kind: ClusterRole
+    command.go:179: 2023-10-20T18:16:46-04:00   name: system:openshift:scc:anyuid
+    command.go:179: 2023-10-20T18:16:46-04:00 subjects:
+    command.go:179: 2023-10-20T18:16:46-04:00 - kind: ServiceAccount
+    command.go:179: 2023-10-20T18:16:46-04:00   name: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00 ---
+    command.go:179: 2023-10-20T18:16:46-04:00 apiVersion: rbac.authorization.k8s.io/v1
+    command.go:179: 2023-10-20T18:16:46-04:00 kind: RoleBinding
+    command.go:179: 2023-10-20T18:16:46-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:46-04:00   name: static-client-openshift-privileged
+    command.go:179: 2023-10-20T18:16:46-04:00 roleRef:
+    command.go:179: 2023-10-20T18:16:46-04:00   apiGroup: rbac.authorization.k8s.io
+    command.go:179: 2023-10-20T18:16:46-04:00   kind: ClusterRole
+    command.go:179: 2023-10-20T18:16:46-04:00   name: system:openshift:scc:privileged
+    command.go:179: 2023-10-20T18:16:46-04:00 subjects:
+    command.go:179: 2023-10-20T18:16:46-04:00 - kind: ServiceAccount
+    command.go:179: 2023-10-20T18:16:46-04:00   name: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00 ---
+    command.go:179: 2023-10-20T18:16:46-04:00 apiVersion: v1
+    command.go:179: 2023-10-20T18:16:46-04:00 kind: Service
+    command.go:179: 2023-10-20T18:16:46-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:46-04:00   name: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00 spec:
+    command.go:179: 2023-10-20T18:16:46-04:00   ports:
+    command.go:179: 2023-10-20T18:16:46-04:00   - port: 80
+    command.go:179: 2023-10-20T18:16:46-04:00   selector:
+    command.go:179: 2023-10-20T18:16:46-04:00     app: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00 ---
+    command.go:179: 2023-10-20T18:16:46-04:00 apiVersion: apps/v1
+    command.go:179: 2023-10-20T18:16:46-04:00 kind: Deployment
+    command.go:179: 2023-10-20T18:16:46-04:00 metadata:
+    command.go:179: 2023-10-20T18:16:46-04:00   name: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00 spec:
+    command.go:179: 2023-10-20T18:16:46-04:00   replicas: 1
+    command.go:179: 2023-10-20T18:16:46-04:00   selector:
+    command.go:179: 2023-10-20T18:16:46-04:00     matchLabels:
+    command.go:179: 2023-10-20T18:16:46-04:00       app: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00   template:
+    command.go:179: 2023-10-20T18:16:46-04:00     metadata:
+    command.go:179: 2023-10-20T18:16:46-04:00       annotations:
+    command.go:179: 2023-10-20T18:16:46-04:00         consul.hashicorp.com/connect-inject: "true"
+    command.go:179: 2023-10-20T18:16:46-04:00       labels:
+    command.go:179: 2023-10-20T18:16:46-04:00         app: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00       name: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00     spec:
+    command.go:179: 2023-10-20T18:16:46-04:00       containers:
+    command.go:179: 2023-10-20T18:16:46-04:00       - args:
+    command.go:179: 2023-10-20T18:16:46-04:00         - while true; do sleep 30; done;
+    command.go:179: 2023-10-20T18:16:46-04:00         command:
+    command.go:179: 2023-10-20T18:16:46-04:00         - /bin/sh
+    command.go:179: 2023-10-20T18:16:46-04:00         - -c
+    command.go:179: 2023-10-20T18:16:46-04:00         - --
+    command.go:179: 2023-10-20T18:16:46-04:00         env:
+    command.go:179: 2023-10-20T18:16:46-04:00         - name: HOST_IP
+    command.go:179: 2023-10-20T18:16:46-04:00           valueFrom:
+    command.go:179: 2023-10-20T18:16:46-04:00             fieldRef:
+    command.go:179: 2023-10-20T18:16:46-04:00               fieldPath: status.hostIP
+    command.go:179: 2023-10-20T18:16:46-04:00         image: docker.mirror.hashicorp.services/buildpack-deps:jammy-curl
+    command.go:179: 2023-10-20T18:16:46-04:00         name: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00       serviceAccountName: static-client
+    command.go:179: 2023-10-20T18:16:46-04:00       terminationGracePeriodSeconds: 0
+    command.go:100: 2023-10-20T18:16:46-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 wait --for=condition=available --timeout=5m deploy/static-client]
+    command.go:179: 2023-10-20T18:17:07-04:00 deployment.apps/static-client condition met
+    peering_connect_test.go:259: 2023-10-20T18:17:07-04:00 creating exported services
+    command.go:100: 2023-10-20T18:17:07-04:00 Running command kubectl with args [--context kind-dc1 --namespace default apply -k ../fixtures/cases/crd-peers/default]
+    command.go:179: 2023-10-20T18:17:07-04:00 exportedservices.consul.hashicorp.com/default created
+    peering_connect_test.go:266: 2023-10-20T18:17:07-04:00 checking that the connection is not successful because there's no allow intention
+    command.go:100: 2023-10-20T18:17:07-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf http://static-server.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:08-04:00 * Could not resolve host: static-server.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:08-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:08-04:00 curl: (6) Could not resolve host: static-server.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:08-04:00 command terminated with exit code 6
+    peering_connect_test.go:287: 2023-10-20T18:17:08-04:00 creating intentions in server peer
+    peering_connect_test.go:292: 2023-10-20T18:17:08-04:00 checking that connection is successful
+    command.go:100: 2023-10-20T18:17:08-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf http://static-server.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:10-04:00 *   Trying 240.0.0.2:80...
+    command.go:179: 2023-10-20T18:17:10-04:00 * Connected to static-server.virtual.server.consul (240.0.0.2) port 80 (#0)
+    command.go:179: 2023-10-20T18:17:10-04:00 > GET / HTTP/1.1
+    command.go:179: 2023-10-20T18:17:10-04:00 > Host: static-server.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:10-04:00 > User-Agent: curl/7.81.0
+    command.go:179: 2023-10-20T18:17:10-04:00 > Accept: */*
+    command.go:179: 2023-10-20T18:17:10-04:00 > 
+    command.go:179: 2023-10-20T18:17:15-04:00 * Recv failure: Connection reset by peer
+    command.go:179: 2023-10-20T18:17:15-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:15-04:00 curl: (56) Recv failure: Connection reset by peer
+    command.go:179: 2023-10-20T18:17:15-04:00 command terminated with exit code 56
+    command.go:100: 2023-10-20T18:17:17-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf http://static-server.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:17-04:00 *   Trying 240.0.0.2:80...
+    command.go:179: 2023-10-20T18:17:17-04:00 * Connected to static-server.virtual.server.consul (240.0.0.2) port 80 (#0)
+    command.go:179: 2023-10-20T18:17:17-04:00 > GET / HTTP/1.1
+    command.go:179: 2023-10-20T18:17:17-04:00 > Host: static-server.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:17-04:00 > User-Agent: curl/7.81.0
+    command.go:179: 2023-10-20T18:17:17-04:00 > Accept: */*
+    command.go:179: 2023-10-20T18:17:17-04:00 > 
+    command.go:179: 2023-10-20T18:17:17-04:00 "hello world"
+    command.go:179: 2023-10-20T18:17:17-04:00 * Mark bundle as not supporting multiuse
+    command.go:179: 2023-10-20T18:17:17-04:00 < HTTP/1.1 200 OK
+    command.go:179: 2023-10-20T18:17:17-04:00 < X-App-Name: http-echo
+    command.go:179: 2023-10-20T18:17:17-04:00 < X-App-Version: 0.2.4
+    command.go:179: 2023-10-20T18:17:17-04:00 < Date: Fri, 20 Oct 2023 22:17:17 GMT
+    command.go:179: 2023-10-20T18:17:17-04:00 < Content-Length: 14
+    command.go:179: 2023-10-20T18:17:17-04:00 < Content-Type: text/plain; charset=utf-8
+    command.go:179: 2023-10-20T18:17:17-04:00 < 
+    command.go:179: 2023-10-20T18:17:17-04:00 { [14 bytes data]
+    command.go:179: 2023-10-20T18:17:17-04:00 * Connection #0 to host static-server.virtual.server.consul left intact
+    peering_connect_test.go:294: 2023-10-20T18:17:17-04:00 Took 8.988127489s to check if static server connection was successful
+    peering_connect_test.go:319: 2023-10-20T18:17:17-04:00 creating namespace external in server peer
+    command.go:100: 2023-10-20T18:17:17-04:00 Running command kubectl with args [--context kind-dc1 --namespace default create ns external]
+    command.go:179: 2023-10-20T18:17:18-04:00 namespace/external created
+    peering_connect_test.go:326: 2023-10-20T18:17:18-04:00 creating static-server deployment in server peer outside of mesh
+    command.go:100: 2023-10-20T18:17:18-04:00 Running command kubectl with args [--context kind-dc1 --namespace external apply -k ../fixtures/bases/static-server-https]
+    command.go:179: 2023-10-20T18:17:18-04:00 serviceaccount/static-server created
+    command.go:179: 2023-10-20T18:17:18-04:00 rolebinding.rbac.authorization.k8s.io/static-server created
+    command.go:179: 2023-10-20T18:17:18-04:00 rolebinding.rbac.authorization.k8s.io/static-server-openshift-anyuid created
+    command.go:179: 2023-10-20T18:17:18-04:00 rolebinding.rbac.authorization.k8s.io/static-server-openshift-privileged created
+    command.go:179: 2023-10-20T18:17:19-04:00 configmap/static-server-config created
+    command.go:179: 2023-10-20T18:17:19-04:00 service/static-server created
+    command.go:179: 2023-10-20T18:17:19-04:00 deployment.apps/static-server created
+    command.go:100: 2023-10-20T18:17:19-04:00 Running command kubectl with args [--context kind-dc1 --namespace external kustomize ../fixtures/bases/static-server-https]
+    command.go:179: 2023-10-20T18:17:19-04:00 apiVersion: v1
+    command.go:179: 2023-10-20T18:17:19-04:00 kind: ServiceAccount
+    command.go:179: 2023-10-20T18:17:19-04:00 metadata:
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00 ---
+    command.go:179: 2023-10-20T18:17:19-04:00 apiVersion: rbac.authorization.k8s.io/v1
+    command.go:179: 2023-10-20T18:17:19-04:00 kind: RoleBinding
+    command.go:179: 2023-10-20T18:17:19-04:00 metadata:
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00 roleRef:
+    command.go:179: 2023-10-20T18:17:19-04:00   apiGroup: rbac.authorization.k8s.io
+    command.go:179: 2023-10-20T18:17:19-04:00   kind: ClusterRole
+    command.go:179: 2023-10-20T18:17:19-04:00   name: test-psp
+    command.go:179: 2023-10-20T18:17:19-04:00 subjects:
+    command.go:179: 2023-10-20T18:17:19-04:00 - kind: ServiceAccount
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00 ---
+    command.go:179: 2023-10-20T18:17:19-04:00 apiVersion: rbac.authorization.k8s.io/v1
+    command.go:179: 2023-10-20T18:17:19-04:00 kind: RoleBinding
+    command.go:179: 2023-10-20T18:17:19-04:00 metadata:
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server-openshift-anyuid
+    command.go:179: 2023-10-20T18:17:19-04:00 roleRef:
+    command.go:179: 2023-10-20T18:17:19-04:00   apiGroup: rbac.authorization.k8s.io
+    command.go:179: 2023-10-20T18:17:19-04:00   kind: ClusterRole
+    command.go:179: 2023-10-20T18:17:19-04:00   name: system:openshift:scc:anyuid
+    command.go:179: 2023-10-20T18:17:19-04:00 subjects:
+    command.go:179: 2023-10-20T18:17:19-04:00 - kind: ServiceAccount
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00 ---
+    command.go:179: 2023-10-20T18:17:19-04:00 apiVersion: rbac.authorization.k8s.io/v1
+    command.go:179: 2023-10-20T18:17:19-04:00 kind: RoleBinding
+    command.go:179: 2023-10-20T18:17:19-04:00 metadata:
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server-openshift-privileged
+    command.go:179: 2023-10-20T18:17:19-04:00 roleRef:
+    command.go:179: 2023-10-20T18:17:19-04:00   apiGroup: rbac.authorization.k8s.io
+    command.go:179: 2023-10-20T18:17:19-04:00   kind: ClusterRole
+    command.go:179: 2023-10-20T18:17:19-04:00   name: system:openshift:scc:privileged
+    command.go:179: 2023-10-20T18:17:19-04:00 subjects:
+    command.go:179: 2023-10-20T18:17:19-04:00 - kind: ServiceAccount
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00 ---
+    command.go:179: 2023-10-20T18:17:19-04:00 apiVersion: v1
+    command.go:179: 2023-10-20T18:17:19-04:00 data:
+    command.go:179: 2023-10-20T18:17:19-04:00   config: |-
+    command.go:179: 2023-10-20T18:17:19-04:00     {
+    command.go:179: 2023-10-20T18:17:19-04:00       local_certs
+    command.go:179: 2023-10-20T18:17:19-04:00       skip_install_trust
+    command.go:179: 2023-10-20T18:17:19-04:00       auto_https disable_redirects
+    command.go:179: 2023-10-20T18:17:19-04:00     }
+    command.go:179: 2023-10-20T18:17:19-04:00     static-server.default {
+    command.go:179: 2023-10-20T18:17:19-04:00       log
+    command.go:179: 2023-10-20T18:17:19-04:00       respond  "hello world"
+    command.go:179: 2023-10-20T18:17:19-04:00     }
+    command.go:179: 2023-10-20T18:17:19-04:00     :80 {
+    command.go:179: 2023-10-20T18:17:19-04:00       log
+    command.go:179: 2023-10-20T18:17:19-04:00       respond  "hello world"
+    command.go:179: 2023-10-20T18:17:19-04:00     }
+    command.go:179: 2023-10-20T18:17:19-04:00 kind: ConfigMap
+    command.go:179: 2023-10-20T18:17:19-04:00 metadata:
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server-config
+    command.go:179: 2023-10-20T18:17:19-04:00 ---
+    command.go:179: 2023-10-20T18:17:19-04:00 apiVersion: v1
+    command.go:179: 2023-10-20T18:17:19-04:00 kind: Service
+    command.go:179: 2023-10-20T18:17:19-04:00 metadata:
+    command.go:179: 2023-10-20T18:17:19-04:00   labels:
+    command.go:179: 2023-10-20T18:17:19-04:00     app: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00 spec:
+    command.go:179: 2023-10-20T18:17:19-04:00   ports:
+    command.go:179: 2023-10-20T18:17:19-04:00   - name: https-port
+    command.go:179: 2023-10-20T18:17:19-04:00     port: 443
+    command.go:179: 2023-10-20T18:17:19-04:00     protocol: TCP
+    command.go:179: 2023-10-20T18:17:19-04:00     targetPort: https-port
+    command.go:179: 2023-10-20T18:17:19-04:00   - name: http-port
+    command.go:179: 2023-10-20T18:17:19-04:00     port: 80
+    command.go:179: 2023-10-20T18:17:19-04:00     protocol: TCP
+    command.go:179: 2023-10-20T18:17:19-04:00     targetPort: http-port
+    command.go:179: 2023-10-20T18:17:19-04:00   selector:
+    command.go:179: 2023-10-20T18:17:19-04:00     app: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00 ---
+    command.go:179: 2023-10-20T18:17:19-04:00 apiVersion: apps/v1
+    command.go:179: 2023-10-20T18:17:19-04:00 kind: Deployment
+    command.go:179: 2023-10-20T18:17:19-04:00 metadata:
+    command.go:179: 2023-10-20T18:17:19-04:00   name: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00 spec:
+    command.go:179: 2023-10-20T18:17:19-04:00   replicas: 1
+    command.go:179: 2023-10-20T18:17:19-04:00   selector:
+    command.go:179: 2023-10-20T18:17:19-04:00     matchLabels:
+    command.go:179: 2023-10-20T18:17:19-04:00       app: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00   template:
+    command.go:179: 2023-10-20T18:17:19-04:00     metadata:
+    command.go:179: 2023-10-20T18:17:19-04:00       labels:
+    command.go:179: 2023-10-20T18:17:19-04:00         app: static-server
+    command.go:179: 2023-10-20T18:17:19-04:00     spec:
+    command.go:179: 2023-10-20T18:17:19-04:00       containers:
+    command.go:179: 2023-10-20T18:17:19-04:00       - image: caddy:latest
+    command.go:179: 2023-10-20T18:17:19-04:00         name: caddy
+    command.go:179: 2023-10-20T18:17:19-04:00         ports:
+    command.go:179: 2023-10-20T18:17:19-04:00         - containerPort: 443
+    command.go:179: 2023-10-20T18:17:19-04:00           name: https-port
+    command.go:179: 2023-10-20T18:17:19-04:00         - containerPort: 80
+    command.go:179: 2023-10-20T18:17:19-04:00           name: http-port
+    command.go:179: 2023-10-20T18:17:19-04:00         volumeMounts:
+    command.go:179: 2023-10-20T18:17:19-04:00         - mountPath: /data
+    command.go:179: 2023-10-20T18:17:19-04:00           name: data
+    command.go:179: 2023-10-20T18:17:19-04:00         - mountPath: /etc/caddy/
+    command.go:179: 2023-10-20T18:17:19-04:00           name: config
+    command.go:179: 2023-10-20T18:17:19-04:00           readOnly: true
+    command.go:179: 2023-10-20T18:17:19-04:00       volumes:
+    command.go:179: 2023-10-20T18:17:19-04:00       - emptyDir: {}
+    command.go:179: 2023-10-20T18:17:19-04:00         name: data
+    command.go:179: 2023-10-20T18:17:19-04:00       - configMap:
+    command.go:179: 2023-10-20T18:17:19-04:00           items:
+    command.go:179: 2023-10-20T18:17:19-04:00           - key: config
+    command.go:179: 2023-10-20T18:17:19-04:00             path: Caddyfile
+    command.go:179: 2023-10-20T18:17:19-04:00           name: static-server-config
+    command.go:179: 2023-10-20T18:17:19-04:00         name: config
+    command.go:100: 2023-10-20T18:17:19-04:00 Running command kubectl with args [--context kind-dc1 --namespace external wait --for=condition=available --timeout=5m deploy/static-server]
+    command.go:179: 2023-10-20T18:17:21-04:00 deployment.apps/static-server condition met
+    peering_connect_test.go:330: 2023-10-20T18:17:21-04:00 creating a write policy for the static-server
+    peering_connect_test.go:330: 2023-10-20T18:17:22-04:00 getting the terminating gateway role
+    peering_connect_test.go:330: 2023-10-20T18:17:22-04:00 update role with policy
+    peering_connect_test.go:334: 2023-10-20T18:17:22-04:00 creating mesh config entry to enable MeshDestinationOnly
+    peering_connect_test.go:337: 2023-10-20T18:17:22-04:00 creating config entry
+    peering_connect_test.go:337: 2023-10-20T18:17:22-04:00 creating the external namespace in Consul
+    command.go:100: 2023-10-20T18:17:23-04:00 Running command kubectl with args [--context kind-dc1 get -n external pods -l app=static-server -o=jsonpath={.items[0].status.podIP}]
+    command.go:179: 2023-10-20T18:17:23-04:00 10.244.0.60
+    peering_connect_test.go:346: 2023-10-20T18:17:23-04:00 creating config entry
+    peering_connect_test.go:346: 2023-10-20T18:17:23-04:00 creating the external namespace in Consul
+    peering_connect_test.go:347: 2023-10-20T18:17:23-04:00 creating config entry
+    peering_connect_test.go:347: 2023-10-20T18:17:23-04:00 creating the external namespace in Consul
+    peering_connect_test.go:351: 2023-10-20T18:17:24-04:00 testing intentions prevent connections through the terminating gateway
+    command.go:100: 2023-10-20T18:17:24-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:24-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:24-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:24-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:24-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:26-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:27-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:27-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:27-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:27-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:29-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:30-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:30-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:30-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:30-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:32-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:33-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:33-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:33-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:33-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:35-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:36-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:36-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:36-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:36-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:38-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:39-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:39-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:39-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:39-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:41-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:41-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:41-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:41-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:41-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:43-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:44-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:44-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:44-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:44-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:46-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:46-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:46-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:46-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:46-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:48-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:48-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:48-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:48-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:48-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:50-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:51-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:51-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:51-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:51-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:53-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:54-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:54-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:54-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:54-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:56-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:56-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:56-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:56-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:57-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:17:59-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:17:59-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:59-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:17:59-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:17:59-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:01-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:02-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:02-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:02-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:02-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:04-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:04-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:04-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:04-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:04-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:07-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:07-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:07-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:07-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:07-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:09-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:10-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:10-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:10-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:10-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:12-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:12-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:12-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:12-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:12-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:14-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:15-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:15-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:15-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:15-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:17-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:18-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:18-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:18-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:18-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:20-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:20-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:20-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:20-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:21-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:23-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:23-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:23-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:23-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:23-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:25-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:25-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:25-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:25-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:25-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:27-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:28-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:28-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:28-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:28-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:30-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:30-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:30-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:30-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:30-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:32-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:33-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:33-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:33-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:33-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:35-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:35-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:35-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:35-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:35-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:37-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:38-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:38-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:38-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:38-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:40-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:40-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:40-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:40-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:40-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:42-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:42-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:42-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:42-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:42-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:44-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:45-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:45-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:45-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:45-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:47-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:48-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:48-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:48-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:48-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:50-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:50-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:50-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:50-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:50-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:52-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:53-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:53-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:53-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:53-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:55-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:55-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:55-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:55-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:55-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:18:57-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:18:58-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:58-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:18:58-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:18:58-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:00-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:00-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:00-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:00-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:00-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:02-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:03-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:03-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:03-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:03-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:05-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:06-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:06-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:06-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:06-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:08-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:09-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:09-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:09-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:09-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:11-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:12-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:12-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:12-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:12-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:14-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:14-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:14-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:14-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:14-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:16-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:17-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:17-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:17-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:17-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:19-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:19-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:19-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:19-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:19-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:21-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:22-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:22-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:22-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:22-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:24-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:24-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:24-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:24-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:24-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:26-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:27-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:27-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:27-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:27-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:29-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:30-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:30-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:30-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:30-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:32-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:33-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:33-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:33-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:33-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:35-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:35-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:35-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:35-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:36-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:38-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:38-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:38-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:38-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:38-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:40-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:41-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:41-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:41-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:41-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:43-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:43-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:43-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:43-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:43-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:45-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:46-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:46-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:46-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:46-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:48-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:48-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:48-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:48-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:48-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:50-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:51-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:51-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:51-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:51-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:53-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:53-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:53-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:53-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:53-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:55-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:56-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:56-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:56-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:56-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:19:58-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:19:58-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:58-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:19:58-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:19:58-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:00-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:01-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:01-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:01-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:01-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:03-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:03-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:03-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:03-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:03-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:05-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:06-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:06-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:06-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:06-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:08-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:09-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:09-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:09-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:09-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:11-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:11-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:11-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:11-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:11-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:13-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:14-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:14-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:14-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:14-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:16-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:16-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:16-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:16-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:16-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:18-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:19-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:19-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:19-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:19-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:21-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:22-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:22-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:22-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:22-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:24-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:24-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:24-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:24-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:24-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:26-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:27-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:27-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:27-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:27-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:29-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:29-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:29-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:29-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:29-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:31-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:32-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:32-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:32-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:32-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:34-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:34-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:34-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:34-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:34-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:36-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:36-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:36-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:36-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:36-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:38-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:38-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:38-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:38-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:38-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:40-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:43-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:43-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:43-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:43-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:45-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:45-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:45-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:45-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:46-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:48-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:48-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:48-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:48-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:48-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:50-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:50-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:50-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:50-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:50-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:52-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:52-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:52-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:52-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:52-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:55-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:55-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:55-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:55-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:55-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:57-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:57-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:57-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:57-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:57-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:20:59-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:20:59-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:59-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:20:59-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:20:59-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:01-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:03-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:03-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:03-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:03-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:05-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:05-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:05-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:05-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:05-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:08-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:08-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:08-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:08-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:08-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:10-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:11-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:11-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:11-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:11-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:13-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:13-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:13-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:13-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:13-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:15-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:15-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:15-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:15-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:15-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:17-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:18-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:18-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:18-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:18-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:20-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:20-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:20-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:20-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:20-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:22-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:23-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:23-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:23-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:23-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:25-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:25-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:25-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:25-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:25-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:27-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:28-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:28-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:28-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:28-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:30-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:30-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:30-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:30-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:30-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:32-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:32-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:32-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:32-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:32-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:34-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:35-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:35-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:35-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:35-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:37-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:37-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:37-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:37-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:37-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:39-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:39-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:39-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:39-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:39-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:41-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:41-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:41-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:41-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:41-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:43-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:44-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:44-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:44-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:44-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:46-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:46-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:46-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:46-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:46-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:48-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:48-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:48-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:48-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:48-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:50-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:51-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:51-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:51-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:51-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:53-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:54-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:54-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:54-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:54-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:21:56-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:21:58-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:58-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:21:58-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:21:58-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:00-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:00-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:00-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:00-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:00-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:02-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:02-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:02-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:02-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:02-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:04-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:05-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:05-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:05-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:05-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:07-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:07-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:07-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:07-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:07-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:09-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:10-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:10-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:10-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:10-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:12-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:12-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:12-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:12-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:12-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:14-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:14-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:14-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:14-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:14-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:16-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:17-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:17-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:17-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:17-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:19-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:19-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:19-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:19-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:19-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:21-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:21-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:21-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:21-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:22-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:24-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:24-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:24-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:24-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:24-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:26-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:27-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:27-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:27-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:27-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:29-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:29-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:29-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:29-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:29-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:31-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:31-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:31-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:31-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:31-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:33-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:34-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:34-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:34-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:34-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:36-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:36-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:36-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:36-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:36-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:38-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:39-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:39-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:39-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:39-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:41-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:41-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:41-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:41-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:41-04:00 command terminated with exit code 6
+    command.go:100: 2023-10-20T18:22:43-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 exec deploy/static-client -c static-client -- curl -vvvsSf -k https://static-server.external.virtual.server.consul]
+    command.go:179: 2023-10-20T18:22:44-04:00 * Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:44-04:00 * Closing connection 0
+    command.go:179: 2023-10-20T18:22:44-04:00 curl: (6) Could not resolve host: static-server.external.virtual.server.consul
+    command.go:179: 2023-10-20T18:22:44-04:00 command terminated with exit code 6
+    peering_connect_test.go:352: assertions.go:333: 
+        	Error Trace:	/Users/thomaseckert/Repos/consul-k8s/acceptance/framework/k8s/deploy.go:144
+        	            				/Users/thomaseckert/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.14.1/testutil/retry/retry.go:198
+        	            				/Users/thomaseckert/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.14.1/testutil/retry/retry.go:199
+        	            				/Users/thomaseckert/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.14.1/testutil/retry/retry.go:156
+        	            				/Users/thomaseckert/Repos/consul-k8s/acceptance/framework/k8s/deploy.go:137
+        	            				/Users/thomaseckert/Repos/consul-k8s/acceptance/framework/k8s/deploy.go:111
+        	            				/Users/thomaseckert/Repos/consul-k8s/acceptance/framework/k8s/deploy.go:179
+        	            				/Users/thomaseckert/Repos/consul-k8s/acceptance/tests/peering/peering_connect_test.go:352
+        	Error:      	Condition failed!
+        
+        
+    helpers.go:101: 2023-10-20T18:22:44-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    deploy.go:68: 2023-10-20T18:22:44-04:00 dumping logs, pod info, and envoy config for  to /var/folders/f1/2p5xy4c5675f9m84ngmw0d300000gq/T/consul-test118114415/TestPeering_Connect/secure_installation/kind-dc1
+    command.go:100: 2023-10-20T18:22:45-04:00 Running command kubectl with args [--context kind-dc1 --namespace external delete --timeout=120s --ignore-not-found -k ../fixtures/bases/static-server-https]
+    command.go:179: 2023-10-20T18:22:45-04:00 serviceaccount "static-server" deleted
+    command.go:179: 2023-10-20T18:22:45-04:00 rolebinding.rbac.authorization.k8s.io "static-server" deleted
+    command.go:179: 2023-10-20T18:22:45-04:00 rolebinding.rbac.authorization.k8s.io "static-server-openshift-anyuid" deleted
+    command.go:179: 2023-10-20T18:22:45-04:00 rolebinding.rbac.authorization.k8s.io "static-server-openshift-privileged" deleted
+    command.go:179: 2023-10-20T18:22:45-04:00 configmap "static-server-config" deleted
+    command.go:179: 2023-10-20T18:22:45-04:00 service "static-server" deleted
+    command.go:179: 2023-10-20T18:22:45-04:00 deployment.apps "static-server" deleted
+    helpers.go:101: 2023-10-20T18:22:45-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    command.go:100: 2023-10-20T18:22:45-04:00 Running command kubectl with args [--context kind-dc1 --namespace default delete ns external]
+    command.go:179: 2023-10-20T18:22:45-04:00 Warning: deleting cluster-scoped resources, not scoped to the provided namespace
+    command.go:179: 2023-10-20T18:22:45-04:00 namespace "external" deleted
+    helpers.go:101: 2023-10-20T18:22:51-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    command.go:100: 2023-10-20T18:22:51-04:00 Running command kubectl with args [--context kind-dc1 --namespace default delete --timeout=120s --ignore-not-found -k ../fixtures/cases/crd-peers/default]
+    command.go:179: 2023-10-20T18:22:52-04:00 exportedservices.consul.hashicorp.com "default" deleted
+    helpers.go:101: 2023-10-20T18:22:52-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    deploy.go:68: 2023-10-20T18:22:52-04:00 dumping logs, pod info, and envoy config for  to /var/folders/f1/2p5xy4c5675f9m84ngmw0d300000gq/T/consul-test118114415/TestPeering_Connect/secure_installation/kind-dc2
+TestPeering_Connect/secure_installation 2023-10-20T18:22:53-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc2
+    command.go:100: 2023-10-20T18:22:53-04:00 Running command kubectl with args [--context kind-dc2 --namespace ns2 delete --timeout=120s --ignore-not-found -k ../fixtures/cases/static-client-tproxy]
+    command.go:179: 2023-10-20T18:22:53-04:00 serviceaccount "static-client" deleted
+    command.go:179: 2023-10-20T18:22:53-04:00 rolebinding.rbac.authorization.k8s.io "static-client" deleted
+    command.go:179: 2023-10-20T18:22:53-04:00 rolebinding.rbac.authorization.k8s.io "static-client-openshift-anyuid" deleted
+    command.go:179: 2023-10-20T18:22:53-04:00 rolebinding.rbac.authorization.k8s.io "static-client-openshift-privileged" deleted
+    command.go:179: 2023-10-20T18:22:53-04:00 service "static-client" deleted
+    command.go:179: 2023-10-20T18:22:53-04:00 deployment.apps "static-client" deleted
+    helpers.go:101: 2023-10-20T18:22:53-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    port_forward.go:55: 2023-10-20T18:22:53-04:00 stopping monitor of the port-forwarded server
+    deploy.go:68: 2023-10-20T18:22:53-04:00 dumping logs, pod info, and envoy config for  to /var/folders/f1/2p5xy4c5675f9m84ngmw0d300000gq/T/consul-test118114415/TestPeering_Connect/secure_installation/kind-dc1
+TestPeering_Connect/secure_installation 2023-10-20T18:22:57-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc1
+    command.go:100: 2023-10-20T18:22:58-04:00 Running command kubectl with args [--context kind-dc1 --namespace ns1 delete --timeout=120s --ignore-not-found -k ../fixtures/cases/static-server-inject]
+    command.go:179: 2023-10-20T18:22:58-04:00 serviceaccount "static-server" deleted
+    command.go:179: 2023-10-20T18:22:58-04:00 rolebinding.rbac.authorization.k8s.io "static-server" deleted
+    command.go:179: 2023-10-20T18:22:58-04:00 rolebinding.rbac.authorization.k8s.io "static-server-openshift-anyuid" deleted
+    command.go:179: 2023-10-20T18:22:58-04:00 rolebinding.rbac.authorization.k8s.io "static-server-openshift-privileged" deleted
+    command.go:179: 2023-10-20T18:22:58-04:00 service "static-server" deleted
+    command.go:179: 2023-10-20T18:22:58-04:00 deployment.apps "static-server" deleted
+    helpers.go:101: 2023-10-20T18:22:58-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    port_forward.go:55: 2023-10-20T18:22:58-04:00 stopping monitor of the port-forwarded server
+    command.go:100: 2023-10-20T18:22:58-04:00 Running command kubectl with args [--context kind-dc2 --namespace default delete --timeout=120s --ignore-not-found -k ../fixtures/bases/mesh-gateway]
+    command.go:179: 2023-10-20T18:22:59-04:00 proxydefaults.consul.hashicorp.com "global" deleted
+    helpers.go:101: 2023-10-20T18:22:59-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    command.go:100: 2023-10-20T18:22:59-04:00 Running command kubectl with args [--context kind-dc1 --namespace default delete --timeout=120s --ignore-not-found -k ../fixtures/bases/mesh-gateway]
+    command.go:179: 2023-10-20T18:22:59-04:00 proxydefaults.consul.hashicorp.com "global" deleted
+    helpers.go:101: 2023-10-20T18:22:59-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    command.go:100: 2023-10-20T18:22:59-04:00 Running command kubectl with args [--context kind-dc2 --namespace default delete ns ns2]
+    command.go:179: 2023-10-20T18:22:59-04:00 Warning: deleting cluster-scoped resources, not scoped to the provided namespace
+    command.go:179: 2023-10-20T18:22:59-04:00 namespace "ns2" deleted
+    helpers.go:101: 2023-10-20T18:23:06-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    command.go:100: 2023-10-20T18:23:06-04:00 Running command kubectl with args [--context kind-dc1 --namespace default delete ns ns1]
+    command.go:179: 2023-10-20T18:23:06-04:00 Warning: deleting cluster-scoped resources, not scoped to the provided namespace
+    command.go:179: 2023-10-20T18:23:06-04:00 namespace "ns1" deleted
+    helpers.go:101: 2023-10-20T18:23:12-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    command.go:100: 2023-10-20T18:23:12-04:00 Running command kubectl with args [--context kind-dc1 --namespace default delete secret api-token]
+    command.go:179: 2023-10-20T18:23:12-04:00 secret "api-token" deleted
+    command.go:100: 2023-10-20T18:23:12-04:00 Running command kubectl with args [--context kind-dc1 --namespace default delete --timeout=120s -f ../fixtures/bases/peering/peering-dialer.yaml]
+    command.go:179: 2023-10-20T18:23:12-04:00 peeringdialer.consul.hashicorp.com "client" deleted
+    helpers.go:101: 2023-10-20T18:23:12-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    command.go:100: 2023-10-20T18:23:12-04:00 Running command kubectl with args [--context kind-dc2 --namespace default delete --timeout=120s -f ../fixtures/bases/peering/peering-acceptor.yaml]
+    command.go:179: 2023-10-20T18:23:12-04:00 peeringacceptor.consul.hashicorp.com "server" deleted
+    helpers.go:101: 2023-10-20T18:23:12-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    port_forward.go:55: 2023-10-20T18:23:12-04:00 stopping monitor of the port-forwarded server
+    port_forward.go:55: 2023-10-20T18:23:12-04:00 stopping monitor of the port-forwarded server
+    command.go:100: 2023-10-20T18:23:12-04:00 Running command kubectl with args [--context kind-dc2 --namespace default delete --timeout=120s --ignore-not-found -k ../fixtures/bases/mesh-peering]
+    command.go:179: 2023-10-20T18:23:13-04:00 mesh.consul.hashicorp.com "mesh" deleted
+    helpers.go:101: 2023-10-20T18:23:13-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    command.go:100: 2023-10-20T18:23:13-04:00 Running command kubectl with args [--context kind-dc1 --namespace default delete --timeout=120s --ignore-not-found -k ../fixtures/bases/mesh-peering]
+    command.go:179: 2023-10-20T18:23:13-04:00 mesh.consul.hashicorp.com "mesh" deleted
+    helpers.go:101: 2023-10-20T18:23:13-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    helm_cluster.go:131: 2023-10-20T18:23:13-04:00 dumping logs, pod info, and envoy config for release=test-wtqy0j to /var/folders/f1/2p5xy4c5675f9m84ngmw0d300000gq/T/consul-test118114415/TestPeering_Connect/secure_installation/kind-dc2
+TestPeering_Connect/secure_installation 2023-10-20T18:23:14-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc2
+    command.go:100: 2023-10-20T18:23:18-04:00 Running command helm with args [delete --kube-context kind-dc2 --keep-history --namespace default test-wtqy0j]
+E1020 18:23:40.645062   80194 portforward.go:407] an error occurred forwarding 64282 -> 19000: error forwarding port 19000 to pod ce997023883cb964a5c4a93498d32646d8d07fcfd7391ed42ef38e2f6405a974, uid : network namespace for sandbox "ce997023883cb964a5c4a93498d32646d8d07fcfd7391ed42ef38e2f6405a974" is closed
+E1020 18:23:40.645349   80194 portforward.go:233] lost connection to pod
+    port_forward.go:61: 2023-10-20T18:23:41-04:00 lost connection to port-forwarded server; restarting port-forwarding port 64282
+TestPeering_Connect/secure_installation 2023-10-20T18:23:41-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc2
+    command.go:179: 2023-10-20T18:23:41-04:00 release "test-wtqy0j" uninstalled
+    port_forward.go:61: 2023-10-20T18:23:42-04:00 lost connection to port-forwarded server; restarting port-forwarding port 64282
+TestPeering_Connect/secure_installation 2023-10-20T18:23:42-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc2
+    helpers.go:101: 2023-10-20T18:23:42-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    port_forward.go:55: 2023-10-20T18:23:42-04:00 stopping monitor of the port-forwarded server
+    helpers.go:101: 2023-10-20T18:23:42-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    helm_cluster.go:131: 2023-10-20T18:23:42-04:00 dumping logs, pod info, and envoy config for release=test-wtqy0j to /var/folders/f1/2p5xy4c5675f9m84ngmw0d300000gq/T/consul-test118114415/TestPeering_Connect/secure_installation/kind-dc1
+TestPeering_Connect/secure_installation 2023-10-20T18:23:43-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc1
+TestPeering_Connect/secure_installation 2023-10-20T18:23:44-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc1
+    command.go:100: 2023-10-20T18:23:47-04:00 Running command helm with args [delete --kube-context kind-dc1 --keep-history --namespace default test-wtqy0j]
+E1020 18:24:09.814716   80194 portforward.go:407] an error occurred forwarding 64349 -> 19000: error forwarding port 19000 to pod faf955a0b281e64a949c141b8d35fb1fe5a071c3e08dcfd56a4faf93c688c91c, uid : failed to execute portforward in network namespace "/var/run/netns/cni-c10894c7-18a6-22fc-1e80-9008fe804afb": failed to connect to localhost:19000 inside namespace "faf955a0b281e64a949c141b8d35fb1fe5a071c3e08dcfd56a4faf93c688c91c", IPv4: dial tcp4 127.0.0.1:19000: connect: connection refused IPv6 dial tcp6 [::1]:19000: connect: connection refused 
+E1020 18:24:09.815060   80194 portforward.go:233] lost connection to pod
+E1020 18:24:10.525821   80194 portforward.go:407] an error occurred forwarding 64341 -> 19000: error forwarding port 19000 to pod da631955499fe32cdc15c44996e278d8a58713b78c26375bbe8771b8e8b6e888, uid : network namespace for sandbox "da631955499fe32cdc15c44996e278d8a58713b78c26375bbe8771b8e8b6e888" is closed
+E1020 18:24:10.526075   80194 portforward.go:233] lost connection to pod
+    port_forward.go:61: 2023-10-20T18:24:10-04:00 lost connection to port-forwarded server; restarting port-forwarding port 64349
+TestPeering_Connect/secure_installation 2023-10-20T18:24:10-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc1
+    port_forward.go:61: 2023-10-20T18:24:11-04:00 lost connection to port-forwarded server; restarting port-forwarding port 64341
+TestPeering_Connect/secure_installation 2023-10-20T18:24:11-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc1
+    port_forward.go:61: 2023-10-20T18:24:11-04:00 lost connection to port-forwarded server; restarting port-forwarding port 64349
+TestPeering_Connect/secure_installation 2023-10-20T18:24:11-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc1
+    command.go:179: 2023-10-20T18:24:12-04:00 release "test-wtqy0j" uninstalled
+    port_forward.go:61: 2023-10-20T18:24:12-04:00 lost connection to port-forwarded server; restarting port-forwarding port 64341
+TestPeering_Connect/secure_installation 2023-10-20T18:24:12-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc1
+    port_forward.go:61: 2023-10-20T18:24:12-04:00 lost connection to port-forwarded server; restarting port-forwarding port 64349
+TestPeering_Connect/secure_installation 2023-10-20T18:24:12-04:00 client.go:33: Configuring kubectl using config file /Users/thomaseckert/.kube/config with context kind-dc1
+    helpers.go:101: 2023-10-20T18:24:12-04:00 cleaning up resources for TestPeering_Connect/secure_installation
+    port_forward.go:55: 2023-10-20T18:24:12-04:00 stopping monitor of the port-forwarded server
+    port_forward.go:55: 2023-10-20T18:24:12-04:00 stopping monitor of the port-forwarded server
+--- FAIL: TestPeering_Connect (721.87s)
+    --- FAIL: TestPeering_Connect/secure_installation (721.87s)
+FAIL
+FAIL	github.com/hashicorp/consul-k8s/acceptance/tests/peering	722.846s
+FAIL
