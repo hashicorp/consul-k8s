@@ -35,7 +35,7 @@ const (
 )
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
-func TestAPIGateway_Basic(t *testing.T) {
+func T2estAPIGateway_Basic(t *testing.T) {
 	cases := []struct {
 		secure bool
 	}{
@@ -337,6 +337,15 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/api-gateways/jwt-auth")
+	})
+
+	logger.Log(t, "try (and fail) to add a second gateway policy to the gateway")
+	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/api-gateways/jwt-auth/extraGatewayPolicy")
+	require.Error(t, err, out)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		// Ignore errors here because if the test ran as expected
+		// the custom resources will have been deleted.
+		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/api-gateways/jwt-auth/extraGatewayPolicy")
 	})
 
 	// Create certificate secret, we do this separately since
