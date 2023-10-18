@@ -97,3 +97,46 @@ func UpdateTerminatingGatewayRole(t *testing.T, consulClient *api.Client, rules 
 	_, _, err = consulClient.ACL().RoleUpdate(termGwRole, nil)
 	require.NoError(t, err)
 }
+
+func CreateServiceDefaultDestination(t *testing.T, consulClient *api.Client, serviceNamespace string, name string, protocol string, port int, addresses ...string) {
+	t.Helper()
+
+	logger.Log(t, "creating config entry")
+
+	if serviceNamespace != "" {
+		logger.Logf(t, "creating the %s namespace in Consul", serviceNamespace)
+		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
+			Name: serviceNamespace,
+		}, nil)
+		require.NoError(t, err)
+	}
+
+	configEntry := &api.ServiceConfigEntry{
+		Kind:      api.ServiceDefaults,
+		Name:      name,
+		Namespace: serviceNamespace,
+		Protocol:  protocol,
+		Destination: &api.DestinationConfig{
+			Addresses: addresses,
+			Port:      port,
+		},
+	}
+
+	created, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+	require.NoError(t, err)
+	require.True(t, created, "failed to create config entry")
+}
+
+func CreateMeshConfigEntry(t *testing.T, consulClient *api.Client, namespace string) {
+	t.Helper()
+
+	logger.Log(t, "creating mesh config entry to enable MeshDestinationOnly")
+	created, _, err := consulClient.ConfigEntries().Set(&api.MeshConfigEntry{
+		Namespace: namespace,
+		TransparentProxy: api.TransparentProxyMeshConfig{
+			MeshDestinationsOnly: true,
+		},
+	}, nil)
+	require.NoError(t, err)
+	require.True(t, created, "failed to create config entry")
+}
