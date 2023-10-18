@@ -22,7 +22,8 @@ import (
 
 // This test validates that service mesh works properly across two peered clusters.
 // It deploys a static client in one cluster and a static server in another and checks that requests from the client
-// can reach the server. It also deploys a static server pod that is not connected to the mesh, but added as a
+// can reach the server.
+// It also deploys a static server pod that is not connected to the mesh, but added as a
 // destination for a terminating gateway. It checks that requests from the client can reach this server through the
 // terminating gateway via the mesh gateways.
 func TestPeering_Connect(t *testing.T) {
@@ -37,8 +38,6 @@ func TestPeering_Connect(t *testing.T) {
 
 	const staticServerPeer = "server"
 	const staticClientPeer = "client"
-
-	const externalServerNamespace = "external"
 
 	cases := []struct {
 		name        string
@@ -187,11 +186,6 @@ func TestPeering_Connect(t *testing.T) {
 				ConfigPath:  staticServerPeerClusterContext.KubectlOptions(t).ConfigPath,
 				Namespace:   staticServerNamespace,
 			}
-			externalServerOpts := &terratestk8s.KubectlOptions{
-				ContextName: staticServerPeerClusterContext.KubectlOptions(t).ContextName,
-				ConfigPath:  staticServerPeerClusterContext.KubectlOptions(t).ConfigPath,
-				Namespace:   externalServerNamespace,
-			}
 			staticClientOpts := &terratestk8s.KubectlOptions{
 				ContextName: staticClientPeerClusterContext.KubectlOptions(t).ContextName,
 				ConfigPath:  staticClientPeerClusterContext.KubectlOptions(t).ConfigPath,
@@ -202,12 +196,6 @@ func TestPeering_Connect(t *testing.T) {
 			k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
-			})
-
-			logger.Logf(t, "creating namespace %s in server peer", externalServerNamespace)
-			k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", externalServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", externalServerNamespace)
 			})
 
 			logger.Logf(t, "creating namespace %s in client peer", staticClientNamespace)
@@ -271,12 +259,6 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default")
 			})
 
-			// Create the external server in the server Kubernetes cluster, outside the mesh.
-			logger.Log(t, "creating external-server in server peer")
-			k8s.DeployKustomize(t, externalServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
-
-			// Add a service default to set the external server as a destination for the terminating gateway.
-
 			if c.ACLsEnabled {
 				logger.Log(t, "checking that the connection is not successful because there's no allow intention")
 				if cfg.EnableTransparentProxy {
@@ -311,16 +293,80 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
 
-			// Check that requests can reach the external static-server from the static client cluster
+			// Check that requests can reach the external static-server from the static client cluster.
 			if cfg.EnableTransparentProxy {
-				if c.ACLsEnabled { // I may just need acls enabled for all of this.
-					terminatingGatewayRules := `service_prefix "static-server" {policy = "write"}`
+				const (
+					externalServerNamespace   = "external"
+					externalServerServiceName = "static-server.external"
+					externalServerHostnameID  = "static-server-hostname"
+					externalServerIPID        = "static-server-ip"
+					terminatingGatewayRules   = `namespace "external" {
+						policy = "write"
+						service "static-server" {
+							policy = "write"
+						}
+					}`
+				)
+				externalServerOpts := &terratestk8s.KubectlOptions{
+					ContextName: staticServerOpts.ContextName,
+					ConfigPath:  staticServerOpts.ConfigPath,
+					Namespace:   externalServerNamespace,
+				}
+
+				logger.Logf(t, "creating namespace %s in server peer", externalServerNamespace)
+				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", externalServerNamespace)
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", externalServerNamespace)
+				})
+
+				// Create the external server in the server Kubernetes cluster, outside the mesh in the "external" namespace
+				logger.Log(t, "creating static-server deployment in server peer outside of mesh")
+				k8s.DeployKustomize(t, externalServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-https")
+
+				if c.ACLsEnabled {
 					terminatinggateway.UpdateTerminatingGatewayRole(t, staticServerPeerClient, terminatingGatewayRules)
 				}
-			}
 
-			logger.Log(t, "All done! Sleeping now kthxbai")
-			time.Sleep(24 * time.Hour)
+				// Prevent dialing the server directly through the sidecar.
+				terminatinggateway.CreateMeshConfigEntry(t, staticServerPeerClient, "")
+
+				// Create the config entry for the terminating gateway
+				terminatinggateway.CreateTerminatingGatewayConfigEntry(t, staticServerPeerClient, "", "", externalServerHostnameID, externalServerIPID)
+
+				externalServerIP, err := k8s.RunKubectlAndGetOutputE(t, staticServerPeerClusterContext.KubectlOptions(t), "get", "-n", "external", "pods", "-l", "app=static-server", "-o=jsonpath={.items[0].status.podIP}")
+				require.NoError(t, err)
+				require.NotEmpty(t, externalServerIP)
+
+				externalServerHostnameURL := fmt.Sprintf("https://%s.virtual.%s.consul", externalServerServiceName, staticServerPeer)
+				//externalServerIPURL := fmt.Sprintf("http://%s", externalServerIP)
+
+				// Manually register services
+
+				terminatinggateway.CreateServiceDefaultDestination(t, staticServerPeerClient, "", externalServerHostnameID, "http", 443, externalServerServiceName)
+				terminatinggateway.CreateServiceDefaultDestination(t, staticServerPeerClient, "", externalServerIPID, "http", 80, externalServerIP)
+
+				fmt.Println("Break!")
+
+				// If ACLs are enabled, test that intentions prevent connections.
+				if c.ACLsEnabled {
+					logger.Log(t, "testing intentions prevent connections through the terminating gateway")
+					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "-k", externalServerHostnameURL)
+					//k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, externalServerIPURL)
+
+					logger.Log(t, "adding intentions to allow traffic from client ==> server")
+					terminatinggateway.AddIntention(t, staticServerPeerClient, "", staticClientName, "", externalServerHostnameID)
+					terminatinggateway.AddIntention(t, staticServerPeerClient, "", staticClientName, "", externalServerIPID)
+				}
+
+				// Test that we can make a call to the terminating gateway.
+				logger.Log(t, "trying calls to terminating gateway")
+				//k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerIPURL)
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "-k", externalServerHostnameURL)
+			}
+			// TODO check without tproxy the connection using localhost addr
+
+			//logger.Log(t, "All done! Sleeping now kthxbai")
+			//time.Sleep(24 * time.Hour)
 		})
 	}
 }
