@@ -1,3 +1,5 @@
+# Copyright (c) HashiCorp, Inc.
+
 name: build
 on:
   workflow_dispatch:
@@ -26,7 +28,7 @@ jobs:
         # version, because "goenv" can react to it automatically.
         run: |
           echo "Building with Go $(cat .go-version)"
-          echo "::set-output name=go-version::$(cat .go-version)"
+          echo "go-version=$(cat .go-version)" >> $GITHUB_OUTPUT
 
   get-product-version:
     runs-on: ubuntu-latest
@@ -38,7 +40,7 @@ jobs:
         id: get-product-version
         run: |
           make version
-          echo "::set-output name=product-version::$(make version)"
+          echo "product-version=$(make version)" >> $GITHUB_OUTPUT
 
   generate-metadata-file:
     needs: get-product-version
@@ -105,7 +107,7 @@ jobs:
 
       fail-fast: true
 
-    name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build    
+    name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} build
     steps:
       - uses: actions/checkout@v3
 
@@ -141,7 +143,7 @@ jobs:
         if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
         uses: hashicorp/actions-packaging-linux@v1
         with:
-          name: consul-k8s 
+          name: consul-k8s
           description: "consul-k8s provides a cli interface to first-class integrations between Consul and Kubernetes."
           arch: ${{ matrix.goarch }}
           version: ${{ needs.get-product-version.outputs.product-version }}
@@ -230,6 +232,15 @@ jobs:
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
+
+      # This naming convention will be used ONLY for per-commit dev images
+      - name: Set docker dev tag
+        run: |
+          echo "full_dev_tag=${{ env.version }}"
+          echo "full_dev_tag=${{ env.version }}" >> $GITHUB_ENV
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" 
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" >> $GITHUB_ENV
+
       - name: Docker Build (Action)
         uses: hashicorp/actions-docker-build@v1
         with:
@@ -249,8 +260,10 @@ jobs:
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-${{ github.sha }}
 
   build-docker-ubi-redhat-registry:
     name: Docker ${{ matrix.arch }} UBI build for RedHat Registry
@@ -320,6 +333,17 @@ jobs:
         run:
           cp LICENSE ./control-plane
       - uses: hashicorp/actions-docker-build@v1
+
+      # This naming convention will be used ONLY for per-commit dev images
+      - name: Set docker dev tag
+        run: |
+          echo "full_dev_tag=${{ env.version }}"
+          echo "full_dev_tag=${{ env.version }}" >> $GITHUB_ENV
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" 
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" >> $GITHUB_ENV
+
+      - name: Docker Build (Action)
+        uses: hashicorp/actions-docker-build@v1
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
@@ -337,5 +361,7 @@ jobs:
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}    
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi-${{ github.sha }}
