@@ -332,8 +332,6 @@ jobs:
       - name: Copy LICENSE
         run:
           cp LICENSE ./control-plane
-      - uses: hashicorp/actions-docker-build@v1
-
       # This naming convention will be used ONLY for per-commit dev images
       - name: Set docker dev tag
         run: |
