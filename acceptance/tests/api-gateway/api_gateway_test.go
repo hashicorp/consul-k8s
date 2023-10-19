@@ -35,7 +35,7 @@ const (
 )
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
-func T2estAPIGateway_Basic(t *testing.T) {
+func TestAPIGateway_Basic(t *testing.T) {
 	cases := []struct {
 		secure bool
 	}{
@@ -399,7 +399,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
 		require.Len(r, gateway.Status.Listeners, 4)
 
-		require.EqualValues(r, int32(1), gateway.Status.Listeners[0].AttachedRoutes)
+		require.EqualValues(r, int32(2), gateway.Status.Listeners[0].AttachedRoutes)
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
@@ -479,6 +479,8 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	targetHTTPAddress := fmt.Sprintf("http://%s/v1", gatewayAddress)
 	targetHTTPAddressAdmin := fmt.Sprintf("http://%s:8081/admin", gatewayAddress)
 	targetHTTPAddressPet := fmt.Sprintf("http://%s:8081/pet", gatewayAddress)
+	targetHTTPAddressAdminNoAuthOnRoute := fmt.Sprintf("http://%s:8081/admin-no-auth", gatewayAddress)
+	targetHTTPAddressPetNotAuthOnRoute := fmt.Sprintf("http://%s:8081/pet-no-auth", gatewayAddress)
 
 	// Now we create the allow intention.
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -541,6 +543,33 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	// will succeed because we use the token with the correct role and the correct issuer
 	logger.Log(t, "trying calls to api gateway /pet should succeed with JWT token with correct role")
 	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressPet)
+
+	// ensure that routes attached to the same gateway don't cause changes in another route
+	// * the verification on the gateway is the only one used as this route does not define any JWT configuration
+
+	// should fail because we're missing JWT
+	logger.Log(t, "trying calls to api gateway /pet-no-auth should fail without JWT token")
+	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressPetNotAuthOnRoute)
+
+	// should fail because we use the token with the wrong role and correct issuer
+	logger.Log(t, "trying calls to api gateway /pet-no-auth should fail with wrong role")
+	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressPetNotAuthOnRoute)
+
+	// will succeed because we use the token with the correct role and the correct issuer
+	logger.Log(t, "trying calls to api gateway /pet-no-auth should succeed with JWT token with correct role")
+	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressPetNotAuthOnRoute)
+
+	// should fail because we're missing JWT
+	logger.Log(t, "trying calls to api gateway /admin-no-auth should fail without JWT token")
+	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressAdminNoAuthOnRoute)
+
+	// should fail because we use the token with the wrong role and correct issuer
+	logger.Log(t, "trying calls to api gateway /admin-no-auth should fail with wrong role")
+	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressAdminNoAuthOnRoute)
+
+	// will succeed because we use the token with the correct role and the correct issuer
+	logger.Log(t, "trying calls to api gateway /admin-no-auth should succeed with JWT token with correct role")
+	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressAdminNoAuthOnRoute)
 }
 
 func checkStatusCondition(t require.TestingT, conditions []metav1.Condition, toCheck metav1.Condition) {
