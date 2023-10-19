@@ -28,7 +28,7 @@ jobs:
         # version, because "goenv" can react to it automatically.
         run: |
           echo "Building with Go $(cat .go-version)"
-          echo "::set-output name=go-version::$(cat .go-version)"
+          echo "go-version=$(cat .go-version)" >> $GITHUB_OUTPUT
 
   get-product-version:
     runs-on: ubuntu-latest
@@ -40,7 +40,7 @@ jobs:
         id: get-product-version
         run: |
           make version
-          echo "::set-output name=product-version::$(make version)"
+          echo "product-version=$(make version)" >> $GITHUB_OUTPUT
 
   generate-metadata-file:
     needs: get-product-version
@@ -269,6 +269,15 @@ jobs:
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
+
+      # This naming convention will be used ONLY for per-commit dev images
+      - name: Set docker dev tag
+        run: |
+          echo "full_dev_tag=${{ env.version }}"
+          echo "full_dev_tag=${{ env.version }}" >> $GITHUB_ENV
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" 
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" >> $GITHUB_ENV
+
       - name: Docker Build (Action)
         uses: hashicorp/actions-docker-build@v1
         if: ${{ !matrix.fips }}
@@ -289,8 +298,10 @@ jobs:
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-${{ github.sha }}
 
       - name: Docker FIPS Build (Action)
         uses: hashicorp/actions-docker-build@v1
@@ -312,8 +323,10 @@ jobs:
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.minor_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.minor_dev_tag }}-${{ github.sha }}
 
   build-docker-ubi-redhat-registry:
     name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI build for RedHat Registry
@@ -405,6 +418,15 @@ jobs:
       - name: Copy LICENSE
         run:
           cp LICENSE ./control-plane
+
+      # This naming convention will be used ONLY for per-commit dev images
+      - name: Set docker dev tag
+        run: |
+          echo "full_dev_tag=${{ env.version }}"
+          echo "full_dev_tag=${{ env.version }}" >> $GITHUB_ENV
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" 
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" >> $GITHUB_ENV
+
       - name: Docker Build (Action)
         uses: hashicorp/actions-docker-build@v1
         if: ${{ !matrix.fips }}
@@ -425,8 +447,11 @@ jobs:
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi-${{ github.sha }}
+
       - name: Docker FIPS Build (Action)
         uses: hashicorp/actions-docker-build@v1
         if: ${{ matrix.fips }}
@@ -447,5 +472,7 @@ jobs:
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi-${{ github.sha }}
