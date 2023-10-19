@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -50,6 +52,26 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)
+
+			consulClient, _ := consulCluster.SetupConsulClient(t, secure)
+
+			// Check that the ACL token is deleted.
+			if secure {
+				// We need to register the cleanup function before we create the deployments
+				// because golang will execute them in reverse order i.e. the last registered
+				// cleanup function will be executed first.
+				t.Cleanup(func() {
+					retrier := &retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Second}
+					retry.RunWith(retrier, t, func(r *retry.R) {
+						tokens, _, err := consulClient.ACL().TokenList(nil)
+						require.NoError(r, err)
+						for _, token := range tokens {
+							require.NotContains(r, token.Description, multiport)
+							require.NotContains(r, token.Description, connhelper.StaticClientName)
+						}
+					})
+				})
+			}
 
 			logger.Log(t, "creating multiport static-server and static-client deployments")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/bases/v2-multiport-app")
@@ -128,8 +150,6 @@ func TestMeshInject_MultiportService(t *testing.T) {
 				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2345")
 			}
-
-			// TODO: verify that ACL tokens are removed
 		})
 	}
 }
