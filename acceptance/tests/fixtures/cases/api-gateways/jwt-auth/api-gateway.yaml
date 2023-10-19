@@ -15,6 +15,12 @@ spec:
       namespaces:
         from: "All"
   - protocol: HTTP
+    port: 8082
+    name: http-invalid-attach
+    allowedRoutes:
+      namespaces:
+        from: "All"
+  - protocol: HTTP
     port: 80
     name: http
     allowedRoutes:
