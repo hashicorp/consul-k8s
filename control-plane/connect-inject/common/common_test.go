@@ -507,7 +507,7 @@ func Test_ConsulNamespaceIsNotFound(t *testing.T) {
 		},
 		{
 			name:                   "namespace is missing",
-			input:                  status.Error(codes.InvalidArgument, "namespace resource not found"),
+			input:                  status.Error(codes.InvalidArgument, "namespace not found"),
 			expectMissingNamespace: true,
 		},
 	}
@@ -572,7 +572,7 @@ func Test_ConsulNamespaceIsNotFound_ErrorMsg(t *testing.T) {
 	s, ok := status.FromError(err)
 	require.True(t, ok)
 	require.Equal(t, codes.InvalidArgument, s.Code())
-	require.Contains(t, s.Message(), "namespace resource not found")
+	require.Contains(t, s.Message(), "namespace not found")
 
 	require.True(t, ConsulNamespaceIsNotFound(err))
 }
