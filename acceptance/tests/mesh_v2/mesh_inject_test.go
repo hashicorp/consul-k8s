@@ -35,6 +35,7 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			helmValues := map[string]string{
 				"global.experiments[0]": "resource-apis",
+				"global.image":          "ndhanushkodi/consul-dev:expose2",
 				// The UI is not supported for v2 in 1.17, so for now it must be disabled.
 				"ui.enabled":            "false",
 				"connectInject.enabled": "true",

@@ -31,18 +31,18 @@ spec:
           ports:
             - containerPort: 8080
               name: web
-#          livenessProbe:
-#            httpGet:
-#              port: 8080
-#            initialDelaySeconds: 1
-#            failureThreshold: 1
-#            periodSeconds: 1
-#          startupProbe:
-#            httpGet:
-#              port: 8080
-#            initialDelaySeconds: 1
-#            failureThreshold: 30
-#            periodSeconds: 1
+          livenessProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
           readinessProbe:
             exec:
               command: ['sh', '-c', 'test ! -f /tmp/unhealthy-multiport']
@@ -59,19 +59,18 @@ spec:
               # This name is meant to be used alongside the _numeric_ K8s service target port
               # to verify that we can still route traffic to the named port when there's a mismatch.
               name: admin
-# TODO: (v2/nitya) add these probes back when expose paths and L7 are supported.
-#          livenessProbe:
-#            httpGet:
-#              port: 9090
-#            initialDelaySeconds: 1
-#            failureThreshold: 1
-#            periodSeconds: 1
-#          startupProbe:
-#            httpGet:
-#              port: 9090
-#            initialDelaySeconds: 1
-#            failureThreshold: 30
-#            periodSeconds: 1
+          livenessProbe:
+            httpGet:
+              port: 9090
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 9090
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
           readinessProbe:
             exec:
               command: ['sh', '-c', 'test ! -f /tmp/unhealthy-multiport-admin']
