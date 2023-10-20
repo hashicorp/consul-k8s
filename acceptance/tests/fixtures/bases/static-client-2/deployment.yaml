@@ -1,0 +1,30 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-client-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static-client-2
+  template:
+    metadata:
+      name: static-client-2
+      labels:
+        app: static-client-2
+    spec:
+      containers:
+        - name: static-client-2
+          image: docker.mirror.hashicorp.services/buildpack-deps:jammy-curl
+          command: [ "/bin/sh", "-c", "--" ]
+          args: [ "while true; do sleep 30; done;" ]
+          env:
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+      serviceAccountName: static-client-2
+      terminationGracePeriodSeconds: 0 # so deletion is quick

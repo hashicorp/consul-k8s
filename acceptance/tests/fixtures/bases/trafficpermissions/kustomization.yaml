@@ -2,4 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 resources:
-  - trafficpermissions.yaml
+  - trafficpermissions-client-to-multiport.yaml
+  - trafficpermissions-client-to-multiport-2.yaml
+  - trafficpermissions-client-2-to-multiport.yaml
+  - trafficpermissions-client-2-to-multiport-2.yaml

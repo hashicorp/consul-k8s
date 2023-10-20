@@ -4,10 +4,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: static-client
+  name: static-client-2
 spec:
   template:
     metadata:
       annotations:
         "consul.hashicorp.com/mesh-inject": "true"
-        "consul.hashicorp.com/mesh-service-destinations": "web.port.multiport.svc:1234,admin.port.multiport.svc:2345,web.port.multiport-2.svc:4321,admin.port.multiport-2.svc:5432"
+        "consul.hashicorp.com/transparent-proxy": "true"

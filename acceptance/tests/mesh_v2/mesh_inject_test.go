@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -19,12 +21,29 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
-const multiport = "multiport"
-
-// Test that mesh sidecar proxies work for an application with multiple ports. The multiport application is a Pod listening on
-// two ports. This tests inbound connections to each port of the multiport app, and outbound connections from the
-// multiport app to static-server.
+// TestMeshInject_MultiportService asserts that mesh sidecar proxies work for an application with multiple ports.
+// The multiport application is a Pod listening on two ports. This tests inbound connections to each port of the
+// multiport app, and outbound connections from the multiport app to static-server.
 func TestMeshInject_MultiportService(t *testing.T) {
+	sourceOne := connhelper.StaticClientName
+	sourceTwo := fmt.Sprintf("%s-2", sourceOne)
+	sources := []string{sourceOne, sourceTwo}
+	const destinationOne = "multiport"
+	destinationTwo := fmt.Sprintf("%s-2", destinationOne)
+	explicitDestinations := []string{
+		"http://localhost:1234",
+		"http://localhost:2345",
+		"http://localhost:4321",
+		"http://localhost:5432",
+	}
+	implicitDestinations := []string{
+		fmt.Sprintf("http://%s:8080", destinationOne),
+		fmt.Sprintf("http://%s:9090", destinationOne),
+		fmt.Sprintf("http://%s:8080", destinationTwo),
+		fmt.Sprintf("http://%s:9090", destinationTwo),
+	}
+	resetConnectionErrs := []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}
+
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 
@@ -34,16 +53,19 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.experiments[0]": "resource-apis",
-				"global.image":          "ndhanushkodi/consul-dev:expose2",
+				"global.image":                "docker.mirror.hashicorp.services/hashicorppreview/consul:1.17.0",
+				"global.imageK8S":             "docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.3.0",
+				"global.imageConsulDataplane": "docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.3.0",
+				"global.experiments[0]":       "resource-apis",
 				// The UI is not supported for v2 in 1.17, so for now it must be disabled.
 				"ui.enabled":            "false",
 				"connectInject.enabled": "true",
 				// Enable DNS so we can test that DNS redirection _isn't_ set in the pod.
 				"dns.enabled": "true",
 
-				"global.tls.enabled":           strconv.FormatBool(secure),
-				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
+				"global.tls.enabled":                   strconv.FormatBool(secure),
+				"global.acls.manageSystemACLs":         strconv.FormatBool(secure),
+				"global.gossipEncryption.autoGenerate": strconv.FormatBool(secure),
 			}
 
 			releaseName := helpers.RandomName()
@@ -51,29 +73,24 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			consulCluster.Create(t)
 
-			logger.Log(t, "creating multiport static-server and static-client deployments")
+			logger.Log(t, "creating 2 sources and 2 destinations")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/bases/v2-multiport-app")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/bases/v2-multiport-app-2")
 			if cfg.EnableTransparentProxy {
 				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/cases/v2-static-client-inject-tproxy")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/cases/v2-static-client-inject-2-tproxy")
 			} else {
 				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/cases/v2-static-client-inject")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/cases/v2-static-client-inject-2")
 			}
 
-			// Check that static-client has been injected and now has 2 containers.
-			podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "app=static-client",
-			})
-			require.NoError(t, err)
-			require.Len(t, podList.Items, 1)
-			require.Len(t, podList.Items[0].Spec.Containers, 2)
+			// Check that sources has been injected and now has 2 containers.
+			verifyPods(t, ctx, fmt.Sprintf("app=%s", sourceOne), 1, 2)
+			verifyPods(t, ctx, fmt.Sprintf("app=%s", sourceTwo), 1, 2)
 
-			// Check that multiport has been injected and now has 3 containers.
-			podList, err = ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "app=multiport",
-			})
-			require.NoError(t, err)
-			require.Len(t, podList.Items, 1)
-			require.Len(t, podList.Items[0].Spec.Containers, 3)
+			// Check that destinations has been injected and now has 3 containers.
+			verifyPods(t, ctx, fmt.Sprintf("app=%s", destinationOne), 1, 3)
+			verifyPods(t, ctx, fmt.Sprintf("app=%s", destinationTwo), 1, 3)
 
 			if !secure {
 				k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../../tests/fixtures/cases/trafficpermissions-deny")
@@ -81,12 +98,11 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			// Now test that traffic is denied between the source and the destination.
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://multiport:8080")
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://multiport:9090")
+				verifySourceDestinationCommunication(t, ctx, sources, implicitDestinations, resetConnectionErrs)
 			} else {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2345")
+				verifySourceDestinationCommunication(t, ctx, sources, explicitDestinations, resetConnectionErrs)
 			}
+
 			k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../../tests/fixtures/bases/trafficpermissions")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../../tests/fixtures/bases/trafficpermissions")
@@ -94,28 +110,23 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			// TODO: add a trafficpermission to a particular port and validate
 
-			// Check connection from static-client to multiport.
+			// Check connection from sources to destinations.
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://multiport:8080")
+				verifySourceDestinationCommunication(t, ctx, sources, implicitDestinations, nil)
 			} else {
-				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
-			}
-
-			// Check connection from static-client to multiport-admin.
-			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "hello world from 9090 admin", "http://google.com:80")
-				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "hello world from 9090 admin", "http://multiport:9090")
-			} else {
-				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "hello world from 9090 admin", "http://localhost:2345")
+				verifySourceDestinationCommunication(t, ctx, sources, explicitDestinations, nil)
 			}
 
 			// Test that kubernetes readiness status is synced to Consul. This will make the multi port pods unhealthy
 			// and check inbound connections to the multi port pods' services.
 			// Create the files so that the readiness probes of the multi port pod fails.
-			logger.Log(t, "testing k8s -> consul health checks sync by making the multiport unhealthy")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "-c", "multiport", "--", "touch", "/tmp/unhealthy-multiport")
-			logger.Log(t, "testing k8s -> consul health checks sync by making the multiport-admin unhealthy")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "-c", "multiport-admin", "--", "touch", "/tmp/unhealthy-multiport-admin")
+			destinations := []string{destinationOne, destinationTwo}
+			for _, dst := range destinations {
+				logger.Logf(t, "testing k8s -> consul health checks sync by making the %s unhealthy", dst)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+dst, "-c", dst, "--", "touch", "/tmp/unhealthy-"+dst)
+				logger.Logf(t, "testing k8s -> consul health checks sync by making the %s unhealthy", dst+"-admin")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+dst, "-c", dst+"-admin", "--", "touch", "/tmp/unhealthy-"+dst+"-admin")
+			}
 
 			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 			// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -123,14 +134,35 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://multiport:8080")
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://multiport:9090")
+				verifySourceDestinationCommunication(t, ctx, sources, implicitDestinations, resetConnectionErrs)
 			} else {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2345")
+				verifySourceDestinationCommunication(t, ctx, sources, explicitDestinations, resetConnectionErrs)
 			}
 
 			// TODO: verify that ACL tokens are removed
 		})
+	}
+}
+
+func verifyPods(t *testing.T, ctx environment.TestContext, labelSelector string, numPods, numContainers int) {
+	t.Helper()
+	// Check that static-client has been injected and now has 2 containers.
+	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	require.NoError(t, err)
+	require.Len(t, podList.Items, numPods)
+	require.Len(t, podList.Items[0].Spec.Containers, numContainers)
+}
+
+func verifySourceDestinationCommunication(t *testing.T, ctx environment.TestContext, sources []string, destinations []string, failureMsgs []string) {
+	for _, source := range sources {
+		for _, destination := range destinations {
+			if len(failureMsgs) > 0 {
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), source, false, failureMsgs, "", destination)
+			} else {
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), source, destination)
+			}
+		}
 	}
 }

@@ -4,6 +4,7 @@
 apiVersion: auth.consul.hashicorp.com/v2beta1
 kind: TrafficPermissions
 metadata:
-  name: client-to-server
+  name: static-client-2-to-multiport
 spec:
   action: ACTION_DENY
+  

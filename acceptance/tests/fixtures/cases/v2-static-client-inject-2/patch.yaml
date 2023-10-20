@@ -4,7 +4,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: static-client
+  name: static-client-2
 spec:
   template:
     metadata:

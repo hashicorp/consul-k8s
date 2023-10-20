@@ -6,4 +6,7 @@ kind: Kustomization
 resources:
 - ../../bases/trafficpermissions
 patches:
-- path: patch.yaml
+- path: patch-client-to-multiport.yaml
+- path: patch-client-to-multiport-2.yaml
+- path: patch-client-2-to-multiport.yaml
+- path: patch-client-2-to-multiport-2.yaml

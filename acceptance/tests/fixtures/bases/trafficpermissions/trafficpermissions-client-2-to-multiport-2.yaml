@@ -1,0 +1,14 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: auth.consul.hashicorp.com/v2beta1
+kind: TrafficPermissions
+metadata:
+  name: static-client-2-to-multiport-2
+spec:
+  destination:
+    identityName: multiport-2
+  action: ACTION_ALLOW
+  permissions:
+    - sources:
+        - identityName: static-client-2

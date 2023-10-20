@@ -4,10 +4,10 @@
 apiVersion: auth.consul.hashicorp.com/v2beta1
 kind: TrafficPermissions
 metadata:
-  name: client-to-server
+  name: static-client-to-multiport-2
 spec:
   destination:
-    identityName: multiport
+    identityName: multiport-2
   action: ACTION_ALLOW
   permissions:
     - sources:
