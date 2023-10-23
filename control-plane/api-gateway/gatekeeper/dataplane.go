@@ -111,13 +111,14 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	}
 
 	container.SecurityContext = &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: pointer.Bool(true),
-		RunAsNonRoot:           pointer.Bool(true),
+		AllowPrivilegeEscalation: pointer.Bool(false),
 		// Drop any Linux capabilities you'd get other than NET_BIND_SERVICE.
 		Capabilities: &corev1.Capabilities{
 			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
+		ReadOnlyRootFilesystem: pointer.Bool(true),
+		RunAsNonRoot:           pointer.Bool(true),
 	}
 
 	return container, nil
