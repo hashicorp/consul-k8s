@@ -3233,7 +3233,7 @@ terminatingGateways:
   gateways:
     - name: terminating-gateway
 
-# [DEPRECATED] Use connectInject.apiGateway instead. This stanza will be removed with the release of Consul 1.17
+# [DEPRECATED] Use connectInject.apiGateway instead.
 # Configuration settings for the Consul API Gateway integration
 apiGateway:
   # When true the helm chart will install the Consul API Gateway controller
@@ -3248,7 +3248,7 @@ apiGateway:
   # The name (and tag) of the Envoy Docker image used for the
   # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
   # @default: envoyproxy/envoy:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy:v1.25.1"
+  imageEnvoy: "envoyproxy/envoy:v1.25.11"
 
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
   # @type: string
