@@ -7,4 +7,15 @@ metadata:
   name: static-client-2-to-multiport
 spec:
   action: ACTION_DENY
-  
+
+  apiVersion: auth.consul.hashicorp.com/v2beta1
+  kind: TrafficPermissions
+  metadata:
+    name: static-client-2-to-multiport
+  spec:
+    destination:
+      identityName: multiport
+    action: ACTION_ALLOW
+    permissions:
+      - sources:
+          - identityName: static-client-2

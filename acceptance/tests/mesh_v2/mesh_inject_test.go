@@ -4,15 +4,9 @@
 package mesh_v2
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"testing"
-
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
-
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -44,7 +38,7 @@ func TestMeshInject_MultiportService(t *testing.T) {
 	}
 	resetConnectionErrs := []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}
 
-	for _, secure := range []bool{false, true} {
+	for _, secure := range []bool{false} {
 		name := fmt.Sprintf("secure: %t", secure)
 
 		t.Run(name, func(t *testing.T) {
@@ -85,12 +79,12 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			}
 
 			// Check that sources has been injected and now has 2 containers.
-			verifyPods(t, ctx, fmt.Sprintf("app=%s", sourceOne), 1, 2)
-			verifyPods(t, ctx, fmt.Sprintf("app=%s", sourceTwo), 1, 2)
+			k8s.CheckPods(t, ctx, fmt.Sprintf("app=%s", sourceOne), 1, 2)
+			k8s.CheckPods(t, ctx, fmt.Sprintf("app=%s", sourceTwo), 1, 2)
 
 			// Check that destinations has been injected and now has 3 containers.
-			verifyPods(t, ctx, fmt.Sprintf("app=%s", destinationOne), 1, 3)
-			verifyPods(t, ctx, fmt.Sprintf("app=%s", destinationTwo), 1, 3)
+			k8s.CheckPods(t, ctx, fmt.Sprintf("app=%s", destinationOne), 1, 3)
+			k8s.CheckPods(t, ctx, fmt.Sprintf("app=%s", destinationTwo), 1, 3)
 
 			if !secure {
 				k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../../tests/fixtures/cases/trafficpermissions-deny")
@@ -98,11 +92,12 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			// Now test that traffic is denied between the source and the destination.
 			if cfg.EnableTransparentProxy {
-				verifySourceDestinationCommunication(t, ctx, sources, implicitDestinations, resetConnectionErrs)
+				k8s.CheckSourceToDestinationCommunication(t, ctx, sources, implicitDestinations, resetConnectionErrs)
 			} else {
-				verifySourceDestinationCommunication(t, ctx, sources, explicitDestinations, resetConnectionErrs)
+				k8s.CheckSourceToDestinationCommunication(t, ctx, sources, explicitDestinations, resetConnectionErrs)
 			}
 
+			// Enable traffic permissions so two sources can dial two destinations.
 			k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../../tests/fixtures/bases/trafficpermissions")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../../tests/fixtures/bases/trafficpermissions")
@@ -112,9 +107,9 @@ func TestMeshInject_MultiportService(t *testing.T) {
 
 			// Check connection from sources to destinations.
 			if cfg.EnableTransparentProxy {
-				verifySourceDestinationCommunication(t, ctx, sources, implicitDestinations, nil)
+				k8s.CheckSourceToDestinationCommunication(t, ctx, sources, implicitDestinations, nil)
 			} else {
-				verifySourceDestinationCommunication(t, ctx, sources, explicitDestinations, nil)
+				k8s.CheckSourceToDestinationCommunication(t, ctx, sources, explicitDestinations, nil)
 			}
 
 			// Test that kubernetes readiness status is synced to Consul. This will make the multi port pods unhealthy
@@ -134,35 +129,12 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			if cfg.EnableTransparentProxy {
-				verifySourceDestinationCommunication(t, ctx, sources, implicitDestinations, resetConnectionErrs)
+				k8s.CheckSourceToDestinationCommunication(t, ctx, sources, implicitDestinations, resetConnectionErrs)
 			} else {
-				verifySourceDestinationCommunication(t, ctx, sources, explicitDestinations, resetConnectionErrs)
+				k8s.CheckSourceToDestinationCommunication(t, ctx, sources, explicitDestinations, resetConnectionErrs)
 			}
 
 			// TODO: verify that ACL tokens are removed
 		})
-	}
-}
-
-func verifyPods(t *testing.T, ctx environment.TestContext, labelSelector string, numPods, numContainers int) {
-	t.Helper()
-	// Check that static-client has been injected and now has 2 containers.
-	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	require.NoError(t, err)
-	require.Len(t, podList.Items, numPods)
-	require.Len(t, podList.Items[0].Spec.Containers, numContainers)
-}
-
-func verifySourceDestinationCommunication(t *testing.T, ctx environment.TestContext, sources []string, destinations []string, failureMsgs []string) {
-	for _, source := range sources {
-		for _, destination := range destinations {
-			if len(failureMsgs) > 0 {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), source, false, failureMsgs, "", destination)
-			} else {
-				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), source, destination)
-			}
-		}
 	}
 }

@@ -4,7 +4,10 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"strings"
 	"testing"
@@ -190,6 +193,33 @@ func CheckStaticServerHTTPConnectionFailing(t *testing.T, options *k8s.KubectlOp
 	CheckStaticServerConnection(t, options, sourceApp, false, []string{
 		"curl: (22) The requested URL returned error: 403",
 	}, "", curlArgs...)
+}
+
+// CheckSourceToDestinationCommunication verifies that each source can or cannot communicate with each destination.  When
+// failureMsgs is not empty, the communication is expected to fail with the given failureMsgs.  When failureMsgs is nil or empty,
+// then communication is expected to succeed.
+func CheckSourceToDestinationCommunication(t *testing.T, ctx environment.TestContext, sources []string, destinations []string, failureMsgs []string) {
+	t.Helper()
+	for _, source := range sources {
+		for _, destination := range destinations {
+			if len(failureMsgs) > 0 {
+				CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), source, false, failureMsgs, "", destination)
+			} else {
+				CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), source, destination)
+			}
+		}
+	}
+}
+
+// CheckPods verifies that the pod list count and the # of containers in each pods matches the expected inputs for a given label selector.
+func CheckPods(t *testing.T, ctx environment.TestContext, labelSelector string, numPods, numContainers int) {
+	t.Helper()
+	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	require.NoError(t, err)
+	require.Len(t, podList.Items, numPods)
+	require.Len(t, podList.Items[0].Spec.Containers, numContainers)
 }
 
 // labelMapToString takes a label map[string]string
