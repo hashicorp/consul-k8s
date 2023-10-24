@@ -127,9 +127,9 @@ func (r *GatewayCache) subscribeToGateway(ctx context.Context, ref api.ResourceR
 		}, backoff.WithContext(retryBackoff, ctx)); err != nil {
 			// if we timeout we don't care about the error message because it's expected to happen on long polls
 			// any other error we want to alert on
-			if !refs.Contains(strings.ToLower(err.Error()), "timeout") &&
-				!refs.Contains(strings.ToLower(err.Error()), "no such host") &&
-				!refs.Contains(strings.ToLower(err.Error()), "connection refused") {	
+			if !strings.Contains(strings.ToLower(err.Error()), "timeout") &&
+				!strings.Contains(strings.ToLower(err.Error()), "no such host") &&
+				!strings.Contains(strings.ToLower(err.Error()), "connection refused") {	
 				r.logger.Error(err, fmt.Sprintf("unable to fetch config entry for gateway: %s/%s", ref.Namespace, ref.Name))
 			}
 			continue
