@@ -12,8 +12,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/api"
-	"github.com/stretchr/testify/require"
 )
 
 // Test that terminating gateways work in a default and secure installations.
@@ -57,7 +55,7 @@ func TestTerminatingGateway(t *testing.T) {
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Register the external service
-			registerExternalService(t, consulClient, "")
+			helpers.RegisterExternalService(t, consulClient, "", staticServerName)
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
@@ -95,34 +93,3 @@ func TestTerminatingGateway(t *testing.T) {
 const staticServerPolicyRules = `service "static-server" {
   policy = "write"
 }`
-
-func registerExternalService(t *testing.T, consulClient *api.Client, namespace string) {
-	t.Helper()
-
-	address := staticServerName
-	service := &api.AgentService{
-		ID:      staticServerName,
-		Service: staticServerName,
-		Port:    80,
-	}
-
-	if namespace != "" {
-		address = fmt.Sprintf("%s.%s", staticServerName, namespace)
-		service.Namespace = namespace
-
-		logger.Logf(t, "creating the %s namespace in Consul", namespace)
-		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
-			Name: namespace,
-		}, nil)
-		require.NoError(t, err)
-	}
-
-	logger.Log(t, "registering the external service")
-	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
-		Node:     "legacy_node",
-		Address:  address,
-		NodeMeta: map[string]string{"external-node": "true", "external-probe": "true"},
-		Service:  service,
-	}, nil)
-	require.NoError(t, err)
-}
