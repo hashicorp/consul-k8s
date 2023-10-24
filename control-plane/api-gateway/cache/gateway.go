@@ -131,7 +131,7 @@ func (r *GatewayCache) subscribeToGateway(ctx context.Context, ref api.ResourceR
 			// any other error we want to alert on
 			if !strings.Contains(strings.ToLower(err.Error()), "timeout") &&
 				!strings.Contains(strings.ToLower(err.Error()), "no such host") &&
-				!strings.Contains(strings.ToLower(err.Error()), "connection refused") {	
+				!strings.Contains(strings.ToLower(err.Error()), "connection refused") {
 				r.logger.Error(err, fmt.Sprintf("unable to fetch config entry for gateway: %s/%s", ref.Namespace, ref.Name))
 			}
 			continue
