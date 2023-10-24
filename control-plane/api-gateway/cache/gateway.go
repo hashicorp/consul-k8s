@@ -6,14 +6,16 @@ package cache
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/cenkalti/backoff"
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 type GatewayCache struct {
@@ -125,7 +127,13 @@ func (r *GatewayCache) subscribeToGateway(ctx context.Context, ref api.ResourceR
 
 			return nil
 		}, backoff.WithContext(retryBackoff, ctx)); err != nil {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch config entry for gateway: %s/%s", ref.Namespace, ref.Name))
+			// if we timeout we don't care about the error message because it's expected to happen on long polls
+			// any other error we want to alert on
+			if !strings.Contains(strings.ToLower(err.Error()), "timeout") &&
+				!strings.Contains(strings.ToLower(err.Error()), "no such host") &&
+				!strings.Contains(strings.ToLower(err.Error()), "connection refused") {
+				r.logger.Error(err, fmt.Sprintf("unable to fetch config entry for gateway: %s/%s", ref.Namespace, ref.Name))
+			}
 			continue
 		}
 
