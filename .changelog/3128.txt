@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: only alert on valid errors, not timeouts in gateway
+```
