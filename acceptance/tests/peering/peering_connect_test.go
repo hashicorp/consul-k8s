@@ -296,27 +296,22 @@ func TestPeering_Connect(t *testing.T) {
 			// Check that requests can reach the external static-server from the static client cluster.
 			if cfg.EnableTransparentProxy {
 				const (
-					externalServerNamespace   = "external"
-					externalServerServiceName = "static-server.external"
-					externalServerHostnameID  = "static-server-hostname"
-					externalServerIPID        = "static-server-ip"
-					terminatingGatewayRules   = `namespace "external" {
-						policy = "write"
-						service "static-server" {
-							policy = "write"
-						}
-					}`
+					externalServerK8sNamespace = "external"
+					externalServerServiceName  = "static-server.external"
+					externalServerHostnameID   = "static-server-hostname"
+					externalServerIPID         = "static-server-ip"
+					terminatingGatewayRules    = `service_prefix "static-server" {policy = "write"}`
 				)
 				externalServerOpts := &terratestk8s.KubectlOptions{
 					ContextName: staticServerOpts.ContextName,
 					ConfigPath:  staticServerOpts.ConfigPath,
-					Namespace:   externalServerNamespace,
+					Namespace:   externalServerK8sNamespace,
 				}
 
-				logger.Logf(t, "creating namespace %s in server peer", externalServerNamespace)
-				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", externalServerNamespace)
+				logger.Logf(t, "creating namespace %s in server peer", externalServerK8sNamespace)
+				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", externalServerK8sNamespace)
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", externalServerNamespace)
+					k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", externalServerK8sNamespace)
 				})
 
 				// Create the external server in the server Kubernetes cluster, outside the mesh in the "external" namespace
@@ -338,20 +333,19 @@ func TestPeering_Connect(t *testing.T) {
 				require.NotEmpty(t, externalServerIP)
 
 				externalServerHostnameURL := fmt.Sprintf("https://%s.virtual.%s.consul", externalServerServiceName, staticServerPeer)
-				//externalServerIPURL := fmt.Sprintf("http://%s", externalServerIP)
+				externalServerIPURL := fmt.Sprintf("http://%s", externalServerIP)
+				fmt.Println(externalServerIPURL)
 
-				// Manually register services
+				helpers.RegisterExternalService(t, staticServerPeerClient, "", externalServerServiceName)
 
 				terminatinggateway.CreateServiceDefaultDestination(t, staticServerPeerClient, "", externalServerHostnameID, "http", 443, externalServerServiceName)
 				terminatinggateway.CreateServiceDefaultDestination(t, staticServerPeerClient, "", externalServerIPID, "http", 80, externalServerIP)
-
-				fmt.Println("Break!")
 
 				// If ACLs are enabled, test that intentions prevent connections.
 				if c.ACLsEnabled {
 					logger.Log(t, "testing intentions prevent connections through the terminating gateway")
 					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, "-k", externalServerHostnameURL)
-					//k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, externalServerIPURL)
+					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, externalServerIPURL)
 
 					logger.Log(t, "adding intentions to allow traffic from client ==> server")
 					terminatinggateway.AddIntention(t, staticServerPeerClient, "", staticClientName, "", externalServerHostnameID)
@@ -360,13 +354,9 @@ func TestPeering_Connect(t *testing.T) {
 
 				// Test that we can make a call to the terminating gateway.
 				logger.Log(t, "trying calls to terminating gateway")
-				//k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerIPURL)
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "-k", externalServerHostnameURL)
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerIPURL)
 			}
-			// TODO check without tproxy the connection using localhost addr
-
-			//logger.Log(t, "All done! Sleeping now kthxbai")
-			//time.Sleep(24 * time.Hour)
 		})
 	}
 }
