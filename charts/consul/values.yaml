@@ -639,7 +639,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.4-dev
+  imageConsulDataplane: docker.io/hashicorppreview/consul-dataplane:1.4.0-dev-0e18da45b85751abedd7cec496b17873266d65b6
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
