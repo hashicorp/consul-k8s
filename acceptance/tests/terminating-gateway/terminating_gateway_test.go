@@ -55,7 +55,7 @@ func TestTerminatingGateway(t *testing.T) {
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Register the external service
-			helpers.RegisterExternalService(t, consulClient, "", staticServerName)
+			helpers.RegisterExternalService(t, consulClient, "", staticServerName, staticServerName, 80)
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
