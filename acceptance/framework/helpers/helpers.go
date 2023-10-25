@@ -149,16 +149,13 @@ func MergeMaps(a, b map[string]string) {
 }
 
 // RegisterExternalService registers an external service with Consul for testing purposes.
-// The function creates a Consul service registration for the specified service, optionally within a namespace.
-// If a namespace is provided, it creates the namespace in Consul and associates the service with it.
-func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, name string) {
+func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, name, address string, port int) {
 	t.Helper()
 
-	address := name
 	service := &api.AgentService{
 		ID:      name,
 		Service: name,
-		Port:    80,
+		Port:    port,
 	}
 
 	if namespace != "" {
