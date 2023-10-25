@@ -4,12 +4,10 @@
 package cache
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -23,32 +21,11 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
-func init() {
-	gatewayTpl = template.Must(template.New("root").Parse(strings.TrimSpace(gatewayRulesTpl)))
-}
+func init() {}
 
 type templateArgs struct {
 	EnableNamespaces bool
 }
-
-var (
-	gatewayTpl      *template.Template
-	gatewayRulesTpl = `
-mesh = "read"
-{{- if .EnableNamespaces }}
-  namespace_prefix "" {
-{{- end }}
-		node_prefix "" {
-			policy = "read"
-		}
-    service_prefix "" {
-      policy = "write"
-    }
-{{- if .EnableNamespaces }}
-	}
-{{- end }}
-`
-)
 
 const (
 	namespaceWildcard = "*"
@@ -334,30 +311,7 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	return nil
 }
 
-func (c *Cache) ensurePolicy(client *api.Client) (string, error) {
-	policy := c.gatewayPolicy()
-
-	created, _, err := client.ACL().PolicyCreate(&policy, &api.WriteOptions{})
-
-	if isPolicyExistsErr(err, policy.Name) {
-		existing, _, err := client.ACL().PolicyReadByName(policy.Name, &api.QueryOptions{})
-		if err != nil {
-			return "", err
-		}
-		return existing.ID, nil
-	}
-	if err != nil {
-		return "", err
-	}
-	return created.ID, nil
-}
-
 func (c *Cache) ensureRole(client *api.Client) (string, error) {
-	policyID, err := c.ensurePolicy(client)
-	if err != nil {
-		return "", err
-	}
-
 	aclRoleName := "managed-gateway-acl-role"
 
 	aclRole, _, err := client.ACL().RoleReadByName(aclRoleName, &api.QueryOptions{})
@@ -371,28 +325,13 @@ func (c *Cache) ensureRole(client *api.Client) (string, error) {
 	role := &api.ACLRole{
 		Name:        aclRoleName,
 		Description: "ACL Role for Managed API Gateways",
-		Policies:    []*api.ACLLink{{ID: policyID}},
+		TemplatedPolicie: []*api.ACLTemplatedPolicy{
+			{Name: "builtin/api-gateway"},
+		},
 	}
 
 	_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
 	return aclRoleName, err
-}
-
-func (c *Cache) gatewayPolicy() api.ACLPolicy {
-	var data bytes.Buffer
-	if err := gatewayTpl.Execute(&data, templateArgs{
-		EnableNamespaces: c.namespacesEnabled,
-	}); err != nil {
-		// just panic if we can't compile the simple template
-		// as it means something else is going severly wrong.
-		panic(err)
-	}
-
-	return api.ACLPolicy{
-		Name:        "api-gateway-token-policy",
-		Description: "API Gateway token Policy",
-		Rules:       data.String(),
-	}
 }
 
 // Get returns a config entry from the cache that corresponds to the given resource reference.
