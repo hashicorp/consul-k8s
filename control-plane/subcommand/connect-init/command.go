@@ -116,7 +116,7 @@ func (c *Command) Run(args []string) int {
 	// First do the ACL Login, if necessary.
 	if c.flagACLAuthMethod != "" {
 		// loginMeta is the default metadata that we pass to the consul login API.
-		loginMeta := map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName)}
+		loginMeta := map[string]string{"pod": fmt.Sprintf("%s/%s", c.flagPodNamespace, c.flagPodName), connectinject.MetaKeyPodUID: os.Getenv("POD_UID")}
 		loginParams := common.LoginParams{
 			AuthMethod:      c.flagACLAuthMethod,
 			Namespace:       c.flagAuthMethodNamespace,

@@ -38,6 +38,7 @@ const (
 	MetaKeyKubeServiceName     = "k8s-service-name"
 	MetaKeyKubeNS              = "k8s-namespace"
 	MetaKeyManagedBy           = "managed-by"
+	MetaKeyPodUID              = "pod-uid"
 	TokenMetaPodNameKey        = "pod"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
@@ -127,9 +128,6 @@ type EndpointsController struct {
 
 	Scheme *runtime.Scheme
 	context.Context
-
-	// startTime of a Reconcile loop, will reset on each reconcile loop.
-	startTime time.Time
 }
 
 // Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
@@ -137,8 +135,6 @@ type EndpointsController struct {
 func (r *EndpointsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
 	var serviceEndpoints corev1.Endpoints
-
-	r.startTime = time.Now()
 
 	// Ignore the request if the namespace of the endpoint is not allowed.
 	if shouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
@@ -446,6 +442,7 @@ func (r *EndpointsController) createServiceRegistrations(pod corev1.Pod, service
 		MetaKeyKubeServiceName: serviceEndpoints.Name,
 		MetaKeyKubeNS:          serviceEndpoints.Namespace,
 		MetaKeyManagedBy:       managedByValue,
+		MetaKeyPodUID:          string(pod.UID),
 	}
 	for k, v := range pod.Annotations {
 		if strings.HasPrefix(k, annotationMeta) && strings.TrimPrefix(k, annotationMeta) != "" {
@@ -782,7 +779,7 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 
 			if r.AuthMethod != "" && serviceDeregistered {
 				r.Log.Info("reconciling ACL tokens for service", "svc", serviceRegistration.Service)
-				err = r.deleteACLTokensForServiceInstance(client, serviceRegistration.Service, k8sSvcNamespace, serviceRegistration.Meta[MetaKeyPodName])
+				err = r.deleteACLTokensForServiceInstance(client, serviceRegistration.Service, k8sSvcNamespace, serviceRegistration.Meta[MetaKeyPodName], serviceRegistration.Meta[MetaKeyPodUID])
 				if err != nil {
 					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", serviceRegistration.Service)
 					return err
@@ -796,8 +793,8 @@ func (r *EndpointsController) deregisterServiceOnAllAgents(ctx context.Context, 
 
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
-// has been configured with and will only delete tokens for the provided podName.
-func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Client, serviceName, k8sNS, podName string) error {
+// has been configured with and will only delete tokens for the provided podName and podUID.
+func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Client, serviceName, k8sNS, podName string, podUID string) error {
 	// Skip if podName is empty.
 	if podName == "" {
 		return nil
@@ -824,11 +821,7 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Clie
 			tokenPodName := strings.TrimPrefix(tokenMeta[TokenMetaPodNameKey], k8sNS+"/")
 
 			// If we can't find token's pod, delete it.
-			if tokenPodName == podName {
-				if r.startTime.Before(token.CreateTime) {
-					r.Log.Info("token created after start time of current reconcile loop, skipping deletion...", "start_time", r.startTime, "accessor_id", token.AccessorID, "create_time", token.CreateTime)
-					continue
-				}
+			if tokenPodName == podName && tokenMeta[MetaKeyPodUID] == podUID {
 				r.Log.Info("deleting ACL token for pod", "name", podName)
 				_, err = client.ACL().TokenDelete(token.AccessorID, nil)
 				if err != nil {
