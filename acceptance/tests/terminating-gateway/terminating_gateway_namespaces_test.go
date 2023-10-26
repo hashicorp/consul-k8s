@@ -102,7 +102,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, nsK8SOptions, staticClientName, staticServerLocalAddress)
 
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				AddIntention(t, consulClient, testNamespace, staticClientName, testNamespace, staticServerName)
+				AddIntention(t, consulClient, "", testNamespace, staticClientName, testNamespace, staticServerName)
 			}
 
 			// Test that we can make a call to the terminating gateway.
@@ -211,7 +211,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, ns2K8SOptions, staticClientName, staticServerLocalAddress)
 
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				AddIntention(t, consulClient, StaticClientNamespace, staticClientName, testNamespace, staticServerName)
+				AddIntention(t, consulClient, "", StaticClientNamespace, staticClientName, testNamespace, staticServerName)
 			}
 
 			// Test that we can make a call to the terminating gateway

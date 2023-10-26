@@ -19,7 +19,7 @@ const (
 	staticServerLocalAddress = "http://localhost:1234"
 )
 
-func AddIntention(t *testing.T, consulClient *api.Client, sourceNS, sourceService, destinationNS, destinationsService string) {
+func AddIntention(t *testing.T, consulClient *api.Client, sourcePeer, sourceNS, sourceService, destinationNS, destinationsService string) {
 	t.Helper()
 
 	logger.Log(t, fmt.Sprintf("creating %s => %s intention", sourceService, destinationsService))
@@ -32,6 +32,7 @@ func AddIntention(t *testing.T, consulClient *api.Client, sourceNS, sourceServic
 				Name:      sourceService,
 				Namespace: sourceNS,
 				Action:    api.IntentionActionAllow,
+				Peer:      sourcePeer,
 			},
 		},
 	}, nil)

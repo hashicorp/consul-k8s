@@ -13,9 +13,3 @@ spec:
   - name: static-server-hostname
     consumers:
     - peer: client
-  - name: static-server-ip
-    consumers:
-      - peer: client
-  - name: example
-    consumers:
-      - peer: client
