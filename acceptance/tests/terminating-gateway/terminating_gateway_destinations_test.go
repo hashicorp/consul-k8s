@@ -111,8 +111,8 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
 
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				AddIntention(t, consulClient, "", staticClientName, "", staticServerHostnameID)
-				AddIntention(t, consulClient, "", staticClientName, "", staticServerIPID)
+				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerHostnameID)
+				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerIPID)
 			}
 
 			// Test that we can make a call to the terminating gateway.
