@@ -305,6 +305,7 @@ func TestPeering_Connect(t *testing.T) {
 					terminatingGatewayRules    = `service_prefix "static-server" {policy = "write"}`
 				)
 
+				// Create the namespace for the "external" static server.
 				externalServerOpts := &terratestk8s.KubectlOptions{
 					ContextName: staticServerOpts.ContextName,
 					ConfigPath:  staticServerOpts.ConfigPath,
@@ -320,35 +321,33 @@ func TestPeering_Connect(t *testing.T) {
 				logger.Log(t, "creating static-server deployment in server peer outside of mesh")
 				k8s.DeployKustomize(t, externalServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
-				if c.ACLsEnabled {
-					terminatinggateway.UpdateTerminatingGatewayRole(t, staticServerPeerClient, terminatingGatewayRules)
-				}
-
 				// Prevent dialing the server directly through the sidecar.
 				terminatinggateway.CreateMeshConfigEntry(t, staticServerPeerClient, "")
 				terminatinggateway.CreateMeshConfigEntry(t, staticClientPeerClient, "")
 
 				// Create the config entry for the terminating gateway
 				terminatinggateway.CreateTerminatingGatewayConfigEntry(t, staticServerPeerClient, "", "", externalServerHostnameID)
+				if c.ACLsEnabled {
+					// Allow the terminating gateway write access to services prefixed with "static-server".
+					terminatinggateway.UpdateTerminatingGatewayRole(t, staticServerPeerClient, terminatingGatewayRules)
+				}
 
-				externalServerIP, err := k8s.RunKubectlAndGetOutputE(t, staticServerPeerClusterContext.KubectlOptions(t), "get", "-n", "external", "pods", "-l", "app=static-server", "-o=jsonpath={.items[0].status.podIP}")
-				require.NoError(t, err)
-				require.NotEmpty(t, externalServerIP)
-
+				// This is the URL that the static-client will use to dial the external static server in the server peer.
 				externalServerHostnameURL := fmt.Sprintf("http://%s.virtual.%s.consul", externalServerHostnameID, staticServerPeer)
 
+				// Register the external service.
 				terminatinggateway.CreateServiceDefaultDestination(t, staticServerPeerClient, "", externalServerHostnameID, "http", 80, fmt.Sprintf("%s.%s", externalServerServiceName, externalServerK8sNamespace))
+				// (t-eckert) this shouldn't be required but currently is with HTTP services. It works around a bug.
+				helpers.RegisterExternalService(t, staticServerPeerClient, "", externalServerHostnameID, fmt.Sprintf("%s.%s", externalServerServiceName, externalServerK8sNamespace), 80)
 
+				// Export the external service to the client peer.
 				logger.Log(t, "creating exported external services")
 				k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/external")
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/external")
 				})
 
-				// (t-eckert) this shouldn't be required but currently is with HTTP services. It works around a bug.
-				helpers.RegisterExternalService(t, staticServerPeerClient, "", externalServerHostnameID, fmt.Sprintf("%s.%s", externalServerServiceName, externalServerK8sNamespace), 80)
-
-				// If ACLs are enabled, test that intentions prevent connections.
+				// If ACLs are enabled, test that deny intentions prevent connections.
 				if c.ACLsEnabled {
 					logger.Log(t, "testing intentions prevent connections through the terminating gateway")
 					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, externalServerHostnameURL)
