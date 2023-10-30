@@ -19,7 +19,7 @@ spec:
       containers:
         - name: fake-server
           # TODO: move this to a hashicorp mirror
-          image: docker.io/chaapppie/fakeserver:latest
+          image: docker.io/achooo/fakeserver:latest
           ports:
             - containerPort: 443
               name: https
