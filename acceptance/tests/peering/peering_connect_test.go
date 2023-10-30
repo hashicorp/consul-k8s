@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// This test validates that service mesh works properly across two peered clusters.
+// TestPeering_Connect validates that service mesh works properly across two peered clusters.
 // It deploys a static client in one cluster and a static server in another and checks that requests from the client
 // can reach the server.
 // It also deploys a static server pod that is not connected to the mesh, but added as a
