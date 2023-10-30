@@ -9,7 +9,7 @@ spec:
   services:
   - name: static-server
     consumers:
-      - peer: client
+    - peer: client
   - name: static-server-hostname
     consumers:
     - peer: client
