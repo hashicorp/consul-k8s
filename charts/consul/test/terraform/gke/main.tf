@@ -21,7 +21,7 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.28."
+  version_prefix = "1.27."
 }
 
 # We assume that the subnets are already created to save time.
@@ -39,20 +39,14 @@ resource "google_container_cluster" "cluster" {
   location           = var.zone
   # 2023-10-30 - There is a bug with the terraform provider where lastest_master_version is not being returned by the
   # api. Hardcode GKE version for now.
-  #min_master_version = data.google_container_engine_versions.main.latest_master_version
-  #node_version       = data.google_container_engine_versions.main.latest_master_version
-  min_master_version = "1.28.2-gke.1157000"
-  node_version       = "1.28.2-gke.1157000"
+  min_master_version = data.google_container_engine_versions.main.latest_master_version
+  node_version       = data.google_container_engine_versions.main.latest_master_version
   node_config {
     tags         = ["consul-k8s-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
   }
-  subnetwork      = data.google_compute_subnetwork.subnet.name
-  resource_labels = var.labels
-
-  release_channel {
-    channel = "RAPID"
-  }
+  subnetwork          = data.google_compute_subnetwork.subnet.name
+  resource_labels     = var.labels
   deletion_protection = false
 }
 
