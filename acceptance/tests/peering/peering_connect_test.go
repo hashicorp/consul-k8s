@@ -3,8 +3,6 @@ package peering
 import (
 	"context"
 	"fmt"
-	terminatinggateway "github.com/hashicorp/consul-k8s/acceptance/tests/terminating-gateway"
-	"github.com/hashicorp/go-version"
 	"strconv"
 	"testing"
 	"time"
@@ -14,8 +12,10 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	terminatinggateway "github.com/hashicorp/consul-k8s/acceptance/tests/terminating-gateway"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
