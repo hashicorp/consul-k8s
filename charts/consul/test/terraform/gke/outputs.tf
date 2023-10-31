@@ -12,3 +12,7 @@ output "cluster_names" {
 output "kubeconfigs" {
   value = [for cl in google_container_cluster.cluster : format("$HOME/.kube/%s", cl.name)]
 }
+
+output "versions" {
+  value = data.google_container_engine_versions.main
+}
