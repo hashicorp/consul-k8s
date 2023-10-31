@@ -809,7 +809,6 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Clie
 		// Only delete tokens that:
 		// * have been created with the auth method configured for this endpoints controller
 		// * have a single service identity whose service name is the same as 'serviceName'
-		// * created before start time of current reconcile loop
 		if token.AuthMethod == r.AuthMethod &&
 			len(token.ServiceIdentities) == 1 &&
 			token.ServiceIdentities[0].ServiceName == serviceName {
