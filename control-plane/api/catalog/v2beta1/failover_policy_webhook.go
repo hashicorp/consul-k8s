@@ -17,7 +17,7 @@ import (
 
 // +kubebuilder:object:generate=false
 
-type TCPRouteWebhook struct {
+type FailoverPolicyWebhook struct {
 	Logger logr.Logger
 
 	// ConsulTenancyConfig contains the injector's namespace and partition configuration.
@@ -27,7 +27,7 @@ type TCPRouteWebhook struct {
 	client.Client
 }
 
-var _ common.MeshConfigLister = &TCPRouteWebhook{}
+var _ common.MeshConfigLister = &FailoverPolicyWebhook{}
 
 // NOTE: The path value in the below line is the path to the webhook.
 // If it is updated, run code-gen, update subcommand/inject-connect/command.go
@@ -35,10 +35,10 @@ var _ common.MeshConfigLister = &TCPRouteWebhook{}
 //
 // NOTE: The below line cannot be combined with any other comment. If it is it will break the code generation.
 //
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v2beta1-tcproute,mutating=true,failurePolicy=fail,groups=mesh.consul.hashicorp.com,resources=tcproute,versions=v2beta1,name=mutate-tcproute.mesh.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v2beta1-failoverpolicy,mutating=true,failurePolicy=fail,groups=catalog.consul.hashicorp.com,resources=failoverpolicy,versions=v2beta1,name=mutate-failoverpolicy.catalog.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
-func (v *TCPRouteWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
-	var resource TCPRoute
+func (v *FailoverPolicyWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
+	var resource FailoverPolicy
 	err := v.decoder.Decode(req, &resource)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
@@ -47,8 +47,8 @@ func (v *TCPRouteWebhook) Handle(ctx context.Context, req admission.Request) adm
 	return common.ValidateMeshConfig(ctx, req, v.Logger, v, &resource, v.ConsulTenancyConfig)
 }
 
-func (v *TCPRouteWebhook) List(ctx context.Context) ([]common.MeshConfig, error) {
-	var resourceList TCPRouteList
+func (v *FailoverPolicyWebhook) List(ctx context.Context) ([]common.MeshConfig, error) {
+	var resourceList FailoverPolicyList
 	if err := v.Client.List(ctx, &resourceList); err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (v *TCPRouteWebhook) List(ctx context.Context) ([]common.MeshConfig, error)
 	return entries, nil
 }
 
-func (v *TCPRouteWebhook) InjectDecoder(d *admission.Decoder) error {
+func (v *FailoverPolicyWebhook) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }

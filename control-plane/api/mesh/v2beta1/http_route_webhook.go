@@ -35,7 +35,7 @@ var _ common.MeshConfigLister = &HTTPRouteWebhook{}
 //
 // NOTE: The below line cannot be combined with any other comment. If it is it will break the code generation.
 //
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-v2beta1-httproute,mutating=true,failurePolicy=fail,groups=auth.consul.hashicorp.com,resources=httproute,versions=v2beta1,name=mutate-httproute.auth.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-v2beta1-httproute,mutating=true,failurePolicy=fail,groups=mesh.consul.hashicorp.com,resources=httproute,versions=v2beta1,name=mutate-httproute.mesh.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
 func (v *HTTPRouteWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var resource HTTPRoute

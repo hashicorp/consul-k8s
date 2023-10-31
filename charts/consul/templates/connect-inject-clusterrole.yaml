@@ -94,6 +94,26 @@ rules:
     - patch
     - update
 - apiGroups:
+    - catalog.consul.hashicorp.com
+  resources:
+    - failoverpolicies
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - catalog.consul.hashicorp.com
+  resources:
+    - failoverpolicies/status
+  verbs:
+    - get
+    - patch
+    - update
+- apiGroups:
     - mesh.consul.hashicorp.com
   resources:
     - grpcroutes

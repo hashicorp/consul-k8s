@@ -229,19 +229,19 @@ webhooks:
       path: /mutate-v1alpha1-controlplanerequestlimits
   failurePolicy: Fail
   admissionReviewVersions:
-    - "v1beta1"
-    - "v1"
+  - "v1beta1"
+  - "v1"
   name: mutate-controlplanerequestlimit.consul.hashicorp.com
   rules:
-    - apiGroups:
-        - consul.hashicorp.com
-      apiVersions:
-        - v1alpha1
-      operations:
-        - CREATE
-        - UPDATE
-      resources:
-        - controlplanerequestlimits
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - controlplanerequestlimits
   sideEffects: None
 - name: {{ template "consul.fullname" . }}-connect-injector.consul.hashicorp.com
   # The webhook will fail scheduling all pods that are not part of consul if all replicas of the webhook are unhealthy.
@@ -313,8 +313,8 @@ webhooks:
   - "v1beta1"
   - "v1"
 - admissionReviewVersions:
-    - v1beta1
-    - v1
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
@@ -323,20 +323,20 @@ webhooks:
   failurePolicy: Fail
   name: mutate-samenessgroup.consul.hashicorp.com
   rules:
-    - apiGroups:
-        - consul.hashicorp.com
-      apiVersions:
-        - v1alpha1
-      operations:
-        - CREATE
-        - UPDATE
-      resources:
-        - samenessgroups
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - samenessgroups
   sideEffects: None
 {{- if (mustHas "resource-apis" .Values.global.experiments) }}
 - admissionReviewVersions:
-    - v1beta1
-    - v1
+  - v1beta1
+  - v1
   clientConfig:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
@@ -345,15 +345,120 @@ webhooks:
   failurePolicy: Fail
   name: mutate-trafficpermissions.auth.consul.hashicorp.com
   rules:
-    - apiGroups:
-        - auth.consul.hashicorp.com
-      apiVersions:
-        - v2beta1
-      operations:
-        - CREATE
-        - UPDATE
-      resources:
-        - trafficpermissions
+  - apiGroups:
+    - auth.consul.hashicorp.com
+    apiVersions:
+    - v2beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - trafficpermissions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v2beta1-failoverpolicy
+  failurePolicy: Fail
+  name: mutate-failoverpolicy.catalog.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - catalog.consul.hashicorp.com
+    apiVersions:
+    - v2beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - failoverpolicy
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v2beta1-grpcroute
+  failurePolicy: Fail
+  name: mutate-grpcroute.mesh.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - mesh.consul.hashicorp.com
+    apiVersions:
+    - v2beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - grpcroute
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v2beta1-httproute
+  failurePolicy: Fail
+  name: mutate-httproute.mesh.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - mesh.consul.hashicorp.com
+    apiVersions:
+    - v2beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - httproute
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v2beta1-proxyconfiguration
+  failurePolicy: Fail
+  name: mutate-proxyconfiguration.mesh.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - mesh.consul.hashicorp.com
+    apiVersions:
+    - v2beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - proxyconfiguration
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v2beta1-tcproute
+  failurePolicy: Fail
+  name: mutate-tcproute.mesh.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - mesh.consul.hashicorp.com
+    apiVersions:
+    - v2beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - tcproute
   sideEffects: None
 {{- end }}
 {{- end }}

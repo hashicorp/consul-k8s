@@ -31,6 +31,7 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
+	catalogv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/catalog/v2beta1"
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -164,8 +165,9 @@ func init() {
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
 
 	// V2 resources
-	utilruntime.Must(authv2beta1.AddAuthToScheme(scheme))
-	utilruntime.Must(meshv2beta1.AddMeshToScheme(scheme))
+	utilruntime.Must(authv2beta1.AddToScheme(scheme))
+	utilruntime.Must(catalogv2beta1.AddToScheme(scheme))
+	utilruntime.Must(meshv2beta1.AddToScheme(scheme))
 
 	//+kubebuilder:scaffold:scheme
 }

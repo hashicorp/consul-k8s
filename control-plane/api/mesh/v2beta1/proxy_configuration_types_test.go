@@ -18,6 +18,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -425,6 +426,296 @@ func TestProxyConfiguration_Resource(t *testing.T) {
 			}, test.CmpProtoIgnoreOrder()...)
 			diff := cmp.Diff(expected, actual, opts...)
 			require.Equal(t, "", diff, "ProxyConfiguration do not match")
+		})
+	}
+}
+
+func TestProxyConfiguration_Validate(t *testing.T) {
+	cases := []struct {
+		name            string
+		input           *ProxyConfiguration
+		expectedErrMsgs []string
+	}{
+		{
+			name: "kitchen sink OK",
+			input: &ProxyConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-config",
+				},
+				Spec: pbmesh.ProxyConfiguration{
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{
+							"test-prefix",
+						},
+						Names: []string{
+							"test-name",
+							"test-other-name",
+						},
+						Filter: "test-filter",
+					},
+					DynamicConfig: &pbmesh.DynamicConfig{
+						Mode: pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT,
+						TransparentProxy: &pbmesh.TransparentProxy{
+							OutboundListenerPort: 1500,
+							DialedDirectly:       false,
+						},
+						MutualTlsMode: pbmesh.MutualTLSMode_MUTUAL_TLS_MODE_DEFAULT,
+						LocalConnection: map[string]*pbmesh.ConnectionConfig{
+							"test-connection": {
+								ConnectTimeout: &durationpb.Duration{Seconds: 5},
+								RequestTimeout: &durationpb.Duration{Seconds: 10},
+							},
+						},
+						InboundConnections: &pbmesh.InboundConnectionsConfig{
+							MaxInboundConnections:     1,
+							BalanceInboundConnections: 5,
+						},
+						MeshGatewayMode: pbmesh.MeshGatewayMode_MESH_GATEWAY_MODE_UNSPECIFIED,
+						ExposeConfig: &pbmesh.ExposeConfig{
+							ExposePaths: []*pbmesh.ExposePath{
+								{
+									ListenerPort:  80,
+									Path:          "/test-path",
+									LocalPathPort: 8080,
+									Protocol:      pbmesh.ExposePathProtocol_EXPOSE_PATH_PROTOCOL_HTTP2,
+								},
+							},
+						},
+					},
+					BootstrapConfig: &pbmesh.BootstrapConfig{
+						StatsdUrl:                       "statsdUrl",
+						DogstatsdUrl:                    "dogstatsUrl",
+						StatsTags:                       []string{"test-tags", "another-test-tag"},
+						PrometheusBindAddr:              "promBindAddr",
+						StatsBindAddr:                   "statsBindAddr",
+						ReadyBindAddr:                   "readyBindAddr",
+						OverrideJsonTpl:                 "overrideJsonTpl",
+						StaticClustersJson:              "staticClustersJson",
+						StaticListenersJson:             "staticListenersJson",
+						StatsSinksJson:                  "statsSinkJson",
+						StatsConfigJson:                 "statsConfigJson",
+						StatsFlushInterval:              "statsFlushInterval",
+						TracingConfigJson:               "tracingConfigJson",
+						TelemetryCollectorBindSocketDir: "bindSocketDir/",
+					},
+				},
+			},
+			expectedErrMsgs: nil,
+		},
+		{
+			name: "missing workloads",
+			input: &ProxyConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-config",
+				},
+				Spec: pbmesh.ProxyConfiguration{
+					DynamicConfig: &pbmesh.DynamicConfig{
+						Mode: pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT,
+						TransparentProxy: &pbmesh.TransparentProxy{
+							OutboundListenerPort: 1500,
+							DialedDirectly:       false,
+						},
+						MutualTlsMode: pbmesh.MutualTLSMode_MUTUAL_TLS_MODE_DEFAULT,
+						LocalConnection: map[string]*pbmesh.ConnectionConfig{
+							"test-connection": {
+								ConnectTimeout: &durationpb.Duration{Seconds: 5},
+								RequestTimeout: &durationpb.Duration{Seconds: 10},
+							},
+						},
+						InboundConnections: &pbmesh.InboundConnectionsConfig{
+							MaxInboundConnections:     1,
+							BalanceInboundConnections: 5,
+						},
+						MeshGatewayMode: pbmesh.MeshGatewayMode_MESH_GATEWAY_MODE_UNSPECIFIED,
+						ExposeConfig: &pbmesh.ExposeConfig{
+							ExposePaths: []*pbmesh.ExposePath{
+								{
+									ListenerPort:  80,
+									Path:          "/test-path",
+									LocalPathPort: 8080,
+									Protocol:      pbmesh.ExposePathProtocol_EXPOSE_PATH_PROTOCOL_HTTP2,
+								},
+							},
+						},
+					},
+					BootstrapConfig: &pbmesh.BootstrapConfig{
+						StatsdUrl:                       "statsdUrl",
+						DogstatsdUrl:                    "dogstatsUrl",
+						StatsTags:                       []string{"test-tags", "another-test-tag"},
+						PrometheusBindAddr:              "promBindAddr",
+						StatsBindAddr:                   "statsBindAddr",
+						ReadyBindAddr:                   "readyBindAddr",
+						OverrideJsonTpl:                 "overrideJsonTpl",
+						StaticClustersJson:              "staticClustersJson",
+						StaticListenersJson:             "staticListenersJson",
+						StatsSinksJson:                  "statsSinkJson",
+						StatsConfigJson:                 "statsConfigJson",
+						StatsFlushInterval:              "statsFlushInterval",
+						TracingConfigJson:               "tracingConfigJson",
+						TelemetryCollectorBindSocketDir: "bindSocketDir/",
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.workloads: Required value: cannot be empty`,
+			},
+		},
+		{
+			name: "missing dynamic config and bootstrap config",
+			input: &ProxyConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-config",
+				},
+				Spec: pbmesh.ProxyConfiguration{
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{
+							"test-prefix",
+						},
+						Names: []string{
+							"test-name",
+							"test-other-name",
+						},
+						Filter: "test-filter",
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec: Required value: at least one of "bootstrap_config" or "dynamic_config" fields must be set`,
+			},
+		},
+		{
+			name: "unsupported dynamic config fields",
+			input: &ProxyConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-config",
+				},
+				Spec: pbmesh.ProxyConfiguration{
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{
+							"test-prefix",
+						},
+						Names: []string{
+							"test-name",
+							"test-other-name",
+						},
+						Filter: "test-filter",
+					},
+					DynamicConfig: &pbmesh.DynamicConfig{
+						Mode: pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT,
+						TransparentProxy: &pbmesh.TransparentProxy{
+							OutboundListenerPort: 8080,
+							DialedDirectly:       true, // unsupported.
+						},
+						MutualTlsMode:   pbmesh.MutualTLSMode_MUTUAL_TLS_MODE_PERMISSIVE, // unsupported.
+						MeshGatewayMode: pbmesh.MeshGatewayMode_MESH_GATEWAY_MODE_REMOTE, // unsupported.
+						AccessLogs: &pbmesh.AccessLogsConfig{ // unsupported.
+							Enabled:             true,
+							DisableListenerLogs: true,
+						},
+						PublicListenerJson:      "unsupported",
+						ListenerTracingJson:     "unsupported",
+						LocalClusterJson:        "unsupported",
+						LocalWorkloadAddress:    "unsupported",
+						LocalWorkloadPort:       8080,
+						LocalWorkloadSocketPath: "unsupported",
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.dynamicConfig.mutualTlsMode: Invalid value: MUTUAL_TLS_MODE_PERMISSIVE: field is currently not supported`,
+				`spec.dynamicConfig.meshGatewayMode: Invalid value: MESH_GATEWAY_MODE_REMOTE: field is currently not supported`,
+				`spec.dynamicConfig.accessLogs: Invalid value`,
+				`spec.dynamicConfig.publicListenerJson: Invalid value: "unsupported": field is currently not supported`,
+				`spec.dynamicConfig.listenerTracingJson: Invalid value: "unsupported": field is currently not supported`,
+				`spec.dynamicConfig.localClusterJson: Invalid value: "unsupported": field is currently not supported`,
+				`spec.dynamicConfig.localWorkloadAddress: Invalid value: "unsupported": field is currently not supported`,
+				`spec.dynamicConfig.localWorkloadPort: Invalid value: 0x1f90: field is currently not supported`,
+				`spec.dynamicConfig.localWorkloadSocketPath: Invalid value: "unsupported": field is currently not supported`,
+				`spec.dynamicConfig.transparentProxy.dialedDirectely: Invalid value: true: field is currently not supported`,
+			},
+		},
+		{
+			name: "invalid ports",
+			input: &ProxyConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-config",
+				},
+				Spec: pbmesh.ProxyConfiguration{
+					Workloads: &pbcatalog.WorkloadSelector{
+						Prefixes: []string{
+							"test-prefix",
+						},
+						Names: []string{
+							"test-name",
+							"test-other-name",
+						},
+						Filter: "test-filter",
+					},
+					DynamicConfig: &pbmesh.DynamicConfig{
+						Mode: pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT,
+						TransparentProxy: &pbmesh.TransparentProxy{
+							OutboundListenerPort: 0,
+							DialedDirectly:       false,
+						},
+						MutualTlsMode: pbmesh.MutualTLSMode_MUTUAL_TLS_MODE_DEFAULT,
+						LocalConnection: map[string]*pbmesh.ConnectionConfig{
+							"test-connection": {
+								ConnectTimeout: &durationpb.Duration{Seconds: 5},
+								RequestTimeout: &durationpb.Duration{Seconds: 10},
+							},
+						},
+						InboundConnections: &pbmesh.InboundConnectionsConfig{
+							MaxInboundConnections:     1,
+							BalanceInboundConnections: 5,
+						},
+						MeshGatewayMode: pbmesh.MeshGatewayMode_MESH_GATEWAY_MODE_UNSPECIFIED,
+						ExposeConfig: &pbmesh.ExposeConfig{
+							ExposePaths: []*pbmesh.ExposePath{
+								{
+									ListenerPort:  0,
+									Path:          "/test-path",
+									LocalPathPort: 0,
+									Protocol:      pbmesh.ExposePathProtocol_EXPOSE_PATH_PROTOCOL_HTTP2,
+								},
+							},
+						},
+					},
+					BootstrapConfig: &pbmesh.BootstrapConfig{
+						StatsdUrl:                       "statsdUrl",
+						DogstatsdUrl:                    "dogstatsUrl",
+						StatsTags:                       []string{"test-tags", "another-test-tag"},
+						PrometheusBindAddr:              "promBindAddr",
+						StatsBindAddr:                   "statsBindAddr",
+						ReadyBindAddr:                   "readyBindAddr",
+						OverrideJsonTpl:                 "overrideJsonTpl",
+						StaticClustersJson:              "staticClustersJson",
+						StaticListenersJson:             "staticListenersJson",
+						StatsSinksJson:                  "statsSinkJson",
+						StatsConfigJson:                 "statsConfigJson",
+						StatsFlushInterval:              "statsFlushInterval",
+						TracingConfigJson:               "tracingConfigJson",
+						TelemetryCollectorBindSocketDir: "bindSocketDir/",
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.dynamicConfig.transparentProxy.outboundListenerPort: Invalid value: 0x0: port number is outside the range 1 to 65535`,
+				`spec.dynamicConfig.exposeConfig.exposePaths[0].listenerPort: Invalid value: 0x0: port number is outside the range 1 to 65535`,
+				`spec.dynamicConfig.exposeConfig.exposePaths[0].localPathPort: Invalid value: 0x0: port number is outside the range 1 to 65535`,
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.input.Validate(common.ConsulTenancyConfig{})
+			if len(tc.expectedErrMsgs) != 0 {
+				require.Error(t, err)
+				for _, s := range tc.expectedErrMsgs {
+					require.Contains(t, err.Error(), s)
+				}
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

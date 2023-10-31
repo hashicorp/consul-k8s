@@ -4,9 +4,11 @@ package v2beta1
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -146,14 +148,134 @@ func (in *ProxyConfiguration) SyncedConditionStatus() corev1.ConditionStatus {
 	return condition.Status
 }
 
-func (in *ProxyConfiguration) Validate(_ common.ConsulTenancyConfig) error {
+func (in *ProxyConfiguration) Validate(tenancy common.ConsulTenancyConfig) error {
 	var errs field.ErrorList
+	var config pbmesh.ProxyConfiguration
+	path := field.NewPath("spec")
+
+	res := in.Resource(tenancy.ConsulDestinationNamespace, tenancy.ConsulPartition)
+
+	if err := res.Data.UnmarshalTo(&config); err != nil {
+		return fmt.Errorf("error parsing resource data as type %q: %s", &config, err)
+	}
+
+	if err := validateSelector(config.Workloads, path.Child("workloads")); err != nil {
+		errs = append(errs, err...)
+	}
+
+	if config.DynamicConfig == nil && config.BootstrapConfig == nil {
+		errs = append(errs, field.Required(path, "at least one of \"bootstrap_config\" or \"dynamic_config\" fields must be set"))
+	}
+
+	if err := validateDynamicConfig(config.DynamicConfig, path.Child("dynamicConfig")); err != nil {
+		errs = append(errs, err...)
+	}
+
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: MeshGroup, Kind: common.ProxyConfiguration},
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+func validateDynamicConfig(cfg *pbmesh.DynamicConfig, path *field.Path) field.ErrorList {
+	if cfg == nil {
+		return nil
+	}
+
+	var errs field.ErrorList
+
+	if cfg.MutualTlsMode != pbmesh.MutualTLSMode_MUTUAL_TLS_MODE_DEFAULT {
+		errs = append(errs, field.Invalid(path.Child("mutualTlsMode"), cfg.MutualTlsMode, "field is currently not supported"))
+	}
+
+	if cfg.MeshGatewayMode != pbmesh.MeshGatewayMode_MESH_GATEWAY_MODE_UNSPECIFIED {
+		errs = append(errs, field.Invalid(path.Child("meshGatewayMode"), cfg.MeshGatewayMode, "field is currently not supported"))
+	}
+
+	if cfg.AccessLogs != nil {
+		errs = append(errs, field.Invalid(path.Child("accessLogs"), cfg.AccessLogs, "field is currently not supported"))
+	}
+
+	if cfg.PublicListenerJson != "" {
+		errs = append(errs, field.Invalid(path.Child("publicListenerJson"), cfg.PublicListenerJson, "field is currently not supported"))
+	}
+
+	if cfg.ListenerTracingJson != "" {
+		errs = append(errs, field.Invalid(path.Child("listenerTracingJson"), cfg.ListenerTracingJson, "field is currently not supported"))
+	}
+
+	if cfg.LocalClusterJson != "" {
+		errs = append(errs, field.Invalid(path.Child("localClusterJson"), cfg.LocalClusterJson, "field is currently not supported"))
+	}
+
+	// nolint:staticcheck
+	if cfg.LocalWorkloadAddress != "" {
+		errs = append(errs, field.Invalid(path.Child("localWorkloadAddress"), cfg.LocalWorkloadAddress, "field is currently not supported"))
+	}
+
+	// nolint:staticcheck
+	if cfg.LocalWorkloadPort != 0 {
+		errs = append(errs, field.Invalid(path.Child("localWorkloadPort"), cfg.LocalWorkloadPort, "field is currently not supported"))
+	}
+
+	// nolint:staticcheck
+	if cfg.LocalWorkloadSocketPath != "" {
+		errs = append(errs, field.Invalid(path.Child("localWorkloadSocketPath"), cfg.LocalWorkloadSocketPath, "field is currently not supported"))
+	}
+
+	if cfg.TransparentProxy != nil {
+		if cfg.TransparentProxy.DialedDirectly {
+			errs = append(errs, field.Invalid(path.Child("transparentProxy").Child("dialedDirectely"), cfg.TransparentProxy.DialedDirectly, "field is currently not supported"))
+		}
+		if err := validatePort(cfg.TransparentProxy.OutboundListenerPort, path.Child("transparentProxy").Child("outboundListenerPort")); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if cfg.ExposeConfig != nil {
+		exposePath := path.Child("exposeConfig")
+		for i, path := range cfg.ExposeConfig.ExposePaths {
+			if err := validatePort(path.ListenerPort, exposePath.Child("exposePaths").Index(i).Child("listenerPort")); err != nil {
+				errs = append(errs, err)
+			}
+
+			if err := validatePort(path.LocalPathPort, exposePath.Child("exposePaths").Index(i).Child("localPathPort")); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	return errs
+}
+
+func validatePort(port uint32, path *field.Path) *field.Error {
+	if port < 1 || port > math.MaxUint16 {
+		return field.Invalid(path, port, "port number is outside the range 1 to 65535")
+	}
+	return nil
+}
+
+func validateSelector(workloads *pbcatalog.WorkloadSelector, path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if workloads == nil {
+		errs = append(errs, field.Required(path, "cannot be empty"))
+		return errs
+	}
+
+	if len(workloads.Names) == 0 && len(workloads.Prefixes) == 0 {
+		errs = append(errs, field.Required(path, "both workloads.names and workloads.prefixes cannot be empty"))
+		return errs
+	}
+
+	for i, name := range workloads.Names {
+		namePath := path.Child("names")
+		if name == "" {
+			errs = append(errs, field.Invalid(namePath.Index(i), name, "cannot be empty"))
+		}
+	}
+	return errs
 }
 
 // DefaultNamespaceFields is required as part of the common.MeshConfig interface.

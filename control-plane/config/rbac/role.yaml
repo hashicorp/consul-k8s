@@ -46,6 +46,26 @@ rules:
   - patch
   - update
 - apiGroups:
+  - catalog.consul.hashicorp.com
+  resources:
+  - failoverpolicy
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - catalog.consul.hashicorp.com
+  resources:
+  - failoverpolicy/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - consul.hashicorp.com
   resources:
   - controlplanerequestlimits

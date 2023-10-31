@@ -22,6 +22,6 @@ var (
 	// AuthSchemeBuilder is used to add go types to the GroupVersionKind scheme.
 	AuthSchemeBuilder = &scheme.Builder{GroupVersion: AuthGroupVersion}
 
-	// AddAuthToScheme adds the types in this group-version to the given scheme.
-	AddAuthToScheme = AuthSchemeBuilder.AddToScheme
+	// AddToScheme adds the types in this group-version to the given scheme.
+	AddToScheme = AuthSchemeBuilder.AddToScheme
 )

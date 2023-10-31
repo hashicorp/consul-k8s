@@ -12,6 +12,7 @@ import (
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
+	catalogv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/catalog/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/config-entries/controllersv2"
@@ -177,6 +178,15 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.ProxyConfiguration)
 		return err
 	}
+	if err := (&controllersv2.FailoverPolicyController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.FailoverPolicy),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.FailoverPolicy)
+		return err
+	}
 
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
@@ -251,6 +261,12 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.TCPRouteWebhook{
 			Client:              mgr.GetClient(),
 			Logger:              ctrl.Log.WithName("webhooks").WithName(common.TCPRoute),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-failoverpolicy",
+		&ctrlRuntimeWebhook.Admission{Handler: &catalogv2beta1.FailoverPolicyWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.FailoverPolicy),
 			ConsulTenancyConfig: consulTenancyConfig,
 		}})
 
