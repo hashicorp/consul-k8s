@@ -226,7 +226,7 @@ func TestRun_ServicePollingWithACLsAndTLS(t *testing.T) {
 			require.NoError(t, err)
 			token, _, err := consulClient.ACL().TokenReadSelf(nil)
 			require.NoError(t, err)
-			require.Equal(t, "token created via login: {\"pod\":\"default-ns/counting-pod\"}", token.Description)
+			require.Equal(t, "token created via login: {\"pod\":\"default-ns/counting-pod\",\"pod-uid\":\"\"}", token.Description)
 
 			// Validate contents of proxyFile.
 			data, err := os.ReadFile(proxyFile)

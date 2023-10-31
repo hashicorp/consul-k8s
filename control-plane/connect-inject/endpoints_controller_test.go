@@ -5940,12 +5940,12 @@ func TestGetTokenMetaFromDescription(t *testing.T) {
 		expectedTokenMeta map[string]string
 	}{
 		"no description prefix": {
-			description:       `{"pod":"default/pod"}`,
-			expectedTokenMeta: map[string]string{"pod": "default/pod"},
+			description:       `{"pod":"default/pod", "pod-uid": "123"}`,
+			expectedTokenMeta: map[string]string{"pod": "default/pod", "pod-uid": "123"},
 		},
 		"consul's default description prefix": {
-			description:       `token created via login: {"pod":"default/pod"}`,
-			expectedTokenMeta: map[string]string{"pod": "default/pod"},
+			description:       `token created via login: {"pod":"default/pod", "pod-uid": "123"}`,
+			expectedTokenMeta: map[string]string{"pod": "default/pod", "pod-uid": "123"},
 		},
 	}
 
