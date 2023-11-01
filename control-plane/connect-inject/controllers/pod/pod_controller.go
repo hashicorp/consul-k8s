@@ -150,6 +150,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	r.Log.Info("retrieved", "name", pod.Name, "ns", pod.Namespace)
 
 	if inject.HasBeenMeshInjected(pod) {
+
+		// It is possible the pod was scheduled but doesn't have an allocated IP yet, so safely requeue
+		if pod.Status.PodIP == "" {
+			r.Log.Info("pod does not have IP allocated; re-queueing request", "pod", req.Name, "ns", req.Namespace)
+			return ctrl.Result{Requeue: true}, nil
+		}
+
 		if err := r.writeProxyConfiguration(ctx, pod); err != nil {
 			// We could be racing with the namespace controller.
 			// Requeue (which includes backoff) to try again.
