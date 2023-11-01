@@ -819,9 +819,12 @@ func (r *EndpointsController) deleteACLTokensForServiceInstance(client *api.Clie
 
 			tokenPodName := strings.TrimPrefix(tokenMeta[TokenMetaPodNameKey], k8sNS+"/")
 
+			// backward compability logic on token with no podUID in metadata
+			podUIDMatched := tokenMeta[MetaKeyPodUID] == podUID || tokenMeta[MetaKeyPodUID] == ""
+
 			// If we can't find token's pod, delete it.
-			if tokenPodName == podName && tokenMeta[MetaKeyPodUID] == podUID {
-				r.Log.Info("deleting ACL token for pod", "name", podName)
+			if tokenPodName == podName && podUIDMatched {
+				r.Log.Info("deleting ACL token for pod", "name", podName, "AccessorID", token.AccessorID)
 				_, err = client.ACL().TokenDelete(token.AccessorID, nil)
 				if err != nil {
 					return fmt.Errorf("failed to delete token from Consul: %s", err)
