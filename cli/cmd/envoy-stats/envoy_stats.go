@@ -113,6 +113,11 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	if c.flagPod == "" || c.flagNamespace == "" {
+		c.UI.Output("namespace and pod name are required")
+		return 1
+	}
+
 	pf := common.PortForward{
 		Namespace:  c.flagNamespace,
 		PodName:    c.flagPod,
