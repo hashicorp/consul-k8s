@@ -117,6 +117,10 @@ func (pf *PortForward) Close() {
 	close(pf.stopChan)
 }
 
+func (pf *PortForward) GetLocalPort() int {
+	return pf.localPort
+}
+
 // allocateLocalPort looks for an open port on localhost and sets it to the
 // localPort field.
 func (pf *PortForward) allocateLocalPort() error {
