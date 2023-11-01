@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/config"
 	config_read "github.com/hashicorp/consul-k8s/cli/cmd/config/read"
+	envoy_stats "github.com/hashicorp/consul-k8s/cli/cmd/envoy-stats"
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/list"
@@ -47,6 +48,11 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 		},
 		"status": func() (cli.Command, error) {
 			return &status.Command{
+				BaseCommand: baseCommand,
+			}, nil
+		},
+		"envoy-stats": func() (cli.Command, error) {
+			return &envoy_stats.Command{
 				BaseCommand: baseCommand,
 			}, nil
 		},
