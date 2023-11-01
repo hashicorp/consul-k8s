@@ -81,6 +81,7 @@ func (c *Command) validateFlags() error {
 
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
+
 	if err := c.set.Parse(args); err != nil {
 		c.UI.Output(err.Error())
 		return 1
@@ -88,6 +89,11 @@ func (c *Command) Run(args []string) int {
 
 	if err := c.validateFlags(); err != nil {
 		c.UI.Output(err.Error())
+		return 1
+	}
+
+	if c.flagPod == "" || c.flagNamespace == "" {
+		c.UI.Output("namespace and pod name are required")
 		return 1
 	}
 
@@ -113,11 +119,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagPod == "" || c.flagNamespace == "" {
-		c.UI.Output("namespace and pod name are required")
-		return 1
-	}
-
 	pf := common.PortForward{
 		Namespace:  c.flagNamespace,
 		PodName:    c.flagPod,
@@ -135,13 +136,13 @@ func (c *Command) Run(args []string) int {
 
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%s/stats", strconv.Itoa(pf.GetLocalPort())))
 	if err != nil {
-		c.UI.Output("error hitting stats endpoint of envoy")
+		c.UI.Output("error hitting stats endpoint of envoy %s", err)
 		return 1
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.UI.Output("error reading body of http response")
+		c.UI.Output("error reading body of http response %s", err)
 		return 1
 	}
 
