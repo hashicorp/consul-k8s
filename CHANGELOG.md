@@ -1,4 +1,4 @@
-## 1.1.7- (November 2, 2023)
+## 1.1.7 (November 2, 2023)
 
 SECURITY:
 
