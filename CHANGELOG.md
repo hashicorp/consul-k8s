@@ -1,4 +1,4 @@
-## 1.0.11- (November 2, 2023)
+## 1.0.11 (November 2, 2023)
 
 SECURITY:
 
