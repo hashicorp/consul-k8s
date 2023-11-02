@@ -8,8 +8,12 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"io"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	"net/http"
 	"os"
+	"strconv"
 	"testing"
 )
 
@@ -59,4 +63,125 @@ func setupCommand(buf io.Writer) *Command {
 	command.init()
 
 	return command
+}
+
+type MockPortForwarder struct {
+}
+
+func (mpf *MockPortForwarder) Open(ctx context.Context) (string, error) {
+	return "localhost:" + strconv.Itoa(envoyAdminPort), nil
+}
+
+func (mpf *MockPortForwarder) Close() {
+	//noop
+}
+
+func (mpf *MockPortForwarder) GetLocalPort() int {
+	return envoyAdminPort
+}
+
+func TestEnvoyStats(t *testing.T) {
+	cases := map[string]struct {
+		namespace string
+		pods      []v1.Pod
+	}{
+		"Sidecar Pods": {
+			namespace: "default",
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "default",
+						Labels: map[string]string{
+							"consul.hashicorp.com/connect-inject-status": "injected",
+						},
+					},
+				},
+			},
+		},
+		"All kinds of Pods": {
+			namespace: "default",
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "default",
+						Labels: map[string]string{
+							"consul.hashicorp.com/connect-inject-status": "injected",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mesh-gateway",
+						Namespace: "default",
+						Labels: map[string]string{
+							"component": "mesh-gateway",
+							"chart":     "consul-helm",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "api-gateway",
+						Namespace: "default",
+						Labels: map[string]string{
+							"api-gateway.consul.hashicorp.com/managed": "true",
+						},
+					},
+				},
+			},
+		},
+		"Pods in consul namespaces": {
+			namespace: "consul",
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "api-gateway",
+						Namespace: "consul",
+						Labels: map[string]string{
+							"api-gateway.consul.hashicorp.com/managed": "true",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "consul",
+						Labels: map[string]string{
+							"consul.hashicorp.com/connect-inject-status": "injected",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	srv := startHttpServer(envoyAdminPort)
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			c := setupCommand(new(bytes.Buffer))
+			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: tc.pods})
+			c.flagNamespace = tc.namespace
+			mpf := &MockPortForwarder{}
+			resp, err := c.getEnvoyStats(mpf)
+			require.NoError(t, err)
+			require.Equal(t, resp, "Envoy Stats")
+		})
+	}
+	srv.Shutdown(context.Background())
+}
+
+func startHttpServer(port int) *http.Server {
+	srv := &http.Server{Addr: ":" + strconv.Itoa(port)}
+
+	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "Envoy Stats")
+	})
+
+	go func() {
+		srv.ListenAndServe()
+	}()
+
+	return srv
 }
