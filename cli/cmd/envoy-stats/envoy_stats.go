@@ -16,7 +16,7 @@ import (
 	"sync"
 )
 
-const envoyRemotePortForwarding = 19000
+const envoyAdminPort = 19000
 
 type Command struct {
 	*common.BaseCommand
@@ -122,7 +122,7 @@ func (c *Command) Run(args []string) int {
 	pf := common.PortForward{
 		Namespace:  c.flagNamespace,
 		PodName:    c.flagPod,
-		RemotePort: envoyRemotePortForwarding,
+		RemotePort: envoyAdminPort,
 		KubeClient: c.kubernetes,
 		RestConfig: c.restConfig,
 	}
