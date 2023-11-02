@@ -6,8 +6,6 @@ package controllers
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -21,23 +19,15 @@ const (
 	// Naming convention: TARGET_REFERENCE.
 	GatewayClass_GatewayClassConfigIndex = "__gatewayclass_referencing_gatewayclassconfig"
 	GatewayClass_ControllerNameIndex     = "__gatewayclass_controller_name"
-
-	Gateway_GatewayClassIndex = "__gateway_referencing_gatewayclass"
-
-	HTTPRoute_GatewayIndex            = "__httproute_referencing_gateway"
-	HTTPRoute_ServiceIndex            = "__httproute_referencing_service"
-	HTTPRoute_MeshServiceIndex        = "__httproute_referencing_mesh_service"
-	HTTPRoute_RouteRetryFilterIndex   = "__httproute_referencing_retryfilter"
-	HTTPRoute_RouteTimeoutFilterIndex = "__httproute_referencing_timeoutfilter"
-	HTTPRoute_RouteAuthFilterIndex    = "__httproute_referencing_routeauthfilter"
-
-	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
-	TCPRoute_ServiceIndex     = "__tcproute_referencing_service"
-	TCPRoute_MeshServiceIndex = "__tcproute_referencing_mesh_service"
-
-	MeshService_PeerIndex      = "__meshservice_referencing_peer"
-	Secret_GatewayIndex        = "__secret_referencing_gateway"
-	Gatewaypolicy_GatewayIndex = "__gatewaypolicy_referencing_gateway"
+	Gateway_GatewayClassIndex            = "__gateway_referencing_gatewayclass"
+	HTTPRoute_GatewayIndex               = "__httproute_referencing_gateway"
+	HTTPRoute_ServiceIndex               = "__httproute_referencing_service"
+	HTTPRoute_MeshServiceIndex           = "__httproute_referencing_mesh_service"
+	TCPRoute_GatewayIndex                = "__tcproute_referencing_gateway"
+	TCPRoute_ServiceIndex                = "__tcproute_referencing_service"
+	TCPRoute_MeshServiceIndex            = "__tcproute_referencing_mesh_service"
+	MeshService_PeerIndex                = "__meshservice_referencing_peer"
+	Secret_GatewayIndex                  = "__secret_referencing_gateway"
 )
 
 // RegisterFieldIndexes registers all of the field indexes for the API gateway controllers.
@@ -113,26 +103,6 @@ var indexes = []index{
 		name:        MeshService_PeerIndex,
 		target:      &v1alpha1.MeshService{},
 		indexerFunc: peersForMeshService,
-	},
-	{
-		name:        HTTPRoute_RouteRetryFilterIndex,
-		target:      &gwv1beta1.HTTPRoute{},
-		indexerFunc: filtersForHTTPRoute,
-	},
-	{
-		name:        HTTPRoute_RouteTimeoutFilterIndex,
-		target:      &gwv1beta1.HTTPRoute{},
-		indexerFunc: filtersForHTTPRoute,
-	},
-	{
-		name:        HTTPRoute_RouteAuthFilterIndex,
-		target:      &gwv1beta1.HTTPRoute{},
-		indexerFunc: filtersForHTTPRoute,
-	},
-	{
-		name:        Gatewaypolicy_GatewayIndex,
-		target:      &v1alpha1.GatewayPolicy{},
-		indexerFunc: gatewayForGatewayPolicy,
 	},
 }
 
@@ -300,67 +270,4 @@ func gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference, status
 		}
 	}
 	return references
-}
-
-func filtersForHTTPRoute(o client.Object) []string {
-	route := o.(*gwv1beta1.HTTPRoute)
-	filters := []string{}
-	var nilString *string
-
-	for _, rule := range route.Spec.Rules {
-	FILTERS_LOOP:
-		for _, filter := range rule.Filters {
-			if common.FilterIsExternalFilter(filter) {
-				// TODO this seems like its type agnostic, so this might just work without having to make
-				// multiple index functions per custom filter type?
-
-				// index external filters
-				filter := common.IndexedNamespacedNameWithDefault(string(filter.ExtensionRef.Name), nilString, route.Namespace).String()
-				for _, member := range filters {
-					if member == filter {
-						continue FILTERS_LOOP
-					}
-				}
-				filters = append(filters, filter)
-			}
-		}
-
-		// same thing but over the backend refs
-	BACKEND_LOOP:
-		for _, ref := range rule.BackendRefs {
-			for _, filter := range ref.Filters {
-				if common.FilterIsExternalFilter(filter) {
-					filter := common.IndexedNamespacedNameWithDefault(string(filter.ExtensionRef.Name), nilString, route.Namespace).String()
-					for _, member := range filters {
-						if member == filter {
-							continue BACKEND_LOOP
-						}
-					}
-					filters = append(filters, filter)
-				}
-			}
-		}
-	}
-	return filters
-}
-
-func gatewayForGatewayPolicy(o client.Object) []string {
-	gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
-
-	targetGateway := gatewayPolicy.Spec.TargetRef
-	if targetGateway.Group == gwv1beta1.GroupVersion.String() && targetGateway.Kind == common.KindGateway {
-		policyNamespace := gatewayPolicy.Namespace
-		if policyNamespace == "" {
-			policyNamespace = "default"
-		}
-		targetNS := targetGateway.Namespace
-		if targetNS == "" {
-			targetNS = policyNamespace
-		}
-
-		namespacedName := types.NamespacedName{Name: targetGateway.Name, Namespace: targetNS}
-		return []string{namespacedName.String()}
-	}
-
-	return []string{}
 }

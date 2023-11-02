@@ -174,10 +174,10 @@ func (c *Command) setupKubeClient(settings *helmCLI.EnvSettings) error {
 // Help returns a description of the command and how it is used.
 func (c *Command) Help() string {
 	c.once.Do(c.init)
-	return c.Synopsis() + "\n\nUsage: consul-k8s envoy-stats [flags]\n\n" + c.help
+	return c.Synopsis() + "\n\nUsage: consul-k8s status [flags]\n\n" + c.help
 }
 
 // Synopsis returns a one-line command summary.
 func (c *Command) Synopsis() string {
-	return "Displays Envoy Stats for the pod in a particular namespace"
+	return "Check the status of a Consul installation on Kubernetes."
 }

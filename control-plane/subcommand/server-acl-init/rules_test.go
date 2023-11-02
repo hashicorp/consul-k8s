@@ -8,9 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAgentRules(t *testing.T) {
@@ -964,10 +963,6 @@ func TestInjectRules(t *testing.T) {
     service_prefix "" {
       policy = "write"
       intentions = "write"
-    }
-    identity_prefix "" {
-      policy = "write"
-      intentions = "write"
     }`,
 		},
 		{
@@ -984,10 +979,6 @@ func TestInjectRules(t *testing.T) {
   namespace_prefix "" {
     acl = "write"
     service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-    identity_prefix "" {
       policy = "write"
       intentions = "write"
     }
@@ -1011,10 +1002,6 @@ func TestInjectRules(t *testing.T) {
       policy = "write"
       intentions = "write"
     }
-    identity_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
   }`,
 		},
 		{
@@ -1033,10 +1020,6 @@ partition "part-1" {
     policy = "write"
     acl = "write"
     service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-    identity_prefix "" {
       policy = "write"
       intentions = "write"
     }
@@ -1060,10 +1043,6 @@ partition "part-1" {
     policy = "write"
     acl = "write"
     service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-    identity_prefix "" {
       policy = "write"
       intentions = "write"
     }

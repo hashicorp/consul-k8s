@@ -7,12 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // Test MatchesConsul for cases that should return true.
@@ -56,13 +55,13 @@ func TestJWTProvider_MatchesConsul(t *testing.T) {
 						Remote: &RemoteJWKS{
 							URI:                 "https://jwks.example.com",
 							RequestTimeoutMs:    567,
-							CacheDuration:       metav1.Duration{Duration: 890},
+							CacheDuration:       890,
 							FetchAsynchronously: true,
 							RetryPolicy: &JWKSRetryPolicy{
 								NumRetries: 1,
 								RetryPolicyBackOff: &RetryPolicyBackOff{
-									BaseInterval: metav1.Duration{Duration: 23},
-									MaxInterval:  metav1.Duration{Duration: 456},
+									BaseInterval: 23,
+									MaxInterval:  456,
 								},
 							},
 							JWKSCluster: &JWKSCluster{
@@ -79,7 +78,7 @@ func TestJWTProvider_MatchesConsul(t *testing.T) {
 										InlineBytes:         []byte("inline-bytes"),
 									},
 								},
-								ConnectTimeout: metav1.Duration{Duration: 890},
+								ConnectTimeout: 890,
 							},
 						},
 					},
@@ -239,13 +238,13 @@ func TestJWTProvider_ToConsul(t *testing.T) {
 						Remote: &RemoteJWKS{
 							URI:                 "https://jwks.example.com",
 							RequestTimeoutMs:    567,
-							CacheDuration:       metav1.Duration{Duration: 890},
+							CacheDuration:       890,
 							FetchAsynchronously: true,
 							RetryPolicy: &JWKSRetryPolicy{
 								NumRetries: 1,
 								RetryPolicyBackOff: &RetryPolicyBackOff{
-									BaseInterval: metav1.Duration{Duration: 23},
-									MaxInterval:  metav1.Duration{Duration: 456},
+									BaseInterval: 23,
+									MaxInterval:  456,
 								},
 							},
 							JWKSCluster: &JWKSCluster{
@@ -262,7 +261,7 @@ func TestJWTProvider_ToConsul(t *testing.T) {
 										InlineBytes:         []byte("inline-bytes"),
 									},
 								},
-								ConnectTimeout: metav1.Duration{Duration: 890},
+								ConnectTimeout: 890,
 							},
 						},
 					},
@@ -441,13 +440,13 @@ func TestJWTProvider_Validate(t *testing.T) {
 						Remote: &RemoteJWKS{
 							URI:                 "https://jwks.example.com",
 							RequestTimeoutMs:    5000,
-							CacheDuration:       metav1.Duration{Duration: 10 * time.Second},
+							CacheDuration:       10 * time.Second,
 							FetchAsynchronously: true,
 							RetryPolicy: &JWKSRetryPolicy{
 								NumRetries: 3,
 								RetryPolicyBackOff: &RetryPolicyBackOff{
-									BaseInterval: metav1.Duration{Duration: 5 * time.Second},
-									MaxInterval:  metav1.Duration{Duration: 20 * time.Second},
+									BaseInterval: 5 * time.Second,
+									MaxInterval:  20 * time.Second,
 								},
 							},
 							JWKSCluster: &JWKSCluster{
@@ -457,7 +456,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 										Filename: "cert.crt",
 									},
 								},
-								ConnectTimeout: metav1.Duration{Duration: 890},
+								ConnectTimeout: 890,
 							},
 						},
 					},
@@ -505,13 +504,13 @@ func TestJWTProvider_Validate(t *testing.T) {
 						Remote: &RemoteJWKS{
 							URI:                 "https://jwks.example.com",
 							RequestTimeoutMs:    5000,
-							CacheDuration:       metav1.Duration{Duration: 10 * time.Second},
+							CacheDuration:       10 * time.Second,
 							FetchAsynchronously: true,
 							RetryPolicy: &JWKSRetryPolicy{
 								NumRetries: 3,
 								RetryPolicyBackOff: &RetryPolicyBackOff{
-									BaseInterval: metav1.Duration{Duration: 5 * time.Second},
-									MaxInterval:  metav1.Duration{Duration: 20 * time.Second},
+									BaseInterval: 5 * time.Second,
+									MaxInterval:  20 * time.Second,
 								},
 							},
 							JWKSCluster: &JWKSCluster{
@@ -522,7 +521,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 										CertificateName: "ROOTCA",
 									},
 								},
-								ConnectTimeout: metav1.Duration{Duration: 890},
+								ConnectTimeout: 890,
 							},
 						},
 					},
@@ -621,7 +620,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsgs: []string{
-				`jwtprovider.consul.hashicorp.com "test-jwks-local-and-remote" is invalid: spec.jsonWebKeySet: Invalid value: "{\"local\":{\"filename\":\"jwks.txt\"},\"remote\":{\"uri\":\"https://jwks.example.com\",\"cacheDuration\":\"0s\"}}": exactly one of 'local' or 'remote' is required`,
+				`jwtprovider.consul.hashicorp.com "test-jwks-local-and-remote" is invalid: spec.jsonWebKeySet: Invalid value: "{\"local\":{\"filename\":\"jwks.txt\"},\"remote\":{\"uri\":\"https://jwks.example.com\"}}": exactly one of 'local' or 'remote' is required`,
 			},
 		},
 
@@ -680,7 +679,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 										Filename: "cert.crt",
 									},
 								},
-								ConnectTimeout: metav1.Duration{Duration: 890},
+								ConnectTimeout: 890,
 							},
 						},
 					},
@@ -703,7 +702,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 							URI: "https://jwks.example.com",
 							JWKSCluster: &JWKSCluster{
 								DiscoveryType:  "FAKE_DNS",
-								ConnectTimeout: metav1.Duration{Duration: 890},
+								ConnectTimeout: 890,
 							},
 						},
 					},
@@ -733,7 +732,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 										InlineBytes:         []byte("inline-bytes"),
 									},
 								},
-								ConnectTimeout: metav1.Duration{Duration: 890},
+								ConnectTimeout: 890,
 							},
 						},
 					},
@@ -762,7 +761,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 										EnvironmentVariable: "env-variable",
 									},
 								},
-								ConnectTimeout: metav1.Duration{Duration: 890},
+								ConnectTimeout: 890,
 							},
 						},
 					},
@@ -845,8 +844,8 @@ func TestJWTProvider_Validate(t *testing.T) {
 							RetryPolicy: &JWKSRetryPolicy{
 								NumRetries: 0,
 								RetryPolicyBackOff: &RetryPolicyBackOff{
-									BaseInterval: metav1.Duration{Duration: 100 * time.Second},
-									MaxInterval:  metav1.Duration{Duration: 10 * time.Second},
+									BaseInterval: 100 * time.Second,
+									MaxInterval:  10 * time.Second,
 								},
 							},
 						},
@@ -854,7 +853,7 @@ func TestJWTProvider_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsgs: []string{
-				`jwtprovider.consul.hashicorp.com "test-jwks-retry-intervals" is invalid: spec.jsonWebKeySet.remote.retryPolicy.retryPolicyBackOff: Invalid value: "{\"baseInterval\":\"1m40s\",\"maxInterval\":\"10s\"}": maxInterval should be greater or equal to baseInterval`,
+				`jwtprovider.consul.hashicorp.com "test-jwks-retry-intervals" is invalid: spec.jsonWebKeySet.remote.retryPolicy.retryPolicyBackOff: Invalid value: "{\"baseInterval\":100000000000,\"maxInterval\":10000000000}": maxInterval should be greater or equal to baseInterval`,
 			},
 		},
 	}

@@ -1199,17 +1199,3 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
     yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
-
-#--------------------------------------------------------------------
-# global.experiments=["resource-apis"]
-
-@test "telemetryCollector/Deployment: disabled when V2 is enabled" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'ui.enabled=false' \
-      --set 'global.experiments[0]=resource-apis' \
-      .
-}

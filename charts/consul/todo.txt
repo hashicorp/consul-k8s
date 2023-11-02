@@ -1,0 +1,3 @@
+
+- [x] Remove gatewayclass gatewayclassconfig bats
+- [ ] Add test for each of the CRDs

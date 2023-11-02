@@ -159,7 +159,7 @@ func getDataplaneArgs(namespace string, config common.HelmConfig, bearerTokenFil
 			args = append(args, "-tls-server-name="+config.ConsulTLSServerName)
 		}
 		if config.ConsulCACert != "" {
-			args = append(args, "-ca-certs="+constants.LegacyConsulCAFile)
+			args = append(args, "-ca-certs="+constants.ConsulCAFile)
 		}
 	} else {
 		args = append(args, "-tls-disabled")

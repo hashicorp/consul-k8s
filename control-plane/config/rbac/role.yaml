@@ -5,6 +5,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
@@ -25,26 +26,6 @@ rules:
   - secrets/status
   verbs:
   - get
-- apiGroups:
-  - auth.consul.hashicorp.com
-  resources:
-  - trafficpermissions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - auth.consul.hashicorp.com
-  resources:
-  - trafficpermissions/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - consul.hashicorp.com
   resources:
@@ -341,86 +322,6 @@ rules:
   - consul.hashicorp.com
   resources:
   - terminatinggateways/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - mesh.consul.hashicorp.com
-  resources:
-  - grpcroute
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - mesh.consul.hashicorp.com
-  resources:
-  - grpcroute/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - mesh.consul.hashicorp.com
-  resources:
-  - httproute
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - mesh.consul.hashicorp.com
-  resources:
-  - httproute/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - mesh.consul.hashicorp.com
-  resources:
-  - proxyconfiguration
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - mesh.consul.hashicorp.com
-  resources:
-  - proxyconfiguration/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - mesh.consul.hashicorp.com
-  resources:
-  - tcproute
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - mesh.consul.hashicorp.com
-  resources:
-  - tcproute/status
   verbs:
   - get
   - patch

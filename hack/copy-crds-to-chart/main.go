@@ -79,13 +79,7 @@ func realMain(helmPath string) error {
 				`    release: {{ .Release.Name }}`,
 				`    component: crd`,
 			}
-			var split int
-			if dir == "bases" {
-				split = 6
-			} else {
-				split = 9
-			}
-			withLabels := append(splitOnNewlines[0:split], append(labelLines, splitOnNewlines[split:]...)...)
+			withLabels := append(splitOnNewlines[0:9], append(labelLines, splitOnNewlines[9:]...)...)
 			contents = strings.Join(withLabels, "\n")
 
 			var crdName string
@@ -95,7 +89,7 @@ func realMain(helmPath string) error {
 				crdName = filenameSplit[1]
 			} else if dir == "external" {
 				filenameSplit := strings.Split(info.Name(), ".")
-				crdName = filenameSplit[0] + "-external.yaml"
+				crdName = filenameSplit[0] + ".yaml"
 			}
 
 			destinationPath := filepath.Join(helmPath, "templates", fmt.Sprintf("crd-%s", crdName))

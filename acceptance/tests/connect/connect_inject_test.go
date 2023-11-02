@@ -51,11 +51,11 @@ func TestConnectInject(t *testing.T) {
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
 			if c.secure {
-				connHelper.TestConnectionFailureWithoutIntention(t, connhelper.ConnHelperOpts{})
-				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
+				connHelper.TestConnectionFailureWithoutIntention(t)
+				connHelper.CreateIntention(t)
 			}
 
-			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+			connHelper.TestConnectionSuccess(t)
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
 	}
@@ -328,9 +328,9 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			// and check inbound connections to the multi port pods' services.
 			// Create the files so that the readiness probes of the multi port pod fails.
 			logger.Log(t, "testing k8s -> consul health checks sync by making the multiport unhealthy")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "-c", "multiport", "--", "touch", "/tmp/unhealthy-multiport")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "--", "touch", "/tmp/unhealthy-multiport")
 			logger.Log(t, "testing k8s -> consul health checks sync by making the multiport-admin unhealthy")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "-c", "multiport-admin", "--", "touch", "/tmp/unhealthy-multiport-admin")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "--", "touch", "/tmp/unhealthy-multiport-admin")
 
 			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 			// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.

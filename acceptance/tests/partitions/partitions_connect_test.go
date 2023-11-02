@@ -30,11 +30,6 @@ func TestPartitions_Connect(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
-	// Currently there is a bug which causes flakes when CNI is enabled
-	if cfg.EnableCNI {
-		t.Skipf("TODO(flaky): NET-5819")
-	}
-
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
@@ -410,8 +405,8 @@ func TestPartitions_Connect(t *testing.T) {
 				// Test that kubernetes readiness status is synced to Consul.
 				// Create the file so that the readiness probe of the static-server pod fails.
 				logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
-				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
+				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
 
 				// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 				// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -583,8 +578,8 @@ func TestPartitions_Connect(t *testing.T) {
 				// Test that kubernetes readiness status is synced to Consul.
 				// Create the file so that the readiness probe of the static-server pod fails.
 				logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
-				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
+				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
 
 				// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 				// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.

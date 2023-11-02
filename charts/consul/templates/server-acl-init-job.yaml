@@ -46,7 +46,6 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/mesh-inject": "false"
         {{- if .Values.global.acls.annotations }}
           {{- tpl .Values.global.acls.annotations . | nindent 8 }}
         {{- end }}
@@ -191,10 +190,6 @@ spec:
             -secrets-backend=vault \
             {{- else }}
             -secrets-backend=kubernetes \
-            {{- end }}
-          
-            {{- if (mustHas "resource-apis" .Values.global.experiments) }}
-            -enable-resource-apis=true \
             {{- end }}
 
             {{- if .Values.global.acls.bootstrapToken.secretName }}

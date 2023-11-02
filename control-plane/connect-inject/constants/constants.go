@@ -4,31 +4,14 @@
 package constants
 
 const (
-	// LegacyConsulCAFile is the location of the Consul CA file inside the injected pod.
-	// This is used with the V1 API.
-	LegacyConsulCAFile = "/consul/connect-inject/consul-ca.pem"
-
 	// ConsulCAFile is the location of the Consul CA file inside the injected pod.
-	// This is used with the V2 API.
-	ConsulCAFile = "/consul/mesh-inject/consul-ca.pem"
-
-	// DefaultConsulNS is the default Consul namespace name.
-	DefaultConsulNS = "default"
-
-	// DefaultConsulPartition is the default Consul partition name.
-	DefaultConsulPartition = "default"
-
-	// DefaultConsulPeer is the name used to refer to resources that are in the same cluster.
-	DefaultConsulPeer = "local"
+	ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
 
 	// ProxyDefaultInboundPort is the default inbound port for the proxy.
 	ProxyDefaultInboundPort = 20000
 
 	// ProxyDefaultHealthPort is the default HTTP health check port for the proxy.
 	ProxyDefaultHealthPort = 21000
-
-	// MetaKeyManagedBy is the meta key name for indicating which Kubernetes controller manages a Consul resource.
-	MetaKeyManagedBy = "managed-by"
 
 	// MetaKeyKubeNS is the meta key name for Kubernetes namespace used for the Consul services.
 	MetaKeyKubeNS = "k8s-namespace"
@@ -42,10 +25,6 @@ const (
 	// MetaKeyKubeServiceName is the meta key name for Kubernetes service name used for the Consul services.
 	MetaKeyKubeServiceName = "k8s-service-name"
 
-	// MetaKeyKubeServiceAccountName is the meta key name for Kubernetes service account name used for the Consul
-	// v2 workload identity.
-	MetaKeyKubeServiceAccountName = "k8s-service-account-name"
-
 	// MetaKeyPodName is the meta key name for Kubernetes pod name used for the Consul services.
 	MetaKeyPodName = "pod-name"
 
@@ -54,42 +33,4 @@ const (
 
 	// DefaultGracefulShutdownPath is the default path that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulShutdownPath = "/graceful_shutdown"
-
-	// ConsulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
-	ConsulKubernetesCheckType = "kubernetes-readiness"
-
-	// ConsulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
-	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
-
-	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 )
-
-// GetNormalizedConsulNamespace returns the default namespace if the passed namespace
-// is empty, otherwise returns back the passed in namespace.
-func GetNormalizedConsulNamespace(ns string) string {
-	if ns == "" {
-		ns = DefaultConsulNS
-	}
-
-	return ns
-}
-
-// GetNormalizedConsulPartition returns the default partition if the passed partition
-// is empty, otherwise returns back the passed in partition.
-func GetNormalizedConsulPartition(ap string) string {
-	if ap == "" {
-		ap = DefaultConsulPartition
-	}
-
-	return ap
-}
-
-// GetNormalizedConsulPeer returns the default peer if the passed peer
-// is empty, otherwise returns back the passed in peer.
-func GetNormalizedConsulPeer(peer string) string {
-	if peer == "" {
-		peer = DefaultConsulPeer
-	}
-
-	return peer
-}

@@ -7,9 +7,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/url"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -17,8 +19,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 const (
@@ -394,7 +394,7 @@ type RemoteJWKS struct {
 	// should be expired.
 	//
 	// Default value is 5 minutes.
-	CacheDuration metav1.Duration `json:"cacheDuration,omitempty"`
+	CacheDuration time.Duration `json:"cacheDuration,omitempty"`
 
 	// FetchAsynchronously indicates that the JWKS should be fetched
 	// when a client request arrives. Client requests will be paused
@@ -421,7 +421,7 @@ func (r *RemoteJWKS) toConsul() *capi.RemoteJWKS {
 	return &capi.RemoteJWKS{
 		URI:                 r.URI,
 		RequestTimeoutMs:    r.RequestTimeoutMs,
-		CacheDuration:       r.CacheDuration.Duration,
+		CacheDuration:       r.CacheDuration,
 		FetchAsynchronously: r.FetchAsynchronously,
 		RetryPolicy:         r.RetryPolicy.toConsul(),
 		JWKSCluster:         r.JWKSCluster.toConsul(),
@@ -462,7 +462,7 @@ type JWKSCluster struct {
 
 	// The timeout for new network connections to hosts in the cluster.
 	// If not set, a default value of 5s will be used.
-	ConnectTimeout metav1.Duration `json:"connectTimeout,omitempty"`
+	ConnectTimeout time.Duration `json:"connectTimeout,omitempty"`
 }
 
 func (c *JWKSCluster) toConsul() *capi.JWKSCluster {
@@ -472,7 +472,7 @@ func (c *JWKSCluster) toConsul() *capi.JWKSCluster {
 	return &capi.JWKSCluster{
 		DiscoveryType:   c.DiscoveryType.toConsul(),
 		TLSCertificates: c.TLSCertificates.toConsul(),
-		ConnectTimeout:  c.ConnectTimeout.Duration,
+		ConnectTimeout:  c.ConnectTimeout,
 	}
 }
 
@@ -663,13 +663,13 @@ type RetryPolicyBackOff struct {
 	// BaseInterval to be used for the next back off computation.
 	//
 	// The default value from envoy is 1s.
-	BaseInterval metav1.Duration `json:"baseInterval,omitempty"`
+	BaseInterval time.Duration `json:"baseInterval,omitempty"`
 
 	// MaxInternal to be used to specify the maximum interval between retries.
 	// Optional but should be greater or equal to BaseInterval.
 	//
 	// Defaults to 10 times BaseInterval.
-	MaxInterval metav1.Duration `json:"maxInterval,omitempty"`
+	MaxInterval time.Duration `json:"maxInterval,omitempty"`
 }
 
 func (r *RetryPolicyBackOff) toConsul() *capi.RetryPolicyBackOff {
@@ -677,8 +677,8 @@ func (r *RetryPolicyBackOff) toConsul() *capi.RetryPolicyBackOff {
 		return nil
 	}
 	return &capi.RetryPolicyBackOff{
-		BaseInterval: r.BaseInterval.Duration,
-		MaxInterval:  r.MaxInterval.Duration,
+		BaseInterval: r.BaseInterval,
+		MaxInterval:  r.MaxInterval,
 	}
 }
 
@@ -688,7 +688,7 @@ func (r *RetryPolicyBackOff) validate(path *field.Path) field.ErrorList {
 		return errs
 	}
 
-	if (r.MaxInterval.Duration != 0) && (r.BaseInterval.Duration > r.MaxInterval.Duration) {
+	if (r.MaxInterval != 0) && (r.BaseInterval > r.MaxInterval) {
 		asJSON, _ := json.Marshal(r)
 		errs = append(errs, field.Invalid(path, string(asJSON), "maxInterval should be greater or equal to baseInterval"))
 	}
