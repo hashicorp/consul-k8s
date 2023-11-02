@@ -99,39 +99,6 @@ func TestEnvoyStats(t *testing.T) {
 				},
 			},
 		},
-		"All kinds of Pods": {
-			namespace: "default",
-			pods: []v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pod1",
-						Namespace: "default",
-						Labels: map[string]string{
-							"consul.hashicorp.com/connect-inject-status": "injected",
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "mesh-gateway",
-						Namespace: "default",
-						Labels: map[string]string{
-							"component": "mesh-gateway",
-							"chart":     "consul-helm",
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "api-gateway",
-						Namespace: "default",
-						Labels: map[string]string{
-							"api-gateway.consul.hashicorp.com/managed": "true",
-						},
-					},
-				},
-			},
-		},
 		"Pods in consul namespaces": {
 			namespace: "consul",
 			pods: []v1.Pod{
@@ -163,10 +130,13 @@ func TestEnvoyStats(t *testing.T) {
 			c := setupCommand(new(bytes.Buffer))
 			c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: tc.pods})
 			c.flagNamespace = tc.namespace
-			mpf := &MockPortForwarder{}
-			resp, err := c.getEnvoyStats(mpf)
-			require.NoError(t, err)
-			require.Equal(t, resp, "Envoy Stats")
+			for _, pod := range tc.pods {
+				c.flagPod = pod.Name
+				mpf := &MockPortForwarder{}
+				resp, err := c.getEnvoyStats(mpf)
+				require.NoError(t, err)
+				require.Equal(t, resp, "Envoy Stats")
+			}
 		})
 	}
 	srv.Shutdown(context.Background())
