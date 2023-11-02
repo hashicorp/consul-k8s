@@ -47,6 +47,7 @@ type PortForward struct {
 type PortForwarder interface {
 	Open(context.Context) (string, error)
 	Close()
+	GetLocalPort() int
 }
 
 // forwarder is an interface which can be used for opening a port forward session.
