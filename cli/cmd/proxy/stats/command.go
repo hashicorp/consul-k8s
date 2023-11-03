@@ -45,7 +45,7 @@ func (c *StatsCommand) init() {
 		c.helmActionsRunner = &helm.ActionRunner{}
 	}
 
-	f := c.set.NewSet("Global Options")
+	f := c.set.NewSet("Command Options")
 	f.StringVar(&flag.StringVar{
 		Name:    "kubeconfig",
 		Aliases: []string{"c"},
