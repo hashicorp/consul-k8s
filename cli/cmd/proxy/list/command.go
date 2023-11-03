@@ -10,15 +10,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/consul-k8s/cli/common"
-	"github.com/hashicorp/consul-k8s/cli/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/posener/complete"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 )
 
 const (
@@ -211,21 +212,12 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 
 	// Fetch all pods in the namespace with labels matching the gateway component names.
 	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
-		LabelSelector: "component in (ingress-gateway, mesh-gateway, terminating-gateway), chart=consul-helm",
+		LabelSelector: "component in (api-gateway, ingress-gateway, mesh-gateway, terminating-gateway), chart=consul-helm",
 	})
 	if err != nil {
 		return nil, err
 	}
 	pods = append(pods, gatewaypods.Items...)
-
-	// Fetch all pods in the namespace with a label indicating they are an API gateway.
-	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
-		LabelSelector: "api-gateway.consul.hashicorp.com/managed=true",
-	})
-	if err != nil {
-		return nil, err
-	}
-	pods = append(pods, apigatewaypods.Items...)
 
 	// Fetch all pods in the namespace with a label indicating they are a service networked by Consul.
 	sidecarpods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
@@ -268,21 +260,16 @@ func (c *ListCommand) output(pods []v1.Pod) {
 
 		// Get the type for ingress, mesh, and terminating gateways.
 		switch pod.Labels["component"] {
+		case "api-gateway":
+			proxyType = "API Gateway"
 		case "ingress-gateway":
 			proxyType = "Ingress Gateway"
 		case "mesh-gateway":
 			proxyType = "Mesh Gateway"
 		case "terminating-gateway":
 			proxyType = "Terminating Gateway"
-		}
-
-		// Determine if the pod is an API Gateway.
-		if pod.Labels["api-gateway.consul.hashicorp.com/managed"] == "true" {
-			proxyType = "API Gateway"
-		}
-
-		// Fallback to "Sidecar" as a default
-		if proxyType == "" {
+		default:
+			// Fallback to "Sidecar" as a default
 			proxyType = "Sidecar"
 		}
 
