@@ -25,6 +25,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 var (
@@ -1007,6 +1008,7 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 			require.NotNil(t, actual.Spec.Replicas)
 			require.EqualValues(t, *expected.Spec.Replicas, *actual.Spec.Replicas)
 		}
+		require.Equal(t, expected.Spec.Template.ObjectMeta.Annotations, actual.Spec.Template.ObjectMeta.Annotations)
 
 		// Ensure there is a consul-dataplane container dropping ALL capabilities, adding
 		// back the NET_BIND_SERVICE capability, and establishing a read-only root filesystem
@@ -1189,7 +1191,9 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 					Annotations: map[string]string{
-						"consul.hashicorp.com/connect-inject": "false",
+						constants.AnnotationInject:                   "false",
+						constants.AnnotationGatewayConsulServiceName: name,
+						constants.AnnotationGatewayKind:              "api-gateway",
 					},
 				},
 				Spec: corev1.PodSpec{
