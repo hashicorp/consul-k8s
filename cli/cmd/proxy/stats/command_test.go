@@ -1,4 +1,4 @@
-package envoy_stats
+package stats
 
 import (
 	"bytes"
@@ -45,7 +45,7 @@ func TestFlagParsing(t *testing.T) {
 		})
 	}
 }
-func setupCommand(buf io.Writer) *Command {
+func setupCommand(buf io.Writer) *StatsCommand {
 	// Log at a test level to standard out.
 	log := hclog.New(&hclog.LoggerOptions{
 		Name:   "test",
@@ -54,7 +54,7 @@ func setupCommand(buf io.Writer) *Command {
 	})
 
 	// Setup and initialize the command struct
-	command := &Command{
+	command := &StatsCommand{
 		BaseCommand: &common.BaseCommand{
 			Log: log,
 			UI:  terminal.NewUI(context.Background(), buf),

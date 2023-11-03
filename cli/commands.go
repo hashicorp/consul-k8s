@@ -5,10 +5,10 @@ package main
 
 import (
 	"context"
+	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/stats"
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/config"
 	config_read "github.com/hashicorp/consul-k8s/cli/cmd/config/read"
-	envoy_stats "github.com/hashicorp/consul-k8s/cli/cmd/envoy-stats"
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/list"
@@ -51,11 +51,6 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 				BaseCommand: baseCommand,
 			}, nil
 		},
-		"envoy-stats": func() (cli.Command, error) {
-			return &envoy_stats.Command{
-				BaseCommand: baseCommand,
-			}, nil
-		},
 		"upgrade": func() (cli.Command, error) {
 			return &upgrade.Command{
 				BaseCommand: baseCommand,
@@ -84,6 +79,11 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 		},
 		"proxy read": func() (cli.Command, error) {
 			return &read.ReadCommand{
+				BaseCommand: baseCommand,
+			}, nil
+		},
+		"proxy stats": func() (cli.Command, error) {
+			return &stats.StatsCommand{
 				BaseCommand: baseCommand,
 			}, nil
 		},

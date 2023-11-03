@@ -1,4 +1,4 @@
-package envoy_stats
+package stats
 
 import (
 	"errors"
@@ -13,12 +13,13 @@ import (
 	"k8s.io/client-go/rest"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 )
 
 const envoyAdminPort = 19000
 
-type Command struct {
+type StatsCommand struct {
 	*common.BaseCommand
 
 	helmActionsRunner helm.HelmActionsRunner
@@ -38,8 +39,11 @@ type Command struct {
 	help string
 }
 
-func (c *Command) init() {
+func (c *StatsCommand) init() {
 	c.set = flag.NewSets()
+	if c.helmActionsRunner == nil {
+		c.helmActionsRunner = &helm.ActionRunner{}
+	}
 
 	f := c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
@@ -58,32 +62,27 @@ func (c *Command) init() {
 	f.StringVar(&flag.StringVar{
 		Name:    "namespace",
 		Target:  &c.flagNamespace,
-		Default: "",
-		Usage:   "Namespace of pod",
-	})
-	f.StringVar(&flag.StringVar{
-		Name:    "pod",
-		Target:  &c.flagPod,
-		Default: "",
-		Usage:   "Pod for which envoy stats need to be captured",
+		Usage:   "The namespace where the target Pod can be found.",
+		Aliases: []string{"n"},
 	})
 
 	c.help = c.set.Help()
 }
 
 // validateFlags checks the command line flags and values for errors.
-func (c *Command) validateFlags() error {
+func (c *StatsCommand) validateFlags() error {
 	if len(c.set.Args()) > 0 {
 		return errors.New("should have no non-flag arguments")
 	}
 	return nil
 }
 
-func (c *Command) Run(args []string) int {
+func (c *StatsCommand) Run(args []string) int {
 	c.once.Do(c.init)
 
-	if err := c.set.Parse(args); err != nil {
-		c.UI.Output(err.Error())
+	if err := c.parseFlags(args); err != nil {
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		c.UI.Output("\n" + c.Help())
 		return 1
 	}
 
@@ -92,9 +91,15 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if c.flagPod == "" || c.flagNamespace == "" {
-		c.UI.Output("namespace and pod name are required")
+	if c.flagPod == "" {
+		c.UI.Output("pod name is required")
 		return 1
+	}
+
+	// Setup logger to stream Helm library logs.
+	var uiLogger = func(s string, args ...interface{}) {
+		logMsg := fmt.Sprintf(s, args...)
+		c.UI.Output(logMsg, terminal.WithLibraryStyle())
 	}
 
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
@@ -104,6 +109,24 @@ func (c *Command) Run(args []string) int {
 	}
 	if c.flagKubeContext != "" {
 		settings.KubeContext = c.flagKubeContext
+	}
+
+	if c.flagNamespace == "" {
+		_, _, namespace, err := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+			Settings:    settings,
+			ReleaseName: common.DefaultReleaseName,
+			DebugLog:    uiLogger,
+		})
+		if err != nil {
+			c.UI.Output("error getting namespace from kubeconfig %v", err, terminal.WithErrorStyle())
+			return 1
+		}
+		c.flagNamespace = namespace
+	}
+
+	if c.flagNamespace == "" {
+		c.UI.Output("namespace is required", terminal.WithErrorStyle())
+		return 1
 	}
 
 	if err := c.setupKubeClient(settings); err != nil {
@@ -129,7 +152,7 @@ func (c *Command) Run(args []string) int {
 
 	stats, err := c.getEnvoyStats(&pf)
 	if err != nil {
-		c.UI.Output("error fetching envoy stats", err)
+		c.UI.Output("error fetching envoy stats %v", err, terminal.WithErrorStyle())
 		return 1
 	}
 
@@ -138,7 +161,7 @@ func (c *Command) Run(args []string) int {
 
 }
 
-func (c *Command) getEnvoyStats(pf common.PortForwarder) (string, error) {
+func (c *StatsCommand) getEnvoyStats(pf common.PortForwarder) (string, error) {
 	_, err := pf.Open(c.Ctx)
 	if err != nil {
 		return "", fmt.Errorf("error port forwarding %s", err)
@@ -162,7 +185,7 @@ func (c *Command) getEnvoyStats(pf common.PortForwarder) (string, error) {
 // setupKubeClient to use for non Helm SDK calls to the Kubernetes API The Helm SDK will use
 // settings.RESTClientGetter for its calls as well, so this will use a consistent method to
 // target the right cluster for both Helm SDK and non Helm SDK calls.
-func (c *Command) setupKubeClient(settings *helmCLI.EnvSettings) error {
+func (c *StatsCommand) setupKubeClient(settings *helmCLI.EnvSettings) error {
 	if c.kubernetes == nil {
 		restConfig, err := settings.RESTClientGetter().ToRESTConfig()
 		if err != nil {
@@ -179,13 +202,36 @@ func (c *Command) setupKubeClient(settings *helmCLI.EnvSettings) error {
 	return nil
 }
 
+func (c *StatsCommand) parseFlags(args []string) error {
+	// Separate positional arguments from keyed arguments.
+	var positional []string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			break
+		}
+		positional = append(positional, arg)
+	}
+	keyed := args[len(positional):]
+
+	if len(positional) != 1 {
+		return fmt.Errorf("exactly one positional argument is required: <pod-name>")
+	}
+	c.flagPod = positional[0]
+
+	if err := c.set.Parse(keyed); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Help returns a description of the command and how it is used.
-func (c *Command) Help() string {
+func (c *StatsCommand) Help() string {
 	c.once.Do(c.init)
-	return c.Synopsis() + "\n\nUsage: consul-k8s envoy-stats [flags]\n\n" + c.help
+	return c.Synopsis() + "\n\nUsage: consul-k8s proxy stats pod-name -n namespace [flags]\n\n" + c.help
 }
 
 // Synopsis returns a one-line command summary.
-func (c *Command) Synopsis() string {
+func (c *StatsCommand) Synopsis() string {
 	return "Displays Envoy Stats for the pod in a particular namespace"
 }
