@@ -35,6 +35,7 @@ var (
 	name                = "test"
 	namespace           = "default"
 	labels              = map[string]string{
+		"component":                              "api-gateway",
 		"gateway.consul.hashicorp.com/name":      name,
 		"gateway.consul.hashicorp.com/namespace": namespace,
 		createdAtLabelKey:                        createdAtLabelValue,
@@ -1009,6 +1010,7 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 			require.EqualValues(t, *expected.Spec.Replicas, *actual.Spec.Replicas)
 		}
 		require.Equal(t, expected.Spec.Template.ObjectMeta.Annotations, actual.Spec.Template.ObjectMeta.Annotations)
+		require.Equal(t, expected.Spec.Template.ObjectMeta.Labels, actual.Spec.Template.Labels)
 
 		// Ensure there is a consul-dataplane container dropping ALL capabilities, adding
 		// back the NET_BIND_SERVICE capability, and establishing a read-only root filesystem
