@@ -1447,10 +1447,11 @@ func hasBeenInjected(pod corev1.Pod) bool {
 	return false
 }
 
-// isGateway checks the value of the gateway annotation and returns true if the Pod represents a Gateway.
+// isGateway checks the value of the gateway annotation and returns true if the Pod
+// represents a Gateway kind that should be acted upon by the endpoints controller.
 func isGateway(pod corev1.Pod) bool {
 	anno, ok := pod.Annotations[constants.AnnotationGatewayKind]
-	return ok && anno != ""
+	return ok && anno != "" && anno != apiGateway
 }
 
 // isTelemetryCollector checks whether a pod is part of a deployment for a Consul Telemetry Collector. If so,
