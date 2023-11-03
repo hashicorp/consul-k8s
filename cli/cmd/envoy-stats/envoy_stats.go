@@ -187,5 +187,5 @@ func (c *Command) Help() string {
 
 // Synopsis returns a one-line command summary.
 func (c *Command) Synopsis() string {
-	return "Displays Envoy Stats for the pod in a particular namespace"
+	return "Display Envoy stats for a proxy"
 }
