@@ -6,6 +6,7 @@ package pod
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -267,6 +268,10 @@ func (r *Controller) deleteACLTokensForPod(apiClient *api.Client, pod types.Name
 	// See discussion above about optimizing the token list query.
 	for _, token := range tokens {
 		tokenMeta, err := getTokenMetaFromDescription(token.Description)
+		// It is possible this is from another component, so continue searching
+		if errors.Is(err, NoMetadataErr) {
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("failed to parse token metadata: %s", err)
 		}
@@ -284,13 +289,15 @@ func (r *Controller) deleteACLTokensForPod(apiClient *api.Client, pod types.Name
 	return nil
 }
 
+var NoMetadataErr = fmt.Errorf("failed to extract token metadata from description")
+
 // getTokenMetaFromDescription parses JSON metadata from token's description.
 func getTokenMetaFromDescription(description string) (map[string]string, error) {
 	re := regexp.MustCompile(`.*({.+})`)
 
 	matches := re.FindStringSubmatch(description)
 	if len(matches) != 2 {
-		return nil, fmt.Errorf("failed to extract token metadata from description: %s", description)
+		return nil, NoMetadataErr
 	}
 	tokenMetaJSON := matches[1]
 

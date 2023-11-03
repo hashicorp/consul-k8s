@@ -219,7 +219,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			}
 			require.Equal(t, expectedProbe, container.ReadinessProbe)
 			require.Nil(t, container.StartupProbe)
-			require.Len(t, container.Env, 6)
+			require.Len(t, container.Env, 7)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
 			require.Equal(t, container.Env[0].Value, "/consul/mesh-inject")
 			require.Equal(t, container.Env[2].Name, "POD_NAME")
