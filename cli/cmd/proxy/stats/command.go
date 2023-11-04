@@ -47,6 +47,14 @@ func (c *StatsCommand) init() {
 
 	f := c.set.NewSet("Command Options")
 	f.StringVar(&flag.StringVar{
+		Name:    "namespace",
+		Target:  &c.flagNamespace,
+		Usage:   "The namespace where the target Pod can be found.",
+		Aliases: []string{"n"},
+	})
+
+	f = c.set.NewSet("Global Options")
+	f.StringVar(&flag.StringVar{
 		Name:    "kubeconfig",
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
@@ -58,12 +66,6 @@ func (c *StatsCommand) init() {
 		Target:  &c.flagKubeContext,
 		Default: "",
 		Usage:   "Kubernetes context to use.",
-	})
-	f.StringVar(&flag.StringVar{
-		Name:    "namespace",
-		Target:  &c.flagNamespace,
-		Usage:   "The namespace where the target Pod can be found.",
-		Aliases: []string{"n"},
 	})
 
 	c.help = c.set.Help()
@@ -94,12 +96,6 @@ func (c *StatsCommand) Run(args []string) int {
 	if c.flagPod == "" {
 		c.UI.Output("pod name is required")
 		return 1
-	}
-
-	// Setup logger to stream Helm library logs.
-	var uiLogger = func(s string, args ...interface{}) {
-		logMsg := fmt.Sprintf(s, args...)
-		c.UI.Output(logMsg, terminal.WithLibraryStyle())
 	}
 
 	// helmCLI.New() will create a settings object which is used by the Helm Go SDK calls.
