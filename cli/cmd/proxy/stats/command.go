@@ -112,21 +112,7 @@ func (c *StatsCommand) Run(args []string) int {
 	}
 
 	if c.flagNamespace == "" {
-		_, _, namespace, err := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
-			Settings:    settings,
-			ReleaseName: common.DefaultReleaseName,
-			DebugLog:    uiLogger,
-		})
-		if err != nil {
-			c.UI.Output("error getting namespace from kubeconfig %v", err, terminal.WithErrorStyle())
-			return 1
-		}
-		c.flagNamespace = namespace
-	}
-
-	if c.flagNamespace == "" {
-		c.UI.Output("namespace is required", terminal.WithErrorStyle())
-		return 1
+		c.flagNamespace = settings.Namespace()
 	}
 
 	if err := c.setupKubeClient(settings); err != nil {
