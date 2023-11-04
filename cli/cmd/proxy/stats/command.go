@@ -160,7 +160,10 @@ func (c *StatsCommand) getEnvoyStats(pf common.PortForwarder) (string, error) {
 		return "", fmt.Errorf("error reading body of http response %s", err)
 	}
 
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
 	return string(bodyBytes), nil
 }
 
