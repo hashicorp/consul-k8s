@@ -192,6 +192,19 @@ spec:
             -loadBalancer-ips=true \
             {{- end }}
             {{- end }}
+            {{- if .Values.syncCatalog.leaderElection.enabled }}
+            -enable-leaderElection=true \
+            -leaderElection-lease-name={{ template "consul.fullname" . }}-sync-catalog-lease \
+            {{- if .Values.syncCatalog.leaderElection.leaseDuration }}
+            -leaderElection-lease-duration={{ .Values.syncCatalog.leaderElection.leaseDuration }} \
+            {{- end }}
+            {{- if .Values.syncCatalog.leaderElection.renewDeadline }}
+            -leaderElection-renew-deadline={{ .Values.syncCatalog.leaderElection.renewDeadline }} \
+            {{- end }}
+            {{- if .Values.syncCatalog.leaderElection.retryPeriod }}
+            -leaderElection-retry-period={{ .Values.syncCatalog.leaderElection.retryPeriod }} \
+            {{- end }}
+            {{- end }}
         livenessProbe:
           httpGet:
             path: /health/ready
