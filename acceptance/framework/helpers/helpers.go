@@ -150,3 +150,38 @@ func MergeMaps(a, b map[string]string) {
 		a[k] = v
 	}
 }
+
+// RegisterExternalService registers an external service to a virtual node in Consul for testing purposes.
+// This function takes a testing.T object, a Consul client, service namespace, service name, address, and port as
+// parameters. It registers the service with Consul, and if a namespace is provided, it also creates the namespace
+// in Consul. It uses the provided testing.T object to log registration details and verify the registration process.
+// If the registration fails, the test calling the function will fail.
+func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, name, address string, port int) {
+	t.Helper()
+
+	service := &api.AgentService{
+		ID:      name,
+		Service: name,
+		Port:    port,
+	}
+
+	if namespace != "" {
+		address = fmt.Sprintf("%s.%s", name, namespace)
+		service.Namespace = namespace
+
+		logger.Logf(t, "creating the %s namespace in Consul", namespace)
+		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
+			Name: namespace,
+		}, nil)
+		require.NoError(t, err)
+	}
+
+	logger.Log(t, "registering the external service %s", name)
+	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
+		Node:     "external",
+		Address:  address,
+		NodeMeta: map[string]string{"external-node": "true", "external-probe": "true"},
+		Service:  service,
+	}, nil)
+	require.NoError(t, err)
+}
