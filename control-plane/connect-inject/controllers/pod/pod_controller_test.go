@@ -1225,7 +1225,8 @@ func TestReconcileCreatePod(t *testing.T) {
 		metrics         bool
 		telemetry       bool
 
-		expErr string
+		requeue bool
+		expErr  string
 	}
 
 	run := func(t *testing.T, tc testCase) {
@@ -1290,7 +1291,7 @@ func TestReconcileCreatePod(t *testing.T) {
 		} else {
 			require.NoError(t, err)
 		}
-		require.False(t, resp.Requeue)
+		require.Equal(t, tc.requeue, resp.Requeue)
 
 		wID := getWorkloadID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
 		expectedWorkloadMatches(t, context.Background(), resourceClient, wID, tc.expectedWorkload)
@@ -1381,6 +1382,16 @@ func TestReconcileCreatePod(t *testing.T) {
 			expectedHealthStatus:       createPassingHealthStatus(),
 			expectedProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			expectedDestinations:       createDestinations(),
+		},
+		{
+			name:    "pod w/o IP",
+			podName: "foo",
+			k8sObjects: func() []runtime.Object {
+				pod := createPod("foo", "", true, true)
+				pod.Status.PodIP = ""
+				return []runtime.Object{pod}
+			},
+			requeue: true,
 		},
 		// TODO: make sure multi-error accumulates errors
 	}
