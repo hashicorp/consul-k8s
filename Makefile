@@ -40,6 +40,12 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
+control-plane-dev-skaffold: ## Build consul-k8s-control-plane dev Docker image.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
+	@docker build -t '$(DEV_IMAGE)' \
+       --build-arg 'TARGETARCH=$(GOARCH)' \
+       -f $(CURDIR)/control-plane/Dockerfile.dev $(CURDIR)/control-plane
+
 check-remote-dev-image-env:
 ifndef REMOTE_DEV_IMAGE
 	$(error REMOTE_DEV_IMAGE is undefined: set this image to <your_docker_repo>/<your_docker_image>:<image_tag>, e.g. hashicorp/consul-k8s-dev:latest)
