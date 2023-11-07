@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,20 +108,6 @@ func TestProxyConfiguration_MatchesConsul(t *testing.T) {
 							JsonFormat:          "jsonFormat",
 							TextFormat:          "text format.",
 						},
-						EnvoyExtensions: []*pbmesh.EnvoyExtension{
-							{
-								Name:     "extension-1",
-								Required: true,
-								Arguments: &structpb.Struct{
-									Fields: map[string]*structpb.Value{
-										"field-1": {},
-										"field-2": {},
-									},
-								},
-								ConsulVersion: "1.22.3-beta1",
-								EnvoyVersion:  "1.33.4",
-							},
-						},
 						PublicListenerJson:  "publicListenerJson{}",
 						ListenerTracingJson: "listenerTracingJson{}",
 						LocalClusterJson:    "localClusterJson{}",
@@ -195,20 +180,6 @@ func TestProxyConfiguration_MatchesConsul(t *testing.T) {
 						Path:                "/path",
 						JsonFormat:          "jsonFormat",
 						TextFormat:          "text format.",
-					},
-					EnvoyExtensions: []*pbmesh.EnvoyExtension{
-						{
-							Name:     "extension-1",
-							Required: true,
-							Arguments: &structpb.Struct{
-								Fields: map[string]*structpb.Value{
-									"field-1": {},
-									"field-2": {},
-								},
-							},
-							ConsulVersion: "1.22.3-beta1",
-							EnvoyVersion:  "1.33.4",
-						},
 					},
 					PublicListenerJson:  "publicListenerJson{}",
 					ListenerTracingJson: "listenerTracingJson{}",
@@ -347,20 +318,6 @@ func TestProxyConfiguration_Resource(t *testing.T) {
 							JsonFormat:          "jsonFormat",
 							TextFormat:          "text format.",
 						},
-						EnvoyExtensions: []*pbmesh.EnvoyExtension{
-							{
-								Name:     "extension-1",
-								Required: true,
-								Arguments: &structpb.Struct{
-									Fields: map[string]*structpb.Value{
-										"field-1": {},
-										"field-2": {},
-									},
-								},
-								ConsulVersion: "1.22.3-beta1",
-								EnvoyVersion:  "1.33.4",
-							},
-						},
 						PublicListenerJson:  "publicListenerJson{}",
 						ListenerTracingJson: "listenerTracingJson{}",
 						LocalClusterJson:    "localClusterJson{}",
@@ -433,20 +390,6 @@ func TestProxyConfiguration_Resource(t *testing.T) {
 						Path:                "/path",
 						JsonFormat:          "jsonFormat",
 						TextFormat:          "text format.",
-					},
-					EnvoyExtensions: []*pbmesh.EnvoyExtension{
-						{
-							Name:     "extension-1",
-							Required: true,
-							Arguments: &structpb.Struct{
-								Fields: map[string]*structpb.Value{
-									"field-1": {},
-									"field-2": {},
-								},
-							},
-							ConsulVersion: "1.22.3-beta1",
-							EnvoyVersion:  "1.33.4",
-						},
 					},
 					PublicListenerJson:  "publicListenerJson{}",
 					ListenerTracingJson: "listenerTracingJson{}",
