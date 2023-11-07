@@ -1428,10 +1428,10 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							Headers:    []api.HTTPHeaderFilter{},
 							URLRewrite: nil,
 							RetryFilter: &api.RetryFilter{
-								NumRetries:            pointer.Uint32(3),
+								NumRetries:            3,
 								RetryOn:               []string{"cancelled"},
 								RetryOnStatusCodes:    []uint32{500, 502},
-								RetryOnConnectFailure: pointer.Bool(false),
+								RetryOnConnectFailure: false,
 							},
 							TimeoutFilter: &api.TimeoutFilter{
 								RequestTimeout: time.Duration(10 * time.Nanosecond),
@@ -1484,10 +1484,10 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								Filters: api.HTTPFilters{
 									Headers: []api.HTTPHeaderFilter{},
 									RetryFilter: &api.RetryFilter{
-										NumRetries:            pointer.Uint32(3),
+										NumRetries:            3,
 										RetryOn:               []string{"cancelled"},
 										RetryOnStatusCodes:    []uint32{500, 502},
-										RetryOnConnectFailure: pointer.Bool(false),
+										RetryOnConnectFailure: false,
 									},
 								},
 								ResponseFilters: api.HTTPResponseFilters{
