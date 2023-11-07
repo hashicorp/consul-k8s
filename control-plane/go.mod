@@ -1,13 +1,5 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-// TODO: remove these when the SDK is released for Consul 1.17 and coinciding patch releases
-replace (
-	// This replace directive is needed because `api` requires 0.4.1 of proto-public but we need an unreleased version
-	github.com/hashicorp/consul/proto-public v0.4.1 => github.com/hashicorp/consul/proto-public v0.1.2-0.20231013204122-3d1a606c3b58
-	// This replace directive is needed because `api` requires 0.14.1 of `sdk` but we need an unreleased version
-	github.com/hashicorp/consul/sdk v0.14.1 => github.com/hashicorp/consul/sdk v0.4.1-0.20231011203909-c26d5cf62cb9
-)
-
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.1
@@ -18,9 +10,9 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230825213844-4ea04860c5ed
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
-	github.com/hashicorp/consul/api v1.10.1-0.20231011171434-ca1a755f0c5a
-	github.com/hashicorp/consul/proto-public v0.4.1
-	github.com/hashicorp/consul/sdk v0.14.1
+	github.com/hashicorp/consul/api v1.26.1
+	github.com/hashicorp/consul/proto-public v0.5.1
+	github.com/hashicorp/consul/sdk v0.15.0
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
 	github.com/hashicorp/go-hclog v1.5.0
