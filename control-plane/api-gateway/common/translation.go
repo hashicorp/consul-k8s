@@ -149,12 +149,20 @@ func ToContainerPort(portNumber gwv1beta1.PortNumber, mapPrivilegedContainerPort
 }
 
 func (t ResourceTranslator) translateRouteRetryFilter(routeRetryFilter *v1alpha1.RouteRetryFilter) *api.RetryFilter {
-	return &api.RetryFilter{
-		NumRetries:            routeRetryFilter.Spec.NumRetries,
-		RetryOn:               routeRetryFilter.Spec.RetryOn,
-		RetryOnStatusCodes:    routeRetryFilter.Spec.RetryOnStatusCodes,
-		RetryOnConnectFailure: routeRetryFilter.Spec.RetryOnConnectFailure,
+	filter := &api.RetryFilter{
+		RetryOn:            routeRetryFilter.Spec.RetryOn,
+		RetryOnStatusCodes: routeRetryFilter.Spec.RetryOnStatusCodes,
 	}
+
+	if routeRetryFilter.Spec.NumRetries != nil {
+		filter.NumRetries = *routeRetryFilter.Spec.NumRetries
+	}
+
+	if routeRetryFilter.Spec.RetryOnConnectFailure != nil {
+		filter.RetryOnConnectFailure = *routeRetryFilter.Spec.RetryOnConnectFailure
+	}
+
+	return filter
 }
 
 func (t ResourceTranslator) translateRouteTimeoutFilter(routeTimeoutFilter *v1alpha1.RouteTimeoutFilter) *api.TimeoutFilter {
