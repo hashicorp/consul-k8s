@@ -16,11 +16,6 @@ The v2 Catalog and Resources API should be considered a feature preview within t
 * The v1 and v2 catalog APIs cannot run concurrently.
 * The Consul UI must be disable. It does not support multi-port services or the v2 catalog API in this release.
 * HCP Consul does not support multi-port services or the v2 catalog API in this release.
-* The v2 API only supports transparent proxy mode where services that have permissions to connect to each other can use
-  Kube DNS to connect.
-
-### Known Issues
-* When using the v2 API with transparent proxy, Kubernetes pods cannot use L7 liveness, readiness, or startup probes.
 
 [[GH-2868]](https://github.com/hashicorp/consul-k8s/pull/2868)
 [[GH-2883]](https://github.com/hashicorp/consul-k8s/pull/2883)
