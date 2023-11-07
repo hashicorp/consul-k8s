@@ -274,8 +274,10 @@ func (e entryComparator) urlRewritesEqual(a, b api.URLRewrite) bool {
 }
 
 func (e entryComparator) retryFiltersEqual(a, b api.RetryFilter) bool {
-	return BothNilOrEqual(a.NumRetries, b.NumRetries) && BothNilOrEqual(a.RetryOnConnectFailure, b.RetryOnConnectFailure) &&
-		slices.Equal(a.RetryOn, b.RetryOn) && slices.Equal(a.RetryOnStatusCodes, b.RetryOnStatusCodes)
+	return a.NumRetries == b.NumRetries &&
+		a.RetryOnConnectFailure == b.RetryOnConnectFailure &&
+		slices.Equal(a.RetryOn, b.RetryOn) &&
+		slices.Equal(a.RetryOnStatusCodes, b.RetryOnStatusCodes)
 }
 
 func (e entryComparator) timeoutFiltersEqual(a, b api.TimeoutFilter) bool {
