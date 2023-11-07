@@ -1777,6 +1777,14 @@ func TestReconcileDeletePod(t *testing.T) {
 				},
 			}, nil)
 			require.NoError(t, err)
+
+			// We create another junk token here just to make sure it doesn't interfere with cleaning up the
+			// previous "real" token that has metadata.
+			_, _, err = testClient.APIClient.ACL().Login(&api.ACLLoginParams{
+				AuthMethod:  test.AuthMethod,
+				BearerToken: test.ServiceAccountJWTToken,
+			}, nil)
+			require.NoError(t, err)
 		}
 
 		namespacedName := types.NamespacedName{
