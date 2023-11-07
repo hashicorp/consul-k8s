@@ -150,8 +150,8 @@ func ToContainerPort(portNumber gwv1beta1.PortNumber, mapPrivilegedContainerPort
 
 func (t ResourceTranslator) translateRouteRetryFilter(routeRetryFilter *v1alpha1.RouteRetryFilter) *api.RetryFilter {
 	filter := &api.RetryFilter{
-		RetryOn:               routeRetryFilter.Spec.RetryOn,
-		RetryOnStatusCodes:    routeRetryFilter.Spec.RetryOnStatusCodes,
+		RetryOn:            routeRetryFilter.Spec.RetryOn,
+		RetryOnStatusCodes: routeRetryFilter.Spec.RetryOnStatusCodes,
 	}
 
 	if routeRetryFilter.Spec.NumRetries != nil {
