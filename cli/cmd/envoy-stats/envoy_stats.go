@@ -127,28 +127,36 @@ func (c *Command) Run(args []string) int {
 		RestConfig: c.restConfig,
 	}
 
+	stats, err := c.getEnvoyStats(&pf)
+	if err != nil {
+		c.UI.Output("error fetching envoy stats", err)
+		return 1
+	}
+
+	c.UI.Output(stats)
+	return 0
+
+}
+
+func (c *Command) getEnvoyStats(pf common.PortForwarder) (string, error) {
 	_, err := pf.Open(c.Ctx)
 	if err != nil {
-		c.UI.Output("error port forwarding %s", err)
-		return 1
+		return "", fmt.Errorf("error port forwarding %s", err)
 	}
 	defer pf.Close()
 
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%s/stats", strconv.Itoa(pf.GetLocalPort())))
 	if err != nil {
-		c.UI.Output("error hitting stats endpoint of envoy %s", err)
-		return 1
+		return "", fmt.Errorf("error hitting stats endpoint of envoy %s", err)
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.UI.Output("error reading body of http response %s", err)
-		return 1
+		return "", fmt.Errorf("error reading body of http response %s", err)
 	}
 
-	c.UI.Output(string(bodyBytes))
 	defer resp.Body.Close()
-	return 0
+	return string(bodyBytes), nil
 }
 
 // setupKubeClient to use for non Helm SDK calls to the Kubernetes API The Helm SDK will use
