@@ -5,6 +5,7 @@ package serveraclinit
 
 import (
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -96,6 +97,13 @@ func TestCreateOrUpdateACLPolicy(t *testing.T) {
 		Address: svr.HTTPAddr,
 		Token:   bootToken,
 	})
+
+	// Make sure the ACL system is bootstrapped first
+	require.Eventually(func() bool {
+		_, _, err := consul.ACL().PolicyList(nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
+
 	require.NoError(err)
 	connectInjectRule, err := cmd.injectRules()
 	require.NoError(err)

@@ -30,6 +30,8 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -155,10 +157,16 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
+
+	// V2 resources
+	utilruntime.Must(authv2beta1.AddAuthToScheme(scheme))
+	utilruntime.Must(meshv2beta1.AddMeshToScheme(scheme))
+
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -226,7 +234,7 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 	c.flagSet.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
-		"Enable of disable Consul V2 Resource APIs.")
+		"Enable or disable Consul V2 Resource APIs.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -381,8 +389,8 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	//Right now we exclusively start controllers for V1 or V2.
-	//In the future we might add a flag to pick and choose from both.
+	// Right now we exclusively start controllers for V1 or V2.
+	// In the future we might add a flag to pick and choose from both.
 	if c.flagResourceAPIs {
 		err = c.configureV2Controllers(ctx, mgr, watcher)
 	} else {

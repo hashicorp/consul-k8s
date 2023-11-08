@@ -11,6 +11,8 @@ project {
 
     # ignoring charts templates as adding copyright headers breaks all tests
     "charts/consul/templates/**",
+    # we don't own these and the tool that adds copyright headers breaks them
+    "control-plane/config/crd/external/**",
 
   ]
 }

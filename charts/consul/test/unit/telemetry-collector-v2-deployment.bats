@@ -1031,28 +1031,29 @@ load _helpers
 
 #--------------------------------------------------------------------
 # Admin Partitions
+# TODO: re-enable this test when V2 supports admin partitions.
 
-@test "telemetryCollector/Deployment(V2):  partition flags are set when using admin partitions" {
-  cd `chart_dir`
-  local flags=$(helm template \
-      -s templates/telemetry-collector-v2-deployment.yaml  \
-      --set 'ui.enabled=false' \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.adminPartitions.name=hashi' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[1].args' | tee /dev/stderr)
-
-  local actual=$(echo $flags | jq -r '. | any(contains("-login-partition=hashi"))' | tee /dev/stderr)
-  [ "${actual}" = 'true' ]
-
-  local actual=$(echo $flags | jq -r '. | any(contains("-service-partition=hashi"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
+# @test "telemetryCollector/Deployment: partition flags are set when using admin partitions" {
+#   cd `chart_dir`
+#   local flags=$(helm template \
+#       -s templates/telemetry-collector-deployment.yaml  \
+#       --set 'ui.enabled=false' \
+#       --set 'global.experiments[0]=resource-apis' \
+#       --set 'telemetryCollector.enabled=true' \
+#       --set 'telemetryCollector.image=bar' \
+#       --set 'global.enableConsulNamespaces=true' \
+#       --set 'global.adminPartitions.enabled=true' \
+#       --set 'global.adminPartitions.name=hashi' \
+#       --set 'global.acls.manageSystemACLs=true' \
+#       . | tee /dev/stderr |
+#       yq '.spec.template.spec.containers[1].args' | tee /dev/stderr)
+#
+#   local actual=$(echo $flags | jq -r '. | any(contains("-login-partition=hashi"))' | tee /dev/stderr)
+#   [ "${actual}" = 'true' ]
+#
+#   local actual=$(echo $flags | jq -r '. | any(contains("-service-partition=hashi"))' | tee /dev/stderr)
+#   [ "${actual}" = "true" ]
+# }
 
 @test "telemetryCollector/Deployment(V2):  consul-ca-cert volume mount is not set when using externalServers and useSystemRoots" {
   cd `chart_dir`

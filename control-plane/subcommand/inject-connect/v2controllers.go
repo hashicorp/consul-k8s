@@ -11,22 +11,40 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/config-entries/controllersv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpointsv2"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/pod"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/serviceaccount"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	webhookV2 "github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook_v2"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/namespace"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhookv2"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
-
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
 
-	//Convert allow/deny lists to sets.
+	// Convert allow/deny lists to sets.
 	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
+	k8sNsConfig := common.K8sNamespaceConfig{
+		AllowK8sNamespacesSet: allowK8sNamespaces,
+		DenyK8sNamespacesSet:  denyK8sNamespaces,
+	}
+	consulTenancyConfig := common.ConsulTenancyConfig{
+		EnableConsulPartitions:     c.flagEnablePartitions,
+		EnableConsulNamespaces:     c.flagEnableNamespaces,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+		ConsulPartition:            c.consul.Partition,
+	}
 
 	lifecycleConfig := lifecycle.Config{
 		DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
@@ -46,67 +64,124 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	}
 
 	if err := (&pod.Controller{
-		Client:                     mgr.GetClient(),
-		ConsulClientConfig:         consulConfig,
-		ConsulServerConnMgr:        watcher,
-		AllowK8sNamespacesSet:      allowK8sNamespaces,
-		DenyK8sNamespacesSet:       denyK8sNamespaces,
-		EnableConsulPartitions:     c.flagEnablePartitions,
-		EnableConsulNamespaces:     c.flagEnableNamespaces,
-		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
-		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
-		ConsulPartition:            c.consul.Partition,
-		EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
-		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
-		AuthMethod:                 c.flagACLAuthMethod,
-		MetricsConfig:              metricsConfig,
-		EnableTelemetryCollector:   c.flagEnableTelemetryCollector,
-		Log:                        ctrl.Log.WithName("controller").WithName("pods"),
+		Client:                   mgr.GetClient(),
+		ConsulClientConfig:       consulConfig,
+		ConsulServerConnMgr:      watcher,
+		K8sNamespaceConfig:       k8sNsConfig,
+		ConsulTenancyConfig:      consulTenancyConfig,
+		EnableTransparentProxy:   c.flagDefaultEnableTransparentProxy,
+		TProxyOverwriteProbes:    c.flagTransparentProxyDefaultOverwriteProbes,
+		AuthMethod:               c.flagACLAuthMethod,
+		MetricsConfig:            metricsConfig,
+		EnableTelemetryCollector: c.flagEnableTelemetryCollector,
+		Log:                      ctrl.Log.WithName("controller").WithName("pod"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", pod.Controller{})
 		return err
 	}
 
+	endpointsLogger := ctrl.Log.WithName("controller").WithName("endpoints")
 	if err := (&endpointsv2.Controller{
-		Client:                     mgr.GetClient(),
-		ConsulServerConnMgr:        watcher,
-		AllowK8sNamespacesSet:      allowK8sNamespaces,
-		DenyK8sNamespacesSet:       denyK8sNamespaces,
-		EnableConsulPartitions:     c.flagEnablePartitions,
-		EnableConsulNamespaces:     c.flagEnableNamespaces,
-		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
-		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
-		Log:                        ctrl.Log.WithName("controller").WithName("endpoints"),
-		Scheme:                     mgr.GetScheme(),
-		Context:                    ctx,
+		Client:              mgr.GetClient(),
+		ConsulServerConnMgr: watcher,
+		K8sNamespaceConfig:  k8sNsConfig,
+		ConsulTenancyConfig: consulTenancyConfig,
+		WriteCache:          endpointsv2.NewWriteCache(endpointsLogger),
+		Log:                 endpointsLogger,
+		Scheme:              mgr.GetScheme(),
+		Context:             ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", endpointsv2.Controller{})
 		return err
 	}
 
-	// TODO: Nodes Controller
+	if err := (&serviceaccount.Controller{
+		Client:              mgr.GetClient(),
+		ConsulServerConnMgr: watcher,
+		K8sNamespaceConfig:  k8sNsConfig,
+		ConsulTenancyConfig: consulTenancyConfig,
+		Log:                 ctrl.Log.WithName("controller").WithName("serviceaccount"),
+		Scheme:              mgr.GetScheme(),
+		Context:             ctx,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", serviceaccount.Controller{})
+		return err
+	}
 
-	// TODO: Serviceaccounts Controller
+	if c.flagEnableNamespaces {
+		err := (&namespace.Controller{
+			Client:                     mgr.GetClient(),
+			ConsulClientConfig:         consulConfig,
+			ConsulServerConnMgr:        watcher,
+			AllowK8sNamespacesSet:      allowK8sNamespaces,
+			DenyK8sNamespacesSet:       denyK8sNamespaces,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+			NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+			Log:                        ctrl.Log.WithName("controller").WithName("namespace"),
+		}).SetupWithManager(mgr)
+		if err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", namespace.Controller{})
+			return err
+		}
+	}
 
-	// TODO: V2 Config Controller(s)
+	meshConfigReconciler := &controllersv2.MeshConfigController{
+		ConsulClientConfig:  consulConfig,
+		ConsulServerConnMgr: watcher,
+		ConsulTenancyConfig: consulTenancyConfig,
+	}
+	if err := (&controllersv2.TrafficPermissionsController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.TrafficPermissions),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.TrafficPermissions)
+		return err
+	}
+	if err := (&controllersv2.GRPCRouteController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.GRPCRoute),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.GRPCRoute)
+		return err
+	}
+	if err := (&controllersv2.HTTPRouteController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.HTTPRoute),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.HTTPRoute)
+		return err
+	}
+	if err := (&controllersv2.TCPRouteController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.TCPRoute),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.TCPRoute)
+		return err
+	}
+	if err := (&controllersv2.ProxyConfigurationController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.ProxyConfiguration),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.ProxyConfiguration)
+		return err
+	}
 
-	// // Metadata for webhooks
-	//consulMeta := apicommon.ConsulMeta{
-	//	PartitionsEnabled:    c.flagEnablePartitions,
-	//	Partition:            c.consul.Partition,
-	//	NamespacesEnabled:    c.flagEnableNamespaces,
-	//	DestinationNamespace: c.flagConsulDestinationNamespace,
-	//	Mirroring:            c.flagEnableK8SNSMirroring,
-	//	Prefix:               c.flagK8SNSMirroringPrefix,
-	//}
-
-	// TODO: register webhooks
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
 	mgr.GetWebhookServer().Register("/mutate",
-		&ctrlRuntimeWebhook.Admission{Handler: &webhookV2.MeshWebhook{
+		&ctrlRuntimeWebhook.Admission{Handler: &webhookv2.MeshWebhook{
 			Clientset:                    c.clientset,
 			ReleaseNamespace:             c.flagReleaseNamespace,
 			ConsulConfig:                 consulConfig,
@@ -147,6 +222,42 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 			LogLevel:                     c.flagLogLevel,
 			LogJSON:                      c.flagLogJSON,
 		}})
+
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-trafficpermissions",
+		&ctrlRuntimeWebhook.Admission{Handler: &authv2beta1.TrafficPermissionsWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.TrafficPermissions),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-proxyconfigurations",
+		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.ProxyConfigurationWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.ProxyConfiguration),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-httproute",
+		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.HTTPRouteWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.HTTPRoute),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-grpcroute",
+		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.GRPCRouteWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.GRPCRoute),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-tcproute",
+		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.TCPRouteWebhook{
+			Client:              mgr.GetClient(),
+			Logger:              ctrl.Log.WithName("webhooks").WithName(common.TCPRoute),
+			ConsulTenancyConfig: consulTenancyConfig,
+		}})
+
+	if err := mgr.AddReadyzCheck("ready", webhook.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
+		setupLog.Error(err, "unable to create readiness check")
+		return err
+	}
 
 	if c.flagEnableWebhookCAUpdate {
 		err := c.updateWebhookCABundle(ctx)

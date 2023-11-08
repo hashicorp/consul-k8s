@@ -1,0 +1,15 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ExportedServices
+metadata:
+  name: default
+spec:
+  services:
+  - name: static-server
+    consumers:
+    - peer: client
+  - name: static-server-hostname
+    consumers:
+    - peer: client

@@ -1,0 +1,25 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+# This is used to show that a gateway cannot have more than one gateway policy attached to it
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: GatewayPolicy
+metadata:
+  name: bad-policy
+spec:
+  targetRef:
+    name: gateway
+    sectionName: http-auth
+    group: gateway.networking.k8s.io/v1beta1
+    kind: Gateway
+  override:
+    jwt:
+      providers:
+      - name: "local"
+  default:
+    jwt:
+      providers:
+      - name: "local"
+        verifyClaims:
+        - path:
+            - role
+          value: pet

@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 // createACLPolicyRoleAndBindingRule will create the ACL Policy for the component

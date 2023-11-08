@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/serf/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 func TestRun_FlagDefaults(t *testing.T) {

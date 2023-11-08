@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Add `JWKSCluster` field to `JWTProvider` CRD. 
+```

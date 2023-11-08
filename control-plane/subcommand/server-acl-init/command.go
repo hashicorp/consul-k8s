@@ -16,11 +16,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
@@ -31,6 +26,12 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 type Command struct {
@@ -42,6 +43,8 @@ type Command struct {
 
 	flagResourcePrefix string
 	flagK8sNamespace   string
+
+	flagResourceAPIs bool // Use V2 APIs
 
 	flagAllowDNS bool
 
@@ -129,6 +132,9 @@ func (c *Command) init() {
 		"Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
 
 	c.flags.BoolVar(&c.flagSetServerTokens, "set-server-tokens", true, "Toggle for setting agent tokens for the servers.")
+
+	c.flags.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
+		"Enable or disable Consul V2 Resource APIs. This will affect the binding rule used for Kubernetes auth (Service vs. WorkloadIdentity)")
 
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")

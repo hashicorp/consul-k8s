@@ -19,7 +19,7 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/proto-public/pbdataplane"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -183,6 +183,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagRedirectTrafficConfig != "" {
+		c.watcher.Stop()                                        // Explicitly stop the watcher so that ACLs are cleaned up before we apply re-direction.
 		err := c.applyTrafficRedirectionRules(&bootstrapConfig) // BootstrapConfig is always populated non-nil from the RPC
 		if err != nil {
 			c.logger.Error("error applying traffic redirection rules", "err", err)

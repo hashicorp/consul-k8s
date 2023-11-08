@@ -35,6 +35,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         {{- if .Values.global.tls.annotations }}
           {{- tpl .Values.global.tls.annotations . | nindent 8 }}
         {{- end }}

@@ -9,8 +9,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
-	common "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,11 +23,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 var (
 	createdAtLabelKey   = "gateway.consul.hashicorp.com/created"
 	createdAtLabelValue = "101010"
+	dataplaneImage      = "hashicorp/consul-dataplane"
 	name                = "test"
 	namespace           = "default"
 	labels              = map[string]string{
@@ -104,7 +107,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -151,7 +156,9 @@ func TestUpsert(t *testing.T) {
 					MapPrivilegedContainerPorts: 2000,
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -201,7 +208,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -252,7 +261,8 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: common.HelmConfig{
-				AuthMethod: "method",
+				AuthMethod:     "method",
+				ImageDataplane: dataplaneImage,
 			},
 			initialResources: resources{},
 			finalResources: resources{
@@ -310,7 +320,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -345,7 +357,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -381,7 +395,8 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: common.HelmConfig{
-				AuthMethod: "method",
+				AuthMethod:     "method",
+				ImageDataplane: dataplaneImage,
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -464,7 +479,8 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: common.HelmConfig{
-				AuthMethod: "method",
+				AuthMethod:     "method",
+				ImageDataplane: dataplaneImage,
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -543,7 +559,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
@@ -582,7 +600,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 8, nil, nil, "", "1"),
@@ -621,7 +641,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 1, nil, nil, "", "1"),
@@ -660,7 +682,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 10, nil, nil, "", "1"),
@@ -701,6 +725,7 @@ func TestUpsert(t *testing.T) {
 			},
 			helmConfig: common.HelmConfig{
 				EnableOpenShift: true,
+				ImageDataplane:  "hashicorp/consul-dataplane",
 			},
 			initialResources: resources{},
 			finalResources: resources{
@@ -982,7 +1007,9 @@ func TestDelete(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -1019,7 +1046,9 @@ func TestDelete(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig: common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -1073,7 +1102,8 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			helmConfig: common.HelmConfig{
-				AuthMethod: "method",
+				AuthMethod:     "method",
+				ImageDataplane: dataplaneImage,
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -1240,6 +1270,22 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 			require.NotNil(t, actual.Spec.Replicas)
 			require.EqualValues(t, *expected.Spec.Replicas, *actual.Spec.Replicas)
 		}
+
+		// Ensure there is a consul-dataplane container dropping ALL capabilities, adding
+		// back the NET_BIND_SERVICE capability, and establishing a read-only root filesystem
+		hasDataplaneContainer := false
+		for _, container := range actual.Spec.Template.Spec.Containers {
+			if container.Image == dataplaneImage {
+				hasDataplaneContainer = true
+				require.NotNil(t, container.SecurityContext)
+				require.NotNil(t, container.SecurityContext.Capabilities)
+				require.NotNil(t, container.SecurityContext.ReadOnlyRootFilesystem)
+				assert.True(t, *container.SecurityContext.ReadOnlyRootFilesystem)
+				assert.Equal(t, []corev1.Capability{netBindCapability}, container.SecurityContext.Capabilities.Add)
+				assert.Equal(t, []corev1.Capability{allCapabilities}, container.SecurityContext.Capabilities.Drop)
+			}
+		}
+		assert.True(t, hasDataplaneContainer)
 	}
 
 	for _, expected := range resources.roles {

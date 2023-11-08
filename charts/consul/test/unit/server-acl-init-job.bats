@@ -1081,6 +1081,7 @@ load _helpers
 
   local expected=$(echo '{
     "consul.hashicorp.com/connect-inject": "false",
+    "consul.hashicorp.com/mesh-inject": "false",
     "vault.hashicorp.com/agent-inject": "true",
     "vault.hashicorp.com/agent-pre-populate": "true",
     "vault.hashicorp.com/agent-pre-populate-only": "false",
@@ -2356,7 +2357,11 @@ load _helpers
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -2405,4 +2410,37 @@ load _helpers
      . | tee /dev/stderr |
      yq -r '.spec.template.metadata.annotations["argocd.argoproj.io/hook-delete-policy"]' | tee /dev/stderr)
   [ "${actual}" = null ]
+}
+
+#--------------------------------------------------------------------
+# resource-apis
+
+@test "serverACLInit/Job: resource-apis is not set by default" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'any(contains("-enable-resource-apis"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: -enable-resource-apis=true is set when global.experiments contains [\"resource-apis\"] " {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'ui.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }

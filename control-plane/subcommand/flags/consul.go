@@ -11,10 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-rootcerts"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 const (

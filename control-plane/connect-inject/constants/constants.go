@@ -4,8 +4,13 @@
 package constants
 
 const (
+	// LegacyConsulCAFile is the location of the Consul CA file inside the injected pod.
+	// This is used with the V1 API.
+	LegacyConsulCAFile = "/consul/connect-inject/consul-ca.pem"
+
 	// ConsulCAFile is the location of the Consul CA file inside the injected pod.
-	ConsulCAFile = "/consul/connect-inject/consul-ca.pem"
+	// This is used with the V2 API.
+	ConsulCAFile = "/consul/mesh-inject/consul-ca.pem"
 
 	// DefaultConsulNS is the default Consul namespace name.
 	DefaultConsulNS = "default"
@@ -22,6 +27,9 @@ const (
 	// ProxyDefaultHealthPort is the default HTTP health check port for the proxy.
 	ProxyDefaultHealthPort = 21000
 
+	// MetaKeyManagedBy is the meta key name for indicating which Kubernetes controller manages a Consul resource.
+	MetaKeyManagedBy = "managed-by"
+
 	// MetaKeyKubeNS is the meta key name for Kubernetes namespace used for the Consul services.
 	MetaKeyKubeNS = "k8s-namespace"
 
@@ -33,6 +41,10 @@ const (
 
 	// MetaKeyKubeServiceName is the meta key name for Kubernetes service name used for the Consul services.
 	MetaKeyKubeServiceName = "k8s-service-name"
+
+	// MetaKeyKubeServiceAccountName is the meta key name for Kubernetes service account name used for the Consul
+	// v2 workload identity.
+	MetaKeyKubeServiceAccountName = "k8s-service-account-name"
 
 	// MetaKeyPodName is the meta key name for Kubernetes pod name used for the Consul services.
 	MetaKeyPodName = "pod-name"
@@ -51,3 +63,33 @@ const (
 
 	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 )
+
+// GetNormalizedConsulNamespace returns the default namespace if the passed namespace
+// is empty, otherwise returns back the passed in namespace.
+func GetNormalizedConsulNamespace(ns string) string {
+	if ns == "" {
+		ns = DefaultConsulNS
+	}
+
+	return ns
+}
+
+// GetNormalizedConsulPartition returns the default partition if the passed partition
+// is empty, otherwise returns back the passed in partition.
+func GetNormalizedConsulPartition(ap string) string {
+	if ap == "" {
+		ap = DefaultConsulPartition
+	}
+
+	return ap
+}
+
+// GetNormalizedConsulPeer returns the default peer if the passed peer
+// is empty, otherwise returns back the passed in peer.
+func GetNormalizedConsulPeer(peer string) string {
+	if peer == "" {
+		peer = DefaultConsulPeer
+	}
+
+	return peer
+}

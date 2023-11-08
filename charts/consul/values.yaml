@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.17-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.18-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -86,7 +86,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.3.0-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.4-dev
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -639,7 +639,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.3-dev
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.4-dev
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -2190,6 +2190,11 @@ connectInject:
     # If this setting is false, you will need to install the Gateway API CRDs manually.
     manageExternalCRDs: true
 
+    # Enables Consul on Kubernets to manage only the non-standard CRDs used for Gateway API. If manageExternalCRDs is true 
+    # then all CRDs will be installed; otherwise, if manageNonStandardCRDs is true then only TCPRoute, GatewayClassConfig and MeshService
+    # will be installed.
+    manageNonStandardCRDs: false
+
     # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
     managedGatewayClass:
       # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
@@ -3291,7 +3296,7 @@ terminatingGateways:
   gateways:
     - name: terminating-gateway
 
-# [DEPRECATED] Use connectInject.apiGateway instead. This stanza will be removed with the release of Consul 1.17
+# [DEPRECATED] Use connectInject.apiGateway instead.
 # Configuration settings for the Consul API Gateway integration
 apiGateway:
   # When true the helm chart will install the Consul API Gateway controller
@@ -3323,7 +3328,7 @@ apiGateway:
   # The name (and tag) of the Envoy Docker image used for the
   # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
   # @default: envoyproxy/envoy:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy:v1.25.1"
+  imageEnvoy: "envoyproxy/envoy:v1.25.11"
 
   # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
   # @type: string
@@ -3523,7 +3528,7 @@ telemetryCollector:
   # The name of the Docker image (including any tag) for the containers running
   # the consul-telemetry-collector
   # @type: string
-  image: "hashicorp/consul-telemetry-collector:0.0.1"
+  image: "hashicorp/consul-telemetry-collector:0.0.2"
 
   # The resource settings for consul-telemetry-collector pods.
   # @recurse: false

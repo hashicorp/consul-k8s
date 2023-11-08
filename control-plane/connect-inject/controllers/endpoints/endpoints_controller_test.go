@@ -4167,6 +4167,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				}
 			})
 			consulClient := testClient.APIClient
+			// TODO: stabilize this test by waiting for the ACL bootstrap
 
 			// Register service and proxy in consul
 			var token *api.ACLToken

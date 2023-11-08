@@ -55,7 +55,7 @@ const (
 	apiTimeout        = 5 * time.Minute
 )
 
-var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate}
+var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate, api.JWTProvider}
 
 type Config struct {
 	ConsulClientConfig      *consul.Config
@@ -94,6 +94,7 @@ func New(config Config) *Cache {
 	for _, kind := range Kinds {
 		cache[kind] = common.NewReferenceMap()
 	}
+
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
@@ -224,16 +225,18 @@ func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind strin
 
 	for _, entry := range entries {
 		meta := entry.GetMeta()
-		if meta[constants.MetaKeyKubeName] == "" || meta[constants.MetaKeyDatacenter] != c.datacenter {
-			// Don't process things that don't belong to us. The main reason
-			// for this is so that we don't garbage collect config entries that
-			// are either user-created or that another controller running in a
-			// federated datacenter creates. While we still allow for competing controllers
-			// syncing/overriding each other due to conflicting Kubernetes objects in
-			// two federated clusters (which is what the rest of the controllers also allow
-			// for), we don't want to delete a config entry just because we don't have
-			// its corresponding Kubernetes object if we know it belongs to another datacenter.
-			continue
+		if kind != api.JWTProvider {
+			if meta[constants.MetaKeyKubeName] == "" || meta[constants.MetaKeyDatacenter] != c.datacenter {
+				// Don't process things that don't belong to us. The main reason
+				// for this is so that we don't garbage collect config entries that
+				// are either user-created or that another controller running in a
+				// federated datacenter creates. While we still allow for competing controllers
+				// syncing/overriding each other due to conflicting Kubernetes objects in
+				// two federated clusters (which is what the rest of the controllers also allow
+				// for), we don't want to delete a config entry just because we don't have
+				// its corresponding Kubernetes object if we know it belongs to another datacenter.
+				continue
+			}
 		}
 
 		cache.Set(common.EntryToReference(entry), entry)

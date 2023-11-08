@@ -12,8 +12,9 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 // ConsulUpdateOperation is an operation representing an
@@ -116,10 +117,12 @@ type ResourceMap struct {
 	httpRouteGateways     map[api.ResourceReference]*httpRoute
 	gatewayResources      map[api.ResourceReference]*resourceSet
 	externalFilters       map[corev1.ObjectReference]client.Object
+	gatewayPolicies       map[api.ResourceReference]*v1alpha1.GatewayPolicy
 
 	// consul resources for a gateway
 	consulTCPRoutes  map[api.ResourceReference]*consulTCPRoute
 	consulHTTPRoutes map[api.ResourceReference]*consulHTTPRoute
+	jwtProviders     map[api.ResourceReference]*v1alpha1.JWTProvider
 
 	// mutations
 	consulMutations []*ConsulUpdateOperation
@@ -140,6 +143,8 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
 		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
 		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
+		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.GatewayPolicy),
+		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
 }
 
@@ -399,6 +404,74 @@ func (s *ResourceMap) GetExternalFilter(filterRef gwv1beta1.LocalObjectReference
 func (s *ResourceMap) ExternalFilterExists(filterRef gwv1beta1.LocalObjectReference, namespace string) bool {
 	_, ok := s.GetExternalFilter(filterRef, namespace)
 	return ok
+}
+
+func (s *ResourceMap) GetExternalAuthFilters() []*v1alpha1.RouteAuthFilter {
+	filters := make([]*v1alpha1.RouteAuthFilter, 0, len(s.externalFilters))
+	for _, filter := range s.externalFilters {
+		if authFilter, ok := filter.(*v1alpha1.RouteAuthFilter); ok {
+			filters = append(filters, authFilter)
+		}
+	}
+	return filters
+}
+
+func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v1alpha1.GatewayPolicy {
+	sectionName := ""
+	if gatewayPolicy.Spec.TargetRef.SectionName != nil {
+		sectionName = string(*gatewayPolicy.Spec.TargetRef.SectionName)
+	}
+
+	gwNamespace := gatewayPolicy.Spec.TargetRef.Namespace
+	if gwNamespace == "" {
+		gwNamespace = gatewayPolicy.Namespace
+	}
+
+	key := api.ResourceReference{
+		Kind:        gatewayPolicy.Spec.TargetRef.Kind,
+		Name:        gatewayPolicy.Spec.TargetRef.Name,
+		SectionName: sectionName,
+		Namespace:   gwNamespace,
+	}
+
+	if s.gatewayPolicies == nil {
+		s.gatewayPolicies = make(map[api.ResourceReference]*v1alpha1.GatewayPolicy)
+	}
+
+	s.gatewayPolicies[key] = gatewayPolicy
+
+	return s.gatewayPolicies[key]
+}
+
+func (s *ResourceMap) AddJWTProvider(provider *v1alpha1.JWTProvider) {
+	key := api.ResourceReference{
+		Kind: provider.Kind,
+		Name: provider.Name,
+	}
+	s.jwtProviders[key] = provider
+}
+
+func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.GatewayJWTProvider) (*v1alpha1.JWTProvider, bool) {
+	key := api.ResourceReference{
+		Name: provider.Name,
+		Kind: "JWTProvider",
+	}
+
+	value, exists := s.jwtProviders[key]
+	return value, exists
+}
+
+func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
+	key := api.ResourceReference{
+		Name:        gateway.Name,
+		Kind:        gateway.Kind,
+		SectionName: string(gatewayListener.Name),
+		Namespace:   gateway.Namespace,
+	}
+
+	value, exists := s.gatewayPolicies[key]
+
+	return value, exists
 }
 
 func (s *ResourceMap) ReferenceCountTCPRoute(route gwv1alpha2.TCPRoute) {

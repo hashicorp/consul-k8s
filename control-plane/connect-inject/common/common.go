@@ -9,6 +9,9 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	corev1 "k8s.io/api/core/v1"
@@ -16,7 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
 )
 
 // DetermineAndValidatePort behaves as follows:
@@ -176,4 +178,32 @@ func PortValueFromIntOrString(pod corev1.Pod, port intstr.IntOrString) (uint32, 
 		return 0, err
 	}
 	return uint32(portVal), nil
+}
+
+// HasBeenMeshInjected checks the value of the status annotation and returns true if the Pod has been injected.
+// Does not apply to V1 pods, which use a different key (`constants.KeyInjectStatus`).
+func HasBeenMeshInjected(pod corev1.Pod) bool {
+	if pod.Annotations == nil {
+		return false
+	}
+	if anno, ok := pod.Annotations[constants.KeyMeshInjectStatus]; ok && anno == constants.Injected {
+		return true
+	}
+	return false
+}
+
+// ConsulNamespaceIsNotFound checks the gRPC error code and message to determine
+// if a namespace does not exist. If the namespace exists this function returns false, true otherwise.
+func ConsulNamespaceIsNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	s, ok := status.FromError(err)
+	if !ok {
+		return false
+	}
+	if codes.InvalidArgument == s.Code() && strings.Contains(s.Message(), "namespace not found") {
+		return true
+	}
+	return false
 }

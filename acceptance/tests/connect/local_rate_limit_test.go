@@ -38,13 +38,20 @@ func TestConnectInject_LocalRateLimiting(t *testing.T) {
 	connHelper.DeployClientAndServer(t)
 	connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
 
+	// By default, target the static-server on localhost:1234
+	staticServer := "localhost:1234"
+	if cfg.EnableTransparentProxy {
+		// When TProxy is enabled, use the service name.
+		staticServer = connhelper.StaticServerName
+	}
+
 	// Map the static-server URL and path to the rate limits defined in the service defaults at:
 	// ../fixtures/cases/local-rate-limiting/service-defaults-static-server.yaml
 	rateLimitMap := map[string]int{
-		"http://localhost:1234":             2,
-		"http://localhost:1234/exact":       3,
-		"http://localhost:1234/prefix-test": 4,
-		"http://localhost:1234/regex":       5,
+		"http://" + staticServer:                  2,
+		"http://" + staticServer + "/exact":       3,
+		"http://" + staticServer + "/prefix-test": 4,
+		"http://" + staticServer + "/regex":       5,
 	}
 
 	opts := newRateLimitOptions(t, ctx)

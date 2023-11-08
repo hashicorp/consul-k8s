@@ -6,15 +6,19 @@ package pod
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
 
-	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v1alpha1"
+	"github.com/hashicorp/consul/api"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/go-multierror"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -22,7 +26,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -30,39 +35,25 @@ import (
 )
 
 const (
-	metaKeyManagedBy = "managed-by"
-
 	DefaultTelemetryBindSocketDir = "/consul/mesh-inject"
+	consulNodeAddress             = "127.0.0.1"
+	tokenMetaPodNameKey           = "pod"
 )
 
+// Controller watches Pod events and converts them to V2 Workloads and HealthStatus.
+// The translation from Pod to Workload is 1:1 and the HealthStatus object is a representation
+// of the Pod's Status field. Controller is also responsible for generating V2 Upstreams resources
+// when not in transparent proxy mode. ProxyConfiguration is also optionally created.
 type Controller struct {
 	client.Client
 	// ConsulClientConfig is the config for the Consul API client.
 	ConsulClientConfig *consul.Config
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
 	ConsulServerConnMgr consul.ServerConnectionManager
-	// Only pods in the AllowK8sNamespacesSet are reconciled.
-	AllowK8sNamespacesSet mapset.Set
-	// Pods in the DenyK8sNamespacesSet are ignored.
-	DenyK8sNamespacesSet mapset.Set
-	// EnableConsulPartitions indicates that a user is running Consul Enterprise
-	EnableConsulPartitions bool
-	// ConsulPartition is the Consul Partition to which this controller belongs
-	ConsulPartition string
-	// EnableConsulNamespaces indicates that a user is running Consul Enterprise
-	EnableConsulNamespaces bool
-	// ConsulDestinationNamespace is the name of the Consul namespace to create
-	// all config entries in. If EnableNSMirroring is true this is ignored.
-	ConsulDestinationNamespace string
-	// EnableNSMirroring causes Consul namespaces to be created to match the
-	// k8s namespace of any config entry custom resource. Config entries will
-	// be created in the matching Consul namespace.
-	EnableNSMirroring bool
-	// NSMirroringPrefix is an optional prefix that can be added to the Consul
-	// namespaces created while mirroring. For example, if it is set to "k8s-",
-	// then the k8s `default` namespace will be mirrored in Consul's
-	// `k8s-default` namespace.
-	NSMirroringPrefix string
+	// K8sNamespaceConfig manages allow/deny Kubernetes namespaces.
+	common.K8sNamespaceConfig
+	// ConsulTenancyConfig manages settings related to Consul namespaces and partitions.
+	common.ConsulTenancyConfig
 
 	// TODO: EnableWANFederation
 
@@ -74,7 +65,7 @@ type Controller struct {
 	TProxyOverwriteProbes bool
 
 	// AuthMethod is the name of the Kubernetes Auth Method that
-	// was used to login with Consul. The Endpoints controller
+	// was used to login with Consul. The pods controller
 	// will delete any tokens associated with this auth method
 	// whenever service instances are deregistered.
 	AuthMethod string
@@ -92,17 +83,16 @@ type Controller struct {
 
 // TODO: logs, logs, logs
 
-// Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
-// correspond to the Kubernetes Service. These events are driven by changes to the Pods backing the Kube service.
+// Reconcile reads the state of a Kubernetes Pod and reconciles Consul workloads that are 1:1 mapped.
 func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
 	var pod corev1.Pod
 
-	// Ignore the request if the namespace of the endpoint is not allowed.
+	// Ignore the request if the namespace of the pod is not allowed.
 	// Strictly speaking, this is not required because the mesh webhook also knows valid namespaces
 	// for injection, but it will somewhat reduce the amount of unnecessary deletions for non-injected
 	// pods
-	if common.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
+	if inject.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
 		return ctrl.Result{}, nil
 	}
 
@@ -112,6 +102,16 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 	r.ResourceClient = rc
+
+	apiClient, err := consul.NewClientFromConnMgr(r.ConsulClientConfig, r.ConsulServerConnMgr)
+	if err != nil {
+		r.Log.Error(err, "failed to create Consul API client", "name", req.Name)
+		return ctrl.Result{}, err
+	}
+
+	if r.ConsulClientConfig.APIClientConfig.Token != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-consul-token", r.ConsulClientConfig.APIClientConfig.Token)
+	}
 
 	err = r.Client.Get(ctx, req.NamespacedName, &pod)
 
@@ -124,15 +124,22 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			errs = multierror.Append(errs, err)
 		}
 
-		// TODO: clean up ACL Tokens
-
-		// TODO: delete explicit upstreams
-		//if err := r.deleteUpstreams(ctx, pod); err != nil {
-		//	errs = multierror.Append(errs, err)
-		//}
+		// Delete destinations, if any exist
+		if err := r.deleteDestinations(ctx, req.NamespacedName); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 
 		if err := r.deleteProxyConfiguration(ctx, req.NamespacedName); err != nil {
 			errs = multierror.Append(errs, err)
+		}
+
+		if r.AuthMethod != "" {
+			r.Log.Info("deleting ACL tokens for pod", "name", req.Name, "ns", req.Namespace)
+			err := r.deleteACLTokensForPod(apiClient, req.NamespacedName)
+			if err != nil {
+				r.Log.Error(err, "failed to delete ACL tokens for pod", "name", req.Name, "ns", req.Namespace)
+				errs = multierror.Append(errs, err)
+			}
 		}
 
 		return ctrl.Result{}, errs
@@ -143,21 +150,60 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	r.Log.Info("retrieved", "name", pod.Name, "ns", pod.Namespace)
 
-	if hasBeenInjected(pod) {
+	if inject.HasBeenMeshInjected(pod) {
+
+		// It is possible the pod was scheduled but doesn't have an allocated IP yet, so safely requeue
+		if pod.Status.PodIP == "" {
+			r.Log.Info("pod does not have IP allocated; re-queueing request", "pod", req.Name, "ns", req.Namespace)
+			return ctrl.Result{Requeue: true}, nil
+		}
+
 		if err := r.writeProxyConfiguration(ctx, pod); err != nil {
+			// We could be racing with the namespace controller.
+			// Requeue (which includes backoff) to try again.
+			if inject.ConsulNamespaceIsNotFound(err) {
+				r.Log.Info("Consul namespace not found; re-queueing request",
+					"pod", req.Name, "ns", req.Namespace, "consul-ns",
+					r.getConsulNamespace(req.Namespace), "err", err.Error())
+				return ctrl.Result{Requeue: true}, nil
+			}
 			errs = multierror.Append(errs, err)
 		}
 
 		if err := r.writeWorkload(ctx, pod); err != nil {
+			// Technically this is not needed, but keeping in case this gets refactored in
+			// a different order
+			if inject.ConsulNamespaceIsNotFound(err) {
+				r.Log.Info("Consul namespace not found; re-queueing request",
+					"pod", req.Name, "ns", req.Namespace, "consul-ns",
+					r.getConsulNamespace(req.Namespace), "err", err.Error())
+				return ctrl.Result{Requeue: true}, nil
+			}
 			errs = multierror.Append(errs, err)
 		}
 
-		// TODO: create explicit upstreams
-		//if err := r.writeUpstreams(ctx, pod); err != nil {
-		//	errs = multierror.Append(errs, err)
-		//}
+		// Create explicit destinations (if any exist)
+		if err := r.writeDestinations(ctx, pod); err != nil {
+			// Technically this is not needed, but keeping in case this gets refactored in
+			// a different order
+			if inject.ConsulNamespaceIsNotFound(err) {
+				r.Log.Info("Consul namespace not found; re-queueing request",
+					"pod", req.Name, "ns", req.Namespace, "consul-ns",
+					r.getConsulNamespace(req.Namespace), "err", err.Error())
+				return ctrl.Result{Requeue: true}, nil
+			}
+			errs = multierror.Append(errs, err)
+		}
 
 		if err := r.writeHealthStatus(ctx, pod); err != nil {
+			// Technically this is not needed, but keeping in case this gets refactored in
+			// a different order
+			if inject.ConsulNamespaceIsNotFound(err) {
+				r.Log.Info("Consul namespace not found; re-queueing request",
+					"pod", req.Name, "ns", req.Namespace, "consul-ns",
+					r.getConsulNamespace(req.Namespace), "err", err.Error())
+				return ctrl.Result{Requeue: true}, nil
+			}
 			errs = multierror.Append(errs, err)
 		}
 	}
@@ -169,14 +215,6 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Pod{}).
 		Complete(r)
-}
-
-// hasBeenInjected checks the value of the status annotation and returns true if the Pod has been injected.
-func hasBeenInjected(pod corev1.Pod) bool {
-	if anno, ok := pod.Annotations[constants.KeyMeshInjectStatus]; ok && anno == constants.Injected {
-		return true
-	}
-	return false
 }
 
 func (r *Controller) deleteWorkload(ctx context.Context, pod types.NamespacedName) error {
@@ -197,6 +235,81 @@ func (r *Controller) deleteProxyConfiguration(ctx context.Context, pod types.Nam
 	return err
 }
 
+// deleteACLTokensForPod finds the ACL tokens that belongs to the pod and delete them from Consul.
+// It will only check for ACL tokens that have been created with the auth method this controller
+// has been configured with and will only delete tokens for the provided pod Name.
+func (r *Controller) deleteACLTokensForPod(apiClient *api.Client, pod types.NamespacedName) error {
+	// Skip if name is empty.
+	if pod.Name == "" {
+		return nil
+	}
+
+	// Use the V1 logic for getting a compatible namespace
+	consulNamespace := namespaces.ConsulNamespace(
+		pod.Namespace,
+		r.EnableConsulNamespaces,
+		r.ConsulDestinationNamespace, r.EnableNSMirroring, r.NSMirroringPrefix,
+	)
+
+	// TODO: create an index for the workloadidentity in Consul, which will also require
+	// the identity to be attached to the token for templated-policies.
+	tokens, _, err := apiClient.ACL().TokenListFiltered(
+		api.ACLTokenFilterOptions{
+			AuthMethod: r.AuthMethod,
+		},
+		&api.QueryOptions{
+			Namespace: consulNamespace,
+		})
+	if err != nil {
+		return fmt.Errorf("failed to get a list of tokens from Consul: %s", err)
+	}
+
+	// We iterate through each token in the auth method, which is terribly inefficient.
+	// See discussion above about optimizing the token list query.
+	for _, token := range tokens {
+		tokenMeta, err := getTokenMetaFromDescription(token.Description)
+		// It is possible this is from another component, so continue searching
+		if errors.Is(err, NoMetadataErr) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("failed to parse token metadata: %s", err)
+		}
+
+		tokenPodName := strings.TrimPrefix(tokenMeta[tokenMetaPodNameKey], pod.Namespace+"/")
+
+		// If we can't find token's pod, delete it.
+		if tokenPodName == pod.Name {
+			r.Log.Info("deleting ACL token", "name", pod.Name, "namespace", pod.Namespace, "ID", token.AccessorID)
+			if _, err := apiClient.ACL().TokenDelete(token.AccessorID, &api.WriteOptions{Namespace: consulNamespace}); err != nil {
+				return fmt.Errorf("failed to delete token from Consul: %s", err)
+			}
+		}
+	}
+	return nil
+}
+
+var NoMetadataErr = fmt.Errorf("failed to extract token metadata from description")
+
+// getTokenMetaFromDescription parses JSON metadata from token's description.
+func getTokenMetaFromDescription(description string) (map[string]string, error) {
+	re := regexp.MustCompile(`.*({.+})`)
+
+	matches := re.FindStringSubmatch(description)
+	if len(matches) != 2 {
+		return nil, NoMetadataErr
+	}
+	tokenMetaJSON := matches[1]
+
+	var tokenMeta map[string]string
+	err := json.Unmarshal([]byte(tokenMetaJSON), &tokenMeta)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal token metadata '%s': %s", tokenMetaJSON, err)
+	}
+
+	return tokenMeta, nil
+}
+
 func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 
 	// TODO: we should add some validation on the required fields here
@@ -215,10 +328,13 @@ func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 		},
 		Identity: pod.Spec.ServiceAccountName,
 		Locality: locality,
-		NodeName: common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
-		Ports:    workloadPorts,
+		// Adding a node does not currently work because the node doesn't exist so its health status will always be
+		// unhealthy, causing any endpoints on that node to also be unhealthy.
+		// TODO: (v2/nitya) Bring this back when node controller is built.
+		//NodeName: inject.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
+		Ports: workloadPorts,
 	}
-	data := common.ToProtoAny(workload)
+	data := inject.ToProtoAny(workload)
 
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
@@ -265,7 +381,7 @@ func (r *Controller) writeProxyConfiguration(ctx context.Context, pod corev1.Pod
 		},
 		BootstrapConfig: bootstrapConfig,
 	}
-	data := common.ToProtoAny(pc)
+	data := inject.ToProtoAny(pc)
 
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
@@ -286,7 +402,7 @@ func (r *Controller) getTproxyMode(ctx context.Context, pod corev1.Pod) (pbmesh.
 		return pbmesh.ProxyMode_PROXY_MODE_DEFAULT, fmt.Errorf("could not get namespace info for %s: %w", pod.GetNamespace(), err)
 	}
 
-	tproxyEnabled, err := common.TransparentProxyEnabled(ns, pod, r.EnableTransparentProxy)
+	tproxyEnabled, err := inject.TransparentProxyEnabled(ns, pod, r.EnableTransparentProxy)
 	if err != nil {
 		return pbmesh.ProxyMode_PROXY_MODE_DEFAULT, fmt.Errorf("could not determine if transparent proxy is enabled: %w", err)
 	}
@@ -299,7 +415,7 @@ func (r *Controller) getTproxyMode(ctx context.Context, pod corev1.Pod) (pbmesh.
 
 func (r *Controller) getExposeConfig(pod corev1.Pod) (*pbmesh.ExposeConfig, error) {
 	// Expose k8s probes as Envoy listeners if needed.
-	overwriteProbes, err := common.ShouldOverwriteProbes(pod, r.TProxyOverwriteProbes)
+	overwriteProbes, err := inject.ShouldOverwriteProbes(pod, r.TProxyOverwriteProbes)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine if probes should be overwritten: %w", err)
 	}
@@ -337,7 +453,7 @@ func (r *Controller) getExposeConfig(pod corev1.Pod) (*pbmesh.ExposeConfig, erro
 func getContainerExposePaths(originalPod corev1.Pod, originalContainer, mutatedContainer corev1.Container) ([]*pbmesh.ExposePath, error) {
 	var paths []*pbmesh.ExposePath
 	if mutatedContainer.LivenessProbe != nil && mutatedContainer.LivenessProbe.HTTPGet != nil {
-		originalLivenessPort, err := common.PortValueFromIntOrString(originalPod, originalContainer.LivenessProbe.HTTPGet.Port)
+		originalLivenessPort, err := inject.PortValueFromIntOrString(originalPod, originalContainer.LivenessProbe.HTTPGet.Port)
 		if err != nil {
 			return nil, err
 		}
@@ -350,7 +466,7 @@ func getContainerExposePaths(originalPod corev1.Pod, originalContainer, mutatedC
 		paths = append(paths, newPath)
 	}
 	if mutatedContainer.ReadinessProbe != nil && mutatedContainer.ReadinessProbe.HTTPGet != nil {
-		originalReadinessPort, err := common.PortValueFromIntOrString(originalPod, originalContainer.ReadinessProbe.HTTPGet.Port)
+		originalReadinessPort, err := inject.PortValueFromIntOrString(originalPod, originalContainer.ReadinessProbe.HTTPGet.Port)
 		if err != nil {
 			return nil, err
 		}
@@ -363,7 +479,7 @@ func getContainerExposePaths(originalPod corev1.Pod, originalContainer, mutatedC
 		paths = append(paths, newPath)
 	}
 	if mutatedContainer.StartupProbe != nil && mutatedContainer.StartupProbe.HTTPGet != nil {
-		originalStartupPort, err := common.PortValueFromIntOrString(originalPod, originalContainer.StartupProbe.HTTPGet.Port)
+		originalStartupPort, err := inject.PortValueFromIntOrString(originalPod, originalContainer.StartupProbe.HTTPGet.Port)
 		if err != nil {
 			return nil, err
 		}
@@ -418,7 +534,7 @@ func (r *Controller) writeHealthStatus(ctx context.Context, pod corev1.Pod) erro
 		Description: constants.ConsulKubernetesCheckName,
 		Output:      getHealthStatusReason(status, pod),
 	}
-	data := common.ToProtoAny(hs)
+	data := inject.ToProtoAny(hs)
 
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
@@ -438,10 +554,37 @@ func (r *Controller) writeHealthStatus(ctx context.Context, pod corev1.Pod) erro
 // has been configured with and will only delete tokens for the provided podName.
 // func (r *Controller) deleteACLTokensForWorkload(apiClient *api.Client, svc *api.AgentService, k8sNS, podName string) error {
 
-// TODO: add support for explicit upstreams
-//func (r *Controller) writeUpstreams(pod corev1.Pod) error
+// writeDestinations will write explicit destinations if pod annotations exist.
+func (r *Controller) writeDestinations(ctx context.Context, pod corev1.Pod) error {
+	uss, err := inject.ProcessPodDestinations(pod, r.EnableConsulPartitions, r.EnableConsulNamespaces)
+	if err != nil {
+		return fmt.Errorf("error processing destination annotations: %s", err.Error())
+	}
+	if uss == nil {
+		return nil
+	}
 
-//func (r *Controller) deleteUpstreams(pod corev1.Pod) error
+	data := inject.ToProtoAny(uss)
+	req := &pbresource.WriteRequest{
+		Resource: &pbresource.Resource{
+			Id:       getDestinationsID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
+			Metadata: metaFromPod(pod),
+			Data:     data,
+		},
+	}
+	_, err = r.ResourceClient.Write(ctx, req)
+
+	return err
+}
+
+func (r *Controller) deleteDestinations(ctx context.Context, pod types.NamespacedName) error {
+	req := &pbresource.DeleteRequest{
+		Id: getDestinationsID(pod.Name, r.getConsulNamespace(pod.Namespace), r.getPartition()),
+	}
+
+	_, err := r.ResourceClient.Delete(ctx, req)
+	return err
+}
 
 // consulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
 // depending on Consul Namespaces being enabled and the value of namespace mirroring.
@@ -522,8 +665,8 @@ func parseLocality(node corev1.Node) *pbcatalog.Locality {
 func metaFromPod(pod corev1.Pod) map[string]string {
 	// TODO: allow custom workload metadata
 	return map[string]string{
-		constants.MetaKeyKubeNS: pod.GetNamespace(),
-		metaKeyManagedBy:        constants.ManagedByPodValue,
+		constants.MetaKeyKubeNS:    pod.GetNamespace(),
+		constants.MetaKeyManagedBy: constants.ManagedByPodValue,
 	}
 }
 
@@ -540,6 +683,7 @@ func getHealthStatusFromPod(pod corev1.Pod) pbcatalog.Health {
 			return pbcatalog.Health_HEALTH_PASSING
 		}
 	}
+
 	return pbcatalog.Health_HEALTH_CRITICAL
 }
 
@@ -556,11 +700,7 @@ func getHealthStatusReason(state pbcatalog.Health, pod corev1.Pod) string {
 func getWorkloadID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "catalog",
-			GroupVersion: "v1alpha1",
-			Kind:         "Workload",
-		},
+		Type: pbcatalog.WorkloadType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
@@ -575,11 +715,7 @@ func getWorkloadID(name, namespace, partition string) *pbresource.ID {
 func getProxyConfigurationID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "mesh",
-			GroupVersion: "v1alpha1",
-			Kind:         "ProxyConfiguration",
-		},
+		Type: pbmesh.ProxyConfigurationType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
@@ -594,11 +730,22 @@ func getProxyConfigurationID(name, namespace, partition string) *pbresource.ID {
 func getHealthStatusID(name, namespace, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: name,
-		Type: &pbresource.Type{
-			Group:        "catalog",
-			GroupVersion: "v1alpha1",
-			Kind:         "HealthStatus",
+		Type: pbcatalog.HealthStatusType,
+		Tenancy: &pbresource.Tenancy{
+			Partition: partition,
+			Namespace: namespace,
+
+			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
+			// At a future point, this will move out of the Tenancy block.
+			PeerName: constants.DefaultConsulPeer,
 		},
+	}
+}
+
+func getDestinationsID(name, namespace, partition string) *pbresource.ID {
+	return &pbresource.ID{
+		Name: name,
+		Type: pbmesh.DestinationsType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,

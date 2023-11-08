@@ -39,6 +39,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-enterprise-license

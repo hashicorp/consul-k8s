@@ -37,6 +37,7 @@ spec:
         {{- end }}
       annotations:
         consul.hashicorp.com/connect-inject: "false"
+        consul.hashicorp.com/mesh-inject: "false"
     spec:
       # consul-cni only runs on linux operating systems
       nodeSelector:

@@ -871,7 +871,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.metadata.annotations | length' | tee /dev/stderr)
-  [ "${actual}" = "3" ]
+  [ "${actual}" = "4" ]
 }
 
 @test "terminatingGateways/Deployment: extra annotations can be set through defaults" {
@@ -886,7 +886,7 @@ key2: value2' \
       yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
   local actual=$(echo $object | yq '. | length' | tee /dev/stderr)
-  [ "${actual}" = "5" ]
+  [ "${actual}" = "6" ]
 
   local actual=$(echo $object | yq -r '.key1' | tee /dev/stderr)
   [ "${actual}" = "value1" ]
@@ -908,7 +908,7 @@ key2: value2' \
       yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
   local actual=$(echo $object | yq '. | length' | tee /dev/stderr)
-  [ "${actual}" = "5" ]
+  [ "${actual}" = "6" ]
 
   local actual=$(echo $object | yq -r '.key1' | tee /dev/stderr)
   [ "${actual}" = "value1" ]
@@ -931,7 +931,7 @@ key2: value2' \
       yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
   local actual=$(echo $object | yq '. | length' | tee /dev/stderr)
-  [ "${actual}" = "6" ]
+  [ "${actual}" = "7" ]
 
   local actual=$(echo $object | yq -r '.defaultkey' | tee /dev/stderr)
   [ "${actual}" = "defaultvalue" ]
@@ -1214,7 +1214,13 @@ key2: value2' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."consul.hashicorp.com/gateway-consul-service-name") | del(."consul.hashicorp.com/gateway-kind")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."vault.hashicorp.com/agent-inject") |
+      del(."vault.hashicorp.com/role") |
+      del(."consul.hashicorp.com/gateway-consul-service-name") |
+      del(."consul.hashicorp.com/gateway-kind")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 

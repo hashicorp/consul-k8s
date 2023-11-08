@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: MPL-2.0
 
 apiVersion: consul.hashicorp.com/v1alpha1
-kind: HTTPRouteAuthFilter
+kind: RouteAuthFilter
 metadata:
-  name: example-route-jwt-filter
+  name: route-jwt-auth-filter
 spec:
-  type: JWT
-  JWTProviders:
-  - Provider: "local"
-    VerifyClaims:
-    - Path:
-      - "role"
-      Value: "doctor"
+  jwt:
+    providers:
+    - name: "local"
+      verifyClaims:
+      - path:
+          - role
+        value: doctor

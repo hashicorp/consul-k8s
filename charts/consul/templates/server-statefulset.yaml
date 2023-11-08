@@ -115,6 +115,7 @@ spec:
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/server-config-configmap.yaml") . | sha256sum }}
         {{- if .Values.server.annotations }}
           {{- tpl .Values.server.annotations . | nindent 8 }}
@@ -420,7 +421,7 @@ spec:
                 {{- end }}
                 {{- end }}
                 -config-file=/consul/extra-config/extra-from-values.json \
-                -config-file=/consul/extra-config/locality.json
+                -config-file=/consul/extra-config/locality.json \
                 {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
                 -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
                 {{- end }}
