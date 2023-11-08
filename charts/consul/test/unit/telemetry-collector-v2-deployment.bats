@@ -1348,3 +1348,43 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.image=bar' \
       .
 }
+
+#--------------------------------------------------------------------
+# Namespaces
+
+@test "telemetryCollector/Deployment(V2): namespace flags when mirroringK8S" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-v2-deployment.yaml   \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'syncCatalog.consulNamespaces.mirroringK8S=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-login-namespace=default"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}
+
+@test "telemetryCollector/Deployment(V2): namespace flags when syncCatalog" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-v2-deployment.yaml   \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'syncCatalog.consulNamespaces.mirroringK8S=false' \
+      --set 'syncCatalog.consulNamespaces.consulDestinationNamespace=fakenamespace' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.[1].args | any(contains("-login-namespace=fakenamespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}
