@@ -977,7 +977,7 @@ server:
     # Enables registering a PodDisruptionBudget for the server
     # cluster. If enabled, it only registers the budget so long as
     # the server cluster is enabled. To disable, set to `false`.
-    enabled: true
+    enabled: false
 
     # The maximum number of unavailable pods. By default, this will be
     # automatically computed based on the `server.replicas` value to be `(n/2)-1`.
@@ -2167,7 +2167,7 @@ connectInject:
     # This will enable/disable registering a PodDisruptionBudget for the
     # service mesh sidecar injector. If this is enabled, it will only register the budget so long as
     # the service mesh is enabled.
-    enabled: true
+    enabled: false
 
     # The maximum number of unavailable pods. By default, this will be
     # automatically computed based on the `connectInject.replicas` value to be `(n/2)-1`.
@@ -2769,7 +2769,7 @@ meshGateway:
     # This will enable/disable registering a PodDisruptionBudget for the
     # mesh gateway. If this is enabled, it will only register the budget so long as
     # the mesh gateway.
-    enabled: true
+    enabled: false
 
     # The maximum number of unavailable pods. By default, minAvailable will be set to 1
     # If you need to set this to some value, you will need to add a
@@ -2968,7 +2968,7 @@ ingressGateways:
       # Enables registering a PodDisruptionBudget for the ingress gateways
       # If enabled, it only registers the budget so long as
       # the ingress gateways is enabled. To disable, set to `false`.
-      enabled: true
+      enabled: false
 
       # The maximum number of unavailable pods. By default, minAvailable will be set to 1
       # If you need to set this to some value, you will need to add a
@@ -3159,7 +3159,7 @@ terminatingGateways:
       # Enables registering a PodDisruptionBudget for the terminating gateways
       # If enabled, it only registers the budget so long as
       # the terminating gateways is enabled. To disable, set to `false`.
-      enabled: true
+      enabled: false
 
       # The maximum number of unavailable pods. By default, minAvailable will be set to 1
       # If you need to set this to some value, you will need to add a
@@ -3312,7 +3312,7 @@ apiGateway:
     # Enables registering a PodDisruptionBudget for the apiGateway
     # cluster. If enabled, it only registers the budget so long as
     # the server cluster is enabled. To disable, set to `false`.
-    enabled: true
+    enabled: false
 
     # The maximum number of unavailable pods. By default, minAvailable will be set to 1
     # If you need to set this to some value, you will need to add a
