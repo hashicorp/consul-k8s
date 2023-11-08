@@ -773,7 +773,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -815,7 +817,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -857,7 +861,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -900,7 +906,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
@@ -941,7 +949,9 @@ func TestUpsert(t *testing.T) {
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
-			helmConfig:       common.HelmConfig{},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
