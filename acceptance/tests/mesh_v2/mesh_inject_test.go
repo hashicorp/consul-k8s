@@ -7,6 +7,11 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
+
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -68,6 +73,27 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating 2 sources and 2 destinations")
+			consulClient, _ := consulCluster.SetupConsulClient(t, secure)
+
+			// Check that the ACL token is deleted.
+			if secure {
+				// We need to register the cleanup function before we create the deployments
+				// because golang will execute them in reverse order i.e. the last registered
+				// cleanup function will be executed first.
+				t.Cleanup(func() {
+					retrier := &retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Second}
+					retry.RunWith(retrier, t, func(r *retry.R) {
+						tokens, _, err := consulClient.ACL().TokenList(nil)
+						require.NoError(r, err)
+						for _, token := range tokens {
+							require.NotContains(r, token.Description, multiport)
+							require.NotContains(r, token.Description, connhelper.StaticClientName)
+						}
+					})
+				})
+			}
+
+			logger.Log(t, "creating multiport static-server and static-client deployments")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/bases/v2-multiport-app")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../../tests/fixtures/bases/v2-multiport-app-2")
 			if cfg.EnableTransparentProxy {
@@ -133,8 +159,6 @@ func TestMeshInject_MultiportService(t *testing.T) {
 			} else {
 				k8s.CheckSourceToDestinationCommunication(t, ctx, sources, explicitDestinations, resetConnectionErrs)
 			}
-
-			// TODO: verify that ACL tokens are removed
 		})
 	}
 }

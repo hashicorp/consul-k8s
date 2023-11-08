@@ -22,7 +22,7 @@ annotations:
     - name: consul-dataplane
       image: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.4-dev
     - name: envoy
-      image: envoyproxy/envoy:v1.26.2
+      image: envoyproxy/envoy:v1.25.11
   artifacthub.io/license: MPL-2.0
   artifacthub.io/links: |
     - name: Documentation

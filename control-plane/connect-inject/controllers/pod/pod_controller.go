@@ -6,6 +6,7 @@ package pod
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -150,6 +151,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	r.Log.Info("retrieved", "name", pod.Name, "ns", pod.Namespace)
 
 	if inject.HasBeenMeshInjected(pod) {
+
+		// It is possible the pod was scheduled but doesn't have an allocated IP yet, so safely requeue
+		if pod.Status.PodIP == "" {
+			r.Log.Info("pod does not have IP allocated; re-queueing request", "pod", req.Name, "ns", req.Namespace)
+			return ctrl.Result{Requeue: true}, nil
+		}
+
 		if err := r.writeProxyConfiguration(ctx, pod); err != nil {
 			// We could be racing with the namespace controller.
 			// Requeue (which includes backoff) to try again.
@@ -260,6 +268,10 @@ func (r *Controller) deleteACLTokensForPod(apiClient *api.Client, pod types.Name
 	// See discussion above about optimizing the token list query.
 	for _, token := range tokens {
 		tokenMeta, err := getTokenMetaFromDescription(token.Description)
+		// It is possible this is from another component, so continue searching
+		if errors.Is(err, NoMetadataErr) {
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("failed to parse token metadata: %s", err)
 		}
@@ -277,13 +289,15 @@ func (r *Controller) deleteACLTokensForPod(apiClient *api.Client, pod types.Name
 	return nil
 }
 
+var NoMetadataErr = fmt.Errorf("failed to extract token metadata from description")
+
 // getTokenMetaFromDescription parses JSON metadata from token's description.
 func getTokenMetaFromDescription(description string) (map[string]string, error) {
 	re := regexp.MustCompile(`.*({.+})`)
 
 	matches := re.FindStringSubmatch(description)
 	if len(matches) != 2 {
-		return nil, fmt.Errorf("failed to extract token metadata from description: %s", description)
+		return nil, NoMetadataErr
 	}
 	tokenMetaJSON := matches[1]
 

@@ -19,7 +19,7 @@ const (
 	staticServerLocalAddress = "http://localhost:1234"
 )
 
-func addIntention(t *testing.T, consulClient *api.Client, sourceNS, sourceService, destinationNS, destinationsService string) {
+func AddIntention(t *testing.T, consulClient *api.Client, sourcePeer, sourceNS, sourceService, destinationNS, destinationsService string) {
 	t.Helper()
 
 	logger.Log(t, fmt.Sprintf("creating %s => %s intention", sourceService, destinationsService))
@@ -32,13 +32,14 @@ func addIntention(t *testing.T, consulClient *api.Client, sourceNS, sourceServic
 				Name:      sourceService,
 				Namespace: sourceNS,
 				Action:    api.IntentionActionAllow,
+				Peer:      sourcePeer,
 			},
 		},
 	}, nil)
 	require.NoError(t, err)
 }
 
-func createTerminatingGatewayConfigEntry(t *testing.T, consulClient *api.Client, gwNamespace, serviceNamespace string, serviceNames ...string) {
+func CreateTerminatingGatewayConfigEntry(t *testing.T, consulClient *api.Client, gwNamespace, serviceNamespace string, serviceNames ...string) {
 	t.Helper()
 
 	logger.Log(t, "creating config entry")
@@ -69,7 +70,7 @@ func createTerminatingGatewayConfigEntry(t *testing.T, consulClient *api.Client,
 	require.True(t, created, "failed to create config entry")
 }
 
-func updateTerminatingGatewayRole(t *testing.T, consulClient *api.Client, rules string) {
+func UpdateTerminatingGatewayRole(t *testing.T, consulClient *api.Client, rules string) {
 	t.Helper()
 
 	logger.Log(t, "creating a write policy for the static-server")
@@ -96,4 +97,47 @@ func updateTerminatingGatewayRole(t *testing.T, consulClient *api.Client, rules 
 	termGwRole.Policies = append(termGwRole.Policies, &api.ACLTokenPolicyLink{Name: "static-server-write-policy"})
 	_, _, err = consulClient.ACL().RoleUpdate(termGwRole, nil)
 	require.NoError(t, err)
+}
+
+func CreateServiceDefaultDestination(t *testing.T, consulClient *api.Client, serviceNamespace string, name string, protocol string, port int, addresses ...string) {
+	t.Helper()
+
+	logger.Log(t, "creating config entry")
+
+	if serviceNamespace != "" {
+		logger.Logf(t, "creating the %s namespace in Consul", serviceNamespace)
+		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
+			Name: serviceNamespace,
+		}, nil)
+		require.NoError(t, err)
+	}
+
+	configEntry := &api.ServiceConfigEntry{
+		Kind:      api.ServiceDefaults,
+		Name:      name,
+		Namespace: serviceNamespace,
+		Protocol:  protocol,
+		Destination: &api.DestinationConfig{
+			Addresses: addresses,
+			Port:      port,
+		},
+	}
+
+	created, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+	require.NoError(t, err)
+	require.True(t, created, "failed to create config entry")
+}
+
+func CreateMeshConfigEntry(t *testing.T, consulClient *api.Client, namespace string) {
+	t.Helper()
+
+	logger.Log(t, "creating mesh config entry to enable MeshDestinationOnly")
+	created, _, err := consulClient.ConfigEntries().Set(&api.MeshConfigEntry{
+		Namespace: namespace,
+		TransparentProxy: api.TransparentProxyMeshConfig{
+			MeshDestinationsOnly: true,
+		},
+	}, nil)
+	require.NoError(t, err)
+	require.True(t, created, "failed to create config entry")
 }
