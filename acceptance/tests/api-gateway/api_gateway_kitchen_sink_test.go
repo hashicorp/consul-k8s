@@ -24,7 +24,7 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-// Enabled everything possible, see if anything breaks
+// Enabled everything possible, see if anything breaks.
 func TestAPIGateway_KitchenSink(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
