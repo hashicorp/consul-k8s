@@ -31,23 +31,42 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 
 	runWithEnterpriseOnlyFeatures := cfg.EnableEnterprise
 
+	serverHelmValues := map[string]string{
+		"global.acls.manageSystemACLs": "true",
+		"global.tls.enabled":           "true",
+
+		// Don't install injector, controller and cni on this cluster so that it's not installed twice.
+		"connectInject.enabled":     "false",
+		"connectInject.cni.enabled": "false",
+	}
+	serverReleaseName := helpers.RandomName()
+	consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)
+	consulServerCluster.Create(t)
+
 	helmValues := map[string]string{
-		"connectInject.enabled":                       "true",
+		"server.enabled": "false",
 		"connectInject.consulNamespaces.mirroringK8S": "true",
 		"global.acls.manageSystemACLs":                "true",
 		"global.tls.enabled":                          "true",
 		"global.logLevel":                             "trace",
+		"externalServers.enabled":                     "true",
+		"externalServers.hosts[0]":                    fmt.Sprintf("%s-consul-server", serverReleaseName),
+		"externalServers.httpsPort":                   "8501",
+		"global.tls.caCert.secretName":                fmt.Sprintf("%s-consul-ca-cert", serverReleaseName),
+		"global.tls.caCert.secretKey":                 "tls.crt",
+		"global.acls.bootstrapToken.secretName":       fmt.Sprintf("%s-consul-bootstrap-acl-token", serverReleaseName),
+		"global.acls.bootstrapToken.secretKey":        "token",
 	}
 
 	releaseName := helpers.RandomName()
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	consulCluster.SkipCheckForPreviousInstallations = true
 
 	consulCluster.Create(t)
 
-	// this is necesary when running tests with ACLs enabled
-	runTestsAsSecure := true
 	// Override the default proxy config settings for this test
-	consulClient, _ := consulCluster.SetupConsulClient(t, runTestsAsSecure)
+	consulClient, _ := consulCluster.SetupConsulClient(t, true, serverReleaseName)
+	logger.Log(t, "have consul client")
 	_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
 		Kind: api.ProxyDefaults,
 		Name: api.ProxyConfigGlobal,
@@ -56,6 +75,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		},
 	}, nil)
 	require.NoError(t, err)
+	logger.Log(t, "set consul config entry")
 
 	logger.Log(t, "creating other namespace")
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "create", "namespace", "other")
@@ -135,11 +155,9 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	certificate := generateCertificate(t, nil, "gateway.test.local")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "certificate", "-p", fmt.Sprintf(`{"data":{"tls.crt":"%s","tls.key":"%s"}}`, base64.StdEncoding.EncodeToString(certificate.CertPEM), base64.StdEncoding.EncodeToString(certificate.PrivateKeyPEM)), "--type=merge")
 
-	// We use the static-client pod so that we can make calls to the api gateway
-	// via kubectl exec without needing a route into the cluster from the test machine.
+	// Create static server and static client
 	logger.Log(t, "creating static-client pod")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
-
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
 
 	// On startup, the controller can take upwards of 1m to perform
@@ -157,7 +175,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
 		require.NoError(r, err)
 
-		// check our finalizers
+		//CHECK TO MAKE SURE EVERYTHING WAS SET UP CORECTLY BEFORE RUNNING TESTS
 		require.Len(r, gateway.Finalizers, 1)
 		require.EqualValues(r, gatewayFinalizer, gateway.Finalizers[0])
 
@@ -202,7 +220,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 
 	})
 
-	// check that the Consul entries were created
+	// GENERAL Asserts- test that assets were created as expected
 	entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
 	require.NoError(t, err)
 	gateway := entry.(*api.APIGatewayConfigEntry)
@@ -246,12 +264,9 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	// Test that we can make a call to the api gateway
-	logger.Log(t, "trying calls to api gateway http")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPAddress)
-
 	//asserts only valid when running with enterprise
 	if runWithEnterpriseOnlyFeatures {
+		//JWT Related Asserts
 		// should fail because we're missing JWT
 		logger.Log(t, "trying calls to api gateway /admin should fail without JWT token")
 		k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddress)
@@ -259,5 +274,9 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		// will succeed because we use the token with the correct role and the correct issuer
 		logger.Log(t, "trying calls to api gateway /admin should succeed with JWT token with correct role")
 		k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddress)
+	} else {
+		// Test that we can make a call to the api gateway
+		logger.Log(t, "trying calls to api gateway http")
+		k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPAddress)
 	}
 }

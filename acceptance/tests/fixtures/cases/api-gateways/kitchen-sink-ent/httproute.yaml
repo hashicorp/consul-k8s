@@ -23,4 +23,23 @@ spec:
             group: consul.hashicorp.com
             kind: RouteAuthFilter
             name: route-jwt-auth-filter
-
+        - type: ExtensionRef
+          extensionRef:
+            group: consul.hashicorp.com
+            kind: RouteRetryFilter
+            name: retrytrafficfilter
+        - type: ExtensionRef
+          extensionRef:
+            group: consul.hashicorp.com
+            kind: RouteTimeoutFilter
+            name: timeouttrafficfilter
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+                - name: my-header
+                  value: foo
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: "ReplacePrefixMatch"
+              replacePrefixMatch: "/v1/test"
