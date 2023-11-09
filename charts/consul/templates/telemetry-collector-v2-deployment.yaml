@@ -284,7 +284,7 @@ spec:
           {{- if .Values.global.acls.manageSystemACLs }}
           - -credential-type=login
           - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
-          - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method
+          - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method
           {{- end }}
           # service and login namespace
           {{- if .Values.global.enableConsulNamespaces }}
