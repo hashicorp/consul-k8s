@@ -17,11 +17,10 @@ spec:
       backendRefs:
         - name: static-server
           port: 8080
-#      filters:
-#        #TODO add all different kind of filter types
-#        - type: ExtensionRef
-#          extensionRef:
-#            group: consul.hashicorp.com
-#            kind: RouteAuthFilter
-#            name: route-jwt-auth-filter
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: consul.hashicorp.com
+            kind: RouteAuthFilter
+            name: route-jwt-auth-filter
 

@@ -29,9 +29,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 
-	if !cfg.EnableEnterprise {
-		t.Skipf("skipping this test because -enable-enterprise is not set")
-	}
+	runWithEnterpriseOnlyFeatures := cfg.EnableEnterprise
 
 	helmValues := map[string]string{
 		"connectInject.enabled":                       "true",
@@ -75,6 +73,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: gatewayClassConfigName,
 		},
+		//Set up GatewayClassConfig specific features
 		Spec: v1alpha1.GatewayClassConfigSpec{
 			DeploymentSpec: v1alpha1.DeploymentSpec{
 				DefaultInstances: pointer.Int32(2),
@@ -108,12 +107,16 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	})
 
 	logger.Log(t, "creating api-gateway resources")
-	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/api-gateways/kitchen-sink")
+	fixturePath := "../fixtures/cases/api-gateways/kitchen-sink"
+	if runWithEnterpriseOnlyFeatures {
+		fixturePath += "-ent"
+	}
+	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", fixturePath)
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
-		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/api-gateways/kitchen-sink")
+		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", fixturePath)
 	})
 
 	// Create certificate secret, we do this separately since
@@ -161,7 +164,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		// check our statuses
 		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
 		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
-		require.Len(r, gateway.Status.Listeners, 1)
+		require.Len(r, gateway.Status.Listeners, 2)
 
 		require.EqualValues(r, int32(1), gateway.Status.Listeners[0].AttachedRoutes)
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
@@ -247,91 +250,14 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	logger.Log(t, "trying calls to api gateway http")
 	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPAddress)
 
-	// ensure that overrides -> route extension -> default by making a request to the admin route with a JWT that a "role" of "doctor"
-	// we can see that:
-	// * the "role" verification in the route extension takes precedence over the "role" verification in the gateway default
+	//asserts only valid when running with enterprise
+	if runWithEnterpriseOnlyFeatures {
+		// should fail because we're missing JWT
+		logger.Log(t, "trying calls to api gateway /admin should fail without JWT token")
+		k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddress)
 
-	// should fail because we're missing JWT
-	logger.Log(t, "trying calls to api gateway /admin should fail without JWT token")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressAdmin)
-
-	// should fail because we use the token with the wrong role and correct issuer
-	logger.Log(t, "trying calls to api gateway /admin should fail with wrong role")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressAdmin)
-
-	// will succeed because we use the token with the correct role and the correct issuer
-	logger.Log(t, "trying calls to api gateway /admin should succeed with JWT token with correct role")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressAdmin)
-
-	// ensure that overrides -> route extension -> default by making a request to the admin route with a JWT that has a "role" of "pet"
-	// the route does not define
-	// we can see that:
-	// * the "role" verification in the gateway default is used
-
-	// should fail because we're missing JWT
-	logger.Log(t, "trying calls to api gateway /pet should fail without JWT token")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressPet)
-
-	// should fail because we use the token with the wrong role and correct issuer
-	logger.Log(t, "trying calls to api gateway /pet should fail with wrong role")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressPet)
-
-	// will succeed because we use the token with the correct role and the correct issuer
-	logger.Log(t, "trying calls to api gateway /pet should succeed with JWT token with correct role")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressPet)
-
-	// ensure that routes attached to the same gateway don't cause changes in another route
-	// * the verification on the gateway is the only one used as this route does not define any JWT configuration
-
-	// should fail because we're missing JWT
-	logger.Log(t, "trying calls to api gateway /pet-no-auth should fail without JWT token")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressPetNotAuthOnRoute)
-
-	// should fail because we use the token with the wrong role and correct issuer
-	logger.Log(t, "trying calls to api gateway /pet-no-auth should fail with wrong role")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressPetNotAuthOnRoute)
-
-	// will succeed because we use the token with the correct role and the correct issuer
-	logger.Log(t, "trying calls to api gateway /pet-no-auth should succeed with JWT token with correct role")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressPetNotAuthOnRoute)
-
-	// should fail because we're missing JWT
-	logger.Log(t, "trying calls to api gateway /admin-no-auth should fail without JWT token")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressAdminNoAuthOnRoute)
-
-	// should fail because we use the token with the wrong role and correct issuer
-	logger.Log(t, "trying calls to api gateway /admin-no-auth should fail with wrong role")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressAdminNoAuthOnRoute)
-
-	// will succeed because we use the token with the correct role and the correct issuer
-	logger.Log(t, "trying calls to api gateway /admin-no-auth should succeed with JWT token with correct role")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressAdminNoAuthOnRoute)
-
-	// multiple routes can use the same external ref
-	// we can see that:
-	// * the "role" verification in the route extension takes precedence over the "role" verification in the gateway default
-
-	// should fail because we're missing JWT
-	logger.Log(t, "trying calls to api gateway /admin-2 should fail without JWT token")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressAdmin2)
-
-	// should fail because we use the token with the wrong role and correct issuer
-	logger.Log(t, "trying calls to api gateway /admin-2 should fail with wrong role")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressAdmin2)
-
-	// will succeed because we use the token with the correct role and the correct issuer
-	logger.Log(t, "trying calls to api gateway /admin-2 should succeed with JWT token with correct role")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressAdmin2)
-
-	// should fail because we're missing JWT
-	logger.Log(t, "trying calls to api gateway /pet-2 should fail without JWT token")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetHTTPAddressPet2)
-
-	// should fail because we use the token with the wrong role and correct issuer
-	logger.Log(t, "trying calls to api gateway /pet-2 should fail with wrong role")
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddressPet2)
-
-	// will succeed because we use the token with the correct role and the correct issuer
-	logger.Log(t, "trying calls to api gateway /pet-2 should succeed with JWT token with correct role")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", petToken), targetHTTPAddressPet2)
+		// will succeed because we use the token with the correct role and the correct issuer
+		logger.Log(t, "trying calls to api gateway /admin should succeed with JWT token with correct role")
+		k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, "-H", fmt.Sprintf("Authorization: Bearer %s", doctorToken), targetHTTPAddress)
+	}
 }

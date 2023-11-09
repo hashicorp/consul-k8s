@@ -6,6 +6,9 @@ kind: Kustomization
 resources:
 - ../../../bases/api-gateway
 - ../../static-server-inject
+- jwt-provider.yaml
+- jwt-route-filter.yaml
+- gateway-policy.yaml
 
 
 patches:
