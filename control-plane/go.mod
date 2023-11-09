@@ -1,5 +1,8 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
+// TODO: Remove this when the next version of the submodule is released.
+replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231109213314-40c57f10a0fb
+
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.1
