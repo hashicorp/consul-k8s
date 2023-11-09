@@ -94,7 +94,7 @@ spec:
           - name: CONSUL_LOGIN_DATACENTER
             value: {{ .Values.global.datacenter }}
           - name: CONSUL_LOGIN_META
-            value: "component=consul-telemetry-gateway,pod=$(NAMESPACE)/$(POD_NAME)"
+            value: "component=consul-telemetry-collector,pod=$(NAMESPACE)/$(POD_NAME)"
           {{- end }}
           # service and login namespace
           # this is attempting to replicate the behavior of webhooks in calculating namespace
