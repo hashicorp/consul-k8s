@@ -1,0 +1,3 @@
+```release-note:bug
+consul-telemetry-collector: fix namespace and partition setting when global.acls.manageSystemACLs
+```
