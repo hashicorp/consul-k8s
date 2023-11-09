@@ -99,7 +99,7 @@ spec:
           # acl login info
           {{- if .Values.global.acls.manageSystemACLs }}
           - name: CONSUL_LOGIN_AUTH_METHOD
-            value: {{ template "consul.fullname" $root }}-k8s-auth-method
+            value: {{ template "consul.fullname" . }}-k8s-auth-method
           - name: CONSUL_LOGIN_DATACENTER
             value: {{ .Values.global.datacenter }}
           - name: CONSUL_LOGIN_META
@@ -119,20 +119,11 @@ spec:
           {{- if .Values.global.acls.manageSystemACLs }}
           {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
           - name: CONSUL_LOGIN_NAMESPACE
-            value: "default"
+            value: default
           {{- else }}
           - name: CONSUL_LOGIN_NAMESPACE
             value: {{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
           {{- end }} 
-          {{- end }}
-          {{- end }}
-          # service and login partition
-          {{- if .Values.global.adminPartitions.enabled }}
-          - name: CONSUL_PARTITION
-            value: {{ .Values.global.adminPartitions.name }}
-          {{- if .Values.global.acls.manageSystemACLs }}
-          - name: CONSUL_LOGIN_PARTITION
-            value: {{ .Values.global.adminPartitions.name }}
           {{- end }}
           {{- end }}
         command:
@@ -306,7 +297,7 @@ spec:
           {{- if .Values.global.acls.manageSystemACLs }}
           - -credential-type=login
           - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
-          - -login-auth-method={{ template "consul.fullname" $root }}-k8s-component-auth-method
+          - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method
           {{- end }}
           # service and login namespace
           {{- if .Values.global.enableConsulNamespaces }}
