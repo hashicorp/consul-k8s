@@ -8,9 +8,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 	"testing"
 	"time"
 
@@ -86,45 +83,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "namespace", "other")
 	})
 
-	// create a GatewayClassConfig with configuration set
-	gatewayClassConfigName := "kitchen-sink-gateway-class-config"
-	gatewayClassName := "kitchen-sink"
-	gatewayClassConfig := &v1alpha1.GatewayClassConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: gatewayClassConfigName,
-		},
-		//Set up GatewayClassConfig specific features
-		Spec: v1alpha1.GatewayClassConfigSpec{
-			DeploymentSpec: v1alpha1.DeploymentSpec{
-				DefaultInstances: pointer.Int32(2),
-				MaxInstances:     pointer.Int32(3),
-				MinInstances:     pointer.Int32(1),
-			},
-		},
-	}
 	k8sClient := ctx.ControllerRuntimeClient(t)
-
-	logger.Log(t, "creating gateway class config")
-	err = k8sClient.Create(context.Background(), gatewayClassConfig)
-	require.NoError(t, err)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		logger.Log(t, "deleting all gateway class configs")
-		k8sClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{})
-	})
-
-	gatewayParametersRef := &gwv1beta1.ParametersReference{
-		Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
-		Kind:  gwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
-		Name:  gatewayClassConfigName,
-	}
-
-	// Create gateway class referencing gateway-class-config.
-	logger.Log(t, "creating controlled gateway class")
-	createGatewayClass(t, k8sClient, gatewayClassName, gatewayClassControllerName, gatewayParametersRef)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		logger.Log(t, "deleting all gateway classes")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{})
-	})
 
 	logger.Log(t, "creating api-gateway resources")
 	fixturePath := "../fixtures/cases/api-gateways/kitchen-sink"
@@ -193,10 +152,6 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		require.Len(r, gateway.Status.Addresses, 1)
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
-
-		// gateway class checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayClassName}, &gatewayClass)
-		require.NoError(r, err)
 
 		// check our finalizers
 		require.Len(r, gatewayClass.Finalizers, 1)

@@ -10,5 +10,6 @@ resources:
 
 
 patches:
+- path: gatewayclassconfig.yaml
 - path: httproute.yaml
 - path: api-gateway.yaml
