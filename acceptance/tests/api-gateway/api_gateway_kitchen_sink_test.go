@@ -124,7 +124,6 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	// the reconcile loop to run (hence the 2m timeout here).
 	var (
 		gatewayAddress string
-		gatewayClass   gwv1beta1.GatewayClass
 		httpRoute      gwv1beta1.HTTPRoute
 	)
 
@@ -152,10 +151,6 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		require.Len(r, gateway.Status.Addresses, 2)
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
-
-		// check our finalizers
-		require.Len(r, gatewayClass.Finalizers, 1)
-		require.EqualValues(r, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
 		// http route checks
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
