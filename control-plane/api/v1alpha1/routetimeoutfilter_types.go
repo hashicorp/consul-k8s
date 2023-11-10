@@ -40,9 +40,13 @@ type RouteTimeoutFilterList struct {
 // RouteTimeoutFilterSpec defines the desired state of RouteTimeoutFilter.
 type RouteTimeoutFilterSpec struct {
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Format=duration
 	RequestTimeout metav1.Duration `json:"requestTimeout"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Format=duration
 	IdleTimeout metav1.Duration `json:"idleTimeout"`
 }
 
