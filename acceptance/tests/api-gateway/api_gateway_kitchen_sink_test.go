@@ -149,7 +149,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 
 		// check that we have an address to use
-		require.Len(r, gateway.Status.Addresses, 1)
+		require.Len(r, gateway.Status.Addresses, 2)
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
 
