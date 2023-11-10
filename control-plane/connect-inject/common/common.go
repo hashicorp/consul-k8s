@@ -202,7 +202,7 @@ func ConsulNamespaceIsNotFound(err error) bool {
 	if !ok {
 		return false
 	}
-	if codes.InvalidArgument == s.Code() && strings.Contains(s.Message(), "namespace not found") {
+	if codes.InvalidArgument == s.Code() && strings.Contains(s.Message(), "namespace resource not found") {
 		return true
 	}
 	return false
