@@ -19,13 +19,17 @@ data:
   {{- if (mustHas "resource-apis" .Values.global.experiments) }}
   config.yaml: |
     gatewayClassConfigs:
-      - apiVersion: consul.hashicorp.com/v2beta1
+      - apiVersion: mesh.consul.hashicorp.com/v2beta1
         metadata:
           name: consul-mesh-gateway
           namespace: {{ .Release.Namespace }}
-        deployment:
-          resources:
-            {{ .Values.meshGateway.resources }}
+        kind: gatewayClassConfig
+        spec:
+          deployment:
+            resources:
+              {{ .Values.meshGateway.resources }}
+          nodeSelector: {{ .Values.meshGateway.nodeSelector }}
+          serviceType: {{ .Values.meshGateway.service.type }}
     meshGateways:
       - name: mesh-gateway
         spec:
