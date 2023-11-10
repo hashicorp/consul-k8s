@@ -6,7 +6,7 @@ KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh 
 KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
 KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
 
-# ===========> Helm Targets
+##@ Helm Targets
 
 gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consul website. Usage: make gen-helm-docs consul=<path-to-consul-repo>.
 	@cd hack/helm-reference-gen; go run ./... $(consul)
@@ -24,8 +24,7 @@ generate-external-crds: ## Generate CRDs for externally defined CRDs and copy th
 bats-tests: ## Run Helm chart bats tests.
 	 bats --jobs 4 charts/consul/test/unit
 
-
-# ===========> Control Plane Targets
+##@ Control Plane Targets
 
 control-plane-dev: ## Build consul-k8s-control-plane binary.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a amd64
@@ -91,42 +90,38 @@ ctrl-generate: get-controller-gen ## Run CRD code generation.
 	make ensure-controller-gen-version
 	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
 
-# Perform a terraform fmt check but don't change anything
-terraform-fmt-check:
-	@$(CURDIR)/control-plane/build-support/scripts/terraformfmtcheck.sh $(TERRAFORM_DIR)
 .PHONY: terraform-fmt-check
+terraform-fmt-check: ## Perform a terraform fmt check but don't change anything
+	@$(CURDIR)/control-plane/build-support/scripts/terraformfmtcheck.sh $(TERRAFORM_DIR)
 
-# Format all terraform files according to terraform fmt
-terraform-fmt:
-	@terraform fmt -recursive
 .PHONY: terraform-fmt
+terraform-fmt: ## Format all terraform files according to terraform fmt
+	@terraform fmt -recursive
 
-# Check for hashicorppreview containers
-check-preview-containers:
+check-preview-containers: ## Check for hashicorppreview containers
 	@source $(CURDIR)/control-plane/build-support/scripts/check-hashicorppreview.sh
 
+##@ CLI Targets
 
-# ===========> CLI Targets
-cli-dev:
+cli-dev: ## run cli dev
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
 
-cli-fips-dev:
+cli-fips-dev: ## run cli fips dev
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
 
 cli-lint: ## Run linter in the control-plane directory.
 	cd cli; golangci-lint run -c ../.golangci.yml
 
-
-# ===========> Acceptance Tests Targets
+##@ Acceptance Tests Targets
 
 acceptance-lint: ## Run linter in the control-plane directory.
 	cd acceptance; golangci-lint run -c ../.golangci.yml
 
-# For CNI acceptance tests, the calico CNI pluging needs to be installed on Kind. Our consul-cni plugin will not work 
+# For CNI acceptance tests, the calico CNI plugin needs to be installed on Kind. Our consul-cni plugin will not work
 # without another plugin installed first
-kind-cni-calico:
+kind-cni-calico: ## install cni plugin on kind
 	kubectl create namespace calico-system ||true
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
@@ -140,9 +135,7 @@ kind-delete:
 	kind delete cluster --name dc3
 	kind delete cluster --name dc4
 
-
-# Helper target for doing local cni acceptance testing
-kind-cni: kind-delete
+kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
@@ -152,24 +145,19 @@ kind-cni: kind-delete
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 
-# Helper target for doing local acceptance testing
-kind: kind-delete
+kind: kind-delete ## Helper target for doing local acceptance testing
 	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
 
-# Helper target for loading local dev images (run with `DEV_IMAGE=...` to load non-k8s images)
-kind-load:
+kind-load: ## Helper target for loading local dev images (run with `DEV_IMAGE=...` to load non-k8s images)
 	kind load docker-image --name dc1 $(DEV_IMAGE)
 	kind load docker-image --name dc2 $(DEV_IMAGE)
 	kind load docker-image --name dc3 $(DEV_IMAGE)
 	kind load docker-image --name dc4 $(DEV_IMAGE)
 
-# ===========> Shared Targets
-
-help: ## Show targets and their descriptions.
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-38s\033[0m %s\n", $$1, $$2}'
+##@ Shared Targets
 
 lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance directories.
 	for p in control-plane cli acceptance;  do cd $$p; golangci-lint run --path-prefix $$p -c ../.golangci.yml; cd ..; done
@@ -198,12 +186,16 @@ CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
 ensure-controller-gen-version: ## Ensure controller-gen version is v0.12.1.
-ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.12.1))
-	@echo "controller-gen version is not v0.12.1, uninstall the binary and install the correct version with 'make get-controller-gen'."
-	@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
-	@exit 1
+ifeq (, $(shell which $(CONTROLLER_GEN)))
+	@echo "You don't have $(CONTROLLER_GEN), please install it first."
 else
-	@echo "Found correct version: $(shell $(CONTROLLER_GEN) --version)"
+	ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.12.1))
+		@echo "controller-gen version is not v0.12.1, uninstall the binary and install the correct version with 'make get-controller-gen'."
+		@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
+		@exit 1
+	else
+		@echo "Found correct version: $(shell $(CONTROLLER_GEN) --version)"
+	endif
 endif
 
 add-copyright-header: ## Add copyright header to all files in the project
@@ -213,46 +205,47 @@ ifeq (, $(shell which copywrite))
 endif
 	@copywrite headers --spdx "MPL-2.0" 
 
-# ===========> CI Targets
+##@ CI Targets
 
 ci.aws-acceptance-test-cleanup: ## Deletes AWS resources left behind after failed acceptance tests.
 	@cd hack/aws-acceptance-test-cleanup; go run ./... -auto-approve
 
-version:
+version: ## print version
 	@echo $(VERSION)
 
-consul-version:
+consul-version: ## print consul version
 	@echo $(CONSUL_IMAGE_VERSION)
 
-consul-enterprise-version:
+consul-enterprise-version: ## print consul ent version
 	@echo $(CONSUL_ENTERPRISE_IMAGE_VERSION)
 
-consul-dataplane-version:
+consul-dataplane-version: ## print consul data-plane version
 	@echo $(CONSUL_DATAPLANE_IMAGE_VERSION)
 
-kind-version:
+kind-version: ## print kind version
 	@echo $(KIND_VERSION)
 
-kind-node-image:
+kind-node-image: ## print kind node image
 	@echo $(KIND_NODE_IMAGE)
 
-kubectl-version:
+kubectl-version: ## print kubectl version
 	@echo $(KUBECTL_VERSION)
 
-kind-test-packages:
+kind-test-packages: ## kind test packages
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/kind_acceptance_test_packages.yaml"
 
-gke-test-packages:
+gke-test-packages: ## gke test packages
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/gke_acceptance_test_packages.yaml"
 
-eks-test-packages:
+eks-test-packages: ## eks test packages
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/eks_acceptance_test_packages.yaml"
 
-aks-test-packages:
+aks-test-packages: ## aks test packages
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
 
-# ===========> Release Targets
-check-env:
+##@ Release Targets
+
+check-env: ## check env
 	@printenv | grep "CONSUL_K8S"
 
 prepare-release-script: ## Sets the versions, updates changelog to prepare this repository to release
@@ -289,7 +282,7 @@ endif
 
 prepare-rc-branch: prepare-rc-script
 
-prepare-main-dev:
+prepare-main-dev: ## prepare main dev
 ifndef CONSUL_K8S_RELEASE_VERSION
 	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
@@ -307,7 +300,7 @@ ifndef CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION
 endif
 	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" "" $(CONSUL_K8S_NEXT_RELEASE_VERSION) $(CONSUL_K8S_NEXT_CONSUL_VERSION) $(CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION)
 
-prepare-release-dev:
+prepare-release-dev: ## prepare release dev
 ifndef CONSUL_K8S_RELEASE_VERSION
 	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
@@ -337,3 +330,19 @@ GIT_COMMIT?=$(shell git rev-parse --short HEAD)
 GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_DESCRIBE?=$(shell git describe --tags --always)
 CRD_OPTIONS ?= "crd:ignoreUnexportedFields=true,allowDangerousTypes=true"
+
+##@ Help
+
+# The help target prints out all targets with their descriptions organized
+# beneath their categories. The categories are represented by '##@' and the
+# target descriptions by '##'. The awk commands is responsible for reading the
+# entire set of makefiles included in this invocation, looking for lines of the
+# file as xyz: ## something, and then pretty-format the target and help. Then,
+# if there's a line with ##@ something, that gets pretty-printed as a category.
+# More info on the usage of ANSI control characters for terminal formatting:
+# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_parameters
+# More info on the awk command:
+# http://linuxcommand.org/lc3_adv_awk.php
+.PHONY: help
+help: ## Display this help
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
