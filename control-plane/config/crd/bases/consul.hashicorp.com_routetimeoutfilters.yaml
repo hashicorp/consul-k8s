@@ -51,8 +51,10 @@ spec:
             description: RouteTimeoutFilterSpec defines the desired state of RouteTimeoutFilter.
             properties:
               idleTimeout:
+                format: duration
                 type: string
               requestTimeout:
+                format: duration
                 type: string
             type: object
           status:
