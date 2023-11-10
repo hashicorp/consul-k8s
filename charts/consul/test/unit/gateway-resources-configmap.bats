@@ -44,3 +44,28 @@ load _helpers
     local actual=$(echo $resources | jq -r '.limits.cpu')
     [ $actual = '220m' ]
 }
+
+@test "gateway-resources/ConfigMap: does not contain config.yaml resources without .global.experiments equal to resource-apis" {
+    cd `chart_dir`
+    local resources=$(helm template \
+        -s templates/gateway-resources-configmap.yaml \
+        --set 'connectInject.enabled=true' \
+        --set 'ui.enabled=false' \
+        . | tee /dev/stderr |
+        yq '.data["config.yaml"]' | tee /dev/stderr)
+    [ $resources = null ]
+
+}
+
+@test "gateway-resources/ConfigMap: contains config.yaml resources with .global.experiments equal to resource-apis" {
+    cd `chart_dir`
+    local resources=$(helm template \
+        -s templates/gateway-resources-configmap.yaml \
+        --set 'connectInject.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        . | tee /dev/stderr |
+        yq '.data["config.yaml"]' | tee /dev/stderr)
+
+    [ "$resources" != null ]
+}
