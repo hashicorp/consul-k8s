@@ -51,7 +51,7 @@ spec:
             - -heritage={{ .Release.Service }}
             - -release-name={{ .Release.Name }}
             - -component=api-gateway
-            {{- if .Values.apiGateway.enabled }} # Overide values from the old stanza. To be removed in 1.17 (t-eckert 2023-05-19)
+            {{- if .Values.apiGateway.enabled }} # Override values from the old stanza. To be removed after ~1.18 (t-eckert 2023-05-19) NET-6263
             {{- if .Values.apiGateway.managedGatewayClass.deployment }}
             {{- if .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
             - -deployment-default-instances={{ .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
