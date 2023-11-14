@@ -1,0 +1,284 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.1
+  name: failoverpolicies.catalog.consul.hashicorp.com
+spec:
+  group: catalog.consul.hashicorp.com
+  names:
+    kind: FailoverPolicy
+    listKind: FailoverPolicyList
+    plural: failoverpolicies
+    shortNames:
+    - failover-policy
+    singular: failoverpolicy
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v2beta1
+    schema:
+      openAPIV3Schema:
+        description: FailoverPolicy is the Schema for the failover-policy API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: This is a Resource type.
+            properties:
+              config:
+                description: Config defines failover for any named port not present
+                  in PortConfigs.
+                properties:
+                  destinations:
+                    description: Destinations specifies a fixed list of failover destinations
+                      to try. We never try a destination multiple times, so those
+                      are subtracted from this list before proceeding.
+                    items:
+                      properties:
+                        datacenter:
+                          type: string
+                        port:
+                          description: 'TODO: what should an empty port mean?'
+                          type: string
+                        ref:
+                          description: This must be a Service.
+                          properties:
+                            name:
+                              description: Name is the user-given name of the resource
+                                (e.g. the "billing" service).
+                              type: string
+                            section:
+                              description: Section identifies which part of the resource
+                                the condition relates to.
+                              type: string
+                            tenancy:
+                              description: Tenancy identifies the tenancy units (i.e.
+                                partition, namespace) in which the resource resides.
+                              properties:
+                                namespace:
+                                  description: "Namespace further isolates resources
+                                    within a partition. https://developer.hashicorp.com/consul/docs/enterprise/namespaces
+                                    \n When using the List and WatchList endpoints,
+                                    provide the wildcard value \"*\" to list resources
+                                    across all namespaces."
+                                  type: string
+                                partition:
+                                  description: "Partition is the topmost administrative
+                                    boundary within a cluster. https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
+                                    \n When using the List and WatchList endpoints,
+                                    provide the wildcard value \"*\" to list resources
+                                    across all partitions."
+                                  type: string
+                                peerName:
+                                  description: "PeerName identifies which peer the
+                                    resource is imported from. https://developer.hashicorp.com/consul/docs/connect/cluster-peering
+                                    \n When using the List and WatchList endpoints,
+                                    provide the wildcard value \"*\" to list resources
+                                    across all peers."
+                                  type: string
+                              type: object
+                            type:
+                              description: Type identifies the resource's type.
+                              properties:
+                                group:
+                                  description: Group describes the area of functionality
+                                    to which this resource type relates (e.g. "catalog",
+                                    "authorization").
+                                  type: string
+                                groupVersion:
+                                  description: GroupVersion is incremented when sweeping
+                                    or backward-incompatible changes are made to the
+                                    group's resource types.
+                                  type: string
+                                kind:
+                                  description: Kind identifies the specific resource
+                                    type within the group.
+                                  type: string
+                              type: object
+                          type: object
+                      type: object
+                    type: array
+                  mode:
+                    description: Mode specifies the type of failover that will be
+                      performed. Valid values are "sequential", "" (equivalent to
+                      "sequential") and "order-by-locality".
+                    enum:
+                    - FAILOVER_MODE_UNSPECIFIED
+                    - FAILOVER_MODE_SEQUENTIAL
+                    - FAILOVER_MODE_ORDER_BY_LOCALITY
+                    format: int32
+                    type: string
+                  regions:
+                    items:
+                      type: string
+                    type: array
+                  samenessGroup:
+                    description: SamenessGroup specifies the sameness group to failover
+                      to.
+                    type: string
+                type: object
+              portConfigs:
+                additionalProperties:
+                  properties:
+                    destinations:
+                      description: Destinations specifies a fixed list of failover
+                        destinations to try. We never try a destination multiple times,
+                        so those are subtracted from this list before proceeding.
+                      items:
+                        properties:
+                          datacenter:
+                            type: string
+                          port:
+                            description: 'TODO: what should an empty port mean?'
+                            type: string
+                          ref:
+                            description: This must be a Service.
+                            properties:
+                              name:
+                                description: Name is the user-given name of the resource
+                                  (e.g. the "billing" service).
+                                type: string
+                              section:
+                                description: Section identifies which part of the
+                                  resource the condition relates to.
+                                type: string
+                              tenancy:
+                                description: Tenancy identifies the tenancy units
+                                  (i.e. partition, namespace) in which the resource
+                                  resides.
+                                properties:
+                                  namespace:
+                                    description: "Namespace further isolates resources
+                                      within a partition. https://developer.hashicorp.com/consul/docs/enterprise/namespaces
+                                      \n When using the List and WatchList endpoints,
+                                      provide the wildcard value \"*\" to list resources
+                                      across all namespaces."
+                                    type: string
+                                  partition:
+                                    description: "Partition is the topmost administrative
+                                      boundary within a cluster. https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
+                                      \n When using the List and WatchList endpoints,
+                                      provide the wildcard value \"*\" to list resources
+                                      across all partitions."
+                                    type: string
+                                  peerName:
+                                    description: "PeerName identifies which peer the
+                                      resource is imported from. https://developer.hashicorp.com/consul/docs/connect/cluster-peering
+                                      \n When using the List and WatchList endpoints,
+                                      provide the wildcard value \"*\" to list resources
+                                      across all peers."
+                                    type: string
+                                type: object
+                              type:
+                                description: Type identifies the resource's type.
+                                properties:
+                                  group:
+                                    description: Group describes the area of functionality
+                                      to which this resource type relates (e.g. "catalog",
+                                      "authorization").
+                                    type: string
+                                  groupVersion:
+                                    description: GroupVersion is incremented when
+                                      sweeping or backward-incompatible changes are
+                                      made to the group's resource types.
+                                    type: string
+                                  kind:
+                                    description: Kind identifies the specific resource
+                                      type within the group.
+                                    type: string
+                                type: object
+                            type: object
+                        type: object
+                      type: array
+                    mode:
+                      description: Mode specifies the type of failover that will be
+                        performed. Valid values are "sequential", "" (equivalent to
+                        "sequential") and "order-by-locality".
+                      enum:
+                      - FAILOVER_MODE_UNSPECIFIED
+                      - FAILOVER_MODE_SEQUENTIAL
+                      - FAILOVER_MODE_ORDER_BY_LOCALITY
+                      format: int32
+                      type: string
+                    regions:
+                      items:
+                        type: string
+                      type: array
+                    samenessGroup:
+                      description: SamenessGroup specifies the sameness group to failover
+                        to.
+                      type: string
+                  type: object
+                description: PortConfigs defines failover for a specific port on this
+                  service and takes precedence over Config.
+                type: object
+            type: object
+          status:
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

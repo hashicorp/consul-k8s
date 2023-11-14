@@ -350,12 +350,33 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-v2beta1-grpcroute
+      path: /mutate-v2beta1-failoverpolicy
   failurePolicy: Fail
-  name: mutate-grpcroute.auth.consul.hashicorp.com
+  name: mutate-failoverpolicy.catalog.consul.hashicorp.com
   rules:
   - apiGroups:
-    - auth.consul.hashicorp.com
+    - catalog.consul.hashicorp.com
+    apiVersions:
+    - v2beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - failoverpolicy
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v2beta1-grpcroute
+  failurePolicy: Fail
+  name: mutate-grpcroute.mesh.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - mesh.consul.hashicorp.com
     apiVersions:
     - v2beta1
     operations:
@@ -373,10 +394,10 @@ webhooks:
       namespace: system
       path: /mutate-v2beta1-httproute
   failurePolicy: Fail
-  name: mutate-httproute.auth.consul.hashicorp.com
+  name: mutate-httproute.mesh.consul.hashicorp.com
   rules:
   - apiGroups:
-    - auth.consul.hashicorp.com
+    - mesh.consul.hashicorp.com
     apiVersions:
     - v2beta1
     operations:
@@ -394,10 +415,10 @@ webhooks:
       namespace: system
       path: /mutate-v2beta1-proxyconfiguration
   failurePolicy: Fail
-  name: mutate-proxyconfiguration.auth.consul.hashicorp.com
+  name: mutate-proxyconfiguration.mesh.consul.hashicorp.com
   rules:
   - apiGroups:
-    - auth.consul.hashicorp.com
+    - mesh.consul.hashicorp.com
     apiVersions:
     - v2beta1
     operations:
@@ -415,10 +436,10 @@ webhooks:
       namespace: system
       path: /mutate-v2beta1-tcproute
   failurePolicy: Fail
-  name: mutate-tcproute.auth.consul.hashicorp.com
+  name: mutate-tcproute.mesh.consul.hashicorp.com
   rules:
   - apiGroups:
-    - auth.consul.hashicorp.com
+    - mesh.consul.hashicorp.com
     apiVersions:
     - v2beta1
     operations:

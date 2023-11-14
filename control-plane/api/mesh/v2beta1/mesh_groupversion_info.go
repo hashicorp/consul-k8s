@@ -22,6 +22,6 @@ var (
 	// MeshSchemeBuilder is used to add go types to the GroupVersionKind scheme.
 	MeshSchemeBuilder = &scheme.Builder{GroupVersion: MeshGroupVersion}
 
-	// AddMeshToScheme adds the types in this group-version to the given scheme.
-	AddMeshToScheme = MeshSchemeBuilder.AddToScheme
+	// AddToScheme adds the types in this group-version to the given scheme.
+	AddToScheme = MeshSchemeBuilder.AddToScheme
 )
