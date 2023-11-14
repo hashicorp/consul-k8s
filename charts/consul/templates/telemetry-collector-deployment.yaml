@@ -118,7 +118,8 @@ spec:
               -pod-namespace=${POD_NAMESPACE} \
               -proxy-id-file="/consul/connect-inject/proxyid" \
               -service-account-name="consul-telemetry-collector" \
-              -service-name=""
+              -service-name="" \
+              -telemetry-collector
 
         image: {{ .Values.global.imageK8S }}
         imagePullPolicy: IfNotPresent
@@ -283,6 +284,7 @@ spec:
           - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method
           {{- end }}
           # namespace is hard-coded to default
+          - -service-namespace=default
           - -login-namespace=default
           # service and login partition
           {{- if .Values.global.adminPartitions.enabled }}

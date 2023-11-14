@@ -85,7 +85,6 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagMultiPort, "multiport", false, "If the pod is a multi port pod.")
 	c.flagSet.StringVar(&c.flagGatewayKind, "gateway-kind", "", "Kind of gateway that is being registered: ingress-gateway, terminating-gateway, or mesh-gateway.")
 	c.flagSet.BoolVar(&c.flagTelemetryCollector, "telemetry-collector", false, "Whether this is for a Consul Telemetry Collector. If so, we hard-code the namespace to default.")
-	c.flagSet.BoolVar(&c.flagMultiPort, "multiport", false, "If the pod is a multi port pod.")
 	c.flagSet.StringVar(&c.flagRedirectTrafficConfig, "redirect-traffic-config", os.Getenv("CONSUL_REDIRECT_TRAFFIC_CONFIG"), "Config (in JSON format) to configure iptables for this pod.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
