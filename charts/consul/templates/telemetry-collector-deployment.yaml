@@ -34,6 +34,8 @@ spec:
         # This annotation tells the endpoints controller that this pod was injected even though it wasn't. The
         # endpoints controller would then sync the endpoint into Consul
         "consul.hashicorp.com/connect-inject-status": "injected"
+        # This handles creation of namespaces in Consul in the event that this is the first pod deployed to a namespace.
+        "consul.hashicorp.com/telemetry-collector": "true",
         # We aren't using tproxy and we don't have an original pod. This would be simpler if we made a path similar
         # to gateways
         "consul.hashicorp.com/connect-service-port": "metricsserver"
@@ -130,12 +132,14 @@ spec:
           - /bin/sh
           - -ec
           - |-
-            consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-              -log-level={{ default .Values.global.logLevel .Values.telemetryCollector.logLevel }} \
+            consul-k8s-control-plane connect-init \
               -log-json={{ .Values.global.logJSON }} \
+              -log-level={{ default .Values.global.logLevel .Values.telemetryCollector.logLevel }} \
+              -pod-name=${POD_NAME} \
+              -pod-namespace=${POD_NAMESPACE} \
+              -proxy-id-file="/consul/connect-inject/proxyid" \
               -service-account-name="consul-telemetry-collector" \
-              -service-name="" \
-              -proxy-id-file="/consul/connect-inject/proxyid"
+              -service-name=""
 
         image: {{ .Values.global.imageK8S }}
         imagePullPolicy: IfNotPresent
