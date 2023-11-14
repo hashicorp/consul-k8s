@@ -275,13 +275,12 @@ spec:
           - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method
           {{- if .Values.global.enableConsulNamespaces }}
           {{- if .Values.syncCatalog.consulNamespaces.mirroringK8S }}
-          - -login-namespace="default"
+          - -login-namespace=default
           {{- else }}
           - -login-namespace={{ .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
           {{- end }}
           {{- end }}
           {{- if .Values.global.adminPartitions.enabled }}
-          - foo
           - -login-partition={{ .Values.global.adminPartitions.name }}
           {{- end }}
           {{- end }}

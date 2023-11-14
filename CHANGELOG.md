@@ -1,3 +1,46 @@
+## 1.3.0 (November 8, 2023)
+
+SECURITY:
+
+* Update Envoy version to 1.25.11 to address [CVE-2023-44487](https://github.com/envoyproxy/envoy/security/advisories/GHSA-jhv4-f7mr-xx76) [[GH-3116](https://github.com/hashicorp/consul-k8s/issues/3116)]
+
+FEATURES:
+
+* :tada: This release provides the ability to preview Consul's v2 Catalog and Resource API if enabled.
+The new model supports multi-port application deployments with only a single Envoy proxy.
+Note that the v1 and v2 catalogs are not cross compatible, and not all Consul features are available within this v2 feature preview.
+See the [v2 Catalog and Resource API documentation](https://developer.hashicorp.com/consul/docs/k8s/multiport) for more information.
+The v2 Catalog and Resources API should be considered a feature preview within this release and should not be used in production environments.
+
+### Limitations
+* The v1 and v2 catalog APIs cannot run concurrently.
+* The Consul UI must be disable. It does not support multi-port services or the v2 catalog API in this release.
+* HCP Consul does not support multi-port services or the v2 catalog API in this release.
+
+[[GH-2868]](https://github.com/hashicorp/consul-k8s/pull/2868)
+[[GH-2883]](https://github.com/hashicorp/consul-k8s/pull/2883)
+[[GH-2930]](https://github.com/hashicorp/consul-k8s/pull/2930)
+[[GH-2967]](https://github.com/hashicorp/consul-k8s/pull/2967) [[GH-2941](https://github.com/hashicorp/consul-k8s/issues/2941)]
+* Add the `PrioritizeByLocality` field to the `ServiceResolver` and `ProxyDefaults` CRDs. [[GH-2784](https://github.com/hashicorp/consul-k8s/issues/2784)]
+* Set locality on services registered with connect-inject. [[GH-2346](https://github.com/hashicorp/consul-k8s/issues/2346)]
+* api-gateway: Add support for response header modifiers in HTTPRoute filters [[GH-2904](https://github.com/hashicorp/consul-k8s/issues/2904)]
+* api-gateway: add RouteRetryFilter and RouteTimeoutFilter CRDs [[GH-2735](https://github.com/hashicorp/consul-k8s/issues/2735)]
+* helm: (Consul Enterprise) Adds rate limiting config to serviceDefaults CRD [[GH-2844](https://github.com/hashicorp/consul-k8s/issues/2844)]
+* helm: add persistentVolumeClaimRetentionPolicy variable for managing Statefulsets PVC retain policy when deleting or downsizing the statefulset. [[GH-3180](https://github.com/hashicorp/consul-k8s/issues/3180)]
+
+IMPROVEMENTS:
+
+* (Consul Enterprise) Add support to provide inputs via helm for audit log related configuration [[GH-2265](https://github.com/hashicorp/consul-k8s/issues/2265)]
+* cli: Add consul-k8s proxy stats command line interface that outputs the localhost:19000/stats of envoy in the pod [[GH-3158](https://github.com/hashicorp/consul-k8s/issues/3158)]
+* control-plane: Changed the container ordering in connect-inject to insert consul-dataplane container first if lifecycle is enabled. Container ordering is unchanged if lifecycle is disabled. [[GH-2743](https://github.com/hashicorp/consul-k8s/issues/2743)]
+* helm: Kubernetes v1.28 is now supported. Minimum tested version of Kubernetes is now v1.25. [[GH-3138](https://github.com/hashicorp/consul-k8s/issues/3138)]
+
+BUG FIXES:
+
+* control-plane: Set locality on sidecar proxies in addition to services when registering with connect-inject. [[GH-2748](https://github.com/hashicorp/consul-k8s/issues/2748)]
+* control-plane: remove extraneous error log in v2 pod controller when a pod is scheduled, but not yet allocated an IP. [[GH-3162](https://github.com/hashicorp/consul-k8s/issues/3162)]
+* control-plane: remove extraneous error log in v2 pod controller when attempting to delete ACL tokens. [[GH-3172](https://github.com/hashicorp/consul-k8s/issues/3172)]
+
 ## 1.2.3 (November 2, 2023)
 
 SECURITY:

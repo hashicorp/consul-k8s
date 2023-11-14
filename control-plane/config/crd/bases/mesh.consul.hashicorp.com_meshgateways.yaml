@@ -6,14 +6,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.1
-  name: routetimeoutfilters.consul.hashicorp.com
+  name: meshgateways.mesh.consul.hashicorp.com
 spec:
-  group: consul.hashicorp.com
+  group: mesh.consul.hashicorp.com
   names:
-    kind: RouteTimeoutFilter
-    listKind: RouteTimeoutFilterList
-    plural: routetimeoutfilters
-    singular: routetimeoutfilter
+    kind: MeshGateway
+    listKind: MeshGatewayList
+    plural: meshgateways
+    shortNames:
+    - mesh-gateway
+    singular: meshgateway
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -29,11 +31,10 @@ spec:
       jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v2beta1
     schema:
       openAPIV3Schema:
-        description: RouteTimeoutFilter is the Schema for the httproutetimeoutfilters
-          API
+        description: MeshGateway is the Schema for the Mesh Gateway API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -48,14 +49,6 @@ spec:
           metadata:
             type: object
           spec:
-            description: RouteTimeoutFilterSpec defines the desired state of RouteTimeoutFilter.
-            properties:
-              idleTimeout:
-                format: duration
-                type: string
-              requestTimeout:
-                format: duration
-                type: string
             type: object
           status:
             properties:
