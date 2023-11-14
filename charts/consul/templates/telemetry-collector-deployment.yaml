@@ -35,7 +35,7 @@ spec:
         # endpoints controller would then sync the endpoint into Consul
         "consul.hashicorp.com/connect-inject-status": "injected"
         # This handles creation of namespaces in Consul in the event that this is the first pod deployed to a namespace.
-        "consul.hashicorp.com/telemetry-collector": "true",
+        "consul.hashicorp.com/telemetry-collector": "true"
         # We aren't using tproxy and we don't have an original pod. This would be simpler if we made a path similar
         # to gateways
         "consul.hashicorp.com/connect-service-port": "metricsserver"
