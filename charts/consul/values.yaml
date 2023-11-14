@@ -882,11 +882,26 @@ server:
   # @type: string
   storageClass: null
 
+  # The [Persistent Volume Claim (PVC) retention policy](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention)
+  # controls if and how PVCs are deleted during the lifecycle of a StatefulSet.
+  # WhenDeleted specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is deleted,
+  # and WhenScaled specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is scaled down.
+  #
+  # Example:
+  #
+  # ```yaml
+  # persistentVolumeClaimRetentionPolicy:
+  #   whenDeleted: Retain
+  #   whenScaled: Retain
+  # ```
+  # @type: map
+  persistentVolumeClaimRetentionPolicy: null
+
   # This will enable/disable [service mesh](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
   # _will not_ automatically secure pod communication, this
   # setting will only enable usage of the feature. Consul will automatically initialize
   # a new CA and set of certificates. Additional service mesh settings can be configured
-  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries). 
+  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries).
   connect: true
 
   serviceAccount:
@@ -977,7 +992,7 @@ server:
     # Enables registering a PodDisruptionBudget for the server
     # cluster. If enabled, it only registers the budget so long as
     # the server cluster is enabled. To disable, set to `false`.
-    enabled: false
+    enabled: true
 
     # The maximum number of unavailable pods. By default, this will be
     # automatically computed based on the `server.replicas` value to be `(n/2)-1`.
@@ -986,6 +1001,7 @@ server:
     # command because of a limitation in the Helm templating language.
     # @type: integer
     maxUnavailable: null
+
 
     # The minimum number of available pods.
     # Takes precedence over maxUnavailable if set.
@@ -1261,7 +1277,7 @@ server:
     # @type: string
     caCert: null
 
-  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing 
+  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing
   # and configure a sink and filters for their audit logs. Please refer to
   # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
   # for further information.
@@ -1270,7 +1286,7 @@ server:
     # global.acls.manageSystemACLs must be enabled to use this feature.
     enabled: false
 
-    # A single entry of the sink object provides configuration for the destination to which Consul 
+    # A single entry of the sink object provides configuration for the destination to which Consul
     # will log auditing events.
     #
     # Example:
@@ -1285,7 +1301,7 @@ server:
     #     rotate_duration: 24h
     #     rotate_max_files: 15
     #     rotate_bytes: 25165824
-    #     
+    #
     # ```
     #
     # The sink object supports the following keys:
@@ -1397,7 +1413,7 @@ externalServers:
   # This address must be reachable from the Consul servers.
   # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
   #
-  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and 
+  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
   # `externalServers.k8sAuthMethodHost` should be set to the same value.
   #
   # You could retrieve this value from your `kubeconfig` by running:
@@ -2167,7 +2183,7 @@ connectInject:
     # This will enable/disable registering a PodDisruptionBudget for the
     # service mesh sidecar injector. If this is enabled, it will only register the budget so long as
     # the service mesh is enabled.
-    enabled: false
+    enabled: true
 
     # The maximum number of unavailable pods. By default, this will be
     # automatically computed based on the `connectInject.replicas` value to be `(n/2)-1`.
@@ -2190,7 +2206,7 @@ connectInject:
     # If this setting is false, you will need to install the Gateway API CRDs manually.
     manageExternalCRDs: true
 
-    # Enables Consul on Kubernets to manage only the non-standard CRDs used for Gateway API. If manageExternalCRDs is true 
+    # Enables Consul on Kubernets to manage only the non-standard CRDs used for Gateway API. If manageExternalCRDs is true
     # then all CRDs will be installed; otherwise, if manageNonStandardCRDs is true then only TCPRoute, GatewayClassConfig and MeshService
     # will be installed.
     manageNonStandardCRDs: false
@@ -2677,16 +2693,16 @@ connectInject:
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-shutdown-path`
     # @type: map
     lifecycle:
-        # @type: boolean
-        defaultEnabled: true
-        # @type: boolean
-        defaultEnableShutdownDrainListeners: true
-        # @type: integer
-        defaultShutdownGracePeriodSeconds: 30
-        # @type: integer
-        defaultGracefulPort: 20600
-        # @type: string
-        defaultGracefulShutdownPath: "/graceful_shutdown"
+      # @type: boolean
+      defaultEnabled: true
+      # @type: boolean
+      defaultEnableShutdownDrainListeners: true
+      # @type: integer
+      defaultShutdownGracePeriodSeconds: 30
+      # @type: integer
+      defaultGracefulPort: 20600
+      # @type: string
+      defaultGracefulShutdownPath: "/graceful_shutdown"
 
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of
@@ -3124,8 +3140,8 @@ ingressGateways:
 
   # Gateways is a list of gateway objects. The only required field for
   # each is `name`, though they can also contain any of the fields in
-  # `defaults`. You must provide a unique name for each ingress gateway. These names 
-  # must be unique across different namespaces. 
+  # `defaults`. You must provide a unique name for each ingress gateway. These names
+  # must be unique across different namespaces.
   # Values defined here override the defaults, except in the case of annotations where both will be applied.
   # @type: array<map>
   gateways:
@@ -3152,7 +3168,6 @@ terminatingGateways:
   # include both the default annotations and any additional ones defined
   # for a specific gateway.
   defaults:
-
     # This configures the [`PodDisruptionBudget`](https://kubernetes.io/docs/tasks/run-application/configure-pdb/)
     # for the terminating gateways.
     disruptionBudget:
