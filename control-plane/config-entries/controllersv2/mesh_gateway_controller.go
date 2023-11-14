@@ -29,7 +29,6 @@ type MeshGatewayController struct {
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=meshgateway/status,verbs=get;update;patch
 
 func (r *MeshGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// TODO NET-6392 NET-6393 NET-6394 NET-6395
 	logger := r.Logger(req.NamespacedName)
 
 	// Fetch the resource being reconciled
@@ -70,9 +69,11 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
+	// TODO NET-6392 NET-6393 NET-6394 NET-6395
 	return errors.New("onCreateUpdate not implemented")
 }
 
 func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
+	// TODO NET-6392 NET-6393 NET-6394 NET-6395
 	return errors.New("onDelete not implemented")
 }
