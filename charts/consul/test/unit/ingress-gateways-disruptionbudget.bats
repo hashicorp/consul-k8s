@@ -65,7 +65,7 @@ load _helpers
       -s templates/ingress-gateways-disruptionbudget.yaml \
       --set 'ingressGateways.replicas=3' \
        --set 'ingressGateways.enabled=true' \
-      --set 'ingressGateways.disruptionBudget.enabled=true' \
+      --set 'ingressGateways.defaults.disruptionBudget.enabled=true' \
       --set 'ingressGateways.defaults.disruptionBudget.maxUnavailable=3' \
       --set 'ingressGateways.defaults.disruptionBudget.minAvailable=1' \
       . | tee /dev/stderr)

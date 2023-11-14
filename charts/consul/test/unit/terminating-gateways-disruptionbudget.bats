@@ -65,7 +65,7 @@ load _helpers
       -s templates/terminating-gateways-disruptionbudget.yaml \
       --set 'terminatingGateways.replicas=3' \
        --set 'terminatingGateways.enabled=true' \
-      --set 'terminatingGateways.disruptionBudget.enabled=true' \
+      --set 'terminatingGateways.defaults.disruptionBudget.enabled=true' \
       --set 'terminatingGateways.defaults.disruptionBudget.maxUnavailable=3' \
       --set 'terminatingGateways.defaults.disruptionBudget.minAvailable=1' \
       . | tee /dev/stderr)
