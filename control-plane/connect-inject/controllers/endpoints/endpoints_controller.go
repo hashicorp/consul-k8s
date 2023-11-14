@@ -680,6 +680,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
 		metaKeyManagedBy:         constants.ManagedByValue,
 		metaKeySyntheticNode:     "true",
+		constants.MetaKeyPodUID:  string(pod.UID),
 	}
 
 	service := &api.AgentService{

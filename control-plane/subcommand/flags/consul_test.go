@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
@@ -43,6 +44,7 @@ func TestConsulFlags_Flags(t *testing.T) {
 				LoginNamespaceEnvVar:       "other-test-ns",
 				LoginMetaEnvVar:            "key1=value1,key2=value2",
 				SkipServerWatchEnvVar:      "true",
+				constants.MetaKeyPodUID:    "",
 			},
 			expFlags: &ConsulFlags{
 				Addresses:  "consul.address",
@@ -67,7 +69,7 @@ func TestConsulFlags_Flags(t *testing.T) {
 						Datacenter:      "other-test-dc",
 						Partition:       "other-test-partition",
 						Namespace:       "other-test-ns",
-						Meta:            map[string]string{"key1": "value1", "key2": "value2"},
+						Meta:            map[string]string{"key1": "value1", "key2": "value2", constants.MetaKeyPodUID: ""},
 					},
 				},
 				SkipServerWatch: true,
