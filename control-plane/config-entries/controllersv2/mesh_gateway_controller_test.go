@@ -91,7 +91,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			controller := MeshGatewayController{
 				Client: fakeClient,
 				Log:    logrtest.New(t),
-				Scheme: nil,
+				Scheme: s,
 				MeshConfigController: &MeshConfigController{
 					ConsulClientConfig:  consulClient.Cfg,
 					ConsulServerConnMgr: consulClient.Watcher,
