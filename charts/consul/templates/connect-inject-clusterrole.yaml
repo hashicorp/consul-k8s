@@ -98,6 +98,7 @@ rules:
   resources:
     - grpcroutes
     - httproutes
+    - meshgateways
     - tcproutes
     - proxyconfigurations
   verbs:
@@ -113,6 +114,7 @@ rules:
   resources:
     - grpcroutes/status
     - httproutes/status
+    - meshgateways/status
     - tcproutes/status
     - proxyconfigurations/status
   verbs:
