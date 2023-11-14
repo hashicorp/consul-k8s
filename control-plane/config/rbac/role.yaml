@@ -388,6 +388,26 @@ rules:
 - apiGroups:
   - mesh.consul.hashicorp.com
   resources:
+  - meshgateway
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - meshgateway/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
   - proxyconfiguration
   verbs:
   - create
