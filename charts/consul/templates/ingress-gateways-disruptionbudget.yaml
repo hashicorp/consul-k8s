@@ -3,7 +3,7 @@
 # voluntary cluster changes.
 {{- $root := . }}
 {{- range $ig := .Values.ingressGateways.gateways }}
-{{- if (or (and (ne ($root.Values.ingressGateways.defaults.disruptionBudget.enabled | toString) "-") $root.Values.ingressGateways.defaults.disruptionBudget.enabled) ((and (ne ($ig.disruptionBudget.enabled | toString) "-") $ig.disruptionBudget.enabled)) ) }}
+{{- if (or (and (ne ($root.Values.ingressGateways.defaults.disruptionBudget.enabled | toString) "-") $root.Values.ingressGateways.defaults.disruptionBudget.enabled) (and $ig.disruptionBudget (and (ne ($ig.disruptionBudget.enabled | toString) "-") $ig.disruptionBudget.enabled)) ) }}
 {{- if $root.Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
 apiVersion: policy/v1
 {{- else }}
