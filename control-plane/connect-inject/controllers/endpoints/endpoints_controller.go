@@ -444,6 +444,13 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
+
+	// This is to hard-code the consul-telemetry-collector to the default namespace. In any other namespace, if this is
+	// the first pod, the namespace is not guaranteed to exist. This behavior mirrors that of mesh-gateway.
+	if isTelemetryCollector(pod) {
+		consulNS = defaultNS
+	}
+
 	service := &api.AgentService{
 		ID:        svcID,
 		Service:   svcName,
@@ -774,12 +781,6 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 
 	default:
 		return nil, fmt.Errorf("%s must be one of %s, %s, or %s", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway)
-	}
-
-	// Hard-code namespace to default if this is a Consul Telemetry Collector
-	if isTelemetryCollector(pod) {
-		service.Namespace = defaultNS
-		consulNS = defaultNS
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
