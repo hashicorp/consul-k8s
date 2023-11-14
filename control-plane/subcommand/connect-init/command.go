@@ -235,8 +235,8 @@ func (c *Command) getConnectServiceRegistrations(consulClient *api.Client, proxy
 
 		serviceListOptions := &api.QueryOptions{Filter: filter, MergeCentralConfig: true}
 		if c.flagTelemetryCollector {
-			// For Consul Telemetry Collector, as with Mesh Gateways, we register them into the default namespace.
-			serviceListOptions.Namespace = namespaces.WildcardNamespace
+			// We register the Consul Telemetry Collector into the default namespace.
+			serviceListOptions.Namespace = namespaces.DefaultNamespace
 		}
 
 		serviceList, _, err := consulClient.Catalog().NodeServiceList(c.flagConsulNodeName, serviceListOptions)
