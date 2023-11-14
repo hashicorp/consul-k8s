@@ -30,8 +30,8 @@ load _helpers
       --set 'terminatingGateways.enabled=true' \
       --set 'terminatingGateways.defaults.disruptionBudget.enabled=true' \
       --set 'connectInject.enabled=false' \
-      . | tee /dev/stderr |
-      yq 'length == 0' | tee /dev/stderr)
+      . [ "$status" -eq 1 ]
+        [[ "$output" =~ "connectInject.enabled must be true" ]])
   [ "${actual}" = "true" ]
 }
 
