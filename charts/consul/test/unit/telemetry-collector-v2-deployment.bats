@@ -1368,9 +1368,12 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 
   local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-login-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
+
+  local actual=$(echo $object | jq -r '.[1].args | any(contains("-service-namespace=consul"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
 }
 
-@test "telemetryCollector/Deployment(V2): namespace flags when connectInject" {
+@test "telemetryCollector/Deployment(V2): namespace flags when not mirroringK8S" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/telemetry-collector-v2-deployment.yaml   \
@@ -1386,5 +1389,8 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       yq -r '.spec.template.spec.containers' | tee /dev/stderr)
 
   local actual=$(echo $object | jq -r '.[1].args | any(contains("-login-namespace=fakenamespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  local actual=$(echo $object | jq -r '.[1].args | any(contains("-service-namespace=fakenamespace"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 }
