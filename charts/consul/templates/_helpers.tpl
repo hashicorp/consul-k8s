@@ -424,11 +424,11 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 
 */}}
 {{- define "consul.validateTelemetryCollectorCloud" -}}
-{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
+{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientId.secretName is set, global.telemetryCollector.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
 {{- end }}
-{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, global.cloud.resourceId.secretName,telemetryCollector.cloud.clientId.secretName must also be set."}}
+{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, global.telemetryCollector.resourceId.secretName,telemetryCollector.cloud.clientId.secretName must also be set."}}
 {{- end }}
 {{- end }}
 
