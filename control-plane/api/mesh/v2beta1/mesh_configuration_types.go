@@ -28,7 +28,7 @@ func init() {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// MeshConfiguration is the Schema for the Mesh Gateway API
+// MeshConfiguration is the Schema for the Mesh Configuration
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
