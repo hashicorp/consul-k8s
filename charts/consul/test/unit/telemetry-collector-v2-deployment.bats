@@ -1363,13 +1363,14 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --namespace 'test-namespace' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec' | tee /dev/stderr)
 
   local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-login-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 
-  local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-service-namespace=consul"))' | tee /dev/stderr)
+  local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-service-namespace=test-namespace"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 }
 
