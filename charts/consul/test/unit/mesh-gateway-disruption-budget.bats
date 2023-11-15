@@ -28,9 +28,9 @@ load _helpers
       -s templates/mesh-gateway-disruptionbudget.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.disruptionBudget.enabled=true' \
-      --set 'connectInject.enabled=false' \
-      . [ "$status" -eq 1 ]
-        [[ "$output" =~ "connectInject.enabled must be true" ]]
+      --set 'connectInject.enabled=false' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "connectInject.enabled must be true" ]]
 }
 
 @test "meshGateway/DisruptionBudget: disabled with meshGateway.disruptionBudget.enabled=false" {

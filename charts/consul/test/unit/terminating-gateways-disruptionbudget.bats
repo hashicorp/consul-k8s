@@ -29,9 +29,9 @@ load _helpers
       -s templates/terminating-gateways-disruptionbudget.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'terminatingGateways.defaults.disruptionBudget.enabled=true' \
-      --set 'connectInject.enabled=false' \
-      . [ "$status" -eq 1 ]
-        [[ "$output" =~ "connectInject.enabled must be true" ]]
+      --set 'connectInject.enabled=false' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "connectInject.enabled must be true" ]]
 }
 
 @test "terminatingGateways/DisruptionBudget: disabled with terminatingGateways.disruptionBudget.enabled=false" {

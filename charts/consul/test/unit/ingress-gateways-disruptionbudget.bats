@@ -29,9 +29,9 @@ load _helpers
       -s templates/ingress-gateways-disruptionbudget.yaml \
       --set 'ingressGateways.enabled=true' \
       --set 'ingressGateways.defaults.disruptionBudget.enabled=true' \
-      --set 'connectInject.enabled=false' \
-      . [ "$status" -eq 1 ]
-        [[ "$output" =~ "connectInject.enabled must be true" ]]
+      --set 'connectInject.enabled=false' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "connectInject.enabled must be true" ]]
 }
 
 @test "ingressGateways/DisruptionBudget: disabled with ingressGateways.disruptionBudget.enabled=false" {
