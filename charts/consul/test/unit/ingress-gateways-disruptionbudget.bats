@@ -31,7 +31,7 @@ load _helpers
       --set 'ingressGateways.defaults.disruptionBudget.enabled=true' \
       --set 'connectInject.enabled=false' \
       . [ "$status" -eq 1 ]
-        [[ "$output" =~ "connectInject.enabled must be true" ]])
+        [[ "$output" =~ "connectInject.enabled must be true" ]]
 }
 
 @test "ingressGateways/DisruptionBudget: disabled with ingressGateways.disruptionBudget.enabled=false" {

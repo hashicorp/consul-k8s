@@ -31,7 +31,7 @@ load _helpers
       --set 'terminatingGateways.defaults.disruptionBudget.enabled=true' \
       --set 'connectInject.enabled=false' \
       . [ "$status" -eq 1 ]
-        [[ "$output" =~ "connectInject.enabled must be true" ]])
+        [[ "$output" =~ "connectInject.enabled must be true" ]]
 }
 
 @test "terminatingGateways/DisruptionBudget: disabled with terminatingGateways.disruptionBudget.enabled=false" {

@@ -30,7 +30,7 @@ load _helpers
       --set 'meshGateway.disruptionBudget.enabled=true' \
       --set 'connectInject.enabled=false' \
       . [ "$status" -eq 1 ]
-        [[ "$output" =~ "connectInject.enabled must be true" ]])
+        [[ "$output" =~ "connectInject.enabled must be true" ]]
 }
 
 @test "meshGateway/DisruptionBudget: disabled with meshGateway.disruptionBudget.enabled=false" {
