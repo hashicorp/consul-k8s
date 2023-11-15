@@ -34,7 +34,7 @@ spec:
         # This annotation tells the endpoints controller that this pod was injected even though it wasn't. The
         # endpoints controller would then sync the endpoint into Consul
         "consul.hashicorp.com/connect-inject-status": "injected"
-        # Signals that we should use the default namespace, ignoring all other namespace selection logic.
+        # Signals to the endpoints controller that we should force Consul NS creation, since we bypass the mesh webhook.
         "consul.hashicorp.com/telemetry-collector": "true"
         # We aren't using tproxy and we don't have an original pod. This would be simpler if we made a path similar
         # to gateways
