@@ -231,6 +231,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						continue
 					}
 				}
+
 				if isGateway(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if err = r.registerGateway(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
@@ -443,6 +444,13 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
+
+	// This is to hard-code the consul-telemetry-collector to the default namespace. In any other namespace, if this is
+	// the first pod, the namespace is not guaranteed to exist. This behavior mirrors that of mesh-gateway.
+	if isTelemetryCollector(pod) {
+		consulNS = defaultNS
+	}
+
 	service := &api.AgentService{
 		ID:        svcID,
 		Service:   svcName,
@@ -1333,6 +1341,14 @@ func hasBeenInjected(pod corev1.Pod) bool {
 // isGateway checks the value of the gateway annotation and returns true if the Pod represents a Gateway.
 func isGateway(pod corev1.Pod) bool {
 	anno, ok := pod.Annotations[constants.AnnotationGatewayKind]
+	return ok && anno != ""
+}
+
+// isTelemetryCollector checks whether a pod is part of a deployment for a Consul Telemetry Collector. If so,
+// and this is the first pod deployed to a Namespace, we need to create the Namespace in Consul. Otherwise the
+// deployment may fail out during service registration because it is deployed to a Namespace that does not exist.
+func isTelemetryCollector(pod corev1.Pod) bool {
+	anno, ok := pod.Annotations[constants.LabelTelemetryCollector]
 	return ok && anno != ""
 }
 
