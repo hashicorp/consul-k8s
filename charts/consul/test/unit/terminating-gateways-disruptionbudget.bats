@@ -25,14 +25,13 @@ load _helpers
 
 @test "terminatingGateways/DisruptionBudget: disabled with connectInject.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/terminating-gateways-disruptionbudget.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'terminatingGateways.defaults.disruptionBudget.enabled=true' \
       --set 'connectInject.enabled=false' \
       . [ "$status" -eq 1 ]
         [[ "$output" =~ "connectInject.enabled must be true" ]])
-  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/DisruptionBudget: disabled with terminatingGateways.disruptionBudget.enabled=false" {

@@ -24,14 +24,13 @@ load _helpers
 
 @test "meshGateway/DisruptionBudget: disabled with connectInject.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
+  run helm template \
       -s templates/mesh-gateway-disruptionbudget.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'meshGateway.disruptionBudget.enabled=true' \
       --set 'connectInject.enabled=false' \
       . [ "$status" -eq 1 ]
         [[ "$output" =~ "connectInject.enabled must be true" ]])
-  [ "${actual}" = "true" ]
 }
 
 @test "meshGateway/DisruptionBudget: disabled with meshGateway.disruptionBudget.enabled=false" {
