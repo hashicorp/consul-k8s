@@ -107,6 +107,27 @@ spec:
           - name: CONSUL_LOGIN_META
             value: "component=consul-telemetry-collector,pod=$(NAMESPACE)/$(POD_NAME)"
           {{- end }}
+          # service and login namespace
+          # this is attempting to replicate the behavior of webhooks in calculating namespace
+          # https://github.com/hashicorp/consul-k8s/blob/b84339050bb2c4b62b60cec96275f74952b0ac9d/control-plane/connect-inject/webhook/consul_dataplane_sidecar.go#L200 
+          {{- if .Values.global.enableConsulNamespaces }}
+          {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
+          - name: CONSUL_NAMESPACE
+            value: {{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}{{ .Release.Namespace }}
+          {{- else }}
+          - name: CONSUL_NAMESPACE
+            value: {{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+          {{- end }}
+          {{- if .Values.global.acls.manageSystemACLs }}
+          {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
+          - name: CONSUL_LOGIN_NAMESPACE
+            value: default
+          {{- else }}
+          - name: CONSUL_LOGIN_NAMESPACE
+            value: {{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+          {{- end }} 
+          {{- end }}
+          {{- end }}
         command:
           - /bin/sh
           - -ec
@@ -283,9 +304,21 @@ spec:
           - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
           - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method
           {{- end }}
-          # namespace is hard-coded to default
-          - -service-namespace=default
+          # service and login namespace
+          {{- if .Values.global.enableConsulNamespaces }}
+          {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
+          - -service-namespace={{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}{{ .Release.Namespace }}
+          {{- else }}
+          - -service-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+          {{- end }}
+          {{- if .Values.global.acls.manageSystemACLs }}
+          {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
           - -login-namespace=default
+          {{- else }}
+          - -login-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+          {{- end }} 
+          {{- end }}
+          {{- end }}
           # service and login partition
           {{- if .Values.global.adminPartitions.enabled }}
           - -service-partition={{ .Values.global.adminPartitions.name }}

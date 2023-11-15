@@ -204,6 +204,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
+				if isTelemetryCollector(pod) {
+					if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
+						r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
+						errs = multierror.Append(errs, err)
+					}
+				}
+
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if isConsulDataplaneSupported(pod) {
@@ -444,12 +451,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
-
-	// This is to hard-code the consul-telemetry-collector to the default namespace. In any other namespace, if this is
-	// the first pod, the namespace is not guaranteed to exist. This behavior mirrors that of mesh-gateway.
-	if isTelemetryCollector(pod) {
-		consulNS = defaultNS
-	}
 
 	service := &api.AgentService{
 		ID:        svcID,
@@ -1350,6 +1351,20 @@ func isGateway(pod corev1.Pod) bool {
 func isTelemetryCollector(pod corev1.Pod) bool {
 	anno, ok := pod.Annotations[constants.LabelTelemetryCollector]
 	return ok && anno != ""
+}
+
+// ensureNamespaceExists creates a Consul namespace for a pod in the event it does not exist.
+// At the time of writing, we use this for the Consul Telemetry Collector which may be the first
+// pod deployed to a namespace. If it is, it's connect-inject will fail for lack of a namespace.
+func (r *Controller) ensureNamespaceExists(apiClient *api.Client, pod corev1.Pod) error {
+	if r.EnableConsulNamespaces {
+		consulNS := r.consulNamespace(pod.Namespace)
+		if _, err := namespaces.EnsureExists(apiClient, consulNS, r.CrossNSACLPolicy); err != nil {
+			r.Log.Error(err, "failed to ensure Consul namespace exists", "ns", pod.Namespace, "consul ns", consulNS)
+			return err
+		}
+	}
+	return nil
 }
 
 // mapAddresses combines all addresses to a mapping of address to its health status.
