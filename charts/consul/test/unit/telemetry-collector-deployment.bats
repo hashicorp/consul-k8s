@@ -1225,7 +1225,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'syncCatalog.consulNamespaces.mirroringK8S=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec' | tee /dev/stderr)
 
@@ -1233,7 +1233,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = 'true' ]
 }
 
-@test "telemetryCollector/Deployment: namespace flags when syncCatalog" {
+@test "telemetryCollector/Deployment: namespace flags when connectInject" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
@@ -1241,8 +1241,8 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'syncCatalog.consulNamespaces.mirroringK8S=false' \
-      --set 'syncCatalog.consulNamespaces.consulDestinationNamespace=fakenamespace' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=false' \
+      --set 'connectInject.consulNamespaces.consulDestinationNamespace=fakenamespace' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers' | tee /dev/stderr)
 
