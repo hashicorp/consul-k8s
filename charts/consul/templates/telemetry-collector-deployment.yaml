@@ -139,8 +139,7 @@ spec:
               -pod-namespace=${POD_NAMESPACE} \
               -proxy-id-file="/consul/connect-inject/proxyid" \
               -service-account-name="consul-telemetry-collector" \
-              -service-name="" \
-              -telemetry-collector
+              -service-name=""
 
         image: {{ .Values.global.imageK8S }}
         imagePullPolicy: IfNotPresent
