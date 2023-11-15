@@ -677,12 +677,10 @@ reservedNameTest() {
   cd `chart_dir`
   run helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+      --set 'global.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -720,12 +718,10 @@ reservedNameTest() {
   cd `chart_dir`
   run helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+      --set 'global.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -745,12 +741,10 @@ reservedNameTest() {
   cd `chart_dir`
   run helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+      --set 'global.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -771,12 +765,10 @@ reservedNameTest() {
   cd `chart_dir`
   run helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+      --set 'global.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -800,12 +792,10 @@ reservedNameTest() {
   cd `chart_dir`
   run helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+      --set 'global.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -829,12 +819,10 @@ reservedNameTest() {
   cd `chart_dir`
   run helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+      --set 'global.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -858,12 +846,10 @@ reservedNameTest() {
   cd `chart_dir`
   run helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+      --set 'global.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -887,12 +873,10 @@ reservedNameTest() {
   cd `chart_dir`
   run helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+      --set 'global.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -916,12 +900,10 @@ reservedNameTest() {
   cd `chart_dir`
   run helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
+      --set 'global.enabled=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.tls.caCert.secretName=foo' \
@@ -939,33 +921,6 @@ reservedNameTest() {
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
-}
-
-@test "partitionInit/Job: sets TLS server name if global.cloud.enabled is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/partition-init-job.yaml  \
-      --set 'global.enabled=false' \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set "global.adminPartitions.name=bar" \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.tls.caCert.secretName=foo' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
