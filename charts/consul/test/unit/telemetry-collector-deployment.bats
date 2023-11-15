@@ -1232,7 +1232,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-login-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 
-  local actual=$(echo $object | jq -r '.[1].args | any(contains("-service-namespace=consul"))' | tee /dev/stderr)
+  local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-service-namespace=consul"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 }
 
