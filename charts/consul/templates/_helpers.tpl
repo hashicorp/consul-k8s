@@ -413,22 +413,6 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 {{- end }}
 {{- end -}}
 
-{{/*
-Fails if global.cloud.enabled is set at the same time as:
-- externalServers.enabled
-
-global.cloud is for linking self-managed servers to HCP. If there are no local servers -- we are connecting to externalServers -- then
-there are no servers to link to HCP with global.cloud.
-
-Usage: {{ template "consul.validateCloudMutuallyExclusiveWithExternalServers" . }}
-
-*/}}
-{{- define "consul.validateCloudMutuallyExclusiveWithExternalServers" -}}
-{{- if (and .Values.global.cloud.enabled .Values.externalServers.enabled) }}
-{{fail "When global.cloud.enabled is true, externalServers.enabled cannot be true as well."}}
-{{- end }}
-{{- end -}}
-
 
 {{/*
 Fails if temeletryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
