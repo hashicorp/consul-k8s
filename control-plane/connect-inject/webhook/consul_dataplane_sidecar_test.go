@@ -9,15 +9,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 const nodeName = "test-node"
@@ -1187,6 +1189,7 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 		name       string
 		pod        corev1.Pod
 		expCmdArgs string
+		expPorts   []corev1.ContainerPort
 		expErr     string
 	}{
 		{
@@ -1209,6 +1212,37 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 				},
 			},
 			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics",
+			expPorts: []corev1.ContainerPort{
+				{
+					Name:          "prometheus",
+					ContainerPort: 20200,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			name: "metrics with prometheus port override",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:              "web",
+						constants.AnnotationEnableMetrics:        "true",
+						constants.AnnotationEnableMetricsMerging: "true",
+						constants.AnnotationMergedMetricsPort:    "20123",
+						constants.AnnotationPort:                 "1234",
+						constants.AnnotationPrometheusScrapePath: "/scrape-path",
+						constants.AnnotationPrometheusScrapePort: "6789",
+					},
+				},
+			},
+			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20123 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics",
+			expPorts: []corev1.ContainerPort{
+				{
+					Name:          "prometheus",
+					ContainerPort: 6789,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
 		},
 		{
 			name: "merged metrics with TLS enabled",
@@ -1229,6 +1263,13 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 				},
 			},
 			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics -telemetry-prom-ca-certs-file=/certs/ca.crt -telemetry-prom-ca-certs-path=/certs/ca -telemetry-prom-cert-file=/certs/server.crt -telemetry-prom-key-file=/certs/key.pem",
+			expPorts: []corev1.ContainerPort{
+				{
+					Name:          "prometheus",
+					ContainerPort: 20200,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
 		},
 		{
 			name: "merge metrics with TLS enabled, missing CA gives an error",
@@ -1293,6 +1334,12 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			h := MeshWebhook{
 				ConsulConfig: &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				MetricsConfig: metrics.Config{
+					// These are all the default values passed from the CLI
+					DefaultPrometheusScrapePort: "20200",
+					DefaultPrometheusScrapePath: "/metrics",
+					DefaultMergedMetricsPort:    "20100",
+				},
 			}
 			container, err := h.consulDataplaneSidecar(testNS, c.pod, multiPortInfo{})
 			if c.expErr != "" {
@@ -1301,6 +1348,9 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Contains(t, strings.Join(container.Args, " "), c.expCmdArgs)
+				if c.expPorts != nil {
+					require.ElementsMatch(t, container.Ports, c.expPorts)
+				}
 			}
 		})
 	}
