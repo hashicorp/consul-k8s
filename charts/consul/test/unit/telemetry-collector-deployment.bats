@@ -528,20 +528,86 @@ load _helpers
 #--------------------------------------------------------------------
 # telemetryCollector.cloud
 
-@test "telemetryCollector/Deployment: success with all cloud bits set" {
+@test "telemetryCollector/Deployment: success with global.cloud env vars" {
   cd `chart_dir`
-  run helm template \
+  local object=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
       --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.resourceId.secretName=client-resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=client-resource-id-key' \
       --set 'global.cloud.clientSecret.secretName=client-secret-name' \
       --set 'global.cloud.clientSecret.secretKey=client-secret-key' \
       --set 'global.cloud.clientId.secretName=client-id-name' \
       --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.resourceId.secretName=client-resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=client-resource-id-key' \
-      .
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_RESOURCE_ID")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-resource-id-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_RESOURCE_ID")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-resource-id-key" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_ID")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-id-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_ID")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-id-key" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_SECRET")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-secret-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_SECRET")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-secret-key" ]
+}
+
+@test "telemetryCollector/Deployment: success with telemetryCollector.cloud env vars" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'global.cloud.enabled=false' \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'telemetryCollector.cloud.resourceId.secretName=client-resource-id-name' \
+      --set 'telemetryCollector.cloud.resourceId.secretKey=client-resource-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-key' \
+      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
+      --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_RESOURCE_ID")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-resource-id-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_RESOURCE_ID")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-resource-id-key" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_ID")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-id-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_ID")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-id-key" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_SECRET")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-secret-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_SECRET")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-secret-key" ]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId is set and global.cloud.resourceId is not set or global.cloud.clientSecret.secretName is not set" {
@@ -776,14 +842,16 @@ load _helpers
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
-      --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
-      --set 'telemetryCollector.clientSecret.secretKey=client-secret-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-id-key' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When either telemetryCollector.cloud.clientId.secretName or telemetryCollector.cloud.clientId.secretKey is defined, both must be set." ]]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId.secretKey is set but telemetryCollector.cloud.clientId.secretName is not set." {
@@ -794,13 +862,15 @@ load _helpers
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
-      --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-id-name' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set." ]]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientSecret.secretName is set but telemetryCollector.cloud.clientId.secretName is not set." {
@@ -809,16 +879,17 @@ load _helpers
       -s templates/telemetry-collector-deployment.yaml  \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
-      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
-      --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
-      --set 'telemetryCollector.clientSecret.secretKey=client-secret-key-name'  \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-key-name'  \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set." ]]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId.secretName is set but telemetry.cloud.clientId.secretKey is not set." {
