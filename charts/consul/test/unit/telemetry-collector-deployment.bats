@@ -778,12 +778,12 @@ load _helpers
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
       --set 'telemetryCollector.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.resourceId.secretName=resource-id-name' \
-      --set 'global.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId.secretKey is set but telemetryCollector.cloud.clientId.secretName is not set." {
@@ -795,12 +795,12 @@ load _helpers
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
       --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.resourceId.secretName=resource-id-name' \
-      --set 'global.resourceId.secretKey=resource-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientSecret.secretName is set but telemetryCollector.cloud.clientId.secretName is not set." {
@@ -813,10 +813,12 @@ load _helpers
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
       --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
       --set 'telemetryCollector.clientSecret.secretKey=client-secret-key-name'  \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId.secretName is set but telemetry.cloud.clientId.secretKey is not set." {
@@ -828,6 +830,7 @@ load _helpers
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
@@ -844,6 +847,7 @@ load _helpers
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
       --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
@@ -864,7 +868,47 @@ load _helpers
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set" ]]
+  [[ "$output" =~ "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretKey or global.cloud.resourceId.secretKey must be set" ]]
+}
+
+@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.resourceId.secretName differs from global.cloud.resourceId.secretName." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.cloud.resourceId.secretName=resource-id-1' \
+      --set 'global.cloud.resourceId.secretKey=key' \
+      --set 'telemetryCollector.cloud.resourceId.secretName=resource-id-2' \
+      --set 'telemetryCollector.cloud.resourceId.secretKey=key' \
+      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
+      --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-name' \
+      .
+  [ "$status" -eq 1 ]
+
+  [[ "$output" =~ "When both global.cloud.resourceId.secretName and telemetryCollector.cloud.resourceId.secretName are set, they should be the same." ]]
+}
+
+@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.resourceId.secretKey differs from global.cloud.resourceId.secretKey." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.cloud.resourceId.secretName=name' \
+      --set 'global.cloud.resourceId.secretKey=key-1' \
+      --set 'telemetryCollector.cloud.resourceId.secretName=name' \
+      --set 'telemetryCollector.cloud.resourceId.secretKey=key-2' \
+      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
+      --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-name' \
+      .
+  [ "$status" -eq 1 ]
+
+  [[ "$output" =~ "When both global.cloud.resourceId.secretKey and telemetryCollector.cloud.resourceId.secretKey are set, they should be the same." ]]
 }
 
 #--------------------------------------------------------------------

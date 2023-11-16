@@ -3524,6 +3524,8 @@ telemetryCollector:
     #   - non-default admin partition
     #   - externalServers.enabled where the external servers are HCP managed clusters
     #
+    # If global.cloud.resourceId is set, this should either be unset (defaulting to global.cloud.resourceId) or be the same as global.cloud.resourceId.
+    #
     # @default: global.cloud.resourceId
     resourceId:
       # The name of the Kubernetes secret that holds the resource id.

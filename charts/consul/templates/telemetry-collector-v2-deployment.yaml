@@ -5,6 +5,7 @@
 {{ template "consul.validateCloudSecretKeys" . }}
 {{ template "consul.validateTelemetryCollectorCloud" . }}
 {{ template "consul.validateTelemetryCollectorCloudSecretKeys" . }}
+{{ template "consul.validateTelemetryCollectorResourceId" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
