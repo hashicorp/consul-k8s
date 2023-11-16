@@ -18,6 +18,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
@@ -940,6 +941,178 @@ func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 			} else {
 				require.NoError(err)
 				require.Equal(c.expResources, container.Resources)
+			}
+		})
+	}
+}
+
+func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
+	cases := []struct {
+		name       string
+		pod        corev1.Pod
+		expCmdArgs string
+		expPorts   []corev1.ContainerPort
+		expErr     string
+	}{
+		{
+			name:       "default",
+			pod:        corev1.Pod{},
+			expCmdArgs: "",
+		},
+		{
+			name: "turning on merged metrics",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:              "web",
+						constants.AnnotationEnableMetrics:        "true",
+						constants.AnnotationEnableMetricsMerging: "true",
+						constants.AnnotationMergedMetricsPort:    "20100",
+						constants.AnnotationPort:                 "1234",
+						constants.AnnotationPrometheusScrapePath: "/scrape-path",
+					},
+				},
+			},
+			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics",
+			expPorts: []corev1.ContainerPort{
+				{
+					Name:          "prometheus",
+					ContainerPort: 20200,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			name: "metrics with prometheus port override",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:              "web",
+						constants.AnnotationEnableMetrics:        "true",
+						constants.AnnotationEnableMetricsMerging: "true",
+						constants.AnnotationMergedMetricsPort:    "20123",
+						constants.AnnotationPort:                 "1234",
+						constants.AnnotationPrometheusScrapePath: "/scrape-path",
+						constants.AnnotationPrometheusScrapePort: "6789",
+					},
+				},
+			},
+			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20123 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics",
+			expPorts: []corev1.ContainerPort{
+				{
+					Name:          "prometheus",
+					ContainerPort: 6789,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			name: "merged metrics with TLS enabled",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:              "web",
+						constants.AnnotationEnableMetrics:        "true",
+						constants.AnnotationEnableMetricsMerging: "true",
+						constants.AnnotationMergedMetricsPort:    "20100",
+						constants.AnnotationPort:                 "1234",
+						constants.AnnotationPrometheusScrapePath: "/scrape-path",
+						constants.AnnotationPrometheusCAFile:     "/certs/ca.crt",
+						constants.AnnotationPrometheusCAPath:     "/certs/ca",
+						constants.AnnotationPrometheusCertFile:   "/certs/server.crt",
+						constants.AnnotationPrometheusKeyFile:    "/certs/key.pem",
+					},
+				},
+			},
+			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics -telemetry-prom-ca-certs-file=/certs/ca.crt -telemetry-prom-ca-certs-path=/certs/ca -telemetry-prom-cert-file=/certs/server.crt -telemetry-prom-key-file=/certs/key.pem",
+			expPorts: []corev1.ContainerPort{
+				{
+					Name:          "prometheus",
+					ContainerPort: 20200,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			name: "merge metrics with TLS enabled, missing CA gives an error",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:              "web",
+						constants.AnnotationEnableMetrics:        "true",
+						constants.AnnotationEnableMetricsMerging: "true",
+						constants.AnnotationMergedMetricsPort:    "20100",
+						constants.AnnotationPort:                 "1234",
+						constants.AnnotationPrometheusScrapePath: "/scrape-path",
+						constants.AnnotationPrometheusCertFile:   "/certs/server.crt",
+						constants.AnnotationPrometheusKeyFile:    "/certs/key.pem",
+					},
+				},
+			},
+			expCmdArgs: "",
+			expErr:     fmt.Sprintf("must set one of %q or %q when providing prometheus TLS config", constants.AnnotationPrometheusCAFile, constants.AnnotationPrometheusCAPath),
+		},
+		{
+			name: "merge metrics with TLS enabled, missing cert gives an error",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:              "web",
+						constants.AnnotationEnableMetrics:        "true",
+						constants.AnnotationEnableMetricsMerging: "true",
+						constants.AnnotationMergedMetricsPort:    "20100",
+						constants.AnnotationPort:                 "1234",
+						constants.AnnotationPrometheusScrapePath: "/scrape-path",
+						constants.AnnotationPrometheusCAFile:     "/certs/ca.crt",
+						constants.AnnotationPrometheusKeyFile:    "/certs/key.pem",
+					},
+				},
+			},
+			expCmdArgs: "",
+			expErr:     fmt.Sprintf("must set %q when providing prometheus TLS config", constants.AnnotationPrometheusCertFile),
+		},
+		{
+			name: "merge metrics with TLS enabled, missing key file gives an error",
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationService:              "web",
+						constants.AnnotationEnableMetrics:        "true",
+						constants.AnnotationEnableMetricsMerging: "true",
+						constants.AnnotationMergedMetricsPort:    "20100",
+						constants.AnnotationPort:                 "1234",
+						constants.AnnotationPrometheusScrapePath: "/scrape-path",
+						constants.AnnotationPrometheusCAPath:     "/certs/ca",
+						constants.AnnotationPrometheusCertFile:   "/certs/server.crt",
+					},
+				},
+			},
+			expCmdArgs: "",
+			expErr:     fmt.Sprintf("must set %q when providing prometheus TLS config", constants.AnnotationPrometheusKeyFile),
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			h := MeshWebhook{
+				ConsulConfig: &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				MetricsConfig: metrics.Config{
+					// These are all the default values passed from the CLI
+					DefaultPrometheusScrapePort: "20200",
+					DefaultPrometheusScrapePath: "/metrics",
+					DefaultMergedMetricsPort:    "20100",
+				},
+			}
+			container, err := h.consulDataplaneSidecar(testNS, c.pod)
+			if c.expErr != "" {
+				require.NotNil(t, err)
+				require.Contains(t, err.Error(), c.expErr)
+			} else {
+				require.NoError(t, err)
+				require.Contains(t, strings.Join(container.Args, " "), c.expCmdArgs)
+				if c.expPorts != nil {
+					require.ElementsMatch(t, container.Ports, c.expPorts)
+				}
 			}
 		})
 	}
