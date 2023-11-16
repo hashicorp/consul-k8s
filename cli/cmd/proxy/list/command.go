@@ -304,5 +304,4 @@ func (c *ListCommand) output(pods []v1.Pod) {
 	} else {
 		c.UI.Table(tbl)
 	}
-
 }
