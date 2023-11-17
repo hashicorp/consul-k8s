@@ -652,10 +652,10 @@ global:
   # the API before cancelling the request.
   consulAPITimeout: 5s
 
-  # Enables installing an HCP Consul self-managed cluster.
+  # Enables installing an HCP Consul Central self-managed cluster.
   # Requires Consul v1.14+.
   cloud:
-    # If true, the Helm chart will enable the installation of an HCP Consul
+    # If true, the Helm chart will enable the installation of an HCP Consul Central
     # self-managed cluster.
     enabled: false
 
@@ -670,9 +670,8 @@ global:
       # @type: string
       secretKey: null
 
-    # The client id portion of a service principal with authorization to link the cluster
-    # in global.cloud.resourceId to HCP.
-    # https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals
+    # The client id portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to link the cluster
+    # in global.cloud.resourceId to HCP Consul Central.
     clientId:
       # The name of the Kubernetes secret that holds the client id.
       # @type: string
@@ -681,9 +680,8 @@ global:
       # @type: string
       secretKey: null
 
-    # The client secret portion of a service principal with authorization to link the cluster
-    # in global.cloud.resourceId to HCP.
-    # https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals
+    # The client secret portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to link the cluster
+    # in global.cloud.resourceId to HCP Consul Central.
     clientSecret:
       # The name of the Kubernetes secret that holds the client secret.
       # @type: string
@@ -692,7 +690,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The API endpoint of HCP. This setting is used for internal testing and validation.
+    # The hostname of HCP's API. This setting is used for internal testing and validation.
     apiHost:
       # The name of the Kubernetes secret that holds the api hostname.
       # @type: string
@@ -701,7 +699,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The URL of HCP auth API. This setting is used for internal testing and validation.
+    # The URL of HCP's auth API. This setting is used for internal testing and validation.
     authUrl:
       # The name of the Kubernetes secret that holds the authorization url.
       # @type: string
@@ -710,8 +708,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud scada address.
-    # This is optional when global.cloud.enabled is true.
+    # The address of HCP's scada service. This setting is used for internal testing and validation.
     scadaAddress:
       # The name of the Kubernetes secret that holds the scada address.
       # @type: string
@@ -3491,7 +3488,7 @@ telemetryCollector:
   customExporterConfig: null
 
   service:
-    # This value defines additional annotations for the server service account. This should be formatted as a multi-line
+    # This value defines additional annotations for the telemetry-collector's service account. This should be formatted as a multi-line
     # string.
     #
     # ```yaml
@@ -3517,12 +3514,11 @@ telemetryCollector:
     annotations: null
 
   cloud:
-    # The resource id of the HCP Consul cluster to push metrics for. Eg:
-    # organization/27109cd4-a309-4bf3-9986-e1d071914b18/project/fcef6c24-259d-4510-bb8d-1d812e120e34/hashicorp.consul.global-network-manager.cluster/consul-cluster
+    # The resource id of the HCP Consul Central cluster to push metrics for. Eg:
+    # `organization/27109cd4-a309-4bf3-9986-e1d071914b18/project/fcef6c24-259d-4510-bb8d-1d812e120e34/hashicorp.consul.global-network-manager.cluster/consul-cluster`
     #
-    # This is used for HCP Central clusters where global.cloud.resourceId is unset. For example:
-    #   - non-default admin partition
-    #   - externalServers.enabled where the external servers are HCP managed clusters
+    # This is used for HCP Consul Central-linked or managed clusters where global.cloud.resourceId is unset. For example, when using externalServers
+    # with HCP Consul-managed clusters or HCP Consul Central-linked clusters in a different admin partition.
     #
     # If global.cloud.resourceId is set, this should either be unset (defaulting to global.cloud.resourceId) or be the same as global.cloud.resourceId.
     #
@@ -3535,12 +3531,11 @@ telemetryCollector:
       # @type: string
       secretKey: null
 
-    # The client id portion of a service principal with authorization to push metrics to HCP
-    # https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals
+    # The client id portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to push metrics to HCP
     #
     # This is set in two scenarios:
     #   - the service principal in global.cloud is unset
-    #   - the HCP UI provides a service principal with more scoped permissions that the service principal used in global.cloud
+    #   - the HCP UI provides a service principal with more narrowly scoped permissions that the service principal used in global.cloud
     #
     # @default: global.cloud.clientId
     clientId:
@@ -3551,12 +3546,11 @@ telemetryCollector:
       # @type: string
       secretKey: null
 
-    # The client secret portion of a service principal with authorization to push metrics to HCP.
-    # https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals
+    # The client secret portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to push metrics to HCP.
     #
     # This is set in two scenarios:
     #   - the service principal in global.cloud is unset
-    #   - the HCP UI provides a service principal with more scoped permissions that the service principal used in global.cloud
+    #   - the HCP UI provides a service principal with more narrowly scoped permissions that the service principal used in global.cloud
     #
     # @default: global.cloud.clientSecret
     clientSecret:
@@ -3581,7 +3575,7 @@ telemetryCollector:
   # @type: string
   priorityClassName: ""
 
-  # A list of extra environment variables to set within the stateful set.
+  # A list of extra environment variables to set within the deployment.
   # These could be used to include proxy settings required for cloud auto-join
   # feature, in case kubernetes cluster is behind egress http proxies. Additionally,
   # it could be used to configure custom consul parameters.
