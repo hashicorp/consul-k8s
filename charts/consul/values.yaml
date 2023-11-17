@@ -659,7 +659,7 @@ global:
     # self-managed cluster.
     enabled: false
 
-    # The resource id of the HCP Consul cluster to link to. Eg:
+    # The resource id of the HCP Consul Central cluster to link to. Eg:
     # organization/27109cd4-a309-4bf3-9986-e1d071914b18/project/fcef6c24-259d-4510-bb8d-1d812e120e34/hashicorp.consul.global-network-manager.cluster/consul-cluster
     # This is required when global.cloud.enabled is true.
     resourceId:
