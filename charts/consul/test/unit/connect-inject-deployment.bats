@@ -2639,6 +2639,29 @@ reservedNameTest() {
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: validates that externalServers.hosts is not set with an HCP-managed " {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=abc.aws.hashicorp.cloud' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+     . > /dev/stderr
+
+  [ "$status" -eq 1 ]
+
+  [[ "$output" =~ "When global.cloud.enabled is true, externalServers.hosts should not contain an HCP Consul Managed cluster's address. global.cloud.enabled is for HCP Consul Central linked clusters." ]]
+}
+
 @test "connectInject/Deployment: can provide a TLS server name for the sidecar-injector when global.cloud.enabled is set" {
   cd `chart_dir`
   local env=$(helm template \
@@ -2659,30 +2682,6 @@ reservedNameTest() {
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_TLS_SERVER_NAME").value' | tee /dev/stderr)
   [ "${actual}" = "server.dc1.consul" ]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.enabled at the same time as externalServers.enabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'server.enabled=false' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=0.0.0.0' \
-      .
-  [ "$status" -eq 1 ]
-
-  echo "$output" > /dev/stderr
-  [[ "$output" =~ "When global.cloud.enabled is true, externalServers.enabled cannot be true as well." ]]
 }
 
 #--------------------------------------------------------------------
