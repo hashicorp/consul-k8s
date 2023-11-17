@@ -975,6 +975,7 @@ load _helpers
       --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
       --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-key' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-key-name' \
      . > /dev/stderr
 
   [ "$status" -eq 1 ]
