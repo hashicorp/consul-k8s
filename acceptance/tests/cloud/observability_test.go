@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -44,6 +45,10 @@ var (
 	scadaAddressSecretName     = "scadaaddress-sec-name"
 	scadaAddressSecretKey      = "scadaaddress-sec-key"
 	scadaAddressSecretKeyValue = "fake-server:443"
+
+	bootstrapTokenSecretName = "bootstrap-token"
+	bootstrapTokenSecretKey  = "token"
+	bootstrapToken           = uuid.NewString()
 )
 
 func TestObservabilityCloud(t *testing.T) {
@@ -54,52 +59,40 @@ func TestObservabilityCloud(t *testing.T) {
 	}
 
 	cases := []struct {
-		name                   string
-		enableConsulNamespaces bool
-		destinationNamespace   string
-		mirroringK8S           bool
-		adminPartitionsEnabled bool
-		secure                 bool
+		name                      string
+		validateCloudInteractions bool
+		enableConsulNamespaces    bool
+		destinationNamespace      string
+		mirroringK8S              bool
+		adminPartitionsEnabled    bool
+		secure                    bool
 	}{
 		{
-			"default namespace and partition",
-			false,
-			"",
-			false,
-			false,
-			true,
+			name:                      "default namespace and partition",
+			validateCloudInteractions: true,
 		},
 		{
-			"default namespace and partition; no managed acls",
-			false,
-			"",
-			false,
-			false,
-			false,
+			name:   "default namespace and partition; secure",
+			secure: true,
 		},
 		{
-			"single destination namespace; non-default",
-			true,
-			"test-ns",
-			false,
-			false,
-			true,
+			name:                   "single destination namespace; secure; non-default",
+			enableConsulNamespaces: true,
+			destinationNamespace:   "test-ns",
+			secure:                 true,
 		},
 		{
-			"single destination namespace; non-default; mirroring",
-			true,
-			"test-ns",
-			true,
-			false,
-			true,
+			name:                   "namespace mirroring; secure",
+			enableConsulNamespaces: true,
+			mirroringK8S:           true,
+			secure:                 true,
 		},
 		{
-			"single destination namespace; with admin partitions",
-			true,
-			"test-ns",
-			false,
-			true,
-			true,
+			name:                   "admin partitions; secure",
+			enableConsulNamespaces: true,
+			destinationNamespace:   "test-ns",
+			adminPartitionsEnabled: true,
+			secure:                 true,
 		},
 	}
 
@@ -108,26 +101,40 @@ func TestObservabilityCloud(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			if c.enableConsulNamespaces && !cfg.EnableEnterprise {
-				t.Skipf("skipping this test because -enable-enterprise is not set")
-				return
+				t.Skip("skipping this test because -enable-enterprise is not set")
 			}
 
-			kubectlOptions := ctx.KubectlOptions(t)
+			options := &terratestk8s.KubectlOptions{
+				ContextName: ctx.KubectlOptions(t).ContextName,
+				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
+				Namespace:   ctx.KubectlOptions(t).Namespace,
+			}
+			ns := options.Namespace
 			if c.enableConsulNamespaces && c.destinationNamespace != "" {
-				kubectlOptions.Namespace = c.destinationNamespace
+				ns = c.destinationNamespace
+				options.Namespace = c.destinationNamespace
 			}
-			ns := kubectlOptions.Namespace
-			k8sClient := environment.KubernetesClientFromOptions(t, kubectlOptions)
 
+			// Make sure the namespace exists before trying to add secrets.
+			logger.Logf(t, "creating namespaces %s", ns)
+			k8s.RunKubectl(t, options, "create", "ns", ns)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.RunKubectl(t, options, "delete", "ns", ns)
+			})
+
+			k8sClient := environment.KubernetesClientFromOptions(t, options)
+
+			// Create cloud and telemetryCollector secrets.
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, resourceSecretName, resourceSecretKey, resourceSecretKeyValue)
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, clientIDSecretName, clientIDSecretKey, clientIDSecretKeyValue)
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, clientSecretName, clientSecretKey, clientSecretKeyValue)
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, apiHostSecretName, apiHostSecretKey, apiHostSecretKeyValue)
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, authUrlSecretName, authUrlSecretKey, authUrlSecretKeyValue)
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, scadaAddressSecretName, scadaAddressSecretKey, scadaAddressSecretKeyValue)
+			consul.CreateK8sSecret(t, k8sClient, cfg, ns, bootstrapTokenSecretName, bootstrapTokenSecretKey, bootstrapToken)
 
-			k8s.DeployKustomize(t, kubectlOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/cloud/hcp-mock")
-			podName, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "pod", "-l", "app=fake-server", "-o", `jsonpath="{.items[0].metadata.name}"`)
+			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/cloud/hcp-mock")
+			podName, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "pod", "-l", "app=fake-server", "-o", `jsonpath="{.items[0].metadata.name}"`)
 			podName = strings.ReplaceAll(podName, "\"", "")
 			if err != nil {
 				logger.Log(t, "error finding pod name")
@@ -136,7 +143,7 @@ func TestObservabilityCloud(t *testing.T) {
 			logger.Log(t, "fake-server pod name:"+podName)
 			localPort := terratestk8s.GetAvailablePort(t)
 			tunnel := terratestk8s.NewTunnelWithLogger(
-				kubectlOptions,
+				options,
 				terratestk8s.ResourceTypePod,
 				podName,
 				localPort,
@@ -166,11 +173,12 @@ func TestObservabilityCloud(t *testing.T) {
 			helmValues := map[string]string{
 				"global.imagePullPolicy": "IfNotPresent",
 
-				"global.enableConsulNamespaces":                                    fmt.Sprint(c.enableConsulNamespaces),
-				"global.connectInject.consulNamespaces.mirroringK8S":               fmt.Sprint(c.mirroringK8S),
-				"global.connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
-				"global.acls.manageSystemACLs":                                     fmt.Sprint(c.secure),
-				"global.tls.enabled":                                               fmt.Sprint(c.secure),
+				"global.enableConsulNamespaces":                             fmt.Sprint(c.enableConsulNamespaces),
+				"global.acls.manageSystemACLs":                              fmt.Sprint(c.secure),
+				"global.tls.enabled":                                        fmt.Sprint(c.secure),
+				"connectInject.enabled":                                     "true",
+				"connectInject.consulNamespaces.mirroringK8S":               fmt.Sprint(c.mirroringK8S),
+				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 
 				"global.cloud.enabled":               "true",
 				"global.cloud.resourceId.secretName": resourceSecretName,
@@ -212,14 +220,25 @@ func TestObservabilityCloud(t *testing.T) {
 			if cfg.ConsulImage != "" {
 				helmValues["global.image"] = cfg.ConsulImage
 			}
+			if c.secure {
+				helmValues["global.acls.bootstrapToken.secretName"] = bootstrapTokenSecretName
+				helmValues["global.acls.bootstrapToken.secretKey"] = bootstrapTokenSecretKey
+			}
 
 			consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
+			consulCluster.ACLToken = bootstrapToken
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating static-server deployment")
 
-			k8s.DeployKustomize(t, kubectlOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 			t.Log("Finished deployment. Validating expected conditions now")
+
+			// Validate that the consul-telemetry-collector service was deployed to the expected namespace.
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
+			instances, _, err := consulClient.Catalog().Service("consul-telemetry-collector", "", &api.QueryOptions{Namespace: ns})
+			require.NoError(t, err)
+			require.Len(t, instances, 1)
 
 			for name, tc := range map[string]struct {
 				refresh     *modifyTelemetryConfigBody
@@ -248,7 +267,7 @@ func TestObservabilityCloud(t *testing.T) {
 					recordsPath: recordsPathConsul,
 					//  High timeout as Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
 					timeout: 3 * time.Minute,
-					wait:    30 * time.Second,
+					wait:    1 * time.Second,
 					validations: &metricValidations{
 						expectedLabelKeys:    []string{"node_id", "node_name", "new_label"},
 						expectedMetricName:   "consul.state.services",
@@ -264,13 +283,17 @@ func TestObservabilityCloud(t *testing.T) {
 					recordsPath: recordsPathConsul,
 					// High timeout as Consul server metrics exported every 1 minute (https://github.com/hashicorp/consul/blob/9776c10efb4472f196b47f88bc0db58b1bfa12ef/agent/hcp/telemetry/otel_sink.go#L27)
 					timeout: 3 * time.Minute,
-					wait:    30 * time.Second,
+					wait:    1 * time.Second,
 					validations: &metricValidations{
 						disabled: true,
 					},
 				},
 			} {
 				t.Run(name, func(t *testing.T) {
+					if !c.validateCloudInteractions {
+						t.Skip("skipping server metric and config validation")
+					}
+
 					// For a refresh test, we force a telemetry config update before validating metrics using fakeserver's /telemetry_config_modify endpoint.
 					if tc.refresh != nil {
 						refreshTime := time.Now()
@@ -289,19 +312,6 @@ func TestObservabilityCloud(t *testing.T) {
 					})
 				})
 			}
-
-			// Validate that the consul-telemetry-collector service was deployed to the expected namespace.
-			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
-			consulNamespace := "default"
-			if c.enableConsulNamespaces {
-				consulNamespace = c.destinationNamespace
-				if c.mirroringK8S {
-					consulNamespace = ns
-				}
-			}
-			instances, _, err := consulClient.Catalog().Service("consul-telemetry-collector", "", &api.QueryOptions{Namespace: consulNamespace})
-			require.NoError(t, err)
-			require.Len(t, instances, 1)
 		})
 	}
 }
