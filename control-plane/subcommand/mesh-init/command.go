@@ -183,6 +183,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagRedirectTrafficConfig != "" {
+		c.watcher.Stop()                                        // Explicitly stop the watcher so that ACLs are cleaned up before we apply re-direction.
 		err := c.applyTrafficRedirectionRules(&bootstrapConfig) // BootstrapConfig is always populated non-nil from the RPC
 		if err != nil {
 			c.logger.Error("error applying traffic redirection rules", "err", err)

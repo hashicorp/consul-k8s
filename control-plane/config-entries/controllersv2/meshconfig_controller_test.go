@@ -70,13 +70,14 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: []*pbauth.DestinationRule{
-								{
-									PathExact: "/hello",
-									Methods:   []string{"GET", "POST"},
-									PortNames: []string{"web", "admin"},
-								},
-							},
+							// TODO: enable this when L7 traffic permissions are supported
+							//DestinationRules: []*pbauth.DestinationRule{
+							//	{
+							//		PathExact: "/hello",
+							//		Methods:   []string{"GET", "POST"},
+							//		PortNames: []string{"web", "admin"},
+							//	},
+							//},
 						},
 					},
 				},
@@ -101,13 +102,13 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 								Peer:      constants.DefaultConsulPeer,
 							},
 						},
-						DestinationRules: []*pbauth.DestinationRule{
-							{
-								PathExact: "/hello",
-								Methods:   []string{"GET", "POST"},
-								PortNames: []string{"web", "admin"},
-							},
-						},
+						//DestinationRules: []*pbauth.DestinationRule{
+						//	{
+						//		PathExact: "/hello",
+						//		Methods:   []string{"GET", "POST"},
+						//		PortNames: []string{"web", "admin"},
+						//	},
+						//},
 					},
 				},
 			},
@@ -216,13 +217,14 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: []*pbauth.DestinationRule{
-								{
-									PathExact: "/hello",
-									Methods:   []string{"GET", "POST"},
-									PortNames: []string{"web", "admin"},
-								},
-							},
+							// TODO: enable this when L7 traffic permissions are supported
+							//DestinationRules: []*pbauth.DestinationRule{
+							//	{
+							//		PathExact: "/hello",
+							//		Methods:   []string{"GET", "POST"},
+							//		PortNames: []string{"web", "admin"},
+							//	},
+							//},
 						},
 					},
 				},
@@ -241,13 +243,13 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 								Peer:      constants.DefaultConsulPeer,
 							},
 						},
-						DestinationRules: []*pbauth.DestinationRule{
-							{
-								PathExact: "/hello",
-								Methods:   []string{"GET", "POST"},
-								PortNames: []string{"web", "admin"},
-							},
-						},
+						//DestinationRules: []*pbauth.DestinationRule{
+						//	{
+						//		PathExact: "/hello",
+						//		Methods:   []string{"GET", "POST"},
+						//		PortNames: []string{"web", "admin"},
+						//	},
+						//},
 					},
 				},
 			},
@@ -373,13 +375,14 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 									IdentityName: "source-identity",
 								},
 							},
-							DestinationRules: []*pbauth.DestinationRule{
-								{
-									PathExact: "/hello",
-									Methods:   []string{"GET", "POST"},
-									PortNames: []string{"web", "admin"},
-								},
-							},
+							// TODO: enable this when L7 traffic permissions are supported
+							//DestinationRules: []*pbauth.DestinationRule{
+							//	{
+							//		PathExact: "/hello",
+							//		Methods:   []string{"GET", "POST"},
+							//		PortNames: []string{"web", "admin"},
+							//	},
+							//},
 						},
 					},
 				},

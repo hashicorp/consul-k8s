@@ -461,7 +461,7 @@ func (c *Command) parseAndValidateSidecarProxyFlags() error {
 			return fmt.Errorf("-default-sidecar-proxy-cpu-limit is invalid: %w", err)
 		}
 	}
-	if c.sidecarProxyCPULimit.Value() != 0 && c.sidecarProxyCPURequest.Cmp(c.sidecarProxyMemoryLimit) > 0 {
+	if c.sidecarProxyCPULimit.Value() != 0 && c.sidecarProxyCPURequest.Cmp(c.sidecarProxyCPULimit) > 0 {
 		return fmt.Errorf("request must be <= limit: -default-sidecar-proxy-cpu-request value of %q is greater than the -default-sidecar-proxy-cpu-limit value of %q",
 			c.flagDefaultSidecarProxyCPURequest, c.flagDefaultSidecarProxyCPULimit)
 	}
