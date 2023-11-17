@@ -968,6 +968,33 @@ reservedNameTest() {
   [ "${actual}" = "true" ]
 }
 
+@test "partitionInit/Job: validates that externalServers.hosts is not set with an HCP-managed cluster address when global.cloud.enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/partition-init-job.yaml  \
+      --set 'global.enabled=false' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=abc.aws.hashicorp.cloud' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+     . > /dev/stderr
+
+  [ "$status" -eq 1 ]
+
+  [[ "$output" =~ "When global.cloud.enabled is true, externalServers.hosts should not contain an HCP Consul Managed cluster's address. global.cloud.enabled is for HCP Consul Central linked clusters." ]]
+}
+
 #--------------------------------------------------------------------
 # extraLabels
 
