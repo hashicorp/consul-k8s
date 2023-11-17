@@ -147,6 +147,7 @@ func (c *ListCommand) AutocompleteFlags() complete.Flags {
 		fmt.Sprintf("-%s", flagNameAllNamespaces): complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeConfig):    complete.PredictFiles("*"),
 		fmt.Sprintf("-%s", flagNameKubeContext):   complete.PredictNothing,
+		fmt.Sprintf("-%s", flagOutputFormat):      complete.PredictNothing,
 	}
 }
 
