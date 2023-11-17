@@ -40,14 +40,6 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
-# DANGER: this target is experimental and could be modified/removed at any time.
-# Build consul-k8s-control-plane dev Docker image for use with skaffold or local development.
-control-plane-dev-skaffold:
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
-	@docker build -t '$(DEV_IMAGE)' \
-       --build-arg 'TARGETARCH=$(GOARCH)' \
-       -f $(CURDIR)/control-plane/Dockerfile.dev $(CURDIR)/control-plane
-
 check-remote-dev-image-env:
 ifndef REMOTE_DEV_IMAGE
 	$(error REMOTE_DEV_IMAGE is undefined: set this image to <your_docker_repo>/<your_docker_image>:<image_tag>, e.g. hashicorp/consul-k8s-dev:latest)
@@ -297,7 +289,7 @@ endif
 
 prepare-rc-branch: prepare-rc-script
 
-prepare-main-dev:
+prepare-dev:
 ifndef CONSUL_K8S_RELEASE_VERSION
 	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
@@ -314,24 +306,6 @@ ifndef CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION
 	$(error CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION is required)
 endif
 	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" "" $(CONSUL_K8S_NEXT_RELEASE_VERSION) $(CONSUL_K8S_NEXT_CONSUL_VERSION) $(CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION)
-
-prepare-release-dev:
-ifndef CONSUL_K8S_RELEASE_VERSION
-	$(error CONSUL_K8S_RELEASE_VERSION is required)
-endif
-ifndef CONSUL_K8S_RELEASE_DATE
-	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
-endif
-ifndef CONSUL_K8S_NEXT_RELEASE_VERSION
-	$(error CONSUL_K8S_RELEASE_VERSION is required)
-endif
-ifndef CONSUL_K8S_CONSUL_VERSION
-	$(error CONSUL_K8S_CONSUL_VERSION is required)
-endif
-ifndef CONSUL_K8S_CONSUL_DATAPLANE_VERSION
-	$(error CONSUL_K8S_CONSUL_DATAPLANE_VERSION is required)
-endif
-	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" "" $(CONSUL_K8S_NEXT_RELEASE_VERSION) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION)
 
 # ===========> Makefile config
 .DEFAULT_GOAL := help
