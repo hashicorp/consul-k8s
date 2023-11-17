@@ -62,7 +62,6 @@ func TestObservabilityCloud(t *testing.T) {
 		name                      string
 		validateCloudInteractions bool
 		enableConsulNamespaces    bool
-		destinationNamespace      string
 		mirroringK8S              bool
 		adminPartitionsEnabled    bool
 		secure                    bool
@@ -76,12 +75,6 @@ func TestObservabilityCloud(t *testing.T) {
 			secure: true,
 		},
 		{
-			name:                   "single destination namespace; secure; non-default",
-			enableConsulNamespaces: true,
-			destinationNamespace:   "test-ns",
-			secure:                 true,
-		},
-		{
 			name:                   "namespace mirroring; secure",
 			enableConsulNamespaces: true,
 			mirroringK8S:           true,
@@ -90,7 +83,7 @@ func TestObservabilityCloud(t *testing.T) {
 		{
 			name:                   "admin partitions; secure",
 			enableConsulNamespaces: true,
-			destinationNamespace:   "test-ns",
+			mirroringK8S:           true,
 			adminPartitionsEnabled: true,
 			secure:                 true,
 		},
@@ -110,17 +103,6 @@ func TestObservabilityCloud(t *testing.T) {
 				Namespace:   ctx.KubectlOptions(t).Namespace,
 			}
 			ns := options.Namespace
-			if c.enableConsulNamespaces && c.destinationNamespace != "" {
-				ns = c.destinationNamespace
-				options.Namespace = c.destinationNamespace
-			}
-
-			// Make sure the namespace exists before trying to add secrets.
-			logger.Logf(t, "creating namespaces %s", ns)
-			k8s.RunKubectl(t, options, "create", "ns", ns)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, options, "delete", "ns", ns)
-			})
 
 			k8sClient := environment.KubernetesClientFromOptions(t, options)
 
@@ -173,12 +155,17 @@ func TestObservabilityCloud(t *testing.T) {
 			helmValues := map[string]string{
 				"global.imagePullPolicy": "IfNotPresent",
 
-				"global.enableConsulNamespaces":                             fmt.Sprint(c.enableConsulNamespaces),
-				"global.acls.manageSystemACLs":                              fmt.Sprint(c.secure),
-				"global.tls.enabled":                                        fmt.Sprint(c.secure),
-				"connectInject.enabled":                                     "true",
-				"connectInject.consulNamespaces.mirroringK8S":               fmt.Sprint(c.mirroringK8S),
-				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
+				"global.acls.manageSystemACLs":   fmt.Sprint(c.secure),
+				"global.tls.enabled":             fmt.Sprint(c.secure),
+				"global.adminPartitions.enabled": fmt.Sprint(c.adminPartitionsEnabled),
+
+				"global.enableConsulNamespaces":               fmt.Sprint(c.enableConsulNamespaces),
+				"connectInject.enabled":                       "true",
+				"connectInject.consulNamespaces.mirroringK8S": fmt.Sprint(c.mirroringK8S),
+
+				// TODO this doesn't appear to work because we just deploy to default using kubectl options from context.
+				// https://github.com/hashicorp/consul-k8s/blob/74097fe7b3023105ca755b45da9c72c716547f46/acceptance/framework/consul/helm_cluster.go#L107
+				// "connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 
 				"global.cloud.enabled":               "true",
 				"global.cloud.resourceId.secretName": resourceSecretName,
@@ -225,13 +212,12 @@ func TestObservabilityCloud(t *testing.T) {
 				helmValues["global.acls.bootstrapToken.secretKey"] = bootstrapTokenSecretKey
 			}
 
-			consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
+			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 			consulCluster.ACLToken = bootstrapToken
 			consulCluster.Create(t)
 
-			logger.Log(t, "creating static-server deployment")
-
-			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			logger.Log(t, "creating static-server-inject deployment")
+			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-inject")
 			t.Log("Finished deployment. Validating expected conditions now")
 
 			// Validate that the consul-telemetry-collector service was deployed to the expected namespace.
