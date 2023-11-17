@@ -1,3 +1,3 @@
 ```release-note:improvement
-helm: add validation that global.cloud.enabled and externalServers.enabled are not true at the same time
+helm: add validation that global.cloud.enabled is not set with externalServers.hosts set to HCP-managed clusters
 ```
