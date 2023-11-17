@@ -7,12 +7,12 @@
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
 {{- if and .Values.externalServers.skipServerWatch (not .Values.externalServers.enabled) }}{{ fail "externalServers.enabled must be set if externalServers.skipServerWatch is true" }}{{ end -}}
-{{- if and .Values.externalServers.enabled .Values.global.cloud.enabled (gt (len .Values.externalServers.hosts) 0) (regexMatch (index .Values.externalServers.hosts 0) ".+.hashicorp.cloud") }}{{fail "When global.cloud.enabled is true, externalServers.hosts should not contain an HCP Consul Managed cluster's address. global.cloud.enabled is for HCP Consul Central linked clusters."}}{{- end }}
 {{- $dnsEnabled := (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) -}}
 {{- $dnsRedirectionEnabled := (or (and (ne (.Values.dns.enableRedirection | toString) "-") .Values.dns.enableRedirection) (and (eq (.Values.dns.enableRedirection | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) -}}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
 {{ template "consul.validateResourceAPIs" . }}
+{{ template "consul.validateNoCloudAndHcpManagedExternalServers" . }}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
 kind: Deployment

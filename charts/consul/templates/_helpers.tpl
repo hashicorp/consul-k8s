@@ -380,6 +380,20 @@ Usage: {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{- end -}}
 
 {{/*
+Fails if global.cloud.enabled is set at the same time as externalServers.enabled and externalServers.hosts has an HCP-managed cluster's address.
+global.cloud.enabled is meant for linking a self-managed cluster to HCP. The issue with having global.cloud.enabled and also providing an HCP-managed Consul
+Cluster's address, is that we override the -tls-server-name in places which then causes cert validation errors.
+
+Usage: {{ template "consul.validateNoCloudAndHcpManagedExternalServers" . }}
+
+*/}}
+{{- define "consul.validateNoCloudAndHcpManagedExternalServers" -}}
+{{- if and .Values.externalServers.enabled .Values.global.cloud.enabled (gt (len .Values.externalServers.hosts) 0) (regexMatch (index .Values.externalServers.hosts 0) ".+.hashicorp.cloud") }}
+{{fail "When global.cloud.enabled is true, externalServers.hosts should not contain an HCP Consul Managed cluster's address. global.cloud.enabled is for HCP Consul Central linked clusters."}}
+{{- end }}
+{{- end -}}
+
+{{/*
 Fails global.cloud.enabled is true and one of the following secrets has either an empty secretName or secretKey.
 - global.cloud.resourceId.secretName / secretKey
 - global.cloud.clientId.secretName / secretKey
