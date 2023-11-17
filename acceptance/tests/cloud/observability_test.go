@@ -216,8 +216,8 @@ func TestObservabilityCloud(t *testing.T) {
 			consulCluster.ACLToken = bootstrapToken
 			consulCluster.Create(t)
 
-			logger.Log(t, "creating static-server-inject deployment")
-			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-inject")
+			logger.Log(t, "creating static-server deployment")
+			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 			t.Log("Finished deployment. Validating expected conditions now")
 
 			// Validate that the consul-telemetry-collector service was deployed to the expected namespace.
@@ -225,6 +225,7 @@ func TestObservabilityCloud(t *testing.T) {
 			instances, _, err := consulClient.Catalog().Service("consul-telemetry-collector", "", &api.QueryOptions{Namespace: ns})
 			require.NoError(t, err)
 			require.Len(t, instances, 1)
+			require.Equal(t, "passing", instances[0].Checks.AggregatedStatus())
 
 			for name, tc := range map[string]struct {
 				refresh     *modifyTelemetryConfigBody
