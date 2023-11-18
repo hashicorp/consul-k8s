@@ -2639,10 +2639,11 @@ reservedNameTest() {
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: validates that externalServers.hosts is not set with an HCP-managed " {
+@test "connectInject/Deployment: validates that externalServers.hosts is not set with an HCP-managed cluster's address" {
   cd `chart_dir`
   run helm template \
       -s templates/connect-inject-deployment.yaml  \
+      --set 'global.enabled=false' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
@@ -2659,7 +2660,7 @@ reservedNameTest() {
 
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When global.cloud.enabled is true, externalServers.hosts should not contain an HCP Consul Managed cluster's address. global.cloud.enabled is for HCP Consul Central linked clusters." ]]
+  [[ "$output" =~ "global.cloud.enabled cannot be used in combination with an HCP-managed cluster address in externalServers.hosts. global.cloud.enabled is for linked, not managed, clusters." ]]
 }
 
 @test "connectInject/Deployment: can provide a TLS server name for the sidecar-injector when global.cloud.enabled is set" {

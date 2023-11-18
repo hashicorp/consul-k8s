@@ -961,28 +961,6 @@ load _helpers
   [[ "$output" =~ "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set" ]]
 }
 
-@test "telemetryCollector/Deployment(V2): validates that externalServers.hosts is not set with an HCP-managed cluster address when global.cloud.enabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/telemetry-collector-v2-deployment.yaml  \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=abc.aws.hashicorp.cloud' \
-      --set 'global.cloud.enabled=true' \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
-      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
-      --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
-      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
-      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-key-name' \
-     . > /dev/stderr
-
-  [ "$status" -eq 1 ]
-
-  [[ "$output" =~ "When global.cloud.enabled is true, externalServers.hosts should not contain an HCP Consul Managed cluster's address. global.cloud.enabled is for HCP Consul Central linked clusters." ]]
-}
-
 #--------------------------------------------------------------------
 # global.tls.enabled
 
