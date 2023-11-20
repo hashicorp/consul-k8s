@@ -159,6 +159,15 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
 	}
 
+	// Container Ports
+	metricsPorts, err := w.getMetricsPorts(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	if metricsPorts != nil {
+		container.Ports = append(container.Ports, metricsPorts...)
+	}
+
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
@@ -302,14 +311,21 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, bearer
 		return nil, fmt.Errorf("unable to determine if merged metrics is enabled: %w", err)
 	}
 	if metricsServer {
-
-		// (TODO) Figure out what port will be used for merged metrics and setup merged metrics
-
 		mergedMetricsPort, err := w.MetricsConfig.MergedMetricsPort(pod)
 		if err != nil {
 			return nil, fmt.Errorf("unable to determine if merged metrics port: %w", err)
 		}
 		args = append(args, "-telemetry-prom-merge-port="+mergedMetricsPort)
+
+		serviceMetricsPath := w.MetricsConfig.ServiceMetricsPath(pod)
+		serviceMetricsPort, err := w.MetricsConfig.ServiceMetricsPort(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine if service metrics port: %w", err)
+		}
+
+		if serviceMetricsPath != "" && serviceMetricsPort != "" {
+			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
+		}
 
 		// Pull the TLS config from the relevant annotations.
 		var prometheusCAFile string
@@ -469,4 +485,38 @@ func useProxyHealthCheck(pod corev1.Pod) bool {
 		return useProxyHealthCheck
 	}
 	return false
+}
+
+// getMetricsPorts creates container ports for exposing services such as prometheus.
+// Prometheus in particular needs a named port for use with the operator.
+// https://github.com/hashicorp/consul-k8s/pull/1440
+func (w *MeshWebhook) getMetricsPorts(pod corev1.Pod) ([]corev1.ContainerPort, error) {
+	enableMetrics, err := w.MetricsConfig.EnableMetrics(pod)
+	if err != nil {
+		return nil, fmt.Errorf("error determining if metrics are enabled: %w", err)
+	}
+	if !enableMetrics {
+		return nil, nil
+	}
+
+	prometheusScrapePort, err := w.MetricsConfig.PrometheusScrapePort(pod)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
+	}
+	if prometheusScrapePort == "" {
+		return nil, nil
+	}
+
+	port, err := strconv.Atoi(prometheusScrapePort)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
+	}
+
+	return []corev1.ContainerPort{
+		{
+			Name:          "prometheus",
+			ContainerPort: int32(port),
+			Protocol:      corev1.ProtocolTCP,
+		},
+	}, nil
 }
