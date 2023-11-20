@@ -34,7 +34,7 @@ spec:
     name: v2beta1
     schema:
       openAPIV3Schema:
-        description: GatewayClass is the Schema for the Mesh Gateway API
+        description: GatewayClass is the Schema for the Gateway Class API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
