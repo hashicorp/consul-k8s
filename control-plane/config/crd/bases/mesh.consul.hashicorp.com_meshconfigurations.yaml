@@ -13,10 +13,8 @@ spec:
     kind: MeshConfiguration
     listKind: MeshConfigurationList
     plural: meshconfigurations
-    shortNames:
-    - mesh-gateway
     singular: meshconfiguration
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - description: The sync status of the resource with Consul
@@ -34,7 +32,7 @@ spec:
     name: v2beta1
     schema:
       openAPIV3Schema:
-        description: MeshConfiguration is the Schema for the Mesh Gateway API
+        description: MeshConfiguration is the Schema for the Mesh Configuration
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
