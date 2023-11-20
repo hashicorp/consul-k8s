@@ -310,13 +310,13 @@ func TestPeering_Connect(t *testing.T) {
 				}
 				logger.Logf(t, "creating namespace %s in server peer", externalServerK8sNamespace)
 				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", externalServerK8sNamespace)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 					k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", externalServerK8sNamespace)
 				})
 
 				// Create the external server in the server Kubernetes cluster, outside the mesh in the "external" namespace
 				logger.Log(t, "creating static-server deployment in server peer outside of mesh")
-				k8s.DeployKustomize(t, externalServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+				k8s.DeployKustomize(t, externalServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 				// Prevent dialing the server directly through the sidecar.
 				terminatinggateway.CreateMeshConfigEntry(t, staticServerPeerClient, "")
@@ -340,7 +340,7 @@ func TestPeering_Connect(t *testing.T) {
 				// Export the external service to the client peer.
 				logger.Log(t, "creating exported external services")
 				k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/external")
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 					k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/external")
 				})
 
