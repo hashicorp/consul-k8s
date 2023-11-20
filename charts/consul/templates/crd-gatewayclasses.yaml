@@ -17,10 +17,8 @@ spec:
     kind: GatewayClass
     listKind: GatewayClassList
     plural: gatewayclasses
-    shortNames:
-    - mesh-gateway
     singular: gatewayclass
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - description: The sync status of the resource with Consul
