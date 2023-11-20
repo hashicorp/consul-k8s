@@ -2,7 +2,7 @@ module github.com/hashicorp/consul-k8s/control-plane
 
 // TODO: Remove this when the next version of the submodule is released.
 // We need to use a replace directive instead of directly pinning because `api` requires version `0.5.1` and will clobber the pin, but not the replace directive.
-replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231109213314-40c57f10a0fb
+replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231116180314-d9432f903222
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
