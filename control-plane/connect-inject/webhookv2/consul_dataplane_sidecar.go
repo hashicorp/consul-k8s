@@ -160,12 +160,12 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	}
 
 	// Container Ports
-	ports, err := w.getContainerPorts(pod)
+	metricsPorts, err := w.getMetricsPorts(pod)
 	if err != nil {
 		return corev1.Container{}, err
 	}
-	if ports != nil {
-		container.Ports = ports
+	if metricsPorts != nil {
+		container.Ports = append(container.Ports, metricsPorts...)
 	}
 
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
@@ -487,10 +487,10 @@ func useProxyHealthCheck(pod corev1.Pod) bool {
 	return false
 }
 
-// getContainerPorts creates container ports for exposing services such as prometheus.
+// getMetricsPorts creates container ports for exposing services such as prometheus.
 // Prometheus in particular needs a named port for use with the operator.
 // https://github.com/hashicorp/consul-k8s/pull/1440
-func (w *MeshWebhook) getContainerPorts(pod corev1.Pod) ([]corev1.ContainerPort, error) {
+func (w *MeshWebhook) getMetricsPorts(pod corev1.Pod) ([]corev1.ContainerPort, error) {
 	enableMetrics, err := w.MetricsConfig.EnableMetrics(pod)
 	if err != nil {
 		return nil, fmt.Errorf("error determining if metrics are enabled: %w", err)
