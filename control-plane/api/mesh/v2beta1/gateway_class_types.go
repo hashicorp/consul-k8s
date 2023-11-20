@@ -103,7 +103,7 @@ func (in *GatewayClass) MatchesConsul(candidate *pbresource.Resource, namespace,
 }
 
 func (in *GatewayClass) KubeKind() string {
-	return meshGatewayKubeKind
+	return gatewayClassKubeKind
 }
 
 func (in *GatewayClass) KubernetesName() string {
