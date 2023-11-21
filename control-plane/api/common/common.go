@@ -30,6 +30,7 @@ const (
 	TCPRoute           string = "tcproute"
 	ProxyConfiguration string = "proxyconfiguration"
 	MeshGateway        string = "meshgateway"
+	GatewayClass       string = "gatewayclass"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"
