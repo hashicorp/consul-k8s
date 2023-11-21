@@ -114,7 +114,7 @@ global:
   # secretKey should be in the form of "key".
   secretsBackend:
     vault:
-      # Vault namespace (optional). This sets the Vault namespace for the `vault.hashicorp.com/namespace` 
+      # Vault namespace (optional). This sets the Vault namespace for the `vault.hashicorp.com/namespace`
       # agent annotation and [Vault Connect CA namespace](https://developer.hashicorp.com/consul/docs/connect/ca/vault#namespace).
       # To override one of these values individually, see `agentAnnotations` and `connectCA.additionalConfig`.
       vaultNamespace: ""
@@ -457,7 +457,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods. 
+    # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
     # This should be a YAML map corresponding to a Kubernetes
     # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
     # object.
@@ -558,7 +558,7 @@ global:
     # If enabled, this datacenter will be federation-capable. Only federation
     # via mesh gateways is supported.
     # Mesh gateways and servers will be configured to allow federation.
-    # Requires `global.tls.enabled`, `connectInject.enabled`, and one of 
+    # Requires `global.tls.enabled`, `connectInject.enabled`, and one of
     # `meshGateway.enabled` or `externalServers.enabled` to be true.
     # Requires Consul 1.8+.
     enabled: false
@@ -588,7 +588,7 @@ global:
     # from the one used by the Consul Service Mesh.
     # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
     #
-    # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and 
+    # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
     # `externalServers.k8sAuthMethodHost` should be set to the same value.
     #
     # You can retrieve this value from your `kubeconfig` by running:
@@ -652,14 +652,15 @@ global:
   # the API before cancelling the request.
   consulAPITimeout: 5s
 
-  # Enables installing an HCP Consul self-managed cluster.
+  # Enables installing an HCP Consul Central self-managed cluster.
   # Requires Consul v1.14+.
   cloud:
-    # If true, the Helm chart will enable the installation of an HCP Consul
+    # If true, the Helm chart will enable the installation of an HCP Consul Central
     # self-managed cluster.
     enabled: false
 
-    # The name of the Kubernetes secret that holds the HCP resource id.
+    # The resource id of the HCP Consul Central cluster to link to. Eg:
+    # organization/27109cd4-a309-4bf3-9986-e1d071914b18/project/fcef6c24-259d-4510-bb8d-1d812e120e34/hashicorp.consul.global-network-manager.cluster/consul-cluster
     # This is required when global.cloud.enabled is true.
     resourceId:
       # The name of the Kubernetes secret that holds the resource id.
@@ -669,7 +670,8 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud client id.
+    # The client id portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to link the cluster
+    # in global.cloud.resourceId to HCP Consul Central.
     # This is required when global.cloud.enabled is true.
     clientId:
       # The name of the Kubernetes secret that holds the client id.
@@ -679,7 +681,8 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud client secret.
+    # The client secret portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to link the cluster
+    # in global.cloud.resourceId to HCP Consul Central.
     # This is required when global.cloud.enabled is true.
     clientSecret:
       # The name of the Kubernetes secret that holds the client secret.
@@ -689,8 +692,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud client id.
-    # This is optional when global.cloud.enabled is true.
+    # The hostname of HCP's API. This setting is used for internal testing and validation.
     apiHost:
       # The name of the Kubernetes secret that holds the api hostname.
       # @type: string
@@ -699,8 +701,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud authorization url.
-    # This is optional when global.cloud.enabled is true.
+    # The URL of HCP's auth API. This setting is used for internal testing and validation.
     authUrl:
       # The name of the Kubernetes secret that holds the authorization url.
       # @type: string
@@ -709,8 +710,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud scada address.
-    # This is optional when global.cloud.enabled is true.
+    # The address of HCP's scada service. This setting is used for internal testing and validation.
     scadaAddress:
       # The name of the Kubernetes secret that holds the scada address.
       # @type: string
@@ -866,9 +866,9 @@ server:
 
   # The [Persistent Volume Claim (PVC) retention policy](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention)
   # controls if and how PVCs are deleted during the lifecycle of a StatefulSet.
-  # WhenDeleted specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is deleted, 
+  # WhenDeleted specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is deleted,
   # and WhenScaled specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is scaled down.
-  # 
+  #
   # Example:
   #
   # ```yaml
@@ -883,7 +883,7 @@ server:
   # _will not_ automatically secure pod communication, this
   # setting will only enable usage of the feature. Consul will automatically initialize
   # a new CA and set of certificates. Additional service mesh settings can be configured
-  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries). 
+  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries).
   connect: true
 
   serviceAccount:
@@ -1290,7 +1290,7 @@ server:
       # @type: integer
       writeRate: -1
 
-  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing 
+  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing
   # and configure a sink and filters for their audit logs. Please refer to
   # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
   # for further information.
@@ -1389,7 +1389,7 @@ externalServers:
   # This address must be reachable from the Consul servers.
   # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
   #
-  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and 
+  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
   # `externalServers.k8sAuthMethodHost` should be set to the same value.
   #
   # You could retrieve this value from your `kubeconfig` by running:
@@ -2182,7 +2182,7 @@ connectInject:
     # If this setting is false, you will need to install the Gateway API CRDs manually.
     manageExternalCRDs: true
 
-    # Enables Consul on Kubernets to manage only the non-standard CRDs used for Gateway API. If manageExternalCRDs is true 
+    # Enables Consul on Kubernets to manage only the non-standard CRDs used for Gateway API. If manageExternalCRDs is true
     # then all CRDs will be installed; otherwise, if manageNonStandardCRDs is true then only TCPRoute, GatewayClassConfig and MeshService
     # will be installed.
     manageNonStandardCRDs: false
@@ -3078,8 +3078,8 @@ ingressGateways:
 
   # Gateways is a list of gateway objects. The only required field for
   # each is `name`, though they can also contain any of the fields in
-  # `defaults`. You must provide a unique name for each ingress gateway. These names 
-  # must be unique across different namespaces. 
+  # `defaults`. You must provide a unique name for each ingress gateway. These names
+  # must be unique across different namespaces.
   # Values defined here override the defaults, except in the case of annotations where both will be applied.
   # @type: array<map>
   gateways:
@@ -3473,7 +3473,7 @@ telemetryCollector:
   customExporterConfig: null
 
   service:
-    # This value defines additional annotations for the server service account. This should be formatted as a multi-line
+    # This value defines additional annotations for the telemetry-collector's service account. This should be formatted as a multi-line
     # string.
     #
     # ```yaml
@@ -3499,11 +3499,51 @@ telemetryCollector:
     annotations: null
 
   cloud:
-    clientId:
+    # The resource id of the HCP Consul Central cluster to push metrics for. Eg:
+    # `organization/27109cd4-a309-4bf3-9986-e1d071914b18/project/fcef6c24-259d-4510-bb8d-1d812e120e34/hashicorp.consul.global-network-manager.cluster/consul-cluster`
+    #
+    # This is used for HCP Consul Central-linked or managed clusters where global.cloud.resourceId is unset. For example, when using externalServers
+    # with HCP Consul-managed clusters or HCP Consul Central-linked clusters in a different admin partition.
+    #
+    # If global.cloud.resourceId is set, this should either be unset (defaulting to global.cloud.resourceId) or be the same as global.cloud.resourceId.
+    #
+    # @default: global.cloud.resourceId
+    resourceId:
+      # The name of the Kubernetes secret that holds the resource id.
+      # @type: string
       secretName: null
+      # The key within the Kubernetes secret that holds the resource id.
+      # @type: string
       secretKey: null
-    clientSecret:
+
+    # The client id portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to push metrics to HCP
+    #
+    # This is set in two scenarios:
+    #   - the service principal in global.cloud is unset
+    #   - the HCP UI provides a service principal with more narrowly scoped permissions that the service principal used in global.cloud
+    #
+    # @default: global.cloud.clientId
+    clientId:
+      # The name of the Kubernetes secret that holds the client id.
+      # @type: string
       secretName: null
+      # The key within the Kubernetes secret that holds the client id.
+      # @type: string
+      secretKey: null
+
+    # The client secret portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to push metrics to HCP.
+    #
+    # This is set in two scenarios:
+    #   - the service principal in global.cloud is unset
+    #   - the HCP UI provides a service principal with more narrowly scoped permissions that the service principal used in global.cloud
+    #
+    # @default: global.cloud.clientSecret
+    clientSecret:
+      # The name of the Kubernetes secret that holds the client secret.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the client secret.
+      # @type: string
       secretKey: null
 
   initContainer:
@@ -3520,7 +3560,7 @@ telemetryCollector:
   # @type: string
   priorityClassName: ""
 
-  # A list of extra environment variables to set within the stateful set.
+  # A list of extra environment variables to set within the deployment.
   # These could be used to include proxy settings required for cloud auto-join
   # feature, in case kubernetes cluster is behind egress http proxies. Additionally,
   # it could be used to configure custom consul parameters.
