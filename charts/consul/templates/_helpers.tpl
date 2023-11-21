@@ -415,7 +415,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 
 {{/*
-Fails if temeletryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
+Fails if telemetryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
 - telemetryCollector.cloud.clientId.secretName
 - telemetryCollector.cloud.clientSecret.secretName
 - global.cloud.resourceId.secretName
@@ -424,11 +424,11 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 
 */}}
 {{- define "consul.validateTelemetryCollectorCloud" -}}
-{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
+{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (and (not .Values.global.cloud.clientSecret.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
 {{- end }}
-{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, global.cloud.resourceId.secretName,telemetryCollector.cloud.clientId.secretName must also be set."}}
+{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (and (not .Values.global.cloud.clientId.secretName) (not .Values.telemetryCollector.cloud.clientId.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set."}}
 {{- end }}
 {{- end }}
 
@@ -441,13 +441,32 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 {{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName (not .Values.telemetryCollector.cloud.clientSecret.secretKey)) (and .Values.telemetryCollector.cloud.clientSecret.secretKey (not .Values.telemetryCollector.cloud.clientSecret.secretName)) }}
 {{fail "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set."}}
 {{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
-{{fail "When telemetryCollector has clientId and clientSecret global.cloud.resourceId.secretName must be set"}}
+{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName))) }}
+{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretName or global.cloud.resourceId.secretName must be set"}}
 {{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretKey)) }}
-{{fail "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set"}}
+{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey))) }}
+{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretKey or global.cloud.resourceId.secretKey must be set"}}
 {{- end }}
 {{- end -}}
+
+{{/*
+Fails if telemetryCollector.cloud.resourceId is set but differs from global.cloud.resourceId. This should never happen. Either one or both are set, but they should never differ.
+If they differ, that implies we're configuring servers for one HCP Consul cluster but pushing envoy metrics for a different HCP Consul cluster. A user could set the same value
+in two secrets (it's questionable whether resourceId should be a secret at all) but we won't know at this point, so we just check secret name+key.
+
+Usage: {{ template "consul.validateTelemetryCollectorResourceId" . }}
+
+*/}}
+{{- define "consul.validateTelemetryCollectorResourceId" -}}
+{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName) (not (eq .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName)) }}
+{{fail "When both global.cloud.resourceId.secretName and telemetryCollector.cloud.resourceId.secretName are set, they should be the same."}}
+{{- end }}
+{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey) (not (eq .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey)) }}
+{{fail "When both global.cloud.resourceId.secretKey and telemetryCollector.cloud.resourceId.secretKey are set, they should be the same."}}
+{{- end }}
+{{- end }}
+
+{{/**/}}
 
 {{/*
 Fails if global.experiments.resourceAPIs is set along with any of these unsupported features.

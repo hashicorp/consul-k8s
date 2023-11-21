@@ -5,6 +5,7 @@
 {{ template "consul.validateCloudSecretKeys" . }}
 {{ template "consul.validateTelemetryCollectorCloud" . }}
 {{ template "consul.validateTelemetryCollectorCloudSecretKeys" . }}
+{{ template "consul.validateTelemetryCollectorResourceId" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -165,13 +166,32 @@ spec:
             # These are mounted as secrets so that the telemetry-collector can use them when cloud is enabled.
             # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL,
             #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
-            # - HCP_RESOURCE_ID is created for use in the global cloud section but we will share it here
+            # - HCP_RESOURCE_ID is created either in the global cloud section or in telemetryCollector.cloud
+            {{- if .Values.telemetryCollector.cloud.resourceId.secretName }}
+            - name: HCP_RESOURCE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryCollector.cloud.resourceId.secretName }}
+                  key: {{ .Values.telemetryCollector.cloud.resourceId.secretKey }}
+            {{- else if .Values.global.cloud.resourceId.secretName }}
+            - name: HCP_RESOURCE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.resourceId.secretName }}
+                  key: {{ .Values.global.cloud.resourceId.secretKey }}
+            {{- end }}
             {{- if .Values.telemetryCollector.cloud.clientId.secretName }}
             - name: HCP_CLIENT_ID
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.telemetryCollector.cloud.clientId.secretName }}
                   key: {{ .Values.telemetryCollector.cloud.clientId.secretKey }}
+            {{- else if .Values.global.cloud.clientId.secretName }}
+            - name: HCP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.clientId.secretName }}
+                  key: {{ .Values.global.cloud.clientId.secretKey }}
             {{- end }}
             {{- if .Values.telemetryCollector.cloud.clientSecret.secretName }}
             - name: HCP_CLIENT_SECRET
@@ -179,14 +199,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.telemetryCollector.cloud.clientSecret.secretName }}
                   key: {{ .Values.telemetryCollector.cloud.clientSecret.secretKey }}
-            {{- end}}
-            {{- if .Values.global.cloud.resourceId.secretName }}
-            - name: HCP_RESOURCE_ID
+            {{- else if .Values.global.cloud.clientSecret.secretName }}
+            - name: HCP_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.cloud.resourceId.secretName }}
-                  key: {{ .Values.global.cloud.resourceId.secretKey }}
-            {{- end }}
+                  name: {{ .Values.global.cloud.clientSecret.secretName }}
+                  key: {{ .Values.global.cloud.clientSecret.secretKey }}
+            {{- end}}
             {{- if .Values.global.cloud.authUrl.secretName }}
             - name: HCP_AUTH_URL
               valueFrom:
@@ -227,7 +246,7 @@ spec:
 
           consul-telemetry-collector agent \
           {{- if .Values.telemetryCollector.customExporterConfig }}
-          -config-file-path /consul/config/config.json \
+            -config-file-path /consul/config/config.json \
           {{ end }}
         volumeMounts:
           {{- if .Values.telemetryCollector.customExporterConfig }}
