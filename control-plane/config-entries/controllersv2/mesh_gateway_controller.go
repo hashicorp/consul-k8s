@@ -55,7 +55,8 @@ func (r *MeshGatewayController) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	return r.MeshConfigController.ReconcileEntry(ctx, r, req, &meshv2beta1.MeshGateway{})
+	return ctrl.Result{}, nil
+	// return r.MeshConfigController.ReconcileEntry(ctx, r, req, &meshv2beta1.MeshGateway{})
 }
 
 func (r *MeshGatewayController) Logger(name types.NamespacedName) logr.Logger {
@@ -75,7 +76,15 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 
 	builder := gateways.NewMeshGatewayBuilder(resource)
 
-	err := r.upsertIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount())
+	ifNew := func(ctx context.Context, object client.Object) error {
+		return r.Create(ctx, object)
+	}
+
+	ifExists := func(ctx context.Context, object client.Object) error {
+		return r.Update(ctx, object)
+	}
+
+	err := r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), ifNew, ifExists)
 	if err != nil {
 		return err
 	}
@@ -88,17 +97,26 @@ func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, 
 
 	builder := gateways.NewMeshGatewayBuilder(resource)
 
-	serviceAccount := builder.ServiceAccount()
-	if err := r.Delete(ctx, serviceAccount); err != nil {
+	ifExists := func(ctx context.Context, object client.Object) error {
+		return r.Delete(ctx, object)
+	}
+
+	err := r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), nil, ifExists)
+	if err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *MeshGatewayController) upsertIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object) error {
+type op func(context.Context, client.Object) error
+
+// opIfNewOrOwned runs a given op function to create, update, or delete a resource.
+// The purpose of opIfNewOrOwned is to ensure that we aren't updating or deleting a
+// resource that was not created by us. If this scenario is encountered, we error.
+func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object, ifNew, ifOwned op) error {
 	// Ensure owner reference is always set on objects that we write
-	ctrl.SetControllerReference(gateway, writeSource, r.Scheme)
+	ctrl.SetControllerReference(gateway, writeSource, r.Client.Scheme())
 
 	key := client.ObjectKey{
 		Namespace: writeSource.GetNamespace(),
@@ -118,7 +136,7 @@ func (r *MeshGatewayController) upsertIfNewOrOwned(ctx context.Context, gateway 
 
 	// None exists, so we need only create it
 	if !exists {
-		return r.Create(ctx, writeSource)
+		return ifNew(ctx, writeSource)
 	}
 
 	// Ensure the existing object was put there by us so that we don't overwrite random objects
@@ -126,10 +144,11 @@ func (r *MeshGatewayController) upsertIfNewOrOwned(ctx context.Context, gateway 
 	for _, reference := range scanTarget.GetOwnerReferences() {
 		if reference.UID == gateway.GetUID() && reference.Name == gateway.GetName() {
 			owned = true
+			break
 		}
 	}
 	if !owned {
 		return errors.New("existing resource not owned by controller")
 	}
-	return r.Update(ctx, writeSource)
+	return ifOwned(ctx, writeSource)
 }
