@@ -346,25 +346,25 @@ rules:
   - patch
   - update
 - apiGroups:
-    - mesh.consul.hashicorp.com
+  - mesh.consul.hashicorp.com
   resources:
-    - gatewayclass
+  - gatewayclass
   verbs:
-    - create
-    - delete
-    - get
-    - list
-    - patch
-    - update
-    - watch
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
-    - mesh.consul.hashicorp.com
+  - mesh.consul.hashicorp.com
   resources:
-    - gatewayclass/status
+  - gatewayclass/status
   verbs:
-    - get
-    - patch
-    - update
+  - get
+  - patch
+  - update
 - apiGroups:
   - mesh.consul.hashicorp.com
   resources:
