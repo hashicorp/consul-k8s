@@ -73,14 +73,27 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
 	// TODO NET-6392 NET-6393 NET-6394 NET-6395
 
-	return r.upsertIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, gateways.NewMeshGatewayServiceAccount(resource))
+	builder := gateways.NewMeshGatewayBuilder(resource)
+
+	err := r.upsertIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount())
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
 	// TODO NET-6392 NET-6393 NET-6394 NET-6395
 
-	serviceAccount := gateways.NewMeshGatewayServiceAccount(resource)
-	return r.Delete(ctx, serviceAccount)
+	builder := gateways.NewMeshGatewayBuilder(resource)
+
+	serviceAccount := builder.ServiceAccount()
+	if err := r.Delete(ctx, serviceAccount); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *MeshGatewayController) upsertIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object) error {
