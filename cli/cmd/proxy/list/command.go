@@ -4,6 +4,7 @@
 package list
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -25,6 +26,7 @@ const (
 	flagNameAllNamespaces = "all-namespaces"
 	flagNameKubeConfig    = "kubeconfig"
 	flagNameKubeContext   = "context"
+	flagOutputFormat      = "output-format"
 )
 
 // ListCommand is the command struct for the proxy list command.
@@ -37,6 +39,7 @@ type ListCommand struct {
 
 	flagNamespace     string
 	flagAllNamespaces bool
+	flagOutputFormat  string
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -62,6 +65,13 @@ func (c *ListCommand) init() {
 		Default: false,
 		Usage:   "List pods in all namespaces.",
 		Aliases: []string{"A"},
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagOutputFormat,
+		Default: "table",
+		Target:  &c.flagOutputFormat,
+		Usage:   "Output format",
+		Aliases: []string{"o"},
 	})
 
 	f = c.set.NewSet("Global Options")
@@ -137,6 +147,7 @@ func (c *ListCommand) AutocompleteFlags() complete.Flags {
 		fmt.Sprintf("-%s", flagNameAllNamespaces): complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeConfig):    complete.PredictFiles("*"),
 		fmt.Sprintf("-%s", flagNameKubeContext):   complete.PredictNothing,
+		fmt.Sprintf("-%s", flagOutputFormat):      complete.PredictNothing,
 	}
 }
 
@@ -282,5 +293,16 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		}
 	}
 
-	c.UI.Table(tbl)
+	if c.flagOutputFormat == "json" {
+		tableJson := tbl.ToJson()
+		jsonSt, err := json.MarshalIndent(tableJson, "", "    ")
+		if err != nil {
+			c.UI.Output("Error converting table to json: %v", err.Error(), terminal.WithErrorStyle())
+		} else {
+			c.UI.Output(string(jsonSt))
+		}
+	} else {
+		c.UI.Table(tbl)
+	}
+
 }

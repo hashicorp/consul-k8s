@@ -177,6 +177,15 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.ProxyConfiguration)
 		return err
 	}
+	if err := (&controllersv2.MeshGatewayController{
+		MeshConfigController: meshConfigReconciler,
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controller").WithName(common.MeshGateway),
+		Scheme:               mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.MeshGateway)
+		return err
+	}
 
 	mgr.GetWebhookServer().CertDir = c.flagCertDir
 

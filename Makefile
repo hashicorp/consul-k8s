@@ -50,6 +50,14 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
+.PHONY: control-plane-dev-skaffold
+# DANGER: this target is experimental and could be modified/removed at any time.
+control-plane-dev-skaffold: ## Build consul-k8s-control-plane dev Docker image for use with skaffold or local development.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
+	@docker build -t '$(DEV_IMAGE)' \
+       --build-arg 'TARGETARCH=$(GOARCH)' \
+       -f $(CURDIR)/control-plane/Dockerfile.dev $(CURDIR)/control-plane
+
 .PHONY: check-remote-dev-image-env
 check-remote-dev-image-env:
 ifndef REMOTE_DEV_IMAGE
