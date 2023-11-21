@@ -102,6 +102,7 @@ rules:
     - meshgateways
     - tcproutes
     - proxyconfigurations
+    - gatewayclassconfigs
   verbs:
     - create
     - delete
@@ -119,6 +120,7 @@ rules:
     - meshgateways/status
     - tcproutes/status
     - proxyconfigurations/status
+    - gatewayclassconfigs/status
   verbs:
     - get
     - patch
