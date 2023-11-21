@@ -204,6 +204,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
+				if isTelemetryCollector(pod) {
+					if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
+						r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
+						errs = multierror.Append(errs, err)
+					}
+				}
+
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if isConsulDataplaneSupported(pod) {
@@ -231,6 +238,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						continue
 					}
 				}
+
 				if isGateway(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if err = r.registerGateway(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
@@ -443,6 +451,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
+
 	service := &api.AgentService{
 		ID:        svcID,
 		Service:   svcName,
@@ -1334,6 +1343,28 @@ func hasBeenInjected(pod corev1.Pod) bool {
 func isGateway(pod corev1.Pod) bool {
 	anno, ok := pod.Annotations[constants.AnnotationGatewayKind]
 	return ok && anno != ""
+}
+
+// isTelemetryCollector checks whether a pod is part of a deployment for a Consul Telemetry Collector. If so,
+// and this is the first pod deployed to a Namespace, we need to create the Namespace in Consul. Otherwise the
+// deployment may fail out during service registration because it is deployed to a Namespace that does not exist.
+func isTelemetryCollector(pod corev1.Pod) bool {
+	anno, ok := pod.Annotations[constants.LabelTelemetryCollector]
+	return ok && anno != ""
+}
+
+// ensureNamespaceExists creates a Consul namespace for a pod in the event it does not exist.
+// At the time of writing, we use this for the Consul Telemetry Collector which may be the first
+// pod deployed to a namespace. If it is, it's connect-inject will fail for lack of a namespace.
+func (r *Controller) ensureNamespaceExists(apiClient *api.Client, pod corev1.Pod) error {
+	if r.EnableConsulNamespaces {
+		consulNS := r.consulNamespace(pod.Namespace)
+		if _, err := namespaces.EnsureExists(apiClient, consulNS, r.CrossNSACLPolicy); err != nil {
+			r.Log.Error(err, "failed to ensure Consul namespace exists", "ns", pod.Namespace, "consul ns", consulNS)
+			return err
+		}
+	}
+	return nil
 }
 
 // mapAddresses combines all addresses to a mapping of address to its health status.
