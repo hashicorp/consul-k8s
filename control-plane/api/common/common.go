@@ -31,6 +31,7 @@ const (
 	ProxyConfiguration string = "proxyconfiguration"
 	MeshGateway        string = "meshgateway"
 	GatewayClass       string = "gatewayclass"
+	GatewayClassConfig string = "gatewayclassconfig"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"
