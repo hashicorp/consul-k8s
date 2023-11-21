@@ -1,7 +1,6 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -14,10 +13,8 @@ spec:
     kind: GatewayClassConfig
     listKind: GatewayClassConfigList
     plural: gatewayclassconfigs
-    shortNames:
-    - gateway-class-config
     singular: gatewayclassconfig
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - description: The sync status of the resource with Consul
@@ -49,7 +46,76 @@ spec:
             type: string
           metadata:
             type: object
-          spec: {}
+          spec:
+            description: This is a Resource type.
+            properties:
+              consul:
+                properties:
+                  address:
+                    type: string
+                  authentication:
+                    properties:
+                      address:
+                        type: string
+                      managed:
+                        type: boolean
+                      method:
+                        type: string
+                      namespace:
+                        type: string
+                    type: object
+                  ports:
+                    properties:
+                      grpc:
+                        format: int32
+                        type: integer
+                      http:
+                        format: int32
+                        type: integer
+                    type: object
+                  scheme:
+                    type: string
+                type: object
+              copyAnnotations:
+                properties:
+                  service:
+                    items:
+                      type: string
+                    type: array
+                type: object
+              deployment:
+                properties:
+                  defaultInstances:
+                    format: int32
+                    type: integer
+                  maxInstances:
+                    format: int32
+                    type: integer
+                  minInstances:
+                    format: int32
+                    type: integer
+                type: object
+              image:
+                properties:
+                  consulApiGateway:
+                    type: string
+                  envoy:
+                    type: string
+                type: object
+              logLevel:
+                type: string
+              mapPrivilegedContainerPorts:
+                format: int32
+                type: integer
+              nodeSelector:
+                type: string
+              openshiftSccName:
+                type: string
+              serviceType:
+                type: string
+              useHostPorts:
+                type: boolean
+            type: object
           status:
             properties:
               conditions:
