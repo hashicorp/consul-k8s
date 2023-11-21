@@ -5,8 +5,10 @@ package controllersv2
 
 import (
 	"context"
+	"errors"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -71,8 +73,7 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
 	// TODO NET-6392 NET-6393 NET-6394 NET-6395
 
-	serviceAccount := gateways.NewMeshGatewayServiceAccount(resource)
-	return r.Create(ctx, serviceAccount)
+	return r.upsertIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, gateways.NewMeshGatewayServiceAccount(resource))
 }
 
 func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
@@ -80,4 +81,42 @@ func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, 
 
 	serviceAccount := gateways.NewMeshGatewayServiceAccount(resource)
 	return r.Delete(ctx, serviceAccount)
+}
+
+func (r *MeshGatewayController) upsertIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object) error {
+	// Ensure owner reference is always set on objects that we write
+	ctrl.SetControllerReference(gateway, writeSource, r.Scheme)
+
+	key := client.ObjectKey{
+		Namespace: writeSource.GetNamespace(),
+		Name:      writeSource.GetName(),
+	}
+
+	exists := false
+	if err := r.Get(ctx, key, scanTarget); err != nil {
+		// We failed to fetch the object in a way that doesn't tell us about its existence
+		if !k8serr.IsNotFound(err) {
+			return err
+		}
+	} else {
+		// We successfully fetched the object, so it exists
+		exists = true
+	}
+
+	// None exists, so we need only create it
+	if !exists {
+		return r.Create(ctx, writeSource)
+	}
+
+	// Ensure the existing object was put there by us so that we don't overwrite random objects
+	owned := false
+	for _, reference := range scanTarget.GetOwnerReferences() {
+		if reference.UID == gateway.GetUID() && reference.Name == gateway.GetName() {
+			owned = true
+		}
+	}
+	if !owned {
+		return errors.New("existing resource not owned by controller")
+	}
+	return r.Update(ctx, writeSource)
 }
