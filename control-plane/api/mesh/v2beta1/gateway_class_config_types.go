@@ -33,6 +33,7 @@ func init() {
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 // +kubebuilder:resource:shortName="gateway-class-config"
+// +kubebuilder:resource:scope=Cluster
 type GatewayClassConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
