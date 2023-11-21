@@ -120,17 +120,17 @@ func (c *Command) setServerTokens(serverAddresses []net.IPAddr, bootstrapToken s
 	clientConfig := c.consulFlags.ConsulClientConfig().APIClientConfig
 	clientConfig.Address = fmt.Sprintf("%s:%d", serverAddresses[0].IP.String(), c.consulFlags.HTTPPort)
 	clientConfig.Token = bootstrapToken
-	serverClient, err := consul.NewClient(clientConfig,
+	client, err := consul.NewDynamicClientWithTimeout(clientConfig,
 		c.consulFlags.APITimeout)
 	if err != nil {
 		return err
 	}
-	agentPolicy, err := c.setServerPolicy(serverClient)
+	agentPolicy, err := c.setServerPolicy(client)
 	if err != nil {
 		return err
 	}
 
-	existingTokens, _, err := serverClient.ACL().TokenList(nil)
+	existingTokens, _, err := client.ConsulClient.ACL().TokenList(nil)
 	if err != nil {
 		return err
 	}
@@ -198,7 +198,7 @@ func (c *Command) setServerTokens(serverAddresses []net.IPAddr, bootstrapToken s
 	return nil
 }
 
-func (c *Command) setServerPolicy(consulClient *api.Client) (api.ACLPolicy, error) {
+func (c *Command) setServerPolicy(client *consul.DynamicClient) (api.ACLPolicy, error) {
 	agentRules, err := c.agentRules()
 	if err != nil {
 		c.log.Error("Error templating server agent rules", "err", err)
@@ -213,7 +213,7 @@ func (c *Command) setServerPolicy(consulClient *api.Client) (api.ACLPolicy, erro
 	}
 	err = c.untilSucceeds("creating agent policy - PUT /v1/acl/policy",
 		func() error {
-			return c.createOrUpdateACLPolicy(agentPolicy, consulClient)
+			return c.createOrUpdateACLPolicy(agentPolicy, client)
 		})
 	if err != nil {
 		return api.ACLPolicy{}, err
