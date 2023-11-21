@@ -3885,6 +3885,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 	cases := []struct {
 		name                      string
 		consulSvcName             string
+		consulPodUid              string
 		expectServicesToBeDeleted bool
 		initialConsulSvcs         []*api.AgentService
 		enableACLs                bool
@@ -3970,6 +3971,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 		{
 			name:                      "When ACLs are enabled, the token should be deleted",
 			consulSvcName:             "service-deleted",
+			consulPodUid:              "123",
 			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentService{
 				{
@@ -3983,7 +3985,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "pod1",
-						constants.MetaKeyPodUID:  "",
+						constants.MetaKeyPodUID:  "123",
 					},
 				},
 				{
@@ -4002,7 +4004,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "pod1",
-						constants.MetaKeyPodUID:  "",
+						constants.MetaKeyPodUID:  "123",
 					},
 				},
 			},
@@ -4025,7 +4027,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "mesh-gateway",
-						constants.MetaKeyPodUID:  "",
 					},
 					TaggedAddresses: map[string]api.ServiceAddress{
 						"lan": {
@@ -4043,6 +4044,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 		{
 			name:                      "When ACLs are enabled, the mesh-gateway token should be deleted",
 			consulSvcName:             "service-deleted",
+			consulPodUid:              "124",
 			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentService{
 				{
@@ -4057,7 +4059,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "mesh-gateway",
-						constants.MetaKeyPodUID:  "",
+						constants.MetaKeyPodUID:  "124",
 					},
 					TaggedAddresses: map[string]api.ServiceAddress{
 						"lan": {
@@ -4090,7 +4092,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "ingress-gateway",
-						constants.MetaKeyPodUID:  "",
 					},
 					TaggedAddresses: map[string]api.ServiceAddress{
 						"lan": {
@@ -4108,6 +4109,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 		{
 			name:                      "When ACLs are enabled, the ingress-gateway token should be deleted",
 			consulSvcName:             "service-deleted",
+			consulPodUid:              "125",
 			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentService{
 				{
@@ -4122,7 +4124,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "ingress-gateway",
-						constants.MetaKeyPodUID:  "",
+						constants.MetaKeyPodUID:  "125",
 					},
 					TaggedAddresses: map[string]api.ServiceAddress{
 						"lan": {
@@ -4155,7 +4157,6 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "terminating-gateway",
-						constants.MetaKeyPodUID:  "",
 					},
 				},
 			},
@@ -4163,6 +4164,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 		{
 			name:                      "When ACLs are enabled, the terminating-gateway token should be deleted",
 			consulSvcName:             "service-deleted",
+			consulPodUid:              "126",
 			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentService{
 				{
@@ -4177,7 +4179,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "terminating-gateway",
-						constants.MetaKeyPodUID:  "",
+						constants.MetaKeyPodUID:  "126",
 					},
 				},
 			},
@@ -4224,8 +4226,9 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						AuthMethod:  test.AuthMethod,
 						BearerToken: test.ServiceAccountJWTToken,
 						Meta: map[string]string{
-							"pod":       fmt.Sprintf("%s/%s", svc.Meta[constants.MetaKeyKubeNS], svc.Meta[constants.MetaKeyPodName]),
-							"component": tt.consulSvcName,
+							"pod":                   fmt.Sprintf("%s/%s", svc.Meta[constants.MetaKeyKubeNS], svc.Meta[constants.MetaKeyPodName]),
+							"component":             tt.consulSvcName,
+							constants.MetaKeyPodUID: tt.consulPodUid,
 						},
 					}, nil)
 					require.NoError(t, err)
