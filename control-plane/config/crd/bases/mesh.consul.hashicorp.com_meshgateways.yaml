@@ -13,10 +13,8 @@ spec:
     kind: MeshGateway
     listKind: MeshGatewayList
     plural: meshgateways
-    shortNames:
-    - mesh-gateway
     singular: meshgateway
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - description: The sync status of the resource with Consul
