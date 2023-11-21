@@ -72,8 +72,6 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
-	// TODO NET-6392 NET-6393 NET-6394 NET-6395
-
 	builder := gateways.NewMeshGatewayBuilder(resource)
 
 	ifNew := func(ctx context.Context, object client.Object) error {
@@ -89,12 +87,12 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		return err
 	}
 
+	// TODO NET-6392 NET-6393 NET-6395
+
 	return nil
 }
 
 func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
-	// TODO NET-6392 NET-6393 NET-6394 NET-6395
-
 	builder := gateways.NewMeshGatewayBuilder(resource)
 
 	ifExists := func(ctx context.Context, object client.Object) error {
@@ -105,6 +103,8 @@ func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, 
 	if err != nil {
 		return err
 	}
+
+	// TODO NET-6392 NET-6393 NET-6395
 
 	return nil
 }
