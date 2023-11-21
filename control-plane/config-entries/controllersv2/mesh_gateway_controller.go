@@ -5,7 +5,6 @@ package controllersv2
 
 import (
 	"context"
-	"errors"
 
 	"github.com/go-logr/logr"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -15,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 )
 
 // MeshGatewayController reconciles a MeshGateway object.
@@ -70,10 +70,14 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
 	// TODO NET-6392 NET-6393 NET-6394 NET-6395
-	return errors.New("onCreateUpdate not implemented")
+
+	serviceAccount := gateways.NewMeshGatewayServiceAccount(resource)
+	return r.Create(ctx, serviceAccount)
 }
 
 func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
 	// TODO NET-6392 NET-6393 NET-6394 NET-6395
-	return errors.New("onDelete not implemented")
+
+	serviceAccount := gateways.NewMeshGatewayServiceAccount(resource)
+	return r.Delete(ctx, serviceAccount)
 }
