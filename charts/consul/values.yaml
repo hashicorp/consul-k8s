@@ -672,6 +672,7 @@ global:
 
     # The client id portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to link the cluster
     # in global.cloud.resourceId to HCP Consul Central.
+    # This is required when global.cloud.enabled is true.
     clientId:
       # The name of the Kubernetes secret that holds the client id.
       # @type: string
@@ -682,6 +683,7 @@ global:
 
     # The client secret portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to link the cluster
     # in global.cloud.resourceId to HCP Consul Central.
+    # This is required when global.cloud.enabled is true.
     clientSecret:
       # The name of the Kubernetes secret that holds the client secret.
       # @type: string
