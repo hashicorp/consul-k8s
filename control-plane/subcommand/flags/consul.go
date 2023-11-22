@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
@@ -109,9 +108,6 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 				}
 				f.ConsulLogin.Meta[kvList[0]] = kvList[1]
 			}
-		}
-		if len(f.ConsulLogin.Meta) > 0 {
-			f.ConsulLogin.Meta[constants.MetaKeyPodUID] = os.Getenv("POD_UID")
 		}
 	}
 

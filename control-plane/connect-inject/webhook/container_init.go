@@ -186,7 +186,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			},
 			corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_META",
-				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME),pod-uid=$(POD_UID)",
 			})
 
 		if w.EnableNamespaces {
