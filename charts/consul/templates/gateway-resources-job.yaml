@@ -1,4 +1,4 @@
-{{- if .Values.connectInject.enabled }}
+{{- if or .Values.connectInject.enabled .Values.meshGateway.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:

@@ -13,12 +13,24 @@ target=templates/gateway-resources-job.yaml
     [ "$actual" = "true" ]
 }
 
-@test "gatewayresources/Job: disabled with connectInject.enabled=false" {
+@test "gatewayresources/Job: disabled with connectInject.enabled=false and meshGateway.enabled=false" {
     cd `chart_dir`
     assert_empty helm template \
         -s $target \
         --set 'connectInject.enabled=false' \
+        --set 'meshGateway.enabled=false' \
         .
+}
+
+@test "gatewayresources/Job: enabled with connectInject.enabled=true and meshGateway.enabled=false" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s $target \
+        --set 'connectInject.enabled=true' \
+        --set 'meshGateway.enabled=false' \
+        . | tee /dev/stderr |
+        yq 'length > 0' | tee /dev/stderr)
+    [ "$actual" = "true" ]
 }
 
 @test "gatewayresources/Job: imageK8S set properly" {
