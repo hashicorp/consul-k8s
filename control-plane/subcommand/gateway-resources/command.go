@@ -18,7 +18,6 @@ import (
 	"github.com/mitchellh/cli"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -337,8 +336,9 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Create managed gateway resources after installation/upgrade."
-const help = `
+const (
+	synopsis = "Create managed gateway resources after installation/upgrade."
+	help     = `
 Usage: consul-k8s-control-plane gateway-resources [options]
 
   Installs managed gateway class and configuration resources
@@ -346,17 +346,18 @@ Usage: consul-k8s-control-plane gateway-resources [options]
 	dependencies of CRDs being in-place prior to resource creation.
 
 `
+)
 
-func defaultResourceRequirements() v1.ResourceRequirements {
+func defaultResourceRequirements() corev1.ResourceRequirements {
 	// This is a fallback. The resource.json file should be present unless explicitly removed.
-	return v1.ResourceRequirements{
-		Requests: v1.ResourceList{
-			v1.ResourceMemory: resource.MustParse("100Mi"),
-			v1.ResourceCPU:    resource.MustParse("100m"),
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+			corev1.ResourceCPU:    resource.MustParse("100m"),
 		},
-		Limits: v1.ResourceList{
-			v1.ResourceMemory: resource.MustParse("100Mi"),
-			v1.ResourceCPU:    resource.MustParse("100m"),
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+			corev1.ResourceCPU:    resource.MustParse("100m"),
 		},
 	}
 }
