@@ -115,7 +115,9 @@ type op func(context.Context, client.Object) error
 // resource that was not created by us. If this scenario is encountered, we error.
 func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object, ifNew, ifOwned op) error {
 	// Ensure owner reference is always set on objects that we write
-	ctrl.SetControllerReference(gateway, writeSource, r.Client.Scheme())
+	if err := ctrl.SetControllerReference(gateway, writeSource, r.Client.Scheme()); err != nil {
+		return err
+	}
 
 	key := client.ObjectKey{
 		Namespace: writeSource.GetNamespace(),
