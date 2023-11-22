@@ -1,4 +1,4 @@
-{{- if or .Values.connectInject.enabled .Values.meshGateway.enabled }}
+{{- if .Values.connectInject.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -113,6 +113,34 @@ spec:
             - name: config
               mountPath: /consul/config
               readOnly: true
+        {{ if .Values.meshGateway.enabled }}
+        - name: mesh-gateway-resources
+          image: {{ .Values.global.imageK8S }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          command:
+            - consul-k8s-control-plane
+          args:
+            - gateway-resources
+            - -gateway-class-name=consul
+            - -gateway-class-config-name=consul-mesh-gateway
+            - -controller-name=consul.hashicorp.com/gateway-controller
+            - -app={{template "consul.name" .}}
+            - -chart={{template "consul.chart" .}}
+            - -heritage={{ .Release.Service }}
+            - -release-name={{ .Release.Name }}
+            - -component=mesh-gateway
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+          volumeMounts:
+            - name: config
+              mountPath: /consul/config
+              readOnly: true
+      {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
