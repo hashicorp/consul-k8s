@@ -219,17 +219,18 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			}
 			require.Equal(t, expectedProbe, container.ReadinessProbe)
 			require.Nil(t, container.StartupProbe)
-			require.Len(t, container.Env, 7)
+			require.Len(t, container.Env, 8)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
 			require.Equal(t, container.Env[0].Value, "/consul/connect-inject")
 			require.Equal(t, container.Env[2].Name, "DP_SERVICE_NODE_NAME")
 			require.Equal(t, container.Env[2].Value, "$(NODE_NAME)-virtual")
 			require.Equal(t, container.Env[3].Name, "POD_NAME")
 			require.Equal(t, container.Env[4].Name, "POD_NAMESPACE")
-			require.Equal(t, container.Env[5].Name, "DP_CREDENTIAL_LOGIN_META")
-			require.Equal(t, container.Env[5].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
-			require.Equal(t, container.Env[6].Name, "DP_CREDENTIAL_LOGIN_META1")
-			require.Equal(t, container.Env[6].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
+			require.Equal(t, container.Env[5].Name, "POD_UID")
+			require.Equal(t, container.Env[6].Name, "DP_CREDENTIAL_LOGIN_META")
+			require.Equal(t, container.Env[6].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME),pod-uid=$(POD_UID)")
+			require.Equal(t, container.Env[7].Name, "DP_CREDENTIAL_LOGIN_META1")
+			require.Equal(t, container.Env[7].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME),pod-uid=$(POD_UID)")
 		})
 	}
 }
