@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/gateways"
@@ -73,15 +74,12 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
 	builder := gateways.NewMeshGatewayBuilder(resource)
 
-	ifNew := func(ctx context.Context, object client.Object) error {
-		return r.Create(ctx, object)
+	upsertOp := func(ctx context.Context, _, object client.Object) error {
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, object, func() error { return nil })
+		return err
 	}
 
-	ifExists := func(ctx context.Context, object client.Object) error {
-		return r.Update(ctx, object)
-	}
-
-	err := r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), ifNew, ifExists)
+	err := r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), upsertOp)
 	if err != nil {
 		return err
 	}
@@ -94,11 +92,11 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
 	builder := gateways.NewMeshGatewayBuilder(resource)
 
-	ifExists := func(ctx context.Context, object client.Object) error {
+	deleteOp := func(ctx context.Context, _, object client.Object) error {
 		return r.Delete(ctx, object)
 	}
 
-	err := r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), nil, ifExists)
+	err := r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), deleteOp)
 	if err != nil {
 		return err
 	}
@@ -108,12 +106,19 @@ func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, 
 	return nil
 }
 
-type op func(context.Context, client.Object) error
+// ownedObjectOp represent an operation that needs to be applied
+// only if the newObject does not yet exist or if the existingObject
+// has an owner reference pointing to the MeshGateway being reconciled.
+//
+// The existing and new object are available in case any merging needs
+// to occur, such as unknown annotations and values from the existing object
+// that need to be carried forward onto the new object.
+type ownedObjectOp func(ctx context.Context, existingObject client.Object, newObject client.Object) error
 
-// opIfNewOrOwned runs a given op function to create, update, or delete a resource.
+// opIfNewOrOwned runs a given ownedObjectOp to create, update, or delete a resource.
 // The purpose of opIfNewOrOwned is to ensure that we aren't updating or deleting a
 // resource that was not created by us. If this scenario is encountered, we error.
-func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object, ifNew, ifOwned op) error {
+func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object, op ownedObjectOp) error {
 	// Ensure owner reference is always set on objects that we write
 	if err := ctrl.SetControllerReference(gateway, writeSource, r.Client.Scheme()); err != nil {
 		return err
@@ -135,9 +140,9 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 		exists = true
 	}
 
-	// None exists, so we need only create it
+	// None exists, so we need only execute the operation
 	if !exists {
-		return ifNew(ctx, writeSource)
+		return op(ctx, nil, writeSource)
 	}
 
 	// Ensure the existing object was put there by us so that we don't overwrite random objects
@@ -151,5 +156,5 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 	if !owned {
 		return errors.New("existing resource not owned by controller")
 	}
-	return ifOwned(ctx, writeSource)
+	return op(ctx, scanTarget, writeSource)
 }
