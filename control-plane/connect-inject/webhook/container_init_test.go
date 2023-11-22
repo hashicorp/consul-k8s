@@ -150,7 +150,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
-					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME),pod-uid=$(POD_UID)",
+					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 				},
 			},
 		},
@@ -164,7 +164,7 @@ func TestHandlerContainerInit(t *testing.T) {
 			require.NoError(t, err)
 			actual := strings.Join(container.Command, " ")
 			require.Contains(t, actual, tt.ExpCmd)
-			require.EqualValues(t, container.Env[4:], tt.ExpEnv)
+			require.EqualValues(t, container.Env[3:], tt.ExpEnv)
 		})
 	}
 }
@@ -602,7 +602,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
-					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME),pod-uid=$(POD_UID)",
+					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 				},
 				{
 					Name:  "CONSUL_LOGIN_NAMESPACE",
@@ -673,7 +673,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
-					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME),pod-uid=$(POD_UID)",
+					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 				},
 				{
 					Name:  "CONSUL_LOGIN_NAMESPACE",
@@ -704,7 +704,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 			actual := strings.Join(container.Command, " ")
 			require.Equal(t, tt.Cmd, actual)
 			if tt.ExpEnv != nil {
-				require.Equal(t, tt.ExpEnv, container.Env[4:])
+				require.Equal(t, tt.ExpEnv, container.Env[3:])
 			}
 		})
 	}
@@ -900,18 +900,18 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 			}
 			container, err := w.containerInit(testNS, *pod, multiPortInfo{})
 			require.NoError(t, err)
-			require.Equal(t, "CONSUL_ADDRESSES", container.Env[4].Name)
-			require.Equal(t, w.ConsulAddress, container.Env[4].Value)
-			require.Equal(t, "CONSUL_GRPC_PORT", container.Env[5].Name)
-			require.Equal(t, fmt.Sprintf("%d", w.ConsulConfig.GRPCPort), container.Env[5].Value)
-			require.Equal(t, "CONSUL_HTTP_PORT", container.Env[6].Name)
-			require.Equal(t, fmt.Sprintf("%d", w.ConsulConfig.HTTPPort), container.Env[6].Value)
+			require.Equal(t, "CONSUL_ADDRESSES", container.Env[3].Name)
+			require.Equal(t, w.ConsulAddress, container.Env[3].Value)
+			require.Equal(t, "CONSUL_GRPC_PORT", container.Env[4].Name)
+			require.Equal(t, fmt.Sprintf("%d", w.ConsulConfig.GRPCPort), container.Env[4].Value)
+			require.Equal(t, "CONSUL_HTTP_PORT", container.Env[5].Name)
+			require.Equal(t, fmt.Sprintf("%d", w.ConsulConfig.HTTPPort), container.Env[5].Value)
 			if w.TLSEnabled {
-				require.Equal(t, "CONSUL_USE_TLS", container.Env[9].Name)
-				require.Equal(t, "true", container.Env[9].Value)
+				require.Equal(t, "CONSUL_USE_TLS", container.Env[8].Name)
+				require.Equal(t, "true", container.Env[8].Value)
 				if caProvided {
-					require.Equal(t, "CONSUL_CACERT_PEM", container.Env[10].Name)
-					require.Equal(t, "consul-ca-cert", container.Env[10].Value)
+					require.Equal(t, "CONSUL_CACERT_PEM", container.Env[9].Name)
+					require.Equal(t, "consul-ca-cert", container.Env[9].Value)
 				} else {
 					for _, ev := range container.Env {
 						if ev.Name == "CONSUL_CACERT_PEM" {

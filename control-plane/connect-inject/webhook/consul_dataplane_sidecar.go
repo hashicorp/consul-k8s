@@ -120,13 +120,21 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			},
 			{
 				Name:  "DP_CREDENTIAL_LOGIN_META",
-				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME),pod-uid=$(POD_UID)",
+				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+			},
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META",
+				Value: "pod-uid=$(POD_UID)",
 			},
 			// This entry exists to support certain versions of consul dataplane, where environment variable entries
 			// utilize this numbered notation to indicate individual KV pairs in a map.
 			{
 				Name:  "DP_CREDENTIAL_LOGIN_META1",
-				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME),pod-uid=$(POD_UID)",
+				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+			},
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META2",
+				Value: "pod-uid=$(POD_UID)",
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
