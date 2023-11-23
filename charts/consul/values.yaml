@@ -1005,8 +1005,14 @@ server:
     # the server cluster is enabled. To disable, set to `false`.
     enabled: true
 
-    # The maximum number of unavailable pods. By default, this will be
-    # automatically computed based on the `server.replicas` value to be `(n/2)-1`.
+    # The maximum number of unavailable pods. In most cases you should not change this as it is automatically set to
+    # the correct number when left as null. This setting has been kept to not break backwards compatibility.
+    #
+    # By default, this is set to 1 internally in the chart. When server pods are stopped gracefully, they leave the Raft
+    # consensus pool. When running an odd number of servers, one server leaving the pool does not change the quorum
+    # size, and so fault tolerance is not affected. However, if more than one server were to leave the pool, the quorum
+    # size would change. That's why this is set to 1 internally and should not be changed in most cases.
+    #
     # If you need to set this to `0`, you will need to add a
     # --set 'server.disruptionBudget.maxUnavailable=0'` flag to the helm chart installation
     # command because of a limitation in the Helm templating language.
