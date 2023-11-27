@@ -4,6 +4,7 @@
 package gatewayresources
 
 import (
+	"os"
 	"testing"
 
 	"github.com/mitchellh/cli"
@@ -14,6 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
@@ -253,4 +257,85 @@ func TestRun(t *testing.T) {
 			require.Equal(t, 0, code)
 		})
 	}
+}
+
+var meshGWConfigFileContent = `gatewayClassConfigs:
+  - apiVersion: mesh.consul.hashicorp.com/v2beta1
+    metadata:
+      name: consul-mesh-gateway
+      namespace: namespace
+    kind: gatewayClassConfig
+    spec:
+      deployment:
+meshGateways:
+  - name: mesh-gateway
+    spec:
+      gatewayClassName: consul-mesh-gateway
+`
+
+func TestRun_loadMeshGatewayConfigs(t *testing.T) {
+	tmpdir := t.TempDir()
+	file, err := os.CreateTemp(tmpdir, "config.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = file.Write([]byte(meshGWConfigFileContent))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		k8sClient: client,
+	}
+
+	err = cmd.loadMeshGatewayConfigs(file.Name())
+	require.NoError(t, err)
+	require.NotEmpty(t, cmd.meshGatewayConfig.GatewayClassConfigs)
+
+	// we only created one class config
+	classConfig := cmd.meshGatewayConfig.GatewayClassConfigs[0].DeepCopy()
+
+	// TODO: Add resources to the example yaml and test here once https://github.com/hashicorp/consul/pull/19725 merges
+	expectedClassConfig := v2beta1.GatewayClassConfig{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "mesh.consul.hashicorp.com/v2beta1",
+			Kind:       "gatewayClassConfig",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "consul-mesh-gateway",
+			Namespace: "namespace",
+		},
+		Spec:   meshv2beta1.GatewayClassConfig{},
+		Status: v2beta1.Status{},
+	}
+	require.Equal(t, expectedClassConfig.DeepCopy(), classConfig)
+}
+
+func TestRun_loadMeshGatewayConfigsWhenConfigFileDoesNotExist(t *testing.T) {
+	filename := "./consul/config/config.yaml"
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		k8sClient: client,
+	}
+
+	err := cmd.loadMeshGatewayConfigs(filename)
+	require.NoError(t, err)
+	require.Empty(t, cmd.meshGatewayConfig.GatewayClassConfigs)
 }
