@@ -74,6 +74,14 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// onCreateUpdate is responsible for creating/updating all K8s resources that
+// are required in order to run a meshv2beta1.MeshGateway. These are created/updated
+// in dependency order.
+//  1. ServiceAccount
+//  2. Deployment
+//  3. Service
+//  4. Role
+//  5. RoleBinding
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
 	builder := gateways.NewMeshGatewayBuilder(resource)
 
@@ -92,20 +100,12 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 	return nil
 }
 
+// onDelete is responsible for cleaning up any side effects of onCreateUpdate.
+// We only clean up side effects because all resources that we create explicitly
+// have an owner reference and will thus be cleaned up by the K8s garbage collector
+// once the owning meshv2beta1.MeshGateway is deleted.
 func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
-	builder := gateways.NewMeshGatewayBuilder(resource)
-
-	deleteOp := func(ctx context.Context, _, object client.Object) error {
-		return r.Delete(ctx, object)
-	}
-
-	err := r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), deleteOp)
-	if err != nil {
-		return err
-	}
-
 	// TODO NET-6392 NET-6393 NET-6395
-
 	return nil
 }
 

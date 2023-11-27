@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -19,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
@@ -119,75 +116,6 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			},
 			expectedResult: ctrl.Result{},
 			expectedErr:    nil, // The Reconcile should be a no-op
-		},
-		{
-			name: "MeshGateway deleted with existing ServiceAccount not owned by gateway",
-			k8sObjects: []runtime.Object{
-				&v2beta1.MeshGateway{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:         "default",
-						Name:              "mesh-gateway",
-						DeletionTimestamp: common.PointerTo(metav1.NewTime(time.Now())),
-					},
-				},
-				&corev1.ServiceAccount{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "default",
-						Name:      "mesh-gateway",
-					},
-				},
-			},
-			request: ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: "default",
-					Name:      "mesh-gateway",
-				},
-			},
-			expectedResult: ctrl.Result{},
-			expectedErr:    errors.New("existing resource not owned by controller"),
-			postReconcile: func(t *testing.T, c client.Client) {
-				// Verify ServiceAccount was not deleted
-				key := client.ObjectKey{Namespace: "default", Name: "mesh-gateway"}
-				assert.NoError(t, c.Get(context.Background(), key, &corev1.ServiceAccount{}))
-			},
-		},
-		{
-			name: "MeshGateway deleted with existing ServiceAccount owned by gateway",
-			k8sObjects: []runtime.Object{
-				&v2beta1.MeshGateway{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:         "default",
-						Name:              "mesh-gateway",
-						UID:               "abc123",
-						DeletionTimestamp: common.PointerTo(metav1.NewTime(time.Now())),
-					},
-				},
-				&corev1.ServiceAccount{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "default",
-						Name:      "mesh-gateway",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								UID:  "abc123",
-								Name: "mesh-gateway",
-							},
-						},
-					},
-				},
-			},
-			request: ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: "default",
-					Name:      "mesh-gateway",
-				},
-			},
-			expectedResult: ctrl.Result{},
-			postReconcile: func(t *testing.T, c client.Client) {
-				// Verify ServiceAccount was deleted
-				key := client.ObjectKey{Namespace: "default", Name: "mesh-gateway"}
-				err := c.Get(context.Background(), key, &corev1.ServiceAccount{})
-				assert.True(t, k8serr.IsNotFound(err))
-			},
 		},
 	}
 
