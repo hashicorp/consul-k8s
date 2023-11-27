@@ -21,10 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type TokenResponse struct {
-	Token string `json:"token"`
-}
-
 var (
 	resourceSecretName     = "resource-sec-name"
 	resourceSecretKey      = "resource-sec-key"
