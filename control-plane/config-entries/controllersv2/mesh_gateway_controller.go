@@ -109,7 +109,7 @@ func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, 
 	return nil
 }
 
-// ownedObjectOp represent an operation that needs to be applied
+// ownedObjectOp represents an operation that needs to be applied
 // only if the newObject does not yet exist or if the existingObject
 // has an owner reference pointing to the MeshGateway being reconciled.
 //
