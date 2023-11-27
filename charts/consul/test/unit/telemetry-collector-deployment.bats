@@ -1357,4 +1357,3 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   local actual=$(echo $object | jq -r '.[1].args | any(contains("-service-namespace=fakenamespace"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 }
->>>>>>> 710918dc (Fix consul-telemetry-collector deployments to non-default namespaces (#3215))
