@@ -324,10 +324,6 @@ spec:
           {{- end }}
           # service and login namespace
           {{- if .Values.global.enableConsulNamespaces }}
-<<<<<<< HEAD
-          {{- if .Values.syncCatalog.consulNamespaces.mirroringK8S }}
-          - -login-namespace="default"
-=======
           {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
           - -service-namespace={{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}{{ .Release.Namespace }}
           {{- else }}
@@ -336,7 +332,6 @@ spec:
           {{- if .Values.global.acls.manageSystemACLs }}
           {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
           - -login-namespace=default
->>>>>>> 710918dc (Fix consul-telemetry-collector deployments to non-default namespaces (#3215))
           {{- else }}
           - -login-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
           {{- end }} 
@@ -344,12 +339,8 @@ spec:
           {{- end }}
           # service and login partition
           {{- if .Values.global.adminPartitions.enabled }}
-<<<<<<< HEAD
-          - foo
-=======
           - -service-partition={{ .Values.global.adminPartitions.name }}
           {{- if .Values.global.acls.manageSystemACLs }}
->>>>>>> 710918dc (Fix consul-telemetry-collector deployments to non-default namespaces (#3215))
           - -login-partition={{ .Values.global.adminPartitions.name }}
           {{- end }}
           {{- end }}
