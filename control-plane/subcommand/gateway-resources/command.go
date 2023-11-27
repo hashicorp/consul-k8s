@@ -78,6 +78,8 @@ type Command struct {
 	flagDeploymentMaxInstances     int
 	flagDeploymentMinInstances     int
 
+	flagMeshGatewayConfigLocation string
+
 	flagNodeSelector       string // this is a yaml multiline string map
 	flagTolerations        string // this is a multiline yaml string matching the tolerations array
 	flagServiceAnnotations string // this is a multiline yaml string array of annotations to allow
@@ -152,6 +154,9 @@ func (c *Command) init() {
 			"gateway container.",
 	)
 
+	c.flags.StringVar(&c.flagMeshGatewayConfigLocation, "meshgw-config-file-location", meshGWConfigFilename,
+		"specify a different location for where the mesh gateway config file is")
+
 	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
@@ -176,7 +181,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Load mesh gateway config from the configmap.
-	if err := c.loadMeshGatewayConfigs(meshGWConfigFilename); err != nil {
+	if err := c.loadMeshGatewayConfigs(); err != nil {
 		c.UI.Error(fmt.Sprintf("Error loading config: %s", err))
 		return 1
 	}
@@ -355,8 +360,8 @@ func (c *Command) loadAPIGWResourceConfig() error {
 }
 
 // loadMeshConfigs reads and loads the mesh configs from `/consul/config/config.yaml`, if this file does not exist nothing is done
-func (c *Command) loadMeshGatewayConfigs(filename string) error {
-	file, err := os.Open(filename)
+func (c *Command) loadMeshGatewayConfigs() error {
+	file, err := os.Open(c.flagMeshGatewayConfigLocation)
 	if err != nil {
 		if os.IsNotExist(err) {
 			c.UI.Warn("mesh gateway configuration file not found, skipping mesh gateway configuration")
@@ -381,6 +386,8 @@ func (c *Command) loadMeshGatewayConfigs(filename string) error {
 	return nil
 }
 
+// createMeshGatewayClassAndClassConfigs utilizes the configuration loaded from the mesh gateway config file to
+// create the GatewayClassConfig and GatewayClass for the mesh gateway
 func (c *Command) createMeshGatewayClassAndClassConfigs(ctx context.Context) error {
 	labels := map[string]string{
 		"app":       c.flagApp,
@@ -396,14 +403,14 @@ func (c *Command) createMeshGatewayClassAndClassConfigs(ctx context.Context) err
 		}
 
 		class := &v2beta1.GatewayClass{
-			ObjectMeta: metav1.ObjectMeta{Name: c.flagGatewayClassName, Labels: labels},
+			ObjectMeta: metav1.ObjectMeta{Name: cfg.Name, Labels: labels},
 			Spec: meshv2beta1.GatewayClass{
 				ControllerName: "mesh-gateway-controller",
 				ParametersRef: &meshv2beta1.ParametersReference{
 					Group:     "mesh.consul.hashicorp.com",
 					Kind:      "gatewayClass",
 					Namespace: &cfg.Namespace,
-					Name:      c.flagGatewayClassName,
+					Name:      cfg.Name,
 				},
 			},
 		}

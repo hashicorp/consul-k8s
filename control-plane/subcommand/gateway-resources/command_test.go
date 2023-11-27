@@ -197,18 +197,22 @@ func TestRun(t *testing.T) {
 	for name, tt := range map[string]struct {
 		existingGatewayClass       bool
 		existingGatewayClassConfig bool
+		meshGWConfigFileExists     bool
 	}{
 		"both exist": {
 			existingGatewayClass:       true,
 			existingGatewayClassConfig: true,
 		},
-		"gateway class config doesn't exist": {
+		"api gateway class config doesn't exist": {
 			existingGatewayClass: true,
 		},
-		"gateway class doesn't exist": {
+		"api gateway class doesn't exist": {
 			existingGatewayClassConfig: true,
 		},
 		"neither exist": {},
+		"mesh gw config file exists": {
+			meshGWConfigFileExists: true,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tt := tt
@@ -226,6 +230,11 @@ func TestRun(t *testing.T) {
 			require.NoError(t, gwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
+			configFileName := meshGWConfigFilename
+			if tt.meshGWConfigFileExists {
+				configFileName = createMeshGatewayConfigFile(t)
+			}
+
 			objs := []client.Object{}
 			if tt.existingGatewayClass {
 				objs = append(objs, existingGatewayClass)
@@ -240,6 +249,7 @@ func TestRun(t *testing.T) {
 			cmd := Command{
 				UI:        ui,
 				k8sClient: client,
+				flagMeshGatewayConfigLocation: configFileName,
 			}
 
 			code := cmd.Run([]string{
@@ -274,18 +284,8 @@ meshGateways:
 `
 
 func TestRun_loadMeshGatewayConfigs(t *testing.T) {
-	tmpdir := t.TempDir()
-	file, err := os.CreateTemp(tmpdir, "config.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = file.Write([]byte(meshGWConfigFileContent))
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	filename := createMeshGatewayConfigFile(t)
+	// setup k8s client
 	s := runtime.NewScheme()
 	require.NoError(t, gwv1beta1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
@@ -294,11 +294,12 @@ func TestRun_loadMeshGatewayConfigs(t *testing.T) {
 
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:        ui,
-		k8sClient: client,
+		UI:                            ui,
+		k8sClient:                     client,
+		flagMeshGatewayConfigLocation: filename,
 	}
 
-	err = cmd.loadMeshGatewayConfigs(file.Name())
+	err := cmd.loadMeshGatewayConfigs()
 	require.NoError(t, err)
 	require.NotEmpty(t, cmd.meshGatewayConfig.GatewayClassConfigs)
 
@@ -331,11 +332,31 @@ func TestRun_loadMeshGatewayConfigsWhenConfigFileDoesNotExist(t *testing.T) {
 
 	ui := cli.NewMockUi()
 	cmd := Command{
-		UI:        ui,
-		k8sClient: client,
+		UI:                            ui,
+		k8sClient:                     client,
+		flagMeshGatewayConfigLocation: filename,
 	}
 
-	err := cmd.loadMeshGatewayConfigs(filename)
+	err := cmd.loadMeshGatewayConfigs()
 	require.NoError(t, err)
 	require.Empty(t, cmd.meshGatewayConfig.GatewayClassConfigs)
+}
+
+func createMeshGatewayConfigFile(t *testing.T) string {
+	t.Helper()
+
+	// create a temp file to store configuration yaml
+	tmpdir := t.TempDir()
+	file, err := os.CreateTemp(tmpdir, "config.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = file.Write([]byte(meshGWConfigFileContent))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return file.Name()
 }
