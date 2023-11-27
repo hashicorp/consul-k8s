@@ -1,0 +1,3 @@
+```release-note:bug
+consul-telemetry-collector: add telemetryCollector.cloud.resourceId that works even when not global.cloud.enabled
+```
