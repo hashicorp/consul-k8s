@@ -2660,7 +2660,7 @@ reservedNameTest() {
 
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "global.cloud.enabled cannot be used in combination with an HCP-managed cluster address in externalServers.hosts. global.cloud.enabled is for linked, not managed, clusters." ]]
+  [[ "$output" =~ "global.cloud.enabled cannot be used in combination with an HCP-managed cluster address in externalServers.hosts. global.cloud.enabled is for linked self-managed clusters." ]]
 }
 
 @test "connectInject/Deployment: can provide a TLS server name for the sidecar-injector when global.cloud.enabled is set" {
