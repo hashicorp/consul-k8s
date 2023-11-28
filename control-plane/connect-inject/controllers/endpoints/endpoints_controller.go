@@ -407,6 +407,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		metaKeyKubeServiceName:   serviceEndpoints.Name,
 		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
 		metaKeyManagedBy:         constants.ManagedByValue,
+		constants.MetaKeyPodUID:  string(pod.UID),
 		metaKeySyntheticNode:     "true",
 	}
 	for k, v := range pod.Annotations {
@@ -654,6 +655,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
 		metaKeyManagedBy:         constants.ManagedByValue,
 		metaKeySyntheticNode:     "true",
+		constants.MetaKeyPodUID:  string(pod.UID),
 	}
 
 	service := &api.AgentService{
@@ -933,7 +935,7 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 
 			if r.AuthMethod != "" && serviceDeregistered {
 				r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
-				err := r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
+				err := r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName], svc.Meta[constants.MetaKeyPodUID])
 				if err != nil {
 					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
 					errs = multierror.Append(errs, err)
@@ -948,8 +950,8 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
-// has been configured with and will only delete tokens for the provided podName.
-func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, svc *api.AgentService, k8sNS, podName string) error {
+// has been configured with and will only delete tokens for the provided podName and podUID.
+func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, svc *api.AgentService, k8sNS, podName, podUID string) error {
 	// Skip if podName is empty.
 	if podName == "" {
 		return nil
@@ -985,8 +987,11 @@ func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, sv
 
 			tokenPodName := strings.TrimPrefix(tokenMeta[tokenMetaPodNameKey], k8sNS+"/")
 
+			// backward compability logic on token with no podUID in metadata
+			podUIDMatched := tokenMeta[constants.MetaKeyPodUID] == podUID || tokenMeta[constants.MetaKeyPodUID] == ""
+
 			// If we can't find token's pod, delete it.
-			if tokenPodName == podName {
+			if tokenPodName == podName && podUIDMatched {
 				r.Log.Info("deleting ACL token for pod", "name", podName)
 				if _, err := apiClient.ACL().TokenDelete(token.AccessorID, &api.WriteOptions{Namespace: svc.Namespace}); err != nil {
 					return fmt.Errorf("failed to delete token from Consul: %s", err)
