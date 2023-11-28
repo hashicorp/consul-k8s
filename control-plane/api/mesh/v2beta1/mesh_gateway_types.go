@@ -51,13 +51,13 @@ type MeshGatewayList struct {
 	Items           []*MeshGateway `json:"items"`
 }
 
-func (in *MeshGateway) ResourceID(namespace, partition string) *pbresource.ID {
+func (in *MeshGateway) ResourceID(_, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: in.Name,
 		Type: pbmesh.MeshGatewayType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
-			Namespace: namespace,
+			Namespace: "", // Namespace is always unset because MeshGateway is partition-scoped
 
 			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
 			// At a future point, this will move out of the Tenancy block.
