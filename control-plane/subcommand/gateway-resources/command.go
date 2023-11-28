@@ -36,7 +36,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
-const meshGWConfigFilename = "/consul/config/config.yaml"
+const gatewayConfigFilename = "/consul/config/config.yaml"
 
 // this dupes the Kubernetes tolerations
 // struct with yaml tags for validation.
@@ -78,7 +78,7 @@ type Command struct {
 	flagDeploymentMaxInstances     int
 	flagDeploymentMinInstances     int
 
-	flagMeshGatewayConfigLocation string
+	flagGatewayConfigLocation string
 
 	flagNodeSelector       string // this is a yaml multiline string map
 	flagTolerations        string // this is a multiline yaml string matching the tolerations array
@@ -97,12 +97,12 @@ type Command struct {
 	tolerations        []corev1.Toleration
 	serviceAnnotations []string
 	resources          corev1.ResourceRequirements
-	meshGatewayConfig  meshGatewayConfig
+	gatewayConfig      gatewayConfig
 
 	ctx context.Context
 }
 
-type meshGatewayConfig struct {
+type gatewayConfig struct {
 	GatewayClassConfigs []*v2beta1.GatewayClassConfig `yaml:"gatewayClassConfigs"`
 }
 
@@ -154,8 +154,8 @@ func (c *Command) init() {
 			"gateway container.",
 	)
 
-	c.flags.StringVar(&c.flagMeshGatewayConfigLocation, "meshgw-config-file-location", meshGWConfigFilename,
-		"specify a different location for where the mesh gateway config file is")
+	c.flags.StringVar(&c.flagGatewayConfigLocation, "gateway-config-file-location", gatewayConfigFilename,
+		"specify a different location for where the gateway config file is")
 
 	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
@@ -176,13 +176,13 @@ func (c *Command) Run(args []string) int {
 
 	// Load apigw resource config from the configmap.
 	if err := c.loadAPIGWResourceConfig(); err != nil {
-		c.UI.Error(fmt.Sprintf("Error loading config: %s", err))
+		c.UI.Error(fmt.Sprintf("Error loading api-gateway resource config: %s", err))
 		return 1
 	}
 
-	// Load mesh gateway config from the configmap.
-	if err := c.loadMeshGatewayConfigs(); err != nil {
-		c.UI.Error(fmt.Sprintf("Error loading config: %s", err))
+	// Load gateway config from the configmap.
+	if err := c.loadGatewayConfigs(); err != nil {
+		c.UI.Error(fmt.Sprintf("Error loading gateway config: %s", err))
 		return 1
 	}
 
@@ -268,7 +268,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	if len(c.meshGatewayConfig.GatewayClassConfigs) > 0 {
+	if len(c.gatewayConfig.GatewayClassConfigs) > 0 {
 		err = c.createMeshGatewayClassAndClassConfigs(context.Background())
 		if err != nil {
 			c.UI.Error(err.Error())
@@ -359,44 +359,44 @@ func (c *Command) loadAPIGWResourceConfig() error {
 	return nil
 }
 
-// loadMeshConfigs reads and loads the mesh configs from `/consul/config/config.yaml`, if this file does not exist nothing is done
-func (c *Command) loadMeshGatewayConfigs() error {
-	file, err := os.Open(c.flagMeshGatewayConfigLocation)
+// loadMeshConfigs reads and loads the configs from `/consul/config/config.yaml`, if this file does not exist nothing is done
+func (c *Command) loadGatewayConfigs() error {
+	file, err := os.Open(c.flagGatewayConfigLocation)
 	if err != nil {
 		if os.IsNotExist(err) {
-			c.UI.Warn("mesh gateway configuration file not found, skipping mesh gateway configuration")
+			c.UI.Warn(fmt.Sprintf("gateway configuration file not found, skipping gateway configuration, filename: %s", c.flagGatewayConfigLocation))
 			return nil
 		}
-		c.UI.Error(fmt.Sprintf("Unable to open mesh configuration config.yaml: %s", err))
+		c.UI.Error(fmt.Sprintf("Error openeing gateway configuration file %s: %s", c.flagGatewayConfigLocation, err))
 		return err
 	}
 
 	config, err := io.ReadAll(file)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Unable to read mesh configuration config.yaml: %s", err))
+		c.UI.Error(fmt.Sprintf("Error reading gateway configuration file %s: %s", c.flagGatewayConfigLocation, err))
 		return err
 	}
 
-	err = k8syaml.Unmarshal(config, &c.meshGatewayConfig)
+	err = k8syaml.Unmarshal(config, &c.gatewayConfig)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error decoding mesh gateway config: %s", err))
+		c.UI.Error(fmt.Sprintf("Error decoding gateway config file: %s", err))
 		return err
 	}
 
 	return nil
 }
 
-// createMeshGatewayClassAndClassConfigs utilizes the configuration loaded from the mesh gateway config file to
-// create the GatewayClassConfig and GatewayClass for the mesh gateway
+// createMeshGatewayClassAndClassConfigs utilizes the configuration loaded from the gateway config file to
+// create the GatewayClassConfig and GatewayClass for the gateway
 func (c *Command) createMeshGatewayClassAndClassConfigs(ctx context.Context) error {
 	labels := map[string]string{
 		"app":       c.flagApp,
 		"chart":     c.flagChart,
 		"heritage":  c.flagHeritage,
 		"release":   c.flagRelease,
-		"component": "mesh-gateway",
+		"component": "consul-mesh-gateway",
 	}
-	for _, cfg := range c.meshGatewayConfig.GatewayClassConfigs {
+	for _, cfg := range c.gatewayConfig.GatewayClassConfigs {
 		err := forceV2ClassConfig(ctx, c.k8sClient, cfg)
 		if err != nil {
 			return err
@@ -405,10 +405,10 @@ func (c *Command) createMeshGatewayClassAndClassConfigs(ctx context.Context) err
 		class := &v2beta1.GatewayClass{
 			ObjectMeta: metav1.ObjectMeta{Name: cfg.Name, Labels: labels},
 			Spec: meshv2beta1.GatewayClass{
-				ControllerName: "mesh-gateway-controller",
+				ControllerName: "consul-mesh-gateway-controller",
 				ParametersRef: &meshv2beta1.ParametersReference{
-					Group:     "mesh.consul.hashicorp.com",
-					Kind:      "gatewayClass",
+					Group:     v2beta1.MeshGroup,
+					Kind:      "GatewayClass",
 					Namespace: &cfg.Namespace,
 					Name:      cfg.Name,
 				},
