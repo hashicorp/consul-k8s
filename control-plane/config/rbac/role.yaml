@@ -348,6 +348,26 @@ rules:
 - apiGroups:
   - mesh.consul.hashicorp.com
   resources:
+  - gatewayclass
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - gatewayclass/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
   - grpcroute
   verbs:
   - create
