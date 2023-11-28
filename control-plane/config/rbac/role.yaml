@@ -465,3 +465,24 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+    - mesh.consul.hashicorp.com
+  resources:
+    - gatewayclassconfig
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - mesh.consul.hashicorp.com
+  resources:
+    - gatewayclassconfig/status
+  verbs:
+    - get
+    - patch
+    - update
+
