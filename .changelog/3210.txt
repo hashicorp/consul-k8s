@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: Only delete ACL tokens matched Pod UID in Service Registration metadata 
+```
