@@ -1328,3 +1328,46 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'global.experiments[0]=resource-apis' \
       .
 }
+
+#--------------------------------------------------------------------
+# Namespaces
+
+@test "telemetryCollector/Deployment: namespace flags when mirroringK8S" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --namespace 'test-namespace' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-login-namespace=default"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-service-namespace=test-namespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}
+
+@test "telemetryCollector/Deployment: namespace flags when not mirroringK8S" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=false' \
+      --set 'connectInject.consulNamespaces.consulDestinationNamespace=fakenamespace' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.[1].args | any(contains("-login-namespace=fakenamespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  local actual=$(echo $object | jq -r '.[1].args | any(contains("-service-namespace=fakenamespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}

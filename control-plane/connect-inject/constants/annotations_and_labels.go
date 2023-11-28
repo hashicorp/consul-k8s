@@ -196,6 +196,11 @@ const (
 	// by the peering controllers.
 	LabelPeeringToken = "consul.hashicorp.com/peering-token"
 
+	// LabelTelemetryCollector is a label signaling the pod is associated with the deployment of a Consul Telemetry
+	// Collector. If this is set, during connect-inject, the endpoints-controller ensures the deployed Namespace exists in Consul and create it if it does not.
+	// This is only meant to be used by Deployment/consul-telemetry-collector.
+	LabelTelemetryCollector = "consul.hashicorp.com/telemetry-collector"
+
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	Injected = "injected"
 
