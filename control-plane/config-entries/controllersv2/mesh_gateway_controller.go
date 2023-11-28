@@ -97,6 +97,8 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 
 	// TODO NET-6392 NET-6393 NET-6395
 
+	//Create deployment
+
 	return nil
 }
 
