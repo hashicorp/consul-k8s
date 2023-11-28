@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: Add new `consul.hashicorp.com/proxy-config-map` annotation that allows for setting values in the opaque config map for proxy service registrations.
+```
