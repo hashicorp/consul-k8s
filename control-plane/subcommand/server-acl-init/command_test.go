@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -1283,14 +1284,14 @@ func TestConsulDatacenterList(t *testing.T) {
 			}))
 			defer consulServer.Close()
 
-			consulClient, err := api.NewClient(&api.Config{Address: consulServer.URL})
+			client, err := consul.NewDynamicClient(&api.Config{Address: consulServer.URL})
 			require.NoError(t, err)
 
 			command := Command{
 				log: hclog.New(hclog.DefaultOptions),
 				ctx: context.Background(),
 			}
-			actDC, actPrimaryDC, err := command.consulDatacenterList(consulClient)
+			actDC, actPrimaryDC, err := command.consulDatacenterList(client)
 			if c.expErr != "" {
 				require.EqualError(t, err, c.expErr)
 			} else {
