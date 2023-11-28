@@ -386,9 +386,9 @@ func createMeshGatewayConfigFile(t *testing.T, fileContent string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer file.Close()
 
-	_, err = file.Write([]byte(fileContent))
-
+	_, err = file.WriteString(fileContent)
 	if err != nil {
 		t.Fatal(err)
 	}
