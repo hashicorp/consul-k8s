@@ -367,7 +367,7 @@ func (c *Command) loadGatewayConfigs() error {
 			c.UI.Warn(fmt.Sprintf("gateway configuration file not found, skipping gateway configuration, filename: %s", c.flagGatewayConfigLocation))
 			return nil
 		}
-		c.UI.Error(fmt.Sprintf("Error openeing gateway configuration file %s: %s", c.flagGatewayConfigLocation, err))
+		c.UI.Error(fmt.Sprintf("Error opening gateway configuration file %s: %s", c.flagGatewayConfigLocation, err))
 		return err
 	}
 
