@@ -269,7 +269,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if len(c.gatewayConfig.GatewayClassConfigs) > 0 {
-		err = c.createMeshGatewayClassAndClassConfigs(context.Background())
+		err = c.createV2GatewayClassAndClassConfigs(context.Background(), "consul-mesh-gateway", "consul-mesh-gateway-controller")
 		if err != nil {
 			c.UI.Error(err.Error())
 			return 1
@@ -386,15 +386,15 @@ func (c *Command) loadGatewayConfigs() error {
 	return nil
 }
 
-// createMeshGatewayClassAndClassConfigs utilizes the configuration loaded from the gateway config file to
+// createV2GatewayClassAndClassConfigs utilizes the configuration loaded from the gateway config file to
 // create the GatewayClassConfig and GatewayClass for the gateway
-func (c *Command) createMeshGatewayClassAndClassConfigs(ctx context.Context) error {
+func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, component, controllerName string) error {
 	labels := map[string]string{
 		"app":       c.flagApp,
 		"chart":     c.flagChart,
 		"heritage":  c.flagHeritage,
 		"release":   c.flagRelease,
-		"component": "consul-mesh-gateway",
+		"component": component,
 	}
 	for _, cfg := range c.gatewayConfig.GatewayClassConfigs {
 		err := forceV2ClassConfig(ctx, c.k8sClient, cfg)
@@ -405,7 +405,7 @@ func (c *Command) createMeshGatewayClassAndClassConfigs(ctx context.Context) err
 		class := &v2beta1.GatewayClass{
 			ObjectMeta: metav1.ObjectMeta{Name: cfg.Name, Labels: labels},
 			Spec: meshv2beta1.GatewayClass{
-				ControllerName: "consul-mesh-gateway-controller",
+				ControllerName: controllerName,
 				ParametersRef: &meshv2beta1.ParametersReference{
 					Group:     v2beta1.MeshGroup,
 					Kind:      "GatewayClass",

@@ -232,7 +232,7 @@ func TestRun(t *testing.T) {
 
 			configFileName := gatewayConfigFilename
 			if tt.meshGWConfigFileExists {
-				configFileName = createMeshGatewayConfigFile(t, validGWConfiguration)
+				configFileName = createGatewayConfigFile(t, validGWConfiguration)
 			}
 
 			objs := []client.Object{}
@@ -296,8 +296,8 @@ meshGateways:
       gatewayClassName: consul-mesh-gateway
 `
 
-func TestRun_loadMesGatewayConfigs(t *testing.T) {
-	filename := createMeshGatewayConfigFile(t, validGWConfiguration)
+func TestRun_loadGatewayConfigs(t *testing.T) {
+	filename := createGatewayConfigFile(t, validGWConfiguration)
 	// setup k8s client
 	s := runtime.NewScheme()
 	require.NoError(t, gwv1beta1.Install(s))
@@ -335,8 +335,8 @@ func TestRun_loadMesGatewayConfigs(t *testing.T) {
 	require.Equal(t, expectedClassConfig.DeepCopy(), classConfig)
 }
 
-func TestRun_loadMesGatewayConfigsWithInvalidFile(t *testing.T) {
-	filename := createMeshGatewayConfigFile(t, invalidGWConfiguration)
+func TestRun_loadGatewayConfigsWithInvalidFile(t *testing.T) {
+	filename := createGatewayConfigFile(t, invalidGWConfiguration)
 	// setup k8s client
 	s := runtime.NewScheme()
 	require.NoError(t, gwv1beta1.Install(s))
@@ -377,7 +377,7 @@ func TestRun_loadGatewayConfigsWhenConfigFileDoesNotExist(t *testing.T) {
 	require.Contains(t, string(ui.ErrorWriter.Bytes()), "gateway configuration file not found, skipping gateway configuration")
 }
 
-func createMeshGatewayConfigFile(t *testing.T, fileContent string) string {
+func createGatewayConfigFile(t *testing.T, fileContent string) string {
 	t.Helper()
 
 	// create a temp file to store configuration yaml
