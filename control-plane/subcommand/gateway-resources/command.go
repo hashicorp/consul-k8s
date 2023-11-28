@@ -359,7 +359,7 @@ func (c *Command) loadAPIGWResourceConfig() error {
 	return nil
 }
 
-// loadMeshConfigs reads and loads the configs from `/consul/config/config.yaml`, if this file does not exist nothing is done
+// loadGatewayConfigs reads and loads the configs from `/consul/config/config.yaml`, if this file does not exist nothing is done
 func (c *Command) loadGatewayConfigs() error {
 	file, err := os.Open(c.flagGatewayConfigLocation)
 	if err != nil {
