@@ -26,8 +26,8 @@ func TestValidateMeshConfig(t *testing.T) {
 	otherNS := "other"
 
 	cases := map[string]struct {
-		existingResources   []MeshConfig
-		newResource         MeshConfig
+		existingResources   []ConsulResource
+		newResource         ConsulResource
 		enableNamespaces    bool
 		nsMirroring         bool
 		consulDestinationNS string
@@ -55,7 +55,7 @@ func TestValidateMeshConfig(t *testing.T) {
 			expErrMessage: "invalid",
 		},
 		"duplicate name": {
-			existingResources: []MeshConfig{&mockMeshConfig{
+			existingResources: []ConsulResource{&mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: "default",
 			}},
@@ -68,7 +68,7 @@ func TestValidateMeshConfig(t *testing.T) {
 			expErrMessage: "mockkind resource with name \"foo\" is already defined – all mockkind resources must have unique names across namespaces",
 		},
 		"duplicate name, namespaces enabled": {
-			existingResources: []MeshConfig{&mockMeshConfig{
+			existingResources: []ConsulResource{&mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: "default",
 			}},
@@ -82,7 +82,7 @@ func TestValidateMeshConfig(t *testing.T) {
 			expErrMessage:    "mockkind resource with name \"foo\" is already defined – all mockkind resources must have unique names across namespaces",
 		},
 		"duplicate name, namespaces enabled, mirroring enabled": {
-			existingResources: []MeshConfig{&mockMeshConfig{
+			existingResources: []ConsulResource{&mockMeshConfig{
 				MockName:      "foo",
 				MockNamespace: "default",
 			}},
@@ -152,12 +152,12 @@ func TestMeshConfigDefaultingPatches(t *testing.T) {
 }
 
 type mockMeshConfigLister struct {
-	Resources []MeshConfig
+	Resources []ConsulResource
 }
 
-var _ MeshConfigLister = &mockMeshConfigLister{}
+var _ ConsulResourceLister = &mockMeshConfigLister{}
 
-func (in *mockMeshConfigLister) List(_ context.Context) ([]MeshConfig, error) {
+func (in *mockMeshConfigLister) List(_ context.Context) ([]ConsulResource, error) {
 	return in.Resources, nil
 }
 
@@ -167,7 +167,7 @@ type mockMeshConfig struct {
 	Valid         bool
 }
 
-var _ MeshConfig = &mockMeshConfig{}
+var _ ConsulResource = &mockMeshConfig{}
 
 func (in *mockMeshConfig) ResourceID(_, _ string) *pbresource.ID {
 	return nil

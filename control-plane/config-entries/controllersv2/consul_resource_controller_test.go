@@ -43,7 +43,7 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 
 	cases := []struct {
 		name       string
-		meshConfig common.MeshConfig
+		meshConfig common.ConsulResource
 		expected   *pbauth.TrafficPermissions
 		reconciler func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
 		unmarshal  func(t *testing.T, consul *pbresource.Resource) proto.Message
@@ -189,10 +189,10 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 
 	cases := []struct {
 		name       string
-		meshConfig common.MeshConfig
+		meshConfig common.ConsulResource
 		expected   *pbauth.TrafficPermissions
 		reconciler func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
-		updateF    func(config common.MeshConfig)
+		updateF    func(config common.ConsulResource)
 		unmarshal  func(t *testing.T, consul *pbresource.Resource) proto.Message
 	}{
 		{
@@ -263,7 +263,7 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 					},
 				}
 			},
-			updateF: func(resource common.MeshConfig) {
+			updateF: func(resource common.ConsulResource) {
 				trafficPermissions := resource.(*v2beta1.TrafficPermissions)
 				trafficPermissions.Spec.Action = pbauth.Action_ACTION_DENY
 				trafficPermissions.Spec.Permissions[0].Sources = trafficPermissions.Spec.Permissions[0].Sources[:1]
@@ -348,7 +348,7 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 
 	cases := []struct {
 		name                   string
-		MeshConfigWithDeletion common.MeshConfig
+		MeshConfigWithDeletion common.ConsulResource
 		reconciler             func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
 	}{
 		{

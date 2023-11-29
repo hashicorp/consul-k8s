@@ -15,11 +15,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// MeshConfigLister is implemented by CRD-specific webhooks.
-type MeshConfigLister interface {
+// ConsulResourceLister is implemented by CRD-specific webhooks.
+type ConsulResourceLister interface {
 	// List returns all resources of this type across all namespaces in a
 	// Kubernetes cluster.
-	List(ctx context.Context) ([]MeshConfig, error)
+	List(ctx context.Context) ([]ConsulResource, error)
 }
 
 // ValidateMeshConfig validates a MeshConfig. It is a generic method that
@@ -30,8 +30,8 @@ func ValidateMeshConfig(
 	ctx context.Context,
 	req admission.Request,
 	logger logr.Logger,
-	meshConfigLister MeshConfigLister,
-	meshConfig MeshConfig,
+	meshConfigLister ConsulResourceLister,
+	meshConfig ConsulResource,
 	tenancy ConsulTenancyConfig) admission.Response {
 
 	defaultingPatches, err := MeshConfigDefaultingPatches(meshConfig, tenancy)
@@ -68,7 +68,7 @@ func ValidateMeshConfig(
 }
 
 // MeshConfigDefaultingPatches returns the patches needed to set fields to their defaults.
-func MeshConfigDefaultingPatches(meshConfig MeshConfig, tenancy ConsulTenancyConfig) ([]jsonpatch.Operation, error) {
+func MeshConfigDefaultingPatches(meshConfig ConsulResource, tenancy ConsulTenancyConfig) ([]jsonpatch.Operation, error) {
 	beforeDefaulting, err := json.Marshal(meshConfig)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %s", err)

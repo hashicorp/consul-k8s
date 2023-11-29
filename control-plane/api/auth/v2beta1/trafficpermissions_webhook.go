@@ -27,7 +27,7 @@ type TrafficPermissionsWebhook struct {
 	client.Client
 }
 
-var _ common.MeshConfigLister = &TrafficPermissionsWebhook{}
+var _ common.ConsulResourceLister = &TrafficPermissionsWebhook{}
 
 // NOTE: The path value in the below line is the path to the webhook.
 // If it is updated, run code-gen, update subcommand/inject-connect/command.go
@@ -47,14 +47,14 @@ func (v *TrafficPermissionsWebhook) Handle(ctx context.Context, req admission.Re
 	return common.ValidateMeshConfig(ctx, req, v.Logger, v, &resource, v.ConsulTenancyConfig)
 }
 
-func (v *TrafficPermissionsWebhook) List(ctx context.Context) ([]common.MeshConfig, error) {
+func (v *TrafficPermissionsWebhook) List(ctx context.Context) ([]common.ConsulResource, error) {
 	var resourceList TrafficPermissionsList
 	if err := v.Client.List(ctx, &resourceList); err != nil {
 		return nil, err
 	}
-	var entries []common.MeshConfig
+	var entries []common.ConsulResource
 	for _, item := range resourceList.Items {
-		entries = append(entries, common.MeshConfig(item))
+		entries = append(entries, common.ConsulResource(item))
 	}
 	return entries, nil
 }
