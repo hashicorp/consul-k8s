@@ -106,16 +106,18 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 	// TODO NET-6392 NET-6393 NET-6395
 
 	//Create deployment
-	deployment, err := builder.Deployment(gcc)
+	builtDeployment, err := builder.Deployment(gcc)
 	if err != nil {
 		return err
 	}
 
-	err = r.opIfNewOrOwned(ctx, resource, &appsv1.Deployment{}, deployment, upsertOp)
+	err = r.opIfNewOrOwned(ctx, resource, &appsv1.Deployment{}, builtDeployment, upsertOp)
 	if err != nil {
 		return err
 	}
-	//TODO get existing deployment for merging purposes
+
+	existingDeployment, err := r.getDeploymentForGateway(ctx, resource)
+	builder.MergeDeployments(gcc, existingDeployment, builtDeployment)
 
 	return nil
 }
@@ -226,4 +228,12 @@ func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, g
 		return nil, client.IgnoreNotFound(err)
 	}
 	return &gatewayClass, nil
+}
+
+func (r *MeshGatewayController) getDeploymentForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*appsv1.Deployment, error) {
+	var deployment appsv1.Deployment
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: gateway.Name, Namespace: gateway.Namespace}, &deployment); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	return &deployment, nil
 }

@@ -87,13 +87,13 @@ func (b *meshGatewayBuilder) deploymentSpec(gcc *meshv2beta1.GatewayClassConfig)
 	}, nil
 }
 
-func MergeDeployments(gcc meshv2beta1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
-	if !compareDeployments(a, b) {
-		b.Spec.Template = a.Spec.Template
-		b.Spec.Replicas = deploymentReplicaCount(gcc.Spec.Deployment, a.Spec.Replicas)
+func (b *meshGatewayBuilder) MergeDeployments(gcc *meshv2beta1.GatewayClassConfig, old, new *appsv1.Deployment) *appsv1.Deployment {
+	if !compareDeployments(old, new) {
+		old.Spec.Template = new.Spec.Template
+		new.Spec.Replicas = deploymentReplicaCount(gcc.Spec.Deployment, old.Spec.Replicas)
 	}
 
-	return b
+	return new
 }
 
 func compareDeployments(a, b *appsv1.Deployment) bool {
