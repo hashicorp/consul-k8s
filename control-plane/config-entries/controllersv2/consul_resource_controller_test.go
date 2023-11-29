@@ -297,7 +297,7 @@ func TestConsulResourceController_UpdatesConsulResource(t *testing.T) {
 				return err == nil
 			}, 5*time.Second, 500*time.Millisecond)
 
-			// We haven't run reconcile yet, so we must create the MeshConfig
+			// We haven't run reconcile yet, so we must create the resource
 			// in Consul ourselves.
 			{
 				resource := c.resource.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
@@ -610,9 +610,9 @@ func TestConsulResourceController_SetsSyncedToTrue(t *testing.T) {
 	require.Equal(t, corev1.ConditionTrue, trafficpermissions.SyncedConditionStatus())
 }
 
-// TestMeshConfigController_doesNotCreateUnownedMeshConfig test that if the resource
+// TestConsulResourceController_DoesNotCreateUnownedResource test that if the resource
 // exists in Consul but is not managed by the controller, creating/updating the resource fails.
-func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
+func TestConsulResourceController_DoesNotCreateUnownedResource(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -715,10 +715,10 @@ func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
 
 }
 
-// TestMeshConfigController_doesNotDeleteUnownedConfig tests that if the resource
+// TestConsulResourceController_doesNotDeleteUnownedConfig tests that if the resource
 // exists in Consul but is not managed by the controller, deleting the resource does
 // not delete the Consul resource.
-func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
+func TestConsulResourceController_doesNotDeleteUnownedConfig(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
