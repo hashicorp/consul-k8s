@@ -142,19 +142,19 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 	if err := (&controllersv2.GRPCRouteController{
-		MeshConfigController: meshConfigReconciler,
-		Client:               mgr.GetClient(),
-		Log:                  ctrl.Log.WithName("controller").WithName(common.GRPCRoute),
-		Scheme:               mgr.GetScheme(),
+		ConsulResourceController: meshConfigReconciler,
+		Client:                   mgr.GetClient(),
+		Log:                      ctrl.Log.WithName("controller").WithName(common.GRPCRoute),
+		Scheme:                   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.GRPCRoute)
 		return err
 	}
 	if err := (&controllersv2.HTTPRouteController{
-		MeshConfigController: meshConfigReconciler,
-		Client:               mgr.GetClient(),
-		Log:                  ctrl.Log.WithName("controller").WithName(common.HTTPRoute),
-		Scheme:               mgr.GetScheme(),
+		ConsulResourceController: meshConfigReconciler,
+		Client:                   mgr.GetClient(),
+		Log:                      ctrl.Log.WithName("controller").WithName(common.HTTPRoute),
+		Scheme:                   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.HTTPRoute)
 		return err
@@ -188,19 +188,19 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	}
 
 	if err := (&controllersv2.GatewayClassConfigController{
-		MeshConfigController: meshConfigReconciler,
-		Client:               mgr.GetClient(),
-		Log:                  ctrl.Log.WithName("controller").WithName(common.GatewayClassConfig),
-		Scheme:               mgr.GetScheme(),
+		ConsulResourceController: meshConfigReconciler,
+		Client:                   mgr.GetClient(),
+		Log:                      ctrl.Log.WithName("controller").WithName(common.GatewayClassConfig),
+		Scheme:                   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.GatewayClassConfig)
 		return err
 	}
 	if err := (&controllersv2.GatewayClassController{
-		MeshConfigController: meshConfigReconciler,
-		Client:               mgr.GetClient(),
-		Log:                  ctrl.Log.WithName("controller").WithName(common.GatewayClass),
-		Scheme:               mgr.GetScheme(),
+		ConsulResourceController: meshConfigReconciler,
+		Client:                   mgr.GetClient(),
+		Log:                      ctrl.Log.WithName("controller").WithName(common.GatewayClass),
+		Scheme:                   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.GatewayClass)
 		return err
