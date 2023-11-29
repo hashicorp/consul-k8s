@@ -127,13 +127,13 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		}
 	}
 
-	meshConfigReconciler := &controllersv2.ConsulResourceController{
+	consulResourceReconciler := &controllersv2.ConsulResourceController{
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,
 		ConsulTenancyConfig: consulTenancyConfig,
 	}
 	if err := (&controllersv2.TrafficPermissionsController{
-		ConsulResourceController: meshConfigReconciler,
+		ConsulResourceController: consulResourceReconciler,
 		Client:                   mgr.GetClient(),
 		Log:                      ctrl.Log.WithName("controller").WithName(common.TrafficPermissions),
 		Scheme:                   mgr.GetScheme(),
@@ -142,7 +142,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 	if err := (&controllersv2.GRPCRouteController{
-		ConsulResourceController: meshConfigReconciler,
+		ConsulResourceController: consulResourceReconciler,
 		Client:                   mgr.GetClient(),
 		Log:                      ctrl.Log.WithName("controller").WithName(common.GRPCRoute),
 		Scheme:                   mgr.GetScheme(),
@@ -151,7 +151,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 	if err := (&controllersv2.HTTPRouteController{
-		ConsulResourceController: meshConfigReconciler,
+		ConsulResourceController: consulResourceReconciler,
 		Client:                   mgr.GetClient(),
 		Log:                      ctrl.Log.WithName("controller").WithName(common.HTTPRoute),
 		Scheme:                   mgr.GetScheme(),
@@ -160,7 +160,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 	if err := (&controllersv2.TCPRouteController{
-		ConsulResourceController: meshConfigReconciler,
+		ConsulResourceController: consulResourceReconciler,
 		Client:                   mgr.GetClient(),
 		Log:                      ctrl.Log.WithName("controller").WithName(common.TCPRoute),
 		Scheme:                   mgr.GetScheme(),
@@ -169,7 +169,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 	if err := (&controllersv2.ProxyConfigurationController{
-		ConsulResourceController: meshConfigReconciler,
+		ConsulResourceController: consulResourceReconciler,
 		Client:                   mgr.GetClient(),
 		Log:                      ctrl.Log.WithName("controller").WithName(common.ProxyConfiguration),
 		Scheme:                   mgr.GetScheme(),
@@ -178,7 +178,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 	if err := (&controllersv2.MeshGatewayController{
-		ConsulResourceController: meshConfigReconciler,
+		ConsulResourceController: consulResourceReconciler,
 		Client:                   mgr.GetClient(),
 		Log:                      ctrl.Log.WithName("controller").WithName(common.MeshGateway),
 		Scheme:                   mgr.GetScheme(),
@@ -188,7 +188,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	}
 
 	if err := (&controllersv2.GatewayClassConfigController{
-		ConsulResourceController: meshConfigReconciler,
+		ConsulResourceController: consulResourceReconciler,
 		Client:                   mgr.GetClient(),
 		Log:                      ctrl.Log.WithName("controller").WithName(common.GatewayClassConfig),
 		Scheme:                   mgr.GetScheme(),
@@ -197,7 +197,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 	if err := (&controllersv2.GatewayClassController{
-		ConsulResourceController: meshConfigReconciler,
+		ConsulResourceController: consulResourceReconciler,
 		Client:                   mgr.GetClient(),
 		Log:                      ctrl.Log.WithName("controller").WithName(common.GatewayClass),
 		Scheme:                   mgr.GetScheme(),
