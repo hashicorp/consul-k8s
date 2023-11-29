@@ -13,14 +13,14 @@ import (
 func TestNewMeshGatewayBuilder_ServiceAccount(t *testing.T) {
 	b := NewMeshGatewayBuilder(&meshv2beta1.MeshGateway{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "",
+			Namespace: "default",
 			Name:      "mesh-gateway",
 		},
 	})
 
 	expected := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "",
+			Namespace: "default",
 			Name:      "mesh-gateway",
 			Labels:    b.Labels(),
 		},
