@@ -20,7 +20,7 @@ type HTTPRouteController struct {
 	client.Client
 	Log                  logr.Logger
 	Scheme               *runtime.Scheme
-	MeshConfigController *MeshConfigController
+	MeshConfigController *ConsulResourceController
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=httproute,verbs=get;list;watch;create;update;patch;delete

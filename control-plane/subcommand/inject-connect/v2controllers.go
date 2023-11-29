@@ -127,7 +127,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		}
 	}
 
-	meshConfigReconciler := &controllersv2.MeshConfigController{
+	meshConfigReconciler := &controllersv2.ConsulResourceController{
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,
 		ConsulTenancyConfig: consulTenancyConfig,

@@ -39,7 +39,7 @@ const (
 )
 
 // Controller is implemented by CRD-specific config-entries. It is used by
-// MeshConfigController to abstract CRD-specific config-entries.
+// ConsulResourceController to abstract CRD-specific config-entries.
 type Controller interface {
 	// Update updates the state of the whole object.
 	Update(context.Context, client.Object, ...client.UpdateOption) error
@@ -54,10 +54,10 @@ type Controller interface {
 	Logger(types.NamespacedName) logr.Logger
 }
 
-// MeshConfigController is a generic controller that is used to reconcile
+// ConsulResourceController is a generic controller that is used to reconcile
 // all resource types, e.g. TrafficPermissions, ProxyConfiguration, etc., since
 // they share the same reconcile behaviour.
-type MeshConfigController struct {
+type ConsulResourceController struct {
 	// ConsulClientConfig is the config for the Consul API client.
 	ConsulClientConfig *consul.Config
 
@@ -73,7 +73,7 @@ type MeshConfigController struct {
 // CRD-specific controller should pass themselves in as updater since we
 // need to call back into their own update methods to ensure they update their
 // internal state.
-func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Controller, req ctrl.Request, meshConfig common.MeshConfig) (ctrl.Result, error) {
+func (r *ConsulResourceController) ReconcileEntry(ctx context.Context, crdCtrl Controller, req ctrl.Request, meshConfig common.MeshConfig) (ctrl.Result, error) {
 	logger := crdCtrl.Logger(req.NamespacedName)
 	err := crdCtrl.Get(ctx, req.NamespacedName, meshConfig)
 	if k8serr.IsNotFound(err) {
@@ -235,7 +235,7 @@ func setupWithManager(mgr ctrl.Manager, resource client.Object, reconciler recon
 		Complete(reconciler)
 }
 
-func (r *MeshConfigController) syncFailed(ctx context.Context, logger logr.Logger, updater Controller, resource common.MeshConfig, errType string, err error) (ctrl.Result, error) {
+func (r *ConsulResourceController) syncFailed(ctx context.Context, logger logr.Logger, updater Controller, resource common.MeshConfig, errType string, err error) (ctrl.Result, error) {
 	resource.SetSyncedCondition(corev1.ConditionFalse, errType, err.Error())
 	if updateErr := updater.UpdateStatus(ctx, resource); updateErr != nil {
 		// Log the original error here because we are returning the updateErr.
@@ -246,19 +246,19 @@ func (r *MeshConfigController) syncFailed(ctx context.Context, logger logr.Logge
 	return ctrl.Result{}, err
 }
 
-func (r *MeshConfigController) syncSuccessful(ctx context.Context, updater Controller, resource common.MeshConfig) (ctrl.Result, error) {
+func (r *ConsulResourceController) syncSuccessful(ctx context.Context, updater Controller, resource common.MeshConfig) (ctrl.Result, error) {
 	resource.SetSyncedCondition(corev1.ConditionTrue, "", "")
 	timeNow := metav1.NewTime(time.Now())
 	resource.SetLastSyncedTime(&timeNow)
 	return ctrl.Result{}, updater.UpdateStatus(ctx, resource)
 }
 
-func (r *MeshConfigController) syncUnknown(ctx context.Context, updater Controller, resource common.MeshConfig) error {
+func (r *ConsulResourceController) syncUnknown(ctx context.Context, updater Controller, resource common.MeshConfig) error {
 	resource.SetSyncedCondition(corev1.ConditionUnknown, "", "")
 	return updater.Update(ctx, resource)
 }
 
-func (r *MeshConfigController) syncUnknownWithError(ctx context.Context,
+func (r *ConsulResourceController) syncUnknownWithError(ctx context.Context,
 	logger logr.Logger,
 	updater Controller,
 	resource common.MeshConfig,
@@ -287,7 +287,7 @@ func isNotFoundErr(err error) bool {
 	return codes.NotFound == s.Code()
 }
 
-func (r *MeshConfigController) consulNamespace(namespace string) string {
+func (r *ConsulResourceController) consulNamespace(namespace string) string {
 	ns := namespaces.ConsulNamespace(
 		namespace,
 		r.EnableConsulNamespaces,
@@ -303,7 +303,7 @@ func (r *MeshConfigController) consulNamespace(namespace string) string {
 	return ns
 }
 
-func (r *MeshConfigController) getConsulPartition() string {
+func (r *ConsulResourceController) getConsulPartition() string {
 	if !r.EnableConsulPartitions || r.ConsulPartition == "" {
 		return constants.DefaultConsulPartition
 	}
