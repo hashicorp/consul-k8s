@@ -7,10 +7,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 const (
-	globalDefaultInstances uint32 = 1
+	globalDefaultInstances int32 = 1
 )
 
 func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
@@ -137,32 +138,8 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 
 func deploymentReplicaCount(deployment *pbmesh.Deployment, currentReplicas *int32) *int32 {
 	instanceValue := globalDefaultInstances
-
-	// If currentReplicas is not nil use current value when building deployment...
 	if currentReplicas != nil {
-		currentReplicasUnsigned := uint32(*currentReplicas)
-		instanceValue = currentReplicasUnsigned
-	} else if deployment.DefaultInstances != nil {
-		// otherwise use the default value on the GatewayClassConfig if set.
-		instanceValue = *deployment.DefaultInstances
+		return currentReplicas
 	}
-
-	if deployment.MaxInstances != nil {
-		// Check if the deployment replicas are greater than the maximum and lower to the maximum if so.
-		maxValue := *deployment.MaxInstances
-		if instanceValue > maxValue {
-			instanceValue = maxValue
-		}
-	}
-
-	if deployment.MinInstances != nil {
-		// Check if the deployment replicas are less than the minimum and raise to the minimum if so.
-		minValue := *deployment.MinInstances
-		if instanceValue < minValue {
-			instanceValue = minValue
-		}
-
-	}
-	signedInstanceValue := int32(instanceValue)
-	return &signedInstanceValue
+	return pointer.Int32(instanceValue)
 }

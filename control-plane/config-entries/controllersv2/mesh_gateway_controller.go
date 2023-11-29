@@ -242,7 +242,7 @@ func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, ga
 			return nil, nil
 		}
 
-		if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: gatewayClassConfig.Namespace}, config); err != nil {
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, config); err != nil {
 			return nil, err //client.IgnoreNotFound(err)
 		}
 	}
@@ -251,7 +251,7 @@ func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, ga
 
 func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*meshv2beta1.GatewayClass, error) {
 	var gatewayClass meshv2beta1.GatewayClass
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName), Namespace: gateway.Namespace}, &gatewayClass); err != nil {
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
 		return nil, err //client.IgnoreNotFound(err)
 	}
 	return &gatewayClass, nil
