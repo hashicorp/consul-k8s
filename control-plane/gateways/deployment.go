@@ -1,6 +1,7 @@
 package gateways
 
 import (
+	"fmt"
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -13,7 +14,9 @@ const (
 )
 
 func (b *meshGatewayBuilder) Deployment(gcc *meshv2beta1.GatewayClassConfig) (*appsv1.Deployment, error) {
+	fmt.Println("---- deployment ----")
 	spec, err := b.deploymentSpec(gcc)
+	fmt.Println("%+v", spec)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      b.gateway.Name,
