@@ -2,7 +2,7 @@ module github.com/hashicorp/consul-k8s/control-plane
 
 // TODO: Remove this when the next version of the submodule is released.
 // We need to use a replace directive instead of directly pinning because `api` requires version `0.5.1` and will clobber the pin, but not the replace directive.
-replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231128204611-fd1d97c3349d
+replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231129181242-69b1d2072b7b
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
@@ -48,7 +48,6 @@ require (
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
 	sigs.k8s.io/controller-runtime v0.14.6
 	sigs.k8s.io/gateway-api v0.7.1
-	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -174,6 +173,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 go 1.20
