@@ -32,7 +32,7 @@ type initContainerCommandData struct {
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func initContainer(config *common.GatewayConfig, name, namespace string) (corev1.Container, error) {
+func initContainer(config common.GatewayConfig, name, namespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         config.AuthMethod,
 		LogLevel:           config.LogLevel,

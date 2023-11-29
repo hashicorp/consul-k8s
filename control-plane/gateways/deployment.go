@@ -13,10 +13,10 @@ const (
 	globalDefaultInstances uint32 = 1
 )
 
-func (b *meshGatewayBuilder) Deployment(gcc *meshv2beta1.GatewayClassConfig) (*appsv1.Deployment, error) {
+func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
 	fmt.Println("---- deployment ----")
-	spec, err := b.deploymentSpec(gcc)
-	fmt.Println("%+v", spec)
+	spec, err := b.deploymentSpec()
+	fmt.Printf("%+v\n", spec)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      b.gateway.Name,
@@ -27,7 +27,7 @@ func (b *meshGatewayBuilder) Deployment(gcc *meshv2beta1.GatewayClassConfig) (*a
 	}, err
 }
 
-func (b *meshGatewayBuilder) deploymentSpec(gcc *meshv2beta1.GatewayClassConfig) (*appsv1.DeploymentSpec, error) {
+func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	initContainer, err := initContainer(b.config, b.gateway.Name, b.gateway.Namespace)
 	if err != nil {
 		return nil, err
@@ -39,9 +39,11 @@ func (b *meshGatewayBuilder) deploymentSpec(gcc *meshv2beta1.GatewayClassConfig)
 		return nil, err
 	}
 
+	fmt.Println("deployment spec-------")
+	fmt.Printf("%+v\n", b.gcc)
 	return &appsv1.DeploymentSpec{
 		//TODO get min/max/default from GCC
-		Replicas: deploymentReplicaCount(gcc.Spec.Deployment, nil),
+		Replicas: deploymentReplicaCount(b.gcc.Spec.Deployment, nil),
 		Selector: &metav1.LabelSelector{
 			MatchLabels: b.Labels(),
 		},

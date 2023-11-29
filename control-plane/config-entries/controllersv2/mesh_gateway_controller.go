@@ -6,6 +6,7 @@ package controllersv2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,7 +28,7 @@ type MeshGatewayController struct {
 	Log           logr.Logger
 	Scheme        *runtime.Scheme
 	Controller    *ConsulResourceController
-	GatewayConfig *common.GatewayConfig
+	GatewayConfig common.GatewayConfig
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=meshgateway,verbs=get;list;watch;create;update;patch;delete
@@ -86,13 +87,13 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 //  4. Role
 //  5. RoleBinding
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
-	builder := gateways.NewMeshGatewayBuilder(resource, r.GatewayConfig)
-
 	//fetch gatewayclassconfig
 	gcc, err := r.getGatewayClassConfigForGateway(ctx, resource)
 	if err != nil {
 		return err
 	}
+
+	builder := gateways.NewMeshGatewayBuilder(resource, r.GatewayConfig, gcc)
 
 	upsertOp := func(ctx context.Context, _, object client.Object) error {
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, object, func() error { return nil })
@@ -101,24 +102,38 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 
 	err = r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), upsertOp)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to create service account: %w", err)
 	}
 
 	// TODO NET-6392 NET-6393 NET-6395
 
 	//Create deployment
-	builtDeployment, err := builder.Deployment(gcc)
-	if err != nil {
+
+	mergeDeploymentOp := func(ctx context.Context, existingObject, object client.Object) error {
+		//TODO turn objects into deployments
+		existingDeployment, ok := existingObject.(*appsv1.Deployment)
+		if !ok {
+			return fmt.Errorf("invalid deployment object")
+		}
+		builtDeployment, ok := object.(*appsv1.Deployment)
+		if !ok {
+			return fmt.Errorf("invalid deployment object")
+		}
+
+		builder.MergeDeployments(gcc, existingDeployment, builtDeployment)
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, object, func() error { return nil })
 		return err
 	}
 
-	err = r.opIfNewOrOwned(ctx, resource, &appsv1.Deployment{}, builtDeployment, upsertOp)
+	builtDeployment, err := builder.Deployment()
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to build deployment: %w", err)
 	}
 
-	existingDeployment, err := r.getDeploymentForGateway(ctx, resource)
-	builder.MergeDeployments(gcc, existingDeployment, builtDeployment)
+	err = r.opIfNewOrOwned(ctx, resource, &appsv1.Deployment{}, builtDeployment, mergeDeploymentOp)
+	if err != nil {
+		return fmt.Errorf("Unable to create deployment: %w", err)
+	}
 
 	return nil
 }
@@ -145,15 +160,25 @@ type ownedObjectOp func(ctx context.Context, existingObject client.Object, newOb
 // The purpose of opIfNewOrOwned is to ensure that we aren't updating or deleting a
 // resource that was not created by us. If this scenario is encountered, we error.
 func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object, op ownedObjectOp) error {
+	//Currently need to hardcode namespace to default
+	defaultNamespace := "default"
+
 	// Ensure owner reference is always set on objects that we write
 	if err := ctrl.SetControllerReference(gateway, writeSource, r.Client.Scheme()); err != nil {
 		return err
 	}
 
 	key := client.ObjectKey{
-		Namespace: writeSource.GetNamespace(),
+		// TODO Gateway Management, find a way not to hardcode to default
+		// MeshGateways are clusterscoped, however, kubernetes requires a namespace to be set
+		// on creation of a namespaced object.
+		Namespace: defaultNamespace,
 		Name:      writeSource.GetName(),
 	}
+
+	writeSource.SetNamespace(defaultNamespace)
+
+	fmt.Println("Writing... %+v", writeSource)
 
 	exists := false
 	if err := r.Get(ctx, key, scanTarget); err != nil {
@@ -211,13 +236,14 @@ func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, ga
 		if string(ref.Group) != meshv2beta1.MeshGroup ||
 			ref.Kind != common.GatewayClassConfig {
 			//TODO @Sarah.Alsmiller find out what the controller name should be set to for v2
+			//look at Johns PR for controller name
 			//|| gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
 			// we don't have supported params, so return nil
 			return nil, nil
 		}
 
-		if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, config); err != nil {
-			return nil, client.IgnoreNotFound(err)
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: gatewayClassConfig.Namespace}, config); err != nil {
+			return nil, err //client.IgnoreNotFound(err)
 		}
 	}
 	return config, nil
@@ -225,16 +251,8 @@ func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, ga
 
 func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*meshv2beta1.GatewayClass, error) {
 	var gatewayClass meshv2beta1.GatewayClass
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
-		return nil, client.IgnoreNotFound(err)
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName), Namespace: gateway.Namespace}, &gatewayClass); err != nil {
+		return nil, err //client.IgnoreNotFound(err)
 	}
 	return &gatewayClass, nil
-}
-
-func (r *MeshGatewayController) getDeploymentForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*appsv1.Deployment, error) {
-	var deployment appsv1.Deployment
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: gateway.Name, Namespace: gateway.Namespace}, &deployment); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-	return &deployment, nil
 }

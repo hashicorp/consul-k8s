@@ -24,7 +24,7 @@ const (
 	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config *common.GatewayConfig, resources *corev1.ResourceRequirements, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(config common.GatewayConfig, resources *corev1.ResourceRequirements, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -119,7 +119,7 @@ func consulDataplaneContainer(config *common.GatewayConfig, resources *corev1.Re
 	return container, nil
 }
 
-func getDataplaneArgs(namespace string, config *common.GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
+func getDataplaneArgs(namespace string, config common.GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 

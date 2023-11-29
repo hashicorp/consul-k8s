@@ -10,12 +10,14 @@ import (
 
 type meshGatewayBuilder struct {
 	gateway *meshv2beta1.MeshGateway
-	config  *common.GatewayConfig
+	config  common.GatewayConfig
+	gcc     *meshv2beta1.GatewayClassConfig
 }
 
-func NewMeshGatewayBuilder(gateway *meshv2beta1.MeshGateway, gatewayConfig *common.GatewayConfig) *meshGatewayBuilder {
+func NewMeshGatewayBuilder(gateway *meshv2beta1.MeshGateway, gatewayConfig common.GatewayConfig, gatewayClassConfig *meshv2beta1.GatewayClassConfig) *meshGatewayBuilder {
 	return &meshGatewayBuilder{
 		gateway: gateway,
 		config:  gatewayConfig,
+		gcc:     gatewayClassConfig,
 	}
 }
