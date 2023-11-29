@@ -47,6 +47,11 @@ spec:
           metadata:
             type: object
           spec:
+            properties:
+              gatewayClassName:
+                description: GatewayClassName is the name of the GatewayClass used
+                  by the MeshGateway
+                type: string
             type: object
           status:
             properties:
