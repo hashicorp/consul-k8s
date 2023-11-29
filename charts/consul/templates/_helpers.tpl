@@ -506,9 +506,6 @@ Usage: {{ template "consul.validateResourceAPIs" . }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.syncCatalog.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, syncCatalog.enabled is currently unsupported."}}
 {{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.meshGateway.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, meshGateway.enabled is currently unsupported."}}
-{{- end }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ingressGateways.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, ingressGateways.enabled is currently unsupported."}}
 {{- end }}

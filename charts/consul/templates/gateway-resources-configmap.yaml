@@ -17,6 +17,7 @@ data:
     {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
   {{- end }}
   {{- if (mustHas "resource-apis" .Values.global.experiments) }}
+  {{- if .Values.meshGateway.enabled }}
   config.yaml: |
     gatewayClassConfigs:
       - apiVersion: mesh.consul.hashicorp.com/v2beta1
@@ -34,5 +35,6 @@ data:
         namespace: {{ .Release.Namespace }}
         spec:
           gatewayClassName: consul-mesh-gateway
+  {{- end }}
   {{- end }}
 {{- end }}
