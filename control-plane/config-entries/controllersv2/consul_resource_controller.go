@@ -38,14 +38,14 @@ const (
 	ExternallyManagedConfigError = "ExternallyManagedConfigError"
 )
 
-// ResourceController is implemented by CRD-specific config-entries. It is used by
-// ConsulResourceController to abstract CRD-specific config-entries.
+// ResourceController is implemented by controllers syncing Consul Resources from their CRD counterparts.
+// It is used by ConsulResourceController to abstract CRD-specific Consul Resources.
 type ResourceController interface {
 	// Update updates the state of the whole object.
 	Update(context.Context, client.Object, ...client.UpdateOption) error
 	// UpdateStatus updates the state of just the object's status.
 	UpdateStatus(context.Context, client.Object, ...client.SubResourceUpdateOption) error
-	// Get retrieves an obj for the given object key from the Kubernetes Cluster.
+	// Get retrieves an object for the given object key from the Kubernetes Cluster.
 	// obj must be a struct pointer so that obj can be updated with the response
 	// returned by the Server.
 	Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error
@@ -55,7 +55,7 @@ type ResourceController interface {
 }
 
 // ConsulResourceController is a generic controller that is used to reconcile
-// all resource types, e.g. TrafficPermissions, ProxyConfiguration, etc., since
+// all Consul Resource types, e.g. TrafficPermissions, ProxyConfiguration, etc., since
 // they share the same reconcile behaviour.
 type ConsulResourceController struct {
 	// ConsulClientConfig is the config for the Consul API client.
@@ -125,15 +125,15 @@ func (r *ConsulResourceController) ReconcileEntry(ctx context.Context, crdCtrl R
 			}
 
 			// In the case this resource was created outside of consul, skip the deletion process and continue
-			if !managedByMeshController(res.GetResource()) {
-				logger.Info("resource in Consul was created outside of kubernetes - skipping delete from Consul")
+			if !managedByConsulResourceController(res.GetResource()) {
+				logger.Info("resource in Consul was created outside of Kubernetes - skipping delete from Consul")
 			}
 
-			if err == nil && managedByMeshController(res.GetResource()) {
+			if err == nil && managedByConsulResourceController(res.GetResource()) {
 				_, err := resourceClient.Delete(ctx, &pbresource.DeleteRequest{Id: resource.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 				if err != nil {
 					return r.syncFailed(ctx, logger, crdCtrl, resource, ConsulAgentError,
-						fmt.Errorf("deleting config entry from consul: %w", err))
+						fmt.Errorf("deleting resource from Consul: %w", err))
 				}
 				logger.Info("deletion from Consul successful")
 			}
@@ -163,13 +163,13 @@ func (r *ConsulResourceController) ReconcileEntry(ctx context.Context, crdCtrl R
 
 	// If resource with this name does not exist
 	if isNotFoundErr(err) {
-		logger.Info("resource not found in consul")
+		logger.Info("resource not found in Consul")
 
 		// Create the config entry
 		_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: resource.Resource(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 		if err != nil {
 			return r.syncFailed(ctx, logger, crdCtrl, resource, ConsulAgentError,
-				fmt.Errorf("writing resource to consul: %w", err))
+				fmt.Errorf("writing resource to Consul: %w", err))
 		}
 
 		logger.Info("resource created")
@@ -183,7 +183,7 @@ func (r *ConsulResourceController) ReconcileEntry(ctx context.Context, crdCtrl R
 	}
 
 	// TODO: consider the case where we want to migrate a resource existing into Consul to a CRD with an annotation
-	if !managedByMeshController(res.Resource) {
+	if !managedByConsulResourceController(res.Resource) {
 		return r.syncFailed(ctx, logger, crdCtrl, resource, ExternallyManagedConfigError,
 			fmt.Errorf("resource already exists in Consul"))
 	}
@@ -195,7 +195,7 @@ func (r *ConsulResourceController) ReconcileEntry(ctx context.Context, crdCtrl R
 			return r.syncUnknownWithError(ctx, logger, crdCtrl, resource, ConsulAgentError,
 				fmt.Errorf("updating resource in Consul: %w", err))
 		}
-		logger.Info("config entry updated")
+		logger.Info("resource updated")
 		return r.syncSuccessful(ctx, crdCtrl, resource)
 	} else if resource.SyncedConditionStatus() != corev1.ConditionTrue {
 		return r.syncSuccessful(ctx, crdCtrl, resource)
@@ -310,7 +310,7 @@ func (r *ConsulResourceController) getConsulPartition() string {
 	return r.ConsulPartition
 }
 
-func managedByMeshController(resource *pbresource.Resource) bool {
+func managedByConsulResourceController(resource *pbresource.Resource) bool {
 	if resource == nil {
 		return false
 	}
