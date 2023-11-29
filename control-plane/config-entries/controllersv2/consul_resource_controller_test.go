@@ -116,7 +116,7 @@ func TestConsulResourceController_CreatesConsulResource(t *testing.T) {
 				return &TrafficPermissionsController{
 					Client: client,
 					Log:    logger,
-					MeshConfigController: &ConsulResourceController{
+					ConsulResourceController: &ConsulResourceController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 					},
@@ -257,7 +257,7 @@ func TestConsulResourceController_UpdatesConsulResource(t *testing.T) {
 				return &TrafficPermissionsController{
 					Client: client,
 					Log:    logger,
-					MeshConfigController: &ConsulResourceController{
+					ConsulResourceController: &ConsulResourceController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 					},
@@ -391,7 +391,7 @@ func TestConsulResourceController_DeletesConsulResource(t *testing.T) {
 				return &TrafficPermissionsController{
 					Client: client,
 					Log:    logger,
-					MeshConfigController: &ConsulResourceController{
+					ConsulResourceController: &ConsulResourceController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 					},
@@ -496,7 +496,7 @@ func TestConsulResourceController_ErrorUpdatesSyncStatus(t *testing.T) {
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
 		Log:    logrtest.New(t),
-		MeshConfigController: &ConsulResourceController{
+		ConsulResourceController: &ConsulResourceController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
 		},
@@ -579,7 +579,7 @@ func TestConsulResourceController_SetsSyncedToTrue(t *testing.T) {
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
 		Log:    logrtest.New(t),
-		MeshConfigController: &ConsulResourceController{
+		ConsulResourceController: &ConsulResourceController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
 		},
@@ -681,7 +681,7 @@ func TestMeshConfigController_doesNotCreateUnownedMeshConfig(t *testing.T) {
 		reconciler := TrafficPermissionsController{
 			Client: fakeClient,
 			Log:    logrtest.New(t),
-			MeshConfigController: &ConsulResourceController{
+			ConsulResourceController: &ConsulResourceController{
 				ConsulClientConfig:  testClient.Cfg,
 				ConsulServerConnMgr: testClient.Watcher,
 			},
@@ -767,7 +767,7 @@ func TestMeshConfigController_doesNotDeleteUnownedConfig(t *testing.T) {
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
 		Log:    logrtest.New(t),
-		MeshConfigController: &ConsulResourceController{
+		ConsulResourceController: &ConsulResourceController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
 		},

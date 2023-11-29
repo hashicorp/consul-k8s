@@ -133,10 +133,10 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		ConsulTenancyConfig: consulTenancyConfig,
 	}
 	if err := (&controllersv2.TrafficPermissionsController{
-		MeshConfigController: meshConfigReconciler,
-		Client:               mgr.GetClient(),
-		Log:                  ctrl.Log.WithName("controller").WithName(common.TrafficPermissions),
-		Scheme:               mgr.GetScheme(),
+		ConsulResourceController: meshConfigReconciler,
+		Client:                   mgr.GetClient(),
+		Log:                      ctrl.Log.WithName("controller").WithName(common.TrafficPermissions),
+		Scheme:                   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.TrafficPermissions)
 		return err
@@ -160,28 +160,28 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 	if err := (&controllersv2.TCPRouteController{
-		MeshConfigController: meshConfigReconciler,
-		Client:               mgr.GetClient(),
-		Log:                  ctrl.Log.WithName("controller").WithName(common.TCPRoute),
-		Scheme:               mgr.GetScheme(),
+		ConsulResourceController: meshConfigReconciler,
+		Client:                   mgr.GetClient(),
+		Log:                      ctrl.Log.WithName("controller").WithName(common.TCPRoute),
+		Scheme:                   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.TCPRoute)
 		return err
 	}
 	if err := (&controllersv2.ProxyConfigurationController{
-		MeshConfigController: meshConfigReconciler,
-		Client:               mgr.GetClient(),
-		Log:                  ctrl.Log.WithName("controller").WithName(common.ProxyConfiguration),
-		Scheme:               mgr.GetScheme(),
+		ConsulResourceController: meshConfigReconciler,
+		Client:                   mgr.GetClient(),
+		Log:                      ctrl.Log.WithName("controller").WithName(common.ProxyConfiguration),
+		Scheme:                   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.ProxyConfiguration)
 		return err
 	}
 	if err := (&controllersv2.MeshGatewayController{
-		MeshConfigController: meshConfigReconciler,
-		Client:               mgr.GetClient(),
-		Log:                  ctrl.Log.WithName("controller").WithName(common.MeshGateway),
-		Scheme:               mgr.GetScheme(),
+		ConsulResourceController: meshConfigReconciler,
+		Client:                   mgr.GetClient(),
+		Log:                      ctrl.Log.WithName("controller").WithName(common.MeshGateway),
+		Scheme:                   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.MeshGateway)
 		return err

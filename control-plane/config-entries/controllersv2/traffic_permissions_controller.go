@@ -18,16 +18,16 @@ import (
 // TrafficPermissionsController reconciles a TrafficPermissions object.
 type TrafficPermissionsController struct {
 	client.Client
-	Log                  logr.Logger
-	Scheme               *runtime.Scheme
-	MeshConfigController *ConsulResourceController
+	Log                      logr.Logger
+	Scheme                   *runtime.Scheme
+	ConsulResourceController *ConsulResourceController
 }
 
 // +kubebuilder:rbac:groups=auth.consul.hashicorp.com,resources=trafficpermissions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=auth.consul.hashicorp.com,resources=trafficpermissions/status,verbs=get;update;patch
 
 func (r *TrafficPermissionsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.MeshConfigController.ReconcileEntry(ctx, r, req, &consulv2beta1.TrafficPermissions{})
+	return r.ConsulResourceController.ReconcileEntry(ctx, r, req, &consulv2beta1.TrafficPermissions{})
 }
 
 func (r *TrafficPermissionsController) Logger(name types.NamespacedName) logr.Logger {

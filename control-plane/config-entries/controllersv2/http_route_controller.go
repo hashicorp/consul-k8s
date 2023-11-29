@@ -18,16 +18,16 @@ import (
 // HTTPRouteController reconciles a HTTPRoute object.
 type HTTPRouteController struct {
 	client.Client
-	Log                  logr.Logger
-	Scheme               *runtime.Scheme
-	MeshConfigController *ConsulResourceController
+	Log                      logr.Logger
+	Scheme                   *runtime.Scheme
+	ConsulResourceController *ConsulResourceController
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=httproute,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=httproute/status,verbs=get;update;patch
 
 func (r *HTTPRouteController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.MeshConfigController.ReconcileEntry(ctx, r, req, &meshv2beta1.HTTPRoute{})
+	return r.ConsulResourceController.ReconcileEntry(ctx, r, req, &meshv2beta1.HTTPRoute{})
 }
 
 func (r *HTTPRouteController) Logger(name types.NamespacedName) logr.Logger {
