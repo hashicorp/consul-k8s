@@ -37,20 +37,20 @@ type testReconciler interface {
 	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 }
 
-// TestMeshConfigController_createsMeshConfig validated resources are created in Consul from kube objects.
-func TestMeshConfigController_createsMeshConfig(t *testing.T) {
+// TestConsulResourceController_CreatesConsulResource validated resources are created in Consul from kube objects.
+func TestConsulResourceController_CreatesConsulResource(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name       string
-		meshConfig common.ConsulResource
+		resource   common.ConsulResource
 		expected   *pbauth.TrafficPermissions
 		reconciler func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
 		unmarshal  func(t *testing.T, consul *pbresource.Resource) proto.Message
 	}{
 		{
 			name: "TrafficPermissions",
-			meshConfig: &v2beta1.TrafficPermissions{
+			resource: &v2beta1.TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-traffic-permission",
 					Namespace: metav1.NamespaceDefault,
@@ -137,8 +137,8 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v2beta1.AuthGroupVersion, c.meshConfig)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.meshConfig).Build()
+			s.AddKnownTypes(v2beta1.AuthGroupVersion, c.resource)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.resource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
@@ -154,7 +154,7 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 			namespacedName := types.NamespacedName{
 				Namespace: metav1.NamespaceDefault,
-				Name:      c.meshConfig.KubernetesName(),
+				Name:      c.resource.KubernetesName(),
 			}
 			resp, err := r.Reconcile(ctx, ctrl.Request{
 				NamespacedName: namespacedName,
@@ -162,11 +162,11 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 			require.NoError(t, err)
 			require.False(t, resp.Requeue)
 
-			req := &pbresource.ReadRequest{Id: c.meshConfig.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
+			req := &pbresource.ReadRequest{Id: c.resource.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
 			res, err := resourceClient.Read(ctx, req)
 			require.NoError(t, err)
 			require.NotNil(t, res)
-			require.Equal(t, c.meshConfig.GetName(), res.GetResource().GetId().GetName())
+			require.Equal(t, c.resource.GetName(), res.GetResource().GetId().GetName())
 
 			actual := c.unmarshal(t, res.GetResource())
 			opts := append([]cmp.Option{protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version")}, test.CmpProtoIgnoreOrder()...)
@@ -174,22 +174,22 @@ func TestMeshConfigController_createsMeshConfig(t *testing.T) {
 			require.Equal(t, "", diff, "TrafficPermissions do not match")
 
 			// Check that the status is "synced".
-			err = fakeClient.Get(ctx, namespacedName, c.meshConfig)
+			err = fakeClient.Get(ctx, namespacedName, c.resource)
 			require.NoError(t, err)
-			require.Equal(t, corev1.ConditionTrue, c.meshConfig.SyncedConditionStatus())
+			require.Equal(t, corev1.ConditionTrue, c.resource.SyncedConditionStatus())
 
 			// Check that the finalizer is added.
-			require.Contains(t, c.meshConfig.Finalizers(), FinalizerName)
+			require.Contains(t, c.resource.Finalizers(), FinalizerName)
 		})
 	}
 }
 
-func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
+func TestConsulResourceController_UpdatesConsulResource(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name       string
-		meshConfig common.ConsulResource
+		resource   common.ConsulResource
 		expected   *pbauth.TrafficPermissions
 		reconciler func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
 		updateF    func(config common.ConsulResource)
@@ -197,7 +197,7 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 	}{
 		{
 			name: "TrafficPermissions",
-			meshConfig: &v2beta1.TrafficPermissions{
+			resource: &v2beta1.TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my-traffic-permission",
 					Namespace: metav1.NamespaceDefault,
@@ -283,8 +283,8 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.meshConfig)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.meshConfig).Build()
+			s.AddKnownTypes(v1alpha1.GroupVersion, c.resource)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.resource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
@@ -300,7 +300,7 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 			// We haven't run reconcile yet, so we must create the MeshConfig
 			// in Consul ourselves.
 			{
-				resource := c.meshConfig.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
+				resource := c.resource.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
 				req := &pbresource.WriteRequest{Resource: resource}
 				_, err := resourceClient.Write(ctx, req)
 				require.NoError(t, err)
@@ -310,15 +310,15 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 			{
 				namespacedName := types.NamespacedName{
 					Namespace: metav1.NamespaceDefault,
-					Name:      c.meshConfig.KubernetesName(),
+					Name:      c.resource.KubernetesName(),
 				}
 				// First get it, so we have the latest revision number.
-				err := fakeClient.Get(ctx, namespacedName, c.meshConfig)
+				err := fakeClient.Get(ctx, namespacedName, c.resource)
 				require.NoError(t, err)
 
 				// Update the entry in Kube and run reconcile.
-				c.updateF(c.meshConfig)
-				err = fakeClient.Update(ctx, c.meshConfig)
+				c.updateF(c.resource)
+				err = fakeClient.Update(ctx, c.resource)
 				require.NoError(t, err)
 				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 				resp, err := r.Reconcile(ctx, ctrl.Request{
@@ -328,11 +328,11 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 				require.False(t, resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
-				req := &pbresource.ReadRequest{Id: c.meshConfig.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
+				req := &pbresource.ReadRequest{Id: c.resource.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
 				res, err := resourceClient.Read(ctx, req)
 				require.NoError(t, err)
 				require.NotNil(t, res)
-				require.Equal(t, c.meshConfig.GetName(), res.GetResource().GetId().GetName())
+				require.Equal(t, c.resource.GetName(), res.GetResource().GetId().GetName())
 
 				actual := c.unmarshal(t, res.GetResource())
 				opts := append([]cmp.Option{protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version")}, test.CmpProtoIgnoreOrder()...)
@@ -343,17 +343,17 @@ func TestMeshConfigController_updatesMeshConfig(t *testing.T) {
 	}
 }
 
-func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
+func TestConsulResourceController_DeletesConsulResource(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name                   string
-		MeshConfigWithDeletion common.ConsulResource
-		reconciler             func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
+		name       string
+		resource   common.ConsulResource
+		reconciler func(client.Client, *consul.Config, consul.ServerConnectionManager, logr.Logger) testReconciler
 	}{
 		{
 			name: "TrafficPermissions",
-			MeshConfigWithDeletion: &v2beta1.TrafficPermissions{
+			resource: &v2beta1.TrafficPermissions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-name",
 					Namespace:         metav1.NamespaceDefault,
@@ -405,8 +405,8 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 			ctx := context.Background()
 
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v2beta1.AuthGroupVersion, c.MeshConfigWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.MeshConfigWithDeletion).Build()
+			s.AddKnownTypes(v2beta1.AuthGroupVersion, c.resource)
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.resource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
@@ -422,7 +422,7 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 			// We haven't run reconcile yet, so we must create the config entry
 			// in Consul ourselves.
 			{
-				resource := c.MeshConfigWithDeletion.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
+				resource := c.resource.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
 				req := &pbresource.WriteRequest{Resource: resource}
 				_, err := resourceClient.Write(ctx, req)
 				require.NoError(t, err)
@@ -432,7 +432,7 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 			{
 				namespacedName := types.NamespacedName{
 					Namespace: metav1.NamespaceDefault,
-					Name:      c.MeshConfigWithDeletion.KubernetesName(),
+					Name:      c.resource.KubernetesName(),
 				}
 				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 				resp, err := r.Reconcile(context.Background(), ctrl.Request{
@@ -442,7 +442,7 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 				require.False(t, resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
-				req := &pbresource.ReadRequest{Id: c.MeshConfigWithDeletion.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
+				req := &pbresource.ReadRequest{Id: c.resource.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
 				_, err = resourceClient.Read(ctx, req)
 				require.Error(t, err)
 				require.True(t, isNotFoundErr(err))
@@ -451,7 +451,7 @@ func TestMeshConfigController_deletesMeshConfig(t *testing.T) {
 	}
 }
 
-func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
+func TestConsulResourceController_ErrorUpdatesSyncStatus(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -523,9 +523,9 @@ func TestMeshConfigController_errorUpdatesSyncStatus(t *testing.T) {
 	require.Contains(t, errMsg, actualErrMsg)
 }
 
-// TestMeshConfigController_setsSyncedToTrue tests that if the resource hasn't changed in
+// TestConsulResourceController_SetsSyncedToTrue tests that if the resource hasn't changed in
 // Consul but our resource's synced status isn't set to true, then we update its status.
-func TestMeshConfigController_setsSyncedToTrue(t *testing.T) {
+func TestConsulResourceController_SetsSyncedToTrue(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
