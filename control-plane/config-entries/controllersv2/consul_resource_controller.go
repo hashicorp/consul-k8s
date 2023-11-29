@@ -38,9 +38,9 @@ const (
 	ExternallyManagedConfigError = "ExternallyManagedConfigError"
 )
 
-// Controller is implemented by CRD-specific config-entries. It is used by
+// ResourceController is implemented by CRD-specific config-entries. It is used by
 // ConsulResourceController to abstract CRD-specific config-entries.
-type Controller interface {
+type ResourceController interface {
 	// Update updates the state of the whole object.
 	Update(context.Context, client.Object, ...client.UpdateOption) error
 	// UpdateStatus updates the state of just the object's status.
@@ -73,7 +73,7 @@ type ConsulResourceController struct {
 // CRD-specific controller should pass themselves in as updater since we
 // need to call back into their own update methods to ensure they update their
 // internal state.
-func (r *ConsulResourceController) ReconcileEntry(ctx context.Context, crdCtrl Controller, req ctrl.Request, meshConfig common.ConsulResource) (ctrl.Result, error) {
+func (r *ConsulResourceController) ReconcileEntry(ctx context.Context, crdCtrl ResourceController, req ctrl.Request, meshConfig common.ConsulResource) (ctrl.Result, error) {
 	logger := crdCtrl.Logger(req.NamespacedName)
 	err := crdCtrl.Get(ctx, req.NamespacedName, meshConfig)
 	if k8serr.IsNotFound(err) {
@@ -235,7 +235,7 @@ func setupWithManager(mgr ctrl.Manager, resource client.Object, reconciler recon
 		Complete(reconciler)
 }
 
-func (r *ConsulResourceController) syncFailed(ctx context.Context, logger logr.Logger, updater Controller, resource common.ConsulResource, errType string, err error) (ctrl.Result, error) {
+func (r *ConsulResourceController) syncFailed(ctx context.Context, logger logr.Logger, updater ResourceController, resource common.ConsulResource, errType string, err error) (ctrl.Result, error) {
 	resource.SetSyncedCondition(corev1.ConditionFalse, errType, err.Error())
 	if updateErr := updater.UpdateStatus(ctx, resource); updateErr != nil {
 		// Log the original error here because we are returning the updateErr.
@@ -246,21 +246,21 @@ func (r *ConsulResourceController) syncFailed(ctx context.Context, logger logr.L
 	return ctrl.Result{}, err
 }
 
-func (r *ConsulResourceController) syncSuccessful(ctx context.Context, updater Controller, resource common.ConsulResource) (ctrl.Result, error) {
+func (r *ConsulResourceController) syncSuccessful(ctx context.Context, updater ResourceController, resource common.ConsulResource) (ctrl.Result, error) {
 	resource.SetSyncedCondition(corev1.ConditionTrue, "", "")
 	timeNow := metav1.NewTime(time.Now())
 	resource.SetLastSyncedTime(&timeNow)
 	return ctrl.Result{}, updater.UpdateStatus(ctx, resource)
 }
 
-func (r *ConsulResourceController) syncUnknown(ctx context.Context, updater Controller, resource common.ConsulResource) error {
+func (r *ConsulResourceController) syncUnknown(ctx context.Context, updater ResourceController, resource common.ConsulResource) error {
 	resource.SetSyncedCondition(corev1.ConditionUnknown, "", "")
 	return updater.Update(ctx, resource)
 }
 
 func (r *ConsulResourceController) syncUnknownWithError(ctx context.Context,
 	logger logr.Logger,
-	updater Controller,
+	updater ResourceController,
 	resource common.ConsulResource,
 	errType string,
 	err error) (ctrl.Result, error) {
