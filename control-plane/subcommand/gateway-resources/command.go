@@ -25,6 +25,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	k8syaml "sigs.k8s.io/yaml"
 
 	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 
@@ -383,7 +384,7 @@ func (c *Command) loadGatewayConfigs() error {
 		return err
 	}
 
-	err = yaml.Unmarshal(config, &c.gatewayConfig)
+	err = k8syaml.Unmarshal(config, &c.gatewayConfig)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error decoding gateway config file: %s", err))
 		return err
