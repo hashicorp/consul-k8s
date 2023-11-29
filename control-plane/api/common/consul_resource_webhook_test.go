@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func TestValidateMeshConfig(t *testing.T) {
+func TestValidateConsulResource(t *testing.T) {
 	otherNS := "other"
 
 	cases := map[string]struct {
@@ -37,7 +37,7 @@ func TestValidateMeshConfig(t *testing.T) {
 	}{
 		"no duplicates, valid": {
 			existingResources: nil,
-			newResource: &mockMeshConfig{
+			newResource: &mockConsulResource{
 				MockName:      "foo",
 				MockNamespace: otherNS,
 				Valid:         true,
@@ -46,7 +46,7 @@ func TestValidateMeshConfig(t *testing.T) {
 		},
 		"no duplicates, invalid": {
 			existingResources: nil,
-			newResource: &mockMeshConfig{
+			newResource: &mockConsulResource{
 				MockName:      "foo",
 				MockNamespace: otherNS,
 				Valid:         false,
@@ -55,11 +55,11 @@ func TestValidateMeshConfig(t *testing.T) {
 			expErrMessage: "invalid",
 		},
 		"duplicate name": {
-			existingResources: []ConsulResource{&mockMeshConfig{
+			existingResources: []ConsulResource{&mockConsulResource{
 				MockName:      "foo",
 				MockNamespace: "default",
 			}},
-			newResource: &mockMeshConfig{
+			newResource: &mockConsulResource{
 				MockName:      "foo",
 				MockNamespace: otherNS,
 				Valid:         true,
@@ -68,11 +68,11 @@ func TestValidateMeshConfig(t *testing.T) {
 			expErrMessage: "mockkind resource with name \"foo\" is already defined – all mockkind resources must have unique names across namespaces",
 		},
 		"duplicate name, namespaces enabled": {
-			existingResources: []ConsulResource{&mockMeshConfig{
+			existingResources: []ConsulResource{&mockConsulResource{
 				MockName:      "foo",
 				MockNamespace: "default",
 			}},
-			newResource: &mockMeshConfig{
+			newResource: &mockConsulResource{
 				MockName:      "foo",
 				MockNamespace: otherNS,
 				Valid:         true,
@@ -82,11 +82,11 @@ func TestValidateMeshConfig(t *testing.T) {
 			expErrMessage:    "mockkind resource with name \"foo\" is already defined – all mockkind resources must have unique names across namespaces",
 		},
 		"duplicate name, namespaces enabled, mirroring enabled": {
-			existingResources: []ConsulResource{&mockMeshConfig{
+			existingResources: []ConsulResource{&mockConsulResource{
 				MockName:      "foo",
 				MockNamespace: "default",
 			}},
-			newResource: &mockMeshConfig{
+			newResource: &mockConsulResource{
 				MockName:      "foo",
 				MockNamespace: otherNS,
 				Valid:         true,
@@ -102,10 +102,10 @@ func TestValidateMeshConfig(t *testing.T) {
 			marshalledRequestObject, err := json.Marshal(c.newResource)
 			require.NoError(t, err)
 
-			lister := &mockMeshConfigLister{
+			lister := &mockConsulResourceLister{
 				Resources: c.existingResources,
 			}
-			response := ValidateMeshConfig(ctx, admission.Request{
+			response := ValidateConsulResource(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
@@ -132,14 +132,14 @@ func TestValidateMeshConfig(t *testing.T) {
 	}
 }
 
-func TestMeshConfigDefaultingPatches(t *testing.T) {
-	meshConfig := &mockMeshConfig{
+func TestConsulResourceDefaultingPatches(t *testing.T) {
+	meshConfig := &mockConsulResource{
 		MockName: "test",
 		Valid:    true,
 	}
 
 	// This test validates that DefaultingPatches invokes DefaultNamespaceFields on the Config Entry.
-	patches, err := MeshConfigDefaultingPatches(meshConfig, ConsulTenancyConfig{})
+	patches, err := ConsulResourceDefaultingPatches(meshConfig, ConsulTenancyConfig{})
 	require.NoError(t, err)
 
 	require.Equal(t, []jsonpatch.Operation{
@@ -151,183 +151,183 @@ func TestMeshConfigDefaultingPatches(t *testing.T) {
 	}, patches)
 }
 
-type mockMeshConfigLister struct {
+type mockConsulResourceLister struct {
 	Resources []ConsulResource
 }
 
-var _ ConsulResourceLister = &mockMeshConfigLister{}
+var _ ConsulResourceLister = &mockConsulResourceLister{}
 
-func (in *mockMeshConfigLister) List(_ context.Context) ([]ConsulResource, error) {
+func (in *mockConsulResourceLister) List(_ context.Context) ([]ConsulResource, error) {
 	return in.Resources, nil
 }
 
-type mockMeshConfig struct {
+type mockConsulResource struct {
 	MockName      string
 	MockNamespace string
 	Valid         bool
 }
 
-var _ ConsulResource = &mockMeshConfig{}
+var _ ConsulResource = &mockConsulResource{}
 
-func (in *mockMeshConfig) ResourceID(_, _ string) *pbresource.ID {
+func (in *mockConsulResource) ResourceID(_, _ string) *pbresource.ID {
 	return nil
 }
 
-func (in *mockMeshConfig) Resource(_, _ string) *pbresource.Resource {
+func (in *mockConsulResource) Resource(_, _ string) *pbresource.Resource {
 	return nil
 }
 
-func (in *mockMeshConfig) GetNamespace() string {
+func (in *mockConsulResource) GetNamespace() string {
 	return in.MockNamespace
 }
 
-func (in *mockMeshConfig) SetNamespace(namespace string) {
+func (in *mockConsulResource) SetNamespace(namespace string) {
 	in.MockNamespace = namespace
 }
 
-func (in *mockMeshConfig) GetName() string {
+func (in *mockConsulResource) GetName() string {
 	return in.MockName
 }
 
-func (in *mockMeshConfig) SetName(name string) {
+func (in *mockConsulResource) SetName(name string) {
 	in.MockName = name
 }
 
-func (in *mockMeshConfig) GetGenerateName() string {
+func (in *mockConsulResource) GetGenerateName() string {
 	return ""
 }
 
-func (in *mockMeshConfig) SetGenerateName(_ string) {}
+func (in *mockConsulResource) SetGenerateName(_ string) {}
 
-func (in *mockMeshConfig) GetUID() types.UID {
+func (in *mockConsulResource) GetUID() types.UID {
 	return ""
 }
 
-func (in *mockMeshConfig) SetUID(_ types.UID) {}
+func (in *mockConsulResource) SetUID(_ types.UID) {}
 
-func (in *mockMeshConfig) GetResourceVersion() string {
+func (in *mockConsulResource) GetResourceVersion() string {
 	return ""
 }
 
-func (in *mockMeshConfig) SetResourceVersion(_ string) {}
+func (in *mockConsulResource) SetResourceVersion(_ string) {}
 
-func (in *mockMeshConfig) GetGeneration() int64 {
+func (in *mockConsulResource) GetGeneration() int64 {
 	return 0
 }
 
-func (in *mockMeshConfig) SetGeneration(_ int64) {}
+func (in *mockConsulResource) SetGeneration(_ int64) {}
 
-func (in *mockMeshConfig) GetSelfLink() string {
+func (in *mockConsulResource) GetSelfLink() string {
 	return ""
 }
 
-func (in *mockMeshConfig) SetSelfLink(_ string) {}
+func (in *mockConsulResource) SetSelfLink(_ string) {}
 
-func (in *mockMeshConfig) GetCreationTimestamp() metav1.Time {
+func (in *mockConsulResource) GetCreationTimestamp() metav1.Time {
 	return metav1.Time{}
 }
 
-func (in *mockMeshConfig) SetCreationTimestamp(_ metav1.Time) {}
+func (in *mockConsulResource) SetCreationTimestamp(_ metav1.Time) {}
 
-func (in *mockMeshConfig) GetDeletionTimestamp() *metav1.Time {
+func (in *mockConsulResource) GetDeletionTimestamp() *metav1.Time {
 	return nil
 }
 
-func (in *mockMeshConfig) SetDeletionTimestamp(_ *metav1.Time) {}
+func (in *mockConsulResource) SetDeletionTimestamp(_ *metav1.Time) {}
 
-func (in *mockMeshConfig) GetDeletionGracePeriodSeconds() *int64 {
+func (in *mockConsulResource) GetDeletionGracePeriodSeconds() *int64 {
 	return nil
 }
 
-func (in *mockMeshConfig) SetDeletionGracePeriodSeconds(_ *int64) {}
+func (in *mockConsulResource) SetDeletionGracePeriodSeconds(_ *int64) {}
 
-func (in *mockMeshConfig) GetLabels() map[string]string {
+func (in *mockConsulResource) GetLabels() map[string]string {
 	return nil
 }
 
-func (in *mockMeshConfig) SetLabels(_ map[string]string) {}
+func (in *mockConsulResource) SetLabels(_ map[string]string) {}
 
-func (in *mockMeshConfig) GetAnnotations() map[string]string {
+func (in *mockConsulResource) GetAnnotations() map[string]string {
 	return nil
 }
 
-func (in *mockMeshConfig) SetAnnotations(_ map[string]string) {}
+func (in *mockConsulResource) SetAnnotations(_ map[string]string) {}
 
-func (in *mockMeshConfig) GetFinalizers() []string {
+func (in *mockConsulResource) GetFinalizers() []string {
 	return nil
 }
 
-func (in *mockMeshConfig) SetFinalizers(_ []string) {}
+func (in *mockConsulResource) SetFinalizers(_ []string) {}
 
-func (in *mockMeshConfig) GetOwnerReferences() []metav1.OwnerReference {
+func (in *mockConsulResource) GetOwnerReferences() []metav1.OwnerReference {
 	return nil
 }
 
-func (in *mockMeshConfig) SetOwnerReferences(_ []metav1.OwnerReference) {}
+func (in *mockConsulResource) SetOwnerReferences(_ []metav1.OwnerReference) {}
 
-func (in *mockMeshConfig) GetClusterName() string {
+func (in *mockConsulResource) GetClusterName() string {
 	return ""
 }
 
-func (in *mockMeshConfig) SetClusterName(_ string) {}
+func (in *mockConsulResource) SetClusterName(_ string) {}
 
-func (in *mockMeshConfig) GetManagedFields() []metav1.ManagedFieldsEntry {
+func (in *mockConsulResource) GetManagedFields() []metav1.ManagedFieldsEntry {
 	return nil
 }
 
-func (in *mockMeshConfig) SetManagedFields(_ []metav1.ManagedFieldsEntry) {}
+func (in *mockConsulResource) SetManagedFields(_ []metav1.ManagedFieldsEntry) {}
 
-func (in *mockMeshConfig) KubernetesName() string {
+func (in *mockConsulResource) KubernetesName() string {
 	return in.MockName
 }
 
-func (in *mockMeshConfig) GetObjectMeta() metav1.ObjectMeta {
+func (in *mockConsulResource) GetObjectMeta() metav1.ObjectMeta {
 	return metav1.ObjectMeta{}
 }
 
-func (in *mockMeshConfig) GetObjectKind() schema.ObjectKind {
+func (in *mockConsulResource) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
 
-func (in *mockMeshConfig) DeepCopyObject() runtime.Object {
+func (in *mockConsulResource) DeepCopyObject() runtime.Object {
 	return in
 }
 
-func (in *mockMeshConfig) AddFinalizer(_ string) {}
+func (in *mockConsulResource) AddFinalizer(_ string) {}
 
-func (in *mockMeshConfig) RemoveFinalizer(_ string) {}
+func (in *mockConsulResource) RemoveFinalizer(_ string) {}
 
-func (in *mockMeshConfig) Finalizers() []string {
+func (in *mockConsulResource) Finalizers() []string {
 	return nil
 }
 
-func (in *mockMeshConfig) KubeKind() string {
+func (in *mockConsulResource) KubeKind() string {
 	return "mockkind"
 }
 
-func (in *mockMeshConfig) SetSyncedCondition(_ corev1.ConditionStatus, _ string, _ string) {}
+func (in *mockConsulResource) SetSyncedCondition(_ corev1.ConditionStatus, _ string, _ string) {}
 
-func (in *mockMeshConfig) SetLastSyncedTime(_ *metav1.Time) {}
+func (in *mockConsulResource) SetLastSyncedTime(_ *metav1.Time) {}
 
-func (in *mockMeshConfig) SyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
+func (in *mockConsulResource) SyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
 	return corev1.ConditionTrue, "", ""
 }
 
-func (in *mockMeshConfig) SyncedConditionStatus() corev1.ConditionStatus {
+func (in *mockConsulResource) SyncedConditionStatus() corev1.ConditionStatus {
 	return corev1.ConditionTrue
 }
 
-func (in *mockMeshConfig) Validate(_ ConsulTenancyConfig) error {
+func (in *mockConsulResource) Validate(_ ConsulTenancyConfig) error {
 	if !in.Valid {
 		return errors.New("invalid")
 	}
 	return nil
 }
 
-func (in *mockMeshConfig) DefaultNamespaceFields(_ ConsulTenancyConfig) {
+func (in *mockConsulResource) DefaultNamespaceFields(_ ConsulTenancyConfig) {
 	in.MockNamespace = "bar"
 }
 
-func (in *mockMeshConfig) MatchesConsul(_ *pbresource.Resource, _, _ string) bool {
+func (in *mockConsulResource) MatchesConsul(_ *pbresource.Resource, _, _ string) bool {
 	return false
 }
