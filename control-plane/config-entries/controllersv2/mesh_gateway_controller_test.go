@@ -73,7 +73,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 					},
 				},
 				&corev1.ServiceAccount{
-					ObjectMeta: metav1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "mesh-gateway",
 					},
