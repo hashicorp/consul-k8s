@@ -22,19 +22,19 @@ type ConsulResourceLister interface {
 	List(ctx context.Context) ([]ConsulResource, error)
 }
 
-// ValidateMeshConfig validates a MeshConfig. It is a generic method that
+// ValidateConsulResource validates a Consul Resource. It is a generic method that
 // can be used by all CRD-specific validators.
 // Callers should pass themselves as validator and kind should be the custom
 // resource name, e.g. "TrafficPermissions".
-func ValidateMeshConfig(
+func ValidateConsulResource(
 	ctx context.Context,
 	req admission.Request,
 	logger logr.Logger,
-	meshConfigLister ConsulResourceLister,
-	meshConfig ConsulResource,
+	resourceLister ConsulResourceLister,
+	resource ConsulResource,
 	tenancy ConsulTenancyConfig) admission.Response {
 
-	defaultingPatches, err := MeshConfigDefaultingPatches(meshConfig, tenancy)
+	defaultingPatches, err := ConsulResourceDefaultingPatches(resource, tenancy)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
@@ -45,36 +45,36 @@ func ValidateMeshConfig(
 	// are running Consul enterprise with namespace mirroring.
 	singleConsulDestNS := !(tenancy.EnableConsulNamespaces && tenancy.EnableNSMirroring)
 	if req.Operation == admissionv1.Create && singleConsulDestNS {
-		logger.Info("validate create", "name", meshConfig.KubernetesName())
+		logger.Info("validate create", "name", resource.KubernetesName())
 
-		list, err := meshConfigLister.List(ctx)
+		list, err := resourceLister.List(ctx)
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 		for _, item := range list {
-			if item.KubernetesName() == meshConfig.KubernetesName() {
+			if item.KubernetesName() == resource.KubernetesName() {
 				return admission.Errored(http.StatusBadRequest,
 					fmt.Errorf("%s resource with name %q is already defined – all %s resources must have unique names across namespaces",
-						meshConfig.KubeKind(),
-						meshConfig.KubernetesName(),
-						meshConfig.KubeKind()))
+						resource.KubeKind(),
+						resource.KubernetesName(),
+						resource.KubeKind()))
 			}
 		}
 	}
-	if err := meshConfig.Validate(tenancy); err != nil {
+	if err := resource.Validate(tenancy); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	return admission.Patched(fmt.Sprintf("valid %s request", meshConfig.KubeKind()), defaultingPatches...)
+	return admission.Patched(fmt.Sprintf("valid %s request", resource.KubeKind()), defaultingPatches...)
 }
 
-// MeshConfigDefaultingPatches returns the patches needed to set fields to their defaults.
-func MeshConfigDefaultingPatches(meshConfig ConsulResource, tenancy ConsulTenancyConfig) ([]jsonpatch.Operation, error) {
-	beforeDefaulting, err := json.Marshal(meshConfig)
+// ConsulResourceDefaultingPatches returns the patches needed to set fields to their defaults.
+func ConsulResourceDefaultingPatches(resource ConsulResource, tenancy ConsulTenancyConfig) ([]jsonpatch.Operation, error) {
+	beforeDefaulting, err := json.Marshal(resource)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling input: %s", err)
 	}
-	meshConfig.DefaultNamespaceFields(tenancy)
-	afterDefaulting, err := json.Marshal(meshConfig)
+	resource.DefaultNamespaceFields(tenancy)
+	afterDefaulting, err := json.Marshal(resource)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling after defaulting: %s", err)
 	}

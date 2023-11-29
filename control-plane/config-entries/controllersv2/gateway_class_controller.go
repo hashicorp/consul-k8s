@@ -18,16 +18,16 @@ import (
 // GatewayClassController reconciles a MeshGateway object.
 type GatewayClassController struct {
 	client.Client
-	Log                      logr.Logger
-	Scheme                   *runtime.Scheme
-	ConsulResourceController *ConsulResourceController
+	Log        logr.Logger
+	Scheme     *runtime.Scheme
+	Controller *ConsulResourceController
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=gatewayclass,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=gatewayclass/status,verbs=get;update;patch
 
 func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.ConsulResourceController.ReconcileEntry(ctx, r, req, &meshv2beta1.GatewayClass{})
+	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.GatewayClass{})
 }
 
 func (r *GatewayClassController) Logger(name types.NamespacedName) logr.Logger {

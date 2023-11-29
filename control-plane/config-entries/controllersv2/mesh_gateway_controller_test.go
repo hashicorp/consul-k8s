@@ -136,7 +136,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 				Client: fakeClient,
 				Log:    logrtest.New(t),
 				Scheme: s,
-				ConsulResourceController: &ConsulResourceController{
+				Controller: &ConsulResourceController{
 					ConsulClientConfig:  consulClient.Cfg,
 					ConsulServerConnMgr: consulClient.Watcher,
 				},

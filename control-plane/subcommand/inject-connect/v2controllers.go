@@ -133,74 +133,74 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		ConsulTenancyConfig: consulTenancyConfig,
 	}
 	if err := (&controllersv2.TrafficPermissionsController{
-		ConsulResourceController: consulResourceReconciler,
-		Client:                   mgr.GetClient(),
-		Log:                      ctrl.Log.WithName("controller").WithName(common.TrafficPermissions),
-		Scheme:                   mgr.GetScheme(),
+		Controller: consulResourceReconciler,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.TrafficPermissions),
+		Scheme:     mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.TrafficPermissions)
 		return err
 	}
 	if err := (&controllersv2.GRPCRouteController{
-		ConsulResourceController: consulResourceReconciler,
-		Client:                   mgr.GetClient(),
-		Log:                      ctrl.Log.WithName("controller").WithName(common.GRPCRoute),
-		Scheme:                   mgr.GetScheme(),
+		Controller: consulResourceReconciler,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.GRPCRoute),
+		Scheme:     mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.GRPCRoute)
 		return err
 	}
 	if err := (&controllersv2.HTTPRouteController{
-		ConsulResourceController: consulResourceReconciler,
-		Client:                   mgr.GetClient(),
-		Log:                      ctrl.Log.WithName("controller").WithName(common.HTTPRoute),
-		Scheme:                   mgr.GetScheme(),
+		Controller: consulResourceReconciler,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.HTTPRoute),
+		Scheme:     mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.HTTPRoute)
 		return err
 	}
 	if err := (&controllersv2.TCPRouteController{
-		ConsulResourceController: consulResourceReconciler,
-		Client:                   mgr.GetClient(),
-		Log:                      ctrl.Log.WithName("controller").WithName(common.TCPRoute),
-		Scheme:                   mgr.GetScheme(),
+		Controller: consulResourceReconciler,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.TCPRoute),
+		Scheme:     mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.TCPRoute)
 		return err
 	}
 	if err := (&controllersv2.ProxyConfigurationController{
-		ConsulResourceController: consulResourceReconciler,
-		Client:                   mgr.GetClient(),
-		Log:                      ctrl.Log.WithName("controller").WithName(common.ProxyConfiguration),
-		Scheme:                   mgr.GetScheme(),
+		Controller: consulResourceReconciler,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.ProxyConfiguration),
+		Scheme:     mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.ProxyConfiguration)
 		return err
 	}
 	if err := (&controllersv2.MeshGatewayController{
-		ConsulResourceController: consulResourceReconciler,
-		Client:                   mgr.GetClient(),
-		Log:                      ctrl.Log.WithName("controller").WithName(common.MeshGateway),
-		Scheme:                   mgr.GetScheme(),
+		Controller: consulResourceReconciler,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.MeshGateway),
+		Scheme:     mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.MeshGateway)
 		return err
 	}
 
 	if err := (&controllersv2.GatewayClassConfigController{
-		ConsulResourceController: consulResourceReconciler,
-		Client:                   mgr.GetClient(),
-		Log:                      ctrl.Log.WithName("controller").WithName(common.GatewayClassConfig),
-		Scheme:                   mgr.GetScheme(),
+		Controller: consulResourceReconciler,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.GatewayClassConfig),
+		Scheme:     mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.GatewayClassConfig)
 		return err
 	}
 	if err := (&controllersv2.GatewayClassController{
-		ConsulResourceController: consulResourceReconciler,
-		Client:                   mgr.GetClient(),
-		Log:                      ctrl.Log.WithName("controller").WithName(common.GatewayClass),
-		Scheme:                   mgr.GetScheme(),
+		Controller: consulResourceReconciler,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.GatewayClass),
+		Scheme:     mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.GatewayClass)
 		return err

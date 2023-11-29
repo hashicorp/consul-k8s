@@ -23,9 +23,9 @@ import (
 // MeshGatewayController reconciles a MeshGateway object.
 type MeshGatewayController struct {
 	client.Client
-	Log                      logr.Logger
-	Scheme                   *runtime.Scheme
-	ConsulResourceController *ConsulResourceController
+	Log        logr.Logger
+	Scheme     *runtime.Scheme
+	Controller *ConsulResourceController
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=meshgateway,verbs=get;list;watch;create;update;patch;delete
@@ -56,7 +56,7 @@ func (r *MeshGatewayController) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	return r.ConsulResourceController.ReconcileEntry(ctx, r, req, &meshv2beta1.MeshGateway{})
+	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.MeshGateway{})
 }
 
 func (r *MeshGatewayController) Logger(name types.NamespacedName) logr.Logger {
