@@ -11,7 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
@@ -30,20 +30,9 @@ type initContainerCommandData struct {
 	LogJSON  bool
 }
 
-//TODO put this in the proper file
-type MeshGatewayConfig{
-	AuthMethod
-	LogLevel
-	LogJSON
-	EnableNamespaces
-	ConsulDestinationNamespace
-	EnableNamespaceMirroring
-	NamespaceMirroringPrefix
-
-}
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
+func initContainer(config *common.GatewayConfig, name, namespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         config.AuthMethod,
 		LogLevel:           config.LogLevel,

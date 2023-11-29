@@ -5,7 +5,6 @@ package connectinject
 
 import (
 	"context"
-
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -61,6 +60,30 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
 		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+	}
+
+	gatewayConfig := common.GatewayConfig{
+		ConsulConfig: common.ConsulConfig{
+			Address:    c.consul.Addresses,
+			GRPCPort:   consulConfig.GRPCPort,
+			HTTPPort:   consulConfig.HTTPPort,
+			APITimeout: consulConfig.APITimeout,
+		},
+		ImageDataplane:             c.flagConsulDataplaneImage,
+		ImageConsulK8S:             c.flagConsulK8sImage,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		NamespaceMirroringPrefix:   c.flagK8SNSMirroringPrefix,
+		EnableNamespaces:           c.flagEnableNamespaces,
+		PeeringEnabled:             c.flagEnablePeering,
+		EnableOpenShift:            c.flagEnableOpenShift,
+		EnableNamespaceMirroring:   c.flagEnableK8SNSMirroring,
+		AuthMethod:                 c.consul.ConsulLogin.AuthMethod,
+		LogLevel:                   c.flagLogLevel,
+		LogJSON:                    c.flagLogJSON,
+		TLSEnabled:                 c.consul.UseTLS,
+		ConsulTLSServerName:        c.consul.TLSServerName,
+		ConsulPartition:            c.consul.Partition,
+		ConsulCACert:               string(c.caCertPem),
 	}
 
 	if err := (&pod.Controller{
@@ -178,10 +201,11 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 	if err := (&controllersv2.MeshGatewayController{
-		Controller: consulResourceController,
-		Client:     mgr.GetClient(),
-		Log:        ctrl.Log.WithName("controller").WithName(common.MeshGateway),
-		Scheme:     mgr.GetScheme(),
+		Controller:    consulResourceController,
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controller").WithName(common.MeshGateway),
+		Scheme:        mgr.GetScheme(),
+		GatewayConfig: &gatewayConfig,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.MeshGateway)
 		return err

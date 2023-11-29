@@ -6,8 +6,9 @@ package controllersv2
 import (
 	"context"
 	"errors"
-
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,9 +24,10 @@ import (
 // MeshGatewayController reconciles a MeshGateway object.
 type MeshGatewayController struct {
 	client.Client
-	Log        logr.Logger
-	Scheme     *runtime.Scheme
-	Controller *ConsulResourceController
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	Controller    *ConsulResourceController
+	GatewayConfig *common.GatewayConfig
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=meshgateway,verbs=get;list;watch;create;update;patch;delete
@@ -83,14 +85,20 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 //  4. Role
 //  5. RoleBinding
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
-	builder := gateways.NewMeshGatewayBuilder(resource)
+	builder := gateways.NewMeshGatewayBuilder(resource, r.GatewayConfig)
+
+	//fetch gatewayclassconfig
+	gcc, err := r.getGatewayClassConfigForGateway(ctx, resource)
+	if err != nil {
+		return err
+	}
 
 	upsertOp := func(ctx context.Context, _, object client.Object) error {
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, object, func() error { return nil })
 		return err
 	}
 
-	err := r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), upsertOp)
+	err = r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), upsertOp)
 	if err != nil {
 		return err
 	}
@@ -98,6 +106,16 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 	// TODO NET-6392 NET-6393 NET-6395
 
 	//Create deployment
+	deployment, err := builder.Deployment(gcc)
+	if err != nil {
+		return err
+	}
+
+	err = r.opIfNewOrOwned(ctx, resource, &appsv1.Deployment{}, deployment, upsertOp)
+	if err != nil {
+		return err
+	}
+	//TODO get existing deployment for merging purposes
 
 	return nil
 }
@@ -162,4 +180,50 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 		return errors.New("existing resource not owned by controller")
 	}
 	return op(ctx, scanTarget, writeSource)
+}
+
+func (r *MeshGatewayController) getGatewayClassConfigForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*meshv2beta1.GatewayClassConfig, error) {
+
+	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
+	if err != nil {
+		return nil, err
+	}
+	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
+	if err != nil {
+		return nil, err
+	}
+
+	return gatewayClassConfig, nil
+
+}
+
+func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *meshv2beta1.GatewayClass) (*meshv2beta1.GatewayClassConfig, error) {
+	if gatewayClassConfig == nil {
+		// if we don't have a gateway class we can't fetch the corresponding config
+		return nil, nil
+	}
+
+	config := &meshv2beta1.GatewayClassConfig{}
+	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
+		if string(ref.Group) != meshv2beta1.MeshGroup ||
+			ref.Kind != common.GatewayClassConfig {
+			//TODO @Sarah.Alsmiller find out what the controller name should be set to for v2
+			//|| gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
+			// we don't have supported params, so return nil
+			return nil, nil
+		}
+
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, config); err != nil {
+			return nil, client.IgnoreNotFound(err)
+		}
+	}
+	return config, nil
+}
+
+func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*meshv2beta1.GatewayClass, error) {
+	var gatewayClass meshv2beta1.GatewayClass
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	return &gatewayClass, nil
 }

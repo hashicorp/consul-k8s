@@ -5,8 +5,7 @@ package gateways
 
 import (
 	"fmt"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	corev1 "k8s.io/api/core/v1"
@@ -25,7 +24,7 @@ const (
 	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(config *common.GatewayConfig, resources *corev1.ResourceRequirements, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -99,8 +98,8 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
 	// Configure the resource requests and limits for the proxy if they are set.
-	if gcc.Spec.DeploymentSpec.Resources != nil {
-		container.Resources = *gcc.Spec.DeploymentSpec.Resources
+	if resources != nil {
+		container.Resources = *resources
 	}
 
 	// If running in vanilla K8s, run as root to allow binding to privileged ports;
@@ -120,7 +119,7 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 	return container, nil
 }
 
-func getDataplaneArgs(namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
+func getDataplaneArgs(namespace string, config *common.GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
