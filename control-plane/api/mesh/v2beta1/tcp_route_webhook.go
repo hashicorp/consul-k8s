@@ -44,7 +44,7 @@ func (v *TCPRouteWebhook) Handle(ctx context.Context, req admission.Request) adm
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	return common.ValidateMeshConfig(ctx, req, v.Logger, v, &resource, v.ConsulTenancyConfig)
+	return common.ValidateConsulResource(ctx, req, v.Logger, v, &resource, v.ConsulTenancyConfig)
 }
 
 func (v *TCPRouteWebhook) List(ctx context.Context) ([]common.ConsulResource, error) {

@@ -44,7 +44,7 @@ func (v *ProxyConfigurationWebhook) Handle(ctx context.Context, req admission.Re
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	return common.ValidateMeshConfig(ctx, req, v.Logger, v, &resource, v.ConsulTenancyConfig)
+	return common.ValidateConsulResource(ctx, req, v.Logger, v, &resource, v.ConsulTenancyConfig)
 }
 
 func (v *ProxyConfigurationWebhook) List(ctx context.Context) ([]common.ConsulResource, error) {
