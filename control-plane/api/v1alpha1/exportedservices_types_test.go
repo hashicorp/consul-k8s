@@ -63,7 +63,6 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 								{
 									SamenessGroup: "sg1",
 								},
-								{},
 							},
 						},
 						{
@@ -105,9 +104,7 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 							},
 							{
 								SamenessGroup: "sg1",
-							},
-							{
-								Partition: "default",
+								Partition:     "default",
 							},
 						},
 					},
