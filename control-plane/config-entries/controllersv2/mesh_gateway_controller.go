@@ -5,7 +5,6 @@ package controllersv2
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/go-logr/logr"
@@ -121,9 +120,6 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		}
 
 		mergedDeployment := builder.MergeDeployments(gcc, existingDeployment, builtDeployment)
-		bytes, _ := json.Marshal(mergedDeployment)
-		fmt.Println("---------json deployment -------------")
-		fmt.Println(bytes)
 
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, mergedDeployment, func() error { return nil })
 		return err
@@ -164,8 +160,6 @@ type ownedObjectOp func(ctx context.Context, existingObject client.Object, newOb
 // The purpose of opIfNewOrOwned is to ensure that we aren't updating or deleting a
 // resource that was not created by us. If this scenario is encountered, we error.
 func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object, op ownedObjectOp) error {
-	//Currently need to hardcode namespace to default
-	defaultNamespace := "default"
 
 	// Ensure owner reference is always set on objects that we write
 	if err := ctrl.SetControllerReference(gateway, writeSource, r.Client.Scheme()); err != nil {
@@ -175,13 +169,9 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 	key := client.ObjectKey{
 		// MeshGateways are clusterscoped, however, kubernetes requires a namespace to be set
 		// on creation of a namespaced object.
-		Namespace: defaultNamespace,
+		Namespace: writeSource.GetNamespace(),
 		Name:      writeSource.GetName(),
 	}
-
-	writeSource.SetNamespace(defaultNamespace)
-
-	fmt.Println("Writing... %+v", writeSource)
 
 	exists := false
 	if err := r.Get(ctx, key, scanTarget); err != nil {

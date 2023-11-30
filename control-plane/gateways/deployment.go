@@ -41,7 +41,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	}
 
 	return &appsv1.DeploymentSpec{
-		//TODO @GatewayManagement get min/max/default from GCC
+		//TODO NET-6721
 		Replicas: deploymentReplicaCount(nil, nil),
 		Selector: &metav1.LabelSelector{
 			MatchLabels: b.Labels(),
@@ -138,7 +138,7 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 }
 
 func deploymentReplicaCount(deployment *pbmesh.Deployment, currentReplicas *int32) *int32 {
-	//TODO @GatewayManagement tamp replica count up and down based on min and max values
+	//TODO NET-6721 tamp replica count up and down based on min and max values
 	instanceValue := globalDefaultInstances
 	if currentReplicas != nil {
 		return currentReplicas
