@@ -18,16 +18,16 @@ import (
 // ProxyConfigurationController reconciles a ProxyConfiguration object.
 type ProxyConfigurationController struct {
 	client.Client
-	Log                  logr.Logger
-	Scheme               *runtime.Scheme
-	MeshConfigController *MeshConfigController
+	Log        logr.Logger
+	Scheme     *runtime.Scheme
+	Controller *ConsulResourceController
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=proxyconfiguration,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=proxyconfiguration/status,verbs=get;update;patch
 
 func (r *ProxyConfigurationController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.MeshConfigController.ReconcileEntry(ctx, r, req, &meshv2beta1.ProxyConfiguration{})
+	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.ProxyConfiguration{})
 }
 
 func (r *ProxyConfigurationController) Logger(name types.NamespacedName) logr.Logger {

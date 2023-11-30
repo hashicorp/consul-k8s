@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type MeshConfig interface {
+type ConsulResource interface {
 	ResourceID(namespace, partition string) *pbresource.ID
 	Resource(namespace, partition string) *pbresource.Resource
 
