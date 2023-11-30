@@ -25,7 +25,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-	k8syaml "sigs.k8s.io/yaml"
 
 	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 
@@ -37,8 +36,9 @@ import (
 )
 
 const (
-	gatewayConfigFilename  = "/consul/config/config.yaml"
-	resourceConfigFilename = "/consul/config/resources.json"
+	gatewayConfigFilename       = "/consul/config/config.json"
+	meshResourcesConfigFilename = "/consul/config/meshResources.json"
+	resourceConfigFilename      = "/consul/config/resources.json"
 )
 
 // this dupes the Kubernetes tolerations
@@ -81,8 +81,9 @@ type Command struct {
 	flagDeploymentMaxInstances     int
 	flagDeploymentMinInstances     int
 
-	flagResourceConfigFileLocation string
-	flagGatewayConfigLocation      string
+	flagResourceConfigFileLocation            string
+	flagMeshGatewayResourceConfigFileLocation string
+	flagGatewayConfigLocation                 string
 
 	flagNodeSelector       string // this is a yaml multiline string map
 	flagTolerations        string // this is a multiline yaml string matching the tolerations array
@@ -161,7 +162,10 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagGatewayConfigLocation, "gateway-config-file-location", gatewayConfigFilename,
 		"specify a different location for where the gateway config file is")
 
-	c.flags.StringVar(&c.flagGatewayConfigLocation, "resource-config-file-location", resourceConfigFilename,
+	c.flags.StringVar(&c.flagMeshGatewayResourceConfigFileLocation, "mesh-gw-resource-config-file-location", meshResourcesConfigFilename,
+		"specify a different location for where the mesh gateway resources config file is")
+
+	c.flags.StringVar(&c.flagResourceConfigFileLocation, "resource-config-file-location", resourceConfigFilename,
 		"specify a different location for where the gateway resource config file is")
 
 	c.k8s = &flags.K8SFlags{}
@@ -182,7 +186,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Load apigw resource config from the configmap.
-	if err := c.loadAPIGWResourceConfig(); err != nil {
+	if c.resources, err = c.loadResourceConfig(c.flagResourceConfigFileLocation); err != nil {
 		c.UI.Error(fmt.Sprintf("Error loading api-gateway resource config: %s", err))
 		return 1
 	}
@@ -337,33 +341,32 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
-func (c *Command) loadAPIGWResourceConfig() error {
+func (c *Command) loadResourceConfig(filename string) (corev1.ResourceRequirements, error) {
 	// Load resources.json
-	file, err := os.Open(c.flagResourceConfigFileLocation)
+	file, err := os.Open(filename)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return err
+			return corev1.ResourceRequirements{}, err
 		}
 		c.UI.Info("No resources.json found, using defaults")
-		c.resources = defaultResourceRequirements()
-		return nil
+		return defaultResourceRequirements, nil
 	}
 
 	resources, err := io.ReadAll(file)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Unable to read resources.json, using defaults: %s", err))
-		c.resources = defaultResourceRequirements()
-		return err
+		return defaultResourceRequirements, err
 	}
 
-	if err := json.Unmarshal(resources, &c.resources); err != nil {
-		return err
+	reqs := corev1.ResourceRequirements{}
+	if err := json.Unmarshal(resources, &reqs); err != nil {
+		return corev1.ResourceRequirements{}, err
 	}
 
 	if err := file.Close(); err != nil {
-		return err
+		return corev1.ResourceRequirements{}, err
 	}
-	return nil
+	return reqs, nil
 }
 
 // loadGatewayConfigs reads and loads the configs from `/consul/config/config.yaml`, if this file does not exist nothing is done
@@ -384,10 +387,23 @@ func (c *Command) loadGatewayConfigs() error {
 		return err
 	}
 
-	err = k8syaml.Unmarshal(config, &c.gatewayConfig)
+	err = json.Unmarshal(config, &c.gatewayConfig)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error decoding gateway config file: %s", err))
 		return err
+	}
+
+	for _, cfg := range c.gatewayConfig.GatewayClassConfigs {
+		if cfg.Name != "consul-mesh-gateway" {
+			continue
+		}
+		resources, err := c.loadResourceConfig(c.flagMeshGatewayResourceConfigFileLocation)
+		if err != nil {
+			return err
+		}
+
+		cfg.Spec.Deployment = &meshv2beta1.Deployment{Resources: &resources}
+		break
 	}
 
 	if err := file.Close(); err != nil {
@@ -452,18 +468,15 @@ Usage: consul-k8s-control-plane gateway-resources [options]
 `
 )
 
-func defaultResourceRequirements() corev1.ResourceRequirements {
-	// This is a fallback. The resource.json file should be present unless explicitly removed.
-	return corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("100Mi"),
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceMemory: resource.MustParse("100Mi"),
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-		},
-	}
+var defaultResourceRequirements = corev1.ResourceRequirements{
+	Requests: corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("100Mi"),
+		corev1.ResourceCPU:    resource.MustParse("100m"),
+	},
+	Limits: corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("100Mi"),
+		corev1.ResourceCPU:    resource.MustParse("100m"),
+	},
 }
 
 func forceV1ClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha1.GatewayClassConfig) error {

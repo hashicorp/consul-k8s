@@ -7,7 +7,7 @@ load _helpers
     assert_empty helm template \
         -s templates/gateway-resources-configmap.yaml \
         --set 'connectInject.enabled=false' \
-        . 
+        .
 }
 
 @test "gateway-resources/ConfigMap: enabled with connectInject.enabled=true" {
@@ -45,19 +45,19 @@ load _helpers
     [ $actual = '220m' ]
 }
 
-@test "gateway-resources/ConfigMap: does not contain config.yaml resources without .global.experiments equal to resource-apis" {
+@test "gateway-resources/ConfigMap: does not contain config.json resources without .global.experiments equal to resource-apis" {
     cd `chart_dir`
     local resources=$(helm template \
         -s templates/gateway-resources-configmap.yaml \
         --set 'connectInject.enabled=true' \
         --set 'ui.enabled=false' \
         . | tee /dev/stderr |
-        yq '.data["config.yaml"]' | tee /dev/stderr)
+        yq '.data["config.json"]' | tee /dev/stderr)
     [ $resources = null ]
 
 }
 
-@test "gateway-resources/ConfigMap: contains config.yaml resources with .global.experiments equal to resource-apis" {
+@test "gateway-resources/ConfigMap: contains config.json resources with .global.experiments equal to resource-apis" {
     cd `chart_dir`
     local resources=$(helm template \
         -s templates/gateway-resources-configmap.yaml \
@@ -65,7 +65,7 @@ load _helpers
         --set 'global.experiments[0]=resource-apis' \
         --set 'ui.enabled=false' \
         . | tee /dev/stderr |
-        yq '.data["config.yaml"]' | tee /dev/stderr)
+        yq '.data["config.json"]' | tee /dev/stderr)
 
     [ "$resources" != null ]
 }
