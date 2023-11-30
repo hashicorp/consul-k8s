@@ -122,7 +122,9 @@ func TestSamenessGroups_MatchesConsul(t *testing.T) {
 						{
 							Partition: "p2",
 						},
-						{},
+						{
+							Peer: "test-peer",
+						},
 					},
 				},
 			},
@@ -143,6 +145,7 @@ func TestSamenessGroups_MatchesConsul(t *testing.T) {
 						Partition: "p2",
 					},
 					{
+						Peer:      "test-peer",
 						Partition: "default",
 					},
 				},
