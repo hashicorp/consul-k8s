@@ -6,6 +6,9 @@ import (
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	"testing"
 )
@@ -30,25 +33,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						GatewayClassName: "test-gateway-class",
 					},
 				},
-				config: common.GatewayConfig{
-					ImageDataplane:             "",
-					ImageConsulK8S:             "",
-					ConsulDestinationNamespace: "",
-					NamespaceMirroringPrefix:   "",
-					EnableNamespaces:           false,
-					EnableNamespaceMirroring:   false,
-					AuthMethod:                 "",
-					LogLevel:                   "",
-					ConsulPartition:            "",
-					LogJSON:                    false,
-					TLSEnabled:                 false,
-					PeeringEnabled:             false,
-					ConsulTLSServerName:        "",
-					ConsulCACert:               "",
-					ConsulConfig:               common.ConsulConfig{},
-					EnableOpenShift:            false,
-					MapPrivilegedServicePorts:  0,
-				},
+				config: common.GatewayConfig{},
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: pbmesh.GatewayClassConfig{
 						Deployment: &pbmesh.Deployment{
@@ -59,7 +44,232 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 					},
 				},
 			},
-			want:    nil,
+			want: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: pointer.Int32(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+						},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+							},
+							Annotations: map[string]string{
+								"consul.hashicorp.com/mesh-inject": "false",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{
+								corev1.Volume{
+									Name: "consul-connect-inject-data",
+									VolumeSource: corev1.VolumeSource{
+										EmptyDir: &corev1.EmptyDirVolumeSource{
+											Medium: "Memory",
+										},
+									},
+								},
+							},
+							InitContainers: []corev1.Container{
+								{
+									Name: "consul-connect-inject-init",
+									Command: []string{
+										"/bin/sh",
+										"-ec",
+										"consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \\\n\t-gateway-kind=\"mesh-gateway\" \\\n  -log-json=false \\\n  -service-name=\"\"",
+									},
+									Env: []corev1.EnvVar{
+										{
+											Name:  "POD_NAME",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.name",
+												},
+											},
+										},
+										{
+											Name:  "POD_NAMESPACE",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.namespace",
+												},
+											},
+										},
+										{
+											Name:  "NODE_NAME",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "spec.nodeName",
+												},
+											},
+										},
+										{
+											Name:  "CONSUL_ADDRESSES",
+											Value: "",
+										},
+										{
+											Name:  "CONSUL_GRPC_PORT",
+											Value: "0",
+										},
+										{
+											Name:  "CONSUL_HTTP_PORT",
+											Value: "0",
+										},
+										{
+											Name:  "CONSUL_API_TIMEOUT",
+											Value: "0s",
+										},
+										{
+											Name:  "CONSUL_NODE_NAME",
+											Value: "$(NODE_NAME)-virtual",
+										},
+										{
+											Name:  "CONSUL_NAMESPACE",
+											Value: "",
+										},
+									},
+									Resources: corev1.ResourceRequirements{},
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "consul-connect-inject-data",
+											ReadOnly:  false,
+											MountPath: "/consul/connect-inject",
+										},
+									},
+								},
+							},
+							Containers: []corev1.Container{
+								{
+									Args: []string{
+										"-addresses",
+										"",
+										"-grpc-port=0",
+										"-proxy-service-id-path=/consul/connect-inject/proxyid",
+										"-log-level=",
+										"-log-json=false",
+										"-envoy-concurrency=1",
+										"-tls-disabled",
+										"-envoy-ready-bind-port=21000",
+										"-envoy-admin-bind-port=19000",
+										"-telemetry-prom-scrape-path=/metrics",
+									},
+									Ports: []corev1.ContainerPort{
+										{
+											Name:          "proxy-health",
+											ContainerPort: 21000,
+										},
+									},
+									Env: []corev1.EnvVar{
+										{
+											Name:  "TMPDIR",
+											Value: "/consul/connect-inject",
+										},
+										{
+											Name:  "NODE_NAME",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "spec.nodeName",
+												},
+											},
+										},
+										{
+											Name:  "DP_SERVICE_NODE_NAME",
+											Value: "$(NODE_NAME)-virtual",
+										},
+										{
+											Name:  "DP_ENVOY_READY_BIND_ADDRESS",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "status.podIP",
+												},
+											},
+										},
+									},
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "consul-connect-inject-data",
+											MountPath: "/consul/connect-inject",
+										},
+									},
+									ReadinessProbe: &corev1.Probe{
+										ProbeHandler: corev1.ProbeHandler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Path: "/ready",
+												Port: intstr.IntOrString{
+													Type:   0,
+													IntVal: 21000,
+													StrVal: "",
+												},
+											},
+										},
+										InitialDelaySeconds: 1,
+									},
+									SecurityContext: &corev1.SecurityContext{
+										Capabilities: &corev1.Capabilities{
+											Add: []corev1.Capability{
+												"NET_BIND_SERVICE",
+											},
+											Drop: []corev1.Capability{
+												"ALL",
+											},
+										},
+										RunAsUser:                pointer.Int64(0),
+										ReadOnlyRootFilesystem:   pointer.Bool(true),
+										AllowPrivilegeEscalation: nil,
+										ProcMount:                nil,
+										SeccompProfile:           nil,
+									},
+									Stdin:     false,
+									StdinOnce: false,
+									TTY:       false,
+								},
+							},
+							Affinity: &corev1.Affinity{
+								NodeAffinity: nil,
+								PodAffinity:  nil,
+								PodAntiAffinity: &corev1.PodAntiAffinity{
+									PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+										{
+											Weight: 1,
+											PodAffinityTerm: corev1.PodAffinityTerm{
+												LabelSelector: &metav1.LabelSelector{
+													MatchLabels: map[string]string{
+														"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+													},
+												},
+												TopologyKey: "kubernetes.io/hostname",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Strategy:                appsv1.DeploymentStrategy{},
+					MinReadySeconds:         0,
+					RevisionHistoryLimit:    nil,
+					Paused:                  false,
+					ProgressDeadlineSeconds: nil,
+				},
+				Status: appsv1.DeploymentStatus{},
+			},
 			wantErr: false,
 		},
 	}
