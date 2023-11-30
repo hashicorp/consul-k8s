@@ -98,7 +98,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Targets: []ServiceResolverFailoverTarget{
 								{Peer: "failover_peer3"},
 								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
-								{Partition: "default", Namespace: "default"},
+								{Peer: "failover_peer4"},
 							},
 							Policy: &FailoverPolicy{
 								Mode:    "order-by-locality",
@@ -184,7 +184,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Targets: []capi.ServiceResolverFailoverTarget{
 							{Peer: "failover_peer3"},
 							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
-							{},
+							{Peer: "failover_peer4", Partition: "default", Namespace: "default"},
 						},
 						Policy: &capi.ServiceResolverFailoverPolicy{
 							Mode:    "order-by-locality",
