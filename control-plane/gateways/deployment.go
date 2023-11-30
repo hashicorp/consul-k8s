@@ -15,9 +15,7 @@ const (
 )
 
 func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
-	fmt.Println("---- deployment ----")
 	spec, err := b.deploymentSpec()
-	fmt.Printf("%+v\n", spec)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      b.gateway.Name,
@@ -41,10 +39,9 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	}
 
 	fmt.Println("deployment spec-------")
-	fmt.Printf("%+v\n", b.gcc)
 	return &appsv1.DeploymentSpec{
 		//TODO get min/max/default from GCC
-		Replicas: deploymentReplicaCount(b.gcc.Spec.Deployment, nil),
+		Replicas: deploymentReplicaCount(nil, nil),
 		Selector: &metav1.LabelSelector{
 			MatchLabels: b.Labels(),
 		},
@@ -94,9 +91,12 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 }
 
 func (b *meshGatewayBuilder) MergeDeployments(gcc *meshv2beta1.GatewayClassConfig, old, new *appsv1.Deployment) *appsv1.Deployment {
+	if old == nil {
+		return new
+	}
 	if !compareDeployments(old, new) {
 		old.Spec.Template = new.Spec.Template
-		new.Spec.Replicas = deploymentReplicaCount(gcc.Spec.Deployment, old.Spec.Replicas)
+		new.Spec.Replicas = deploymentReplicaCount(nil, old.Spec.Replicas)
 	}
 
 	return new

@@ -5,6 +5,7 @@ package controllersv2
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/go-logr/logr"
@@ -112,16 +113,20 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 	mergeDeploymentOp := func(ctx context.Context, existingObject, object client.Object) error {
 		//TODO turn objects into deployments
 		existingDeployment, ok := existingObject.(*appsv1.Deployment)
-		if !ok {
-			return fmt.Errorf("invalid deployment object")
+		if !ok && existingDeployment != nil {
+			return fmt.Errorf("unable to infer existingDeployment type")
 		}
 		builtDeployment, ok := object.(*appsv1.Deployment)
 		if !ok {
-			return fmt.Errorf("invalid deployment object")
+			return fmt.Errorf("unable to infer built deployment type")
 		}
 
-		builder.MergeDeployments(gcc, existingDeployment, builtDeployment)
-		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, object, func() error { return nil })
+		mergedDeployment := builder.MergeDeployments(gcc, existingDeployment, builtDeployment)
+		bytes, _ := json.Marshal(mergedDeployment)
+		fmt.Println("---------json deployment -------------")
+		fmt.Println(bytes)
+
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, mergedDeployment, func() error { return nil })
 		return err
 	}
 
