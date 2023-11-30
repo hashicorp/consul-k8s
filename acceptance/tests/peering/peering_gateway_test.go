@@ -167,7 +167,7 @@ func TestPeering_Gateway(t *testing.T) {
 
 	// Ensure the secret is created.
 	retry.RunWith(timer, t, func(r *retry.R) {
-		acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+		acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 		require.NoError(r, err)
 		require.NotEmpty(r, acceptorSecretName)
 	})
