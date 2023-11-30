@@ -1,7 +1,6 @@
 package gateways
 
 import (
-	"fmt"
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,15 +31,17 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		return nil, err
 	}
 
-	//TODO @sarah.alsmiller get resources from gatewayclassconfig spec (?)
-	container, err := consulDataplaneContainer(b.config, nil, b.gateway.Name, b.gateway.Namespace)
+	var resources *corev1.ResourceRequirements
+	if b.gcc != nil && b.gcc.Spec.Deployment != nil {
+		resources = b.gcc.Spec.Deployment.Resources
+	}
+	container, err := consulDataplaneContainer(b.config, resources, b.gateway.Name, b.gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("deployment spec-------")
 	return &appsv1.DeploymentSpec{
-		//TODO get min/max/default from GCC
+		//TODO @GatewayManagement get min/max/default from GCC
 		Replicas: deploymentReplicaCount(nil, nil),
 		Selector: &metav1.LabelSelector{
 			MatchLabels: b.Labels(),
@@ -49,7 +50,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: b.Labels(),
 				Annotations: map[string]string{
-					"consul.hashicorp.com/connect-inject": "false",
+					"consul.hashicorp.com/mesh-inject": "false",
 				},
 			},
 			Spec: corev1.PodSpec{
@@ -137,6 +138,7 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 }
 
 func deploymentReplicaCount(deployment *pbmesh.Deployment, currentReplicas *int32) *int32 {
+	//TODO @GatewayManagement tamp replica count up and down based on min and max values
 	instanceValue := globalDefaultInstances
 	if currentReplicas != nil {
 		return currentReplicas

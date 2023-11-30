@@ -111,7 +111,6 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 	//Create deployment
 
 	mergeDeploymentOp := func(ctx context.Context, existingObject, object client.Object) error {
-		//TODO turn objects into deployments
 		existingDeployment, ok := existingObject.(*appsv1.Deployment)
 		if !ok && existingDeployment != nil {
 			return fmt.Errorf("unable to infer existingDeployment type")
@@ -174,7 +173,6 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 	}
 
 	key := client.ObjectKey{
-		// TODO Gateway Management, find a way not to hardcode to default
 		// MeshGateways are clusterscoped, however, kubernetes requires a namespace to be set
 		// on creation of a namespaced object.
 		Namespace: defaultNamespace,
@@ -216,7 +214,6 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 }
 
 func (r *MeshGatewayController) getGatewayClassConfigForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*meshv2beta1.GatewayClassConfig, error) {
-
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
 	if err != nil {
 		return nil, err
@@ -240,15 +237,12 @@ func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, ga
 	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
 		if string(ref.Group) != meshv2beta1.MeshGroup ||
 			ref.Kind != common.GatewayClassConfig {
-			//TODO @Sarah.Alsmiller find out what the controller name should be set to for v2
-			//look at Johns PR for controller name
-			//|| gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
-			// we don't have supported params, so return nil
+			//TODO @Gateway-Management additionally check for controller name when available
 			return nil, nil
 		}
 
 		if err := r.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, config); err != nil {
-			return nil, err //client.IgnoreNotFound(err)
+			return nil, client.IgnoreNotFound(err)
 		}
 	}
 	return config, nil
@@ -257,7 +251,7 @@ func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, ga
 func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*meshv2beta1.GatewayClass, error) {
 	var gatewayClass meshv2beta1.GatewayClass
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
-		return nil, err //client.IgnoreNotFound(err)
+		return nil, client.IgnoreNotFound(err)
 	}
 	return &gatewayClass, nil
 }
