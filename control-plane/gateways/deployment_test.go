@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package gateways
 
 import (
@@ -37,10 +40,12 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 				config: GatewayConfig{},
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: meshv2beta1.GatewayClassConfigSpec{
-						DeploymentSpec: meshv2beta1.DeploymentSpec{
-							DefaultInstances: pointer.Int32(1),
-							MinInstances:     pointer.Int32(1),
-							MaxInstances:     pointer.Int32(8),
+						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
+							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
+								Default: pointer.Int32(1),
+								Min:     pointer.Int32(1),
+								Max:     pointer.Int32(8),
+							},
 						},
 					},
 				},

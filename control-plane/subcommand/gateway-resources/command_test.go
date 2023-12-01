@@ -363,22 +363,21 @@ func TestRun_loadResourceConfigFileWhenConfigFileDoesNotExist(t *testing.T) {
 	require.Contains(t, string(ui.OutputWriter.Bytes()), "No resources.json found, using defaults")
 }
 
-var validGWConfiguration = `
-gatewayClassConfigs:
+var validGWConfiguration = `gatewayClassConfigs:
 - apiVersion: mesh.consul.hashicorp.com/v2beta1
-  kind: gatewayClassConfig
+  kind: GatewayClassConfig
   metadata:
     name: consul-mesh-gateway
-    namespace: namespace
   spec:
     deployment:
-      resources:
-        requests:
-          cpu: 200m
-          memory: 200Mi
-        limits:
-          cpu: 200m
-          memory: 200Mi
+      container:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 200Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
 meshGateways:
 - name: mesh-gateway
   spec:
@@ -439,15 +438,16 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 	expectedClassConfig := v2beta1.GatewayClassConfig{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "mesh.consul.hashicorp.com/v2beta1",
-			Kind:       "gatewayClassConfig",
+			Kind:       "GatewayClassConfig",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "consul-mesh-gateway",
-			Namespace: "namespace",
+			Name: "consul-mesh-gateway",
 		},
 		Spec: v2beta1.GatewayClassConfigSpec{
-			DeploymentSpec: v2beta1.DeploymentSpec{
-				Resources: expectedResources,
+			Deployment: v2beta1.GatewayClassDeploymentConfig{
+				Container: &v2beta1.GatewayClassContainerConfig{
+					Resources: expectedResources,
+				},
 			},
 		},
 		Status: v2beta1.Status{},
