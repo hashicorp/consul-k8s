@@ -45,21 +45,21 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			k8sObjects: []runtime.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "default",
+						Namespace: "consul",
 						Name:      "mesh-gateway",
 					},
 				},
 			},
 			request: ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Namespace: "default",
+					Namespace: "consul",
 					Name:      "mesh-gateway",
 				},
 			},
 			expectedResult: ctrl.Result{},
 			postReconcile: func(t *testing.T, c client.Client) {
 				// Verify ServiceAccount was created
-				key := client.ObjectKey{Namespace: "default", Name: "mesh-gateway"}
+				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
 				assert.NoError(t, c.Get(context.Background(), key, &corev1.ServiceAccount{}))
 			},
 		},
