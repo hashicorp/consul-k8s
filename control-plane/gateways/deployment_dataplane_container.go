@@ -21,7 +21,7 @@ const (
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
 	defaultPrometheusScrapePath  = "/metrics"
-	defaultEnvoyProxyConcurrency = 1
+	defaultEnvoyProxyConcurrency = "1"
 	volumeName                   = "consul-connect-inject-data"
 )
 
@@ -58,6 +58,8 @@ func consulDataplaneContainer(config GatewayConfig, resources *corev1.ResourceRe
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
 		// consul-dataplane can write files to it. Otherwise, it wouldn't be able to
 		// because we set file system to be read-only.
+		
+		// TODO(nathancoleman): I don't believe consul-dataplane needs to write anymore, investigate.
 		Env: []corev1.EnvVar{
 			{
 				Name:  "TMPDIR",
@@ -98,23 +100,29 @@ func consulDataplaneContainer(config GatewayConfig, resources *corev1.ResourceRe
 		Name:          "proxy-health",
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
+
+	// Configure the wan port.
+	container.Ports = append(container.Ports, corev1.ContainerPort{
+		Name:          "wan",
+		ContainerPort: int32(constants.DefaultWANPort),
+	})
+
 	// Configure the resource requests and limits for the proxy if they are set.
 	if resources != nil {
 		container.Resources = *resources
 	}
 
-	// If running in vanilla K8s, run as root to allow binding to privileged ports;
-	// otherwise, allow the user to be assigned by OpenShift.
 	container.SecurityContext = &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: pointer.Bool(true),
-		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
+		AllowPrivilegeEscalation: pointer.Bool(false),
+		// Drop any Linux capabilities you'd get other than NET_BIND_SERVICE.
+		// FUTURE: We likely require some additional capability in order to support
+		//   MeshGateway's host network option.
 		Capabilities: &corev1.Capabilities{
 			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
-	}
-	if !config.EnableOpenShift {
-		container.SecurityContext.RunAsUser = pointer.Int64(0)
+		ReadOnlyRootFilesystem: pointer.Bool(true),
+		RunAsNonRoot:           pointer.Bool(true),
 	}
 
 	return container, nil
@@ -122,7 +130,6 @@ func consulDataplaneContainer(config GatewayConfig, resources *corev1.ResourceRe
 
 func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
-	envoyConcurrency := defaultEnvoyProxyConcurrency
 
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
@@ -130,7 +137,7 @@ func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile st
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
-		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
+		"-envoy-concurrency=" + defaultEnvoyProxyConcurrency,
 	}
 
 	consulNamespace := namespaces.ConsulNamespace(namespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.ConsulDestinationNamespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.NSMirroringPrefix)
@@ -152,25 +159,13 @@ func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile st
 	if config.ConsulTenancyConfig.ConsulPartition != "" {
 		args = append(args, "-service-partition="+config.ConsulTenancyConfig.ConsulPartition)
 	}
-	if config.TLSEnabled {
-		if config.ConsulTLSServerName != "" {
-			args = append(args, "-tls-server-name="+config.ConsulTLSServerName)
-		}
-		if config.ConsulCACert != "" {
-			args = append(args, "-ca-certs="+constants.LegacyConsulCAFile)
-		}
-	} else {
-		args = append(args, "-tls-disabled")
-	}
+
+	args = append(args, "-tls-disabled")
 
 	// Configure the readiness port on the dataplane sidecar if proxy health checks are enabled.
 	args = append(args, fmt.Sprintf("%s=%d", "-envoy-ready-bind-port", constants.ProxyDefaultHealthPort))
 
 	args = append(args, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000))
-
-	// Set a default scrape path that can be overwritten by the annotation.
-	prometheusScrapePath := defaultPrometheusScrapePath
-	args = append(args, "-telemetry-prom-scrape-path="+prometheusScrapePath)
 
 	return args, nil
 }
