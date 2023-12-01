@@ -5,16 +5,18 @@ package v2beta1
 
 import (
 	"fmt"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -38,8 +40,90 @@ type GatewayClassConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   pbmesh.GatewayClassConfig `json:"spec,omitempty"`
+	Spec   GatewayClassConfigSpec `json:"spec,omitempty"`
 	Status `json:"status,omitempty"`
+}
+
+type GatewayClassConfigSpec struct {
+	// Consul specifies configuration for the Consul Dataplane running as the gateway
+	Consul GatewayClassConsulConfig `json:"consul"`
+	// Kubernetes specifies configuration for the Kubernetes resources created from this GatewayClass
+	Kubernetes GatewayClassKubernetesConfig `json:"kubernetes"`
+}
+
+type GatewayClassKubernetesConfig struct {
+	// Annotations are applied to all Kubernetes resources created from this GatewayClass
+	Annotations GatewayClassAnnotationsLabelsConfig `json:"annotations,omitempty"`
+	// Labels are applied to all Kubernetes resources created from this GatewayClass
+	Labels GatewayClassAnnotationsLabelsConfig `json:"labels,omitempty"`
+	// Deployment contains config specific to the Deployment created from this GatewayClass
+	Deployment GatewayClassDeploymentConfig `json:"deployment,omitempty"'`
+	// Service contains config specific to the corev1.Service created from this GatewayClass
+	Service GatewayClassServiceConfig `json:"service,omitempty"`
+	// ServiceAccount contains config specific to the corev1.ServiceAccount created from this GatewayClass
+	ServiceAccount GatewayClassServiceAccountConfig `json:"serviceAccount,omitempty"`
+}
+
+type GatewayClassDeploymentConfig struct {
+	// Annotations are applied to the created Deployment resource
+	Annotations GatewayClassAnnotationsLabelsConfig `json:"annotations,omitEmpty"`
+	// Labels are applied to the created Deployment resource
+	Labels GatewayClassAnnotationsLabelsConfig `json:"labels,omitempty"`
+	// Container contains config specific to the created Deployment's container
+	Container GatewayClassContainerConfig `json:"container,omitempty"`
+	// InitContainer contains config specific to the created Deployment's init container
+	InitContainer GatewayClassInitContainerConfig `json:"initContainer,omitempty"`
+	// NodeSelector specifies the node selector to use on the created Deployment
+	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
+	// PriorityClassName specifies the priority class name to use on the created Deployment
+	PriorityClassName string `json:"priorityClassName"`
+	// Tolerations specifies the tolerations to use on the created Deployment
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
+type GatewayClassInitContainerConfig struct {
+	// Resources specifies the resource requirements for the created Deployment
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type GatewayClassContainerConfig struct {
+	// Resources specifies the resource requirements for the created Deployment
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type GatewayClassServiceConfig struct {
+	// Annotations are applied to the created Service
+	Annotations GatewayClassAnnotationsLabelsConfig `json:"annotations,omitempty"`
+	// Labels are applied to the created Service
+	Labels GatewayClassAnnotationsLabelsConfig `json:"labels,omitempty"`
+	// Type specifies the type of Service to use (LoadBalancer, ClusterIP, etc.)
+	Type *corev1.ServiceType `json:"type,omitempty"`
+}
+
+type GatewayClassServiceAccountConfig struct {
+	// Annotations are applied to the created ServiceAccount
+	Annotations GatewayClassAnnotationsLabelsConfig `json:"annotations,omitempty"`
+	// Labels are applied to the created ServiceAccount
+	Labels GatewayClassAnnotationsLabelsConfig `json:"labels,omitempty"`
+}
+
+type GatewayClassConsulConfig struct {
+	// Logging specifies the logging configuration for Consul Dataplane
+	Logging GatewayClassConsulLoggingConfig `json:"logging,omitempty"`
+}
+
+type GatewayClassConsulLoggingConfig struct {
+	// Level sets the logging level for Consul Dataplane (debug, info, etc.)
+	Level string `json:"level,omitempty"`
+}
+
+type GatewayClassAnnotationsLabelsConfig struct {
+	// InheritFromGateway lists the names/keys of annotations or labels to copy from the Gateway resource.
+	// Any name/key included here will override those in Set if specified on the Gateway.
+	InheritFromGateway []string `json:"inheritFromGateway,omitempty"`
+	// Set lists the names/keys and values of annotations or labels to set on the resource.
+	// Any name/key included here will be overridden if present in InheritFromGateway and set on the Gateway.
+	Set map[string]string `json:"set,omitempty"`
 }
 
 // +kubebuilder:object:root=true

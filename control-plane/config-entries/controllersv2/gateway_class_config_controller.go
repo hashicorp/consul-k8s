@@ -27,7 +27,7 @@ type GatewayClassConfigController struct {
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=gatewayclassconfig/status,verbs=get;update;patch
 
 func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.GatewayClassConfig{})
+	return ctrl.Result{}, nil
 }
 
 func (r *GatewayClassConfigController) Logger(name types.NamespacedName) logr.Logger {
