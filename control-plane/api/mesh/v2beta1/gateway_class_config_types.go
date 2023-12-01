@@ -39,30 +39,23 @@ type GatewayClassConfig struct {
 }
 
 type GatewayClassConfigSpec struct {
-	// Consul specifies configuration for the Consul Dataplane running as the gateway
-	Consul GatewayClassConsulConfig `json:"consul"`
-	// Kubernetes specifies configuration for the Kubernetes resources created from this GatewayClass
-	Kubernetes GatewayClassKubernetesConfig `json:"kubernetes"`
-}
+	GatewayClassAnnotationsAndLabels `json:",inline"`
 
-type GatewayClassKubernetesConfig struct {
-	// Annotations are applied to all Kubernetes resources created from this GatewayClass
-	Annotations GatewayClassAnnotationsLabelsConfig `json:"annotations,omitempty"`
-	// Labels are applied to all Kubernetes resources created from this GatewayClass
-	Labels GatewayClassAnnotationsLabelsConfig `json:"labels,omitempty"`
 	// Deployment contains config specific to the Deployment created from this GatewayClass
-	Deployment GatewayClassDeploymentConfig `json:"deployment,omitempty"'`
-	// Service contains config specific to the corev1.Service created from this GatewayClass
+	Deployment GatewayClassDeploymentConfig `json:"deployment,omitempty"`
+	// Role contains config specific to the Role created from this GatewayClass
+	Role GatewayClassRoleConfig `json:"role,omitempty"`
+	// RoleBinding contains config specific to the RoleBinding created from this GatewayClass
+	RoleBinding GatewayClassRoleBindingConfig `json:"roleBinding,omitempty"`
+	// Service contains config specific to the Service created from this GatewayClass
 	Service GatewayClassServiceConfig `json:"service,omitempty"`
 	// ServiceAccount contains config specific to the corev1.ServiceAccount created from this GatewayClass
 	ServiceAccount GatewayClassServiceAccountConfig `json:"serviceAccount,omitempty"`
 }
 
 type GatewayClassDeploymentConfig struct {
-	// Annotations are applied to the created Deployment resource
-	Annotations GatewayClassAnnotationsLabelsConfig `json:"annotations,omitEmpty"`
-	// Labels are applied to the created Deployment resource
-	Labels GatewayClassAnnotationsLabelsConfig `json:"labels,omitempty"`
+	GatewayClassAnnotationsAndLabels `json:",inline"`
+
 	// Container contains config specific to the created Deployment's container
 	Container GatewayClassContainerConfig `json:"container,omitempty"`
 	// InitContainer contains config specific to the created Deployment's init container
@@ -76,29 +69,36 @@ type GatewayClassDeploymentConfig struct {
 }
 
 type GatewayClassInitContainerConfig struct {
+	// Consul specifies configuration for the consul-k8s-control-plane init container
+	Consul GatewayClassConsulConfig `json:"consul,omitempty"`
 	// Resources specifies the resource requirements for the created Deployment
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type GatewayClassContainerConfig struct {
+	// Consul specifies configuration for the consul-dataplane container
+	Consul GatewayClassConsulConfig `json:"consul,omitempty"`
 	// Resources specifies the resource requirements for the created Deployment
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
+type GatewayClassRoleConfig struct {
+	GatewayClassAnnotationsAndLabels `json:",inline"`
+}
+
+type GatewayClassRoleBindingConfig struct {
+	GatewayClassAnnotationsAndLabels `json:",inline"`
+}
+
 type GatewayClassServiceConfig struct {
-	// Annotations are applied to the created Service
-	Annotations GatewayClassAnnotationsLabelsConfig `json:"annotations,omitempty"`
-	// Labels are applied to the created Service
-	Labels GatewayClassAnnotationsLabelsConfig `json:"labels,omitempty"`
+	GatewayClassAnnotationsAndLabels `json:",inline"`
+
 	// Type specifies the type of Service to use (LoadBalancer, ClusterIP, etc.)
 	Type *corev1.ServiceType `json:"type,omitempty"`
 }
 
 type GatewayClassServiceAccountConfig struct {
-	// Annotations are applied to the created ServiceAccount
-	Annotations GatewayClassAnnotationsLabelsConfig `json:"annotations,omitempty"`
-	// Labels are applied to the created ServiceAccount
-	Labels GatewayClassAnnotationsLabelsConfig `json:"labels,omitempty"`
+	GatewayClassAnnotationsAndLabels `json:",inline"`
 }
 
 type GatewayClassConsulConfig struct {
@@ -109,6 +109,15 @@ type GatewayClassConsulConfig struct {
 type GatewayClassConsulLoggingConfig struct {
 	// Level sets the logging level for Consul Dataplane (debug, info, etc.)
 	Level string `json:"level,omitempty"`
+}
+
+// GatewayClassAnnotationsAndLabels exists to provide a commonly-embedded wrapper
+// for Annotations and Labels on a given resource configuration
+type GatewayClassAnnotationsAndLabels struct {
+	// Annotations are applied to the created resource
+	Annotations GatewayClassAnnotationsLabelsConfig `json:"annotations,omitempty"`
+	// Labels are applied to the created resource
+	Labels GatewayClassAnnotationsLabelsConfig `json:"labels,omitempty"`
 }
 
 type GatewayClassAnnotationsLabelsConfig struct {
