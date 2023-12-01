@@ -5,11 +5,12 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // Test MatchesConsul.
@@ -155,6 +156,7 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 							Service:               "service",
 							ServiceSubset:         "serviceSubset",
 							Namespace:             "namespace",
+							Partition:             "default",
 							PrefixRewrite:         "prefixRewrite",
 							IdleTimeout:           1 * time.Second,
 							RequestTimeout:        1 * time.Second,
