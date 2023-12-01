@@ -3,10 +3,7 @@
 # A separate file is needed for each release because the cron schedules are different for each release.
 name: weekly-acceptance-1-1-x
 on:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    # Run weekly on Wednesday at 3AM UTC/11PM EST/8PM PST
-    - cron:  '0 3 * * 3'
+  pull_request:
 
 
 # these should be the only settings that you will ever need to change
