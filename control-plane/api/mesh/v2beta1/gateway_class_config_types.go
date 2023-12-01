@@ -4,13 +4,8 @@
 package v2beta1
 
 import (
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -137,93 +132,3 @@ type GatewayClassConfigList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []*GatewayClassConfig `json:"items"`
 }
-
-func (in *GatewayClassConfig) ResourceID(namespace, partition string) *pbresource.ID {
-	return &pbresource.ID{
-		Name: in.Name,
-		Type: pbmesh.GatewayClassConfigType,
-		Tenancy: &pbresource.Tenancy{
-			Partition: partition,
-			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
-		},
-	}
-}
-
-func (in *GatewayClassConfig) Resource(namespace, partition string) *pbresource.Resource {
-	// GatewayClassConfig as defined above only exists in Kubernetes and is not synced to Consul
-	return nil
-}
-
-func (in *GatewayClassConfig) AddFinalizer(f string) {
-	in.ObjectMeta.Finalizers = append(in.Finalizers(), f)
-}
-
-func (in *GatewayClassConfig) RemoveFinalizer(f string) {
-	var newFinalizers []string
-	for _, oldF := range in.Finalizers() {
-		if oldF != f {
-			newFinalizers = append(newFinalizers, oldF)
-		}
-	}
-	in.ObjectMeta.Finalizers = newFinalizers
-}
-
-func (in *GatewayClassConfig) Finalizers() []string {
-	return in.ObjectMeta.Finalizers
-}
-
-func (in *GatewayClassConfig) MatchesConsul(candidate *pbresource.Resource, namespace, partition string) bool {
-	// GatewayClassConfig as defined above only exists in Kubernetes and is not synced to Consul
-	return true
-}
-
-func (in *GatewayClassConfig) KubeKind() string {
-	return gatewayClassConfigKubeKind
-}
-
-func (in *GatewayClassConfig) KubernetesName() string {
-	return in.ObjectMeta.Name
-}
-
-func (in *GatewayClassConfig) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
-	in.Status.Conditions = Conditions{
-		{
-			Type:               ConditionSynced,
-			Status:             status,
-			LastTransitionTime: metav1.Now(),
-			Reason:             reason,
-			Message:            message,
-		},
-	}
-}
-
-func (in *GatewayClassConfig) SetLastSyncedTime(time *metav1.Time) {
-	in.Status.LastSyncedTime = time
-}
-
-func (in *GatewayClassConfig) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
-	cond := in.Status.GetCondition(ConditionSynced)
-	if cond == nil {
-		return corev1.ConditionUnknown, "", ""
-	}
-	return cond.Status, cond.Reason, cond.Message
-}
-
-func (in *GatewayClassConfig) SyncedConditionStatus() corev1.ConditionStatus {
-	condition := in.Status.GetCondition(ConditionSynced)
-	if condition == nil {
-		return corev1.ConditionUnknown
-	}
-	return condition.Status
-}
-
-func (in *GatewayClassConfig) Validate(tenancy common.ConsulTenancyConfig) error {
-	return nil
-}
-
-// DefaultNamespaceFields is required as part of the common.MeshConfig interface.
-func (in *GatewayClassConfig) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
