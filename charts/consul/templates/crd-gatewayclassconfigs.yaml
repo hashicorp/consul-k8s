@@ -51,547 +51,162 @@ spec:
           metadata:
             type: object
           spec:
+            description: GatewayClassConfigSpec specifies the desired state of the
+              Config CRD.
             properties:
-              annotations:
-                description: Annotations are applied to the created resource
+              copyAnnotations:
+                description: Annotation Information to copy to services or deployments
                 properties:
-                  inheritFromGateway:
-                    description: InheritFromGateway lists the names/keys of annotations
-                      or labels to copy from the Gateway resource. Any name/key included
-                      here will override those in Set if specified on the Gateway.
+                  service:
+                    description: List of annotations to copy to the gateway service.
                     items:
                       type: string
                     type: array
-                  set:
-                    additionalProperties:
-                      type: string
-                    description: Set lists the names/keys and values of annotations
-                      or labels to set on the resource. Any name/key included here
-                      will be overridden if present in InheritFromGateway and set
-                      on the Gateway.
-                    type: object
                 type: object
               deployment:
-                description: Deployment contains config specific to the Deployment
-                  created from this GatewayClass
+                description: Deployment defines the deployment configuration for the
+                  gateway.
                 properties:
-                  annotations:
-                    description: Annotations are applied to the created resource
+                  defaultInstances:
+                    default: 1
+                    description: Number of gateway instances that should be deployed
+                      by default
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                  maxInstances:
+                    default: 8
+                    description: Max allowed number of gateway instances
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                  minInstances:
+                    default: 1
+                    description: Minimum allowed number of gateway instances
+                    format: int32
+                    maximum: 8
+                    minimum: 1
+                    type: integer
+                  resources:
+                    description: Resources defines the resource requirements for the
+                      gateway.
                     properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
+                      claims:
+                        description: "Claims lists the names of resources, defined
+                          in spec.resourceClaims, that are used by this container.
+                          \n This is an alpha field and requires enabling the DynamicResourceAllocation
+                          feature gate. \n This field is immutable. It can only be
+                          set for containers."
                         items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                  container:
-                    description: Container contains config specific to the created
-                      Deployment's container
-                    properties:
-                      consul:
-                        description: Consul specifies configuration for the consul-dataplane
-                          container
-                        properties:
-                          logging:
-                            description: Logging specifies the logging configuration
-                              for Consul Dataplane
-                            properties:
-                              level:
-                                description: Level sets the logging level for Consul
-                                  Dataplane (debug, info, etc.)
-                                type: string
-                            type: object
-                        type: object
-                      resources:
-                        description: Resources specifies the resource requirements
-                          for the created Deployment
-                        properties:
-                          claims:
-                            description: "Claims lists the names of resources, defined
-                              in spec.resourceClaims, that are used by this container.
-                              \n This is an alpha field and requires enabling the
-                              DynamicResourceAllocation feature gate. \n This field
-                              is immutable. It can only be set for containers."
-                            items:
-                              description: ResourceClaim references one entry in PodSpec.ResourceClaims.
-                              properties:
-                                name:
-                                  description: Name must match the name of one entry
-                                    in pod.spec.resourceClaims of the Pod where this
-                                    field is used. It makes that resource available
-                                    inside a container.
-                                  type: string
-                              required:
-                              - name
-                              type: object
-                            type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
-                          limits:
-                            additionalProperties:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                              x-kubernetes-int-or-string: true
-                            description: 'Limits describes the maximum amount of compute
-                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                            type: object
-                          requests:
-                            additionalProperties:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                              x-kubernetes-int-or-string: true
-                            description: 'Requests describes the minimum amount of
-                              compute resources required. If Requests is omitted for
-                              a container, it defaults to Limits if that is explicitly
-                              specified, otherwise to an implementation-defined value.
-                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                            type: object
-                        type: object
-                    type: object
-                  initContainer:
-                    description: InitContainer contains config specific to the created
-                      Deployment's init container
-                    properties:
-                      consul:
-                        description: Consul specifies configuration for the consul-k8s-control-plane
-                          init container
-                        properties:
-                          logging:
-                            description: Logging specifies the logging configuration
-                              for Consul Dataplane
-                            properties:
-                              level:
-                                description: Level sets the logging level for Consul
-                                  Dataplane (debug, info, etc.)
-                                type: string
-                            type: object
-                        type: object
-                      resources:
-                        description: Resources specifies the resource requirements
-                          for the created Deployment
-                        properties:
-                          claims:
-                            description: "Claims lists the names of resources, defined
-                              in spec.resourceClaims, that are used by this container.
-                              \n This is an alpha field and requires enabling the
-                              DynamicResourceAllocation feature gate. \n This field
-                              is immutable. It can only be set for containers."
-                            items:
-                              description: ResourceClaim references one entry in PodSpec.ResourceClaims.
-                              properties:
-                                name:
-                                  description: Name must match the name of one entry
-                                    in pod.spec.resourceClaims of the Pod where this
-                                    field is used. It makes that resource available
-                                    inside a container.
-                                  type: string
-                              required:
-                              - name
-                              type: object
-                            type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
-                          limits:
-                            additionalProperties:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                              x-kubernetes-int-or-string: true
-                            description: 'Limits describes the maximum amount of compute
-                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                            type: object
-                          requests:
-                            additionalProperties:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                              x-kubernetes-int-or-string: true
-                            description: 'Requests describes the minimum amount of
-                              compute resources required. If Requests is omitted for
-                              a container, it defaults to Limits if that is explicitly
-                              specified, otherwise to an implementation-defined value.
-                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                            type: object
-                        type: object
-                    type: object
-                  labels:
-                    description: Labels are applied to the created resource
-                    properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
-                        items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                  nodeSelector:
-                    description: NodeSelector specifies the node selector to use on
-                      the created Deployment
-                    properties:
-                      nodeSelectorTerms:
-                        description: Required. A list of node selector terms. The
-                          terms are ORed.
-                        items:
-                          description: A null or empty node selector term matches
-                            no objects. The requirements of them are ANDed. The TopologySelectorTerm
-                            type implements a subset of the NodeSelectorTerm.
+                          description: ResourceClaim references one entry in PodSpec.ResourceClaims.
                           properties:
-                            matchExpressions:
-                              description: A list of node selector requirements by
-                                node's labels.
-                              items:
-                                description: A node selector requirement is a selector
-                                  that contains values, a key, and an operator that
-                                  relates the key and values.
-                                properties:
-                                  key:
-                                    description: The label key that the selector applies
-                                      to.
-                                    type: string
-                                  operator:
-                                    description: Represents a key's relationship to
-                                      a set of values. Valid operators are In, NotIn,
-                                      Exists, DoesNotExist. Gt, and Lt.
-                                    type: string
-                                  values:
-                                    description: An array of string values. If the
-                                      operator is In or NotIn, the values array must
-                                      be non-empty. If the operator is Exists or DoesNotExist,
-                                      the values array must be empty. If the operator
-                                      is Gt or Lt, the values array must have a single
-                                      element, which will be interpreted as an integer.
-                                      This array is replaced during a strategic merge
-                                      patch.
-                                    items:
-                                      type: string
-                                    type: array
-                                required:
-                                - key
-                                - operator
-                                type: object
-                              type: array
-                            matchFields:
-                              description: A list of node selector requirements by
-                                node's fields.
-                              items:
-                                description: A node selector requirement is a selector
-                                  that contains values, a key, and an operator that
-                                  relates the key and values.
-                                properties:
-                                  key:
-                                    description: The label key that the selector applies
-                                      to.
-                                    type: string
-                                  operator:
-                                    description: Represents a key's relationship to
-                                      a set of values. Valid operators are In, NotIn,
-                                      Exists, DoesNotExist. Gt, and Lt.
-                                    type: string
-                                  values:
-                                    description: An array of string values. If the
-                                      operator is In or NotIn, the values array must
-                                      be non-empty. If the operator is Exists or DoesNotExist,
-                                      the values array must be empty. If the operator
-                                      is Gt or Lt, the values array must have a single
-                                      element, which will be interpreted as an integer.
-                                      This array is replaced during a strategic merge
-                                      patch.
-                                    items:
-                                      type: string
-                                    type: array
-                                required:
-                                - key
-                                - operator
-                                type: object
-                              type: array
+                            name:
+                              description: Name must match the name of one entry in
+                                pod.spec.resourceClaims of the Pod where this field
+                                is used. It makes that resource available inside a
+                                container.
+                              type: string
+                          required:
+                          - name
                           type: object
-                          x-kubernetes-map-type: atomic
                         type: array
-                    required:
-                    - nodeSelectorTerms
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Limits describes the maximum amount of compute
+                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Requests describes the minimum amount of compute
+                          resources required. If Requests is omitted for a container,
+                          it defaults to Limits if that is explicitly specified, otherwise
+                          to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
                     type: object
-                    x-kubernetes-map-type: atomic
-                  priorityClassName:
-                    description: PriorityClassName specifies the priority class name
-                      to use on the created Deployment
-                    type: string
-                  tolerations:
-                    description: Tolerations specifies the tolerations to use on the
-                      created Deployment
-                    items:
-                      description: The pod this Toleration is attached to tolerates
-                        any taint that matches the triple <key,value,effect> using
-                        the matching operator <operator>.
-                      properties:
-                        effect:
-                          description: Effect indicates the taint effect to match.
-                            Empty means match all taint effects. When specified, allowed
-                            values are NoSchedule, PreferNoSchedule and NoExecute.
-                          type: string
-                        key:
-                          description: Key is the taint key that the toleration applies
-                            to. Empty means match all taint keys. If the key is empty,
-                            operator must be Exists; this combination means to match
-                            all values and all keys.
-                          type: string
-                        operator:
-                          description: Operator represents a key's relationship to
-                            the value. Valid operators are Exists and Equal. Defaults
-                            to Equal. Exists is equivalent to wildcard for value,
-                            so that a pod can tolerate all taints of a particular
-                            category.
-                          type: string
-                        tolerationSeconds:
-                          description: TolerationSeconds represents the period of
-                            time the toleration (which must be of effect NoExecute,
-                            otherwise this field is ignored) tolerates the taint.
-                            By default, it is not set, which means tolerate the taint
-                            forever (do not evict). Zero and negative values will
-                            be treated as 0 (evict immediately) by the system.
-                          format: int64
-                          type: integer
-                        value:
-                          description: Value is the taint value the toleration matches
-                            to. If the operator is Exists, the value should be empty,
-                            otherwise just a regular string.
-                          type: string
-                      type: object
-                    type: array
-                required:
-                - priorityClassName
                 type: object
-              labels:
-                description: Labels are applied to the created resource
-                properties:
-                  inheritFromGateway:
-                    description: InheritFromGateway lists the names/keys of annotations
-                      or labels to copy from the Gateway resource. Any name/key included
-                      here will override those in Set if specified on the Gateway.
-                    items:
+              mapPrivilegedContainerPorts:
+                description: The value to add to privileged ports ( ports < 1024)
+                  for gateway containers
+                format: int32
+                type: integer
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: 'NodeSelector is a selector which must be true for the
+                  pod to fit on a node. Selector which must match a node''s labels
+                  for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
+                type: object
+              openshiftSCCName:
+                description: The name of the OpenShift SecurityContextConstraints
+                  resource for this gateway class to use.
+                type: string
+              podSecurityPolicy:
+                description: The name of an existing Kubernetes PodSecurityPolicy
+                  to bind to the managed ServiceAccount if ACLs are managed.
+                type: string
+              serviceType:
+                description: Service Type string describes ingress methods for a service
+                enum:
+                - ClusterIP
+                - NodePort
+                - LoadBalancer
+                type: string
+              tolerations:
+                description: 'Tolerations allow the scheduler to schedule nodes with
+                  matching taints. More Info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/'
+                items:
+                  description: The pod this Toleration is attached to tolerates any
+                    taint that matches the triple <key,value,effect> using the matching
+                    operator <operator>.
+                  properties:
+                    effect:
+                      description: Effect indicates the taint effect to match. Empty
+                        means match all taint effects. When specified, allowed values
+                        are NoSchedule, PreferNoSchedule and NoExecute.
                       type: string
-                    type: array
-                  set:
-                    additionalProperties:
+                    key:
+                      description: Key is the taint key that the toleration applies
+                        to. Empty means match all taint keys. If the key is empty,
+                        operator must be Exists; this combination means to match all
+                        values and all keys.
                       type: string
-                    description: Set lists the names/keys and values of annotations
-                      or labels to set on the resource. Any name/key included here
-                      will be overridden if present in InheritFromGateway and set
-                      on the Gateway.
-                    type: object
-                type: object
-              role:
-                description: Role contains config specific to the Role created from
-                  this GatewayClass
-                properties:
-                  annotations:
-                    description: Annotations are applied to the created resource
-                    properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
-                        items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                  labels:
-                    description: Labels are applied to the created resource
-                    properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
-                        items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                type: object
-              roleBinding:
-                description: RoleBinding contains config specific to the RoleBinding
-                  created from this GatewayClass
-                properties:
-                  annotations:
-                    description: Annotations are applied to the created resource
-                    properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
-                        items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                  labels:
-                    description: Labels are applied to the created resource
-                    properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
-                        items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                type: object
-              service:
-                description: Service contains config specific to the Service created
-                  from this GatewayClass
-                properties:
-                  annotations:
-                    description: Annotations are applied to the created resource
-                    properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
-                        items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                  labels:
-                    description: Labels are applied to the created resource
-                    properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
-                        items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                  type:
-                    description: Type specifies the type of Service to use (LoadBalancer,
-                      ClusterIP, etc.)
-                    type: string
-                type: object
-              serviceAccount:
-                description: ServiceAccount contains config specific to the corev1.ServiceAccount
-                  created from this GatewayClass
-                properties:
-                  annotations:
-                    description: Annotations are applied to the created resource
-                    properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
-                        items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                  labels:
-                    description: Labels are applied to the created resource
-                    properties:
-                      inheritFromGateway:
-                        description: InheritFromGateway lists the names/keys of annotations
-                          or labels to copy from the Gateway resource. Any name/key
-                          included here will override those in Set if specified on
-                          the Gateway.
-                        items:
-                          type: string
-                        type: array
-                      set:
-                        additionalProperties:
-                          type: string
-                        description: Set lists the names/keys and values of annotations
-                          or labels to set on the resource. Any name/key included
-                          here will be overridden if present in InheritFromGateway
-                          and set on the Gateway.
-                        type: object
-                    type: object
-                type: object
+                    operator:
+                      description: Operator represents a key's relationship to the
+                        value. Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod
+                        can tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: TolerationSeconds represents the period of time
+                        the toleration (which must be of effect NoExecute, otherwise
+                        this field is ignored) tolerates the taint. By default, it
+                        is not set, which means tolerate the taint forever (do not
+                        evict). Zero and negative values will be treated as 0 (evict
+                        immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: Value is the taint value the toleration matches
+                        to. If the operator is Exists, the value should be empty,
+                        otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
             type: object
           status:
             properties:
