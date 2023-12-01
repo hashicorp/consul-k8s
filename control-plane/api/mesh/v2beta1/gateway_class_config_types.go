@@ -4,18 +4,12 @@
 package v2beta1
 
 import (
-	"fmt"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
-	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
@@ -151,11 +145,8 @@ func (in *GatewayClassConfig) ResourceID(namespace, partition string) *pbresourc
 }
 
 func (in *GatewayClassConfig) Resource(namespace, partition string) *pbresource.Resource {
-	return &pbresource.Resource{
-		Id:       in.ResourceID(namespace, partition),
-		Data:     inject.ToProtoAny(&in.Spec),
-		Metadata: meshConfigMeta(),
-	}
+	// GatewayClassConfig as defined above only exists in Kubernetes and is not synced to Consul
+	return nil
 }
 
 func (in *GatewayClassConfig) AddFinalizer(f string) {
@@ -177,14 +168,8 @@ func (in *GatewayClassConfig) Finalizers() []string {
 }
 
 func (in *GatewayClassConfig) MatchesConsul(candidate *pbresource.Resource, namespace, partition string) bool {
-	return cmp.Equal(
-		in.Resource(namespace, partition),
-		candidate,
-		protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
-		protocmp.IgnoreFields(&pbresource.ID{}, "uid"),
-		protocmp.Transform(),
-		cmpopts.SortSlices(func(a, b any) bool { return fmt.Sprintf("%v", a) < fmt.Sprintf("%v", b) }),
-	)
+	// GatewayClassConfig as defined above only exists in Kubernetes and is not synced to Consul
+	return true
 }
 
 func (in *GatewayClassConfig) KubeKind() string {
@@ -228,7 +213,6 @@ func (in *GatewayClassConfig) SyncedConditionStatus() corev1.ConditionStatus {
 }
 
 func (in *GatewayClassConfig) Validate(tenancy common.ConsulTenancyConfig) error {
-	// TODO add validation logic that ensures we only ever write this to the default namespace.
 	return nil
 }
 
