@@ -5,6 +5,7 @@ package connectinject
 
 import (
 	"context"
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -62,7 +63,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
 
-	gatewayConfig := common.GatewayConfig{
+	gatewayConfig := gateways.GatewayConfig{
 		ConsulConfig: common.ConsulConfig{
 			Address:    c.consul.Addresses,
 			GRPCPort:   consulConfig.GRPCPort,

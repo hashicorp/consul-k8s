@@ -11,7 +11,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
@@ -32,7 +31,7 @@ type initContainerCommandData struct {
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func initContainer(config common.GatewayConfig, name, namespace string) (corev1.Container, error) {
+func initContainer(config GatewayConfig, name, namespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         config.AuthMethod,
 		LogLevel:           config.LogLevel,
@@ -172,7 +171,7 @@ func initContainer(config common.GatewayConfig, name, namespace string) (corev1.
 
 // initContainerCommandTpl is the template for the command executed by
 // the init container.
-// TODO @gateways paramatrise gateway kind
+// TODO @GatewayManagement parametrize gateway kind.
 const initContainerCommandTpl = `
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
 	-gateway-kind="mesh-gateway" \

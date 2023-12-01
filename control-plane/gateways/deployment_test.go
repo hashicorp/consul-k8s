@@ -1,7 +1,6 @@
 package gateways
 
 import (
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +15,7 @@ import (
 func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 	type fields struct {
 		gateway *meshv2beta1.MeshGateway
-		config  common.GatewayConfig
+		config  GatewayConfig
 		gcc     *meshv2beta1.GatewayClassConfig
 	}
 	tests := []struct {
@@ -33,7 +32,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						GatewayClassName: "test-gateway-class",
 					},
 				},
-				config: common.GatewayConfig{},
+				config: GatewayConfig{},
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: pbmesh.GatewayClassConfig{
 						Deployment: &pbmesh.Deployment{
@@ -68,7 +67,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						},
 						Spec: corev1.PodSpec{
 							Volumes: []corev1.Volume{
-								corev1.Volume{
+								{
 									Name: "consul-connect-inject-data",
 									VolumeSource: corev1.VolumeSource{
 										EmptyDir: &corev1.EmptyDirVolumeSource{

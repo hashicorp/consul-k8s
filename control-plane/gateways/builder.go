@@ -4,17 +4,16 @@
 package gateways
 
 import (
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
 
 type meshGatewayBuilder struct {
 	gateway *meshv2beta1.MeshGateway
-	config  common.GatewayConfig
+	config  GatewayConfig
 	gcc     *meshv2beta1.GatewayClassConfig
 }
 
-func NewMeshGatewayBuilder(gateway *meshv2beta1.MeshGateway, gatewayConfig common.GatewayConfig, gatewayClassConfig *meshv2beta1.GatewayClassConfig) *meshGatewayBuilder {
+func NewMeshGatewayBuilder(gateway *meshv2beta1.MeshGateway, gatewayConfig GatewayConfig, gatewayClassConfig *meshv2beta1.GatewayClassConfig) *meshGatewayBuilder {
 	return &meshGatewayBuilder{
 		gateway: gateway,
 		config:  gatewayConfig,

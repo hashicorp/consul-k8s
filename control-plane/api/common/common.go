@@ -83,7 +83,7 @@ type K8sNamespaceConfig struct {
 	DenyK8sNamespacesSet mapset.Set
 }
 
-// ConsulConfig manages config to tell a pod where consul is located
+// ConsulConfig manages config to tell a pod where consul is located.
 type ConsulConfig struct {
 	Address    string
 	GRPCPort   int

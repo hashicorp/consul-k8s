@@ -28,7 +28,7 @@ type MeshGatewayController struct {
 	Log           logr.Logger
 	Scheme        *runtime.Scheme
 	Controller    *ConsulResourceController
-	GatewayConfig common.GatewayConfig
+	GatewayConfig gateways.GatewayConfig
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=meshgateway,verbs=get;list;watch;create;update;patch;delete

@@ -1,6 +1,8 @@
-package common
+package gateways
 
-// GatewayConfig is a combination of settings relevant to Gateways
+import "github.com/hashicorp/consul-k8s/control-plane/api/common"
+
+// GatewayConfig is a combination of settings relevant to Gateways.
 type GatewayConfig struct {
 	// ImageDataplane is the Consul Dataplane image to use in gateway deployments.
 	ImageDataplane string
@@ -20,7 +22,7 @@ type GatewayConfig struct {
 	PeeringEnabled      bool
 	ConsulTLSServerName string
 	ConsulCACert        string
-	ConsulConfig        ConsulConfig
+	ConsulConfig        common.ConsulConfig
 
 	// EnableOpenShift indicates whether we're deploying into an OpenShift environment
 	// and should create SecurityContextConstraints.
