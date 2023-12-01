@@ -205,7 +205,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		Client:        mgr.GetClient(),
 		Log:           ctrl.Log.WithName("controller").WithName(common.MeshGateway),
 		Scheme:        mgr.GetScheme(),
-		GatewayConfig: &gatewayConfig,
+		GatewayConfig: gatewayConfig,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.MeshGateway)
 		return err
