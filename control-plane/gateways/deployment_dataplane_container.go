@@ -5,12 +5,14 @@ package gateways
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
-	"strconv"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
