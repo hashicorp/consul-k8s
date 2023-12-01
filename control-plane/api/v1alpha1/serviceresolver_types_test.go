@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestServiceResolver_MatchesConsul(t *testing.T) {
@@ -63,6 +64,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Service:       "redirect",
 						ServiceSubset: "redirect_subset",
 						Namespace:     "redirect_namespace",
+						Partition:     "default",
 						Datacenter:    "redirect_datacenter",
 						Peer:          "redirect_peer",
 					},
@@ -93,6 +95,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Targets: []ServiceResolverFailoverTarget{
 								{Peer: "failover_peer3"},
 								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+								{Peer: "failover_peer4"},
 							},
 							Policy: &FailoverPolicy{
 								Mode:    "order-by-locality",
@@ -175,6 +178,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Targets: []capi.ServiceResolverFailoverTarget{
 							{Peer: "failover_peer3"},
 							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+							{Peer: "failover_peer4", Partition: "default", Namespace: "default"},
 						},
 						Policy: &capi.ServiceResolverFailoverPolicy{
 							Mode:    "order-by-locality",

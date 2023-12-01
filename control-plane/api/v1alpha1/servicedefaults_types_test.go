@@ -531,7 +531,6 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							},
 							{
 								Name:              "upstream-default",
-								Namespace:         "ns",
 								EnvoyListenerJSON: `{"key": "value"}`,
 								EnvoyClusterJSON:  `{"key": "value"}`,
 								Protocol:          "http2",
@@ -656,7 +655,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						},
 						{
 							Name:              "upstream-default",
-							Namespace:         "ns",
+							Namespace:         "default",
+							Partition:         "default",
 							EnvoyListenerJSON: `{"key": "value"}`,
 							EnvoyClusterJSON:  `{"key": "value"}`,
 							Protocol:          "http2",
