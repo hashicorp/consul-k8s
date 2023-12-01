@@ -61,7 +61,7 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 		return corev1.Container{}, err
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.EnableNamespaces, config.ConsulDestinationNamespace, config.EnableNamespaceMirroring, config.NamespaceMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(namespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.ConsulDestinationNamespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.NSMirroringPrefix)
 
 	initContainerName := injectInitContainerName
 	container := corev1.Container{
@@ -145,10 +145,10 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 			})
 
-		if config.ConsulPartition != "" {
+		if config.ConsulTenancyConfig.ConsulPartition != "" {
 			container.Env = append(container.Env, corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_PARTITION",
-				Value: config.ConsulPartition,
+				Value: config.ConsulTenancyConfig.ConsulPartition,
 			})
 		}
 	}
@@ -158,11 +158,11 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 			Value: consulNamespace,
 		})
 
-	if config.ConsulPartition != "" {
+	if config.ConsulTenancyConfig.ConsulPartition != "" {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
 				Name:  "CONSUL_PARTITION",
-				Value: config.ConsulPartition,
+				Value: config.ConsulTenancyConfig.ConsulPartition,
 			})
 	}
 

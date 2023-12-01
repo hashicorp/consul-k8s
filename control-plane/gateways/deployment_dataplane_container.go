@@ -131,7 +131,7 @@ func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile st
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.EnableNamespaces, config.ConsulDestinationNamespace, config.EnableNamespaceMirroring, config.NamespaceMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(namespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.ConsulDestinationNamespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.NSMirroringPrefix)
 
 	if config.AuthMethod != "" {
 		args = append(args,
@@ -140,15 +140,15 @@ func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile st
 			"-login-bearer-token-path="+bearerTokenFile,
 			"-login-meta="+fmt.Sprintf("gateway=%s/%s", namespace, name),
 		)
-		if config.ConsulPartition != "" {
-			args = append(args, "-login-partition="+config.ConsulPartition)
+		if config.ConsulTenancyConfig.ConsulPartition != "" {
+			args = append(args, "-login-partition="+config.ConsulTenancyConfig.ConsulPartition)
 		}
 	}
-	if config.EnableNamespaces {
+	if config.ConsulTenancyConfig.EnableConsulNamespaces {
 		args = append(args, "-service-namespace="+consulNamespace)
 	}
-	if config.ConsulPartition != "" {
-		args = append(args, "-service-partition="+config.ConsulPartition)
+	if config.ConsulTenancyConfig.ConsulPartition != "" {
+		args = append(args, "-service-partition="+config.ConsulTenancyConfig.ConsulPartition)
 	}
 	if config.TLSEnabled {
 		if config.ConsulTLSServerName != "" {
