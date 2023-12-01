@@ -101,7 +101,7 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 
 	err = r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), upsertOp)
 	if err != nil {
-		return fmt.Errorf("Unable to create service account: %w", err)
+		return fmt.Errorf("unable to create service account: %w", err)
 	}
 
 	// TODO NET-6392 NET-6393 NET-6395
