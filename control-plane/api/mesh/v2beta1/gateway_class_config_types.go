@@ -4,21 +4,8 @@
 package v2beta1
 
 import (
-	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	gatewayClassConfigKubeKind = "gatewayclassconfig"
 )
 
 func init() {
@@ -38,8 +25,72 @@ type GatewayClassConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   pbmesh.GatewayClassConfig `json:"spec,omitempty"`
+	Spec   GatewayClassConfigSpec `json:"spec,omitempty"`
 	Status `json:"status,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// GatewayClassConfigSpec specifies the desired state of the Config CRD.
+type GatewayClassConfigSpec struct {
+
+	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
+	ServiceType *corev1.ServiceType `json:"serviceType,omitempty"`
+
+	// NodeSelector is a selector which must be true for the pod to fit on a node.
+	// Selector which must match a node's labels for the pod to be scheduled on that node.
+	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations allow the scheduler to schedule nodes with matching taints.
+	// More Info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Deployment defines the deployment configuration for the gateway.
+	DeploymentSpec DeploymentSpec `json:"deployment,omitempty"`
+
+	// Annotation Information to copy to services or deployments
+	CopyAnnotations CopyAnnotationsSpec `json:"copyAnnotations,omitempty"`
+
+	// The name of an existing Kubernetes PodSecurityPolicy to bind to the managed ServiceAccount if ACLs are managed.
+	PodSecurityPolicy string `json:"podSecurityPolicy,omitempty"`
+
+	// The name of the OpenShift SecurityContextConstraints resource for this gateway class to use.
+	OpenshiftSCCName string `json:"openshiftSCCName,omitempty"`
+
+	// The value to add to privileged ports ( ports < 1024) for gateway containers
+	MapPrivilegedContainerPorts int32 `json:"mapPrivilegedContainerPorts,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+type DeploymentSpec struct {
+	// +kubebuilder:default:=1
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=1
+	// Number of gateway instances that should be deployed by default
+	DefaultInstances *int32 `json:"defaultInstances,omitempty"`
+	// +kubebuilder:default:=8
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=1
+	// Max allowed number of gateway instances
+	MaxInstances *int32 `json:"maxInstances,omitempty"`
+	// +kubebuilder:default:=1
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=1
+	// Minimum allowed number of gateway instances
+	MinInstances *int32 `json:"minInstances,omitempty"`
+
+	// Resources defines the resource requirements for the gateway.
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+//+kubebuilder:object:generate=true
+
+// CopyAnnotationsSpec defines the annotations that should be copied to the gateway service.
+type CopyAnnotationsSpec struct {
+	// List of annotations to copy to the gateway service.
+	Service []string `json:"service,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -50,103 +101,3 @@ type GatewayClassConfigList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []*GatewayClassConfig `json:"items"`
 }
-
-func (in *GatewayClassConfig) ResourceID(namespace, partition string) *pbresource.ID {
-	return &pbresource.ID{
-		Name: in.Name,
-		Type: pbmesh.GatewayClassConfigType,
-		Tenancy: &pbresource.Tenancy{
-			Partition: partition,
-			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
-		},
-	}
-}
-
-func (in *GatewayClassConfig) Resource(namespace, partition string) *pbresource.Resource {
-	return &pbresource.Resource{
-		Id:       in.ResourceID(namespace, partition),
-		Data:     inject.ToProtoAny(&in.Spec),
-		Metadata: meshConfigMeta(),
-	}
-}
-
-func (in *GatewayClassConfig) AddFinalizer(f string) {
-	in.ObjectMeta.Finalizers = append(in.Finalizers(), f)
-}
-
-func (in *GatewayClassConfig) RemoveFinalizer(f string) {
-	var newFinalizers []string
-	for _, oldF := range in.Finalizers() {
-		if oldF != f {
-			newFinalizers = append(newFinalizers, oldF)
-		}
-	}
-	in.ObjectMeta.Finalizers = newFinalizers
-}
-
-func (in *GatewayClassConfig) Finalizers() []string {
-	return in.ObjectMeta.Finalizers
-}
-
-func (in *GatewayClassConfig) MatchesConsul(candidate *pbresource.Resource, namespace, partition string) bool {
-	return cmp.Equal(
-		in.Resource(namespace, partition),
-		candidate,
-		protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
-		protocmp.IgnoreFields(&pbresource.ID{}, "uid"),
-		protocmp.Transform(),
-		cmpopts.SortSlices(func(a, b any) bool { return fmt.Sprintf("%v", a) < fmt.Sprintf("%v", b) }),
-	)
-}
-
-func (in *GatewayClassConfig) KubeKind() string {
-	return gatewayClassConfigKubeKind
-}
-
-func (in *GatewayClassConfig) KubernetesName() string {
-	return in.ObjectMeta.Name
-}
-
-func (in *GatewayClassConfig) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
-	in.Status.Conditions = Conditions{
-		{
-			Type:               ConditionSynced,
-			Status:             status,
-			LastTransitionTime: metav1.Now(),
-			Reason:             reason,
-			Message:            message,
-		},
-	}
-}
-
-func (in *GatewayClassConfig) SetLastSyncedTime(time *metav1.Time) {
-	in.Status.LastSyncedTime = time
-}
-
-func (in *GatewayClassConfig) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
-	cond := in.Status.GetCondition(ConditionSynced)
-	if cond == nil {
-		return corev1.ConditionUnknown, "", ""
-	}
-	return cond.Status, cond.Reason, cond.Message
-}
-
-func (in *GatewayClassConfig) SyncedConditionStatus() corev1.ConditionStatus {
-	condition := in.Status.GetCondition(ConditionSynced)
-	if condition == nil {
-		return corev1.ConditionUnknown
-	}
-	return condition.Status
-}
-
-func (in *GatewayClassConfig) Validate(tenancy common.ConsulTenancyConfig) error {
-	// TODO add validation logic that ensures we only ever write this to the default namespace.
-	return nil
-}
-
-// DefaultNamespaceFields is required as part of the common.MeshConfig interface.
-func (in *GatewayClassConfig) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
