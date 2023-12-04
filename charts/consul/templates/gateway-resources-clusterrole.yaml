@@ -12,6 +12,7 @@ metadata:
 rules:
   - apiGroups:
     - consul.hashicorp.com
+    - mesh.consul.hashicorp.com
     resources:
     - gatewayclassconfigs
     verbs:
@@ -20,6 +21,7 @@ rules:
     - create
   - apiGroups:
     - gateway.networking.k8s.io
+    - mesh.consul.hashicorp.com
     resources:
     - gatewayclasses
     verbs:

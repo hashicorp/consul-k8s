@@ -5,7 +5,7 @@ kind: ConfigMap
 metadata:
   name: {{ template "consul.fullname" . }}-gateway-resources-config
   namespace: {{ .Release.Namespace }}
-  labels: 
+  labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
@@ -26,8 +26,7 @@ data:
         kind: gatewayClassConfig
         spec:
           deployment:
-            resources:
-              {{ .Values.meshGateway.resources }}
+            resources: {{ toJson .Values.meshGateway.resources }}
           nodeSelector: {{ .Values.meshGateway.nodeSelector }}
           serviceType: {{ .Values.meshGateway.service.type }}
     meshGateways:
@@ -35,5 +34,5 @@ data:
         namespace: {{ .Release.Namespace }}
         spec:
           gatewayClassName: consul-mesh-gateway
-    {{- end }}
+  {{- end }}
 {{- end }}
