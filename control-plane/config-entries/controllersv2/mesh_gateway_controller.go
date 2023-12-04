@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	appsv1 "k8s.io/api/apps/v1"
