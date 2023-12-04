@@ -17,5 +17,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ template "consul.fullname" . }}-webhook-cert-manager
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
 {{- end }}

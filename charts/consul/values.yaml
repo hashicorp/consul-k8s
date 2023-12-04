@@ -27,6 +27,11 @@ global:
   # @type: string
   name: null
 
+  # Set the default namespace used for all resources in the Helm chart. If not set,
+  # the namespace will be the same as the helm release.
+  # @type: string
+  namespace: null
+
   # The domain Consul will answer DNS queries for
   # (Refer to [`-domain`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_domain)) and the domain services synced from
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.

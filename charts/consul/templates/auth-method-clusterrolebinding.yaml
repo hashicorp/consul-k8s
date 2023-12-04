@@ -16,7 +16,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ template "consul.fullname" . }}-auth-method
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -35,5 +35,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ template "consul.fullname" . }}-auth-method
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
 {{- end }}

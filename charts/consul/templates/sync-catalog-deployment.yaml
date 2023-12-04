@@ -7,7 +7,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ template "consul.fullname" . }}-sync-catalog
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ template "consul.namespace" . }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}

@@ -3,7 +3,7 @@ apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: {{ template "consul.fullname" . }}-cni
-  namespace: {{ default .Release.Namespace .Values.connectInject.cni.namespace }}
+  namespace: {{ default (include "consul.namespace" .) .Values.connectInject.cni.namespace }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
