@@ -29,7 +29,6 @@ type GatewayConfig struct {
 	ConsulConfig common.ConsulConfig
 
 	// EnableOpenShift indicates whether we're deploying into an OpenShift environment
-	// and should create SecurityContextConstraints.
 	EnableOpenShift bool
 
 	// MapPrivilegedServicePorts is the value which Consul will add to privileged container port values (ports < 1024)
