@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -19,9 +18,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 )
+
+// errResourceNotOwned indicates that a resource the controller would have
+// updated or deleted does not have an owner reference pointing to the MeshGateway.
+var errResourceNotOwned = errors.New("existing resource not owned by controller")
 
 // MeshGatewayController reconciles a MeshGateway object.
 type MeshGatewayController struct {
@@ -197,7 +202,7 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 		}
 	}
 	if !owned {
-		return errors.New("existing resource not owned by controller")
+		return errResourceNotOwned
 	}
 	return op(ctx, scanTarget, writeSource)
 }
@@ -224,7 +229,7 @@ func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, ga
 
 	config := &meshv2beta1.GatewayClassConfig{}
 	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
-		if string(ref.Group) != meshv2beta1.MeshGroup ||
+		if ref.Group != meshv2beta1.MeshGroup ||
 			ref.Kind != common.GatewayClassConfig {
 			//TODO @Gateway-Management additionally check for controller name when available
 			return nil, nil
