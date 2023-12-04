@@ -204,6 +204,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
+				if isTelemetryCollector(pod) {
+					if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
+						r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
+						errs = multierror.Append(errs, err)
+					}
+				}
+
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if isConsulDataplaneSupported(pod) {
@@ -231,6 +238,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						continue
 					}
 				}
+
 				if isGateway(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if err = r.registerGateway(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
@@ -429,6 +437,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		metaKeyKubeServiceName:   serviceEndpoints.Name,
 		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
 		metaKeyManagedBy:         constants.ManagedByValue,
+		constants.MetaKeyPodUID:  string(pod.UID),
 		metaKeySyntheticNode:     "true",
 	}
 	for k, v := range pod.Annotations {
@@ -443,6 +452,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
+
 	service := &api.AgentService{
 		ID:        svcID,
 		Service:   svcName,
@@ -679,6 +689,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
 		metaKeyManagedBy:         constants.ManagedByValue,
 		metaKeySyntheticNode:     "true",
+		constants.MetaKeyPodUID:  string(pod.UID),
 	}
 
 	service := &api.AgentService{
@@ -958,7 +969,7 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 
 			if r.AuthMethod != "" && serviceDeregistered {
 				r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
-				err := r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
+				err := r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName], svc.Meta[constants.MetaKeyPodUID])
 				if err != nil {
 					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
 					errs = multierror.Append(errs, err)
@@ -973,8 +984,8 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
-// has been configured with and will only delete tokens for the provided podName.
-func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, svc *api.AgentService, k8sNS, podName string) error {
+// has been configured with and will only delete tokens for the provided podName and podUID.
+func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, svc *api.AgentService, k8sNS, podName, podUID string) error {
 	// Skip if podName is empty.
 	if podName == "" {
 		return nil
@@ -1010,8 +1021,11 @@ func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, sv
 
 			tokenPodName := strings.TrimPrefix(tokenMeta[tokenMetaPodNameKey], k8sNS+"/")
 
+			// backward compability logic on token with no podUID in metadata
+			podUIDMatched := tokenMeta[constants.MetaKeyPodUID] == podUID || tokenMeta[constants.MetaKeyPodUID] == ""
+
 			// If we can't find token's pod, delete it.
-			if tokenPodName == podName {
+			if tokenPodName == podName && podUIDMatched {
 				r.Log.Info("deleting ACL token for pod", "name", podName)
 				if _, err := apiClient.ACL().TokenDelete(token.AccessorID, &api.WriteOptions{Namespace: svc.Namespace}); err != nil {
 					return fmt.Errorf("failed to delete token from Consul: %s", err)
@@ -1334,6 +1348,28 @@ func hasBeenInjected(pod corev1.Pod) bool {
 func isGateway(pod corev1.Pod) bool {
 	anno, ok := pod.Annotations[constants.AnnotationGatewayKind]
 	return ok && anno != ""
+}
+
+// isTelemetryCollector checks whether a pod is part of a deployment for a Consul Telemetry Collector. If so,
+// and this is the first pod deployed to a Namespace, we need to create the Namespace in Consul. Otherwise the
+// deployment may fail out during service registration because it is deployed to a Namespace that does not exist.
+func isTelemetryCollector(pod corev1.Pod) bool {
+	anno, ok := pod.Annotations[constants.LabelTelemetryCollector]
+	return ok && anno != ""
+}
+
+// ensureNamespaceExists creates a Consul namespace for a pod in the event it does not exist.
+// At the time of writing, we use this for the Consul Telemetry Collector which may be the first
+// pod deployed to a namespace. If it is, it's connect-inject will fail for lack of a namespace.
+func (r *Controller) ensureNamespaceExists(apiClient *api.Client, pod corev1.Pod) error {
+	if r.EnableConsulNamespaces {
+		consulNS := r.consulNamespace(pod.Namespace)
+		if _, err := namespaces.EnsureExists(apiClient, consulNS, r.CrossNSACLPolicy); err != nil {
+			r.Log.Error(err, "failed to ensure Consul namespace exists", "ns", pod.Namespace, "consul ns", consulNS)
+			return err
+		}
+	}
+	return nil
 }
 
 // mapAddresses combines all addresses to a mapping of address to its health status.

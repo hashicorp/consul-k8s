@@ -10,9 +10,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-  name: gatewayclassconfigs.consul.hashicorp.com
+  name: gatewayclassconfigs.mesh.consul.hashicorp.com
 spec:
-  group: consul.hashicorp.com
+  group: mesh.consul.hashicorp.com
   names:
     kind: GatewayClassConfig
     listKind: GatewayClassConfigList
@@ -20,11 +20,23 @@ spec:
     singular: gatewayclassconfig
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v2beta1
     schema:
       openAPIV3Schema:
-        description: GatewayClassConfig defines the values that may be set on a GatewayClass
-          for Consul API Gateway.
+        description: GatewayClassConfig is the Schema for the Mesh Gateway API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -39,20 +51,43 @@ spec:
           metadata:
             type: object
           spec:
-            description: Spec defines the desired state of GatewayClassConfig.
+            description: This is a Resource type.
             properties:
+              consul:
+                properties:
+                  address:
+                    type: string
+                  authentication:
+                    properties:
+                      address:
+                        type: string
+                      managed:
+                        type: boolean
+                      method:
+                        type: string
+                      namespace:
+                        type: string
+                    type: object
+                  ports:
+                    properties:
+                      grpc:
+                        format: int32
+                        type: integer
+                      http:
+                        format: int32
+                        type: integer
+                    type: object
+                  scheme:
+                    type: string
+                type: object
               copyAnnotations:
-                description: Annotation Information to copy to services or deployments
                 properties:
                   service:
-                    description: List of annotations to copy to the gateway service.
                     items:
                       type: string
                     type: array
                 type: object
               deployment:
-                description: Deployment defines the deployment configuration for the
-                  gateway.
                 properties:
                   podDisruptionBudget:
                     description: PodDisruptionBudget prevents the eviction of the gateway pods
@@ -74,147 +109,77 @@ spec:
                         format: int32
                         type: integer
                   defaultInstances:
-                    default: 1
-                    description: Number of gateway instances that should be deployed
-                      by default
                     format: int32
-                    maximum: 8
-                    minimum: 1
                     type: integer
                   maxInstances:
-                    default: 8
-                    description: Max allowed number of gateway instances
                     format: int32
-                    maximum: 8
-                    minimum: 1
                     type: integer
                   minInstances:
-                    default: 1
-                    description: Minimum allowed number of gateway instances
                     format: int32
-                    maximum: 8
-                    minimum: 1
                     type: integer
-                  resources:
-                    description: Resources defines the resource requirements for the
-                      gateway.
-                    properties:
-                      claims:
-                        description: "Claims lists the names of resources, defined
-                          in spec.resourceClaims, that are used by this container.
-                          \n This is an alpha field and requires enabling the DynamicResourceAllocation
-                          feature gate. \n This field is immutable. It can only be
-                          set for containers."
-                        items:
-                          description: ResourceClaim references one entry in PodSpec.ResourceClaims.
-                          properties:
-                            name:
-                              description: Name must match the name of one entry in
-                                pod.spec.resourceClaims of the Pod where this field
-                                is used. It makes that resource available inside a
-                                container.
-                              type: string
-                          required:
-                          - name
-                          type: object
-                        type: array
-                        x-kubernetes-list-map-keys:
-                        - name
-                        x-kubernetes-list-type: map
-                      limits:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                        type: object
-                      requests:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: 'Requests describes the minimum amount of compute
-                          resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                        type: object
-                    type: object
                 type: object
+              image:
+                properties:
+                  consulApiGateway:
+                    type: string
+                  envoy:
+                    type: string
+                type: object
+              logLevel:
+                type: string
               mapPrivilegedContainerPorts:
-                description: The value to add to privileged ports ( ports < 1024)
-                  for gateway containers
                 format: int32
                 type: integer
               nodeSelector:
-                additionalProperties:
-                  type: string
-                description: 'NodeSelector is a selector which must be true for the
-                  pod to fit on a node. Selector which must match a node''s labels
-                  for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
-                type: object
-              openshiftSCCName:
-                description: The name of the OpenShift SecurityContextConstraints
-                  resource for this gateway class to use.
                 type: string
-              podSecurityPolicy:
-                description: The name of an existing Kubernetes PodSecurityPolicy
-                  to bind to the managed ServiceAccount if ACLs are managed.
+              openshiftSccName:
                 type: string
               serviceType:
-                description: Service Type string describes ingress methods for a service
-                enum:
-                - ClusterIP
-                - NodePort
-                - LoadBalancer
                 type: string
-              tolerations:
-                description: 'Tolerations allow the scheduler to schedule nodes with
-                  matching taints. More Info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/'
+              useHostPorts:
+                type: boolean
+            type: object
+          status:
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
                 items:
-                  description: The pod this Toleration is attached to tolerates any
-                    taint that matches the triple <key,value,effect> using the matching
-                    operator <operator>.
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
                   properties:
-                    effect:
-                      description: Effect indicates the taint effect to match. Empty
-                        means match all taint effects. When specified, allowed values
-                        are NoSchedule, PreferNoSchedule and NoExecute.
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
                       type: string
-                    key:
-                      description: Key is the taint key that the toleration applies
-                        to. Empty means match all taint keys. If the key is empty,
-                        operator must be Exists; this combination means to match all
-                        values and all keys.
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
                       type: string
-                    operator:
-                      description: Operator represents a key's relationship to the
-                        value. Valid operators are Exists and Equal. Defaults to Equal.
-                        Exists is equivalent to wildcard for value, so that a pod
-                        can tolerate all taints of a particular category.
+                    reason:
+                      description: The reason for the condition's last transition.
                       type: string
-                    tolerationSeconds:
-                      description: TolerationSeconds represents the period of time
-                        the toleration (which must be of effect NoExecute, otherwise
-                        this field is ignored) tolerates the taint. By default, it
-                        is not set, which means tolerate the taint forever (do not
-                        evict). Zero and negative values will be treated as 0 (evict
-                        immediately) by the system.
-                      format: int64
-                      type: integer
-                    value:
-                      description: Value is the taint value the toleration matches
-                        to. If the operator is Exists, the value should be empty,
-                        otherwise just a regular string.
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
                       type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
                   type: object
                 type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
             type: object
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}
 {{- end }}

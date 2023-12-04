@@ -1,0 +1,4 @@
+```release-note:bug
+control-plane: Fixes a bug with the control-plane CLI validation where the consul-dataplane sidecar CPU request is
+compared against the memory limit instead of the CPU limit.
+```

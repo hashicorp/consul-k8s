@@ -7,14 +7,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -32,7 +33,7 @@ func init() {
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
 // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
-// +kubebuilder:resource:shortName="mesh-gateway"
+// +kubebuilder:resource:scope="Namespaced"
 type MeshGateway struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -50,13 +51,13 @@ type MeshGatewayList struct {
 	Items           []*MeshGateway `json:"items"`
 }
 
-func (in *MeshGateway) ResourceID(namespace, partition string) *pbresource.ID {
+func (in *MeshGateway) ResourceID(_, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: in.Name,
 		Type: pbmesh.MeshGatewayType,
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
-			Namespace: namespace,
+			Namespace: "", // Namespace is always unset because MeshGateway is partition-scoped
 
 			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
 			// At a future point, this will move out of the Tenancy block.

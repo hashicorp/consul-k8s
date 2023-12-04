@@ -96,8 +96,11 @@ rules:
 - apiGroups:
     - mesh.consul.hashicorp.com
   resources:
+    - gatewayclassconfigs
+    - gatewayclasses
     - grpcroutes
     - httproutes
+    - meshgateways
     - tcproutes
     - proxyconfigurations
   verbs:
@@ -111,8 +114,11 @@ rules:
 - apiGroups:
     - mesh.consul.hashicorp.com
   resources:
+    - gatewayclassconfigs/status
+    - gatewayclasses/status
     - grpcroutes/status
     - httproutes/status
+    - meshgateways/status
     - tcproutes/status
     - proxyconfigurations/status
   verbs:

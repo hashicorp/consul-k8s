@@ -29,6 +29,9 @@ const (
 	HTTPRoute          string = "httproute"
 	TCPRoute           string = "tcproute"
 	ProxyConfiguration string = "proxyconfiguration"
+	MeshGateway        string = "meshgateway"
+	GatewayClass       string = "gatewayclass"
+	GatewayClassConfig string = "gatewayclassconfig"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"

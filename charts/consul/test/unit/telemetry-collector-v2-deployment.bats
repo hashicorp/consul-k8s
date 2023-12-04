@@ -860,14 +860,16 @@ load _helpers
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
-      --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
-      --set 'telemetryCollector.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.resourceId.secretName=resource-id-name' \
-      --set 'global.resourceId.secretKey=resource-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When either telemetryCollector.cloud.clientId.secretName or telemetryCollector.cloud.clientId.secretKey is defined, both must be set." ]]
 }
 
 @test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientId.secretKey is set but telemetryCollector.cloud.clientId.secretName is not set." {
@@ -880,13 +882,15 @@ load _helpers
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
-      --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.resourceId.secretName=resource-id-name' \
-      --set 'global.resourceId.secretKey=resource-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set." ]]
 }
 
 @test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientSecret.secretName is set but telemetryCollector.cloud.clientId.secretName is not set." {
@@ -897,14 +901,17 @@ load _helpers
       --set 'global.experiments[0]=resource-apis' \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
-      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
-      --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
-      --set 'telemetryCollector.clientSecret.secretKey=client-secret-key-name'  \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-key-name'  \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set." ]]
 }
 
 @test "telemetryCollector/Deployment(V2):  fails when telemetryCollector.cloud.clientId.secretName is set but telemetry.cloud.clientId.secretKey is not set." {
@@ -958,7 +965,9 @@ load _helpers
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set" ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretKey or global.cloud.resourceId.secretKey must be set" ]]
 }
 
 #--------------------------------------------------------------------
@@ -1362,15 +1371,19 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'syncCatalog.consulNamespaces.mirroringK8S=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --namespace 'test-namespace' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec' | tee /dev/stderr)
 
   local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-login-namespace=default"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
+
+  local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-service-namespace=test-namespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
 }
 
-@test "telemetryCollector/Deployment(V2): namespace flags when syncCatalog" {
+@test "telemetryCollector/Deployment(V2): namespace flags when not mirroringK8S" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/telemetry-collector-v2-deployment.yaml   \
@@ -1380,11 +1393,14 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.image=bar' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.acls.manageSystemACLs=true' \
-      --set 'syncCatalog.consulNamespaces.mirroringK8S=false' \
-      --set 'syncCatalog.consulNamespaces.consulDestinationNamespace=fakenamespace' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=false' \
+      --set 'connectInject.consulNamespaces.consulDestinationNamespace=fakenamespace' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers' | tee /dev/stderr)
 
   local actual=$(echo $object | jq -r '.[1].args | any(contains("-login-namespace=fakenamespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  local actual=$(echo $object | jq -r '.[1].args | any(contains("-service-namespace=fakenamespace"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 }
