@@ -1,12 +1,13 @@
 package gateways
 
 import (
-	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
 
 const (
@@ -31,7 +32,10 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		return nil, err
 	}
 
-	resources := b.gcc.DeploymentSpec.Resources
+	var resources *corev1.ResourceRequirements
+	if b.gcc != nil {
+		resources = b.gcc.Spec.DeploymentSpec.Resources
+	}
 
 	container, err := consulDataplaneContainer(b.config, resources, b.gateway.Name, b.gateway.Namespace)
 	if err != nil {

@@ -326,7 +326,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Command: []string{
 										"/bin/sh",
 										"-ec",
-										"consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \\\n\t-gateway-kind=\"mesh-gateway\" \\\n  -log-json=false \\\n  -service-name=\"\"",
+										"consul-k8s-control-plane connect-init \\\n  -pod-name=${POD_NAME} \\\n  -pod-namespace=${POD_NAMESPACE} \\\n  -gateway-kind=\"mesh-gateway\" \\\n  -log-json=false \\\n  -service-name=\"\"",
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -524,7 +524,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 			b := &meshGatewayBuilder{
 				gateway: tt.fields.gateway,
 				config:  tt.fields.config,
-				gcc:     tt.fields.gcc.Spec,
+				gcc:     tt.fields.gcc,
 			}
 			got, err := b.Deployment()
 			if !tt.wantErr && (err != nil) {

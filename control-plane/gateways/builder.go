@@ -10,19 +10,13 @@ import (
 type meshGatewayBuilder struct {
 	gateway *meshv2beta1.MeshGateway
 	config  GatewayConfig
-	gcc     meshv2beta1.GatewayClassConfigSpec
+	gcc     *meshv2beta1.GatewayClassConfig
 }
 
 func NewMeshGatewayBuilder(gateway *meshv2beta1.MeshGateway, gatewayConfig GatewayConfig, gatewayClassConfig *meshv2beta1.GatewayClassConfig) *meshGatewayBuilder {
-	var gccSpec meshv2beta1.GatewayClassConfigSpec
-
-	if gatewayClassConfig != nil {
-		gccSpec = gatewayClassConfig.Spec
-	}
-
 	return &meshGatewayBuilder{
 		gateway: gateway,
 		config:  gatewayConfig,
-		gcc:     gccSpec,
+		gcc:     gatewayClassConfig,
 	}
 }
