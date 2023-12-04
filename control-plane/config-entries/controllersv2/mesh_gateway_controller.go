@@ -89,6 +89,7 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 	//fetch gatewayclassconfig
 	gcc, err := r.getGatewayClassConfigForGateway(ctx, resource)
 	if err != nil {
+		r.Log.Error(err, "unable to get gatewayclassconfig for gateway: %s gatewayclass: %s", resource.Name, resource.Spec.GatewayClassName)
 		return err
 	}
 
