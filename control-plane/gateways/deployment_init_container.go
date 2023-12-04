@@ -157,8 +157,10 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 // the init container.
 // TODO @GatewayManagement parametrize gateway kind.
 const initContainerCommandTpl = `
-consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-	-gateway-kind="mesh-gateway" \
+consul-k8s-control-plane connect-init \
+  -pod-name=${POD_NAME} \
+  -pod-namespace=${POD_NAMESPACE} \
+  -gateway-kind="mesh-gateway" \
   -log-json={{ .LogJSON }} \
   {{- if .AuthMethod }}
   -service-account-name="{{ .ServiceAccountName }}" \
