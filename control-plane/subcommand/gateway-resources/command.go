@@ -29,6 +29,8 @@ import (
 
 	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 
+	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -37,9 +39,8 @@ import (
 )
 
 const (
-	gatewayConfigFilename       = "/consul/config/config.json"
-	meshResourcesConfigFilename = "/consul/config/meshResources.json"
-	resourceConfigFilename      = "/consul/config/resources.json"
+	gatewayConfigFilename  = "/consul/config/config.yaml"
+	resourceConfigFilename = "/consul/config/resources.json"
 )
 
 // this dupes the Kubernetes tolerations
@@ -162,7 +163,6 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagGatewayConfigLocation, "gateway-config-file-location", gatewayConfigFilename,
 		"specify a different location for where the gateway config file is")
 
-
 	c.flags.StringVar(&c.flagResourceConfigFileLocation, "resource-config-file-location", resourceConfigFilename,
 		"specify a different location for where the gateway resource config file is")
 
@@ -218,6 +218,16 @@ func (c *Command) Run(args []string) int {
 		}
 		if err := v1alpha1.AddToScheme(s); err != nil {
 			c.UI.Error(fmt.Sprintf("Could not add consul-k8s schema: %s", err))
+			return 1
+		}
+
+		if err := authv2beta1.AddAuthToScheme(s); err != nil {
+			c.UI.Error(fmt.Sprintf("Could not add authv2beta schema: %s", err))
+			return 1
+		}
+
+		if err := v2beta1.AddMeshToScheme(s); err != nil {
+			c.UI.Error(fmt.Sprintf("Could not add meshv2 schema: %s", err))
 			return 1
 		}
 
@@ -391,7 +401,6 @@ func (c *Command) loadGatewayConfigs() error {
 		return err
 	}
 
-	fmt.Println("HERE 3")
 	if err := file.Close(); err != nil {
 		return err
 	}
@@ -409,6 +418,7 @@ func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, compo
 		"component": component,
 	}
 	for _, cfg := range c.gatewayConfig.GatewayClassConfigs {
+		cfg.Kind = "GatewayClassConfig"
 		err := forceV2ClassConfig(ctx, c.k8sClient, cfg)
 		if err != nil {
 			return err
@@ -416,6 +426,7 @@ func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, compo
 
 		class := &v2beta1.GatewayClass{
 			ObjectMeta: metav1.ObjectMeta{Name: cfg.Name, Labels: labels},
+			TypeMeta:   metav1.TypeMeta{Kind: "GatewayClass"},
 			Spec: meshv2beta1.GatewayClass{
 				ControllerName: controllerName,
 				ParametersRef: &meshv2beta1.ParametersReference{

@@ -344,7 +344,7 @@ func TestRun_loadResourceConfigInvalidConfigFile(t *testing.T) {
 }
 
 func TestRun_loadResourceConfigFileWhenConfigFileDoesNotExist(t *testing.T) {
-	filename := "./consul/config/resources.yaml"
+	filename := "./consul/config/resources.json"
 	s := runtime.NewScheme()
 	require.NoError(t, gwv1beta1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
@@ -456,7 +456,7 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 }
 
 func TestRun_loadGatewayConfigsWithInvalidFile(t *testing.T) {
-	filename := createGatewayConfigFile(t, invalidGWConfiguration, "config.json")
+	filename := createGatewayConfigFile(t, invalidGWConfiguration, "config.yaml")
 	// setup k8s client
 	s := runtime.NewScheme()
 	require.NoError(t, gwv1beta1.Install(s))
@@ -477,7 +477,7 @@ func TestRun_loadGatewayConfigsWithInvalidFile(t *testing.T) {
 }
 
 func TestRun_loadGatewayConfigsWhenConfigFileDoesNotExist(t *testing.T) {
-	filename := "./consul/config/config.json"
+	filename := "./consul/config/config.yaml"
 	s := runtime.NewScheme()
 	require.NoError(t, gwv1beta1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))

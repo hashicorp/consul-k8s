@@ -26,8 +26,7 @@ data:
         kind: gatewayClassConfig
         spec:
           deployment:
-            resources:
-              {{ .Values.meshGateway.resources }}
+            resources: {{ toJson .Values.meshGateway.resources }}
           nodeSelector: {{ .Values.meshGateway.nodeSelector }}
           serviceType: {{ .Values.meshGateway.service.type }}
     meshGateways:
