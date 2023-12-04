@@ -34,11 +34,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 				},
 				config: GatewayConfig{},
 				gcc: &meshv2beta1.GatewayClassConfig{
-					Spec: pbmesh.GatewayClassConfig{
-						Deployment: &pbmesh.Deployment{
-							DefaultInstances: pointer.Uint32(1),
-							MinInstances:     pointer.Uint32(1),
-							MaxInstances:     pointer.Uint32(8),
+					Spec: meshv2beta1.GatewayClassConfigSpec{
+						DeploymentSpec: meshv2beta1.DeploymentSpec{
+							DefaultInstances: pointer.Int32(1),
+							MinInstances:     pointer.Int32(1),
+							MaxInstances:     pointer.Int32(8),
 						},
 					},
 				},
@@ -522,7 +522,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 			b := &meshGatewayBuilder{
 				gateway: tt.fields.gateway,
 				config:  tt.fields.config,
-				gcc:     tt.fields.gcc,
+				gcc:     tt.fields.gcc.Spec,
 			}
 			got, err := b.Deployment()
 			if !tt.wantErr && (err != nil) {

@@ -31,10 +31,8 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		return nil, err
 	}
 
-	var resources *corev1.ResourceRequirements
-	if b.gcc != nil && b.gcc.Spec.Deployment != nil {
-		resources = b.gcc.Spec.Deployment.Resources
-	}
+	resources := b.gcc.DeploymentSpec.Resources
+
 	container, err := consulDataplaneContainer(b.config, resources, b.gateway.Name, b.gateway.Namespace)
 	if err != nil {
 		return nil, err
