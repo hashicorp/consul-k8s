@@ -7,7 +7,7 @@ load _helpers
     assert_empty helm template \
         -s templates/gateway-resources-configmap.yaml \
         --set 'connectInject.enabled=false' \
-        . 
+        .
 }
 
 @test "gateway-resources/ConfigMap: enabled with connectInject.enabled=true" {
