@@ -105,14 +105,14 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		return fmt.Errorf("unable to create service account: %w", err)
 	}
 
-	// TODO NET-6392 NET-6393 NET-6395
+	// TODO NET-6393 NET-6395
 
 	//Create deployment
 
 	mergeDeploymentOp := func(ctx context.Context, existingObject, object client.Object) error {
 		existingDeployment, ok := existingObject.(*appsv1.Deployment)
 		if !ok && existingDeployment != nil {
-			return fmt.Errorf("unable to infer existingDeployment type")
+			return fmt.Errorf("unable to infer existing deployment type")
 		}
 		builtDeployment, ok := object.(*appsv1.Deployment)
 		if !ok {
