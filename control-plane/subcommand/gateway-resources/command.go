@@ -377,7 +377,7 @@ func (c *Command) loadResourceConfig(filename string) (corev1.ResourceRequiremen
 	return reqs, nil
 }
 
-// loadGatewayConfigs reads and loads the configs from `/consul/config/config.yaml`, if this file does not exist nothing is done
+// loadGatewayConfigs reads and loads the configs from `/consul/config/config.yaml`, if this file does not exist nothing is done.
 func (c *Command) loadGatewayConfigs() error {
 	file, err := os.Open(c.flagGatewayConfigLocation)
 	if err != nil {
@@ -408,7 +408,7 @@ func (c *Command) loadGatewayConfigs() error {
 }
 
 // createV2GatewayClassAndClassConfigs utilizes the configuration loaded from the gateway config file to
-// create the GatewayClassConfig and GatewayClass for the gateway
+// create the GatewayClassConfig and GatewayClass for the gateway.
 func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, component, controllerName string) error {
 	labels := map[string]string{
 		"app":       c.flagApp,
