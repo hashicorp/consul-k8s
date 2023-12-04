@@ -17,8 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -376,7 +374,11 @@ gatewayClassConfigs:
     deployment:
       resources:
         requests:
-          cpu: 100m
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 200m
+          memory: 200Mi
 meshGateways:
 - name: mesh-gateway
   spec:
@@ -384,92 +386,73 @@ meshGateways:
 `
 
 var invalidGWConfiguration = `
-  "gatewayClassConfigs": [
-    {
-      "apiVersion": "mesh.consul.hashicorp.com/v2beta1",
-      "kind": "gatewayClassConfig",
-      "metadata": {
-        "name": "consul-mesh-gateway",
-        "namespace": "namespace"
-      },
-      "spec": {}
-    }
-  ],
-  "meshGateways": [
-    {
-      "name": "mesh-gateway",
-      "spec": {
-        "gatewayClassName": "consul-mesh-gateway"
-      }
-    }
-  ]
-}
+gatewayClassConfigs:
+iVersion= mesh.consul.hashicorp.com/v2beta1
+  kind: gatewayClassConfig
+  metadata:
+    name: consul-mesh-gateway
+    namespace: namespace
+  spec:
+    deployment:
+      resources:
+        requests:
+          cpu: 100m
+meshGateways:
+- name: mesh-gateway
+  spec:
+    gatewayClassName: consul-mesh-gateway
 `
 
 func TestRun_loadGatewayConfigs(t *testing.T) {
-	testCases := map[string]struct {
-		resourceFilename  string
-		expectedResources *corev1.ResourceRequirements
-	}{
-		"resourceFile exists": {
-			resourceFilename: createGatewayConfigFile(t, validResourceConfiguration, "meshResources.json"),
-			expectedResources: &corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceMemory: resource.MustParse("200Mi"),
-					corev1.ResourceCPU:    resource.MustParse("200m"),
-				},
-				Limits: corev1.ResourceList{
-					corev1.ResourceMemory: resource.MustParse("200Mi"),
-					corev1.ResourceCPU:    resource.MustParse("200m"),
-				},
+	expectedResources := &corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+			corev1.ResourceCPU:    resource.MustParse("200m"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+			corev1.ResourceCPU:    resource.MustParse("200m"),
+		},
+	}
+	filename := createGatewayConfigFile(t, validGWConfiguration, "config.yaml")
+	// setup k8s client
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:                        ui,
+		k8sClient:                 client,
+		flagGatewayConfigLocation: filename,
+	}
+
+	err := cmd.loadGatewayConfigs()
+	require.NoError(t, err)
+	require.NotEmpty(t, cmd.gatewayConfig.GatewayClassConfigs)
+
+	// we only created one class config
+	classConfig := cmd.gatewayConfig.GatewayClassConfigs[0].DeepCopy()
+
+	expectedClassConfig := v2beta1.GatewayClassConfig{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "mesh.consul.hashicorp.com/v2beta1",
+			Kind:       "gatewayClassConfig",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "consul-mesh-gateway",
+			Namespace: "namespace",
+		},
+		Spec: v2beta1.GatewayClassConfigSpec{
+			DeploymentSpec: v2beta1.DeploymentSpec{
+				Resources: expectedResources,
 			},
 		},
-		"resourceFile does not exist": {
-			resourceFilename:  "/doesnt/exist/meshResources.json",
-			expectedResources: &defaultResourceRequirements,
-		},
+		Status: v2beta1.Status{},
 	}
-
-	filename := createGatewayConfigFile(t, validGWConfiguration, "config.yaml")
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			// setup k8s client
-			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
-			require.NoError(t, v1alpha1.AddToScheme(s))
-
-			client := fake.NewClientBuilder().WithScheme(s).Build()
-
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:                        ui,
-				k8sClient:                 client,
-				flagGatewayConfigLocation: filename,
-				flagMeshGatewayResourceConfigFileLocation: testCase.resourceFilename,
-			}
-
-			err := cmd.loadGatewayConfigs()
-			require.NoError(t, err)
-			require.NotEmpty(t, cmd.gatewayConfig.GatewayClassConfigs)
-
-			// we only created one class config
-			classConfig := cmd.gatewayConfig.GatewayClassConfigs[0].DeepCopy()
-
-			expectedClassConfig := v2beta1.GatewayClassConfig{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "mesh.consul.hashicorp.com/v2beta1",
-					Kind:       "gatewayClassConfig",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "consul-mesh-gateway",
-					Namespace: "namespace",
-				},
-				Spec:   meshv2beta1.GatewayClassConfig{},
-				Status: v2beta1.Status{},
-			}
-			require.Equal(t, expectedClassConfig.DeepCopy(), classConfig)
-		})
-	}
+	require.Equal(t, expectedClassConfig.DeepCopy(), classConfig)
 }
 
 func TestRun_loadGatewayConfigsWithInvalidFile(t *testing.T) {

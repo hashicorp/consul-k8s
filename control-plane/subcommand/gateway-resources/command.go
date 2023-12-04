@@ -82,9 +82,8 @@ type Command struct {
 	flagDeploymentMaxInstances     int
 	flagDeploymentMinInstances     int
 
-	flagResourceConfigFileLocation            string
-	flagMeshGatewayResourceConfigFileLocation string
-	flagGatewayConfigLocation                 string
+	flagResourceConfigFileLocation string
+	flagGatewayConfigLocation      string
 
 	flagNodeSelector       string // this is a yaml multiline string map
 	flagTolerations        string // this is a multiline yaml string matching the tolerations array
@@ -163,8 +162,6 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagGatewayConfigLocation, "gateway-config-file-location", gatewayConfigFilename,
 		"specify a different location for where the gateway config file is")
 
-	c.flags.StringVar(&c.flagMeshGatewayResourceConfigFileLocation, "mesh-gw-resource-config-file-location", meshResourcesConfigFilename,
-		"specify a different location for where the mesh gateway resources config file is")
 
 	c.flags.StringVar(&c.flagResourceConfigFileLocation, "resource-config-file-location", resourceConfigFilename,
 		"specify a different location for where the gateway resource config file is")
