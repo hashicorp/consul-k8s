@@ -20,7 +20,7 @@ func TestNewMeshGatewayBuilder_ServiceAccount(t *testing.T) {
 			Namespace: "default",
 			Name:      "mesh-gateway",
 		},
-	}, GatewayConfig{}, &meshv2beta1.GatewayClassConfig{
+	}, GatewayConfig{}, &meshv2beta1.GatewayClassConfigSpec{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gcc",
