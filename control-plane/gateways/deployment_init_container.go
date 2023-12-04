@@ -114,22 +114,6 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
 	}
 
-	if config.TLSEnabled {
-		container.Env = append(container.Env,
-			corev1.EnvVar{
-				Name:  "CONSUL_USE_TLS",
-				Value: "true",
-			},
-			corev1.EnvVar{
-				Name:  "CONSUL_CACERT_PEM",
-				Value: config.ConsulCACert,
-			},
-			corev1.EnvVar{
-				Name:  "CONSUL_TLS_SERVER_NAME",
-				Value: config.ConsulTLSServerName,
-			})
-	}
-
 	if config.AuthMethod != "" {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
