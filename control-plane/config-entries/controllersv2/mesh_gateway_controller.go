@@ -166,8 +166,6 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 	}
 
 	key := client.ObjectKey{
-		// MeshGateways are clusterscoped, however, kubernetes requires a namespace to be set
-		// on creation of a namespaced object.
 		Namespace: writeSource.GetNamespace(),
 		Name:      writeSource.GetName(),
 	}
