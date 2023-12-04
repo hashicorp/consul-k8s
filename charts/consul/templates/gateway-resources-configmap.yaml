@@ -35,5 +35,5 @@ data:
         namespace: {{ .Release.Namespace }}
         spec:
           gatewayClassName: consul-mesh-gateway
-    {{- end }}
+  {{- end }}
 {{- end }}

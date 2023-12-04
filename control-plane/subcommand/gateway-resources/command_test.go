@@ -366,27 +366,21 @@ func TestRun_loadResourceConfigFileWhenConfigFileDoesNotExist(t *testing.T) {
 }
 
 var validGWConfiguration = `
-{
-  "gatewayClassConfigs": [
-    {
-      "apiVersion": "mesh.consul.hashicorp.com/v2beta1",
-      "kind": "gatewayClassConfig",
-      "metadata": {
-        "name": "consul-mesh-gateway",
-        "namespace": "namespace"
-      },
-      "spec": {}
-    }
-  ],
-  "meshGateways": [
-    {
-      "name": "mesh-gateway",
-      "spec": {
-        "gatewayClassName": "consul-mesh-gateway"
-      }
-    }
-  ]
-}
+gatewayClassConfigs:
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: gatewayClassConfig
+  metadata:
+    name: consul-mesh-gateway
+    namespace: namespace
+  spec:
+    deployment:
+      resources:
+        requests:
+          cpu: 100m
+meshGateways:
+- name: mesh-gateway
+  spec:
+    gatewayClassName: consul-mesh-gateway
 `
 
 var invalidGWConfiguration = `
@@ -436,50 +430,45 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 		},
 	}
 
-	filename := createGatewayConfigFile(t, validGWConfiguration, "config.json")
+	filename := createGatewayConfigFile(t, validGWConfiguration, "config.yaml")
 	for name, testCase := range testCases {
-	    t.Run(name, func(t *testing.T) {
-		// setup k8s client
-		s := runtime.NewScheme()
-		require.NoError(t, gwv1beta1.Install(s))
-		require.NoError(t, v1alpha1.AddToScheme(s))
+		t.Run(name, func(t *testing.T) {
+			// setup k8s client
+			s := runtime.NewScheme()
+			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, v1alpha1.AddToScheme(s))
 
-		client := fake.NewClientBuilder().WithScheme(s).Build()
+			client := fake.NewClientBuilder().WithScheme(s).Build()
 
-		ui := cli.NewMockUi()
-		cmd := Command{
-			UI:                        ui,
-			k8sClient:                 client,
-			flagGatewayConfigLocation: filename,
-			flagMeshGatewayResourceConfigFileLocation: testCase.resourceFilename,
-		}
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:                        ui,
+				k8sClient:                 client,
+				flagGatewayConfigLocation: filename,
+				flagMeshGatewayResourceConfigFileLocation: testCase.resourceFilename,
+			}
 
-		err := cmd.loadGatewayConfigs()
-		require.NoError(t, err)
-		require.NotEmpty(t, cmd.gatewayConfig.GatewayClassConfigs)
+			err := cmd.loadGatewayConfigs()
+			require.NoError(t, err)
+			require.NotEmpty(t, cmd.gatewayConfig.GatewayClassConfigs)
 
-		// we only created one class config
-		classConfig := cmd.gatewayConfig.GatewayClassConfigs[0].DeepCopy()
+			// we only created one class config
+			classConfig := cmd.gatewayConfig.GatewayClassConfigs[0].DeepCopy()
 
-		expectedClassConfig := v2beta1.GatewayClassConfig{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "mesh.consul.hashicorp.com/v2beta1",
-				Kind:       "gatewayClassConfig",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "consul-mesh-gateway",
-				Namespace: "namespace",
-			},
-			Spec: meshv2beta1.GatewayClassConfig{
-				Deployment: &meshv2beta1.Deployment{
-					Resources: testCase.expectedResources,
+			expectedClassConfig := v2beta1.GatewayClassConfig{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "mesh.consul.hashicorp.com/v2beta1",
+					Kind:       "gatewayClassConfig",
 				},
-			},
-			Status: v2beta1.Status{},
-		}
-		require.Equal(t, expectedClassConfig.DeepCopy(), classConfig)
-
-})
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "consul-mesh-gateway",
+					Namespace: "namespace",
+				},
+				Spec:   meshv2beta1.GatewayClassConfig{},
+				Status: v2beta1.Status{},
+			}
+			require.Equal(t, expectedClassConfig.DeepCopy(), classConfig)
+		})
 	}
 }
 
