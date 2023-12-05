@@ -11,6 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -111,7 +112,21 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		return fmt.Errorf("unable to create service account: %w", err)
 	}
 
-	// TODO NET-6393 NET-6395
+	//Create Role
+
+	err = r.opIfNewOrOwned(ctx, resource, &rbacv1.Role{}, builder.Role(), upsertOp)
+	if err != nil {
+		return fmt.Errorf("unable to create role: %w", err)
+	}
+
+	//Create RoleBinding
+
+	err = r.opIfNewOrOwned(ctx, resource, &rbacv1.RoleBinding{}, builder.RoleBinding(), upsertOp)
+	if err != nil {
+		return fmt.Errorf("unable to create role binding: %w", err)
+	}
+
+	// TODO NET-6393
 
 	//Create deployment
 
@@ -133,12 +148,12 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 
 	builtDeployment, err := builder.Deployment()
 	if err != nil {
-		return fmt.Errorf("Unable to build deployment: %w", err)
+		return fmt.Errorf("unable to build deployment: %w", err)
 	}
 
 	err = r.opIfNewOrOwned(ctx, resource, &appsv1.Deployment{}, builtDeployment, mergeDeploymentOp)
 	if err != nil {
-		return fmt.Errorf("Unable to create deployment: %w", err)
+		return fmt.Errorf("unable to create deployment: %w", err)
 	}
 
 	return nil
@@ -149,7 +164,7 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 // have an owner reference and will thus be cleaned up by the K8s garbage collector
 // once the owning meshv2beta1.MeshGateway is deleted.
 func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
-	// TODO NET-6392 NET-6393 NET-6395
+	// TODO NET-6392 NET-6393
 	return nil
 }
 
