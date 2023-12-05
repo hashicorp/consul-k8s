@@ -58,6 +58,9 @@ const (
 	// DefaultGracefulShutdownPath is the default path that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulShutdownPath = "/graceful_shutdown"
 
+	//DefaultWANPort is the default port that consul-dataplane uses for WAN.
+	DefaultWANPort = 8443
+
 	// ConsulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
 	ConsulKubernetesCheckType = "kubernetes-readiness"
 
