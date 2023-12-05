@@ -292,7 +292,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 
 		// Register the service instance with Consul.
 		r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
-			"id", serviceRegistration.ID)
+			"id", serviceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(serviceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register service", "name", serviceRegistration.Service.Service)
@@ -308,7 +308,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		}
 
 		// Register the proxy service instance with Consul.
-		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service)
+		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service, "id", proxyServiceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(proxyServiceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Service.Service)
@@ -975,11 +975,50 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 					errs = multierror.Append(errs, err)
 				}
 			}
+
+			if serviceDeregistered {
+				err = r.deregisterNode(apiClient, nodeSvcs.Node.Node)
+				if err != nil {
+					r.Log.Error(err, "failed to deregister node", "svc", svc.Service)
+					errs = multierror.Append(errs, err)
+				}
+			}
 		}
 	}
 
 	return errs
 
+}
+
+// deregisterNode removes a node if it does not have any associated services attached to it.
+// When using Consul Enterprise, serviceInstancesForK8SServiceNameAndNamespace will search across all namespaces
+// (wildcard) to determine if there any other services associated with the Node. We also only search for nodes that have
+// the correct kubernetes metadata (managed-by-endpoints-controller and synthetic-node).
+func (r *Controller) deregisterNode(apiClient *api.Client, nodeName string) error {
+	var (
+		serviceList *api.CatalogNodeServiceList
+		err         error
+	)
+
+	filter := fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q`,
+		"synthetic-node", "true", metaKeyManagedBy, constants.ManagedByValue)
+	if r.EnableConsulNamespaces {
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
+	} else {
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter})
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get a list of node services: %s", err)
+	}
+
+	if len(serviceList.Services) == 0 {
+		r.Log.Info("deregistering node from consul", "node", nodeName, "services", serviceList.Services)
+		_, err := apiClient.Catalog().Deregister(&api.CatalogDeregistration{Node: nodeName}, nil)
+		if err != nil {
+			r.Log.Error(err, "failed to deregister node", "name", nodeName)
+		}
+	}
+	return nil
 }
 
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
