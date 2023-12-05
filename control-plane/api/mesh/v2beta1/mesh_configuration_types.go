@@ -50,13 +50,13 @@ type MeshConfigurationList struct {
 	Items           []*MeshConfiguration `json:"items"`
 }
 
-func (in *MeshConfiguration) ResourceID(namespace, partition string) *pbresource.ID {
+func (in *MeshConfiguration) ResourceID(_, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: in.Name,
 		Type: pbmesh.MeshConfigurationType,
 		Tenancy: &pbresource.Tenancy{
+			// we don't pass a namespace here because MeshConfiguration is partition-scoped
 			Partition: partition,
-			Namespace: namespace,
 
 			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
 			// At a future point, this will move out of the Tenancy block.
@@ -65,9 +65,9 @@ func (in *MeshConfiguration) ResourceID(namespace, partition string) *pbresource
 	}
 }
 
-func (in *MeshConfiguration) Resource(namespace, partition string) *pbresource.Resource {
+func (in *MeshConfiguration) Resource(_, partition string) *pbresource.Resource {
 	return &pbresource.Resource{
-		Id:       in.ResourceID(namespace, partition),
+		Id:       in.ResourceID("", partition),
 		Data:     inject.ToProtoAny(&in.Spec),
 		Metadata: meshConfigMeta(),
 	}
@@ -91,9 +91,9 @@ func (in *MeshConfiguration) Finalizers() []string {
 	return in.ObjectMeta.Finalizers
 }
 
-func (in *MeshConfiguration) MatchesConsul(candidate *pbresource.Resource, namespace, partition string) bool {
+func (in *MeshConfiguration) MatchesConsul(candidate *pbresource.Resource, _, partition string) bool {
 	return cmp.Equal(
-		in.Resource(namespace, partition),
+		in.Resource("", partition),
 		candidate,
 		protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
 		protocmp.IgnoreFields(&pbresource.ID{}, "uid"),
