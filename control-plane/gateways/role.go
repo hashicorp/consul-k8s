@@ -24,7 +24,11 @@ func (b *meshGatewayBuilder) RoleBinding() *rbacv1.RoleBinding {
 			Labels:    b.Labels(),
 		},
 		Subjects: []rbacv1.Subject{
-			{Kind: rbacv1.ServiceAccountKind, Name: b.gateway.Name, Namespace: b.gateway.Namespace},
+			{
+				Kind:      rbacv1.ServiceAccountKind,
+				Name:      b.gateway.Name,
+				Namespace: b.gateway.Namespace,
+			},
 		},
 	}
 }
