@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -65,6 +66,13 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	}
 	client, err := api.NewClient(consulConfig.APIClientConfig)
 	require.NoError(t, err)
+
+	// Check that we can reach the test client
+	timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		_, err := client.Agent().Self()
+		require.NoError(r, err)
+	})
 
 	return &TestServerClient{
 		TestServer: consulServer,
