@@ -56,4 +56,8 @@ spec:
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
       {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: { { template "consul.fullname" . } }-gateway-resources-config
 {{- end }}
