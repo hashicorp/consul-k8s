@@ -14,6 +14,15 @@ rules:
     - consul.hashicorp.com
     - mesh.consul.hashicorp.com
     resources:
+    - meshgateways
+    verbs:
+    - get
+    - update
+    - create
+  - apiGroups:
+    - consul.hashicorp.com
+    - mesh.consul.hashicorp.com
+    resources:
     - gatewayclassconfigs
     verbs:
     - get

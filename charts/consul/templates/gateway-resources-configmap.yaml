@@ -77,8 +77,9 @@ data:
               set: {{ toJson .Values.meshGateway.serviceAccount.annotations }}
           {{- end }}
     meshGateways:
-      - name: mesh-gateway
-        namespace: {{ .Release.Namespace }}
+      - metadata:
+          name: mesh-gateway
+          namespace: {{ .Release.Namespace }}
         spec:
           gatewayClassName: consul-mesh-gateway
   {{- end }}

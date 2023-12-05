@@ -17,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -379,7 +381,9 @@ var validGWConfiguration = `gatewayClassConfigs:
             cpu: 200m
             memory: 200Mi
 meshGateways:
-- name: mesh-gateway
+- metadata:
+    name: mesh-gateway
+    namespace: consul
   spec:
     gatewayClassName: consul-mesh-gateway
 `
@@ -431,6 +435,7 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 	err := cmd.loadGatewayConfigs()
 	require.NoError(t, err)
 	require.NotEmpty(t, cmd.gatewayConfig.GatewayClassConfigs)
+	require.NotEmpty(t, cmd.gatewayConfig.MeshGateways)
 
 	// we only created one class config
 	classConfig := cmd.gatewayConfig.GatewayClassConfigs[0].DeepCopy()
@@ -453,6 +458,21 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 		Status: v2beta1.Status{},
 	}
 	require.Equal(t, expectedClassConfig.DeepCopy(), classConfig)
+
+	// check mesh gateway, we only created one of these
+	actualMeshGateway := cmd.gatewayConfig.MeshGateways[0]
+
+	expectedMeshGateway := &v2beta1.MeshGateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mesh-gateway",
+			Namespace: "consul",
+		},
+		Spec: meshv2beta1.MeshGateway{
+			GatewayClassName: "consul-mesh-gateway",
+		},
+	}
+
+	require.Equal(t, expectedMeshGateway.DeepCopy(), actualMeshGateway)
 }
 
 func TestRun_loadGatewayConfigsWithInvalidFile(t *testing.T) {
@@ -474,6 +494,7 @@ func TestRun_loadGatewayConfigsWithInvalidFile(t *testing.T) {
 	err := cmd.loadGatewayConfigs()
 	require.Error(t, err)
 	require.Empty(t, cmd.gatewayConfig.GatewayClassConfigs)
+	require.Empty(t, cmd.gatewayConfig.MeshGateways)
 }
 
 func TestRun_loadGatewayConfigsWhenConfigFileDoesNotExist(t *testing.T) {
@@ -494,6 +515,7 @@ func TestRun_loadGatewayConfigsWhenConfigFileDoesNotExist(t *testing.T) {
 	err := cmd.loadGatewayConfigs()
 	require.NoError(t, err)
 	require.Empty(t, cmd.gatewayConfig.GatewayClassConfigs)
+	require.Empty(t, cmd.gatewayConfig.MeshGateways)
 	require.Contains(t, string(ui.ErrorWriter.Bytes()), "gateway configuration file not found, skipping gateway configuration")
 }
 
