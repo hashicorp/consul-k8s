@@ -4,6 +4,7 @@ on:
   pull_request:
 
 # these should be the only settings that you will ever need to change
+# some change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
   CONTEXT: "pr"
@@ -19,6 +20,6 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: mw/enhance-test-logs-for-github-actions
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
