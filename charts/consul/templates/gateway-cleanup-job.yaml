@@ -52,6 +52,10 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
+            volumeMounts:
+              - name: config
+                mountPath: /consul/config
+                readOnly: true
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
@@ -59,5 +63,5 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: { { template "consul.fullname" . } }-gateway-resources-config
+            name: {{ template "consul.fullname" . }}-gateway-resources-config
 {{- end }}
