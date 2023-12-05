@@ -452,7 +452,6 @@ func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, compo
 		if err != nil {
 			return err
 		}
-
 	}
 
 	return nil
