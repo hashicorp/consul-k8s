@@ -25,10 +25,16 @@ func (b *meshGatewayBuilder) RoleBinding() *rbacv1.RoleBinding {
 		},
 		Subjects: []rbacv1.Subject{
 			{
+				APIGroup:  "",
 				Kind:      rbacv1.ServiceAccountKind,
 				Name:      b.gateway.Name,
 				Namespace: b.gateway.Namespace,
 			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     b.Role().Name,
 		},
 	}
 }
