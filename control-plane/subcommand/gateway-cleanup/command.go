@@ -138,6 +138,7 @@ func (c *Command) Run(args []string) int {
 	config := &v1alpha1.GatewayClassConfig{}
 	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassConfigName}, config)
 	if err != nil {
+
 		if k8serrors.IsNotFound(err) {
 			// no gateway class config, just ignore and return
 			return 0
@@ -150,6 +151,7 @@ func (c *Command) Run(args []string) int {
 	_ = c.k8sClient.Delete(context.Background(), config)
 
 	// find the gateway class
+
 	gatewayClass := &gwv1beta1.GatewayClass{}
 	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, gatewayClass)
 	if err != nil {
@@ -186,12 +188,14 @@ func (c *Command) Run(args []string) int {
 	//V2 Cleanup
 	err = c.loadGatewayConfigs()
 	if err != nil {
+
 		c.UI.Error(err.Error())
 		return 1
 	}
 	err = c.deleteV2GatewayClassAndClassConfigs()
 	if err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 
