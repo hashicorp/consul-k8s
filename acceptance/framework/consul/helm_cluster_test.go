@@ -31,7 +31,7 @@ func TestNewHelmCluster(t *testing.T) {
 			want: map[string]string{
 				"global.image":    "test-config-image",
 				"global.logLevel": "debug",
-				"server.replicas": "1",
+				"server.replicas": "3",
 				"connectInject.transparentProxy.defaultEnabled": "false",
 				"dns.enabled":        "false",
 				"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
@@ -43,8 +43,8 @@ func TestNewHelmCluster(t *testing.T) {
 			helmValues: map[string]string{
 				"global.image":           "test-image",
 				"global.logLevel":        "debug",
-				"server.bootstrapExpect": "3",
-				"server.replicas":        "3",
+				"server.bootstrapExpect": "1",
+				"server.replicas":        "1",
 				"connectInject.transparentProxy.defaultEnabled": "true",
 				"dns.enabled":        "true",
 				"server.extraConfig": `"{\"foo\": \"bar\"}"`,
@@ -54,8 +54,8 @@ func TestNewHelmCluster(t *testing.T) {
 			want: map[string]string{
 				"global.image":           "test-image",
 				"global.logLevel":        "debug",
-				"server.bootstrapExpect": "3",
-				"server.replicas":        "3",
+				"server.bootstrapExpect": "1",
+				"server.replicas":        "1",
 				"connectInject.transparentProxy.defaultEnabled": "true",
 				"dns.enabled":        "true",
 				"server.extraConfig": `"{\"foo\": \"bar\"}"`,

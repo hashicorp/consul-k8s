@@ -335,8 +335,7 @@ func TestVault_Partitions(t *testing.T) {
 		"global.acls.partitionToken.secretName": partitionTokenSecret.Path,
 		"global.acls.partitionToken.secretKey":  partitionTokenSecret.Key,
 
-		"server.exposeGossipAndRPCPorts": "true",
-		"server.serverCert.secretName":   serverPKIConfig.CertPath,
+		"server.serverCert.secretName": serverPKIConfig.CertPath,
 
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecretName,

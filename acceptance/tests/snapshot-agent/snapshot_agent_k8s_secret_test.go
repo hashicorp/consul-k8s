@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,8 +19,10 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -84,20 +87,36 @@ func TestSnapshotAgent_K8sSecret(t *testing.T) {
 			podList, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(),
 				metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=server,release=%s", releaseName)})
 			require.NoError(t, err)
-			require.Len(t, podList.Items, 1, "expected to find only 1 consul server instance")
 
+			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
+			leaderPod := findConsulLeader(t, consulClient, podList.Items)
+
+			// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
 			// We need to give some extra time for ACLs to finish bootstrapping and for servers to come up.
 			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
-				// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
-				pod := podList.Items[0]
-				snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", pod.Name, "-c", "consul-snapshot-agent", "--", "ls", "/tmp")
+				snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", leaderPod, "-c", "consul-snapshot-agent", "--", "ls", "/tmp")
 				require.NoError(r, err)
 				logger.Logf(t, "Snapshot: \n%s", snapshotFileListOutput)
 				require.Contains(r, snapshotFileListOutput, ".snap", "Agent pod does not contain snapshot files")
 			})
 		})
 	}
+}
+
+func findConsulLeader(t *testing.T, client *api.Client, pods []corev1.Pod) string {
+	t.Helper()
+
+	leaderAddr, err := client.Status().Leader()
+	require.NoError(t, err)
+
+	for _, pod := range pods {
+		if strings.Contains(leaderAddr, pod.Status.PodIP) {
+			return pod.Name
+		}
+	}
+	t.Fatalf("could not find consul leader with address %q", leaderAddr)
+	return ""
 }
 
 func generateSnapshotAgentConfig(t *testing.T) string {

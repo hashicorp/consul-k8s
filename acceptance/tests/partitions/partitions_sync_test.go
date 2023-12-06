@@ -102,9 +102,7 @@ func TestPartitions_Sync(t *testing.T) {
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
-			serverHelmValues := map[string]string{
-				"server.exposeGossipAndRPCPorts": "true",
-			}
+			serverHelmValues := map[string]string{}
 
 			// On Kind, there are no load balancers but since all clusters
 			// share the same node network (docker bridge), we can use
@@ -156,9 +154,10 @@ func TestPartitions_Sync(t *testing.T) {
 				"global.tls.caCert.secretName": caCertSecretName,
 				"global.tls.caCert.secretKey":  "tls.crt",
 
-				"externalServers.enabled":       "true",
-				"externalServers.hosts[0]":      partitionSvcAddress,
-				"externalServers.tlsServerName": "server.dc1.consul",
+				"externalServers.enabled":         "true",
+				"externalServers.hosts[0]":        partitionSvcAddress,
+				"externalServers.tlsServerName":   "server.dc1.consul",
+				"externalServers.skipServerWatch": "true",
 			}
 
 			if c.ACLsEnabled {

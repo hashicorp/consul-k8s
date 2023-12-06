@@ -172,6 +172,13 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
 	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
 
+	// Unset affinity if running on kind because we want to allow more than 1 server running on the same node.
+	// For these tests, we don't care about servers running on separate nodes because we don't care about node
+	// going down in tests.
+	if t.UseKind {
+		setIfNotEmpty(helmValues, "server.affinity", "null")
+	}
+
 	return helmValues, nil
 }
 

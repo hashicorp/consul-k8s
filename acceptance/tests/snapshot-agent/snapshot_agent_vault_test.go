@@ -206,14 +206,15 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	podList, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(),
 		metav1.ListOptions{LabelSelector: fmt.Sprintf("app=consul,component=server,release=%s", consulReleaseName)})
 	require.NoError(t, err)
-	require.Len(t, podList.Items, 1, "expected to find only 1 consul server instance")
+
+	consulClient, _ := consulCluster.SetupConsulClient(t, true)
+	leaderPod := findConsulLeader(t, consulClient, podList.Items)
 
 	// We need to give some extra time for ACLs to finish bootstrapping and for servers to come up.
+	// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
 	timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
-		pod := podList.Items[0]
-		snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", pod.Name, "-c", "consul-snapshot-agent", "--", "ls", "/tmp")
+		snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", leaderPod, "-c", "consul-snapshot-agent", "--", "ls", "/tmp")
 		require.NoError(r, err)
 		logger.Logf(t, "Snapshot: \n%s", snapshotFileListOutput)
 		require.Contains(r, snapshotFileListOutput, ".snap", "Agent pod does not contain snapshot files")

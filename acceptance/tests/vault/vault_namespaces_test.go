@@ -241,7 +241,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	require.NoError(t, err)
 	// There are two identical keys for LAN and WAN since there is only 1 dc.
 	require.Len(t, keys, 2)
-	require.Equal(t, 1, keys[0].PrimaryKeys[gossipKey])
+	require.Equal(t, 3, keys[0].PrimaryKeys[gossipKey])
 
 	// Confirm that the Vault Connect CA has been bootstrapped correctly.
 	caConfig, _, err := consulClient.Connect().CAGetConfig(nil)
