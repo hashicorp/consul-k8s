@@ -77,7 +77,9 @@ data:
               set: {{ toJson .Values.meshGateway.serviceAccount.annotations }}
           {{- end }}
     meshGateways:
-      - metadata:
+      - apiVersion: mesh.consul.hashicorp.com/v2beta1
+        kind: meshGateway
+        metadata:
           name: mesh-gateway
           namespace: {{ .Release.Namespace }}
         spec:

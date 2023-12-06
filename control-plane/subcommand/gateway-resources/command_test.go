@@ -381,7 +381,9 @@ var validGWConfiguration = `gatewayClassConfigs:
             cpu: 200m
             memory: 200Mi
 meshGateways:
-- metadata:
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: meshGateway
+  metadata:
     name: mesh-gateway
     namespace: consul
   spec:
@@ -442,7 +444,7 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 
 	expectedClassConfig := v2beta1.GatewayClassConfig{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "mesh.consul.hashicorp.com/v2beta1",
+			APIVersion: v2beta1.MeshGroupVersion.String(),
 			Kind:       "GatewayClassConfig",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -463,6 +465,10 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 	actualMeshGateway := cmd.gatewayConfig.MeshGateways[0]
 
 	expectedMeshGateway := &v2beta1.MeshGateway{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "meshGateway",
+			APIVersion: v2beta1.MeshGroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mesh-gateway",
 			Namespace: "consul",
