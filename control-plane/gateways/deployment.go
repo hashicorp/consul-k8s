@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package gateways
 
 import (
@@ -33,8 +36,8 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	}
 
 	var resources *corev1.ResourceRequirements
-	if b.gcc != nil {
-		resources = b.gcc.Spec.DeploymentSpec.Resources
+	if b.gcc != nil && b.gcc.Spec.Deployment.Container != nil {
+		resources = b.gcc.Spec.Deployment.Container.Resources
 	}
 
 	container, err := consulDataplaneContainer(b.config, resources, b.gateway.Name, b.gateway.Namespace)
