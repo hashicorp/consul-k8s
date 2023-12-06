@@ -46,6 +46,7 @@ func (d *DynamicClient) RefreshClient() error {
 
 func NewDynamicClientWithTimeout(config *capi.Config, consulAPITimeout time.Duration) (*DynamicClient, error) {
 	client, err := NewClient(config, consulAPITimeout)
+	// Some change
 	if err != nil {
 		return nil, err
 	}
