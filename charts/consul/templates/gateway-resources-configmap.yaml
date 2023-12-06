@@ -16,7 +16,7 @@ data:
   resources.json: |
     {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
   {{- end }}
-  {{- if (mustHas "resource-apis" .Values.global.experiments) }}
+  {{- if and (mustHas "resource-apis" .Values.global.experiments) .Values.meshGateway.enabled }}
   config.yaml: |
     gatewayClassConfigs:
       - apiVersion: mesh.consul.hashicorp.com/v2beta1
