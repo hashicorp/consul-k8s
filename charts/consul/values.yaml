@@ -655,12 +655,8 @@ global:
   # Enables installing an HCP Consul Central self-managed cluster.
   # Requires Consul v1.14+.
   cloud:
-    # If true, the Helm chart will link a [self-managed cluster to HCP](https://developer.hashicorp.com/hcp/docs/consul/self-managed).
-    # This can either be used to [configure a new cluster](https://developer.hashicorp.com/hcp/docs/consul/self-managed/new)
-    # or [link an existing one](https://developer.hashicorp.com/hcp/docs/consul/self-managed/existing).
-    #
-    # Note: this setting should not be enabled for [HashiCorp-managed clusters](https://developer.hashicorp.com/hcp/docs/consul/hcp-managed).
-    # It is strictly for linking self-managed clusters.
+    # If true, the Helm chart will enable the installation of an HCP Consul Central
+    # self-managed cluster.
     enabled: false
 
     # The resource id of the HCP Consul Central cluster to link to. Eg:
