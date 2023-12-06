@@ -78,7 +78,7 @@ data:
           {{- end }}
     meshGateways:
       - apiVersion: mesh.consul.hashicorp.com/v2beta1
-        kind: meshGateway
+        kind: MeshGateway
         metadata:
           name: mesh-gateway
           namespace: {{ .Release.Namespace }}
