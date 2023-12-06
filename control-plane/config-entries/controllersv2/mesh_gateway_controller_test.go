@@ -109,7 +109,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			},
 			expectedResult: ctrl.Result{},
 			postReconcile: func(t *testing.T, c client.Client) {
-				// Verify ClusterRole was created
+				// Verify Role was created
 				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
 				assert.NoError(t, c.Get(context.Background(), key, &rbacv1.Role{}))
 			},
@@ -190,7 +190,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			},
 			expectedResult: ctrl.Result{},
 			postReconcile: func(t *testing.T, c client.Client) {
-				// Verify ClusterRole was created
+				// Verify RoleBinding was created
 				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
 				assert.NoError(t, c.Get(context.Background(), key, &rbacv1.RoleBinding{}))
 			},
