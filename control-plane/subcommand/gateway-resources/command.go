@@ -418,7 +418,6 @@ func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, compo
 		"component": component,
 	}
 	for _, cfg := range c.gatewayConfig.GatewayClassConfigs {
-		cfg.Kind = "GatewayClassConfig"
 		err := forceV2ClassConfig(ctx, c.k8sClient, cfg)
 		if err != nil {
 			return err
