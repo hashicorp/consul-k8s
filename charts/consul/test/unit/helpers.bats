@@ -431,18 +431,6 @@ load _helpers
   [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, syncCatalog.enabled is currently unsupported." ]]
 }
 
-@test "connectInject/Deployment: fails if resource-apis is set and meshGateway is enabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/tests/test-runner.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'ui.enabled=false' \
-      --set 'meshGateway.enabled=true' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, meshGateway.enabled is currently unsupported." ]]
-}
-
 @test "connectInject/Deployment: fails if resource-apis is set and ingressGateways is enabled" {
   cd `chart_dir`
   run helm template \
