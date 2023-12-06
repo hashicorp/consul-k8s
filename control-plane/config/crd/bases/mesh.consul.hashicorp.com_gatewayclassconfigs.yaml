@@ -103,6 +103,10 @@ spec:
                                 type: string
                             type: object
                         type: object
+                      portModifier:
+                        description: PortModifier specifies the value to be added
+                          to every port value for listeners on this gateway
+                        type: integer
                       resources:
                         description: Resources specifies the resource requirements
                           for the created Deployment's container
