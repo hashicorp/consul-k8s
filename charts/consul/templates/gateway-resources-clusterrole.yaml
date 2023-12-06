@@ -11,6 +11,14 @@ metadata:
     component: gateway-resources
 rules:
   - apiGroups:
+    - mesh.consul.hashicorp.com
+    resources:
+    - meshgateways
+    verbs:
+    - get
+    - update
+    - create
+  - apiGroups:
     - consul.hashicorp.com
     - mesh.consul.hashicorp.com
     resources:
