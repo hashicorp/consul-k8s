@@ -4576,7 +4576,7 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 		name               string
 		k8sServiceNameMeta string
 		k8sNamespaceMeta   string
-		expected           []*api.AgentService
+		expected           []*api.CatalogService
 	}{
 		{
 			"no k8s service name or namespace meta",
@@ -4600,22 +4600,21 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 			"both k8s service name and namespace set",
 			k8sSvc,
 			k8sNS,
-			[]*api.AgentService{
+			[]*api.CatalogService{
 				{
-					ID:      "foo1",
-					Service: "foo",
-					Meta:    map[string]string{"k8s-service-name": k8sSvc, "k8s-namespace": k8sNS},
+					ID:          "foo1",
+					ServiceName: "foo",
+					ServiceMeta: map[string]string{"k8s-service-name": k8sSvc, "k8s-namespace": k8sNS},
 				},
 				{
-					Kind:    api.ServiceKindConnectProxy,
-					ID:      "foo1-proxy",
-					Service: "foo-sidecar-proxy",
-					Port:    20000,
-					Proxy: &api.AgentServiceConnectProxyConfig{
+					ID:          "foo1-proxy",
+					ServiceName: "foo-sidecar-proxy",
+					ServicePort: 20000,
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
 						DestinationServiceName: "foo",
 						DestinationServiceID:   "foo1",
 					},
-					Meta: map[string]string{"k8s-service-name": k8sSvc, "k8s-namespace": k8sNS},
+					ServiceMeta: map[string]string{"k8s-service-name": k8sSvc, "k8s-namespace": k8sNS},
 				},
 			},
 		},
@@ -4684,14 +4683,14 @@ func TestServiceInstancesForK8SServiceNameAndNamespace(t *testing.T) {
 			}
 			ep := Controller{}
 
-			svcs, err := ep.serviceInstancesForK8SServiceNameAndNamespace(consulClient, k8sSvc, k8sNS, consulNodeName)
+			svcs, err := ep.serviceInstances(consulClient, k8sSvc, k8sNS)
 			require.NoError(t, err)
-			if len(svcs.Services) > 0 {
+			if len(svcs) > 0 {
 				require.Len(t, svcs, 2)
-				require.NotNil(t, c.expected[0], svcs.Services[0])
-				require.Equal(t, c.expected[0].Service, svcs.Services[0].Service)
-				require.NotNil(t, c.expected[1], svcs.Services[1])
-				require.Equal(t, c.expected[1].Service, svcs.Services[1].Service)
+				require.NotNil(t, svcs[0], c.expected[0])
+				require.Equal(t, c.expected[0].ServiceName, svcs[0].ServiceName)
+				require.NotNil(t, svcs[1], c.expected[1])
+				require.Equal(t, c.expected[1].ServiceName, svcs[1].ServiceName)
 			}
 		})
 	}
