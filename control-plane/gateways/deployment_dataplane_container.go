@@ -109,17 +109,16 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.Gat
 	})
 
 	// Configure the wan port.
-	container.Ports = append(container.Ports, corev1.ContainerPort{
+	wanPort := corev1.ContainerPort{
 		Name:          "wan",
 		ContainerPort: int32(constants.DefaultWANPort),
-	})
+	}
 
 	if containerConfig != nil {
-		container.Ports = append(container.Ports, corev1.ContainerPort{
-			Name:          "mesh-gateway-port",
-			ContainerPort: int32(443 + containerConfig.PortModifier),
-		})
+		wanPort.ContainerPort = int32(443 + containerConfig.PortModifier)
 	}
+
+	container.Ports = append(container.Ports, wanPort)
 
 	// Configure the resource requests and limits for the proxy if they are set.
 	if resources != nil {
