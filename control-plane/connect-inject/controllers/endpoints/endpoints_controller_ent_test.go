@@ -1954,7 +1954,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "mesh-gateway",
 						Kind:    api.ServiceKindMeshGateway,
-						Service: "mesh-gateway",
+						Service: consulSvcName,
 						Port:    80,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -1985,7 +1985,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "mesh-gateway",
 						Kind:    api.ServiceKindMeshGateway,
-						Service: "mesh-gateway",
+						Service: consulSvcName,
 						Port:    80,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -2016,7 +2016,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "terminating-gateway",
 						Kind:    api.ServiceKindTerminatingGateway,
-						Service: "terminating-gateway",
+						Service: consulSvcName,
 						Port:    8443,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -2037,7 +2037,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "terminating-gateway",
 						Kind:    api.ServiceKindTerminatingGateway,
-						Service: "terminating-gateway",
+						Service: consulSvcName,
 						Port:    8443,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -2089,7 +2089,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "ingress-gateway",
 						Kind:    api.ServiceKindIngressGateway,
-						Service: "ingress-gateway",
+						Service: consulSvcName,
 						Port:    80,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -2175,15 +2175,16 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 
 				// Create the endpoints controller.
 				ep := &Controller{
-					Client:                 fakeClient,
-					Log:                    logrtest.NewTestLogger(t),
-					ConsulClientConfig:     testClient.Cfg,
-					ConsulServerConnMgr:    testClient.Watcher,
-					AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
-					DenyK8sNamespacesSet:   mapset.NewSetWith(),
-					ReleaseName:            "consul",
-					ReleaseNamespace:       "default",
-					EnableConsulNamespaces: true,
+					Client:                     fakeClient,
+					Log:                        logrtest.NewTestLogger(t),
+					ConsulClientConfig:         testClient.Cfg,
+					ConsulServerConnMgr:        testClient.Watcher,
+					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
+					DenyK8sNamespacesSet:       mapset.NewSetWith(),
+					ReleaseName:                "consul",
+					ReleaseNamespace:           "default",
+					EnableConsulNamespaces:     true,
+					ConsulDestinationNamespace: ts.ConsulNS,
 				}
 				if tt.enableACLs {
 					ep.AuthMethod = test.AuthMethod
@@ -2216,6 +2217,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					}
 
 					token, _, err = consulClient.ACL().TokenRead(token.AccessorID, queryOpts)
+					require.Error(t, err)
 					require.Contains(t, err.Error(), "ACL not found", token)
 				}
 			})
