@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -25,12 +27,17 @@ const (
 	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config GatewayConfig, resources *corev1.ResourceRequirements, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.GatewayClassContainerConfig, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
 		bearerTokenFile string
 	)
+
+	var resources *corev1.ResourceRequirements
+	if containerConfig != nil {
+		resources = containerConfig.Resources
+	}
 
 	if config.AuthMethod != "" {
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -102,10 +109,16 @@ func consulDataplaneContainer(config GatewayConfig, resources *corev1.ResourceRe
 	})
 
 	// Configure the wan port.
-	container.Ports = append(container.Ports, corev1.ContainerPort{
+	wanPort := corev1.ContainerPort{
 		Name:          "wan",
 		ContainerPort: int32(constants.DefaultWANPort),
-	})
+	}
+
+	if containerConfig != nil {
+		wanPort.ContainerPort = int32(443 + containerConfig.PortModifier)
+	}
+
+	container.Ports = append(container.Ports, wanPort)
 
 	// Configure the resource requests and limits for the proxy if they are set.
 	if resources != nil {

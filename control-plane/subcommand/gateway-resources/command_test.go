@@ -373,6 +373,7 @@ var validGWConfiguration = `gatewayClassConfigs:
   spec:
     deployment:
       container:
+        portModifier: 8000
         resources:
           requests:
             cpu: 200m
@@ -453,7 +454,8 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 		Spec: v2beta1.GatewayClassConfigSpec{
 			Deployment: v2beta1.GatewayClassDeploymentConfig{
 				Container: &v2beta1.GatewayClassContainerConfig{
-					Resources: expectedResources,
+					Resources:    expectedResources,
+					PortModifier: 8000,
 				},
 			},
 		},
