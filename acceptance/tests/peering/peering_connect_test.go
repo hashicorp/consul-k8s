@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -61,6 +62,7 @@ func TestPeering_Connect(t *testing.T) {
 			staticServerPeerClusterContext := env.DefaultContext(t)
 			staticClientPeerClusterContext := env.Context(t, 1)
 
+			// Create Clusters starting with our first cluster
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
 
@@ -78,53 +80,69 @@ func TestPeering_Connect(t *testing.T) {
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
-			staticServerPeerHelmValues := map[string]string{
-				"global.datacenter":                        staticServerPeer,
-				"terminatingGateways.enabled":              "true",
-				"terminatingGateways.gateways[0].name":     "terminating-gateway",
-				"terminatingGateways.gateways[0].replicas": "1",
-			}
-
-			if !cfg.UseKind {
-				staticServerPeerHelmValues["server.replicas"] = "3"
-			}
-
-			// On Kind, there are no load balancers but since all clusters
-			// share the same node network (docker bridge), we can use
-			// a NodePort service so that we can access node(s) in a different Kind cluster.
-			if cfg.UseKind {
-				staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
-				staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
-				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
-			}
-
+			var wg sync.WaitGroup
 			releaseName := helpers.RandomName()
 
-			helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
+			var staticServerPeerCluster *consul.HelmCluster
+			wg.Add(1)
+			go func() {
+				staticServerPeerHelmValues := map[string]string{
+					"global.datacenter":                        staticServerPeer,
+					"terminatingGateways.enabled":              "true",
+					"terminatingGateways.gateways[0].name":     "terminating-gateway",
+					"terminatingGateways.gateways[0].replicas": "1",
+				}
 
-			// Install the first peer where static-server will be deployed in the static-server kubernetes context.
-			staticServerPeerCluster := consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
-			staticServerPeerCluster.Create(t)
+				if !cfg.UseKind {
+					staticServerPeerHelmValues["server.replicas"] = "3"
+				}
 
-			staticClientPeerHelmValues := map[string]string{
-				"global.datacenter": staticClientPeer,
-			}
+				// On Kind, there are no load balancers but since all clusters
+				// share the same node network (docker bridge), we can use
+				// a NodePort service so that we can access node(s) in a different Kind cluster.
+				if cfg.UseKind {
+					staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+					staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
+					staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
+				}
 
-			if !cfg.UseKind {
-				staticClientPeerHelmValues["server.replicas"] = "3"
-			}
+				helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
 
-			if cfg.UseKind {
-				staticClientPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
-				staticClientPeerHelmValues["meshGateway.service.type"] = "NodePort"
-				staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
-			}
+				// Install the first peer where static-server will be deployed in the static-server kubernetes context.
+				staticServerPeerCluster = consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
+				staticServerPeerCluster.Create(t)
+				wg.Done()
+			}()
 
-			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
+			var staticClientPeerCluster *consul.HelmCluster
+			wg.Add(1)
+			go func() {
+				// Create a second cluster to be peered with
+				staticClientPeerHelmValues := map[string]string{
+					"global.datacenter": staticClientPeer,
+				}
 
-			// Install the second peer where static-client will be deployed in the static-client kubernetes context.
-			staticClientPeerCluster := consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
-			staticClientPeerCluster.Create(t)
+				if !cfg.UseKind {
+					staticClientPeerHelmValues["server.replicas"] = "3"
+				}
+
+				if cfg.UseKind {
+					staticClientPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+					staticClientPeerHelmValues["meshGateway.service.type"] = "NodePort"
+					staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
+				}
+
+				helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
+
+				// Install the second peer where static-client will be deployed in the static-client kubernetes context.
+				staticClientPeerCluster = consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
+				staticClientPeerCluster.Create(t)
+				wg.Done()
+			}()
+
+			// Wait for the clusters to start up
+			logger.Log(t, "waiting for clusters to start up . . .")
+			wg.Wait()
 
 			// Create Mesh resource to use mesh gateways.
 			logger.Log(t, "creating mesh config")
@@ -350,7 +368,7 @@ func TestPeering_Connect(t *testing.T) {
 				// If ACLs are enabled, test that deny intentions prevent connections.
 				if c.ACLsEnabled {
 					logger.Log(t, "testing intentions prevent connections through the terminating gateway")
-					k8s.CheckStaticServerConnectionFailing(t, staticClientOpts, staticClientName, externalServerHostnameURL)
+					k8s.CheckStaticServerHTTPConnectionFailing(t, staticClientOpts, staticClientName, externalServerHostnameURL)
 
 					logger.Log(t, "adding intentions to allow traffic from client ==> server")
 					terminatinggateway.AddIntention(t, staticServerPeerClient, staticClientPeer, "", staticClientName, "", externalServerHostnameID)
