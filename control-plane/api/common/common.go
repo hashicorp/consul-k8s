@@ -5,8 +5,9 @@
 package common
 
 import (
-	mapset "github.com/deckarep/golang-set"
 	"time"
+
+	mapset "github.com/deckarep/golang-set"
 )
 
 const (
@@ -35,6 +36,7 @@ const (
 	MeshGateway        string = "meshgateway"
 	GatewayClass       string = "gatewayclass"
 	GatewayClassConfig string = "gatewayclassconfig"
+	MeshConfiguration  string = "meshconfiguration"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"
