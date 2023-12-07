@@ -153,6 +153,13 @@ spec:
                                 any existing header values of the same name.
                               type: object
                           type: object
+                        retryOn:
+                          description: RetryOn is a flat list of conditions for Consul
+                            to retry requests based on the response from an upstream
+                            service.
+                          items:
+                            type: string
+                          type: array
                         retryOnConnectFailure:
                           description: RetryOnConnectFailure allows for connection
                             failure errors to trigger a retry.
