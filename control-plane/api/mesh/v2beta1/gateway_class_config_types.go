@@ -89,6 +89,9 @@ type GatewayClassContainerConfig struct {
 	Consul GatewayClassConsulConfig `json:"consul,omitempty"`
 	// Resources specifies the resource requirements for the created Deployment's container
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	// PortModifier specifies the value to be added to every port value for listeners on this gateway.
+	// This is generally used to avoid binding to privileged ports in the container.
+	PortModifier int `json:"portModifier,omitempty"`
 }
 
 type GatewayClassRoleConfig struct {

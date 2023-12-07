@@ -4,11 +4,12 @@
 package gateways
 
 import (
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
@@ -35,18 +36,18 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		return nil, err
 	}
 
-	var resources *corev1.ResourceRequirements
-	if b.gcc != nil && b.gcc.Spec.Deployment.Container != nil {
-		resources = b.gcc.Spec.Deployment.Container.Resources
+	var containerConfig *meshv2beta1.GatewayClassContainerConfig
+	if b.gcc != nil {
+		containerConfig = b.gcc.Spec.Deployment.Container
 	}
 
-	container, err := consulDataplaneContainer(b.config, resources, b.gateway.Name, b.gateway.Namespace)
+	container, err := consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}
 
 	return &appsv1.DeploymentSpec{
-		//TODO NET-6721
+		// TODO NET-6721
 		Replicas: deploymentReplicaCount(nil, nil),
 		Selector: &metav1.LabelSelector{
 			MatchLabels: b.Labels(),
@@ -143,7 +144,7 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 }
 
 func deploymentReplicaCount(deployment *pbmesh.Deployment, currentReplicas *int32) *int32 {
-	//TODO NET-6721 tamp replica count up and down based on min and max values
+	// TODO NET-6721 tamp replica count up and down based on min and max values
 	instanceValue := globalDefaultInstances
 	if currentReplicas != nil {
 		return currentReplicas
