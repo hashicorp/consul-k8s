@@ -132,19 +132,42 @@ func (c *Command) Run(args []string) int {
 	// do the cleanup
 
 	//V1 Cleanup
+	err = c.deleteV1GatewayClassAndGatewayClasConfig()
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
 
+	//V2 Cleanup
+	err = c.loadGatewayConfigs()
+	if err != nil {
+
+		c.UI.Error(err.Error())
+		return 1
+	}
+	err = c.deleteV2GatewayClassAndClassConfigs()
+	if err != nil {
+		c.UI.Error(err.Error())
+
+		return 1
+	}
+
+	return 0
+}
+
+func (c *Command) deleteV1GatewayClassAndGatewayClasConfig() error {
 	// find the class config and mark it for deletion first so that we
 	// can do an early return if the gateway class isn't found
 	config := &v1alpha1.GatewayClassConfig{}
-	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassConfigName}, config)
+	err := c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassConfigName}, config)
 	if err != nil {
 
 		if k8serrors.IsNotFound(err) {
 			// no gateway class config, just ignore and return
-			return 0
+			return nil
 		}
 		c.UI.Error(err.Error())
-		return 1
+		return err
 	}
 
 	// ignore any returned errors
@@ -157,10 +180,10 @@ func (c *Command) Run(args []string) int {
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			// no gateway class, just ignore and return
-			return 0
+			return nil
 		}
 		c.UI.Error(err.Error())
-		return 1
+		return err
 	}
 
 	// ignore any returned errors
@@ -184,22 +207,7 @@ func (c *Command) Run(args []string) int {
 		// if we failed, return 0 anyway after logging the error
 		// since we don't want to block someone from uninstallation
 	}
-
-	//V2 Cleanup
-	err = c.loadGatewayConfigs()
-	if err != nil {
-
-		c.UI.Error(err.Error())
-		return 1
-	}
-	err = c.deleteV2GatewayClassAndClassConfigs()
-	if err != nil {
-		c.UI.Error(err.Error())
-
-		return 1
-	}
-
-	return 0
+	return nil
 }
 
 func (c *Command) validateFlags() error {
@@ -245,6 +253,7 @@ func (c *Command) loadGatewayConfigs() error {
 	file, err := os.Open(c.flagGatewayConfigLocation)
 	if err != nil {
 		if os.IsNotExist(err) {
+			panic(err)
 			c.UI.Warn(fmt.Sprintf("gateway configuration file not found, skipping gateway configuration, filename: %s", c.flagGatewayConfigLocation))
 			return nil
 		}
@@ -279,8 +288,8 @@ func (c *Command) deleteV2GatewayClassAndClassConfigs() error {
 		err := c.k8sClient.Get(context.Background(), types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, config)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				// no gateway class config, just ignore and return
-				return nil
+				// no gateway class config, just ignore and continue
+				continue
 			}
 			return err
 		}
@@ -294,8 +303,8 @@ func (c *Command) deleteV2GatewayClassAndClassConfigs() error {
 		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, gatewayClass)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				// no gateway class, just ignore and return
-				return nil
+				// no gateway class, just ignore and continue
+				continue
 			}
 			return err
 		}

@@ -128,6 +128,62 @@ func TestRunV2Resources(t *testing.T) {
             memory: 200Mi
 `,
 		},
+		"multiple v2 resources exists": {
+			gatewayClassConfig: []*v2beta1.GatewayClassConfig{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-gateway",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-gateway2",
+					},
+				},
+			},
+			gatewayClass: []*v2beta1.GatewayClass{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-gateway",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-gateway2",
+					},
+				},
+			},
+			configMapData: `gatewayClassConfigs:
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: GatewayClassConfig
+  metadata:
+    name: test-gateway
+  spec:
+    deployment:
+      container:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 200Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: GatewayClassConfig
+  metadata:
+    name: test-gateway2
+  spec:
+    deployment:
+      container:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 200Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
+`,
+		},
 		"v2 emptyconfigmap": {
 			configMapData: "",
 		},
@@ -151,13 +207,7 @@ func TestRunV2Resources(t *testing.T) {
 				objs = append(objs, gatewayClassConfig)
 			}
 
-			configMap := &corev1.ConfigMap{
-				Data: map[string]string{
-					"config.yaml": tt.configMapData,
-				},
-			}
-
-			objs = append(objs, configMap)
+			path := createGatewayConfigFile(t, tt.configMapData, "config.yaml")
 
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 
@@ -167,11 +217,13 @@ func TestRunV2Resources(t *testing.T) {
 				k8sClient:                  client,
 				flagGatewayClassName:       "gateway-class",
 				flagGatewayClassConfigName: "gateway-class-config",
+				flagGatewayConfigLocation:  path,
 			}
 
 			code := cmd.Run([]string{
 				"-gateway-class-config-name", "gateway-class-config",
 				"-gateway-class-name", "gateway-class",
+				"-gateway-config-file-location", path,
 			})
 
 			require.Equal(t, 0, code)
@@ -194,6 +246,5 @@ func createGatewayConfigFile(t *testing.T, fileContent, filename string) string 
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	return file.Name()
 }
