@@ -148,6 +148,9 @@ type ServiceRouteDestination struct {
 	NumRetries uint32 `json:"numRetries,omitempty"`
 	// RetryOnConnectFailure allows for connection failure errors to trigger a retry.
 	RetryOnConnectFailure bool `json:"retryOnConnectFailure,omitempty"`
+	// RetryOn is a flat list of conditions for Consul to retry requests based on the response from an upstream service.
+	// Refer to the valid conditions here: https://developer.hashicorp.com/consul/docs/connect/config-entries/service-router#routes-destination-retryon
+	RetryOn []string `json:"retryOn,omitempty"`
 	// RetryOnStatusCodes is a flat list of http response status codes that are eligible for retry.
 	RetryOnStatusCodes []uint32 `json:"retryOnStatusCodes,omitempty"`
 	// Allow HTTP header manipulation to be configured.
@@ -352,6 +355,7 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 		RequestTimeout:        in.RequestTimeout.Duration,
 		NumRetries:            in.NumRetries,
 		RetryOnConnectFailure: in.RetryOnConnectFailure,
+		RetryOn:               in.RetryOn,
 		RetryOnStatusCodes:    in.RetryOnStatusCodes,
 		RequestHeaders:        in.RequestHeaders.toConsul(),
 		ResponseHeaders:       in.ResponseHeaders.toConsul(),
