@@ -1,0 +1,18 @@
+{{- if (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
+# ConfigMap with extra configuration specified directly to the chart
+# for client agents only.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-client-tmp-extra-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: client
+data:
+  extra-from-values.json: |-
+{{ tpl .Values.client.extraConfig . | trimAll "\"" | indent 4 }}
+{{- end }}
