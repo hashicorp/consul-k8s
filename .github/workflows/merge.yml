@@ -9,7 +9,7 @@ on:
       # Push events to branches matching refs/heads/release/**
       - "release/**"
 
-# these should be the only settings that you will ever need to change
+# a change these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
   CONTEXT: "merge"
