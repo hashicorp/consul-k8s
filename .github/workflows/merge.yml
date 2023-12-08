@@ -5,6 +5,7 @@ on:
     # Sequence of patterns matched against refs/heads
     branches:
       # Push events on main branch
+      - test-concurrency-to-be-merged-into
       - main
       # Push events to branches matching refs/heads/release/**
       - "release/**"
@@ -25,6 +26,6 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: mw/add-user-concurrency-skip
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
