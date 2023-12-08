@@ -4,6 +4,10 @@
 package v2beta1
 
 import (
+	"errors"
+	"strconv"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -52,8 +56,10 @@ type GatewayClassDeploymentConfig struct {
 	Container *GatewayClassContainerConfig `json:"container,omitempty"`
 	// InitContainer contains config specific to the created Deployment's init container
 	InitContainer *GatewayClassInitContainerConfig `json:"initContainer,omitempty"`
-	// NodeSelector specifies the node selector to use on the created Deployment
-	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
+	// NodeSelector is a selector which must be true for the pod to fit on a node.
+	// Selector which must match a node's labels for the pod to be scheduled on that node.
+	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+	NodeSelector nodeSelector `json:"nodeSelector,omitempty"`
 	// PriorityClassName specifies the priority class name to use on the created Deployment
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 	// Replicas specifies the configuration to control the number of replicas for the created Deployment
@@ -62,6 +68,36 @@ type GatewayClassDeploymentConfig struct {
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 	// Tolerations specifies the tolerations to use on the created Deployment
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
+type nodeSelector map[string]string
+
+func (n *nodeSelector) UnmarshalJSON(in []byte) error {
+	// we've gotta do some string munging because this comes in as quoted string with
+	// newline characters in between entries and at the end
+	selectorString := string(in)
+	// unquote the string
+	selectorString, err := strconv.Unquote(selectorString)
+	if err != nil {
+		return err
+	}
+
+	// remove the final newline character
+	selectorString = strings.Trim(selectorString, "\n")
+
+	selectors := make(map[string]string)
+	selectorItems := strings.Split(selectorString, "\n")
+	for _, item := range selectorItems {
+		pair := strings.Split(item, ":")
+		if len(pair) < 2 {
+			return errors.New("nodeSelector tags are malformed")
+		}
+		key, value := strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])
+		selectors[key] = value
+	}
+
+	*n = selectors
+	return nil
 }
 
 type GatewayClassReplicasConfig struct {
