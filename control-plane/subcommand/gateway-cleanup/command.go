@@ -299,7 +299,7 @@ func (c *Command) deleteV2GatewayClassAndClassConfigs() error {
 
 		// find the gateway class
 		gatewayClass := &v2beta1.GatewayClass{}
-		//TODO is the correct name for the gatewayclass?
+		//TODO: NET-6838 To pull the GatewayClassName from the Configmap
 		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, gatewayClass)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
