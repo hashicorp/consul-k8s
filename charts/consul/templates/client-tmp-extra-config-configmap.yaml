@@ -1,6 +1,9 @@
 {{- if (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
-# ConfigMap with extra configuration specified directly to the chart
-# for client agents only.
+# ConfigMap that is used as a temporary landing spot so that the container command
+# in the client-daemonset where it needs to be transformed.  ConfigMaps create
+# read only volumes so it needs to be copied and transformed to the extra-config
+# emptyDir volume where all final extra cofngi lives for use in consul.  (locality-init
+# also writes to extra-config volume.)
 apiVersion: v1
 kind: ConfigMap
 metadata:

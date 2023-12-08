@@ -1,5 +1,9 @@
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
-# StatefulSet to run the actual Consul server cluster.
+# ConfigMap that is used as a temporary landing spot so that the container command
+# in the server-stateful set where it needs to be transformed.  ConfigMaps create
+# read only volumes so it needs to be copied and transformed to the extra-config
+# emptyDir volume where all final extra cofngi lives for use in consul.  (locality-init
+# also writes to extra-config volume.)
 apiVersion: v1
 kind: ConfigMap
 metadata:
