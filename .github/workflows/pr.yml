@@ -3,7 +3,7 @@ name: pr
 on:
   pull_request:
 
-# a change these should be the only settings that you will ever need to change
+# a change to drop these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
   CONTEXT: "pr"
