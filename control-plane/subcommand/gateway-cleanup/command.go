@@ -253,7 +253,6 @@ func (c *Command) loadGatewayConfigs() error {
 	file, err := os.Open(c.flagGatewayConfigLocation)
 	if err != nil {
 		if os.IsNotExist(err) {
-			panic(err)
 			c.UI.Warn(fmt.Sprintf("gateway configuration file not found, skipping gateway configuration, filename: %s", c.flagGatewayConfigLocation))
 			return nil
 		}
