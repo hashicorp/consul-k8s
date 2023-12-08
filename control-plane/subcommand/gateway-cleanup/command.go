@@ -8,7 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-
 	"io"
 	"os"
 	"sync"
