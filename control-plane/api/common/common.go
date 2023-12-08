@@ -4,7 +4,11 @@
 // Package common holds code that isn't tied to a particular CRD version or type.
 package common
 
-import mapset "github.com/deckarep/golang-set"
+import (
+	"time"
+
+	mapset "github.com/deckarep/golang-set"
+)
 
 const (
 	// V1 config entries.
@@ -32,6 +36,7 @@ const (
 	MeshGateway        string = "meshgateway"
 	GatewayClass       string = "gatewayclass"
 	GatewayClassConfig string = "gatewayclassconfig"
+	MeshConfiguration  string = "meshconfiguration"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"
@@ -78,4 +83,12 @@ type K8sNamespaceConfig struct {
 	AllowK8sNamespacesSet mapset.Set
 	// Endpoints in the DenyK8sNamespacesSet are ignored.
 	DenyK8sNamespacesSet mapset.Set
+}
+
+// ConsulConfig manages config to tell a pod where consul is located.
+type ConsulConfig struct {
+	Address    string
+	GRPCPort   int
+	HTTPPort   int
+	APITimeout time.Duration
 }

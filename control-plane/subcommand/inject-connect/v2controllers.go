@@ -6,6 +6,7 @@ package connectinject
 import (
 	"context"
 
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -132,6 +133,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		ConsulServerConnMgr: watcher,
 		ConsulTenancyConfig: consulTenancyConfig,
 	}
+
 	if err := (&controllersv2.TrafficPermissionsController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
@@ -141,6 +143,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.TrafficPermissions)
 		return err
 	}
+
 	if err := (&controllersv2.GRPCRouteController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
@@ -150,6 +153,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.GRPCRoute)
 		return err
 	}
+
 	if err := (&controllersv2.HTTPRouteController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
@@ -159,6 +163,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.HTTPRoute)
 		return err
 	}
+
 	if err := (&controllersv2.TCPRouteController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
@@ -168,6 +173,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.TCPRoute)
 		return err
 	}
+
 	if err := (&controllersv2.ProxyConfigurationController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
@@ -177,11 +183,41 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.ProxyConfiguration)
 		return err
 	}
+
+	if err := (&controllersv2.MeshConfigurationController{
+		Controller: consulResourceController,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.MeshConfiguration),
+		Scheme:     mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.MeshConfiguration)
+		return err
+	}
+
 	if err := (&controllersv2.MeshGatewayController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.MeshGateway),
 		Scheme:     mgr.GetScheme(),
+		GatewayConfig: gateways.GatewayConfig{
+			ConsulConfig: common.ConsulConfig{
+				Address:    c.consul.Addresses,
+				GRPCPort:   consulConfig.GRPCPort,
+				HTTPPort:   consulConfig.HTTPPort,
+				APITimeout: consulConfig.APITimeout,
+			},
+			ImageDataplane:      c.flagConsulDataplaneImage,
+			ImageConsulK8S:      c.flagConsulK8sImage,
+			ConsulTenancyConfig: consulTenancyConfig,
+			PeeringEnabled:      c.flagEnablePeering,
+			EnableOpenShift:     c.flagEnableOpenShift,
+			AuthMethod:          c.consul.ConsulLogin.AuthMethod,
+			LogLevel:            c.flagLogLevel,
+			LogJSON:             c.flagLogJSON,
+			TLSEnabled:          c.consul.UseTLS,
+			ConsulTLSServerName: c.consul.TLSServerName,
+			ConsulCACert:        string(c.caCertPem),
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.MeshGateway)
 		return err
@@ -196,6 +232,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.GatewayClassConfig)
 		return err
 	}
+
 	if err := (&controllersv2.GatewayClassController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),

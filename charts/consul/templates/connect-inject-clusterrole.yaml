@@ -98,6 +98,7 @@ rules:
   resources:
     - gatewayclassconfigs
     - gatewayclasses
+    - meshconfigurations
     - grpcroutes
     - httproutes
     - meshgateways
@@ -116,6 +117,7 @@ rules:
   resources:
     - gatewayclassconfigs/status
     - gatewayclasses/status
+    - meshconfigurations/status
     - grpcroutes/status
     - httproutes/status
     - meshgateways/status

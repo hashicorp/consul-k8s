@@ -1,0 +1,3 @@
+```release-note:feature
+crd: adds the [`retryOn`](https://developer.hashicorp.com/consul/docs/connect/config-entries/service-router#routes-destination-retryon) field to the ServiceRouter CRD.
+```

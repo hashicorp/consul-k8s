@@ -5,7 +5,7 @@ kind: ConfigMap
 metadata:
   name: {{ template "consul.fullname" . }}-gateway-resources-config
   namespace: {{ .Release.Namespace }}
-  labels: 
+  labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
@@ -16,24 +16,73 @@ data:
   resources.json: |
     {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
   {{- end }}
-  {{- if (mustHas "resource-apis" .Values.global.experiments) }}
+  {{- if and (mustHas "resource-apis" .Values.global.experiments) .Values.meshGateway.enabled }}
   config.yaml: |
     gatewayClassConfigs:
       - apiVersion: mesh.consul.hashicorp.com/v2beta1
         metadata:
           name: consul-mesh-gateway
-          namespace: {{ .Release.Namespace }}
-        kind: gatewayClassConfig
+        kind: GatewayClassConfig
         spec:
+          labels:
+            set:
+              app: {{ template "consul.name" . }}
+              chart: {{ template "consul.chart" . }}
+              heritage: {{ .Release.Service }}
+              release: {{ .Release.Name }}
+              component: mesh-gateway
           deployment:
-            resources:
-              {{ .Values.meshGateway.resources }}
-          nodeSelector: {{ .Values.meshGateway.nodeSelector }}
-          serviceType: {{ .Values.meshGateway.service.type }}
+            {{- if .Values.meshGateway.affinity }}
+            affinity: {{ toJson (default "{}" .Values.meshGateway.affinity) }}
+            {{- end }}
+            {{- if .Values.meshGateway.annotations }}
+            annotations:
+              set: {{ toJson .Values.meshGateway.annotations }}
+            {{- end }}
+            {{- if .Values.global.extraLabels }}
+            labels:
+              set: {{ toJson .Values.global.extraLabels }}
+            {{- end }}
+            container:
+              consul:
+                logging:
+                  level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
+              portModifier: {{ sub .Values.meshGateway.containerPort .Values.meshGateway.service.port }}
+              resources: {{ toJson .Values.meshGateway.resources }}
+            initContainer:
+              consul:
+                logging:
+                  level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
+              resources: {{ toJson .Values.meshGateway.initServiceInitContainer.resources }}
+            {{- if .Values.meshGateway.nodeSelector }}
+            nodeSelector: {{ toJson .Values.meshGateway.nodeSelector }}
+            {{- end }}
+            priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
+            replicas:
+              default: {{ .Values.meshGateway.replicas }}
+              min: {{ .Values.meshGateway.replicas }}
+              max: {{ .Values.meshGateway.replicas }}
+            {{- if .Values.meshGateway.tolerations }}
+            tolerations: {{ toJson .Values.meshGateway.tolerations }}
+            {{- end }}
+          service:
+            {{- if .Values.meshGateway.service.annotations }}
+            annotations:
+              set: {{ toJson .Values.meshGateway.service.annotations }}
+            {{- end }}
+            type: {{ .Values.meshGateway.service.type }}
+          {{- if .Values.meshGateway.serviceAccount.annotations }}
+          serviceAccount:
+            annotations:
+              set: {{ toJson .Values.meshGateway.serviceAccount.annotations }}
+          {{- end }}
     meshGateways:
-      - name: mesh-gateway
-        namespace: {{ .Release.Namespace }}
+      - apiVersion: mesh.consul.hashicorp.com/v2beta1
+        kind: MeshGateway
+        metadata:
+          name: mesh-gateway
+          namespace: {{ .Release.Namespace }}
         spec:
           gatewayClassName: consul-mesh-gateway
-    {{- end }}
+  {{- end }}
 {{- end }}

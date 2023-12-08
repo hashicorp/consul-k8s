@@ -7,7 +7,7 @@ load _helpers
     assert_empty helm template \
         -s templates/gateway-resources-configmap.yaml \
         --set 'connectInject.enabled=false' \
-        . 
+        .
 }
 
 @test "gateway-resources/ConfigMap: enabled with connectInject.enabled=true" {
@@ -62,6 +62,7 @@ load _helpers
     local resources=$(helm template \
         -s templates/gateway-resources-configmap.yaml \
         --set 'connectInject.enabled=true' \
+        --set 'meshGateway.enabled=true' \
         --set 'global.experiments[0]=resource-apis' \
         --set 'ui.enabled=false' \
         . | tee /dev/stderr |

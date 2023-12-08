@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package gateways
 
 import (
@@ -16,7 +19,7 @@ func TestNewMeshGatewayBuilder_ServiceAccount(t *testing.T) {
 			Namespace: "default",
 			Name:      "mesh-gateway",
 		},
-	})
+	}, GatewayConfig{}, nil)
 
 	expected := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{

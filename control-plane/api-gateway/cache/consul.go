@@ -29,6 +29,7 @@ func init() {
 
 type templateArgs struct {
 	EnableNamespaces bool
+	APIGatewayName   string
 }
 
 var (
@@ -41,7 +42,10 @@ mesh = "read"
 		node_prefix "" {
 			policy = "read"
 		}
-    service_prefix "" {
+		service_prefix "" {
+			policy = "read"
+		}
+    service "{{.APIGatewayName}}" {
       policy = "write"
     }
 {{- if .EnableNamespaces }}
@@ -334,8 +338,8 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	return nil
 }
 
-func (c *Cache) ensurePolicy(client *api.Client) (string, error) {
-	policy := c.gatewayPolicy()
+func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, error) {
+	policy := c.gatewayPolicy(gatewayName)
 
 	created, _, err := client.ACL().PolicyCreate(&policy, &api.WriteOptions{})
 
@@ -352,13 +356,13 @@ func (c *Cache) ensurePolicy(client *api.Client) (string, error) {
 	return created.ID, nil
 }
 
-func (c *Cache) ensureRole(client *api.Client) (string, error) {
-	policyID, err := c.ensurePolicy(client)
+func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, error) {
+	policyID, err := c.ensurePolicy(client, gatewayName)
 	if err != nil {
 		return "", err
 	}
 
-	aclRoleName := "managed-gateway-acl-role"
+	aclRoleName := fmt.Sprint("managed-gateway-acl-role-", gatewayName)
 
 	aclRole, _, err := client.ACL().RoleReadByName(aclRoleName, &api.QueryOptions{})
 	if err != nil {
@@ -378,10 +382,11 @@ func (c *Cache) ensureRole(client *api.Client) (string, error) {
 	return aclRoleName, err
 }
 
-func (c *Cache) gatewayPolicy() api.ACLPolicy {
+func (c *Cache) gatewayPolicy(gatewayName string) api.ACLPolicy {
 	var data bytes.Buffer
 	if err := gatewayTpl.Execute(&data, templateArgs{
 		EnableNamespaces: c.namespacesEnabled,
+		APIGatewayName:   gatewayName,
 	}); err != nil {
 		// just panic if we can't compile the simple template
 		// as it means something else is going severly wrong.
@@ -389,7 +394,7 @@ func (c *Cache) gatewayPolicy() api.ACLPolicy {
 	}
 
 	return api.ACLPolicy{
-		Name:        "api-gateway-token-policy",
+		Name:        fmt.Sprint("api-gateway-policy-for-", gatewayName),
 		Description: "API Gateway token Policy",
 		Rules:       data.String(),
 	}
@@ -454,7 +459,7 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 		return err
 	}
 
-	role, err := c.ensureRole(client)
+	role, err := c.ensureRole(client, service)
 	if err != nil {
 		return ignoreACLsDisabled(err)
 	}

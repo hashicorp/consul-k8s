@@ -5,14 +5,15 @@ package controllersv2
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +41,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		// postReconcile runs some set of assertions on the state of k8s after Reconcile is called
 		postReconcile func(*testing.T, client.Client)
 	}{
+		// ServiceAccount
 		{
 			name: "MeshGateway created with no existing ServiceAccount",
 			k8sObjects: []runtime.Object{
@@ -86,10 +88,59 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 				},
 			},
 			expectedResult: ctrl.Result{},
-			expectedErr:    errors.New("existing resource not owned by controller"),
+			expectedErr:    errResourceNotOwned,
+		},
+		// Role
+		{
+			name: "MeshGateway created with no existing Role",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "consul",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "consul",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			postReconcile: func(t *testing.T, c client.Client) {
+				// Verify Role was created
+				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
+				assert.NoError(t, c.Get(context.Background(), key, &rbacv1.Role{}))
+			},
 		},
 		{
-			name: "MeshGateway created with existing ServiceAccount owned by gateway",
+			name: "MeshGateway created with existing Role not owned by gateway",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+				&rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "default",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			expectedErr:    errResourceNotOwned,
+		},
+		{
+			name: "MeshGateway created with existing Role owned by gateway",
 			k8sObjects: []runtime.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
@@ -98,7 +149,169 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						UID:       "abc123",
 					},
 				},
-				&corev1.ServiceAccount{
+				&rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								UID:  "abc123",
+								Name: "mesh-gateway",
+							},
+						},
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "default",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			expectedErr:    nil, // The Reconcile should be a no-op
+		},
+		// RoleBinding
+		{
+			name: "MeshGateway created with no existing RoleBinding",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "consul",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "consul",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			postReconcile: func(t *testing.T, c client.Client) {
+				// Verify RoleBinding was created
+				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
+				assert.NoError(t, c.Get(context.Background(), key, &rbacv1.RoleBinding{}))
+			},
+		},
+		{
+			name: "MeshGateway created with existing RoleBinding not owned by gateway",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+				&rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "default",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			expectedErr:    errResourceNotOwned,
+		},
+		{
+			name: "MeshGateway created with existing RoleBinding owned by gateway",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+						UID:       "abc123",
+					},
+				},
+				&rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								UID:  "abc123",
+								Name: "mesh-gateway",
+							},
+						},
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "default",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			expectedErr:    nil, // The Reconcile should be a no-op
+		},
+		// Deployment
+		{
+			name: "MeshGateway created with no existing Deployment",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "consul",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "consul",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			postReconcile: func(t *testing.T, c client.Client) {
+				// Verify Deployment was created
+				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
+				assert.NoError(t, c.Get(context.Background(), key, &appsv1.Deployment{}))
+			},
+		},
+		{
+			name: "MeshGateway created with existing Deployment not owned by gateway",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "default",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			expectedErr:    errResourceNotOwned,
+		},
+		{
+			name: "MeshGateway created with existing Deployment owned by gateway",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+						UID:       "abc123",
+					},
+				},
+				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "mesh-gateway",
@@ -130,7 +343,9 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 
 			s := runtime.NewScheme()
 			require.NoError(t, corev1.AddToScheme(s))
-			s.AddKnownTypes(v2beta1.MeshGroupVersion, &v2beta1.MeshGateway{})
+			require.NoError(t, appsv1.AddToScheme(s))
+			require.NoError(t, rbacv1.AddToScheme(s))
+			s.AddKnownTypes(v2beta1.MeshGroupVersion, &v2beta1.MeshGateway{}, &v2beta1.GatewayClass{}, &v2beta1.GatewayClassConfig{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).
 				WithRuntimeObjects(testCase.k8sObjects...).
 				Build()
@@ -147,7 +362,8 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 
 			res, err := controller.Reconcile(context.Background(), testCase.request)
 			if testCase.expectedErr != nil {
-				require.EqualError(t, err, testCase.expectedErr.Error())
+				//require.EqualError(t, err, testCase.expectedErr.Error())
+				require.ErrorIs(t, err, testCase.expectedErr)
 			} else {
 				require.NoError(t, err)
 			}

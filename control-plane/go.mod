@@ -2,7 +2,7 @@ module github.com/hashicorp/consul-k8s/control-plane
 
 // TODO: Remove this when the next version of the submodule is released.
 // We need to use a replace directive instead of directly pinning because `api` requires version `0.5.1` and will clobber the pin, but not the replace directive.
-replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231128204611-fd1d97c3349d
+replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231201193057-9b4c05bfd85f
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
@@ -40,7 +40,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.3.0
 	google.golang.org/grpc v1.56.3
 	google.golang.org/protobuf v1.30.0
-	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.26.3
 	k8s.io/apimachinery v0.26.3
 	k8s.io/client-go v0.26.3
@@ -48,6 +48,7 @@ require (
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
 	sigs.k8s.io/controller-runtime v0.14.6
 	sigs.k8s.io/gateway-api v0.7.1
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -167,13 +168,12 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/resty.v1 v1.12.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiextensions-apiserver v0.26.3 // indirect
 	k8s.io/component-base v0.26.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
-	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 go 1.20

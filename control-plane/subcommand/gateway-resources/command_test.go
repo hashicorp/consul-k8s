@@ -4,16 +4,22 @@
 package gatewayresources
 
 import (
+	"os"
 	"testing"
 
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
@@ -193,18 +199,22 @@ func TestRun(t *testing.T) {
 	for name, tt := range map[string]struct {
 		existingGatewayClass       bool
 		existingGatewayClassConfig bool
+		meshGWConfigFileExists     bool
 	}{
 		"both exist": {
 			existingGatewayClass:       true,
 			existingGatewayClassConfig: true,
 		},
-		"gateway class config doesn't exist": {
+		"api gateway class config doesn't exist": {
 			existingGatewayClass: true,
 		},
-		"gateway class doesn't exist": {
+		"api gateway class doesn't exist": {
 			existingGatewayClassConfig: true,
 		},
 		"neither exist": {},
+		"mesh gw config file exists": {
+			meshGWConfigFileExists: true,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tt := tt
@@ -222,6 +232,11 @@ func TestRun(t *testing.T) {
 			require.NoError(t, gwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
+			configFileName := gatewayConfigFilename
+			if tt.meshGWConfigFileExists {
+				configFileName = createGatewayConfigFile(t, validGWConfiguration, "config.yaml")
+			}
+
 			objs := []client.Object{}
 			if tt.existingGatewayClass {
 				objs = append(objs, existingGatewayClass)
@@ -234,8 +249,9 @@ func TestRun(t *testing.T) {
 
 			ui := cli.NewMockUi()
 			cmd := Command{
-				UI:        ui,
-				k8sClient: client,
+				UI:                        ui,
+				k8sClient:                 client,
+				flagGatewayConfigLocation: configFileName,
 			}
 
 			code := cmd.Run([]string{
@@ -253,4 +269,279 @@ func TestRun(t *testing.T) {
 			require.Equal(t, 0, code)
 		})
 	}
+}
+
+var validResourceConfiguration = `{
+    "requests": {
+        "memory": "200Mi",
+        "cpu": "200m"
+    },
+    "limits": {
+        "memory": "200Mi",
+        "cpu": "200m"
+    }
+}
+`
+
+var invalidResourceConfiguration = `{"resources":
+{
+	"memory": "100Mi"
+        "cpu": "100m"
+    },
+    "limits": {
+	"memory": "100Mi"
+        "cpu": "100m"
+    },
+}
+`
+
+func TestRun_loadResourceConfig(t *testing.T) {
+	filename := createGatewayConfigFile(t, validResourceConfiguration, "resource.json")
+	// setup k8s client
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		k8sClient: client,
+	}
+
+	expectedResources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+			corev1.ResourceCPU:    resource.MustParse("200m"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+			corev1.ResourceCPU:    resource.MustParse("200m"),
+		},
+	}
+
+	resources, err := cmd.loadResourceConfig(filename)
+	require.NoError(t, err)
+	require.Equal(t, resources, expectedResources)
+}
+
+func TestRun_loadResourceConfigInvalidConfigFile(t *testing.T) {
+	filename := createGatewayConfigFile(t, invalidResourceConfiguration, "resource.json")
+	// setup k8s client
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		k8sClient: client,
+	}
+
+	_, err := cmd.loadResourceConfig(filename)
+	require.Error(t, err)
+}
+
+func TestRun_loadResourceConfigFileWhenConfigFileDoesNotExist(t *testing.T) {
+	filename := "./consul/config/resources.json"
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		k8sClient: client,
+	}
+
+	resources, err := cmd.loadResourceConfig(filename)
+	require.NoError(t, err)
+	require.Equal(t, resources, defaultResourceRequirements) // should be using defaults
+	require.Contains(t, string(ui.OutputWriter.Bytes()), "No resources.json found, using defaults")
+}
+
+var validGWConfiguration = `gatewayClassConfigs:
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: GatewayClassConfig
+  metadata:
+    name: consul-mesh-gateway
+  spec:
+    deployment:
+      container:
+        portModifier: 8000
+        resources:
+          requests:
+            cpu: 200m
+            memory: 200Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
+meshGateways:
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: MeshGateway
+  metadata:
+    name: mesh-gateway
+    namespace: consul
+  spec:
+    gatewayClassName: consul-mesh-gateway
+`
+
+var invalidGWConfiguration = `
+gatewayClassConfigs:
+iVersion= mesh.consul.hashicorp.com/v2beta1
+  kind: gatewayClassConfig
+  metadata:
+    name: consul-mesh-gateway
+    namespace: namespace
+  spec:
+    deployment:
+      resources:
+        requests:
+          cpu: 100m
+meshGateways:
+- name: mesh-gateway
+  spec:
+    gatewayClassName: consul-mesh-gateway
+`
+
+func TestRun_loadGatewayConfigs(t *testing.T) {
+	expectedResources := &corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+			corev1.ResourceCPU:    resource.MustParse("200m"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+			corev1.ResourceCPU:    resource.MustParse("200m"),
+		},
+	}
+	filename := createGatewayConfigFile(t, validGWConfiguration, "config.yaml")
+	// setup k8s client
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:                        ui,
+		k8sClient:                 client,
+		flagGatewayConfigLocation: filename,
+	}
+
+	err := cmd.loadGatewayConfigs()
+	require.NoError(t, err)
+	require.NotEmpty(t, cmd.gatewayConfig.GatewayClassConfigs)
+	require.NotEmpty(t, cmd.gatewayConfig.MeshGateways)
+
+	// we only created one class config
+	classConfig := cmd.gatewayConfig.GatewayClassConfigs[0].DeepCopy()
+
+	expectedClassConfig := v2beta1.GatewayClassConfig{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: v2beta1.MeshGroupVersion.String(),
+			Kind:       "GatewayClassConfig",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-mesh-gateway",
+		},
+		Spec: v2beta1.GatewayClassConfigSpec{
+			Deployment: v2beta1.GatewayClassDeploymentConfig{
+				Container: &v2beta1.GatewayClassContainerConfig{
+					Resources:    expectedResources,
+					PortModifier: 8000,
+				},
+			},
+		},
+		Status: v2beta1.Status{},
+	}
+	require.Equal(t, expectedClassConfig.DeepCopy(), classConfig)
+
+	// check mesh gateway, we only created one of these
+	actualMeshGateway := cmd.gatewayConfig.MeshGateways[0]
+
+	expectedMeshGateway := &v2beta1.MeshGateway{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "MeshGateway",
+			APIVersion: v2beta1.MeshGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mesh-gateway",
+			Namespace: "consul",
+		},
+		Spec: meshv2beta1.MeshGateway{
+			GatewayClassName: "consul-mesh-gateway",
+		},
+	}
+
+	require.Equal(t, expectedMeshGateway.DeepCopy(), actualMeshGateway)
+}
+
+func TestRun_loadGatewayConfigsWithInvalidFile(t *testing.T) {
+	filename := createGatewayConfigFile(t, invalidGWConfiguration, "config.yaml")
+	// setup k8s client
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:                        ui,
+		k8sClient:                 client,
+		flagGatewayConfigLocation: filename,
+	}
+
+	err := cmd.loadGatewayConfigs()
+	require.Error(t, err)
+	require.Empty(t, cmd.gatewayConfig.GatewayClassConfigs)
+	require.Empty(t, cmd.gatewayConfig.MeshGateways)
+}
+
+func TestRun_loadGatewayConfigsWhenConfigFileDoesNotExist(t *testing.T) {
+	filename := "./consul/config/config.yaml"
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:                        ui,
+		k8sClient:                 client,
+		flagGatewayConfigLocation: filename,
+	}
+
+	err := cmd.loadGatewayConfigs()
+	require.NoError(t, err)
+	require.Empty(t, cmd.gatewayConfig.GatewayClassConfigs)
+	require.Empty(t, cmd.gatewayConfig.MeshGateways)
+	require.Contains(t, string(ui.ErrorWriter.Bytes()), "gateway configuration file not found, skipping gateway configuration")
+}
+
+func createGatewayConfigFile(t *testing.T, fileContent, filename string) string {
+	t.Helper()
+
+	// create a temp file to store configuration yaml
+	tmpdir := t.TempDir()
+	file, err := os.CreateTemp(tmpdir, filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(fileContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return file.Name()
 }
