@@ -1379,6 +1379,7 @@ externalServers:
   # used to join the cluster. In most cases, the `client.join` values
   # should be the same, however, they may be different if you
   # wish to use separate hosts for the HTTPS connections.
+  # 'tlsServerName' is required if TLS is enabled and 'hosts' is not a DNS name.
   # @type: array<string>
   hosts: []
 
@@ -1389,6 +1390,7 @@ externalServers:
   grpcPort: 8502
 
   # The server name to use as the SNI host header when connecting with HTTPS.
+  # The hostname to expect in the server certificate's subject.
   # @type: string
   tlsServerName: null
 
