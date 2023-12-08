@@ -165,7 +165,7 @@ func TestFailover_Connect(t *testing.T) {
 
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
-				//"global.imageEnvoy":      "envoyproxy/envoy:v1.28.0",
+				"global.imageEnvoy":      "envoyproxy/envoy:v1.28.0",
 
 				"global.tls.enabled":   "true",
 				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
