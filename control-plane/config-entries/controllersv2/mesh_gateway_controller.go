@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -128,7 +129,28 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		return fmt.Errorf("unable to create role binding: %w", err)
 	}
 
-	// TODO NET-6393
+	//Create Service
+
+	mergeServiceOp := func(ctx context.Context, existingObject, object client.Object) error {
+		existingService, ok := existingObject.(*corev1.Service)
+		if !ok && existingService != nil {
+			return fmt.Errorf("unable to infer existing service type")
+		}
+		builtService, ok := object.(*corev1.Service)
+		if !ok {
+			return fmt.Errorf("unable to infer built service type")
+		}
+
+		mergedService := mergeService(existingService, builtService)
+
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, mergedService, func() error { return nil })
+		return err
+	}
+
+	err = r.opIfNewOrOwned(ctx, resource, &corev1.Service{}, builder.Service(), mergeServiceOp)
+	if err != nil {
+		return fmt.Errorf("unable to create service: %w", err)
+	}
 
 	// Create deployment
 
@@ -264,4 +286,41 @@ func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, g
 		return nil, client.IgnoreNotFound(err)
 	}
 	return &gatewayClass, nil
+}
+
+func areServicesEqual(a, b *corev1.Service) bool {
+
+	if a == nil || b == nil {
+		return true
+	}
+
+	if !equality.Semantic.DeepEqual(a.Annotations, b.Annotations) {
+		return false
+	}
+
+	if len(b.Spec.Ports) != len(a.Spec.Ports) {
+		return false
+	}
+
+	for i, port := range a.Spec.Ports {
+		otherPort := b.Spec.Ports[i]
+		if port.Port != otherPort.Port || port.Protocol != otherPort.Protocol {
+			return false
+		}
+	}
+	return true
+}
+
+// mergeService is used to keep annotations and ports from the `from` Service
+// to the `to` service. This prevents an infinite reconciliation loop when
+// Kubernetes adds this configuration back in.
+func mergeService(from, to *corev1.Service) *corev1.Service {
+	if areServicesEqual(from, to) {
+		return to
+	}
+
+	to.Annotations = from.Annotations
+	to.Spec.Ports = from.Spec.Ports
+
+	return to
 }

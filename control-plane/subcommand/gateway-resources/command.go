@@ -436,6 +436,7 @@ func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, compo
 			return err
 		}
 
+		// TODO: NET-6934 remove hardcoded values;
 		class := &v2beta1.GatewayClass{
 			ObjectMeta: metav1.ObjectMeta{Name: cfg.Name, Labels: labels},
 			TypeMeta:   metav1.TypeMeta{Kind: "GatewayClass"},
