@@ -418,6 +418,13 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 
+	// Make sure the client can return config before proceeding
+	timer := &retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		_, err = consulClient.Agent().Self()
+		require.NoError(r, err)
+	})
+
 	return consulClient, config.Address
 }
 
