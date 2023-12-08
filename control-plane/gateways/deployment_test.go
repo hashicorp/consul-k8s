@@ -6,13 +6,14 @@ package gateways
 import (
 	"testing"
 
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
@@ -41,6 +42,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: meshv2beta1.GatewayClassConfigSpec{
 						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
+							NodeSelector: meshv2beta1.NodeSelector{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
 								Default: pointer.Int32(1),
 								Min:     pointer.Int32(1),
@@ -250,6 +252,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									TTY:       false,
 								},
 							},
+							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Affinity: &corev1.Affinity{
 								NodeAffinity: nil,
 								PodAffinity:  nil,
