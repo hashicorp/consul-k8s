@@ -372,9 +372,7 @@ var validGWConfiguration = `gatewayClassConfigs:
     name: consul-mesh-gateway
   spec:
     deployment:
-      nodeSelector: |
-        beta.kubernetes.io/arch: amd64
-        beta.kubernetes.io/os: linux
+      nodeSelector: "beta.kubernetes.io/arch: amd64\nbeta.kubernetes.io/os: linux\n"
       container:
         portModifier: 8000
         resources:

@@ -55,7 +55,8 @@ data:
                   level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
               resources: {{ toJson .Values.meshGateway.initServiceInitContainer.resources }}
             {{- if .Values.meshGateway.nodeSelector }}
-            nodeSelector: {{ toJson .Values.meshGateway.nodeSelector }}
+            nodeSelector: |
+                {{ .Values.meshGateway.nodeSelector }}
             {{- end }}
             priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
             replicas:

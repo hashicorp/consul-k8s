@@ -4,7 +4,9 @@
 package v2beta1
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -73,27 +75,34 @@ type GatewayClassDeploymentConfig struct {
 type NodeSelector map[string]string
 
 func (n *NodeSelector) UnmarshalJSON(in []byte) error {
-	// we've gotta do some string munging because this comes in as quoted string with
-	// newline characters in between entries and at the end
-	selectorString := string(in)
-	// unquote the string
-	selectorString, err := strconv.Unquote(selectorString)
-	if err != nil {
-		return err
-	}
-
-	// remove the final newline character
-	selectorString = strings.Trim(selectorString, "\n")
-
+	// try to unmarshal into a map, if this fails then we're coming from the yaml file where it's a different format
 	selectors := make(map[string]string)
-	selectorItems := strings.Split(selectorString, "\n")
-	for _, item := range selectorItems {
-		pair := strings.Split(item, ":")
-		if len(pair) < 2 {
-			return errors.New("nodeSelector tags are malformed")
+
+	err := json.Unmarshal(in, &selectors)
+	if err != nil {
+		selectors = make(map[string]string)
+		// we've gotta do some string munging because this comes in as quoted string with
+		// newline characters in between entries and at the end
+		selectorString := string(in)
+		fmt.Printf("\n\n%#v\n\n", selectorString)
+		// unquote the string
+		selectorString, err := strconv.Unquote(selectorString)
+		if err != nil {
+			return fmt.Errorf("error unquoting string: %w", err)
 		}
-		key, value := strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])
-		selectors[key] = value
+
+		// remove the final newline character
+		selectorString = strings.Trim(selectorString, "\n")
+
+		selectorItems := strings.Split(selectorString, "\n")
+		for _, item := range selectorItems {
+			pair := strings.Split(item, ":")
+			if len(pair) < 2 {
+				return errors.New("nodeSelector tags are malformed")
+			}
+			key, value := strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])
+			selectors[key] = value
+		}
 	}
 
 	*n = selectors
