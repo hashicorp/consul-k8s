@@ -108,6 +108,7 @@ spec:
                         description: MinAvailable is the minimum number of gateway pods that must be available during voluntary disruption. Takes precedence over MaxUnavailable.
                         format: int32
                         type: integer
+                    type: object
                   defaultInstances:
                     format: int32
                     type: integer
