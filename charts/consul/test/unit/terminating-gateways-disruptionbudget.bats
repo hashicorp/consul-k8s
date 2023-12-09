@@ -116,3 +116,19 @@ load _helpers
       yq '.spec.maxUnavailable' | tee /dev/stderr)
   [ "${actual}" = "5" ]
 }
+
+@test "terminatingGateways/DisruptionBudget: override pdb enabled at child" {
+  cd `chart_dir`
+  local actual=$(helm template \
+       -s templates/terminating-gateways-disruptionbudget.yaml \
+      --set 'terminatingGateways.replicas=1' \
+       --set 'terminatingGateways.enabled=true' \
+      --set 'terminatingGateways.defaults.disruptionBudget.enabled=false' \
+      --set 'terminatingGateways.defaults.disruptionBudget.maxUnavailable=2' \
+      --set 'terminatingGateways.gateways[0].disruptionBudget.enabled=true' \
+      --set 'terminatingGateways.gateways[0].name=unit-test-gateway' \
+      --set 'terminatingGateways.gateways[0].disruptionBudget.maxUnavailable=5' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "5" ]
+}
