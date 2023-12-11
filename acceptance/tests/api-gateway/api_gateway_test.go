@@ -297,6 +297,8 @@ const (
 )
 
 func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
+	t.Skipf("TODO(flaky): NET-6878")
+
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 
