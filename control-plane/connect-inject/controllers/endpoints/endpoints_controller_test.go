@@ -3568,6 +3568,8 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				}
 			})
 			consulClient := testClient.APIClient
+			// Wait so that bootstrap finishes
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			// Holds token accessorID for each service ID.
 			tokensForServices := make(map[string]string)
@@ -4222,7 +4224,8 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				}
 			})
 			consulClient := testClient.APIClient
-			// TODO: stabilize this test by waiting for the ACL bootstrap
+			// Wait so that bootstrap finishes
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			// Register service and proxy in consul
 			var token *api.ACLToken
