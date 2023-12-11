@@ -42,7 +42,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: meshv2beta1.GatewayClassConfigSpec{
 						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
-							NodeSelector: meshv2beta1.NodeSelector{"beta.kubernetes.io/arch": "amd64"},
+							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
 								Default: pointer.Int32(1),
 								Min:     pointer.Int32(1),
