@@ -78,8 +78,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
 			require.NoError(t, err, out)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				// Ignore errors here because if the test ran as expected
-				// the custom resources will have been deleted.
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
 			})
 
@@ -89,8 +87,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 			require.NoError(t, err, out)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				// Ignore errors here because if the test ran as expected
-				// the custom resources will have been deleted.
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 			})
 
@@ -116,8 +112,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "creating tcp-route")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				// Ignore errors here because if the test ran as expected
-				// the custom resources will have been deleted.
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
 			})
 
@@ -164,7 +158,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			})
 
 			// now that we've satisfied those assertions, we know reconciliation is done
-			// so we can run assertions on the routes and the other objects
+			// so that we can run assertions on the routes and the other objects
 
 			// gateway class checks
 			var gatewayClass gwv1beta1.GatewayClass
@@ -317,8 +311,9 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 
 	consulCluster.Create(t)
 
-	// this is necesary when running tests with ACLs enabled
+	// This is necesary when running tests with ACLs enabled
 	runTestsAsSecure := true
+
 	// Override the default proxy config settings for this test
 	consulClient, _ := consulCluster.SetupConsulClient(t, runTestsAsSecure)
 	_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
@@ -334,8 +329,6 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "create", "namespace", "other")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		// Ignore errors here because if the test ran as expected
-		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "namespace", "other")
 	})
 
@@ -343,16 +336,12 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/api-gateways/jwt-auth")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		// Ignore errors here because if the test ran as expected
-		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/api-gateways/jwt-auth")
 	})
 
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", "other", "-f", "../fixtures/cases/api-gateways/jwt-auth/external-ref-other-ns.yaml")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		// Ignore errors here because if the test ran as expected
-		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-n", "other", "-f", "../fixtures/cases/api-gateways/jwt-auth/external-ref-other-ns.yaml")
 	})
 
@@ -360,8 +349,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/api-gateways/jwt-auth/extraGatewayPolicy")
 	require.Error(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		// Ignore errors here because if the test ran as expected
-		// the custom resources will have been deleted.
+		// For safety cleanup, but the previous error check guarantees this resource was not created
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/api-gateways/jwt-auth/extraGatewayPolicy")
 	})
 
@@ -371,8 +359,6 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		// Ignore errors here because if the test ran as expected
-		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	})
 
@@ -392,7 +378,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
 
 	// On startup, the controller can take upwards of 1m to perform
-	// leader election so we may need to wait a long time for
+	// leader election so that we may need to wait a long time for
 	// the reconcile loop to run (hence the 2m timeout here).
 	var (
 		gatewayAddress                string
@@ -430,7 +416,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 
 		// check that we have an address to use
 		require.Len(r, gateway.Status.Addresses, 1)
-		// now we know we have an address, set it so we can use it
+		// now we know we have an address, set it so that we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
 
 		// gateway class checks
