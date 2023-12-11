@@ -70,6 +70,11 @@ const (
 	// connections to.
 	AnnotationPort = "consul.hashicorp.com/connect-service-port"
 
+	// AnnotationProxyConfigMap allows for default values to be set in the opaque config map
+	// during proxy registration. The value for this annotation is expected to be valid json.
+	// Other annotations / configuration may overwrite the values in the map.
+	AnnotationProxyConfigMap = "consul.hashicorp.com/proxy-config-map"
+
 	// AnnotationUpstreams is a list of upstreams to register with the
 	// proxy in the format of `<service-name>:<local-port>,...`. The
 	// service name should map to a Consul service namd and the local port
