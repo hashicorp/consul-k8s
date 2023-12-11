@@ -11,8 +11,12 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 )
 
-// Test that Connect works in a default and ACLsEnabled installations for X-Partition and in-partition networking.
-func TestSegments_Mesh(t *testing.T) {
+// TestSegments_MeshWithAgentfulClients is a simple test that verifies that
+// the Consul service mesh can be configured to use segments with:
+// - one cluster with an alpha segment configured on the servers
+// - clients enabled and joining the alpha segment
+// - static client can communicate with static server
+func TestSegments_MeshWithAgentfulClients(t *testing.T) {
 	cases := map[string]struct {
 		secure bool
 	}{
@@ -33,14 +37,13 @@ func TestSegments_Mesh(t *testing.T) {
 			helmValues := map[string]string{
 				"connectInject.enabled": "true",
 
-				"controller.enabled": "true",
-
-				"server.replicas":    "1",
+				"server.replicas":    "3",
 				"server.extraConfig": `"{\"segments\": [{\"name\":\"alpha1\"\,\"bind\":\"0.0.0.0\"\,\"port\":8303}]}"`,
 
-				"client.enabled": "true",
-				"client.join[0]": "${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
-
+				"client.enabled":     "true",
+				"client.join[0]":     "${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
+				"client.join[1]":     "${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
+				"client.join[2]":     "${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
 				"client.extraConfig": `"{\"segment\": \"alpha1\"}"`,
 			}
 
