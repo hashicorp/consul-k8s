@@ -52,12 +52,12 @@ type GatewayClassDeploymentConfig struct {
 	Container *GatewayClassContainerConfig `json:"container,omitempty"`
 	// InitContainer contains config specific to the created Deployment's init container
 	InitContainer *GatewayClassInitContainerConfig `json:"initContainer,omitempty"`
-	// NodeSelector is a feature that constrains the scheduling of a pod to nodes that 
-	// match specified labels. 
-    // By defining NodeSelector in a pod's configuration, you can ensure that the pod is
-    // only scheduled to nodes with the corresponding labels, providing a way to
-    // influence the placement of workloads based on node attributes. 
-    // More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+	// NodeSelector is a feature that constrains the scheduling of a pod to nodes that
+	// match specified labels.
+	// By defining NodeSelector in a pod's configuration, you can ensure that the pod is
+	// only scheduled to nodes with the corresponding labels, providing a way to
+	// influence the placement of workloads based on node attributes.
+	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// PriorityClassName specifies the priority class name to use on the created Deployment
 	PriorityClassName string `json:"priorityClassName,omitempty"`
@@ -68,7 +68,6 @@ type GatewayClassDeploymentConfig struct {
 	// Tolerations specifies the tolerations to use on the created Deployment
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
-
 
 type GatewayClassReplicasConfig struct {
 	// Default is the number of replicas assigned to the Deployment when created
