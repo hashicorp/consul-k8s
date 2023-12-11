@@ -54,9 +54,8 @@ data:
                 logging:
                   level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
               resources: {{ toJson .Values.meshGateway.initServiceInitContainer.resources }}
-            {{- if .Values.meshGateway.nodeSelector }}
-            nodeSelector: |
-                {{ .Values.meshGateway.nodeSelector }}
+            {{- with .Values.meshGateway.nodeSelector }}
+            nodeSelector: {{- fromYaml . | toYaml | nindent 14}}
             {{- end }}
             priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
             replicas:

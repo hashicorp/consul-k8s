@@ -4,12 +4,6 @@
 package v2beta1
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"strconv"
-	"strings"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -61,7 +55,7 @@ type GatewayClassDeploymentConfig struct {
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
 	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
-	NodeSelector NodeSelector `json:"nodeSelector,omitempty"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// PriorityClassName specifies the priority class name to use on the created Deployment
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 	// Replicas specifies the configuration to control the number of replicas for the created Deployment
@@ -72,42 +66,6 @@ type GatewayClassDeploymentConfig struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
-type NodeSelector map[string]string
-
-func (n *NodeSelector) UnmarshalJSON(in []byte) error {
-	// try to unmarshal into a map, if this fails then we're coming from the yaml file where it's a different format
-	selectors := make(map[string]string)
-
-	err := json.Unmarshal(in, &selectors)
-	if err != nil {
-		selectors = make(map[string]string)
-		// we've gotta do some string munging because this comes in as quoted string with
-		// newline characters in between entries and at the end
-		selectorString := string(in)
-		fmt.Printf("\n\n%#v\n\n", selectorString)
-		// unquote the string
-		selectorString, err := strconv.Unquote(selectorString)
-		if err != nil {
-			return fmt.Errorf("error unquoting string: %w", err)
-		}
-
-		// remove the final newline character
-		selectorString = strings.Trim(selectorString, "\n")
-
-		selectorItems := strings.Split(selectorString, "\n")
-		for _, item := range selectorItems {
-			pair := strings.Split(item, ":")
-			if len(pair) < 2 {
-				return errors.New("nodeSelector tags are malformed")
-			}
-			key, value := strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])
-			selectors[key] = value
-		}
-	}
-
-	*n = selectors
-	return nil
-}
 
 type GatewayClassReplicasConfig struct {
 	// Default is the number of replicas assigned to the Deployment when created

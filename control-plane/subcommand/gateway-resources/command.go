@@ -401,6 +401,8 @@ func (c *Command) loadGatewayConfigs() error {
 		return err
 	}
 
+	fmt.Println(string(config))
+
 	err = k8syaml.Unmarshal(config, &c.gatewayConfig)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error decoding gateway config file: %s", err))
