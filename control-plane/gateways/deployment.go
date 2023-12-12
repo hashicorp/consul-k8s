@@ -46,6 +46,12 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		return nil, err
 	}
 
+	var nodeSelector map[string]string
+
+	if b.gcc != nil && b.gcc.Spec.Deployment.NodeSelector != nil {
+		nodeSelector = b.gcc.Spec.Deployment.NodeSelector
+	}
+
 	return &appsv1.DeploymentSpec{
 		// TODO NET-6721
 		Replicas: deploymentReplicaCount(nil, nil),
@@ -89,7 +95,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 						},
 					},
 				},
-				NodeSelector:       nil,
+				NodeSelector:       nodeSelector,
 				Tolerations:        nil,
 				ServiceAccountName: b.serviceAccountName(),
 			},

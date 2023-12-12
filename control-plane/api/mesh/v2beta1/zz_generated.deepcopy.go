@@ -333,8 +333,10 @@ func (in *GatewayClassDeploymentConfig) DeepCopyInto(out *GatewayClassDeployment
 	}
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = new(v1.NodeSelector)
-		(*in).DeepCopyInto(*out)
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas

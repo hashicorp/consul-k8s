@@ -372,6 +372,9 @@ var validGWConfiguration = `gatewayClassConfigs:
     name: consul-mesh-gateway
   spec:
     deployment:
+      nodeSelector:
+        beta.kubernetes.io/arch: amd64
+        beta.kubernetes.io/os: linux
       container:
         portModifier: 8000
         resources:
@@ -453,6 +456,10 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 		},
 		Spec: v2beta1.GatewayClassConfigSpec{
 			Deployment: v2beta1.GatewayClassDeploymentConfig{
+				NodeSelector: map[string]string{
+					"beta.kubernetes.io/arch": "amd64",
+					"beta.kubernetes.io/os":   "linux",
+				},
 				Container: &v2beta1.GatewayClassContainerConfig{
 					Resources:    expectedResources,
 					PortModifier: 8000,
