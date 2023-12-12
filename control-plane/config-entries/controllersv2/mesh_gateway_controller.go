@@ -229,7 +229,7 @@ func (r *MeshGatewayController) getGatewayClassConfigForGateway(ctx context.Cont
 		return nil, err
 	}
 
-	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
+	gatewayClassConfig, err := r.getGatewayClassForGatewayClassConfig(ctx, gatewayClass)
 	if err != nil {
 		return nil, err
 	}
@@ -237,14 +237,14 @@ func (r *MeshGatewayController) getGatewayClassConfigForGateway(ctx context.Cont
 	return gatewayClassConfig, nil
 }
 
-func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClass *meshv2beta1.GatewayClass) (*meshv2beta1.GatewayClassConfig, error) {
-	if gatewayClass == nil {
+func (r *MeshGatewayController) getGatewayClassForGatewayClassConfig(ctx context.Context, gatewayClassConfig *meshv2beta1.GatewayClass) (*meshv2beta1.GatewayClassConfig, error) {
+	if gatewayClassConfig == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
 		return nil, nil
 	}
 
 	config := &meshv2beta1.GatewayClassConfig{}
-	if ref := gatewayClass.Spec.ParametersRef; ref != nil {
+	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
 		if ref.Group != meshv2beta1.MeshGroup || ref.Kind != "GatewayClassConfig" {
 			// TODO @Gateway-Management additionally check for controller name when available
 			return nil, nil
