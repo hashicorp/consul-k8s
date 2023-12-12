@@ -83,6 +83,7 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.Deployment{}).
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
+		Owns(&corev1.Service{}).
 		Owns(&corev1.ServiceAccount{}).
 		Complete(r)
 }
