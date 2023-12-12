@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	// NOTE: these are only used in consul types, they do not map to k8s kinds
+	// NOTE: these are only used in consul types, they do not map to k8s kinds.
 
 	// V1 config entries.
 	ServiceDefaults          string = "servicedefaults"
