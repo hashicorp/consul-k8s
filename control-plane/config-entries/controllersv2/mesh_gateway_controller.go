@@ -80,6 +80,9 @@ func (r *MeshGatewayController) UpdateStatus(ctx context.Context, obj client.Obj
 func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&meshv2beta1.MeshGateway{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&rbacv1.Role{}).
+		Owns(&rbacv1.RoleBinding{}).
 		Owns(&corev1.ServiceAccount{}).
 		Complete(r)
 }
