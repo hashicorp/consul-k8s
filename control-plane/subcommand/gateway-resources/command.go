@@ -345,11 +345,7 @@ func (c *Command) validateFlags() error {
 			return fmt.Errorf("error decoding node selector: %w", err)
 		}
 	}
-	if c.flagNodeSelector != "" {
-		if err := yaml.Unmarshal([]byte(c.flagNodeSelector), &c.nodeSelector); err != nil {
-			return fmt.Errorf("error decoding node selector: %w", err)
-		}
-	}
+
 	if c.flagServiceAnnotations != "" {
 		if err := yaml.Unmarshal([]byte(c.flagServiceAnnotations), &c.serviceAnnotations); err != nil {
 			return fmt.Errorf("error decoding service annotations: %w", err)
@@ -441,7 +437,7 @@ func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, compo
 				ControllerName: controllerName,
 				ParametersRef: &meshv2beta1.ParametersReference{
 					Group:     v2beta1.MeshGroup,
-					Kind:      "GatewayClass",
+					Kind:      "GatewayClassConfig",
 					Namespace: &cfg.Namespace,
 					Name:      cfg.Name,
 				},
