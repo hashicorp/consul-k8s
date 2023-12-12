@@ -13,9 +13,9 @@ import (
 
 // TestSegments_MeshWithAgentfulClients is a simple test that verifies that
 // the Consul service mesh can be configured to use segments with:
-// - one cluster with an alpha segment configured on the servers
-// - clients enabled and joining the alpha segment
-// - static client can communicate with static server
+// - one cluster with an alpha segment configured on the servers.
+// - clients enabled and joining the alpha segment.
+// - static client can communicate with static server.
 func TestSegments_MeshWithAgentfulClients(t *testing.T) {
 	cases := map[string]struct {
 		secure bool
