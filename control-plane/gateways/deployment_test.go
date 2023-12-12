@@ -48,6 +48,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								Min:     pointer.Int32(1),
 								Max:     pointer.Int32(8),
 							},
+							PriorityClassName: "priorityclassname",
 						},
 					},
 				},
@@ -252,7 +253,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									TTY:       false,
 								},
 							},
-							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
+							NodeSelector:      map[string]string{"beta.kubernetes.io/arch": "amd64"},
+							PriorityClassName: "priorityclassname",
 							Affinity: &corev1.Affinity{
 								NodeAffinity: nil,
 								PodAffinity:  nil,
