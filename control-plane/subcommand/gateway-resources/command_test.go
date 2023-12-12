@@ -375,6 +375,11 @@ var validGWConfiguration = `gatewayClassConfigs:
       nodeSelector:
         beta.kubernetes.io/arch: amd64
         beta.kubernetes.io/os: linux
+      tolerations:
+        - key: "key1"
+          operator: "Equal"
+          value: "value1"
+          effect: "NoSchedule"
       container:
         portModifier: 8000
         resources:
@@ -459,6 +464,14 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 				NodeSelector: map[string]string{
 					"beta.kubernetes.io/arch": "amd64",
 					"beta.kubernetes.io/os":   "linux",
+				},
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "key1",
+						Operator: "Equal",
+						Value:    "value1",
+						Effect:   "NoSchedule",
+					},
 				},
 				Container: &v2beta1.GatewayClassContainerConfig{
 					Resources:    expectedResources,
