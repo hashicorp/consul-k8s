@@ -12,6 +12,7 @@ import (
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -69,6 +70,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 				Labels: b.Labels(),
 				Annotations: map[string]string{
 					"consul.hashicorp.com/mesh-inject": "false",
+					constants.AnnotationGatewayKind:    "mesh",
 				},
 			},
 			Spec: corev1.PodSpec{
