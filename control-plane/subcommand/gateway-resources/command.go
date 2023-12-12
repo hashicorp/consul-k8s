@@ -401,8 +401,6 @@ func (c *Command) loadGatewayConfigs() error {
 		return err
 	}
 
-	fmt.Println(string(config))
-
 	err = k8syaml.Unmarshal(config, &c.gatewayConfig)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error decoding gateway config file: %s", err))
@@ -439,7 +437,7 @@ func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, compo
 				ControllerName: controllerName,
 				ParametersRef: &meshv2beta1.ParametersReference{
 					Group:     v2beta1.MeshGroup,
-					Kind:      "GatewayClass",
+					Kind:      "GatewayClassConfig",
 					Namespace: &cfg.Namespace,
 					Name:      cfg.Name,
 				},
