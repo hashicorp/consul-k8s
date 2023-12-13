@@ -66,7 +66,7 @@ data:
             priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
             {{- if .Values.meshGateway.topologySpreadConstraints }}
             topologySpreadConstraints:
-              {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 8 | trim }}
+              {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 16 | trim }}
             {{- end }}
             replicas:
               default: {{ .Values.meshGateway.replicas }}
