@@ -64,6 +64,10 @@ data:
             hostNetwork: {{ . }}
             {{- end }}
             priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
+            {{- if .Values.meshGateway.topologySpreadConstraints }}
+            topologySpreadConstraints:
+              {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 8 | trim }}
+            {{- end }}
             replicas:
               default: {{ .Values.meshGateway.replicas }}
               min: {{ .Values.meshGateway.replicas }}
