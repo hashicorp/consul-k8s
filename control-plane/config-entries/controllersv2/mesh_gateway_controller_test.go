@@ -345,6 +345,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
 			require.NoError(t, rbacv1.AddToScheme(s))
+			require.NoError(t, v2beta1.AddMeshToScheme(s))
 			s.AddKnownTypes(v2beta1.MeshGroupVersion, &v2beta1.MeshGateway{}, &v2beta1.GatewayClass{}, &v2beta1.GatewayClassConfig{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).
 				WithRuntimeObjects(testCase.k8sObjects...).
