@@ -50,6 +50,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								Max:     pointer.Int32(8),
 							},
 							PriorityClassName: "priorityclassname",
+							TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+								{
+									MaxSkew:           1,
+									TopologyKey:       "key",
+									WhenUnsatisfiable: "DoNotSchedule",
+								},
+							},
 						},
 					},
 				},
@@ -257,6 +264,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							},
 							NodeSelector:      map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							PriorityClassName: "priorityclassname",
+							TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+								{
+									MaxSkew:           1,
+									TopologyKey:       "key",
+									WhenUnsatisfiable: "DoNotSchedule",
+								},
+							},
 							Affinity: &corev1.Affinity{
 								NodeAffinity: nil,
 								PodAffinity:  nil,
