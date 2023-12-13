@@ -150,7 +150,12 @@ func (h *HelmCluster) Create(t *testing.T) {
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
-	helm.Install(t, h.helmOptions, chartName, h.releaseName)
+
+	// Retry the install in case previous tests have not finished cleaning up.
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
+		require.NoError(r, err)
+	})
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
