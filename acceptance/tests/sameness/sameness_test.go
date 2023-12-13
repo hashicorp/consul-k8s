@@ -173,8 +173,6 @@ func TestFailover_Connect(t *testing.T) {
 
 				"global.adminPartitions.enabled": "true",
 
-				"global.logLevel": "warn",
-
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
 				"connectInject.enabled":                       "true",
