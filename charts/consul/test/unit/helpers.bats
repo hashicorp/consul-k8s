@@ -348,7 +348,7 @@ load _helpers
   [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, global.peering.enabled is currently unsupported." ]]
 }
 
-@test "connectInject/Deployment: fails if resource-apis is set and admin partitions are enabled" {
+@test "connectInject/Deployment: fails if resource-apis is set, v2tenancy is unset, and admin partitions are enabled" {
   cd `chart_dir`
   run helm template \
       -s templates/tests/test-runner.yaml \
@@ -359,7 +359,7 @@ load _helpers
       --set 'global.adminPartitions.enabled=true' \
       .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, global.adminPartitions.enabled is currently unsupported." ]]
+  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, global.experiments.v2tenancy must also be set to support global.adminPartitions.enabled." ]]
 }
 
 @test "connectInject/Deployment: fails if resource-apis is set and federation is enabled" {
