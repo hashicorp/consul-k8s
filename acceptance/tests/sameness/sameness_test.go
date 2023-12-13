@@ -373,6 +373,7 @@ func TestFailover_Connect(t *testing.T) {
 				// Copy secrets to the necessary peers to be used for dialing later
 				for _, vv := range testClusters {
 					if isAcceptor(v.name, vv.acceptors) {
+						logger.Logf(t, "getting %s secret name from %s", vv.name, v.name)
 						acceptorSecretName := v.getPeeringAcceptorSecret(t, cfg, vv.name)
 						logger.Logf(t, "acceptor %s created on %s", acceptorSecretName, v.name)
 
