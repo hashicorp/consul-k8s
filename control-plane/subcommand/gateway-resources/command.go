@@ -407,6 +407,12 @@ func (c *Command) loadGatewayConfigs() error {
 		return err
 	}
 
+	// ensure default resources requirements are set
+	for idx := range c.gatewayConfig.MeshGateways {
+		if c.gatewayConfig.GatewayClassConfigs[idx].Spec.Deployment.Container == nil {
+			c.gatewayConfig.GatewayClassConfigs[idx].Spec.Deployment.Container = &v2beta1.GatewayClassContainerConfig{Resources: &defaultResourceRequirements}
+		}
+	}
 	if err := file.Close(); err != nil {
 		return err
 	}
