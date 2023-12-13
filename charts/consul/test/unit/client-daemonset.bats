@@ -625,7 +625,7 @@ load _helpers
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 8caf4be6fe70e4b636f18dbd2c26976dd740b40ebed8e5eb7daf25de21f03735 ]
+  [ "${actual}" = 678c5c1c2ca0f8cb1464d38636f12714c05df26fab1a101e43ce619fdbc2e7d1 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when extraConfig is provided" {
@@ -636,7 +636,7 @@ load _helpers
       --set 'client.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 5f3bea644353a229d4963a8d8c670239de4e04a0529187b13e4756b04a0826c4 ]
+  [ "${actual}" = 0ef58da6fd14fb57c702a2a0d631c4eecacff152fe3a36836a23283b19d8dbe1 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when connectInject.enabled=true" {
@@ -647,7 +647,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 8caf4be6fe70e4b636f18dbd2c26976dd740b40ebed8e5eb7daf25de21f03735 ]
+  [ "${actual}" = 678c5c1c2ca0f8cb1464d38636f12714c05df26fab1a101e43ce619fdbc2e7d1 ]
 }
 
 #--------------------------------------------------------------------
