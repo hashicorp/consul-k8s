@@ -2,8 +2,6 @@ package environment
 
 import (
 	"fmt"
-	"testing"
-
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/stretchr/testify/require"
@@ -18,17 +16,16 @@ const (
 // TestEnvironment represents the infrastructure environment of the test,
 // such as the kubernetes cluster(s) the test is running against.
 type TestEnvironment interface {
-	DefaultContext(t *testing.T) TestContext
-	Context(t *testing.T, index int) TestContext
+	DefaultContext(t testutil.TestingTB) TestContext
+	Context(t testutil.TestingTB, index int) TestContext
 }
 
 // TestContext represents a specific context a test needs,
 // for example, information about a specific Kubernetes cluster.
 type TestContext interface {
-	KubectlOptions(t *testing.T) *k8s.KubectlOptions
-	// TODO: I don't love this.
+	KubectlOptions(t testutil.TestingTB) *k8s.KubectlOptions
 	KubectlOptionsForNamespace(ns string) *k8s.KubectlOptions
-	KubernetesClient(t *testing.T) kubernetes.Interface
+	KubernetesClient(t testutil.TestingTB) kubernetes.Interface
 }
 
 type KubernetesEnvironment struct {
@@ -56,13 +53,13 @@ func NewKubernetesEnvironmentFromConfig(config *config.TestConfig) *KubernetesEn
 	return kenv
 }
 
-func (k *KubernetesEnvironment) Context(t *testing.T, index int) TestContext {
+func (k *KubernetesEnvironment) Context(t testutil.TestingTB, index int) TestContext {
 	lenContexts := len(k.contexts)
 	require.Greater(t, lenContexts, index, fmt.Sprintf("context list does not contain an index %d, length is %d", index, lenContexts))
 	return k.contexts[index]
 }
 
-func (k *KubernetesEnvironment) DefaultContext(t *testing.T) TestContext {
+func (k *KubernetesEnvironment) DefaultContext(t testutil.TestingTB) TestContext {
 	lenContexts := len(k.contexts)
 	require.Greater(t, lenContexts, DefaultContextIndex, fmt.Sprintf("context list does not contain an index %d, length is %d", DefaultContextIndex, lenContexts))
 	return k.contexts[DefaultContextIndex]
@@ -80,9 +77,7 @@ type kubernetesContext struct {
 // KubernetesContextFromOptions returns the Kubernetes context from options.
 // If context is explicitly set in options, it returns that context.
 // Otherwise, it returns the current context.
-func KubernetesContextFromOptions(t *testing.T, options *k8s.KubectlOptions) string {
-	t.Helper()
-
+func KubernetesContextFromOptions(t testutil.TestingTB, options *k8s.KubectlOptions) string {
 	// First, check if context set in options and return that
 	if options.ContextName != "" {
 		return options.ContextName
@@ -98,7 +93,7 @@ func KubernetesContextFromOptions(t *testing.T, options *k8s.KubectlOptions) str
 	return rawConfig.CurrentContext
 }
 
-func (k kubernetesContext) KubectlOptions(t *testing.T) *k8s.KubectlOptions {
+func (k kubernetesContext) KubectlOptions(t testutil.TestingTB) *k8s.KubectlOptions {
 	if k.options != nil {
 		return k.options
 	}
@@ -137,7 +132,7 @@ func (k kubernetesContext) KubectlOptionsForNamespace(ns string) *k8s.KubectlOpt
 }
 
 // KubernetesClientFromOptions takes KubectlOptions and returns Kubernetes API client.
-func KubernetesClientFromOptions(t *testing.T, options *k8s.KubectlOptions) kubernetes.Interface {
+func KubernetesClientFromOptions(t testutil.TestingTB, options *k8s.KubectlOptions) kubernetes.Interface {
 	configPath, err := options.GetConfigPath(t)
 	require.NoError(t, err)
 
@@ -150,7 +145,7 @@ func KubernetesClientFromOptions(t *testing.T, options *k8s.KubectlOptions) kube
 	return client
 }
 
-func (k kubernetesContext) KubernetesClient(t *testing.T) kubernetes.Interface {
+func (k kubernetesContext) KubernetesClient(t testutil.TestingTB) kubernetes.Interface {
 	if k.client != nil {
 		return k.client
 	}

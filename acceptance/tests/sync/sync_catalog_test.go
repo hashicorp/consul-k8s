@@ -115,12 +115,12 @@ func TestSyncCatalogWithIngress(t *testing.T) {
 				// Retry the kubectl apply because we've seen sporadic
 				// "connection refused" errors where the mutating webhook
 				// endpoint fails initially.
-				out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/ingress")
+				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", "../fixtures/bases/ingress")
 				require.NoError(r, err, out)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				helpers.Cleanup(r, cfg.NoCleanupOnFailure, func() {
 					// Ignore errors here because if the test ran as expected
 					// the custom resources will have been deleted.
-					k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/ingress")
+					k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "delete", "-k", "../fixtures/bases/ingress")
 				})
 			})
 

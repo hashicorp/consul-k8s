@@ -110,7 +110,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					"static-server",
 					"static-server-sidecar-proxy",
 				} {
-					logger.Logf(t, "checking for %s service in Consul catalog", name)
+					logger.Logf(r, "checking for %s service in Consul catalog", name)
 					instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
 					r.Check(err)
 
@@ -157,7 +157,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 				// Ensure outbound requests are still successful during grace
 				// period.
 				retry.RunWith(&retry.Timer{Timeout: time.Duration(gracePeriodSeconds) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
-					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
+					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
 					require.NoError(r, err)
 					require.Condition(r, func() bool {
 						exists := false
@@ -174,7 +174,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			} else {
 				// Ensure outbound requests fail because proxy has terminated
 				retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
-					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
+					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
 					require.Error(r, err)
 					require.Condition(r, func() bool {
 						exists := false
@@ -192,7 +192,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					"static-client",
 					"static-client-sidecar-proxy",
 				} {
-					logger.Logf(t, "checking for %s service in Consul catalog", name)
+					logger.Logf(r, "checking for %s service in Consul catalog", name)
 					instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
 					r.Check(err)
 

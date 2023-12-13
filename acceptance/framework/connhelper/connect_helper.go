@@ -158,7 +158,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		&retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}, t,
 		func(r *retry.R) {
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-				podList, err := c.Ctx.KubernetesClient(t).CoreV1().
+				podList, err := c.Ctx.KubernetesClient(r).CoreV1().
 					Pods(opts.Namespace).
 					List(context.Background(), metav1.ListOptions{
 						LabelSelector: labelSelector,
