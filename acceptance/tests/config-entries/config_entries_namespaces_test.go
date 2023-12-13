@@ -128,7 +128,7 @@ func TestControllerNamespaces(t *testing.T) {
 					// Retry the kubectl apply because we've seen sporadic
 					// "connection refused" errors where the mutating webhook
 					// endpoint fails initially.
-					out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", KubeNS, "-k", "../fixtures/cases/crds-ent")
+					out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-n", KubeNS, "-k", "../fixtures/cases/crds-ent")
 					require.NoError(r, err, out)
 					// NOTE: No need to clean up because the namespace will be deleted.
 				})
