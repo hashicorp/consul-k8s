@@ -37,8 +37,11 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	}
 
 	var containerConfig *meshv2beta1.GatewayClassContainerConfig
+	var deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
+
 	if b.gcc != nil {
 		containerConfig = b.gcc.Spec.Deployment.Container
+		deploymentConfig = b.gcc.Spec.Deployment
 	}
 
 	container, err := consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
@@ -96,6 +99,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 					},
 				},
 				NodeSelector:       nodeSelector,
+				PriorityClassName:  deploymentConfig.PriorityClassName,
 				Tolerations:        nil,
 				ServiceAccountName: b.serviceAccountName(),
 			},
