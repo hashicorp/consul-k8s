@@ -394,8 +394,8 @@ github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230609143603-198c4433d892
 github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230609143603-198c4433d892/go.mod h1:iZ8BJGSnY52wnxJTo2VIfGX63CPjqiNzbuqdOtJCKnI=
 github.com/hashicorp/consul/api v1.10.1-0.20230906155245-56917eb4c968 h1:lQ7QmlL0N4/ftLBex8n73Raji29o7EVssqCoeeczKac=
 github.com/hashicorp/consul/api v1.10.1-0.20230906155245-56917eb4c968/go.mod h1:NZJGRFYruc/80wYowkPFCp1LbGmJC9L8izrwfyVx/Wg=
-github.com/hashicorp/consul/sdk v0.4.1-0.20231206152437-b95f9700b04c h1:j89V5jn4/XAYDLbhQNqV0WeMSzEOUa3asaFceXrL70M=
-github.com/hashicorp/consul/sdk v0.4.1-0.20231206152437-b95f9700b04c/go.mod h1:r/OmRRPbHOe0yxNahLw7G9x5WG17E1BIECMtCjcPSNo=
+github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f h1:GKsa7bfoL7xgvCkzYJMF9eYYNfLWQyk8QuRZZl4nMTo=
+github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f/go.mod h1:r/OmRRPbHOe0yxNahLw7G9x5WG17E1BIECMtCjcPSNo=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
 github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=

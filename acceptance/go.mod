@@ -2,7 +2,7 @@ module github.com/hashicorp/consul-k8s/acceptance
 
 go 1.20
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20231206152437-b95f9700b04c
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f
 
 require (
 	github.com/google/uuid v1.3.0
