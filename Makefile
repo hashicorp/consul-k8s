@@ -170,11 +170,16 @@ kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
 	make kind-cni-calico
 
 .PHONY: kind
-kind: kind-delete ## Helper target for doing local acceptance testing
+kind: kind-delete ## Helper target for doing local acceptance testing (works in all cases)
 	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
+
+.PHONY: kind-small
+kind-small: kind-delete ## Helper target for doing local acceptance testing (when you only need two clusters)
+	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
+	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
 
 .PHONY: kind-load
 kind-load: ## Helper target for loading local dev images (run with `DEV_IMAGE=...` to load non-k8s images)
