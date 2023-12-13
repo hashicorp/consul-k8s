@@ -718,10 +718,6 @@ func (c *cluster) getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig,
 		require.NotEmpty(r, acceptorSecretName)
 	})
 
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, c.context.KubectlOptions(t), "delete", "secret", acceptorSecretName)
-	})
-
 	return acceptorSecretName
 }
 
