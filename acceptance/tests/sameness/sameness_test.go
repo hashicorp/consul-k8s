@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -646,7 +647,7 @@ func (c *cluster) serviceTargetCheck(t *testing.T, expectedName string, curlAddr
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// Use -s/--silent and -S/--show-error flags w/ curl to reduce noise during retries.
 		// This silences extra output like the request progress bar, but preserves errors.
-		resp, err = k8s.RunKubectlAndGetOutputE(t, c.clientOpts, "exec", "-i",
+		resp, err = k8s.RunKubectlAndGetOutputE(r, c.clientOpts, "exec", "-i",
 			staticClientDeployment, "-c", staticClientName, "--", "curl", "-sS", curlAddress)
 		require.NoError(r, err)
 		assert.Contains(r, resp, expectedName)
@@ -672,7 +673,7 @@ func (c *cluster) preparedQueryFailoverCheck(t *testing.T, releaseName string, e
 	// that failover occurred, that is left to client `Execute`
 	dnsPQLookup := []string{fmt.Sprintf("%s.query.consul", *c.pqName)}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		logs := dnsQuery(t, releaseName, dnsPQLookup, c.primaryCluster, failover)
+		logs := dnsQuery(r, releaseName, dnsPQLookup, c.primaryCluster, failover)
 		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", *c.primaryCluster.dnsIP))
 		assert.Contains(r, logs, "ANSWER SECTION:")
 		assert.Contains(r, logs, *failover.staticServerIP)
@@ -686,7 +687,7 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// Use the primary cluster when performing a DNS lookup, this mostly affects cases
 		// where we are verifying DNS for a partition
-		logs := dnsQuery(t, releaseName, dnsLookup, c.primaryCluster, failover)
+		logs := dnsQuery(r, releaseName, dnsLookup, c.primaryCluster, failover)
 
 		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", *c.primaryCluster.dnsIP))
 		assert.Contains(r, logs, "ANSWER SECTION:")
@@ -697,7 +698,7 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 		// the context can be used to determine that failover occured to the expected kubernetes cluster
 		// hosting Consul
 		assert.Contains(r, logs, "ADDITIONAL SECTION:")
-		expectedName := failover.context.KubectlOptions(t).ContextName
+		expectedName := failover.context.KubectlOptions(r).ContextName
 		if cfg.UseKind {
 			expectedName = strings.Replace(expectedName, "kind-", "", -1)
 		}
@@ -712,7 +713,7 @@ func (c *cluster) getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig,
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		var err error
-		acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status.secret.name}")
+		acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(r, c.context.KubectlOptions(r), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status.secret.name}")
 		require.NoError(r, err)
 		require.NotEmpty(r, acceptorSecretName)
 	})
@@ -830,16 +831,17 @@ func setK8sNodeLocality(t *testing.T, context environment.TestContext, c *cluste
 }
 
 // dnsQuery performs a dns query with the provided query string.
-func dnsQuery(t *testing.T, releaseName string, dnsQuery []string, dnsServer, failover *cluster) string {
+func dnsQuery(t testutil.TestingTB, releaseName string, dnsQuery []string, dnsServer, failover *cluster) string {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
 	var logs string
+
 	retry.RunWith(timer, t, func(r *retry.R) {
 		args := []string{"exec", "-i",
 			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default",
 				releaseName)}
 		args = append(args, dnsQuery...)
 		var err error
-		logs, err = k8s.RunKubectlAndGetOutputE(t, dnsServer.clientOpts, args...)
+		logs, err = k8s.RunKubectlAndGetOutputE(r, dnsServer.clientOpts, args...)
 		require.NoError(r, err)
 	})
 	logger.Logf(t, "%s: %s", failover.name, logs)

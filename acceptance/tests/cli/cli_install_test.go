@@ -70,11 +70,11 @@ func TestInstall(t *testing.T) {
 			retrier := &retry.Timer{Timeout: 160 * time.Second, Wait: 2 * time.Second}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
-					out, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "read", podName)
+					out, err := cli.Run(r, ctx.KubectlOptions(r), "proxy", "read", podName)
 					require.NoError(r, err)
 
 					output := string(out)
-					logger.Log(t, output)
+					r.Log(output)
 
 					// Both proxies must see their own local agent and app as clusters.
 					require.Regexp(r, "consul-dataplane.*STATIC", output)
