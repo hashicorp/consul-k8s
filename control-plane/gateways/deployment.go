@@ -36,9 +36,21 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		return nil, err
 	}
 
-	var containerConfig *meshv2beta1.GatewayClassContainerConfig
+	var (
+		containerConfig  *meshv2beta1.GatewayClassContainerConfig
+		nodeSelector     map[string]string
+		tolerations      []corev1.Toleration
+		deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
+	)
 	if b.gcc != nil {
 		containerConfig = b.gcc.Spec.Deployment.Container
+		deploymentConfig = b.gcc.Spec.Deployment
+
+		if b.gcc.Spec.Deployment.NodeSelector != nil {
+			nodeSelector = b.gcc.Spec.Deployment.NodeSelector
+		}
+
+		tolerations = b.gcc.Spec.Deployment.Tolerations
 	}
 
 	container, err := consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
@@ -89,8 +101,9 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 						},
 					},
 				},
-				NodeSelector:       nil,
-				Tolerations:        nil,
+				NodeSelector:       nodeSelector,
+				PriorityClassName:  deploymentConfig.PriorityClassName,
+				Tolerations:        tolerations,
 				ServiceAccountName: b.serviceAccountName(),
 			},
 		},

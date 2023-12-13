@@ -19,8 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 )
@@ -80,6 +78,10 @@ func (r *MeshGatewayController) UpdateStatus(ctx context.Context, obj client.Obj
 func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&meshv2beta1.MeshGateway{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&rbacv1.Role{}).
+		Owns(&rbacv1.RoleBinding{}).
+		Owns(&corev1.Service{}).
 		Owns(&corev1.ServiceAccount{}).
 		Complete(r)
 }
@@ -93,7 +95,7 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 //  4. Role
 //  5. RoleBinding
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
-	//fetch gatewayclassconfig
+	// fetch gatewayclassconfig
 	gcc, err := r.getGatewayClassConfigForGateway(ctx, resource)
 	if err != nil {
 		r.Log.Error(err, "unable to get gatewayclassconfig for gateway: %s gatewayclass: %s", resource.Name, resource.Spec.GatewayClassName)
@@ -112,14 +114,14 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		return fmt.Errorf("unable to create service account: %w", err)
 	}
 
-	//Create Role
+	// Create Role
 
 	err = r.opIfNewOrOwned(ctx, resource, &rbacv1.Role{}, builder.Role(), upsertOp)
 	if err != nil {
 		return fmt.Errorf("unable to create role: %w", err)
 	}
 
-	//Create RoleBinding
+	// Create RoleBinding
 
 	err = r.opIfNewOrOwned(ctx, resource, &rbacv1.RoleBinding{}, builder.RoleBinding(), upsertOp)
 	if err != nil {
@@ -128,7 +130,7 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 
 	// TODO NET-6393
 
-	//Create deployment
+	// Create deployment
 
 	mergeDeploymentOp := func(ctx context.Context, existingObject, object client.Object) error {
 		existingDeployment, ok := existingObject.(*appsv1.Deployment)
@@ -181,7 +183,6 @@ type ownedObjectOp func(ctx context.Context, existingObject client.Object, newOb
 // The purpose of opIfNewOrOwned is to ensure that we aren't updating or deleting a
 // resource that was not created by us. If this scenario is encountered, we error.
 func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object, op ownedObjectOp) error {
-
 	// Ensure owner reference is always set on objects that we write
 	if err := ctrl.SetControllerReference(gateway, writeSource, r.Client.Scheme()); err != nil {
 		return err
@@ -227,26 +228,25 @@ func (r *MeshGatewayController) getGatewayClassConfigForGateway(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
+
+	gatewayClassConfig, err := r.getGatewayClassConfigForGatewayClass(ctx, gatewayClass)
 	if err != nil {
 		return nil, err
 	}
 
 	return gatewayClassConfig, nil
-
 }
 
-func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *meshv2beta1.GatewayClass) (*meshv2beta1.GatewayClassConfig, error) {
-	if gatewayClassConfig == nil {
+func (r *MeshGatewayController) getGatewayClassConfigForGatewayClass(ctx context.Context, gatewayClass *meshv2beta1.GatewayClass) (*meshv2beta1.GatewayClassConfig, error) {
+	if gatewayClass == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
 		return nil, nil
 	}
 
 	config := &meshv2beta1.GatewayClassConfig{}
-	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
-		if ref.Group != meshv2beta1.MeshGroup ||
-			ref.Kind != common.GatewayClassConfig {
-			//TODO @Gateway-Management additionally check for controller name when available
+	if ref := gatewayClass.Spec.ParametersRef; ref != nil {
+		if ref.Group != meshv2beta1.MeshGroup || ref.Kind != "GatewayClassConfig" {
+			// TODO @Gateway-Management additionally check for controller name when available
 			return nil, nil
 		}
 
@@ -259,6 +259,7 @@ func (r *MeshGatewayController) getConfigForGatewayClass(ctx context.Context, ga
 
 func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*meshv2beta1.GatewayClass, error) {
 	var gatewayClass meshv2beta1.GatewayClass
+
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}

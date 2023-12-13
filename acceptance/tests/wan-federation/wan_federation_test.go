@@ -426,7 +426,7 @@ func serviceFailoverCheck(t *testing.T, options *terratestK8s.KubectlOptions, po
 	// Retry until we get the response we expect, sometimes you get back the previous server until things stabalize
 	logger.Log(t, "Initial failover check")
 	retry.RunWith(timer, t, func(r *retry.R) {
-		resp, err = k8s.RunKubectlAndGetOutputE(t, options, "exec", "-i",
+		resp, err = k8s.RunKubectlAndGetOutputE(r, options, "exec", "-i",
 			staticClientDeployment, "-c", connhelper.StaticClientName, "--", "curl", fmt.Sprintf("localhost:%s", port))
 		assert.NoError(r, err)
 		assert.Contains(r, resp, expectedName)
@@ -438,7 +438,7 @@ func serviceFailoverCheck(t *testing.T, options *terratestK8s.KubectlOptions, po
 		time.Sleep(500 * time.Millisecond)
 		resp = ""
 		retry.RunWith(timer, t, func(r *retry.R) {
-			resp, err = k8s.RunKubectlAndGetOutputE(t, options, "exec", "-i",
+			resp, err = k8s.RunKubectlAndGetOutputE(r, options, "exec", "-i",
 				staticClientDeployment, "-c", connhelper.StaticClientName, "--", "curl", fmt.Sprintf("localhost:%s", port))
 			assert.NoError(r, err)
 		})
