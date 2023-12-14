@@ -1924,6 +1924,48 @@ func TestServiceResource_addIngress(t *testing.T) {
 			expectedAddress:   "1.1.1.1",
 			expectedPort:      8080,
 		},
+		"ignore ingress if missing load balancer status": {
+			enableIngress: true,
+			syncIngressIP: true,
+			ingress: &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-ingress",
+				},
+				Spec: networkingv1.IngressSpec{
+					TLS: []networkingv1.IngressTLS{
+						{
+							Hosts:      []string{"test.host.consul"},
+							SecretName: "test-tls-secret",
+						},
+					},
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "test.host.consul",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path: "/",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "test-service",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectIngressSync: false,
+			expectedAddress:   "1.1.1.1",
+			expectedPort:      8080,
+		},
 	}
 
 	for name, test := range cases {
