@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	globalDefaultInstances int32 = 1
+	globalDefaultInstances    int32 = 1
+	meshGatewayAnnotationKind       = "mesh-gateway"
 )
 
 func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
@@ -69,8 +70,8 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: b.Labels(),
 				Annotations: map[string]string{
-					"consul.hashicorp.com/mesh-inject": "false",
-					constants.AnnotationGatewayKind:    "mesh",
+					constants.AnnotationMeshInject:  "false",
+					constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
 				},
 			},
 			Spec: corev1.PodSpec{
