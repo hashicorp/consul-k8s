@@ -373,6 +373,7 @@ var validGWConfigurationKitchenSink = `gatewayClassConfigs:
   spec:
     deployment:
       hostNetwork: true
+      dnsPolicy: ClusterFirst
       replicas:
         min: 3
         default: 3
@@ -451,6 +452,7 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 			filename: "kitchenSinkConfig.yaml",
 			expectedDeployment: v2beta1.GatewayClassDeploymentConfig{
 				HostNetwork: true,
+				DNSPolicy:   "ClusterFirst",
 				NodeSelector: map[string]string{
 					"beta.kubernetes.io/arch": "amd64",
 					"beta.kubernetes.io/os":   "linux",

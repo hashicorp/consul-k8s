@@ -103,6 +103,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 				HostNetwork:               deploymentConfig.HostNetwork,
 				Tolerations:               deploymentConfig.Tolerations,
 				ServiceAccountName:        b.serviceAccountName(),
+				DNSPolicy:                 corev1.DNSPolicy(deploymentConfig.DNSPolicy),
 			},
 		},
 	}, nil
