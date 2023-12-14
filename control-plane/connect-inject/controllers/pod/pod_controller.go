@@ -664,10 +664,16 @@ func parseLocality(node corev1.Node) *pbcatalog.Locality {
 
 func metaFromPod(pod corev1.Pod) map[string]string {
 	// TODO: allow custom workload metadata
-	return map[string]string{
+	meta := map[string]string{
 		constants.MetaKeyKubeNS:    pod.GetNamespace(),
 		constants.MetaKeyManagedBy: constants.ManagedByPodValue,
 	}
+
+	if gatewayKind := pod.Annotations[constants.AnnotationGatewayKind]; gatewayKind != "" {
+		meta[constants.MetaGatewayKind] = gatewayKind
+	}
+
+	return meta
 }
 
 // getHealthStatusFromPod checks the Pod for a "Ready" condition that is true.
