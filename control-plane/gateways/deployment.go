@@ -155,18 +155,18 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 
 func deploymentReplicaCount(replicas *meshv2beta1.GatewayClassReplicasConfig, currentReplicas *int32) *int32 {
 	// if we have the replicas config, use it
-	if replicas != nil && currentReplicas == nil {
+	if replicas != nil && replicas.Default != nil && currentReplicas == nil {
 		return replicas.Default
 	}
 
 	// if we have the replicas config and the current replicas, use the min/max to ensure
 	// the current replicas are within the min/max range
 	if replicas != nil && currentReplicas != nil {
-		if *currentReplicas > *replicas.Max {
+		if replicas.Max != nil && *currentReplicas > *replicas.Max {
 			return replicas.Max
 		}
 
-		if *currentReplicas < *replicas.Min {
+		if replicas.Min != nil && *currentReplicas < *replicas.Min {
 			return replicas.Min
 		}
 
