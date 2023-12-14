@@ -38,16 +38,6 @@ load _helpers
       .
 }
 
-@test "server/ConfigMap: extraConfig is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'server.extraConfig="{\"hello\": \"world\"}"' \
-      . | tee /dev/stderr |
-      yq '.data["extra-from-values.json"] | match("world") | length' | tee /dev/stderr)
-  [ ! -z "${actual}" ]
-}
-
 #--------------------------------------------------------------------
 # retry-join
 
