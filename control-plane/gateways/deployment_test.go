@@ -16,6 +16,7 @@ import (
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 func Test_meshGatewayBuilder_Deployment(t *testing.T) {
@@ -72,7 +73,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 							},
 							Annotations: map[string]string{
-								"consul.hashicorp.com/mesh-inject": "false",
+								constants.AnnotationMeshInject:  "false",
+								constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -316,7 +318,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 							},
 							Annotations: map[string]string{
-								"consul.hashicorp.com/mesh-inject": "false",
+								constants.AnnotationMeshInject:  "false",
+								constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
 							},
 						},
 						Spec: corev1.PodSpec{

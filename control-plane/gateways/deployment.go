@@ -10,10 +10,12 @@ import (
 	"k8s.io/utils/pointer"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
-	globalDefaultInstances int32 = 1
+	globalDefaultInstances    int32 = 1
+	meshGatewayAnnotationKind       = "mesh-gateway"
 )
 
 func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
@@ -65,7 +67,8 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: b.Labels(),
 				Annotations: map[string]string{
-					"consul.hashicorp.com/mesh-inject": "false",
+					constants.AnnotationMeshInject:  "false",
+					constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
 				},
 			},
 			Spec: corev1.PodSpec{
