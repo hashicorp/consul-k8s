@@ -60,6 +60,9 @@ data:
             {{- with .Values.meshGateway.nodeSelector }}
             nodeSelector: {{ fromYaml . | toJson }}
             {{- end }}
+            {{- with .Values.meshGateway.hostNetwork }}
+            hostNetwork: {{ . }}
+            {{- end }}
             priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
             replicas:
               default: {{ .Values.meshGateway.replicas }}

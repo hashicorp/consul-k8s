@@ -160,6 +160,10 @@ spec:
                             type: object
                         type: object
                     type: object
+                  hostNetwork:
+                    description: HostNetwork specifies whether the gateway pods should
+                      run on the host network
+                    type: boolean
                   initContainer:
                     description: InitContainer contains config specific to the created
                       Deployment's init container
