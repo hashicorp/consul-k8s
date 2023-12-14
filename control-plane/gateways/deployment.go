@@ -9,8 +9,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
-
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
 
@@ -41,16 +39,15 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		nodeSelector     map[string]string
 		tolerations      []corev1.Toleration
 		deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
+		replicas         *meshv2beta1.GatewayClassReplicasConfig
 	)
+
 	if b.gcc != nil {
 		containerConfig = b.gcc.Spec.Deployment.Container
 		deploymentConfig = b.gcc.Spec.Deployment
-
-		if b.gcc.Spec.Deployment.NodeSelector != nil {
-			nodeSelector = b.gcc.Spec.Deployment.NodeSelector
-		}
-
+		nodeSelector = b.gcc.Spec.Deployment.NodeSelector
 		tolerations = b.gcc.Spec.Deployment.Tolerations
+		replicas = b.gcc.Spec.Deployment.Replicas
 	}
 
 	container, err := consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
@@ -60,7 +57,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 
 	return &appsv1.DeploymentSpec{
 		// TODO NET-6721
-		Replicas: deploymentReplicaCount(nil, nil),
+		Replicas: deploymentReplicaCount(replicas, nil),
 		Selector: &metav1.LabelSelector{
 			MatchLabels: b.Labels(),
 		},
@@ -156,11 +153,31 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
-func deploymentReplicaCount(deployment *pbmesh.Deployment, currentReplicas *int32) *int32 {
-	// TODO NET-6721 tamp replica count up and down based on min and max values
-	instanceValue := globalDefaultInstances
+func deploymentReplicaCount(replicas *meshv2beta1.GatewayClassReplicasConfig, currentReplicas *int32) *int32 {
+	// if we have the replicas config, use it
+	if replicas != nil && replicas.Default != nil && currentReplicas == nil {
+		return replicas.Default
+	}
+
+	// if we have the replicas config and the current replicas, use the min/max to ensure
+	// the current replicas are within the min/max range
+	if replicas != nil && currentReplicas != nil {
+		if replicas.Max != nil && *currentReplicas > *replicas.Max {
+			return replicas.Max
+		}
+
+		if replicas.Min != nil && *currentReplicas < *replicas.Min {
+			return replicas.Min
+		}
+
+		return currentReplicas
+	}
+
+	// if we don't have the replicas config, use the current replicas if we have them
 	if currentReplicas != nil {
 		return currentReplicas
 	}
-	return pointer.Int32(instanceValue)
+
+	// otherwise use the global default
+	return pointer.Int32(globalDefaultInstances)
 }
