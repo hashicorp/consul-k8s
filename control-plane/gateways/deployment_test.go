@@ -43,6 +43,10 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: meshv2beta1.GatewayClassConfigSpec{
 						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
+							Container: &meshv2beta1.GatewayClassContainerConfig{
+								HostPort:     8080,
+								PortModifier: 8000,
+							},
 							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
 								Default: pointer.Int32(1),
@@ -184,6 +188,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										{
 											Name:          "wan",
 											ContainerPort: 8443,
+											HostPort:      8080,
 										},
 									},
 									Env: []corev1.EnvVar{
