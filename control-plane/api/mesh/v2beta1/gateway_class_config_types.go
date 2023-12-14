@@ -67,6 +67,8 @@ type GatewayClassDeploymentConfig struct {
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 	// Tolerations specifies the tolerations to use on the created Deployment
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	// HostNetwork specifies whether the gateway pods should run on the host network
+	HostNetwork bool `json:"hostNetwork,omitempty"`
 }
 
 type GatewayClassReplicasConfig struct {

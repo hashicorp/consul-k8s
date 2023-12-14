@@ -372,6 +372,7 @@ var validGWConfigurationKitchenSink = `gatewayClassConfigs:
     name: consul-mesh-gateway
   spec:
     deployment:
+      hostNetwork: true
       replicas:
         min: 3
         default: 3
@@ -449,6 +450,7 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 			config:   validGWConfigurationKitchenSink,
 			filename: "kitchenSinkConfig.yaml",
 			expectedDeployment: v2beta1.GatewayClassDeploymentConfig{
+				HostNetwork: true,
 				NodeSelector: map[string]string{
 					"beta.kubernetes.io/arch": "amd64",
 					"beta.kubernetes.io/os":   "linux",

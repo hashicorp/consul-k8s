@@ -36,18 +36,12 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 
 	var (
 		containerConfig  *meshv2beta1.GatewayClassContainerConfig
-		nodeSelector     map[string]string
-		tolerations      []corev1.Toleration
 		deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
-		replicas         *meshv2beta1.GatewayClassReplicasConfig
 	)
 
 	if b.gcc != nil {
 		containerConfig = b.gcc.Spec.Deployment.Container
 		deploymentConfig = b.gcc.Spec.Deployment
-		nodeSelector = b.gcc.Spec.Deployment.NodeSelector
-		tolerations = b.gcc.Spec.Deployment.Tolerations
-		replicas = b.gcc.Spec.Deployment.Replicas
 	}
 
 	container, err := consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
@@ -57,7 +51,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 
 	return &appsv1.DeploymentSpec{
 		// TODO NET-6721
-		Replicas: deploymentReplicaCount(replicas, nil),
+		Replicas: deploymentReplicaCount(deploymentConfig.Replicas, nil),
 		Selector: &metav1.LabelSelector{
 			MatchLabels: b.Labels(),
 		},
@@ -98,9 +92,10 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 						},
 					},
 				},
-				NodeSelector:       nodeSelector,
+				NodeSelector:       deploymentConfig.NodeSelector,
 				PriorityClassName:  deploymentConfig.PriorityClassName,
-				Tolerations:        tolerations,
+				HostNetwork:        deploymentConfig.HostNetwork,
+				Tolerations:        deploymentConfig.Tolerations,
 				ServiceAccountName: b.serviceAccountName(),
 			},
 		},
