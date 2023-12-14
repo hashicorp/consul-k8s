@@ -433,7 +433,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										},
 										{
 											Name:          "wan",
-											ContainerPort: 8443,
+											ContainerPort: 443,
 										},
 									},
 									Env: []corev1.EnvVar{
