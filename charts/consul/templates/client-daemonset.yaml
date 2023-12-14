@@ -86,7 +86,7 @@ spec:
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/client-config-configmap.yaml") . | sha256sum }}
+        "consul.hashicorp.com/config-checksum": {{ print (include (print $.Template.BasePath "/client-config-configmap.yaml") .) (include (print $.Template.BasePath "/client-tmp-extra-config-configmap.yaml") .) | sha256sum }}
         {{- if .Values.client.annotations }}
           {{- tpl .Values.client.annotations . | nindent 8 }}
         {{- end }}
@@ -141,6 +141,9 @@ spec:
         - name: consul-data
           emptyDir:
             medium: "Memory"
+        - name: tmp-extra-config
+          configMap:
+            name: {{ template "consul.fullname" . }}-client-tmp-extra-config
         {{- if .Values.global.tls.enabled }}
         {{- if not .Values.global.secretsBackend.vault.enabled }}
         - name: consul-ca-cert
@@ -389,7 +392,7 @@ spec:
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
                 {{- end }}
-                -config-file=/consul/extra-config/extra-from-values.json \
+                -config-dir=/consul/extra-config \
                 -domain={{ .Values.global.domain }}
           volumeMounts:
             - name: data
@@ -398,6 +401,8 @@ spec:
               mountPath: /consul/config
             - name: extra-config
               mountPath: /consul/extra-config
+            - name: tmp-extra-config
+              mountPath: /consul/tmp/extra-config
             - mountPath: /consul/login
               name: consul-data
               readOnly: true
