@@ -98,7 +98,9 @@ type GatewayClassContainerConfig struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// PortModifier specifies the value to be added to every port value for listeners on this gateway.
 	// This is generally used to avoid binding to privileged ports in the container.
-	PortModifier int `json:"portModifier,omitempty"`
+	PortModifier int32 `json:"portModifier,omitempty"`
+	// HostPort specifies a port to be exposed to the external host network
+	HostPort int32 `json:"hostPort,omitempty"`
 }
 
 type GatewayClassRoleConfig struct {
