@@ -27,17 +27,14 @@ const (
 	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.GatewayClassContainerConfig, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.GatewayClassContainerConfig, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
 		bearerTokenFile string
 	)
 
-	var resources *corev1.ResourceRequirements
-	if containerConfig != nil {
-		resources = containerConfig.Resources
-	}
+	resources := containerConfig.Resources
 
 	if config.AuthMethod != "" {
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -112,11 +109,10 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.Gat
 	wanPort := corev1.ContainerPort{
 		Name:          "wan",
 		ContainerPort: int32(constants.DefaultWANPort),
+		HostPort:      containerConfig.HostPort,
 	}
 
-	if containerConfig != nil {
-		wanPort.ContainerPort = int32(443 + containerConfig.PortModifier)
-	}
+	wanPort.ContainerPort = 443 + containerConfig.PortModifier
 
 	container.Ports = append(container.Ports, wanPort)
 

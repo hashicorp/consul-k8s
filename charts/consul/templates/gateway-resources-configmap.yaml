@@ -51,6 +51,9 @@ data:
                 logging:
                   level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
               portModifier: {{ sub .Values.meshGateway.containerPort .Values.meshGateway.service.port }}
+              {{- if .Values.meshGateway.hostPort }}
+              hostPort: {{ .Values.meshGateway.hostPort }}
+              {{- end }}
               resources: {{ toJson .Values.meshGateway.resources }}
             initContainer:
               consul:
