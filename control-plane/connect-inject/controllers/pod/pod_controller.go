@@ -150,7 +150,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	r.Log.Info("retrieved", "name", pod.Name, "ns", pod.Namespace)
 
-	if inject.HasBeenMeshInjected(pod) {
+	if inject.HasBeenMeshInjected(pod) || inject.IsGateway(pod) {
 
 		// It is possible the pod was scheduled but doesn't have an allocated IP yet, so safely requeue
 		if pod.Status.PodIP == "" {
