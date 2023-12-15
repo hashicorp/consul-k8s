@@ -2,6 +2,9 @@
 {{- if (and $serverEnabled .Values.externalServers.enabled) }}{{ fail "only one of server.enabled or externalServers.enabled can be set" }}{{ end -}}
 {{- if (or $serverEnabled .Values.externalServers.enabled) }}
 {{- if and .Values.global.acls.createReplicationToken (not .Values.global.acls.manageSystemACLs) }}{{ fail "if global.acls.createReplicationToken is true, global.acls.manageSystemACLs must be true" }}{{ end -}}
+{{- if .Values.global.metrics.enableDatadogIntegration }}
+{{- if and .Values.global.metrics.enableDatadogIntegration.createAgentToken (not .Values.global.acls.manageSystemACLs) }}{{ fail "if global.metrics.enableDatadogIntegration.createAgentToken is true, global.acls.manageSystemACLs must be true" }}{{ end -}}
+{{- end }}
 {{- if .Values.global.bootstrapACLs }}{{ fail "global.bootstrapACLs was removed, use global.acls.manageSystemACLs instead" }}{{ end -}}
 {{- if .Values.global.acls.manageSystemACLs }}
 {{- if or (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey))  (and .Values.global.acls.bootstrapToken.secretKey (not .Values.global.acls.bootstrapToken.secretName))}}{{ fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided" }}{{ end -}}
@@ -271,6 +274,10 @@ spec:
 
             {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey) }}
             -create-enterprise-license-token=true \
+            {{- end }}
+
+            {{- if (and .Values.global.metrics.datadogIntegration.enabled .Values.global.acls.manageSystemACLs) }}
+            -create-dd-agent-token=true \
             {{- end }}
 
             {{- if .Values.server.snapshotAgent.enabled }}

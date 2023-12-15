@@ -2444,3 +2444,35 @@ load _helpers
     yq 'any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# global.metrics.datadogIntegration
+
+@test "serverACLInit/Job: -create-dd-agent-token not set when datadogIntegration=false and manageSystemACLs=true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$( echo "$command" |
+    yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: -create-dd-agent-token set when global.metrics.datadogIntegration=true and global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$( echo "$command" |
+    yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
