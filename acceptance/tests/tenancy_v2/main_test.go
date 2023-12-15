@@ -16,12 +16,15 @@ var suite testsuite.Suite
 func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
 
-	expectedNumberOfClusters := 2
-	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) {
+	expectedNumberOfClusters := 1
+	if suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) {
 		os.Exit(suite.Run())
 	} else {
-		fmt.Println(fmt.Sprintf("Skipping tenancy_v2 tests because either -enable-multi-cluster is "+
-			"not set or the number of clusters, %d, did not match the expected count of %d", len(suite.Config().KubeEnvs), expectedNumberOfClusters))
+		fmt.Println(fmt.Sprintf(
+			"Skipping tenancy_v2 tests because the number of clusters, %d, did not match the expected count of %d",
+			len(suite.Config().KubeEnvs),
+			expectedNumberOfClusters,
+		))
 		os.Exit(0)
 	}
 }
