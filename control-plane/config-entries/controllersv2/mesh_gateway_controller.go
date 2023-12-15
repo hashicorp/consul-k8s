@@ -289,7 +289,7 @@ func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, g
 }
 
 func areServicesEqual(a, b *corev1.Service) bool {
-
+	// If either service "a" or "b" is nil, don't want to try and merge the nil service
 	if a == nil || b == nil {
 		return true
 	}
