@@ -59,7 +59,7 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flags.BoolVar(&c.flagV2Tenancy, "use-v2tenancy", false,
+	c.flags.BoolVar(&c.flagV2Tenancy, "enable-v2tenancy", false,
 		"Enable V2 tenancy.")
 
 	c.consul = &flags.ConsulFlags{}

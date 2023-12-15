@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// CreateTunnelToResourcePort returns a local address:port that is tunneled to the given resource's port.
 func CreateTunnelToResourcePort(t *testing.T, resourceName string, remotePort int, options *terratestk8s.KubectlOptions, logger terratestLogger.TestLogger) string {
 	localPort := terratestk8s.GetAvailablePort(t)
 	tunnel := terratestk8s.NewTunnelWithLogger(

@@ -129,7 +129,7 @@ func TestRun_PartitionCreate(t *testing.T) {
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-partition", partitionName,
 				"-timeout", "1m",
-				"-use-v2tenancy=" + strconv.FormatBool(tc.v2tenancy),
+				"-enable-v2tenancy=" + strconv.FormatBool(tc.v2tenancy),
 			}
 
 			responseCode := cmd.Run(args)
@@ -238,7 +238,7 @@ func TestRun_PartitionExists(t *testing.T) {
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-partition", partitionName,
-				"-use-v2tenancy=" + strconv.FormatBool(tc.v2tenancy),
+				"-enable-v2tenancy=" + strconv.FormatBool(tc.v2tenancy),
 			}
 
 			responseCode := cmd.Run(args)
@@ -290,7 +290,7 @@ func TestRun_ExitsAfterTimeout(t *testing.T) {
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-timeout", timeout.String(),
 				"-partition", partitionName,
-				"-use-v2tenancy=" + strconv.FormatBool(tc.v2tenancy),
+				"-enable-v2tenancy=" + strconv.FormatBool(tc.v2tenancy),
 			}
 
 			testClient.TestServer.Stop()

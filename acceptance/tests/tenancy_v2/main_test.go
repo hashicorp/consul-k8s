@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package partitions
+package tenancy_v2
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) {
 		os.Exit(suite.Run())
 	} else {
-		fmt.Println(fmt.Sprintf("Skipping partitions tests because either -enable-multi-cluster is "+
+		fmt.Println(fmt.Sprintf("Skipping tenancy_v2 tests because either -enable-multi-cluster is "+
 			"not set or the number of clusters, %d, did not match the expected count of %d", len(suite.Config().KubeEnvs), expectedNumberOfClusters))
 		os.Exit(0)
 	}

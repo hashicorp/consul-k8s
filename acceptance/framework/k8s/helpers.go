@@ -35,18 +35,18 @@ func KubernetesAPIServerHostFromOptions(t *testing.T, options *terratestk8s.Kube
 }
 
 // WaitForAllPodsToBeReady waits until all pods with the provided podLabelSelector
-// are in the ready status. It checks every second for 11 minutes.
+// are in the ready status. It checks every 2 second for 20 minutes.
 // If there is at least one container in a pod that isn't ready after that,
 // it fails the test.
 func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespace, podLabelSelector string) {
 	t.Helper()
 
-	logger.Logf(t, "Waiting for pods with label %q to be ready.", podLabelSelector)
-
 	// Wait up to 20m.
 	// On Azure, volume provisioning can sometimes take close to 5 min,
 	// so we need to give a bit more time for pods to become healthy.
-	counter := &retry.Counter{Count: 20 * 60, Wait: 2 * time.Second}
+	counter := &retry.Counter{Count: 10 * 60, Wait: 2 * time.Second}
+	logger.Logf(t, "Waiting %s for pods with label %q to be ready.", time.Duration(counter.Count*int(counter.Wait)), podLabelSelector)
+
 	retry.RunWith(counter, t, func(r *retry.R) {
 		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
 		require.NoError(r, err)
