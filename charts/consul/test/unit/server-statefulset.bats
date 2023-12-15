@@ -783,6 +783,212 @@ load _helpers
   [ "${actual}" = "https" ]
 }
 
+@test "server/StatefulSet: when global.metrics.datadogIntegration.enabled=true, adds ad.datadoghq.com annotations" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadogIntegration.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
+
+  local actual=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/tolerate-unready"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.logs"' | tee /dev/stderr)
+  [ "${actual}" = "[source:consul consul_service:consul-server]" ]
+
+  local consul_checks=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr)
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.init_config | tee /dev/stderr)"
+  [ "${actual}" = "{}" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].url | tee /dev/stderr)"
+  [ "${actual}" = "http://consul-server.consul.svc:8500" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].new_leader_checks | tee /dev/stderr)"
+  [ "${actual}" = "true" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].catalog_checks | tee /dev/stderr)"
+  [ "${actual}" = "true" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].auth_type | tee /dev/stderr)"
+  [ "${actual}" = "basic" ]
+}
+
+@test "server/StatefulSet: when global.metrics.datadogIntegration.enabled=true and global.tls.enabled, adds tls altered ad.datadoghq.com annotations" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.tls.enabled=true'  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadogIntegration.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
+
+  local actual=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/tolerate-unready"' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.logs"' | tee /dev/stderr)
+  [ "${actual}" = "[source:consul consul_service:consul-server]" ]
+
+  local consul_checks=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr)
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.init_config | tee /dev/stderr)"
+  [ "${actual}" = "{}" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].url | tee /dev/stderr)"
+  [ "${actual}" = "https://consul-server.default.svc:8501" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].tls_cert | tee /dev/stderr)"
+  [ "${actual}" = "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].tls_private_key | tee /dev/stderr)"
+  [ "${actual}" = "/etc/datadog-agent/conf.d/consul.d/certs/tls.key" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].tls_ca_cert | tee /dev/stderr)"
+  [ "${actual}" = "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].new_leader_checks | tee /dev/stderr)"
+  [ "${actual}" = "true" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].catalog_checks | tee /dev/stderr)"
+  [ "${actual}" = "true" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].auth_type | tee /dev/stderr)"
+  [ "${actual}" = "basic" ]
+}
+
+@test "server/StatefulSet: when global.metrics.datadogIntegration.enabled=true and global.acls.manageSystemACLs=true, adds ad.datadoghq.com annotations for datadog-agent-metrics-acl-token secret rendering" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
+
+  local consul_checks=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr)
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .consul.instances | jq -r .[0].acl_token | tee /dev/stderr)"
+  [ "${actual}" = "ENC[k8s_secret@default/default-datadog-agent-metrics-acl-token/token]" ]
+}
+
+@test "server/StatefulSet: when global.metrics.datadogIntegration.openMetricsPrometheus.enabled, applicable openmetrics annotation is set" {
+  cd `chart_dir`
+  local annotations=$(helm template --debug \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.metrics.datadogIntegration.openMetricsPrometheus.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
+
+  local consul_checks=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr)
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.init_config | tee /dev/stderr)"
+  [ "${actual}" = "{}" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
+  [ "${actual}" = "http://%%host%%:8500/v1/agent/metrics" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].namespace | tee /dev/stderr)"
+  [ "${actual}" = "default" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].metrics[0] | tee /dev/stderr)"
+  [ "${actual}" = ".*" ]
+
+}
+
+@test "server/StatefulSet: when datadogIntegration.openMetricsPrometheus.enabled, applicable openmetrics annotation is set with tls url" {
+  cd `chart_dir`
+  local annotations=$(helm template --debug \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.tls.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.metrics.datadogIntegration.openMetricsPrometheus.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
+
+  local consul_checks=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr)
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.init_config | tee /dev/stderr)"
+  [ "${actual}" = "{}" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
+  [ "${actual}" = "https://%%host%%:8501/v1/agent/metrics" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].namespace | tee /dev/stderr)"
+  [ "${actual}" = "default" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].metrics[0] | tee /dev/stderr)"
+  [ "${actual}" = ".*" ]
+
+}
+
+
+@test "server/StatefulSet: datadog unified tagging labels get added when global.metrics.datadogIntegration.enabled=true" {
+  cd `chart_dir`
+  local labels=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.image=hashicorp/consul-enterprise:1.17.0-ent' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadogIntegration.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels' | tee /dev/stderr)
+
+  local actual=$( echo "$labels" | \
+    yq -r '."tags.datadoghq.com/version"' | tee /dev/stderr )
+  [ "${actual}" = "1.17.0-ent" ]
+
+  local actual=$( echo "$labels" | \
+    yq -r '."tags.datadoghq.com/env"' | tee /dev/stderr )
+  [ "${actual}" = "consul" ]
+
+  local actual=$( echo "$labels" | \
+    yq -r '."tags.datadoghq.com/service"' | tee /dev/stderr )
+  [ "${actual}" = "consul-server" ]
+}
+
 #--------------------------------------------------------------------
 # config-configmap
 
@@ -891,16 +1097,16 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
 
-  local actual=$(echo $security_context | jq -r .runAsNonRoot)
+  local actual=$(echo "$security_context" | yq -r .runAsNonRoot)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo $security_context | jq -r .fsGroup)
+  local actual=$(echo "$security_context" | yq -r .fsGroup)
   [ "${actual}" = "1000" ]
 
-  local actual=$(echo $security_context | jq -r .runAsUser)
+  local actual=$(echo "$security_context" | yq -r .runAsUser)
   [ "${actual}" = "100" ]
 
-  local actual=$(echo $security_context | jq -r .runAsGroup)
+  local actual=$(echo "$security_context" | yq -r .runAsGroup)
   [ "${actual}" = "1000" ]
 }
 
@@ -910,14 +1116,26 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       --set 'server.securityContext.runAsNonRoot=false' \
       --set 'server.securityContext.privileged=true' \
+      --set 'server.securityContext.runAsGroup=0' \
+      --set 'server.securityContext.runAsUser=0' \
+      --set 'server.securityContext.fsGroup=0' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.securityContext' | tee /dev/stderr)
 
-  local actual=$(echo $security_context | jq -r .runAsNonRoot)
+  local actual=$(echo "$security_context" | yq -r .runAsNonRoot)
   [ "${actual}" = "false" ]
 
-  local actual=$(echo $security_context | jq -r .privileged)
+  local actual=$(echo "$security_context" | yq -r .privileged)
   [ "${actual}" = "true" ]
+
+    local actual=$(echo "$security_context" | yq -r .fsGroup)
+  [ "${actual}" = "0" ]
+
+  local actual=$(echo "$security_context" | yq -r .runAsUser)
+  [ "${actual}" = "0" ]
+
+  local actual=$(echo "$security_context" | yq -r .runAsGroup)
+  [ "${actual}" = "0" ]
 }
 
 #--------------------------------------------------------------------

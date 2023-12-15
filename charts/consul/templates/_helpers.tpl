@@ -145,7 +145,7 @@ substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The out
 is passed to consul as a -config-file param on command line.
 */}}
 {{- define "consul.extraconfig" -}}
-              cp /consul/tmp/extra-config/extra-from-values.json /consul/extra-config/extra-from-values.json
+              cp /consul/config/extra-from-values.json /consul/extra-config/extra-from-values.json
               [ -n "${HOST_IP}" ] && sed -Ei "s|HOST_IP|${HOST_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${POD_IP}" ] && sed -Ei "s|POD_IP|${POD_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
@@ -519,3 +519,92 @@ Usage: {{ template "consul.validateResourceAPIs" . }}
 {{fail "When the value global.experiments.resourceAPIs is set, apiGateway.enabled is currently unsupported."}}
 {{- end }}
 {{- end }}
+
+{{/*
+Validation for Consul Datadog Integration deployment:
+
+Fail if global.metrics.datadogIntegration.enabled=true and global.metrics.enabled or global.metrics.enableAgentMetrics are unset
+    - global.metrics.datadogIntegration.enabled=true
+    - global.metrics.enableAgentMetrics=false || global.metrics.enabled=false
+
+Fail if Consul OpenMetrics (Prometheus) and DogStatsD metrics are both enabled.
+    - global.metrics.datadogIntegration.dogstatsd.enabled (scrapes `/v1/agent/metrics?format=prometheus` via the `use_prometheus_endpoint` option)
+    - global.metrics.datadogIntegration.openMetricsPrometheus.enabled (scrapes `/v1/agent/metrics?format=prometheus`)
+    - see https://docs.datadoghq.com/integrations/consul/?tab=host#host for recommendation to not have both
+
+Usage: {{ template "consul.validateDatadogConfiguration" . }}
+
+*/}}
+
+{{- define "consul.validateDatadogConfiguration" -}}
+{{- if and .Values.global.metrics.datadogIntegration.enabled (or (not .Values.global.metrics.enableAgentMetrics) (not .Values.global.metrics.enabled) )}}
+{{fail "When enabling datadog metrics collection, the /v1/agent/metrics is required to be accessible, therefore global.metrics.enableAgentMetrics and global.metrics.enabled must be also be enabled."}}
+{{- end }}
+{{- if and .Values.global.metrics.datadogIntegration.dogstatsd.enabled .Values.global.metrics.datadogIntegration.openMetricsPrometheus.enabled }}
+{{fail "You must have one of DogStatsD (global.metrics.datadogIntegration.dogstatsd.enabled) or OpenMetrics (global.metrics.datadogIntegration.openMetricsPrometheus.enabled) enabled, not both as this is an unsupported configuration." }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Sets the dogstatsd_addr field of the agent configuration dependent on the
+socket transport type being used:
+  - "UDS" (Unix Domain Socket): prefixes "unix://" to URL and appends path to socket (i.e., unix:///var/run/datadog/dsd.socket)
+  - "UDP" (User Datagram Protocol): adds no prefix and appends dogstatsd port number to hostname/IP (i.e., 172.20.180.10:8125)
+- global.metrics.enableDatadogIntegration.dogstatsd configuration
+
+Usage: {{ template "consul.dogstatsdAaddressInfo" . }}
+*/}}
+
+{{- define "consul.dogstatsdAaddressInfo" -}}
+{{- if (and .Values.global.metrics.datadogIntegration.enabled .Values.global.metrics.datadogIntegration.dogstatsd.enabled) }}
+        "dogstatsd_addr": "{{- if eq .Values.global.metrics.datadogIntegration.dogstatsd.socketTransportType "UDS" }}unix://{{ .Values.global.metrics.datadogIntegration.dogstatsd.dogstatsdAddr }}{{- else }}{{ .Values.global.metrics.datadogIntegration.dogstatsd.dogstatsdAddr | trimAll "\"" }}:{{ .Values.global.metrics.datadogIntegration.dogstatsd.dogstatsdPort | toString }}{{- end }}",{{- end }}
+{{- end -}}
+
+{{/*
+Configures the metrics prefixing that's required to either allow or dissallow certaing RPC or gRPC server calls:
+
+Usage: {{ template "consul.metricsPrefixFiltering" . }}
+*/}}
+{{- define "consul.metricsPrefixFiltering" -}}
+{{- $allowList := .Values.global.metrics.metricsPrefixFiltering.allowList }}
+{{- $blockList := .Values.global.metrics.metricsPrefixFiltering.blockList }}
+{{- if and (not (empty $allowList)) (not (empty $blockList)) }}
+        "prefix_filter": [{{- range $index, $value := concat $allowList $blockList -}}
+    "{{- if (has $value $allowList) }}{{ printf "+%s" ($value | trimAll "\"") }}{{- else }}{{ printf "-%s" ($value | trimAll "\"") }}{{- end }}"{{- if lt $index (sub (len (concat $allowList $blockList)) 1) -}},{{- end -}}
+  {{- end -}}],
+{{- else if not (empty $allowList) }}
+        "prefix_filter": [{{- range $index, $value := $allowList -}}
+    "{{ printf "+%s" ($value | trimAll "\"") }}"{{- if lt $index (sub (len $allowList) 1) -}},{{- end -}}
+  {{- end -}}],
+{{- else if not (empty $blockList) }}
+        "prefix_filter": [{{- range $index, $value := $blockList -}}
+    "{{ printf "-%s" ($value | trimAll "\"") }}"{{- if lt $index (sub (len $blockList) 1) -}},{{- end -}}
+  {{- end -}}],
+{{- end }}
+{{- end -}}
+
+{{/*
+Retrieves the global consul/consul-enterprise version string for use with labels or tags.
+Requirements for valid labels:
+ -  a valid label must be an empty string or consist of
+    =>  alphanumeric characters
+    =>  '-', '_' or '.'
+    =>  must start and end with an alphanumeric character
+        (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is
+        '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')
+
+Usage: {{ template "consul.versionInfo" }}
+*/}}
+{{- define "consul.versionInfo" -}}
+{{- $imageVersion := regexSplit ":" .Values.global.image -1 }}
+{{- $versionInfo := printf "%s" (index $imageVersion 1 ) | trimSuffix "\"" }}
+{{- $sanitizedVersion := "" }}
+{{- $pattern := "^([A-Za-z0-9][-A-Za-z0-9_.]*[A-Za-z0-9])?$" }}
+{{- if not (regexMatch $pattern $versionInfo) -}}
+    {{- $sanitizedVersion = regexReplaceAll "[^A-Za-z0-9-_.]|sha256" $versionInfo "" }}
+    {{- $sanitizedVersion = printf "%s" (trimSuffix "-" (trimPrefix "-" $sanitizedVersion)) -}}
+{{- else }}
+    {{- $sanitizedVersion = $versionInfo }}
+{{- end -}}
+{{- printf "%s" $sanitizedVersion | quote }}
+{{- end -}}

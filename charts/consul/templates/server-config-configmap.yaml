@@ -192,8 +192,15 @@ data:
   telemetry-config.json: |-
     {
       "telemetry": {
-        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}"
-      }
+        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}",
+        "disable_hostname": {{ .Values.global.metrics.disableAgentHostName }},{{ template "consul.metricsPrefixFiltering" . }}
+        "enable_host_metrics": {{ .Values.global.metrics.enableHostMetrics }}{{- if .Values.global.metrics.datadogIntegration.dogstatsd.enabled }},{{ template "consul.dogstatsdAaddressInfo" . }}
+        {{- if .Values.global.metrics.datadogIntegration.dogstatsd.enabled }}
+        "dogstatsd_tags": {{ .Values.global.metrics.datadogIntegration.dogstatsd.dogstatsdTags | toJson }}
+        {{- end }}
+        {{- end }}
+      },
+      "enable_debug": {{ .Values.global.metrics.enableConsulAgentDebug }}
     }
   {{- end }}
   {{- if and .Values.server.auditLogs.enabled .Values.global.acls.manageSystemACLs }}

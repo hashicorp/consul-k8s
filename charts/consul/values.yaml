@@ -618,6 +618,23 @@ global:
     # @type: boolean
     enableAgentMetrics: false
 
+    # When set to true, enables Consul to report additional debugging information, including runtime profiling (pprof) data.
+    # This setting is only required for clusters without ACL enabled.
+    # If you change this setting, you must restart the agent for the change to take effect. Default is false.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.AgentMetrics` is true.
+    # @type: boolean
+    enableConsulAgentDebug: false
+
+    # Set to true to stop prepending the machine's hostname to gauge-type metrics. Default is false.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.AgentMetrics` is true.
+    # @type: boolean
+    disableAgentHostName: false
+
+    # Configures consul agent metrics. Only applicable if
+    # Only applicable if `global.metrics.enabled` and `global.metrics.AgentMetrics` is true.
+    # @type: boolean
+    enableHostMetrics: false
+
     # Configures the retention time for metrics in Consul clients and
     # servers. This must be greater than 0 for Consul clients and servers
     # to expose any metrics at all.
@@ -635,6 +652,121 @@ global:
     # consul-telemetry-collector. This includes gateway metrics and sidecar metrics.
     # @type: boolean
     enableTelemetryCollector: false
+
+    # This configures the list of filter rules to apply for allowing/blocking
+    # metrics by prefix in the following format:
+    #
+    # A leading "+" will enable any metrics with the given prefix, and a leading "-" will block them.
+    # If there is overlap between two rules, the more specific rule will take precedence.
+    # Blocking will take priority if the same prefix is listed multiple times.
+    #
+    # - allowList:
+    metricsPrefixFiltering:
+      # @type: array<string>
+      allowList: []
+      # @type: array<string>
+      blockList: []
+
+    # Configures consul integration configurations for datadog on kubernetes.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
+    datadogIntegration:
+      # Enables datadog [Consul autodiscovery integration](https://docs.datadoghq.com/integrations/consul/?tab=containerized#metric-collection)
+      # by configuring the required `ad.datadoghq.com/consul.checks` annotation. All available datadog-specific checks are enabled.
+      #
+      # ~> **Note:** Simply enabling `datadogIntegration` does not enable openmetrics (prometheus) nor DogStatsD
+      #              metrics collection. When using OpenMetrics (i.e., `datadogIntegration.openMetricsPrometheus.enabled=true`)
+      #              This changes the auto-discovery checks datadog will detect to scrape only the `/v1/agent/metrics?format=prometheus`
+      #              API endpoint. When using DogStatsD custom metrics collection, the datadog specific checks will be enabled as
+      #              you can only have either OpenMetrics/Prometheus _or_ DogStatsD enabled at a given time.
+      #
+      # @default: false
+      # @type: boolean
+      enabled: false
+
+      # Configures Kubernetes Prometheus/OpenMetrics auto-discovery annotations for use with Datadog.
+      # This configuration is less common and more for advanced usage with custom metrics monitoring
+      # configurations. See https://docs.datadoghq.com/containers/kubernetes/prometheus/?tab=kubernetesadv2 for more details
+      # surround further configuration.
+      openMetricsPrometheus:
+        # @default: false
+        # @type: boolean
+        enabled: false
+
+      datadogOpenTelemetryCollector:
+        # Enables forwarding of Consul's Telemetry Collector OTLP metrics for
+        # ingestion by Datadog Agent
+        # @default: false
+        # @type: boolean
+        enable: false
+        # @default: "http"
+        # @type: string
+        protocol: "http"
+
+      # Configuration settings for DogStatsD metrics aggregation service
+      # that is bundled with the Datadog Agent.
+      # DogStatsD implements the StatsD protocol and adds a few Datadog-specific extensions:
+      # - Histogram metric type
+      # - Service checks
+      # - Events
+      # - Tagging
+      dogstatsd:
+        enabled: true
+        # Sets the socket transport type for dogstatsd:
+        #  - "UDS" (Unix Domain Socket): prefixes `unix://` to URL and appends path to socket (i.e., "unix:///var/run/datadog/dsd.socket")
+        #    If set, this will create the required [hostPath](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath) mount for
+        #    managing [DogStatsD with Unix Domain Socket on Kubernetes](https://docs.datadoghq.com/developers/dogstatsd/unix_socket/?tab=kubernetes).
+        #    The volume is mounted using the `DirectoryOrCreate` type, thereby setting `0755` permissions with the same kubelet group ownership.
+        #
+        #  Applies the following `volumes` and `volumeMounts` to the consul-server stateful set consul containers:
+        #
+        # ```yaml
+        # volumes:
+        #   - name: dsdsocket
+        #     hostPath:
+        #       path: /var/run/datadog
+        #       type: DirectoryOrCreate
+        # volumeMounts:
+        #   - name: dsdsocket
+        #     mountPath: /var/run/datadog
+        #     readOnly: true
+        # ```
+        #  - "UDP" (User Datagram Protocol): assigns address to use `hostname/IP:Port` formatted URL for UDP transport to hostIP based
+        #     dogstatsd sink (i.e., 127.0.0.1:8125).
+        #
+        # @default: "UDS"
+        # @type: string
+        socketTransportType: "UDS"
+        # Sets URL path for dogstatsd:
+        #
+        # Can be either a path to unix domain socket or an IP Address or Hostname that's reachable from the
+        # consul-server service, server containers. When using "UDS" the path will be appended. When using "UDP"
+        # the path will be prepended to the specified `dogstatsdPort`.
+        #
+        # @default: "/var/run/datadog/dsd.socket"
+        # @type: string
+        dogstatsdAddr: "/var/run/datadog/dsd.socket"
+        # Configures IP based dogstatsd designated port that will be appended to "UDP" based transport socket IP/Hostname URL.
+        #
+        # @default: 8125
+        # @type: integer
+        dogstatsdPort: 8125
+        # Configures datadog [autodiscovery](https://docs.datadoghq.com/containers/kubernetes/log/?tab=operator#autodiscovery)
+        # style [log integration](https://docs.datadoghq.com/integrations/consul/?tab=containerized#log-collection)
+        # configuration for Consul.
+        #
+        # The default settings should handle most Consul Kubernetes deployment schemes. The resultant annotation
+        # will reside on the consul-server statefulset as autodiscovery annotations.
+        # (i.e., ad.datadoghq.com/consul.logs: ["source:consul","consul_service:consul-server", ""])
+        #
+        # @default: ["source:consul","consul_service:consul-server"]
+        # @type: array<string>
+        dogstatsdTags: ["source:consul","consul_service:consul-server"]
+      # Namespace
+      #
+      # @default: "default"
+      # @type: string
+      datadogNamespace: "default"
+
 
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
