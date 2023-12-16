@@ -276,7 +276,7 @@ spec:
             -create-enterprise-license-token=true \
             {{- end }}
 
-            {{- if (and .Values.global.metrics.datadogIntegration.enabled .Values.global.acls.manageSystemACLs) }}
+            {{- if (and (not .Values.global.metrics.datadogIntegration.dogstatsd.enabled) .Values.global.metrics.datadogIntegration.enabled .Values.global.acls.manageSystemACLs) }}
             -create-dd-agent-token=true \
             {{- end }}
 

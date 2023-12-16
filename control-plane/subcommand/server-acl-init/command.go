@@ -61,7 +61,6 @@ type Command struct {
 
 	flagCreateEntLicenseToken bool
 	flagCreateDDAgentToken    bool
-	flagDatadogAgentNS        string
 
 	flagSnapshotAgent bool
 

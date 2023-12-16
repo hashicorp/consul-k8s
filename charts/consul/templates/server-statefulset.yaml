@@ -155,7 +155,7 @@ spec:
                   "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
                   "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
         {{- else }}
-                  "openmetrics_endpoint": "http://%%host%%:8500/v1/agent/metrics?format=prometheus",
+                  "openmetrics_endpoint": "http://consul-server.{{ .Release.Namespace }}.svc:8500/v1/agent/metrics?format=prometheus",
         {{- end }}
         {{- if ( .Values.global.acls.manageSystemACLs) }}
                   "headers": {
@@ -168,7 +168,7 @@ spec:
               ]
             }
           }
-        {{- else }}
+        {{- else if (not .Values.global.metrics.datadogIntegration.dogstatsd.enabled) }}
         "ad.datadoghq.com/consul.checks": |
           {
             "consul": {
@@ -195,6 +195,8 @@ spec:
               ]
             }
           }
+        {{- else }}
+        "ad.datadoghq.com/consul.metrics_exclude": "true"
         {{- end }}
         {{- end }}
         {{- end }}

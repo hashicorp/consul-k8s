@@ -1376,6 +1376,7 @@ load _helpers
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
       --set 'global.metrics.datadogIntegration.enabled=true'  \
+      --set 'global.metrics.datadogIntegration.dogstatsd.enabled=true'  \
       . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_tags | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
 

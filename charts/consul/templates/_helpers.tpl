@@ -425,10 +425,10 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 */}}
 {{- define "consul.validateTelemetryCollectorCloud" -}}
 {{- if (and .Values.telemetryCollector.cloud.clientId.secretName (and (not .Values.global.cloud.clientSecret.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
+{{fail "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set." }}
 {{- end }}
 {{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (and (not .Values.global.cloud.clientId.secretName) (not .Values.telemetryCollector.cloud.clientId.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set."}}
+{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set." }}
 {{- end }}
 {{- end }}
 
@@ -529,6 +529,9 @@ Fail if Consul OpenMetrics (Prometheus) and DogStatsD metrics are both enabled.
     - global.metrics.datadogIntegration.openMetricsPrometheus.enabled (scrapes `/v1/agent/metrics?format=prometheus`)
     - see https://docs.datadoghq.com/integrations/consul/?tab=host#host for recommendation to not have both
 
+Fail if Consul Open Telemetry collector forwarding protocol is not one of either "http" or "grpc"
+    - global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol!="http" || global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol!="grpc"
+
 Usage: {{ template "consul.validateDatadogConfiguration" . }}
 
 */}}
@@ -539,6 +542,9 @@ Usage: {{ template "consul.validateDatadogConfiguration" . }}
 {{- end }}
 {{- if and .Values.global.metrics.datadogIntegration.dogstatsd.enabled .Values.global.metrics.datadogIntegration.openMetricsPrometheus.enabled }}
 {{fail "You must have one of DogStatsD (global.metrics.datadogIntegration.dogstatsd.enabled) or OpenMetrics (global.metrics.datadogIntegration.openMetricsPrometheus.enabled) enabled, not both as this is an unsupported configuration." }}
+{{- end }}
+{{- if and .Values.global.metrics.datadogIntegration.datadogOpenTelemetryCollector.enabled (or (eq (.Values.global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol | trimAll "\"" | quote) "http") (eq (.Values.global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol | trimAll "\"" | quote) "grpc")) }}
+{{fail "Valid values for global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol must be one of either \"http\" or \"grpc\"." }}
 {{- end }}
 {{- end -}}
 
