@@ -670,14 +670,29 @@ global:
     # Configures consul integration configurations for datadog on kubernetes.
     # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
     datadogIntegration:
-      # Enables datadog [Consul autodiscovery integration](https://docs.datadoghq.com/integrations/consul/?tab=containerized#metric-collection)
-      # by configuring the required `ad.datadoghq.com/consul.checks` annotation. All available datadog-specific checks are enabled.
+      # Enables datadog [Consul Autodiscovery Integration](https://docs.datadoghq.com/integrations/consul/?tab=containerized#metric-collection)
+      # by configuring the required `ad.datadoghq.com/consul.checks` annotation. The following _Consul_ agent metrics/health statuses
+      # are monitored by Datadog unless monitoring via OpenMetrics (Prometheus) or DogStatsD:
+      #   - Serf events and member flaps
+      #   - The Raft protocol
+      #   - DNS performance
+      #   - API Endpoints Scraped:
+      #     - `/v1/agent/metrics?format=prometheus`
+      #     - `/v1/agent/self`
+      #     - `/v1/status/leader`
+      #     - `/v1/status/peers`
+      #     - `/v1/catalog/services`
+      #     - `/v1/health/service`
+      #     - `/v1/health/state/any`
+      #     - `/v1/coordinate/datacenters`
+      #     - `/v1/coordinate/nodes`
       #
-      # ~> **Note:** Simply enabling `datadogIntegration` does not enable openmetrics (prometheus) nor DogStatsD
-      #              metrics collection. When using OpenMetrics (i.e., `datadogIntegration.openMetricsPrometheus.enabled=true`)
-      #              This changes the auto-discovery checks datadog will detect to scrape only the `/v1/agent/metrics?format=prometheus`
-      #              API endpoint. When using DogStatsD custom metrics collection, the datadog specific checks will be enabled as
-      #              you can only have either OpenMetrics/Prometheus _or_ DogStatsD enabled at a given time.
+      # Setting either `global.metrics.datadogIntegration.openMetricsPrometheus.enabled=true` or `global.metrics.datadogIntegration.dogstatsd.enabled=true` disables the above checks
+      # in lieu of metrics data collection via DogStatsD or by a customer OpenMetrics (Prometheus) collection endpoint.
+      #
+      # ~> **Note:** If you have a [dogstatsd_mapper_profile](https://docs.datadoghq.com/integrations/consul/?tab=host#dogstatsd) configured for Consul
+      # residing on either your Datadog NodeAgent or ClusterAgent the default Consul agent metrics/health status checks will fail. If you do not desire
+      # to utilize DogStatsD metrics emission from Consul, remove this configuration file, and restart your Datadog agent to permit the checks to run.
       #
       # @default: false
       # @type: boolean
@@ -694,10 +709,17 @@ global:
 
       datadogOpenTelemetryCollector:
         # Enables forwarding of Consul's Telemetry Collector OTLP metrics for
-        # ingestion by Datadog Agent
+        # ingestion by Datadog Agent.
         # @default: false
         # @type: boolean
-        enable: false
+        enabled: false
+        # Protocol used for DataDog Endpoint OTLP ingestion.
+        #
+        # Valid protocol options are one of either:
+        #
+        #   - "http": will forward to DataDog HTTP OTLP Node Agent Endpoint default - "0.0.0.0:4318"
+        #   - "grpc": will forward to DataDog gRPC OTLP Node Agent Endpoint default - "0.0.0.0:4317"
+        #
         # @default: "http"
         # @type: string
         protocol: "http"
@@ -710,7 +732,7 @@ global:
       # - Events
       # - Tagging
       dogstatsd:
-        enabled: true
+        enabled: false
         # Sets the socket transport type for dogstatsd:
         #  - "UDS" (Unix Domain Socket): prefixes `unix://` to URL and appends path to socket (i.e., "unix:///var/run/datadog/dsd.socket")
         #    If set, this will create the required [hostPath](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath) mount for
@@ -731,7 +753,7 @@ global:
         #     readOnly: true
         # ```
         #  - "UDP" (User Datagram Protocol): assigns address to use `hostname/IP:Port` formatted URL for UDP transport to hostIP based
-        #     dogstatsd sink (i.e., 127.0.0.1:8125).
+        #     dogstatsd sink (i.e., 127.0.0.1:8125). HostIP of Datadog agent must be reachable and known to Consul server emitting metrics.
         #
         # @default: "UDS"
         # @type: string

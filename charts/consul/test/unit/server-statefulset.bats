@@ -901,7 +901,7 @@ load _helpers
 
 @test "server/StatefulSet: when global.metrics.datadogIntegration.openMetricsPrometheus.enabled, applicable openmetrics annotation is set" {
   cd `chart_dir`
-  local annotations=$(helm template --debug \
+  local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
@@ -919,7 +919,11 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
-  [ "${actual}" = "http://%%host%%:8500/v1/agent/metrics" ]
+  [ "${actual}" = "http://consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].headers | tee /dev/stderr)"
+  [ -n "${actual}" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].namespace | tee /dev/stderr)"
@@ -933,7 +937,7 @@ load _helpers
 
 @test "server/StatefulSet: when datadogIntegration.openMetricsPrometheus.enabled, applicable openmetrics annotation is set with tls url" {
   cd `chart_dir`
-  local annotations=$(helm template --debug \
+  local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.tls.enabled=true'  \
@@ -952,7 +956,59 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
-  [ "${actual}" = "https://%%host%%:8501/v1/agent/metrics" ]
+  [ "${actual}" = "https://consul-server.default.svc:8501/v1/agent/metrics?format=prometheus" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].headers | tee /dev/stderr)"
+  [ -n "${actual}" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].tls_cert | tee /dev/stderr)"
+  [ "${actual}" = "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].tls_private_key | tee /dev/stderr)"
+  [ "${actual}" = "/etc/datadog-agent/conf.d/consul.d/certs/tls.key" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].tls_ca_cert | tee /dev/stderr)"
+  [ "${actual}" = "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].namespace | tee /dev/stderr)"
+  [ "${actual}" = "default" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].metrics[0] | tee /dev/stderr)"
+  [ "${actual}" = ".*" ]
+}
+
+@test "server/StatefulSet: when global.metrics.datadogIntegration.openMetricsPrometheus.enabled, applicable openmetrics annotation is set with acls.manageSystemACLs enabled" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.metrics.datadogIntegration.openMetricsPrometheus.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
+
+  local consul_checks=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr)
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.init_config | tee /dev/stderr)"
+  [ "${actual}" = "{}" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
+  [ "${actual}" = "http://consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
+
+  local actual="$( echo "$consul_checks" | \
+    jq -r .openmetrics.instances | jq -r '.[0].headers["X-Consul-Token"]' | tee /dev/stderr)"
+  [ "${actual}" = "ENC[k8s_secret@default/default-datadog-agent-metrics-acl-token/token]" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].namespace | tee /dev/stderr)"

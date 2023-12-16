@@ -2476,3 +2476,20 @@ load _helpers
     yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "serverACLInit/Job: -create-dd-agent-token NOT set when global.metrics.datadogIntegration=true, global.metrics.datadogIntegration.dogstatsd.enabled=true, and global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.metrics.datadogIntegration.dogstatsd.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$( echo "$command" |
+    yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
