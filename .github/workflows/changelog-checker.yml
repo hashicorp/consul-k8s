@@ -8,7 +8,7 @@ name: Changelog Checker
 on:
   pull_request:
     types: [opened, synchronize, labeled]
-    # Runs on PRs to main and all release branches
+    ## Runs on PRs to main and all release branches
     branches:
       - main
       - release/*
