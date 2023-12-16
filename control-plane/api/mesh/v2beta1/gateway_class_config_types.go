@@ -115,6 +115,7 @@ type GatewayClassServiceConfig struct {
 	GatewayClassAnnotationsAndLabels `json:",inline"`
 
 	// Type specifies the type of Service to use (LoadBalancer, ClusterIP, etc.)
+	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
 	Type *corev1.ServiceType `json:"type,omitempty"`
 }
 
