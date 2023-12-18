@@ -34,7 +34,8 @@ func TestTenancy_Partition_Created(t *testing.T) {
 
 	// We're skipping ACLs for now because they're not supported in v2.
 	cfg := suite.Config()
-	cfg.SkipWhenOpenshiftAndCNI(t)
+	// Requires connnectInject.enabled which we disable below.
+	cfg.SkipWhenCNI(t)
 	ctx := suite.Environment().DefaultContext(t)
 
 	serverHelmValues := map[string]string{
