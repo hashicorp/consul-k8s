@@ -67,6 +67,11 @@ type GatewayClassDeploymentConfig struct {
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 	// Tolerations specifies the tolerations to use on the created Deployment
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	// HostNetwork specifies whether the gateway pods should run on the host network
+	HostNetwork bool `json:"hostNetwork,omitempty"`
+	// TopologySpreadConstraints is a feature that controls how pods are spead across your topology.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 }
 
 type GatewayClassReplicasConfig struct {
@@ -96,7 +101,9 @@ type GatewayClassContainerConfig struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// PortModifier specifies the value to be added to every port value for listeners on this gateway.
 	// This is generally used to avoid binding to privileged ports in the container.
-	PortModifier int `json:"portModifier,omitempty"`
+	PortModifier int32 `json:"portModifier,omitempty"`
+	// HostPort specifies a port to be exposed to the external host network
+	HostPort int32 `json:"hostPort,omitempty"`
 }
 
 type GatewayClassRoleConfig struct {
@@ -111,6 +118,7 @@ type GatewayClassServiceConfig struct {
 	GatewayClassAnnotationsAndLabels `json:",inline"`
 
 	// Type specifies the type of Service to use (LoadBalancer, ClusterIP, etc.)
+	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
 	Type *corev1.ServiceType `json:"type,omitempty"`
 }
 

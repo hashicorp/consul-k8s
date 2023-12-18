@@ -51,6 +51,9 @@ data:
                 logging:
                   level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
               portModifier: {{ sub .Values.meshGateway.containerPort .Values.meshGateway.service.port }}
+              {{- if .Values.meshGateway.hostPort }}
+              hostPort: {{ .Values.meshGateway.hostPort }}
+              {{- end }}
               resources: {{ toJson .Values.meshGateway.resources }}
             initContainer:
               consul:
@@ -60,7 +63,14 @@ data:
             {{- with .Values.meshGateway.nodeSelector }}
             nodeSelector: {{ fromYaml . | toJson }}
             {{- end }}
+            {{- with .Values.meshGateway.hostNetwork }}
+            hostNetwork: {{ . }}
+            {{- end }}
             priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
+            {{- if .Values.meshGateway.topologySpreadConstraints }}
+            topologySpreadConstraints:
+              {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 16 | trim }}
+            {{- end }}
             replicas:
               default: {{ .Values.meshGateway.replicas }}
               min: {{ .Values.meshGateway.replicas }}

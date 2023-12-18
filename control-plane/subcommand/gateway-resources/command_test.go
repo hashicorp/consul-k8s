@@ -372,6 +372,11 @@ var validGWConfigurationKitchenSink = `gatewayClassConfigs:
     name: consul-mesh-gateway
   spec:
     deployment:
+      hostNetwork: true
+      replicas:
+        min: 3
+        default: 3
+        max: 3
       nodeSelector:
         beta.kubernetes.io/arch: amd64
         beta.kubernetes.io/os: linux
@@ -435,6 +440,7 @@ meshGateways:
 `
 
 func TestRun_loadGatewayConfigs(t *testing.T) {
+	var replicasCount int32 = 3
 	testCases := map[string]struct {
 		config             string
 		filename           string
@@ -444,9 +450,15 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 			config:   validGWConfigurationKitchenSink,
 			filename: "kitchenSinkConfig.yaml",
 			expectedDeployment: v2beta1.GatewayClassDeploymentConfig{
+				HostNetwork: true,
 				NodeSelector: map[string]string{
 					"beta.kubernetes.io/arch": "amd64",
 					"beta.kubernetes.io/os":   "linux",
+				},
+				Replicas: &v2beta1.GatewayClassReplicasConfig{
+					Default: &replicasCount,
+					Min:     &replicasCount,
+					Max:     &replicasCount,
 				},
 				Tolerations: []corev1.Toleration{
 					{

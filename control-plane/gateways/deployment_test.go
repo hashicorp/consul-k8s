@@ -16,6 +16,7 @@ import (
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 func Test_meshGatewayBuilder_Deployment(t *testing.T) {
@@ -42,6 +43,10 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: meshv2beta1.GatewayClassConfigSpec{
 						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
+							Container: &meshv2beta1.GatewayClassContainerConfig{
+								HostPort:     8080,
+								PortModifier: 8000,
+							},
 							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
 								Default: pointer.Int32(1),
@@ -49,6 +54,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								Max:     pointer.Int32(8),
 							},
 							PriorityClassName: "priorityclassname",
+							TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+								{
+									MaxSkew:           1,
+									TopologyKey:       "key",
+									WhenUnsatisfiable: "DoNotSchedule",
+								},
+							},
 						},
 					},
 				},
@@ -72,7 +84,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 							},
 							Annotations: map[string]string{
-								"consul.hashicorp.com/mesh-inject": "false",
+								constants.AnnotationMeshInject:  "false",
+								constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -182,6 +195,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										{
 											Name:          "wan",
 											ContainerPort: 8443,
+											HostPort:      8080,
 										},
 									},
 									Env: []corev1.EnvVar{
@@ -255,6 +269,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							},
 							NodeSelector:      map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							PriorityClassName: "priorityclassname",
+							TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+								{
+									MaxSkew:           1,
+									TopologyKey:       "key",
+									WhenUnsatisfiable: "DoNotSchedule",
+								},
+							},
 							Affinity: &corev1.Affinity{
 								NodeAffinity: nil,
 								PodAffinity:  nil,
@@ -316,7 +337,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 							},
 							Annotations: map[string]string{
-								"consul.hashicorp.com/mesh-inject": "false",
+								constants.AnnotationMeshInject:  "false",
+								constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -425,7 +447,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										},
 										{
 											Name:          "wan",
-											ContainerPort: 8443,
+											ContainerPort: 443,
 										},
 									},
 									Env: []corev1.EnvVar{

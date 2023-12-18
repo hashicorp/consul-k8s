@@ -333,6 +333,87 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			expectedResult: ctrl.Result{},
 			expectedErr:    nil, // The Reconcile should be a no-op
 		},
+		// Service
+		{
+			name: "MeshGateway created with no existing Service",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "consul",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "consul",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			postReconcile: func(t *testing.T, c client.Client) {
+				// Verify Service was created
+				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
+				assert.NoError(t, c.Get(context.Background(), key, &corev1.Service{}))
+			},
+		},
+		{
+			name: "MeshGateway created with existing Service not owned by gateway",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "default",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			expectedErr:    errResourceNotOwned,
+		},
+		{
+			name: "MeshGateway created with existing Service owned by gateway",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+						UID:       "abc123",
+					},
+				},
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								UID:  "abc123",
+								Name: "mesh-gateway",
+							},
+						},
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "default",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			expectedErr:    nil, // The Reconcile should be a no-op
+		},
 	}
 
 	for _, testCase := range testCases {

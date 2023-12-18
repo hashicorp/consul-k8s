@@ -27,6 +27,10 @@ const (
 	// ProxyDefaultHealthPort is the default HTTP health check port for the proxy.
 	ProxyDefaultHealthPort = 21000
 
+	// MetaGatewayKind is the meta key name for indicating which kind of gateway a Pod is for, if any.
+	// The value should be one of "mesh", "api", or "terminating".
+	MetaGatewayKind = "gateway-kind"
+
 	// MetaKeyManagedBy is the meta key name for indicating which Kubernetes controller manages a Consul resource.
 	MetaKeyManagedBy = "managed-by"
 
