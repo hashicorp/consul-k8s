@@ -1,3 +1,36 @@
+## 1.1.8 (December 19, 2023)
+
+SECURITY:
+
+* Update `github.com/golang-jwt/jwt/v4` to v4.5.0 to address [PRISMA-2022-0270](https://github.com/golang-jwt/jwt/issues/258). [[GH-3237](https://github.com/hashicorp/consul-k8s/issues/3237)]
+* Upgrade to use Go 1.20.12. This resolves CVEs
+[CVE-2023-45283](https://nvd.nist.gov/vuln/detail/CVE-2023-45283): (`path/filepath`) recognize \??\ as a Root Local Device path prefix (Windows)
+[CVE-2023-45284](https://nvd.nist.gov/vuln/detail/CVE-2023-45285): recognize device names with trailing spaces and superscripts (Windows)
+[CVE-2023-39326](https://nvd.nist.gov/vuln/detail/CVE-2023-39326): (`net/http`) limit chunked data overhead
+[CVE-2023-45285](https://nvd.nist.gov/vuln/detail/CVE-2023-45285): (`cmd/go`) go get may unexpectedly fallback to insecure git [[GH-3312](https://github.com/hashicorp/consul-k8s/issues/3312)]
+
+FEATURES:
+
+* crd: adds the [`retryOn`](https://developer.hashicorp.com/consul/docs/connect/config-entries/service-router#routes-destination-retryon) field to the ServiceRouter CRD. [[GH-3308](https://github.com/hashicorp/consul-k8s/issues/3308)]
+* helm: add persistentVolumeClaimRetentionPolicy variable for managing Statefulsets PVC retain policy when deleting or downsizing the statefulset. [[GH-3180](https://github.com/hashicorp/consul-k8s/issues/3180)]
+
+IMPROVEMENTS:
+
+* cli: Add -o json (-output-format json) to `consul-k8s proxy list` command that returns the result in json format. [[GH-3221](https://github.com/hashicorp/consul-k8s/issues/3221)]
+* cli: Add consul-k8s proxy stats command line interface that outputs the localhost:19000/stats of envoy in the pod [[GH-3158](https://github.com/hashicorp/consul-k8s/issues/3158)]
+* control-plane: Add new `consul.hashicorp.com/proxy-config-map` annotation that allows for setting values in the opaque config map for proxy service registrations. [[GH-3347](https://github.com/hashicorp/consul-k8s/issues/3347)]
+* helm: add validation that global.cloud.enabled is not set with externalServers.hosts set to HCP-managed clusters [[GH-3315](https://github.com/hashicorp/consul-k8s/issues/3315)]
+
+BUG FIXES:
+
+* consul-telemetry-collector: add telemetryCollector.cloud.resourceId that works even when not global.cloud.enabled [[GH-3219](https://github.com/hashicorp/consul-k8s/issues/3219)]
+* consul-telemetry-collector: fix deployments to non-default namespaces when global.enableConsulNamespaces [[GH-3215](https://github.com/hashicorp/consul-k8s/issues/3215)]
+* consul-telemetry-collector: fix args to consul-dataplane when global.acls.manageSystemACLs [[GH-3184](https://github.com/hashicorp/consul-k8s/issues/3184)]
+* control-plane: Only delete ACL tokens matched Pod UID in Service Registration metadata [[GH-3210](https://github.com/hashicorp/consul-k8s/issues/3210)]
+* control-plane: fixes an issue with the server-acl-init job where the job would fail on upgrades due to consul server ip address changes. [[GH-3137](https://github.com/hashicorp/consul-k8s/issues/3137)]
+* control-plane: Remove virtual nodes in the Consul Catalog when they do not have any services listed. [[GH-3137](https://github.com/hashicorp/consul-k8s/issues/3137)]
+* mesh: prevent extra-config from being loaded twice (and erroring for segment config) on clients and servers. [[GH-3337](https://github.com/hashicorp/consul-k8s/issues/3337)]
+
 ## 1.1.7 (November 2, 2023)
 
 SECURITY:
