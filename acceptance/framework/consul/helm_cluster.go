@@ -14,6 +14,7 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -386,7 +387,7 @@ func (h *HelmCluster) ResourceClient(t *testing.T, secure bool, release ...strin
 	localTunnelAddr := h.CreatePortForwardTunnel(t, 8502, releaseName)
 
 	// Create a grpc connection to the server pod.
-	grpcConn, err := grpc.Dial(localTunnelAddr, grpc.WithInsecure())
+	grpcConn, err := grpc.Dial(localTunnelAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err)
 	resourceClient := pbresource.NewResourceServiceClient(grpcConn)
 	return resourceClient
