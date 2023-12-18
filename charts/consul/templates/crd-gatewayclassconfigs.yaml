@@ -173,6 +173,11 @@ spec:
                   dnsPolicy:
                     description: DNSPolicy specifies the dns policy to use. These
                       are set on a per pod basis.
+                    enum:
+                    - Default
+                    - ClusterFirst
+                    - ClusterFirstWithHostNet
+                    - None
                     type: string
                   hostNetwork:
                     description: HostNetwork specifies whether the gateway pods should

@@ -73,7 +73,8 @@ type GatewayClassDeploymentConfig struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 	// DNSPolicy specifies the dns policy to use. These are set on a per pod basis.
-	DNSPolicy string `json:"dnsPolicy,omitempty"`
+	// +kubebuilder:validation:Enum=Default;ClusterFirst;ClusterFirstWithHostNet;None
+	DNSPolicy corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
 }
 
 type GatewayClassReplicasConfig struct {
