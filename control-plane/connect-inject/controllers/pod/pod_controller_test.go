@@ -785,7 +785,7 @@ func TestProxyConfigurationDelete(t *testing.T) {
 		{
 			name:                       "proxy configuration delete",
 			pod:                        createPod("foo", "", true, true),
-			existingProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration("foo", true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 	}
 
@@ -1308,7 +1308,7 @@ func TestReconcileCreatePod(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			name:    "vanilla new pod",
+			name:    "vanilla new mesh-injected pod",
 			podName: "foo",
 			k8sObjects: func() []runtime.Object {
 				pod := createPod("foo", "", true, true)
@@ -1322,7 +1322,26 @@ func TestReconcileCreatePod(t *testing.T) {
 			overwriteProbes:            true,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration("foo", true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+		},
+		{
+			name:    "vanilla new gateway pod (not mesh-injected)",
+			podName: "foo",
+			k8sObjects: func() []runtime.Object {
+				pod := createPod("foo", "", false, true)
+				pod.Annotations[constants.AnnotationGatewayKind] = "mesh-gateway"
+				pod.Annotations[constants.AnnotationMeshInject] = "false"
+				pod.Annotations[constants.AnnotationTransparentProxyOverwriteProbes] = "false"
+
+				return []runtime.Object{pod}
+			},
+			tproxy:                     true,
+			telemetry:                  true,
+			metrics:                    true,
+			overwriteProbes:            true,
+			expectedWorkload:           createWorkload(),
+			expectedHealthStatus:       createPassingHealthStatus(),
+			expectedProxyConfiguration: createProxyConfiguration("foo", false, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:      "pod in ignored namespace",
@@ -1380,7 +1399,7 @@ func TestReconcileCreatePod(t *testing.T) {
 			overwriteProbes:            true,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			expectedProxyConfiguration: createProxyConfiguration("foo", true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			expectedDestinations:       createDestinations(),
 		},
 		{
@@ -1827,14 +1846,14 @@ func TestReconcileDeletePod(t *testing.T) {
 			podName:                    "foo",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration("foo", true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:                       "annotated delete pod",
 			podName:                    "foo",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			existingProxyConfiguration: createProxyConfiguration("foo", true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			existingDestinations:       createDestinations(),
 		},
 		{
@@ -1842,7 +1861,7 @@ func TestReconcileDeletePod(t *testing.T) {
 			podName:                    "foo",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration("foo", pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration("foo", true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 			aclsEnabled:                true,
 		},
 	}
@@ -1989,37 +2008,41 @@ func createCriticalHealthStatus(name string, namespace string) *pbcatalog.Health
 
 // createProxyConfiguration creates a proxyConfiguration that matches the pod from createPod,
 // assuming that metrics, telemetry, and overwrite probes are enabled separately.
-func createProxyConfiguration(podName string, mode pbmesh.ProxyMode) *pbmesh.ProxyConfiguration {
+func createProxyConfiguration(podName string, overwriteProbes bool, mode pbmesh.ProxyMode) *pbmesh.ProxyConfiguration {
 	mesh := &pbmesh.ProxyConfiguration{
 		Workloads: &pbcatalog.WorkloadSelector{
 			Names: []string{podName},
 		},
 		DynamicConfig: &pbmesh.DynamicConfig{
-			Mode: mode,
-			ExposeConfig: &pbmesh.ExposeConfig{
-				ExposePaths: []*pbmesh.ExposePath{
-					{
-						ListenerPort:  20400,
-						LocalPathPort: 2001,
-						Path:          "/livez",
-					},
-					{
-						ListenerPort:  20300,
-						LocalPathPort: 2000,
-						Path:          "/readyz",
-					},
-					{
-						ListenerPort:  20500,
-						LocalPathPort: 2002,
-						Path:          "/startupz",
-					},
-				},
-			},
+			Mode:         mode,
+			ExposeConfig: nil,
 		},
 		BootstrapConfig: &pbmesh.BootstrapConfig{
 			PrometheusBindAddr:              "0.0.0.0:1234",
 			TelemetryCollectorBindSocketDir: DefaultTelemetryBindSocketDir,
 		},
+	}
+
+	if overwriteProbes {
+		mesh.DynamicConfig.ExposeConfig = &pbmesh.ExposeConfig{
+			ExposePaths: []*pbmesh.ExposePath{
+				{
+					ListenerPort:  20400,
+					LocalPathPort: 2001,
+					Path:          "/livez",
+				},
+				{
+					ListenerPort:  20300,
+					LocalPathPort: 2000,
+					Path:          "/readyz",
+				},
+				{
+					ListenerPort:  20500,
+					LocalPathPort: 2002,
+					Path:          "/startupz",
+				},
+			},
+		}
 	}
 
 	if mode == pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT {

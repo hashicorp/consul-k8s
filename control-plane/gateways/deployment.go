@@ -63,8 +63,13 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: b.Labels(),
 				Annotations: map[string]string{
-					constants.AnnotationMeshInject:  "false",
+					// Indicate that this pod is a mesh gateway pod so that the Pod controller,
+					// consul-k8s CLI, etc. can key off of it
 					constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
+					// It's not logical to add a proxy sidecar since our workload is itself a proxy
+					constants.AnnotationMeshInject: "false",
+					// This functionality only applies when proxy sidecars are used
+					constants.AnnotationTransparentProxyOverwriteProbes: "false",
 				},
 			},
 			Spec: corev1.PodSpec{
