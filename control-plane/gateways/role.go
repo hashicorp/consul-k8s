@@ -11,9 +11,10 @@ import (
 func (b *meshGatewayBuilder) Role() *rbacv1.Role {
 	return &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      b.gateway.Name,
-			Namespace: b.gateway.Namespace,
-			Labels:    b.Labels(),
+			Name:        b.gateway.Name,
+			Namespace:   b.gateway.Namespace,
+			Labels:      b.Labels(&rbacv1.Role{}),
+			Annotations: b.Annotations(&rbacv1.Role{}),
 		},
 		Rules: []rbacv1.PolicyRule{},
 	}
@@ -22,9 +23,10 @@ func (b *meshGatewayBuilder) Role() *rbacv1.Role {
 func (b *meshGatewayBuilder) RoleBinding() *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      b.gateway.Name,
-			Namespace: b.gateway.Namespace,
-			Labels:    b.Labels(),
+			Name:        b.gateway.Name,
+			Namespace:   b.gateway.Namespace,
+			Labels:      b.Labels(&rbacv1.RoleBinding{}),
+			Annotations: b.Annotations(&rbacv1.RoleBinding{}),
 		},
 		Subjects: []rbacv1.Subject{
 			{

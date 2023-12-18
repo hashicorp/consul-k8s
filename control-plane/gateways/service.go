@@ -4,6 +4,7 @@
 package gateways
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -30,11 +31,11 @@ func (b *meshGatewayBuilder) Service() *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        b.gateway.Name,
 			Namespace:   b.gateway.Namespace,
-			Labels:      b.Labels(),
-			Annotations: b.Annotations(),
+			Labels:      b.Labels(&corev1.Service{}),
+			Annotations: b.Annotations(&corev1.Service{}),
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: b.Labels(),
+			Selector: b.Labels(&appsv1.Deployment{}),
 			Type:     serviceType,
 			Ports: []corev1.ServicePort{
 				{

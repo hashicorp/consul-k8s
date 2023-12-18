@@ -70,6 +70,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 					Labels: map[string]string{
 						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 					},
+					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: pointer.Int32(1),
@@ -324,6 +325,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 					Labels: map[string]string{
 						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 					},
+					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: pointer.Int32(1),
