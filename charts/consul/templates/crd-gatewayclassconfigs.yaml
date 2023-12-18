@@ -91,7 +91,7 @@ spec:
                     type: object
                   container:
                     description: Container contains config specific to the created
-                      Deployment's container
+                      Deployment's container.
                     properties:
                       consul:
                         description: Consul specifies configuration for the consul-dataplane
@@ -170,13 +170,22 @@ spec:
                             type: object
                         type: object
                     type: object
+                  dnsPolicy:
+                    description: DNSPolicy specifies the dns policy to use. These
+                      are set on a per pod basis.
+                    enum:
+                    - Default
+                    - ClusterFirst
+                    - ClusterFirstWithHostNet
+                    - None
+                    type: string
                   hostNetwork:
                     description: HostNetwork specifies whether the gateway pods should
-                      run on the host network
+                      run on the host network.
                     type: boolean
                   initContainer:
                     description: InitContainer contains config specific to the created
-                      Deployment's init container
+                      Deployment's init container.
                     properties:
                       consul:
                         description: Consul specifies configuration for the consul-k8s-control-plane
@@ -275,11 +284,11 @@ spec:
                     type: object
                   priorityClassName:
                     description: PriorityClassName specifies the priority class name
-                      to use on the created Deployment
+                      to use on the created Deployment.
                     type: string
                   replicas:
                     description: Replicas specifies the configuration to control the
-                      number of replicas for the created Deployment
+                      number of replicas for the created Deployment.
                     properties:
                       default:
                         description: Default is the number of replicas assigned to
@@ -303,7 +312,7 @@ spec:
                     type: object
                   securityContext:
                     description: SecurityContext specifies the security context for
-                      the created Deployment's Pod
+                      the created Deployment's Pod.
                     properties:
                       fsGroup:
                         description: "A special supplemental group that applies to
@@ -478,7 +487,7 @@ spec:
                     type: object
                   tolerations:
                     description: Tolerations specifies the tolerations to use on the
-                      created Deployment
+                      created Deployment.
                     items:
                       description: The pod this Toleration is attached to tolerates
                         any taint that matches the triple <key,value,effect> using
@@ -850,6 +859,10 @@ spec:
                   type:
                     description: Type specifies the type of Service to use (LoadBalancer,
                       ClusterIP, etc.)
+                    enum:
+                    - ClusterIP
+                    - NodePort
+                    - LoadBalancer
                     type: string
                 type: object
               serviceAccount:
