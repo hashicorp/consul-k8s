@@ -25,9 +25,7 @@ func TestNewMeshGatewayBuilder_ServiceAccount(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "mesh-gateway",
-			Labels: map[string]string{
-				"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-			},
+			Labels: defaultLabels,
 			Annotations: map[string]string{},
 		},
 	}

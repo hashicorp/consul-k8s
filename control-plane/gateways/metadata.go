@@ -10,6 +10,10 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
 
+const labelManagedBy = "mesh.consul.hashicorp.com/managed-by"
+
+var defaultLabels = map[string]string{labelManagedBy: "consul-k8s"}
+
 // Annotations returns the computed set of annotations for a resource by inheriting
 // from the MeshGateway's annotations and adding specified key-values.
 func (b *meshGatewayBuilder) Annotations(object client.Object) map[string]string {
@@ -44,7 +48,7 @@ func (b *meshGatewayBuilder) Annotations(object client.Object) map[string]string
 // from the MeshGateway's labels and adding specified key-values.
 func (b *meshGatewayBuilder) Labels(object client.Object) map[string]string {
 	if b.gcc == nil {
-		return map[string]string{"mesh.consul.hashicorp.com/managed-by": "consul-k8s"}
+		return defaultLabels
 	}
 
 	var (
@@ -64,11 +68,13 @@ func (b *meshGatewayBuilder) Labels(object client.Object) map[string]string {
 	case *corev1.ServiceAccount:
 		primarySource = b.gcc.Spec.ServiceAccount.Labels
 	default:
-		return map[string]string{"mesh.consul.hashicorp.com/managed-by": "consul-k8s"}
+		return defaultLabels
 	}
 
 	labels := computeAnnotationsOrLabels(b.gateway.Labels, primarySource, secondarySource)
-	labels["mesh.consul.hashicorp.com/managed-by"] = "consul-k8s"
+	for k, v := range defaultLabels {
+		labels[k] = v
+	}
 	return labels
 }
 
