@@ -101,7 +101,7 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			expectedConsulNamespace:    constants.DefaultConsulNS,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:         "kitchen sink new pod, non-default ns and partition",
@@ -127,7 +127,7 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			expectedConsulNamespace:    "bar",
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:         "new pod with namespace prefix",
@@ -194,7 +194,7 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			expectedConsulNamespace:    constants.DefaultConsulNS,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			expectedDestinations:       createDestinations(),
 		},
 		{
@@ -273,12 +273,12 @@ func TestReconcileUpdatePodWithMirrorNamespaces(t *testing.T) {
 			existingConsulNamespace:    "bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 
 			expectedConsulNamespace:    "bar",
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 	}
 
@@ -311,7 +311,7 @@ func TestReconcileDeletePodWithMirrorNamespaces(t *testing.T) {
 			existingConsulNamespace:    "bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 
 			expectedConsulNamespace: "bar",
 		},
@@ -330,7 +330,7 @@ func TestReconcileDeletePodWithMirrorNamespaces(t *testing.T) {
 			existingConsulNamespace:    "bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			existingDestinations:       createDestinations(),
 
 			expectedConsulNamespace: "bar",
@@ -415,7 +415,7 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			expectedConsulNamespace:    constants.DefaultConsulNS,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:      "new pod with explicit destinations, ns and partition",
@@ -439,7 +439,7 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			expectedConsulNamespace:    constants.DefaultConsulNS,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			expectedDestinations:       createDestinations(),
 		},
 		{
@@ -466,7 +466,7 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			expectedConsulNamespace:    "a-penguin-walks-into-a-bar",
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:         "namespace in Consul does not exist",
@@ -543,12 +543,12 @@ func TestReconcileUpdatePodWithDestinationNamespace(t *testing.T) {
 			existingConsulNamespace:    "a-penguin-walks-into-a-bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 
 			expectedConsulNamespace:    "a-penguin-walks-into-a-bar",
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 	}
 
@@ -581,7 +581,7 @@ func TestReconcileDeletePodWithDestinationNamespace(t *testing.T) {
 			existingConsulNamespace:    "a-penguin-walks-into-a-bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 
 			expectedConsulNamespace: "a-penguin-walks-into-a-bar",
 		},
@@ -600,7 +600,7 @@ func TestReconcileDeletePodWithDestinationNamespace(t *testing.T) {
 			existingConsulNamespace:    "a-penguin-walks-into-a-bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			existingDestinations:       createDestinations(),
 
 			expectedConsulNamespace: "a-penguin-walks-into-a-bar",
