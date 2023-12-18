@@ -1,4 +1,4 @@
-## Copyright (c) HashiCorp, Inc.
+# Copyright (c) HashiCorp, Inc.
 
 # This workflow checks that there is either a 'pr/no-backport' label applied to a PR
 # or there is a backport/<pr number>.txt file associated with a PR for a backport label
