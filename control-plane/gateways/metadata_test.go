@@ -10,7 +10,8 @@ import (
 
 func Test_computeAnnotationsOrLabels(t *testing.T) {
 	gatewaySet := map[string]string{
-		"service.beta.kubernetes.io/aws-load-balancer-name": "my-lb", // Will be inherited
+		"service.beta.kubernetes.io/aws-load-balancer-internal": "true",  // Will not be inherited
+		"service.beta.kubernetes.io/aws-load-balancer-name":     "my-lb", // Will be inherited
 	}
 
 	primary := meshv2beta1.GatewayClassAnnotationsLabelsConfig{
