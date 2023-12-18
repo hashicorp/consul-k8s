@@ -55,7 +55,6 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	}
 
 	return &appsv1.DeploymentSpec{
-		// TODO NET-6721
 		Replicas: deploymentReplicaCount(deploymentConfig.Replicas, nil),
 		Selector: &metav1.LabelSelector{
 			MatchLabels: b.Labels(&appsv1.Deployment{}),
