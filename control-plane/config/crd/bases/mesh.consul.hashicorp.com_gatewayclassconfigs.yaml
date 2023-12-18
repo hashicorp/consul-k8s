@@ -850,6 +850,10 @@ spec:
                   type:
                     description: Type specifies the type of Service to use (LoadBalancer,
                       ClusterIP, etc.)
+                    enum:
+                    - ClusterIP
+                    - NodePort
+                    - LoadBalancer
                     type: string
                 type: object
               serviceAccount:
