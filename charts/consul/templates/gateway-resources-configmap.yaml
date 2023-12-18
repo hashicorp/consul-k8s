@@ -66,6 +66,9 @@ data:
             {{- with .Values.meshGateway.hostNetwork }}
             hostNetwork: {{ . }}
             {{- end }}
+            {{- with .Values.meshGateway.dnsPolicy }}
+            dnsPolicy: {{ . }}
+            {{- end }}
             priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
             {{- if .Values.meshGateway.topologySpreadConstraints }}
             topologySpreadConstraints:
