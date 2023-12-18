@@ -486,8 +486,8 @@ func TestFailover_Connect(t *testing.T) {
 					}{
 						{failoverServer: testClusters[keyCluster01b], expectedPQ: expectedPQ{partition: "ap1", peerName: "", namespace: "ns2"}},
 						{failoverServer: testClusters[keyCluster01a], expectedPQ: expectedPQ{partition: "default", peerName: "", namespace: "ns2"}},
-						{failoverServer: testClusters[keyCluster02a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster02a].name, namespace: "ns2"}},
-						{failoverServer: testClusters[keyCluster03a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster03a].name, namespace: "ns2"}},
+						{failoverServer: testClusters[keyCluster02a], expectedPQ: expectedPQ{partition: "ap1", peerName: testClusters[keyCluster02a].name, namespace: "ns2"}},
+						{failoverServer: testClusters[keyCluster03a], expectedPQ: expectedPQ{partition: "ap1", peerName: testClusters[keyCluster03a].name, namespace: "ns2"}},
 					},
 					checkDNSPQ: false,
 				},
@@ -528,9 +528,9 @@ func TestFailover_Connect(t *testing.T) {
 					// We're resetting the scale, so make sure we have all the new IP addresses saved
 					testClusters.setServerIP(t)
 
-					for _, v := range sc.failovers {
+					for i, v := range sc.failovers {
 						// Verify Failover (If this is the first check, then just verifying we're starting with the right server)
-						logger.Log(t, "checking service failover")
+						logger.Log(t, "checking service failover", i)
 
 						if cfg.EnableTransparentProxy {
 							serviceFailoverCheck(t, sc.server, v.failoverServer.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", sc.server.fullTextPartition()))
@@ -540,11 +540,11 @@ func TestFailover_Connect(t *testing.T) {
 
 						// Verify DNS
 						if sc.checkDNSPQ {
-							logger.Log(t, "verifying dns")
+							logger.Log(t, "verifying dns", i)
 							dnsFailoverCheck(t, cfg, releaseName, *sc.server.dnsIP, sc.server, v.failoverServer)
 
 							// Verify PQ
-							logger.Log(t, "verifying prepared query")
+							logger.Log(t, "verifying prepared query", i)
 							preparedQueryFailoverCheck(t, releaseName, *sc.server.dnsIP, v.expectedPQ, sc.server, v.failoverServer)
 						} else {
 							// We currently skip running DNS and PQ tests for a couple of reasons
