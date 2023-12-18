@@ -2,13 +2,15 @@ package v1alpha1
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 func TestTerminatingGateway_MatchesConsul(t *testing.T) {
@@ -267,7 +269,7 @@ func TestTerminatingGateway_Validate(t *testing.T) {
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(testCase.namespacesEnabled)
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {
@@ -283,39 +285,44 @@ func TestTerminatingGateway_Validate(t *testing.T) {
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 func TestTerminatingGateway_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
-		enabled              bool
-		destinationNamespace string
-		mirroring            bool
-		prefix               string
-		expectedDestination  string
+		consulMeta          common.ConsulMeta
+		expectedDestination string
 	}{
 		"disabled": {
-			enabled:              false,
-			destinationNamespace: "",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    false,
+				DestinationNamespace: "",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "",
 		},
 		"destinationNS": {
-			enabled:              true,
-			destinationNamespace: "foo",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "foo",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "foo",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "foo",
 		},
 		"mirroringEnabledWithoutPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "",
-			expectedDestination:  "bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "",
+			},
+			expectedDestination: "bar",
 		},
 		"mirroringWithPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "ns-",
-			expectedDestination:  "ns-bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "ns-",
+			},
+			expectedDestination: "ns-bar",
 		},
 	}
 
@@ -356,37 +363,45 @@ func TestTerminatingGateway_DefaultNamespaceFields(t *testing.T) {
 					},
 				},
 			}
-			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			input.DefaultNamespaceFields(s.consulMeta)
 			require.True(t, cmp.Equal(input, output))
 		})
 	}
 }
 
 func TestTerminatingGateway_AddFinalizer(t *testing.T) {
-	resource := &TerminatingGateway{}
-	resource.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, resource.ObjectMeta.Finalizers)
+	terminatingGateway := &TerminatingGateway{}
+	terminatingGateway.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, terminatingGateway.ObjectMeta.Finalizers)
 }
 
 func TestTerminatingGateway_RemoveFinalizer(t *testing.T) {
-	resource := &TerminatingGateway{
+	terminatingGateway := &TerminatingGateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	resource.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, resource.ObjectMeta.Finalizers)
+	terminatingGateway.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, terminatingGateway.ObjectMeta.Finalizers)
 }
 
 func TestTerminatingGateway_SetSyncedCondition(t *testing.T) {
-	resource := &TerminatingGateway{}
-	resource.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	terminatingGateway := &TerminatingGateway{}
+	terminatingGateway.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, resource.Status.Conditions[0].Status)
-	require.Equal(t, "reason", resource.Status.Conditions[0].Reason)
-	require.Equal(t, "message", resource.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, terminatingGateway.Status.Conditions[0].Status)
+	require.Equal(t, "reason", terminatingGateway.Status.Conditions[0].Reason)
+	require.Equal(t, "message", terminatingGateway.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, resource.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, terminatingGateway.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestTerminatingGateway_SetLastSyncedTime(t *testing.T) {
+	terminatingGateway := &TerminatingGateway{}
+	syncedTime := metav1.NewTime(time.Now())
+	terminatingGateway.SetLastSyncedTime(&syncedTime)
+
+	require.Equal(t, &syncedTime, terminatingGateway.Status.LastSyncedTime)
 }
 
 func TestTerminatingGateway_GetSyncedConditionStatus(t *testing.T) {
@@ -397,7 +412,7 @@ func TestTerminatingGateway_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			resource := &TerminatingGateway{
+			terminatingGateway := &TerminatingGateway{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -406,7 +421,7 @@ func TestTerminatingGateway_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, resource.SyncedConditionStatus())
+			require.Equal(t, status, terminatingGateway.SyncedConditionStatus())
 		})
 	}
 }
@@ -455,8 +470,8 @@ func TestTerminatingGateway_ObjectMeta(t *testing.T) {
 		Name:      "name",
 		Namespace: "namespace",
 	}
-	resource := &TerminatingGateway{
+	terminatingGateway := &TerminatingGateway{
 		ObjectMeta: meta,
 	}
-	require.Equal(t, meta, resource.GetObjectMeta())
+	require.Equal(t, meta, terminatingGateway.GetObjectMeta())
 }

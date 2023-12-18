@@ -6,22 +6,22 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
-	admissionV1 "k8s.io/api/admission/v1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 // +kubebuilder:object:generate=false
 
 type ProxyDefaultsWebhook struct {
 	client.Client
-	ConsulClient           *capi.Client
-	Logger                 logr.Logger
-	decoder                *admission.Decoder
-	EnableConsulNamespaces bool
-	EnableNSMirroring      bool
+	ConsulClient *capi.Client
+	Logger       logr.Logger
+	decoder      *admission.Decoder
+	ConsulMeta   common.ConsulMeta
 }
 
 // NOTE: The path value in the below line is the path to the webhook.
@@ -41,7 +41,7 @@ func (v *ProxyDefaultsWebhook) Handle(ctx context.Context, req admission.Request
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if req.Operation == admissionV1.Create {
+	if req.Operation == admissionv1.Create {
 		v.Logger.Info("validate create", "name", proxyDefaults.KubernetesName())
 
 		if proxyDefaults.KubernetesName() != common.Global {
@@ -61,7 +61,7 @@ func (v *ProxyDefaultsWebhook) Handle(ctx context.Context, req admission.Request
 		}
 	}
 
-	if err := proxyDefaults.Validate(v.EnableConsulNamespaces); err != nil {
+	if err := proxyDefaults.Validate(v.ConsulMeta); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 	return admission.Allowed(fmt.Sprintf("valid %s request", proxyDefaults.KubeKind()))

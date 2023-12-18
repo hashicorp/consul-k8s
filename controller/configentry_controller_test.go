@@ -10,8 +10,6 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/api/common"
-	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -22,6 +20,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/hashicorp/consul-k8s/api/common"
+	"github.com/hashicorp/consul-k8s/api/v1alpha1"
 )
 
 const datacenterName = "datacenter"
@@ -109,7 +110,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGatewayConfig{
+					MeshGateway: v1alpha1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -238,7 +239,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.Destination{
+					Destination: v1alpha1.IntentionDestination{
 						Name: "foo",
 					},
 					Sources: v1alpha1.SourceIntentions{
@@ -523,7 +524,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGatewayConfig{
+					MeshGateway: v1alpha1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -674,7 +675,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.Destination{
+					Destination: v1alpha1.IntentionDestination{
 						Name: "foo",
 					},
 					Sources: v1alpha1.SourceIntentions{
@@ -962,7 +963,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGatewayConfig{
+					MeshGateway: v1alpha1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -1078,7 +1079,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.Destination{
+					Destination: v1alpha1.IntentionDestination{
 						Name: "foo",
 					},
 					Sources: v1alpha1.SourceIntentions{
@@ -1316,7 +1317,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGatewayConfig{
+					MeshGateway: v1alpha1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -1372,7 +1373,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.Destination{
+					Destination: v1alpha1.IntentionDestination{
 						Name: "foo",
 					},
 				},
@@ -1574,7 +1575,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGatewayConfig{
+					MeshGateway: v1alpha1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -1656,7 +1657,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 					Namespace: kubeNS,
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.Destination{
+					Destination: v1alpha1.IntentionDestination{
 						Name: "foo",
 					},
 					Sources: v1alpha1.SourceIntentions{
@@ -2021,7 +2022,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v1alpha1.ProxyDefaultsSpec{
-					MeshGateway: v1alpha1.MeshGatewayConfig{
+					MeshGateway: v1alpha1.MeshGateway{
 						Mode: "remote",
 					},
 				},
@@ -2146,7 +2147,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 					Finalizers:        []string{FinalizerName},
 				},
 				Spec: v1alpha1.ServiceIntentionsSpec{
-					Destination: v1alpha1.Destination{
+					Destination: v1alpha1.IntentionDestination{
 						Name: "foo",
 					},
 					Sources: v1alpha1.SourceIntentions{

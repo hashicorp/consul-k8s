@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -12,6 +11,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 const ServiceResolverKubeKind string = "serviceresolver"
@@ -25,7 +26,9 @@ func init() {
 
 // ServiceResolver is the Schema for the serviceresolvers API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+// +kubebuilder:resource:shortName="service-resolver"
 type ServiceResolver struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -35,14 +38,14 @@ type ServiceResolver struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceResolverList contains a list of ServiceResolver
+// ServiceResolverList contains a list of ServiceResolver.
 type ServiceResolverList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ServiceResolver `json:"items"`
 }
 
-// ServiceResolverSpec defines the desired state of ServiceResolver
+// ServiceResolverSpec defines the desired state of ServiceResolver.
 type ServiceResolverSpec struct {
 	// DefaultSubset is the subset to use when no explicit subset is requested.
 	// If empty the unnamed subset is used.
@@ -67,7 +70,7 @@ type ServiceResolverSpec struct {
 	Failover ServiceResolverFailoverMap `json:"failover,omitempty"`
 	// ConnectTimeout is the timeout for establishing new network connections
 	// to this service.
-	ConnectTimeout time.Duration `json:"connectTimeout,omitempty"`
+	ConnectTimeout metav1.Duration `json:"connectTimeout,omitempty"`
 	// LoadBalancer determines the load balancing policy and configuration for services
 	// issuing requests to this upstream service.
 	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
@@ -80,9 +83,12 @@ type ServiceResolverRedirect struct {
 	// of one defined as that service's DefaultSubset If empty the default
 	// subset is used.
 	ServiceSubset string `json:"serviceSubset,omitempty"`
-	// Namespace is the namespace to resolve the service from instead of the
-	// current one.
+	// Namespace is the Consul namespace to resolve the service from instead of
+	// the current namespace. If empty the current namespace is assumed.
 	Namespace string `json:"namespace,omitempty"`
+	// Partition is the Consul partition to resolve the service from instead of
+	// the current partition. If empty the current partition is assumed.
+	Partition string `json:"partition,omitempty"`
 	// Datacenter is the datacenter to resolve the service from instead of the
 	// current one.
 	Datacenter string `json:"datacenter,omitempty"`
@@ -180,7 +186,7 @@ type CookieConfig struct {
 	Session bool `json:"session,omitempty"`
 
 	// TTL is the ttl for generated cookies. Cannot be specified for session cookies.
-	TTL time.Duration `json:"ttl,omitempty"`
+	TTL metav1.Duration `json:"ttl,omitempty"`
 
 	// Path is the path to set for the cookie.
 	Path string `json:"path,omitempty"`
@@ -240,6 +246,10 @@ func (in *ServiceResolver) SetSyncedCondition(status corev1.ConditionStatus, rea
 	}
 }
 
+func (in *ServiceResolver) SetLastSyncedTime(time *metav1.Time) {
+	in.Status.LastSyncedTime = time
+}
+
 func (in *ServiceResolver) SyncedCondition() (status corev1.ConditionStatus, reason string, message string) {
 	cond := in.Status.GetCondition(ConditionSynced)
 	if cond == nil {
@@ -265,7 +275,7 @@ func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 		Subsets:        in.Spec.Subsets.toConsul(),
 		Redirect:       in.Spec.Redirect.toConsul(),
 		Failover:       in.Spec.Failover.toConsul(),
-		ConnectTimeout: in.Spec.ConnectTimeout,
+		ConnectTimeout: in.Spec.ConnectTimeout.Duration,
 		LoadBalancer:   in.Spec.LoadBalancer.toConsul(),
 		Meta:           meta(datacenter),
 	}
@@ -277,14 +287,14 @@ func (in *ServiceResolver) MatchesConsul(candidate capi.ConfigEntry) bool {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceResolverConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceResolverConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceResolver) ConsulGlobalResource() bool {
 	return false
 }
 
-func (in *ServiceResolver) Validate(namespacesEnabled bool) error {
+func (in *ServiceResolver) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 
@@ -296,7 +306,7 @@ func (in *ServiceResolver) Validate(namespacesEnabled bool) error {
 
 	errs = append(errs, in.Spec.LoadBalancer.validate(path.Child("loadBalancer"))...)
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateEnterprise(consulMeta)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -308,8 +318,7 @@ func (in *ServiceResolver) Validate(namespacesEnabled bool) error {
 
 // DefaultNamespaceFields has no behaviour here as service-resolver have namespace fields
 // that do not default.
-func (in *ServiceResolver) DefaultNamespaceFields(_ bool, _ string, _ bool, _ string) {
-	return
+func (in *ServiceResolver) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
 
 func (in ServiceResolverSubsetMap) toConsul() map[string]capi.ServiceResolverSubset {
@@ -414,7 +423,7 @@ func (in *CookieConfig) toConsul() *capi.CookieConfig {
 	}
 	return &capi.CookieConfig{
 		Session: in.Session,
-		TTL:     in.TTL,
+		TTL:     in.TTL.Duration,
 		Path:    in.Path,
 	}
 }
@@ -424,17 +433,17 @@ func (in *CookieConfig) validate(path *field.Path) *field.Error {
 		return nil
 	}
 
-	if in.Session && in.TTL > 0 {
+	if in.Session && in.TTL.Duration > 0 {
 		asJSON, _ := json.Marshal(in)
 		return field.Invalid(path, string(asJSON), "cannot set both session and ttl")
 	}
 	return nil
 }
 
-func (in *ServiceResolver) validateNamespaces(namespacesEnabled bool) field.ErrorList {
+func (in *ServiceResolver) validateEnterprise(consulMeta common.ConsulMeta) field.ErrorList {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
-	if !namespacesEnabled {
+	if !consulMeta.NamespacesEnabled {
 		if in.Spec.Redirect != nil {
 			if in.Spec.Redirect.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("redirect").Child("namespace"), in.Spec.Redirect.Namespace, `Consul Enterprise namespaces must be enabled to set redirect.namespace`))
@@ -445,7 +454,13 @@ func (in *ServiceResolver) validateNamespaces(namespacesEnabled bool) field.Erro
 				errs = append(errs, field.Invalid(path.Child("failover").Key(k).Child("namespace"), v.Namespace, `Consul Enterprise namespaces must be enabled to set failover.namespace`))
 			}
 		}
-
+	}
+	if !consulMeta.PartitionsEnabled {
+		if in.Spec.Redirect != nil {
+			if in.Spec.Redirect.Partition != "" {
+				errs = append(errs, field.Invalid(path.Child("redirect").Child("partition"), in.Spec.Redirect.Partition, `Consul Enterprise partitions must be enabled to set redirect.partition`))
+			}
+		}
 	}
 	return errs
 }
@@ -473,16 +488,21 @@ func (in *LoadBalancer) validate(path *field.Path) field.ErrorList {
 
 func (in HashPolicy) validate(path *field.Path) field.ErrorList {
 	var errs field.ErrorList
-	validFields := []string{"header", "cookie", "query_parameter"}
-	if !sliceContains(validFields, in.Field) {
-		errs = append(errs, field.Invalid(path.Child("field"), in.Field,
-			notInSliceMessage(validFields)))
-	}
+	if in.Field != "" {
+		validFields := []string{"header", "cookie", "query_parameter"}
+		if !sliceContains(validFields, in.Field) {
+			errs = append(errs, field.Invalid(path.Child("field"), in.Field,
+				notInSliceMessage(validFields)))
+		}
 
-	if in.Field != "" && in.SourceIP {
-		asJSON, _ := json.Marshal(in)
-		errs = append(errs, field.Invalid(path, string(asJSON),
-			"cannot set both field and sourceIP"))
+		if in.SourceIP {
+			asJSON, _ := json.Marshal(in)
+			errs = append(errs, field.Invalid(path, string(asJSON),
+				"cannot set both field and sourceIP"))
+		} else if in.FieldValue == "" {
+			errs = append(errs, field.Invalid(path.Child("fieldValue"), in.FieldValue,
+				"fieldValue cannot be empty if field is set"))
+		}
 	}
 
 	if err := in.CookieConfig.validate(path.Child("cookieConfig")); err != nil {

@@ -7,24 +7,22 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
-	admissionV1 "k8s.io/api/admission/v1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 // +kubebuilder:object:generate=false
 
 type ServiceIntentionsWebhook struct {
 	client.Client
-	ConsulClient               *capi.Client
-	Logger                     logr.Logger
-	decoder                    *admission.Decoder
-	EnableConsulNamespaces     bool
-	EnableNSMirroring          bool
-	ConsulDestinationNamespace string
-	NSMirroringPrefix          string
+	ConsulClient *capi.Client
+	Logger       logr.Logger
+	decoder      *admission.Decoder
+	ConsulMeta   common.ConsulMeta
 }
 
 // NOTE: The path value in the below line is the path to the webhook.
@@ -44,13 +42,13 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	defaultingPatches, err := common.DefaultingPatches(&svcIntentions, v.EnableConsulNamespaces, v.EnableNSMirroring, v.ConsulDestinationNamespace, v.NSMirroringPrefix)
+	defaultingPatches, err := common.DefaultingPatches(&svcIntentions, v.ConsulMeta)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	singleConsulDestNS := !(v.EnableConsulNamespaces && v.EnableNSMirroring)
-	if req.Operation == admissionV1.Create {
+	singleConsulDestNS := !(v.ConsulMeta.NamespacesEnabled && v.ConsulMeta.Mirroring)
+	if req.Operation == admissionv1.Create {
 		v.Logger.Info("validate create", "name", svcIntentions.KubernetesName())
 
 		if err := v.Client.List(ctx, &svcIntentionsList); err != nil {
@@ -72,7 +70,7 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 					fmt.Errorf("an existing ServiceIntentions resource has `spec.destination.name: %s` and `spec.destination.namespace: %s`", svcIntentions.Spec.Destination.Name, svcIntentions.Spec.Destination.Namespace))
 			}
 		}
-	} else if req.Operation == admissionV1.Update {
+	} else if req.Operation == admissionv1.Update {
 		v.Logger.Info("validate update", "name", svcIntentions.KubernetesName())
 		var prevIntention, newIntention ServiceIntentions
 		if err := v.decoder.DecodeRaw(*req.OldObject.DeepCopy(), &prevIntention); err != nil {
@@ -89,7 +87,7 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 	}
 
 	// ServiceIntentions are invalid if destination namespaces or source namespaces are set when Consul Namespaces are not enabled.
-	if err := svcIntentions.Validate(v.EnableConsulNamespaces); err != nil {
+	if err := svcIntentions.Validate(v.ConsulMeta); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 

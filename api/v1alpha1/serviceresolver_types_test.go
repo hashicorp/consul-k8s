@@ -4,11 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 func TestServiceResolver_MatchesConsul(t *testing.T) {
@@ -74,7 +75,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 						},
 					},
-					ConnectTimeout: 1 * time.Second,
+					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -90,7 +91,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 								FieldValue: "value",
 								CookieConfig: &CookieConfig{
 									Session: true,
-									TTL:     1,
+									TTL:     metav1.Duration{Duration: 1},
 									Path:    "path",
 								},
 								SourceIP: true,
@@ -243,7 +244,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 						},
 					},
-					ConnectTimeout: 1 * time.Second,
+					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -259,7 +260,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 								FieldValue: "value",
 								CookieConfig: &CookieConfig{
 									Session: true,
-									TTL:     1,
+									TTL:     metav1.Duration{Duration: 1},
 									Path:    "path",
 								},
 								SourceIP: true,
@@ -371,6 +372,14 @@ func TestServiceResolver_SetSyncedCondition(t *testing.T) {
 	require.True(t, serviceResolver.Status.Conditions[0].LastTransitionTime.Before(&now))
 }
 
+func TestServiceResolver_SetLastSyncedTime(t *testing.T) {
+	serviceResolver := &ServiceResolver{}
+	syncedTime := metav1.NewTime(time.Now())
+	serviceResolver.SetLastSyncedTime(&syncedTime)
+
+	require.Equal(t, &syncedTime, serviceResolver.Status.LastSyncedTime)
+}
+
 func TestServiceResolver_GetSyncedConditionStatus(t *testing.T) {
 	cases := []corev1.ConditionStatus{
 		corev1.ConditionUnknown,
@@ -447,6 +456,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input             *ServiceResolver
 		namespacesEnabled bool
+		partitionsEnabled bool
 		expectedErrMsgs   []string
 	}{
 		"namespaces enabled: valid": {
@@ -468,6 +478,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: true,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"namespaces disabled: valid": {
@@ -487,6 +498,50 @@ func TestServiceResolver_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: false,
+			partitionsEnabled: false,
+			expectedErrMsgs:   nil,
+		},
+		"partitions enabled: valid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service:   "bar",
+						Namespace: "namespace-a",
+						Partition: "other",
+					},
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Service:   "baz",
+							Namespace: "namespace-b",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"partitions disabled: valid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Service: "bar",
+					},
+					Failover: map[string]ServiceResolverFailover{
+						"failA": {
+							Service: "baz",
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"failover service, servicesubset, namespace, datacenters empty": {
@@ -534,8 +589,47 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].field: Invalid value: "invalid": must be one of "header", "cookie", "query_parameter"`,
+				`serviceresolver.consul.hashicorp.com "foo" is invalid: [spec.loadBalancer.hashPolicies[0].field: Invalid value: "invalid": must be one of "header", "cookie", "query_parameter"`,
+				`spec.loadBalancer.hashPolicies[0].fieldValue: Invalid value: "": fieldValue cannot be empty if field is set`,
 			},
+		},
+		"hashPolicy.field without fieldValue": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					LoadBalancer: &LoadBalancer{
+						HashPolicies: []HashPolicy{
+							{
+								Field: "header",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].fieldValue: Invalid value: "": fieldValue cannot be empty if field is set`,
+			},
+		},
+		"hashPolicy just sourceIP set": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					LoadBalancer: &LoadBalancer{
+						HashPolicies: []HashPolicy{
+							{
+								SourceIP: true,
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
 		},
 		"hashPolicy sourceIP and field set": {
 			input: &ServiceResolver{
@@ -558,6 +652,22 @@ func TestServiceResolver_Validate(t *testing.T) {
 				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0]: Invalid value: "{\"field\":\"header\",\"sourceIP\":true}": cannot set both field and sourceIP`,
 			},
 		},
+		"hashPolicy nothing set is valid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					LoadBalancer: &LoadBalancer{
+						HashPolicies: []HashPolicy{
+							{},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
+		},
 		"cookieConfig session and ttl set": {
 			input: &ServiceResolver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -567,10 +677,11 @@ func TestServiceResolver_Validate(t *testing.T) {
 					LoadBalancer: &LoadBalancer{
 						HashPolicies: []HashPolicy{
 							{
-								Field: "cookie",
+								Field:      "cookie",
+								FieldValue: "cookiename",
 								CookieConfig: &CookieConfig{
 									Session: true,
-									TTL:     100,
+									TTL:     metav1.Duration{Duration: 100},
 								},
 							},
 						},
@@ -579,7 +690,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].cookieConfig: Invalid value: "{\"session\":true,\"ttl\":100}": cannot set both session and ttl`,
+				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].cookieConfig: Invalid value: "{\"session\":true,\"ttl\":\"100ns\"}": cannot set both session and ttl`,
 			},
 		},
 		"namespaces disabled: redirect namespace specified": {
@@ -596,6 +707,24 @@ func TestServiceResolver_Validate(t *testing.T) {
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
 				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.redirect.namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set redirect.namespace",
+			},
+		},
+		"partitions disabled: redirect partition specified": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					Redirect: &ServiceResolverRedirect{
+						Namespace: "namespace-a",
+						Partition: "other",
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.redirect.partition: Invalid value: \"other\": Consul Enterprise partitions must be enabled to set redirect.partition",
 			},
 		},
 		"namespaces disabled: single failover namespace specified": {
@@ -641,7 +770,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(testCase.namespacesEnabled)
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionsEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {

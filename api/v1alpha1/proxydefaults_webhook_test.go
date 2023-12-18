@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/stretchr/testify/require"
-	admissionV1 "k8s.io/api/admission/v1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 func TestValidateProxyDefault(t *testing.T) {
@@ -59,7 +60,7 @@ func TestValidateProxyDefault(t *testing.T) {
 					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "local",
 					},
 				},
@@ -77,6 +78,34 @@ func TestValidateProxyDefault(t *testing.T) {
 			expAllow:      false,
 			expErrMessage: "proxydefaults resource name must be \"global\"",
 		},
+		"transparentProxy.outboundListenerPort set": {
+			existingResources: []runtime.Object{},
+			newResource: &ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					TransparentProxy: &TransparentProxy{
+						OutboundListenerPort: 1000,
+					},
+				},
+			},
+			expAllow:      false,
+			expErrMessage: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
+		},
+		"mode value set": {
+			existingResources: []runtime.Object{},
+			newResource: &ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					Mode: proxyModeRef("transparent"),
+				},
+			},
+			expAllow:      false,
+			expErrMessage: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -85,7 +114,7 @@ func TestValidateProxyDefault(t *testing.T) {
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ProxyDefaults{}, &ProxyDefaultsList{})
-			client := fake.NewFakeClientWithScheme(s, c.existingResources...)
+			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 
@@ -96,10 +125,10 @@ func TestValidateProxyDefault(t *testing.T) {
 				decoder:      decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{
-				AdmissionRequest: admissionV1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
-					Operation: admissionV1.Create,
+					Operation: admissionv1.Create,
 					Object: runtime.RawExtension{
 						Raw: marshalledRequestObject,
 					},

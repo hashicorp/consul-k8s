@@ -2,16 +2,27 @@ package v1alpha1
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 func TestIngressGateway_MatchesConsul(t *testing.T) {
+
+	defaultMaxConnections := uint32(100)
+	defaultMaxPendingRequests := uint32(101)
+	defaultMaxConcurrentRequests := uint32(102)
+
+	maxConnections := uint32(200)
+	maxPendingRequests := uint32(201)
+	maxConcurrentRequests := uint32(202)
+
 	cases := map[string]struct {
 		Ours    IngressGateway
 		Theirs  capi.ConfigEntry
@@ -45,16 +56,80 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 				Spec: IngressGatewaySpec{
 					TLS: GatewayTLSConfig{
 						Enabled: true,
+						SDS: &GatewayTLSSDSConfig{
+							ClusterName:  "cluster1",
+							CertResource: "cert1",
+						},
+						TLSMinVersion: "TLSv1_0",
+						TLSMaxVersion: "TLSv1_1",
+						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+					},
+					Defaults: &IngressServiceConfig{
+						MaxConnections:        &defaultMaxConnections,
+						MaxPendingRequests:    &defaultMaxPendingRequests,
+						MaxConcurrentRequests: &defaultMaxConcurrentRequests,
 					},
 					Listeners: []IngressListener{
 						{
 							Port:     8888,
 							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								Enabled: true,
+								SDS: &GatewayTLSSDSConfig{
+									ClusterName:  "cluster1",
+									CertResource: "cert1",
+								},
+								TLSMinVersion: "TLSv1_0",
+								TLSMaxVersion: "TLSv1_1",
+								CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+							},
 							Services: []IngressService{
 								{
 									Name:      "name1",
 									Hosts:     []string{"host1_1", "host1_2"},
 									Namespace: "ns1",
+									Partition: "default",
+									IngressServiceConfig: IngressServiceConfig{
+										MaxConnections:        &maxConnections,
+										MaxPendingRequests:    &maxPendingRequests,
+										MaxConcurrentRequests: &maxConcurrentRequests,
+									},
+									TLS: &GatewayServiceTLSConfig{
+										SDS: &GatewayTLSSDSConfig{
+											ClusterName:  "cluster1",
+											CertResource: "cert1",
+										},
+									},
+									RequestHeaders: &HTTPHeaderModifiers{
+										Add: map[string]string{
+											"foo":    "bar",
+											"source": "dest",
+										},
+										Set: map[string]string{
+											"bar": "baz",
+											"key": "car",
+										},
+										Remove: []string{
+											"foo",
+											"bar",
+											"baz",
+										},
+									},
+									ResponseHeaders: &HTTPHeaderModifiers{
+										Add: map[string]string{
+											"doo":    "var",
+											"aource": "sest",
+										},
+										Set: map[string]string{
+											"var": "vaz",
+											"jey": "xar",
+										},
+										Remove: []string{
+											"doo",
+											"var",
+											"vaz",
+										},
+									},
 								},
 								{
 									Name:      "name2",
@@ -81,16 +156,78 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 				Namespace: "foobar",
 				TLS: capi.GatewayTLSConfig{
 					Enabled: true,
+					SDS: &capi.GatewayTLSSDSConfig{
+						ClusterName:  "cluster1",
+						CertResource: "cert1",
+					},
+					TLSMinVersion: "TLSv1_0",
+					TLSMaxVersion: "TLSv1_1",
+					CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+				},
+				Defaults: &capi.IngressServiceConfig{
+					MaxConnections:        &defaultMaxConnections,
+					MaxPendingRequests:    &defaultMaxPendingRequests,
+					MaxConcurrentRequests: &defaultMaxConcurrentRequests,
 				},
 				Listeners: []capi.IngressListener{
 					{
 						Port:     8888,
 						Protocol: "tcp",
+						TLS: &capi.GatewayTLSConfig{
+							Enabled: true,
+							SDS: &capi.GatewayTLSSDSConfig{
+								ClusterName:  "cluster1",
+								CertResource: "cert1",
+							},
+							TLSMinVersion: "TLSv1_0",
+							TLSMaxVersion: "TLSv1_1",
+							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						},
 						Services: []capi.IngressService{
 							{
-								Name:      "name1",
-								Hosts:     []string{"host1_1", "host1_2"},
-								Namespace: "ns1",
+								Name:                  "name1",
+								Hosts:                 []string{"host1_1", "host1_2"},
+								Namespace:             "ns1",
+								Partition:             "default",
+								MaxConnections:        &maxConnections,
+								MaxPendingRequests:    &maxPendingRequests,
+								MaxConcurrentRequests: &maxConcurrentRequests,
+								TLS: &capi.GatewayServiceTLSConfig{
+									SDS: &capi.GatewayTLSSDSConfig{
+										ClusterName:  "cluster1",
+										CertResource: "cert1",
+									},
+								},
+								RequestHeaders: &capi.HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &capi.HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 							{
 								Name:      "name2",
@@ -144,6 +281,15 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 }
 
 func TestIngressGateway_ToConsul(t *testing.T) {
+
+	defaultMaxConnections := uint32(100)
+	defaultMaxPendingRequests := uint32(101)
+	defaultMaxConcurrentRequests := uint32(102)
+
+	maxConnections := uint32(200)
+	maxPendingRequests := uint32(201)
+	maxConcurrentRequests := uint32(202)
+
 	cases := map[string]struct {
 		Ours IngressGateway
 		Exp  *capi.IngressGatewayConfigEntry
@@ -172,16 +318,80 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 				Spec: IngressGatewaySpec{
 					TLS: GatewayTLSConfig{
 						Enabled: true,
+						SDS: &GatewayTLSSDSConfig{
+							ClusterName:  "cluster1",
+							CertResource: "cert1",
+						},
+						TLSMinVersion: "TLSv1_0",
+						TLSMaxVersion: "TLSv1_1",
+						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+					},
+					Defaults: &IngressServiceConfig{
+						MaxConnections:        &defaultMaxConnections,
+						MaxPendingRequests:    &defaultMaxPendingRequests,
+						MaxConcurrentRequests: &defaultMaxConcurrentRequests,
 					},
 					Listeners: []IngressListener{
 						{
 							Port:     8888,
 							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								Enabled: true,
+								SDS: &GatewayTLSSDSConfig{
+									ClusterName:  "cluster1",
+									CertResource: "cert1",
+								},
+								TLSMinVersion: "TLSv1_0",
+								TLSMaxVersion: "TLSv1_1",
+								CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+							},
 							Services: []IngressService{
 								{
 									Name:      "name1",
 									Hosts:     []string{"host1_1", "host1_2"},
 									Namespace: "ns1",
+									Partition: "default",
+									IngressServiceConfig: IngressServiceConfig{
+										MaxConnections:        &maxConnections,
+										MaxPendingRequests:    &maxPendingRequests,
+										MaxConcurrentRequests: &maxConcurrentRequests,
+									},
+									TLS: &GatewayServiceTLSConfig{
+										SDS: &GatewayTLSSDSConfig{
+											ClusterName:  "cluster1",
+											CertResource: "cert1",
+										},
+									},
+									RequestHeaders: &HTTPHeaderModifiers{
+										Add: map[string]string{
+											"foo":    "bar",
+											"source": "dest",
+										},
+										Set: map[string]string{
+											"bar": "baz",
+											"key": "car",
+										},
+										Remove: []string{
+											"foo",
+											"bar",
+											"baz",
+										},
+									},
+									ResponseHeaders: &HTTPHeaderModifiers{
+										Add: map[string]string{
+											"doo":    "var",
+											"aource": "sest",
+										},
+										Set: map[string]string{
+											"var": "vaz",
+											"jey": "xar",
+										},
+										Remove: []string{
+											"doo",
+											"var",
+											"vaz",
+										},
+									},
 								},
 								{
 									Name:      "name2",
@@ -207,16 +417,78 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 				Name: "name",
 				TLS: capi.GatewayTLSConfig{
 					Enabled: true,
+					SDS: &capi.GatewayTLSSDSConfig{
+						ClusterName:  "cluster1",
+						CertResource: "cert1",
+					},
+					TLSMinVersion: "TLSv1_0",
+					TLSMaxVersion: "TLSv1_1",
+					CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+				},
+				Defaults: &capi.IngressServiceConfig{
+					MaxConnections:        &defaultMaxConnections,
+					MaxPendingRequests:    &defaultMaxPendingRequests,
+					MaxConcurrentRequests: &defaultMaxConcurrentRequests,
 				},
 				Listeners: []capi.IngressListener{
 					{
 						Port:     8888,
 						Protocol: "tcp",
+						TLS: &capi.GatewayTLSConfig{
+							Enabled: true,
+							SDS: &capi.GatewayTLSSDSConfig{
+								ClusterName:  "cluster1",
+								CertResource: "cert1",
+							},
+							TLSMinVersion: "TLSv1_0",
+							TLSMaxVersion: "TLSv1_1",
+							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						},
 						Services: []capi.IngressService{
 							{
-								Name:      "name1",
-								Hosts:     []string{"host1_1", "host1_2"},
-								Namespace: "ns1",
+								Name:                  "name1",
+								Hosts:                 []string{"host1_1", "host1_2"},
+								Namespace:             "ns1",
+								Partition:             "default",
+								MaxConnections:        &maxConnections,
+								MaxPendingRequests:    &maxPendingRequests,
+								MaxConcurrentRequests: &maxConcurrentRequests,
+								TLS: &capi.GatewayServiceTLSConfig{
+									SDS: &capi.GatewayTLSSDSConfig{
+										ClusterName:  "cluster1",
+										CertResource: "cert1",
+									},
+								},
+								RequestHeaders: &capi.HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &capi.HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 							{
 								Name:      "name2",
@@ -246,19 +518,54 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			act := c.Ours.ToConsul("datacenter")
-			resource, ok := act.(*capi.IngressGatewayConfigEntry)
+			ingressGateway, ok := act.(*capi.IngressGatewayConfigEntry)
 			require.True(t, ok, "could not cast")
-			require.Equal(t, c.Exp, resource)
+			require.Equal(t, c.Exp, ingressGateway)
 		})
 	}
 }
 
 func TestIngressGateway_Validate(t *testing.T) {
+	zero := uint32(0)
+
 	cases := map[string]struct {
 		input             *IngressGateway
 		namespacesEnabled bool
+		partitionEnabled  bool
 		expectedErrMsgs   []string
 	}{
+		"tls.minTLSVersion invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					TLS: GatewayTLSConfig{
+						TLSMinVersion: "foo",
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.tls.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
+		"tls.maxTLSVersion invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					TLS: GatewayTLSConfig{
+						TLSMaxVersion: "foo",
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.tls.tlsMaxVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
 		"listener.protocol invalid": {
 			input: &IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
@@ -374,6 +681,46 @@ func TestIngressGateway_Validate(t *testing.T) {
 				`spec.listeners[0].services[0].hosts: Invalid value: "[\"host1\",\"host2\"]": hosts must be empty if protocol is "tcp"`,
 			},
 		},
+		"listeners.tls.minTLSVersion invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								TLSMinVersion: "foo",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].tls.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
+		"listeners.tls.maxTLSVersion invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								TLSMaxVersion: "foo",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].tls.tlsMaxVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
+			},
+		},
 		"service.namespace set when namespaces disabled": {
 			input: &IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
@@ -419,6 +766,203 @@ func TestIngressGateway_Validate(t *testing.T) {
 			},
 			namespacesEnabled: true,
 		},
+		"tls valid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					TLS: GatewayTLSConfig{
+						TLSMinVersion: "TLS_AUTO",
+						TLSMaxVersion: "TLS_AUTO",
+					},
+				},
+			},
+		},
+		"listeners.tls valid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							TLS: &GatewayTLSConfig{
+								TLSMinVersion: "TLS_AUTO",
+								TLSMaxVersion: "TLS_AUTO",
+							},
+						},
+					},
+				},
+			},
+		},
+		"service.partition set when partitions disabled": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							Services: []IngressService{
+								{
+									Name:      "name",
+									Partition: "foo",
+								},
+							},
+						},
+					},
+				},
+			},
+			partitionEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.listeners[0].services[0].partition: Invalid value: "foo": Consul Enterprise admin-partitions must be enabled to set service.partition`,
+			},
+		},
+		"service.partition set when partitions enabled": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "tcp",
+							Services: []IngressService{
+								{
+									Name:      "name",
+									Partition: "foo",
+								},
+							},
+						},
+					},
+				},
+			},
+			partitionEnabled: true,
+		},
+		"defaults.maxConnections invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Defaults: &IngressServiceConfig{
+						MaxConnections: &zero,
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.defaults.maxconnections: Invalid`,
+			},
+		},
+		"defaults.maxPendingRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Defaults: &IngressServiceConfig{
+						MaxPendingRequests: &zero,
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.defaults.maxpendingrequests: Invalid`,
+			},
+		},
+		"defaults.maxConcurrentRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Defaults: &IngressServiceConfig{
+						MaxConcurrentRequests: &zero,
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.defaults.maxconcurrentrequests: Invalid`,
+			},
+		},
+		"service.maxConnections invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "http",
+							Services: []IngressService{
+								{
+									Name: "svc1",
+									IngressServiceConfig: IngressServiceConfig{
+										MaxConnections: &zero,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].maxconnections: Invalid`,
+			},
+		},
+		"service.maxConcurrentRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "http",
+							Services: []IngressService{
+								{
+									Name: "svc1",
+									IngressServiceConfig: IngressServiceConfig{
+										MaxConcurrentRequests: &zero,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].maxconcurrentrequests: Invalid`,
+			},
+		},
+		"service.maxPendingRequests invalid": {
+			input: &IngressGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: IngressGatewaySpec{
+					Listeners: []IngressListener{
+						{
+							Protocol: "http",
+							Services: []IngressService{
+								{
+									Name: "svc1",
+									IngressServiceConfig: IngressServiceConfig{
+										MaxPendingRequests: &zero,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.listeners[0].maxpendingrequests: Invalid`,
+			},
+		},
+
 		"multiple errors": {
 			input: &IngressGateway{
 				ObjectMeta: metav1.ObjectMeta{
@@ -447,7 +991,7 @@ func TestIngressGateway_Validate(t *testing.T) {
 
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(testCase.namespacesEnabled)
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {
@@ -463,39 +1007,44 @@ func TestIngressGateway_Validate(t *testing.T) {
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 func TestIngressGateway_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
-		enabled              bool
-		destinationNamespace string
-		mirroring            bool
-		prefix               string
-		expectedDestination  string
+		consulMeta          common.ConsulMeta
+		expectedDestination string
 	}{
 		"disabled": {
-			enabled:              false,
-			destinationNamespace: "",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    false,
+				DestinationNamespace: "",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "",
 		},
 		"destinationNS": {
-			enabled:              true,
-			destinationNamespace: "foo",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "foo",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "foo",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "foo",
 		},
 		"mirroringEnabledWithoutPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "",
-			expectedDestination:  "bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "",
+			},
+			expectedDestination: "bar",
 		},
 		"mirroringWithPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "ns-",
-			expectedDestination:  "ns-bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "ns-",
+			},
+			expectedDestination: "ns-bar",
 		},
 	}
 
@@ -546,37 +1095,45 @@ func TestIngressGateway_DefaultNamespaceFields(t *testing.T) {
 					},
 				},
 			}
-			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			input.DefaultNamespaceFields(s.consulMeta)
 			require.True(t, cmp.Equal(input, output))
 		})
 	}
 }
 
 func TestIngressGateway_AddFinalizer(t *testing.T) {
-	resource := &IngressGateway{}
-	resource.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, resource.ObjectMeta.Finalizers)
+	ingressGateway := &IngressGateway{}
+	ingressGateway.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, ingressGateway.ObjectMeta.Finalizers)
 }
 
 func TestIngressGateway_RemoveFinalizer(t *testing.T) {
-	resource := &IngressGateway{
+	ingressGateway := &IngressGateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	resource.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, resource.ObjectMeta.Finalizers)
+	ingressGateway.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, ingressGateway.ObjectMeta.Finalizers)
 }
 
 func TestIngressGateway_SetSyncedCondition(t *testing.T) {
-	resource := &IngressGateway{}
-	resource.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	ingressGateway := &IngressGateway{}
+	ingressGateway.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, resource.Status.Conditions[0].Status)
-	require.Equal(t, "reason", resource.Status.Conditions[0].Reason)
-	require.Equal(t, "message", resource.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, ingressGateway.Status.Conditions[0].Status)
+	require.Equal(t, "reason", ingressGateway.Status.Conditions[0].Reason)
+	require.Equal(t, "message", ingressGateway.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, resource.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, ingressGateway.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestIngressGateway_SetLastSyncedTime(t *testing.T) {
+	ingressGateway := &IngressGateway{}
+	syncedTime := metav1.NewTime(time.Now())
+	ingressGateway.SetLastSyncedTime(&syncedTime)
+
+	require.Equal(t, &syncedTime, ingressGateway.Status.LastSyncedTime)
 }
 
 func TestIngressGateway_GetSyncedConditionStatus(t *testing.T) {
@@ -587,7 +1144,7 @@ func TestIngressGateway_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			resource := &IngressGateway{
+			ingressGateway := &IngressGateway{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -596,7 +1153,7 @@ func TestIngressGateway_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, resource.SyncedConditionStatus())
+			require.Equal(t, status, ingressGateway.SyncedConditionStatus())
 		})
 	}
 }
@@ -645,8 +1202,8 @@ func TestIngressGateway_ObjectMeta(t *testing.T) {
 		Name:      "name",
 		Namespace: "namespace",
 	}
-	resource := &IngressGateway{
+	ingressGateway := &IngressGateway{
 		ObjectMeta: meta,
 	}
-	require.Equal(t, meta, resource.GetObjectMeta())
+	require.Equal(t, meta, ingressGateway.GetObjectMeta())
 }

@@ -5,10 +5,11 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 // +kubebuilder:object:generate=false
@@ -17,26 +18,8 @@ type TerminatingGatewayWebhook struct {
 	ConsulClient *capi.Client
 	Logger       logr.Logger
 
-	// EnableConsulNamespaces indicates that a user is running Consul Enterprise
-	// with version 1.7+ which supports namespaces.
-	EnableConsulNamespaces bool
-
-	// EnableNSMirroring causes Consul namespaces to be created to match the
-	// k8s namespace of any config entry custom resource. Config entries will
-	// be created in the matching Consul namespace.
-	EnableNSMirroring bool
-
-	// ConsulDestinationNamespace is the namespace in Consul that the config entry created
-	// in k8s will get mapped into. If the Consul namespace does not already exist, it will
-	// be created.
-	ConsulDestinationNamespace string
-
-	// NSMirroringPrefix works in conjunction with Namespace Mirroring.
-	// It is the prefix added to the Consul namespace to map to a specific.
-	// k8s namespace. For example, if `mirroringK8SPrefix` is set to "k8s-", a
-	// service in the k8s `staging` namespace will be registered into the
-	// `k8s-staging` Consul namespace.
-	NSMirroringPrefix string
+	// ConsulMeta contains metadata specific to the Consul installation.
+	ConsulMeta common.ConsulMeta
 
 	decoder *admission.Decoder
 	client.Client
@@ -57,15 +40,7 @@ func (v *TerminatingGatewayWebhook) Handle(ctx context.Context, req admission.Re
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	return common.ValidateConfigEntry(ctx,
-		req,
-		v.Logger,
-		v,
-		&resource,
-		v.EnableConsulNamespaces,
-		v.EnableNSMirroring,
-		v.ConsulDestinationNamespace,
-		v.NSMirroringPrefix)
+	return common.ValidateConfigEntry(ctx, req, v.Logger, v, &resource, v.ConsulMeta)
 }
 
 func (v *TerminatingGatewayWebhook) List(ctx context.Context) ([]common.ConfigEntryResource, error) {

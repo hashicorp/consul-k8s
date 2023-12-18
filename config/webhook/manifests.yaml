@@ -1,11 +1,30 @@
-
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1alpha1-exportedservices
+  failurePolicy: Fail
+  name: mutate-exportedservices.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - exportedservices
+  sideEffects: None
 - admissionReviewVersions:
   - v1beta1
   - v1
@@ -26,6 +45,69 @@ webhooks:
     - UPDATE
     resources:
     - ingressgateways
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1alpha1-mesh
+  failurePolicy: Fail
+  name: mutate-mesh.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - mesh
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1alpha1-peeringacceptors
+  failurePolicy: Fail
+  name: mutate-peeringacceptors.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - peeringacceptors
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-v1alpha1-peeringdialers
+  failurePolicy: Fail
+  name: mutate-peeringdialers.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - peeringdialers
   sideEffects: None
 - admissionReviewVersions:
   - v1beta1

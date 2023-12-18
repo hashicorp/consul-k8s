@@ -5,11 +5,12 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 // Test MatchesConsul.
@@ -79,10 +80,40 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 								ServiceSubset:         "serviceSubset",
 								Namespace:             "namespace",
 								PrefixRewrite:         "prefixRewrite",
-								RequestTimeout:        1 * time.Second,
+								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
 								RetryOnStatusCodes:    []uint32{500, 400},
+								RequestHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 						},
 					},
@@ -129,6 +160,36 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
 							RetryOnStatusCodes:    []uint32{500, 400},
+							RequestHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
@@ -220,10 +281,40 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 								ServiceSubset:         "serviceSubset",
 								Namespace:             "namespace",
 								PrefixRewrite:         "prefixRewrite",
-								RequestTimeout:        1 * time.Second,
+								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
 								RetryOnStatusCodes:    []uint32{500, 400},
+								RequestHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"foo":    "bar",
+										"source": "dest",
+									},
+									Set: map[string]string{
+										"bar": "baz",
+										"key": "car",
+									},
+									Remove: []string{
+										"foo",
+										"bar",
+										"baz",
+									},
+								},
+								ResponseHeaders: &HTTPHeaderModifiers{
+									Add: map[string]string{
+										"doo":    "var",
+										"aource": "sest",
+									},
+									Set: map[string]string{
+										"var": "vaz",
+										"jey": "xar",
+									},
+									Remove: []string{
+										"doo",
+										"var",
+										"vaz",
+									},
+								},
 							},
 						},
 					},
@@ -270,6 +361,36 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
 							RetryOnStatusCodes:    []uint32{500, 400},
+							RequestHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &capi.HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
@@ -291,30 +412,38 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 }
 
 func TestServiceRouter_AddFinalizer(t *testing.T) {
-	ServiceRouter := &ServiceRouter{}
-	ServiceRouter.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, ServiceRouter.ObjectMeta.Finalizers)
+	serviceRouter := &ServiceRouter{}
+	serviceRouter.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, serviceRouter.ObjectMeta.Finalizers)
 }
 
 func TestServiceRouter_RemoveFinalizer(t *testing.T) {
-	ServiceRouter := &ServiceRouter{
+	serviceRouter := &ServiceRouter{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	ServiceRouter.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, ServiceRouter.ObjectMeta.Finalizers)
+	serviceRouter.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, serviceRouter.ObjectMeta.Finalizers)
 }
 
 func TestServiceRouter_SetSyncedCondition(t *testing.T) {
-	ServiceRouter := &ServiceRouter{}
-	ServiceRouter.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	serviceRouter := &ServiceRouter{}
+	serviceRouter.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, ServiceRouter.Status.Conditions[0].Status)
-	require.Equal(t, "reason", ServiceRouter.Status.Conditions[0].Reason)
-	require.Equal(t, "message", ServiceRouter.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, serviceRouter.Status.Conditions[0].Status)
+	require.Equal(t, "reason", serviceRouter.Status.Conditions[0].Reason)
+	require.Equal(t, "message", serviceRouter.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, ServiceRouter.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, serviceRouter.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestServiceRouter_SetLastSyncedTime(t *testing.T) {
+	serviceRouter := &ServiceRouter{}
+	syncedTime := metav1.NewTime(time.Now())
+	serviceRouter.SetLastSyncedTime(&syncedTime)
+
+	require.Equal(t, &syncedTime, serviceRouter.Status.LastSyncedTime)
 }
 
 func TestServiceRouter_GetSyncedConditionStatus(t *testing.T) {
@@ -325,7 +454,7 @@ func TestServiceRouter_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			ServiceRouter := &ServiceRouter{
+			serviceRouter := &ServiceRouter{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -334,7 +463,7 @@ func TestServiceRouter_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, ServiceRouter.SyncedConditionStatus())
+			require.Equal(t, status, serviceRouter.SyncedConditionStatus())
 		})
 	}
 }
@@ -393,6 +522,7 @@ func TestServiceRouter_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input             *ServiceRouter
 		namespacesEnabled bool
+		partitionsEnabled bool
 		expectedErrMsgs   []string
 	}{
 		"namespaces enabled: valid": {
@@ -440,6 +570,56 @@ func TestServiceRouter_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
+		},
+		"partitions enabled: valid": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service:   "destA",
+								Namespace: "namespace-a",
+								Partition: "other",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"partitions disabled: valid": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Match: &ServiceRouteMatch{
+								HTTP: &ServiceRouteHTTPMatch{
+									PathPrefix: "/admin",
+								},
+							},
+							Destination: &ServiceRouteDestination{
+								Service: "destA",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"http match queryParam": {
@@ -535,7 +715,7 @@ func TestServiceRouter_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`servicerouter.consul.hashicorp.com "foo" is invalid: spec.routes[0]: Invalid value: "{\"match\":{\"http\":{}},\"destination\":{\"prefixRewrite\":\"prefixRewrite\"}}": destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route`,
+				`servicerouter.consul.hashicorp.com "foo" is invalid: spec.routes[0]: Invalid value: "{\"match\":{\"http\":{}},\"destination\":{\"prefixRewrite\":\"prefixRewrite\",\"requestTimeout\":\"0s\"}}": destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route`,
 			},
 		},
 		"namespaces disabled: single destination namespace specified": {
@@ -584,10 +764,61 @@ func TestServiceRouter_Validate(t *testing.T) {
 				"spec.routes[1].destination.namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set destination.namespace",
 			},
 		},
+		"partitions disabled: single destination partition specified": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-a",
+								Partition: "partition-a",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"servicerouter.consul.hashicorp.com \"foo\" is invalid: spec.routes[0].destination.partition: Invalid value: \"partition-a\": Consul Enterprise partitions must be enabled to set destination.partition",
+			},
+		},
+		"partitions disabled: multiple destination partitions specified": {
+			input: &ServiceRouter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceRouterSpec{
+					Routes: []ServiceRoute{
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-a",
+								Partition: "partition-a",
+							},
+						},
+						{
+							Destination: &ServiceRouteDestination{
+								Namespace: "namespace-b",
+								Partition: "partition-b",
+							},
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"spec.routes[0].destination.partition: Invalid value: \"partition-a\": Consul Enterprise partitions must be enabled to set destination.partition",
+				"spec.routes[1].destination.partition: Invalid value: \"partition-b\": Consul Enterprise partitions must be enabled to set destination.partition",
+			},
+		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(testCase.namespacesEnabled)
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionsEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {
@@ -603,39 +834,44 @@ func TestServiceRouter_Validate(t *testing.T) {
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 func TestServiceRouter_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
-		enabled              bool
-		destinationNamespace string
-		mirroring            bool
-		prefix               string
-		expectedDestination  string
+		consulMeta          common.ConsulMeta
+		expectedDestination string
 	}{
 		"disabled": {
-			enabled:              false,
-			destinationNamespace: "",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    false,
+				DestinationNamespace: "",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "",
 		},
 		"destinationNS": {
-			enabled:              true,
-			destinationNamespace: "foo",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "foo",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "foo",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "foo",
 		},
 		"mirroringEnabledWithoutPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "",
-			expectedDestination:  "bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "",
+			},
+			expectedDestination: "bar",
 		},
 		"mirroringWithPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "ns-",
-			expectedDestination:  "ns-bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "ns-",
+			},
+			expectedDestination: "ns-bar",
 		},
 	}
 
@@ -704,7 +940,7 @@ func TestServiceRouter_DefaultNamespaceFields(t *testing.T) {
 					},
 				},
 			}
-			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			input.DefaultNamespaceFields(s.consulMeta)
 			require.True(t, cmp.Equal(input, output))
 		})
 	}

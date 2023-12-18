@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.1
-  name: terminatinggateways.consul.hashicorp.com
+  name: peeringacceptors.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
-    kind: TerminatingGateway
-    listKind: TerminatingGatewayList
-    plural: terminatinggateways
+    kind: PeeringAcceptor
+    listKind: PeeringAcceptorList
+    plural: peeringacceptors
     shortNames:
-    - terminating-gateway
-    singular: terminatinggateway
+    - peering-acceptor
+    singular: peeringacceptor
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -32,8 +32,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: TerminatingGateway is the Schema for the terminatinggateways
-          API
+        description: PeeringAcceptor is the Schema for the peeringacceptors API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -48,44 +47,32 @@ spec:
           metadata:
             type: object
           spec:
-            description: TerminatingGatewaySpec defines the desired state of TerminatingGateway.
+            description: PeeringAcceptorSpec defines the desired state of PeeringAcceptor.
             properties:
-              services:
-                description: Services is a list of service names represented by the
-                  terminating gateway.
-                items:
-                  description: A LinkedService is a service represented by a terminating
-                    gateway.
-                  properties:
-                    caFile:
-                      description: CAFile is the optional path to a CA certificate
-                        to use for TLS connections from the gateway to the linked
-                        service.
-                      type: string
-                    certFile:
-                      description: CertFile is the optional path to a client certificate
-                        to use for TLS connections from the gateway to the linked
-                        service.
-                      type: string
-                    keyFile:
-                      description: KeyFile is the optional path to a private key to
-                        use for TLS connections from the gateway to the linked service.
-                      type: string
-                    name:
-                      description: Name is the name of the service, as defined in
-                        Consul's catalog.
-                      type: string
-                    namespace:
-                      description: The namespace the service is registered in.
-                      type: string
-                    sni:
-                      description: SNI is the optional name to specify during the
-                        TLS handshake with a linked service.
-                      type: string
-                  type: object
-                type: array
+              peer:
+                description: Peer describes the information needed to create a peering.
+                properties:
+                  secret:
+                    description: Secret describes how to store the generated peering
+                      token.
+                    properties:
+                      backend:
+                        description: 'Backend is where the generated secret is stored.
+                          Currently supports the value: "kubernetes".'
+                        type: string
+                      key:
+                        description: Key is the key of the secret generated.
+                        type: string
+                      name:
+                        description: Name is the name of the secret generated.
+                        type: string
+                    type: object
+                type: object
+            required:
+            - peer
             type: object
           status:
+            description: PeeringAcceptorStatus defines the observed state of PeeringAcceptor.
             properties:
               conditions:
                 description: Conditions indicate the latest available observations
@@ -122,6 +109,28 @@ spec:
                   synced with Consul.
                 format: date-time
                 type: string
+              latestPeeringVersion:
+                description: LatestPeeringVersion is the latest version of the resource
+                  that was reconciled.
+                format: int64
+                type: integer
+              secret:
+                description: SecretRef shows the status of the secret.
+                properties:
+                  backend:
+                    description: 'Backend is where the generated secret is stored.
+                      Currently supports the value: "kubernetes".'
+                    type: string
+                  key:
+                    description: Key is the key of the secret generated.
+                    type: string
+                  name:
+                    description: Name is the name of the secret generated.
+                    type: string
+                  resourceVersion:
+                    description: ResourceVersion is the resource version for the secret.
+                    type: string
+                type: object
             type: object
         type: object
     served: true

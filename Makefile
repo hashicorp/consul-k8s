@@ -24,7 +24,7 @@ export GIT_DESCRIBE
 export GOLDFLAGS
 export GOTAGS
 
-CRD_OPTIONS ?= "crd:trivialVersions=true,allowDangerousTypes=true"
+CRD_OPTIONS ?= "crd:allowDangerousTypes=true"
 
 ################
 # CI Variables #

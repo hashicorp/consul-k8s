@@ -2,12 +2,14 @@ package v1alpha1
 
 import (
 	"testing"
+	"time"
 
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 // Test MatchesConsul.
@@ -49,6 +51,36 @@ func TestServiceSplitter_MatchesConsul(t *testing.T) {
 							Service:       "foo",
 							ServiceSubset: "bar",
 							Namespace:     "baz",
+							RequestHeaders: &HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
@@ -62,6 +94,36 @@ func TestServiceSplitter_MatchesConsul(t *testing.T) {
 						Service:       "foo",
 						ServiceSubset: "bar",
 						Namespace:     "baz",
+						RequestHeaders: &capi.HTTPHeaderModifiers{
+							Add: map[string]string{
+								"foo":    "bar",
+								"source": "dest",
+							},
+							Set: map[string]string{
+								"bar": "baz",
+								"key": "car",
+							},
+							Remove: []string{
+								"foo",
+								"bar",
+								"baz",
+							},
+						},
+						ResponseHeaders: &capi.HTTPHeaderModifiers{
+							Add: map[string]string{
+								"doo":    "var",
+								"aource": "sest",
+							},
+							Set: map[string]string{
+								"var": "vaz",
+								"jey": "xar",
+							},
+							Remove: []string{
+								"doo",
+								"var",
+								"vaz",
+							},
+						},
 					},
 				},
 			},
@@ -124,6 +186,36 @@ func TestServiceSplitter_ToConsul(t *testing.T) {
 							Service:       "foo",
 							ServiceSubset: "bar",
 							Namespace:     "baz",
+							RequestHeaders: &HTTPHeaderModifiers{
+								Add: map[string]string{
+									"foo":    "bar",
+									"source": "dest",
+								},
+								Set: map[string]string{
+									"bar": "baz",
+									"key": "car",
+								},
+								Remove: []string{
+									"foo",
+									"bar",
+									"baz",
+								},
+							},
+							ResponseHeaders: &HTTPHeaderModifiers{
+								Add: map[string]string{
+									"doo":    "var",
+									"aource": "sest",
+								},
+								Set: map[string]string{
+									"var": "vaz",
+									"jey": "xar",
+								},
+								Remove: []string{
+									"doo",
+									"var",
+									"vaz",
+								},
+							},
 						},
 					},
 				},
@@ -137,6 +229,36 @@ func TestServiceSplitter_ToConsul(t *testing.T) {
 						Service:       "foo",
 						ServiceSubset: "bar",
 						Namespace:     "baz",
+						RequestHeaders: &capi.HTTPHeaderModifiers{
+							Add: map[string]string{
+								"foo":    "bar",
+								"source": "dest",
+							},
+							Set: map[string]string{
+								"bar": "baz",
+								"key": "car",
+							},
+							Remove: []string{
+								"foo",
+								"bar",
+								"baz",
+							},
+						},
+						ResponseHeaders: &capi.HTTPHeaderModifiers{
+							Add: map[string]string{
+								"doo":    "var",
+								"aource": "sest",
+							},
+							Set: map[string]string{
+								"var": "vaz",
+								"jey": "xar",
+							},
+							Remove: []string{
+								"doo",
+								"var",
+								"vaz",
+							},
+						},
 					},
 				},
 				Meta: map[string]string{
@@ -157,30 +279,38 @@ func TestServiceSplitter_ToConsul(t *testing.T) {
 }
 
 func TestServiceSplitter_AddFinalizer(t *testing.T) {
-	ServiceSplitter := &ServiceSplitter{}
-	ServiceSplitter.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, ServiceSplitter.ObjectMeta.Finalizers)
+	serviceSplitter := &ServiceSplitter{}
+	serviceSplitter.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, serviceSplitter.ObjectMeta.Finalizers)
 }
 
 func TestServiceSplitter_RemoveFinalizer(t *testing.T) {
-	ServiceSplitter := &ServiceSplitter{
+	serviceSplitter := &ServiceSplitter{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	ServiceSplitter.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, ServiceSplitter.ObjectMeta.Finalizers)
+	serviceSplitter.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, serviceSplitter.ObjectMeta.Finalizers)
 }
 
 func TestServiceSplitter_SetSyncedCondition(t *testing.T) {
-	ServiceSplitter := &ServiceSplitter{}
-	ServiceSplitter.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	serviceSplitter := &ServiceSplitter{}
+	serviceSplitter.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, ServiceSplitter.Status.Conditions[0].Status)
-	require.Equal(t, "reason", ServiceSplitter.Status.Conditions[0].Reason)
-	require.Equal(t, "message", ServiceSplitter.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, serviceSplitter.Status.Conditions[0].Status)
+	require.Equal(t, "reason", serviceSplitter.Status.Conditions[0].Reason)
+	require.Equal(t, "message", serviceSplitter.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, ServiceSplitter.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, serviceSplitter.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestServiceSplitter_SetLastSyncedTime(t *testing.T) {
+	serviceSplitter := &ServiceSplitter{}
+	syncedTime := metav1.NewTime(time.Now())
+	serviceSplitter.SetLastSyncedTime(&syncedTime)
+
+	require.Equal(t, &syncedTime, serviceSplitter.Status.LastSyncedTime)
 }
 
 func TestServiceSplitter_GetSyncedConditionStatus(t *testing.T) {
@@ -191,7 +321,7 @@ func TestServiceSplitter_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			ServiceSplitter := &ServiceSplitter{
+			serviceSplitter := &ServiceSplitter{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -200,7 +330,7 @@ func TestServiceSplitter_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, ServiceSplitter.SyncedConditionStatus())
+			require.Equal(t, status, serviceSplitter.SyncedConditionStatus())
 		})
 	}
 }
@@ -248,16 +378,17 @@ func TestServiceSplitter_ObjectMeta(t *testing.T) {
 		Name:      "name",
 		Namespace: "namespace",
 	}
-	ServiceSplitter := &ServiceSplitter{
+	serviceSplitter := &ServiceSplitter{
 		ObjectMeta: meta,
 	}
-	require.Equal(t, meta, ServiceSplitter.GetObjectMeta())
+	require.Equal(t, meta, serviceSplitter.GetObjectMeta())
 }
 
 func TestServiceSplitter_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input             *ServiceSplitter
 		namespacesEnabled bool
+		partitionsEnabled bool
 		expectedErrMsgs   []string
 	}{
 		"namespaces enabled: valid": {
@@ -298,6 +429,50 @@ func TestServiceSplitter_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: false,
+			expectedErrMsgs:   nil,
+		},
+		"partitions enabled: valid": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Weight:    99.99,
+							Namespace: "namespace-a",
+							Partition: "partition-a",
+						},
+						{
+							Weight:    0.01,
+							Namespace: "namespace-b",
+							Partition: "partition-b",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs:   nil,
+		},
+		"partitions disabled: valid": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Weight: 99.99,
+						},
+						{
+							Weight: 0.01,
+						},
+					},
+				},
+			},
+			namespacesEnabled: false,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"splits with 0 weight: valid": {
@@ -412,10 +587,58 @@ func TestServiceSplitter_Validate(t *testing.T) {
 				"spec.splits[1].namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set split.namespace",
 			},
 		},
+		"partitions disabled: single split partition specified": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Namespace: "namespace-a",
+							Partition: "partition-a",
+							Weight:    100,
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"servicesplitter.consul.hashicorp.com \"foo\" is invalid: spec.splits[0].partition: Invalid value: \"partition-a\": Consul Enterprise partitions must be enabled to set split.partition",
+			},
+		},
+		"partitions disabled: multiple split partitions specified": {
+			input: &ServiceSplitter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceSplitterSpec{
+					Splits: []ServiceSplit{
+						{
+							Namespace: "namespace-a",
+							Partition: "partition-a",
+							Weight:    50,
+						},
+						{
+							Namespace: "namespace-b",
+							Partition: "partition-b",
+							Weight:    50,
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				"spec.splits[0].partition: Invalid value: \"partition-a\": Consul Enterprise partitions must be enabled to set split.partition",
+				"spec.splits[1].partition: Invalid value: \"partition-b\": Consul Enterprise partitions must be enabled to set split.partition",
+			},
+		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(testCase.namespacesEnabled)
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionsEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {

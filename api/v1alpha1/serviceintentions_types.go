@@ -7,8 +7,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/api/common"
-	"github.com/hashicorp/consul-k8s/namespaces"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -16,6 +14,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/api/common"
+	"github.com/hashicorp/consul-k8s/namespaces"
 )
 
 func init() {
@@ -27,7 +28,9 @@ func init() {
 
 // ServiceIntentions is the Schema for the serviceintentions API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+// +kubebuilder:resource:shortName="service-intentions"
 type ServiceIntentions struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -38,24 +41,24 @@ type ServiceIntentions struct {
 
 // +kubebuilder:object:root=true
 
-// ServiceIntentionsList contains a list of ServiceIntentions
+// ServiceIntentionsList contains a list of ServiceIntentions.
 type ServiceIntentionsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ServiceIntentions `json:"items"`
 }
 
-// ServiceIntentionsSpec defines the desired state of ServiceIntentions
+// ServiceIntentionsSpec defines the desired state of ServiceIntentions.
 type ServiceIntentionsSpec struct {
 	// Destination is the intention destination that will have the authorization granted to.
-	Destination Destination `json:"destination,omitempty"`
+	Destination IntentionDestination `json:"destination,omitempty"`
 	// Sources is the list of all intention sources and the authorization granted to those sources.
 	// The order of this list does not matter, but out of convenience Consul will always store this
 	// reverse sorted by intention precedence, as that is the order that they will be evaluated at enforcement time.
 	Sources SourceIntentions `json:"sources,omitempty"`
 }
 
-type Destination struct {
+type IntentionDestination struct {
 	// Name is the destination of all intentions defined in this config entry.
 	// This may be set to the wildcard character (*) to match
 	// all services that don't otherwise have intentions defined.
@@ -76,6 +79,10 @@ type SourceIntention struct {
 	Name string `json:"name,omitempty"`
 	// Namespace is the namespace for the Name parameter.
 	Namespace string `json:"namespace,omitempty"`
+	// [Experimental] Peer is the peer name for the Name parameter.
+	Peer string `json:"peer,omitempty"`
+	// Partition is the Admin Partition for the Name parameter.
+	Partition string `json:"partition,omitempty"`
 	// Action is required for an L4 intention, and should be set to one of
 	// "allow" or "deny" for the action that should be taken if this intention matches a request.
 	Action IntentionAction `json:"action,omitempty"`
@@ -188,6 +195,10 @@ func (in *ServiceIntentions) SetSyncedCondition(status corev1.ConditionStatus, r
 	}
 }
 
+func (in *ServiceIntentions) SetLastSyncedTime(time *metav1.Time) {
+	in.Status.LastSyncedTime = time
+}
+
 func (in *ServiceIntentions) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
 	cond := in.Status.GetCondition(ConditionSynced)
 	if cond == nil {
@@ -218,17 +229,33 @@ func (in *ServiceIntentions) ConsulGlobalResource() bool {
 	return false
 }
 
+func normalizeEmptyToDefault(value string) string {
+	if value == "" {
+		return "default"
+	}
+	return value
+}
+
 func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 	configEntry, ok := candidate.(*capi.ServiceIntentionsConfigEntry)
 	if !ok {
 		return false
 	}
 
+	specialEquality := cmp.Options{
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Sources.Namespace"
+		}, cmp.Transformer("NormalizeNamespace", normalizeEmptyToDefault)),
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Sources.Partition"
+		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
+	}
+
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
 	return cmp.Equal(
 		in.ToConsul(""),
 		configEntry,
-		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
+		cmpopts.IgnoreFields(capi.ServiceIntentionsConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
 		cmpopts.IgnoreFields(capi.SourceIntention{}, "LegacyID", "LegacyMeta", "LegacyCreateTime", "LegacyUpdateTime", "Precedence", "Type"),
 		cmpopts.IgnoreUnexported(),
 		cmpopts.EquateEmpty(),
@@ -239,10 +266,11 @@ func (in *ServiceIntentions) MatchesConsul(candidate api.ConfigEntry) bool {
 			// piggyback on strings.Compare that returns -1 if a < b.
 			return strings.Compare(sourceIntentionSortKey(a), sourceIntentionSortKey(b)) == -1
 		}),
+		specialEquality,
 	)
 }
 
-func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
+func (in *ServiceIntentions) Validate(consulMeta common.ConsulMeta) error {
 	var errs field.ErrorList
 	path := field.NewPath("spec")
 	if len(in.Spec.Sources) == 0 {
@@ -261,7 +289,8 @@ func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
 		}
 	}
 
-	errs = append(errs, in.validateNamespaces(namespacesEnabled)...)
+	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
+	errs = append(errs, in.validateSourcePeerAndPartitions(consulMeta.PartitionsEnabled)...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -272,14 +301,14 @@ func (in *ServiceIntentions) Validate(namespacesEnabled bool) error {
 }
 
 // DefaultNamespaceFields sets the namespace field on spec.destination to their default values if namespaces are enabled.
-func (in *ServiceIntentions) DefaultNamespaceFields(consulNamespacesEnabled bool, destinationNamespace string, mirroring bool, prefix string) {
+func (in *ServiceIntentions) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
 	// If namespaces are enabled we want to set the destination namespace field to it's
 	// default. If namespaces are not enabled (i.e. OSS) we don't set the
 	// namespace fields because this would cause errors
 	// making API calls (because namespace fields can't be set in OSS).
-	if consulNamespacesEnabled {
+	if consulMeta.NamespacesEnabled {
 		// Default to the current namespace (i.e. the namespace of the config entry).
-		namespace := namespaces.ConsulNamespace(in.Namespace, consulNamespacesEnabled, destinationNamespace, mirroring, prefix)
+		namespace := namespaces.ConsulNamespace(in.Namespace, consulMeta.NamespacesEnabled, consulMeta.DestinationNamespace, consulMeta.Mirroring, consulMeta.Prefix)
 		if in.Spec.Destination.Namespace == "" {
 			in.Spec.Destination.Namespace = namespace
 		}
@@ -301,6 +330,8 @@ func (in *SourceIntention) toConsul() *capi.SourceIntention {
 	return &capi.SourceIntention{
 		Name:        in.Name,
 		Namespace:   in.Namespace,
+		Partition:   in.Partition,
+		Peer:        in.Peer,
 		Action:      in.Action.toConsul(),
 		Permissions: in.Permissions.toConsul(),
 		Description: in.Description,
@@ -440,6 +471,21 @@ func (in *ServiceIntentions) validateNamespaces(namespacesEnabled bool) field.Er
 			if source.Namespace != "" {
 				errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("namespace"), source.Namespace, `Consul Enterprise namespaces must be enabled to set source.namespace`))
 			}
+		}
+	}
+	return errs
+}
+
+func (in *ServiceIntentions) validateSourcePeerAndPartitions(partitionsEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	path := field.NewPath("spec")
+	for i, source := range in.Spec.Sources {
+		if source.Partition != "" && !partitionsEnabled {
+			errs = append(errs, field.Invalid(path.Child("sources").Index(i).Child("partition"), source.Partition, `Consul Enterprise Admin Partitions must be enabled to set source.partition`))
+		}
+
+		if source.Peer != "" && source.Partition != "" {
+			errs = append(errs, field.Invalid(path.Child("sources").Index(i), source, `Both source.peer and source.partition cannot be set.`))
 		}
 	}
 	return errs

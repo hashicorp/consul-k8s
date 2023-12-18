@@ -5,7 +5,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Conditions is the schema for the conditions portion of the payload
+// Conditions is the schema for the conditions portion of the payload.
 type Conditions []Condition
 
 // ConditionType is a camel-cased condition type.
@@ -42,7 +42,7 @@ type Condition struct {
 	Message string `json:"message,omitempty" description:"human-readable message indicating details about last transition"`
 }
 
-// IsTrue is true if the condition is True
+// IsTrue is true if the condition is True.
 func (c *Condition) IsTrue() bool {
 	if c == nil {
 		return false
@@ -50,7 +50,7 @@ func (c *Condition) IsTrue() bool {
 	return c.Status == corev1.ConditionTrue
 }
 
-// IsFalse is true if the condition is False
+// IsFalse is true if the condition is False.
 func (c *Condition) IsFalse() bool {
 	if c == nil {
 		return false
@@ -58,7 +58,7 @@ func (c *Condition) IsFalse() bool {
 	return c.Status == corev1.ConditionFalse
 }
 
-// IsUnknown is true if the condition is Unknown
+// IsUnknown is true if the condition is Unknown.
 func (c *Condition) IsUnknown() bool {
 	if c == nil {
 		return true
@@ -74,6 +74,10 @@ type Status struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions Conditions `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// LastSyncedTime is the last time the resource successfully synced with Consul.
+	// +optional
+	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty" description:"last time the condition transitioned from one status to another"`
 }
 
 func (s *Status) GetCondition(t ConditionType) *Condition {

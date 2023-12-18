@@ -2,13 +2,15 @@ package v1alpha1
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 func TestServiceIntentions_MatchesConsul(t *testing.T) {
@@ -36,13 +38,85 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 			},
 			Matches: true,
 		},
+		"namespaces and partitions equate `default` and empty strings": {
+			Ours: ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "svc-name",
+						Namespace: "ns1",
+					},
+					Sources: []*SourceIntention{
+						{
+							Name:      "svc1",
+							Namespace: "",
+							Partition: "default",
+							Action:    "allow",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceIntentionsConfigEntry{
+				Kind:      capi.ServiceIntentions,
+				Name:      "svc-name",
+				Namespace: "ns1",
+				Sources: []*capi.SourceIntention{
+					{
+						Name:       "svc1",
+						Namespace:  "default",
+						Partition:  "",
+						Action:     "allow",
+						Precedence: 0,
+					},
+				},
+			},
+			Matches: true,
+		},
+		"source namespaces and partitions are compared": {
+			Ours: ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "svc-name",
+						Namespace: "test",
+					},
+					Sources: []*SourceIntention{
+						{
+							Name:      "svc1",
+							Namespace: "test",
+							Partition: "test",
+							Action:    "allow",
+						},
+					},
+				},
+			},
+			Theirs: &capi.ServiceIntentionsConfigEntry{
+				Kind:      capi.ServiceIntentions,
+				Name:      "svc-name",
+				Namespace: "test",
+				Sources: []*capi.SourceIntention{
+					{
+						Name:       "svc1",
+						Namespace:  "not-test",
+						Partition:  "not-test",
+						Action:     "allow",
+						Precedence: 0,
+					},
+				},
+			},
+			Matches: false,
+		},
 		"all fields set matches": {
 			Ours: ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "name",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "svc-name",
 						Namespace: "test",
 					},
@@ -50,18 +124,21 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 						{
 							Name:        "svc1",
 							Namespace:   "test",
+							Partition:   "test",
 							Action:      "allow",
 							Description: "allow access from svc1",
 						},
 						{
 							Name:        "*",
 							Namespace:   "not-test",
+							Partition:   "not-test",
 							Action:      "deny",
 							Description: "disallow access from namespace not-test",
 						},
 						{
 							Name:      "svc-2",
 							Namespace: "bar",
+							Partition: "bar",
 							Permissions: IntentionPermissions{
 								{
 									Action: "allow",
@@ -100,6 +177,7 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					{
 						Name:        "svc1",
 						Namespace:   "test",
+						Partition:   "test",
 						Action:      "allow",
 						Precedence:  0,
 						Description: "allow access from svc1",
@@ -107,6 +185,7 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					{
 						Name:        "*",
 						Namespace:   "not-test",
+						Partition:   "not-test",
 						Action:      "deny",
 						Precedence:  1,
 						Description: "disallow access from namespace not-test",
@@ -114,6 +193,7 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					{
 						Name:      "svc-2",
 						Namespace: "bar",
+						Partition: "bar",
 						Permissions: []*capi.IntentionPermission{
 							{
 								Action: "allow",
@@ -168,7 +248,7 @@ func TestServiceIntentions_MatchesConsul(t *testing.T) {
 					Name: "name",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "bar",
 					},
 					Sources: SourceIntentions{
@@ -240,7 +320,7 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 					Name: "name",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "svc-name",
 						Namespace: "dest-ns",
 					},
@@ -248,18 +328,21 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 						{
 							Name:        "svc1",
 							Namespace:   "test",
+							Partition:   "test",
 							Action:      "allow",
 							Description: "allow access from svc1",
 						},
 						{
 							Name:        "*",
 							Namespace:   "not-test",
+							Partition:   "not-test",
 							Action:      "deny",
 							Description: "disallow access from namespace not-test",
 						},
 						{
 							Name:      "svc-2",
 							Namespace: "bar",
+							Partition: "bar",
 							Permissions: IntentionPermissions{
 								{
 									Action: "allow",
@@ -298,18 +381,21 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 					{
 						Name:        "svc1",
 						Namespace:   "test",
+						Partition:   "test",
 						Action:      "allow",
 						Description: "allow access from svc1",
 					},
 					{
 						Name:        "*",
 						Namespace:   "not-test",
+						Partition:   "not-test",
 						Action:      "deny",
 						Description: "disallow access from namespace not-test",
 					},
 					{
 						Name:      "svc-2",
 						Namespace: "bar",
+						Partition: "bar",
 						Permissions: []*capi.IntentionPermission{
 							{
 								Action: "allow",
@@ -348,38 +434,46 @@ func TestServiceIntentions_ToConsul(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			act := c.Ours.ToConsul("datacenter")
-			serviceResolver, ok := act.(*capi.ServiceIntentionsConfigEntry)
+			serviceIntentions, ok := act.(*capi.ServiceIntentionsConfigEntry)
 			require.True(t, ok, "could not cast")
-			require.Equal(t, c.Exp, serviceResolver)
+			require.Equal(t, c.Exp, serviceIntentions)
 		})
 	}
 }
 
 func TestServiceIntentions_AddFinalizer(t *testing.T) {
-	serviceResolver := &ServiceIntentions{}
-	serviceResolver.AddFinalizer("finalizer")
-	require.Equal(t, []string{"finalizer"}, serviceResolver.ObjectMeta.Finalizers)
+	serviceIntentions := &ServiceIntentions{}
+	serviceIntentions.AddFinalizer("finalizer")
+	require.Equal(t, []string{"finalizer"}, serviceIntentions.ObjectMeta.Finalizers)
 }
 
 func TestServiceIntentions_RemoveFinalizer(t *testing.T) {
-	serviceResolver := &ServiceIntentions{
+	serviceIntentions := &ServiceIntentions{
 		ObjectMeta: metav1.ObjectMeta{
 			Finalizers: []string{"f1", "f2"},
 		},
 	}
-	serviceResolver.RemoveFinalizer("f1")
-	require.Equal(t, []string{"f2"}, serviceResolver.ObjectMeta.Finalizers)
+	serviceIntentions.RemoveFinalizer("f1")
+	require.Equal(t, []string{"f2"}, serviceIntentions.ObjectMeta.Finalizers)
 }
 
 func TestServiceIntentions_SetSyncedCondition(t *testing.T) {
-	serviceResolver := &ServiceIntentions{}
-	serviceResolver.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
+	serviceIntentions := &ServiceIntentions{}
+	serviceIntentions.SetSyncedCondition(corev1.ConditionTrue, "reason", "message")
 
-	require.Equal(t, corev1.ConditionTrue, serviceResolver.Status.Conditions[0].Status)
-	require.Equal(t, "reason", serviceResolver.Status.Conditions[0].Reason)
-	require.Equal(t, "message", serviceResolver.Status.Conditions[0].Message)
+	require.Equal(t, corev1.ConditionTrue, serviceIntentions.Status.Conditions[0].Status)
+	require.Equal(t, "reason", serviceIntentions.Status.Conditions[0].Reason)
+	require.Equal(t, "message", serviceIntentions.Status.Conditions[0].Message)
 	now := metav1.Now()
-	require.True(t, serviceResolver.Status.Conditions[0].LastTransitionTime.Before(&now))
+	require.True(t, serviceIntentions.Status.Conditions[0].LastTransitionTime.Before(&now))
+}
+
+func TestServiceIntentions_SetLastSyncedTime(t *testing.T) {
+	serviceIntentions := &ServiceIntentions{}
+	syncedTime := metav1.NewTime(time.Now())
+	serviceIntentions.SetLastSyncedTime(&syncedTime)
+
+	require.Equal(t, &syncedTime, serviceIntentions.Status.LastSyncedTime)
 }
 
 func TestServiceIntentions_GetSyncedConditionStatus(t *testing.T) {
@@ -390,7 +484,7 @@ func TestServiceIntentions_GetSyncedConditionStatus(t *testing.T) {
 	}
 	for _, status := range cases {
 		t.Run(string(status), func(t *testing.T) {
-			serviceResolver := &ServiceIntentions{
+			serviceIntentions := &ServiceIntentions{
 				Status: Status{
 					Conditions: []Condition{{
 						Type:   ConditionSynced,
@@ -399,7 +493,7 @@ func TestServiceIntentions_GetSyncedConditionStatus(t *testing.T) {
 				},
 			}
 
-			require.Equal(t, status, serviceResolver.SyncedConditionStatus())
+			require.Equal(t, status, serviceIntentions.SyncedConditionStatus())
 		})
 	}
 }
@@ -434,7 +528,7 @@ func TestServiceIntentions_ConsulName(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Destination: Destination{
+			Destination: IntentionDestination{
 				Name:      "foo",
 				Namespace: "baz",
 			},
@@ -449,7 +543,7 @@ func TestServiceIntentions_KubernetesName(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Destination: Destination{
+			Destination: IntentionDestination{
 				Name:      "foo",
 				Namespace: "baz",
 			},
@@ -464,7 +558,7 @@ func TestServiceIntentions_ConsulNamespace(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Destination: Destination{
+			Destination: IntentionDestination{
 				Name:      "foo",
 				Namespace: "baz",
 			},
@@ -483,7 +577,7 @@ func TestServiceIntentions_ConsulNamespaceWithWildcard(t *testing.T) {
 			Namespace: "bar",
 		},
 		Spec: ServiceIntentionsSpec{
-			Destination: Destination{
+			Destination: IntentionDestination{
 				Name:      "foo",
 				Namespace: "*",
 			},
@@ -496,48 +590,53 @@ func TestServiceIntentions_ObjectMeta(t *testing.T) {
 		Name:      "name",
 		Namespace: "namespace",
 	}
-	serviceResolver := &ServiceIntentions{
+	serviceIntentions := &ServiceIntentions{
 		ObjectMeta: meta,
 	}
-	require.Equal(t, meta, serviceResolver.GetObjectMeta())
+	require.Equal(t, meta, serviceIntentions.GetObjectMeta())
 }
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 func TestServiceIntentions_DefaultNamespaceFields(t *testing.T) {
 	namespaceConfig := map[string]struct {
-		enabled              bool
-		destinationNamespace string
-		mirroring            bool
-		prefix               string
-		expectedDestination  string
+		consulMeta          common.ConsulMeta
+		expectedDestination string
 	}{
 		"disabled": {
-			enabled:              false,
-			destinationNamespace: "",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    false,
+				DestinationNamespace: "",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "",
 		},
 		"destinationNS": {
-			enabled:              true,
-			destinationNamespace: "foo",
-			mirroring:            false,
-			prefix:               "",
-			expectedDestination:  "foo",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "foo",
+				Mirroring:            false,
+				Prefix:               "",
+			},
+			expectedDestination: "foo",
 		},
 		"mirroringEnabledWithoutPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "",
-			expectedDestination:  "bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "",
+			},
+			expectedDestination: "bar",
 		},
 		"mirroringWithPrefix": {
-			enabled:              true,
-			destinationNamespace: "",
-			mirroring:            true,
-			prefix:               "ns-",
-			expectedDestination:  "ns-bar",
+			consulMeta: common.ConsulMeta{
+				NamespacesEnabled:    true,
+				DestinationNamespace: "",
+				Mirroring:            true,
+				Prefix:               "ns-",
+			},
+			expectedDestination: "ns-bar",
 		},
 	}
 
@@ -549,7 +648,7 @@ func TestServiceIntentions_DefaultNamespaceFields(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "bar",
 					},
 				},
@@ -560,13 +659,13 @@ func TestServiceIntentions_DefaultNamespaceFields(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "bar",
 						Namespace: s.expectedDestination,
 					},
 				},
 			}
-			input.DefaultNamespaceFields(s.enabled, s.destinationNamespace, s.mirroring, s.prefix)
+			input.DefaultNamespaceFields(s.consulMeta)
 			require.True(t, cmp.Equal(input, output))
 		})
 	}
@@ -576,15 +675,71 @@ func TestServiceIntentions_Validate(t *testing.T) {
 	cases := map[string]struct {
 		input             *ServiceIntentions
 		namespacesEnabled bool
+		partitionsEnabled bool
 		expectedErrMsgs   []string
 	}{
+		"partitions enabled: valid": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Namespace: "web",
+							Partition: "web",
+							Action:    "allow",
+						},
+						{
+							Name:      "db",
+							Namespace: "db",
+							Partition: "db",
+							Action:    "deny",
+						},
+						{
+							Name:      "bar",
+							Namespace: "bar",
+							Partition: "bar",
+							Permissions: IntentionPermissions{
+								{
+									Action: "allow",
+									HTTP: &IntentionHTTPPermission{
+										PathExact: "/foo",
+										Header: IntentionHTTPHeaderPermissions{
+											{
+												Name:    "header",
+												Present: true,
+												Invert:  true,
+											},
+										},
+										Methods: []string{
+											"GET",
+											"PUT",
+										},
+									},
+								},
+							},
+							Description: "an L7 config",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs:   nil,
+		},
 		"namespaces enabled: valid": {
 			input: &ServiceIntentions{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -627,6 +782,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: true,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"namespaces disabled: valid": {
@@ -635,7 +791,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "dest-service",
 					},
 					Sources: SourceIntentions{
@@ -674,6 +830,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				},
 			},
 			namespacesEnabled: false,
+			partitionsEnabled: false,
 			expectedErrMsgs:   nil,
 		},
 		"no sources": {
@@ -682,7 +839,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -700,7 +857,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -724,7 +881,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -755,7 +912,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -787,7 +944,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -819,7 +976,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -851,7 +1008,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -882,7 +1039,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -919,7 +1076,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -980,7 +1137,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -1011,7 +1168,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace",
 					},
@@ -1043,7 +1200,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace-a",
 					},
@@ -1066,7 +1223,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "dest-service",
 					},
 					Sources: SourceIntentions{
@@ -1089,7 +1246,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "dest-service",
 					},
 					Sources: SourceIntentions{
@@ -1123,7 +1280,7 @@ func TestServiceIntentions_Validate(t *testing.T) {
 					Name: "does-not-matter",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "dest-service",
 						Namespace: "namespace-a",
 					},
@@ -1153,10 +1310,151 @@ func TestServiceIntentions_Validate(t *testing.T) {
 				`spec.sources[2].namespace: Invalid value: "namespace-d": Consul Enterprise namespaces must be enabled to set source.namespace`,
 			},
 		},
+		"partitions disabled: single source partition specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "partition-other",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+						},
+						{
+							Name:      "bar",
+							Namespace: "namespace-d",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.sources[0].partition: Invalid value: "partition-other": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
+			},
+		},
+		"partitions disabled: multiple source partition specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "partition-other",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+							Partition: "partition-first",
+						},
+						{
+							Name:      "bar",
+							Namespace: "namespace-d",
+							Partition: "partition-foo",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: false,
+			expectedErrMsgs: []string{
+				`spec.sources[0].partition: Invalid value: "partition-other": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
+				`spec.sources[1].partition: Invalid value: "partition-first": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
+				`spec.sources[2].partition: Invalid value: "partition-foo": Consul Enterprise Admin Partitions must be enabled to set source.partition`,
+			},
+		},
+		"single source peer and partition specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "partition-other",
+							Peer:      "peer-other",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: Both source.peer and source.partition cannot be set.`,
+			},
+		},
+		"multiple source peer and partition specified": {
+			input: &ServiceIntentions{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-matter",
+				},
+				Spec: ServiceIntentionsSpec{
+					Destination: IntentionDestination{
+						Name:      "dest-service",
+						Namespace: "namespace-a",
+					},
+					Sources: SourceIntentions{
+						{
+							Name:      "web",
+							Action:    "allow",
+							Namespace: "namespace-b",
+							Partition: "partition-other",
+							Peer:      "peer-other",
+						},
+						{
+							Name:      "db",
+							Action:    "deny",
+							Namespace: "namespace-c",
+							Partition: "partition-2",
+							Peer:      "peer-2",
+						},
+					},
+				},
+			},
+			namespacesEnabled: true,
+			partitionsEnabled: true,
+			expectedErrMsgs: []string{
+				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: Both source.peer and source.partition cannot be set.`,
+				`spec.sources[1]: Invalid value: v1alpha1.SourceIntention{Name:"db", Namespace:"namespace-c", Peer:"peer-2", Partition:"partition-2", Action:"deny", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: Both source.peer and source.partition cannot be set.`,
+			},
+		},
 	}
 	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := testCase.input.Validate(testCase.namespacesEnabled)
+			err := testCase.input.Validate(common.ConsulMeta{NamespacesEnabled: testCase.namespacesEnabled, PartitionsEnabled: testCase.partitionsEnabled})
 			if len(testCase.expectedErrMsgs) != 0 {
 				require.Error(t, err)
 				for _, s := range testCase.expectedErrMsgs {

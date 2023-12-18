@@ -9,11 +9,13 @@ import (
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
-	admissionV1 "k8s.io/api/admission/v1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 func TestHandle_ServiceIntentions_Create(t *testing.T) {
@@ -33,7 +35,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -56,7 +58,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -79,7 +81,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -97,7 +99,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -120,7 +122,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -138,7 +140,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "baz",
 					},
@@ -161,7 +163,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -179,7 +181,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "baz",
 					},
@@ -202,7 +204,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "foo",
 					},
 					Sources: SourceIntentions{
@@ -219,7 +221,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 					Name: "bar-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "foo",
 					},
 					Sources: SourceIntentions{
@@ -243,23 +245,25 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
-			client := fake.NewFakeClientWithScheme(s, c.existingResources...)
+			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 
 			validator := &ServiceIntentionsWebhook{
-				Client:                 client,
-				ConsulClient:           nil,
-				Logger:                 logrtest.TestLogger{T: t},
-				decoder:                decoder,
-				EnableConsulNamespaces: true,
-				EnableNSMirroring:      c.mirror,
+				Client:       client,
+				ConsulClient: nil,
+				Logger:       logrtest.TestLogger{T: t},
+				decoder:      decoder,
+				ConsulMeta: common.ConsulMeta{
+					NamespacesEnabled: true,
+					Mirroring:         c.mirror,
+				},
 			}
 			response := validator.Handle(ctx, admission.Request{
-				AdmissionRequest: admissionV1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
-					Operation: admissionV1.Create,
+					Operation: admissionv1.Create,
 					Object: runtime.RawExtension{
 						Raw: marshalledRequestObject,
 					},
@@ -290,7 +294,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -313,7 +317,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -335,7 +339,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -358,7 +362,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo-bar",
 						Namespace: "bar",
 					},
@@ -381,7 +385,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -404,7 +408,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 					Name: "foo-intention",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar-foo",
 					},
@@ -426,27 +430,30 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
 			marshalledRequestObject, err := json.Marshal(c.newResource)
+			require.NoError(t, err)
 			marshalledOldRequestObject, err := json.Marshal(c.existingResources[0])
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
-			client := fake.NewFakeClientWithScheme(s, c.existingResources...)
+			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
 			decoder, err := admission.NewDecoder(s)
 			require.NoError(t, err)
 
 			validator := &ServiceIntentionsWebhook{
-				Client:                 client,
-				ConsulClient:           nil,
-				Logger:                 logrtest.TestLogger{T: t},
-				decoder:                decoder,
-				EnableConsulNamespaces: true,
-				EnableNSMirroring:      c.mirror,
+				Client:       client,
+				ConsulClient: nil,
+				Logger:       logrtest.TestLogger{T: t},
+				decoder:      decoder,
+				ConsulMeta: common.ConsulMeta{
+					NamespacesEnabled: true,
+					Mirroring:         c.mirror,
+				},
 			}
 			response := validator.Handle(ctx, admission.Request{
-				AdmissionRequest: admissionV1.AdmissionRequest{
+				AdmissionRequest: admissionv1.AdmissionRequest{
 					Name:      c.newResource.KubernetesName(),
 					Namespace: otherNS,
-					Operation: admissionV1.Update,
+					Operation: admissionv1.Update,
 					Object: runtime.RawExtension{
 						Raw: marshalledRequestObject,
 					},
@@ -482,7 +489,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -505,7 +512,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "foo",
 					},
 					Sources: SourceIntentions{
@@ -533,7 +540,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name: "foo",
 					},
 					Sources: SourceIntentions{
@@ -560,7 +567,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: ServiceIntentionsSpec{
-					Destination: Destination{
+					Destination: IntentionDestination{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -589,23 +596,25 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				require.NoError(t, err)
 				s := runtime.NewScheme()
 				s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
-				client := fake.NewFakeClientWithScheme(s)
+				client := fake.NewClientBuilder().WithScheme(s).Build()
 				decoder, err := admission.NewDecoder(s)
 				require.NoError(t, err)
 
 				validator := &ServiceIntentionsWebhook{
-					Client:                 client,
-					ConsulClient:           nil,
-					Logger:                 logrtest.TestLogger{T: t},
-					decoder:                decoder,
-					EnableConsulNamespaces: namespacesEnabled,
-					EnableNSMirroring:      true,
+					Client:       client,
+					ConsulClient: nil,
+					Logger:       logrtest.TestLogger{T: t},
+					decoder:      decoder,
+					ConsulMeta: common.ConsulMeta{
+						NamespacesEnabled: namespacesEnabled,
+						Mirroring:         true,
+					},
 				}
 				response := validator.Handle(ctx, admission.Request{
-					AdmissionRequest: admissionV1.AdmissionRequest{
+					AdmissionRequest: admissionv1.AdmissionRequest{
 						Name:      c.newResource.KubernetesName(),
 						Namespace: otherNS,
-						Operation: admissionV1.Create,
+						Operation: admissionv1.Create,
 						Object: runtime.RawExtension{
 							Raw: marshalledRequestObject,
 						},

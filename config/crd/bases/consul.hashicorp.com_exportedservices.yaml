@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.1
-  name: terminatinggateways.consul.hashicorp.com
+  name: exportedservices.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
-    kind: TerminatingGateway
-    listKind: TerminatingGatewayList
-    plural: terminatinggateways
+    kind: ExportedServices
+    listKind: ExportedServicesList
+    plural: exportedservices
     shortNames:
-    - terminating-gateway
-    singular: terminatinggateway
+    - exported-services
+    singular: exportedservices
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -32,8 +32,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: TerminatingGateway is the Schema for the terminatinggateways
-          API
+        description: ExportedServices is the Schema for the exportedservices API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -48,39 +47,38 @@ spec:
           metadata:
             type: object
           spec:
-            description: TerminatingGatewaySpec defines the desired state of TerminatingGateway.
+            description: ExportedServicesSpec defines the desired state of ExportedServices.
             properties:
               services:
-                description: Services is a list of service names represented by the
-                  terminating gateway.
+                description: Services is a list of services to be exported and the
+                  list of partitions to expose them to.
                 items:
-                  description: A LinkedService is a service represented by a terminating
-                    gateway.
+                  description: ExportedService manages the exporting of a service
+                    in the local partition to other partitions.
                   properties:
-                    caFile:
-                      description: CAFile is the optional path to a CA certificate
-                        to use for TLS connections from the gateway to the linked
-                        service.
-                      type: string
-                    certFile:
-                      description: CertFile is the optional path to a client certificate
-                        to use for TLS connections from the gateway to the linked
-                        service.
-                      type: string
-                    keyFile:
-                      description: KeyFile is the optional path to a private key to
-                        use for TLS connections from the gateway to the linked service.
-                      type: string
+                    consumers:
+                      description: Consumers is a list of downstream consumers of
+                        the service to be exported.
+                      items:
+                        description: ServiceConsumer represents a downstream consumer
+                          of the service to be exported.
+                        properties:
+                          partition:
+                            description: Partition is the admin partition to export
+                              the service to.
+                            type: string
+                          peer:
+                            description: '[Experimental] Peer is the name of the peer
+                              to export the service to.'
+                            type: string
+                        type: object
+                      type: array
                     name:
-                      description: Name is the name of the service, as defined in
-                        Consul's catalog.
+                      description: Name is the name of the service to be exported.
                       type: string
                     namespace:
-                      description: The namespace the service is registered in.
-                      type: string
-                    sni:
-                      description: SNI is the optional name to specify during the
-                        TLS handshake with a linked service.
+                      description: Namespace is the namespace to export the service
+                        from.
                       type: string
                   type: object
                 type: array
