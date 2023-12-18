@@ -69,6 +69,9 @@ type GatewayClassDeploymentConfig struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 	// HostNetwork specifies whether the gateway pods should run on the host network
 	HostNetwork bool `json:"hostNetwork,omitempty"`
+	// TopologySpreadConstraints is a feature that controls how pods are spead across your topology.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 }
 
 type GatewayClassReplicasConfig struct {
