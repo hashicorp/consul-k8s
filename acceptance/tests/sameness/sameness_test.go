@@ -173,8 +173,6 @@ func TestFailover_Connect(t *testing.T) {
 
 				"global.adminPartitions.enabled": "true",
 
-				"global.logLevel": "warn",
-
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
 				"connectInject.enabled":                       "true",
@@ -195,6 +193,7 @@ func TestFailover_Connect(t *testing.T) {
 			// create in same routine as 01-b depends on 01-a being created first
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				// Create the cluster-01-a
 				defaultPartitionHelmValues := map[string]string{
 					"global.datacenter": cluster01Datacenter,
@@ -265,12 +264,12 @@ func TestFailover_Connect(t *testing.T) {
 
 				testClusters[keyCluster01b].helmCluster = consul.NewHelmCluster(t, secondaryPartitionHelmValues, testClusters[keyCluster01b].context, cfg, releaseName)
 				testClusters[keyCluster01b].helmCluster.Create(t)
-				wg.Done()
 			}()
 
 			// Create cluster-02-a Cluster.
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				PeerOneHelmValues := map[string]string{
 					"global.datacenter": cluster02Datacenter,
 				}
@@ -284,12 +283,12 @@ func TestFailover_Connect(t *testing.T) {
 
 				testClusters[keyCluster02a].helmCluster = consul.NewHelmCluster(t, PeerOneHelmValues, testClusters[keyCluster02a].context, cfg, releaseName)
 				testClusters[keyCluster02a].helmCluster.Create(t)
-				wg.Done()
 			}()
 
 			// Create cluster-03-a Cluster.
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				PeerTwoHelmValues := map[string]string{
 					"global.datacenter": cluster03Datacenter,
 				}
@@ -303,10 +302,10 @@ func TestFailover_Connect(t *testing.T) {
 
 				testClusters[keyCluster03a].helmCluster = consul.NewHelmCluster(t, PeerTwoHelmValues, testClusters[keyCluster03a].context, cfg, releaseName)
 				testClusters[keyCluster03a].helmCluster.Create(t)
-				wg.Done()
 			}()
 
 			// Wait for the clusters to start up
+			logger.Log(t, "waiting for clusters to start up . . .")
 			wg.Wait()
 
 			// Create a ProxyDefaults resource to configure services to use the mesh
@@ -868,7 +867,7 @@ func localityForRegion(r string) api.Locality {
 func deployCustomizeAsync(t *testing.T, opts *terratestk8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		k8s.DeployKustomize(t, opts, noCleanupOnFailure, noCleanup, debugDirectory, kustomizeDir)
-		wg.Done()
 	}()
 }
