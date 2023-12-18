@@ -84,8 +84,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 							},
 							Annotations: map[string]string{
-								constants.AnnotationMeshInject:  "false",
-								constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationMeshInject:                      "false",
+								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -337,8 +338,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 							},
 							Annotations: map[string]string{
-								constants.AnnotationMeshInject:  "false",
-								constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationMeshInject:                      "false",
+								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 							},
 						},
 						Spec: corev1.PodSpec{
