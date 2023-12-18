@@ -42,6 +42,16 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 				config: GatewayConfig{},
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: meshv2beta1.GatewayClassConfigSpec{
+						GatewayClassAnnotationsAndLabels: meshv2beta1.GatewayClassAnnotationsAndLabels{
+							Labels: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+								Set: map[string]string{
+									"app":      "consul",
+									"chart":    "consul-helm",
+									"heritage": "Helm",
+									"release":  "consul",
+								},
+							},
+						},
 						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
 							Container: &meshv2beta1.GatewayClassContainerConfig{
 								HostPort:     8080,
@@ -67,17 +77,59 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
+<<<<<<< HEAD
 					Labels:      defaultLabels,
 					Annotations: map[string]string{},
+||||||| parent of bb907131 (use set labels for setting labels on deployments)
+					Labels: map[string]string{
+						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+					},
+=======
+					Labels: map[string]string{
+						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+						"mesh.consul.hashicorp.com/app":        "consul",
+						"mesh.consul.hashicorp.com/chart":      "consul-helm",
+						"mesh.consul.hashicorp.com/heritage":   "Helm",
+						"mesh.consul.hashicorp.com/release":    "consul",
+					},
+>>>>>>> bb907131 (use set labels for setting labels on deployments)
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: pointer.Int32(1),
 					Selector: &metav1.LabelSelector{
+<<<<<<< HEAD
 						MatchLabels: defaultLabels,
+||||||| parent of bb907131 (use set labels for setting labels on deployments)
+						MatchLabels: map[string]string{
+							"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+						},
+=======
+						MatchLabels: map[string]string{
+							"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+							"mesh.consul.hashicorp.com/app":        "consul",
+							"mesh.consul.hashicorp.com/chart":      "consul-helm",
+							"mesh.consul.hashicorp.com/heritage":   "Helm",
+							"mesh.consul.hashicorp.com/release":    "consul",
+						},
+>>>>>>> bb907131 (use set labels for setting labels on deployments)
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
+<<<<<<< HEAD
 							Labels: defaultLabels,
+||||||| parent of bb907131 (use set labels for setting labels on deployments)
+							Labels: map[string]string{
+								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+							},
+=======
+							Labels: map[string]string{
+								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+								"mesh.consul.hashicorp.com/app":        "consul",
+								"mesh.consul.hashicorp.com/chart":      "consul-helm",
+								"mesh.consul.hashicorp.com/heritage":   "Helm",
+								"mesh.consul.hashicorp.com/release":    "consul",
+							},
+>>>>>>> bb907131 (use set labels for setting labels on deployments)
 							Annotations: map[string]string{
 								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
@@ -281,7 +333,21 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Weight: 1,
 											PodAffinityTerm: corev1.PodAffinityTerm{
 												LabelSelector: &metav1.LabelSelector{
+<<<<<<< HEAD
 													MatchLabels: defaultLabels,
+||||||| parent of bb907131 (use set labels for setting labels on deployments)
+													MatchLabels: map[string]string{
+														"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+													},
+=======
+													MatchLabels: map[string]string{
+														"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+														"mesh.consul.hashicorp.com/app":        "consul",
+														"mesh.consul.hashicorp.com/chart":      "consul-helm",
+														"mesh.consul.hashicorp.com/heritage":   "Helm",
+														"mesh.consul.hashicorp.com/release":    "consul",
+													},
+>>>>>>> bb907131 (use set labels for setting labels on deployments)
 												},
 												TopologyKey: "kubernetes.io/hostname",
 											},
