@@ -20,11 +20,11 @@ func TestMain(m *testing.M) {
 	if suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) {
 		os.Exit(suite.Run())
 	} else {
-		fmt.Println(fmt.Sprintf(
-			"Skipping tenancy_v2 tests because the number of clusters, %d, did not match the expected count of %d",
+		fmt.Printf(
+			"Skipping tenancy_v2 tests because the number of clusters, %d, did not match the expected count of %d\n",
 			len(suite.Config().KubeEnvs),
 			expectedNumberOfClusters,
-		))
+		)
 		os.Exit(0)
 	}
 }
