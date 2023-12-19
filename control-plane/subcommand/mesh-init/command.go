@@ -34,12 +34,14 @@ import (
 const (
 	// The number of times to attempt to read this proxy registration (120s).
 	defaultMaxPollingRetries = 120
+	defaultProxyIDFile       = "/consul/mesh-inject/proxyid"
 )
 
 type Command struct {
 	UI cli.Ui
 
-	flagProxyName string
+	flagProxyName   string
+	flagProxyIDFile string
 
 	maxPollingAttempts uint64 // Number of times to poll Consul for proxy registrations.
 
@@ -66,12 +68,14 @@ func (c *Command) init() {
 
 	// V2 Flags
 	c.flagSet.StringVar(&c.flagProxyName, "proxy-name", os.Getenv("PROXY_NAME"), "The Consul proxy name. This is the K8s Pod name, which is also the name of the Workload in Consul. (Required)")
+	c.flagSet.StringVar(&c.flagProxyIDFile, "proxy-id-file", defaultProxyIDFile, "File name where proxy's Consul service ID should be saved.")
 
 	// Universal flags
 	c.flagSet.StringVar(&c.flagRedirectTrafficConfig, "redirect-traffic-config", os.Getenv("CONSUL_REDIRECT_TRAFFIC_CONFIG"), "Config (in JSON format) to configure iptables for this pod.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
@@ -171,7 +175,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Write the proxy ID to the shared volume so `consul connect envoy` can use it for bootstrapping.
-	if err = common.WriteFileWithPerms(fmt.Sprintf("%s/proxyid", constants.ProxyIDVolumePath), c.flagProxyName, os.FileMode(0444)); err != nil {
+	if err = common.WriteFileWithPerms(c.flagProxyIDFile, c.flagProxyName, 0444); err != nil {
 		// Save an error but return nil so that we don't retry this step.
 		c.logger.Error("error writing proxyid file", "error", err)
 		return 1
