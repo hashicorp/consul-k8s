@@ -67,22 +67,17 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-					},
+					Labels:      defaultLabels,
+					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: pointer.Int32(1),
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-						},
+						MatchLabels: defaultLabels,
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-							},
+							Labels: defaultLabels,
 							Annotations: map[string]string{
 								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
@@ -286,9 +281,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Weight: 1,
 											PodAffinityTerm: corev1.PodAffinityTerm{
 												LabelSelector: &metav1.LabelSelector{
-													MatchLabels: map[string]string{
-														"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-													},
+													MatchLabels: defaultLabels,
 												},
 												TopologyKey: "kubernetes.io/hostname",
 											},
@@ -321,22 +314,17 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-					},
+					Labels:      defaultLabels,
+					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: pointer.Int32(1),
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-						},
+						MatchLabels: defaultLabels,
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-							},
+							Labels: defaultLabels,
 							Annotations: map[string]string{
 								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
@@ -530,9 +518,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Weight: 1,
 											PodAffinityTerm: corev1.PodAffinityTerm{
 												LabelSelector: &metav1.LabelSelector{
-													MatchLabels: map[string]string{
-														"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-													},
+													MatchLabels: defaultLabels,
 												},
 												TopologyKey: "kubernetes.io/hostname",
 											},
