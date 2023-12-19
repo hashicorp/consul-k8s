@@ -45,7 +45,7 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 	volMounts := []corev1.VolumeMount{
 		{
 			Name:      volumeName,
-			MountPath: constants.ProxyIDVolumeName,
+			MountPath: constants.ProxyIDVolumePath,
 		},
 	}
 

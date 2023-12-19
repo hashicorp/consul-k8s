@@ -67,7 +67,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		Env: []corev1.EnvVar{
 			{
 				Name:  "TMPDIR",
-				Value: constants.ProxyIDVolumeName,
+				Value: constants.ProxyIDVolumePath,
 			},
 			{
 				Name: "NODE_NAME",
@@ -85,7 +85,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      volumeName,
-				MountPath: constants.ProxyIDVolumeName,
+				MountPath: constants.ProxyIDVolumePath,
 			},
 		},
 		Args:           args,
@@ -138,7 +138,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 }
 
 func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
-	proxyIDFileName := fmt.Sprintf("%s/proxyid", constants.ProxyIDVolumeName)
+	proxyIDFileName := fmt.Sprintf("%s/proxyid", constants.ProxyIDVolumePath)
 
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
