@@ -2,10 +2,6 @@ package gateways
 
 import (
 	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
@@ -14,66 +10,95 @@ const labelManagedBy = "mesh.consul.hashicorp.com/managed-by"
 
 var defaultLabels = map[string]string{labelManagedBy: "consul-k8s"}
 
-// Annotations returns the computed set of annotations for a resource by inheriting
-// from the MeshGateway's annotations and adding specified key-values from the
-// GatewayClassConfig based on the Kubernetes object type.
-func (b *meshGatewayBuilder) Annotations(object client.Object) map[string]string {
+func (b *meshGatewayBuilder) annotationsForDeployment() map[string]string {
 	if b.gcc == nil {
 		return map[string]string{}
 	}
-
-	var (
-		primarySource   v2beta1.GatewayClassAnnotationsLabelsConfig
-		secondarySource = b.gcc.Spec.Annotations
-	)
-
-	switch object.(type) {
-	case *appsv1.Deployment:
-		primarySource = b.gcc.Spec.Deployment.Annotations
-	case *rbacv1.Role:
-		primarySource = b.gcc.Spec.Role.Annotations
-	case *rbacv1.RoleBinding:
-		primarySource = b.gcc.Spec.RoleBinding.Annotations
-	case *corev1.Service:
-		primarySource = b.gcc.Spec.Service.Annotations
-	case *corev1.ServiceAccount:
-		primarySource = b.gcc.Spec.ServiceAccount.Annotations
-	default:
-		return map[string]string{}
-	}
-
-	return computeAnnotationsOrLabels(b.gateway.Annotations, primarySource, secondarySource)
+	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.Deployment.Annotations, b.gcc.Spec.Annotations)
 }
 
-// Labels returns the computed set of labels for a resource by inheriting
-// from the MeshGateway's labels and adding specified key-values from the
-// GatewayClassConfig based on the Kubernetes object type.
-func (b *meshGatewayBuilder) Labels(object client.Object) map[string]string {
+func (b *meshGatewayBuilder) annotationsForRole() map[string]string {
+	if b.gcc == nil {
+		return map[string]string{}
+	}
+	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.Role.Annotations, b.gcc.Spec.Annotations)
+}
+
+func (b *meshGatewayBuilder) annotationsForRoleBinding() map[string]string {
+	if b.gcc == nil {
+		return map[string]string{}
+	}
+	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.RoleBinding.Annotations, b.gcc.Spec.Annotations)
+}
+
+func (b *meshGatewayBuilder) annotationsForService() map[string]string {
+	if b.gcc == nil {
+		return map[string]string{}
+	}
+	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.Service.Annotations, b.gcc.Spec.Annotations)
+}
+
+func (b *meshGatewayBuilder) annotationsForServiceAccount() map[string]string {
+	if b.gcc == nil {
+		return map[string]string{}
+	}
+	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.ServiceAccount.Annotations, b.gcc.Spec.Annotations)
+}
+
+func (b *meshGatewayBuilder) labelsForDeployment() map[string]string {
 	if b.gcc == nil {
 		return defaultLabels
 	}
 
-	var (
-		primarySource   v2beta1.GatewayClassAnnotationsLabelsConfig
-		secondarySource = b.gcc.Spec.Labels
-	)
+	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.Deployment.Labels, b.gcc.Spec.Labels)
+	for k, v := range defaultLabels {
+		labels[k] = v
+	}
+	return labels
+}
 
-	switch object.(type) {
-	case *appsv1.Deployment:
-		primarySource = b.gcc.Spec.Deployment.Labels
-	case *rbacv1.Role:
-		primarySource = b.gcc.Spec.Role.Labels
-	case *rbacv1.RoleBinding:
-		primarySource = b.gcc.Spec.RoleBinding.Labels
-	case *corev1.Service:
-		primarySource = b.gcc.Spec.Service.Labels
-	case *corev1.ServiceAccount:
-		primarySource = b.gcc.Spec.ServiceAccount.Labels
-	default:
+func (b *meshGatewayBuilder) labelsForRole() map[string]string {
+	if b.gcc == nil {
 		return defaultLabels
 	}
 
-	labels := computeAnnotationsOrLabels(b.gateway.Labels, primarySource, secondarySource)
+	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.Role.Labels, b.gcc.Spec.Labels)
+	for k, v := range defaultLabels {
+		labels[k] = v
+	}
+	return labels
+}
+
+func (b *meshGatewayBuilder) labelsForRoleBinding() map[string]string {
+	if b.gcc == nil {
+		return defaultLabels
+	}
+
+	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.RoleBinding.Labels, b.gcc.Spec.Labels)
+	for k, v := range defaultLabels {
+		labels[k] = v
+	}
+	return labels
+}
+
+func (b *meshGatewayBuilder) labelsForService() map[string]string {
+	if b.gcc == nil {
+		return defaultLabels
+	}
+
+	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.Service.Labels, b.gcc.Spec.Labels)
+	for k, v := range defaultLabels {
+		labels[k] = v
+	}
+	return labels
+}
+
+func (b *meshGatewayBuilder) labelsForServiceAccount() map[string]string {
+	if b.gcc == nil {
+		return defaultLabels
+	}
+
+	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.ServiceAccount.Labels, b.gcc.Spec.Labels)
 	for k, v := range defaultLabels {
 		labels[k] = v
 	}

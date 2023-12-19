@@ -13,8 +13,8 @@ func (b *meshGatewayBuilder) Role() *rbacv1.Role {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        b.gateway.Name,
 			Namespace:   b.gateway.Namespace,
-			Labels:      b.Labels(&rbacv1.Role{}),
-			Annotations: b.Annotations(&rbacv1.Role{}),
+			Labels:      b.labelsForRole(),
+			Annotations: b.annotationsForRole(),
 		},
 		Rules: []rbacv1.PolicyRule{},
 	}
@@ -25,8 +25,8 @@ func (b *meshGatewayBuilder) RoleBinding() *rbacv1.RoleBinding {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        b.gateway.Name,
 			Namespace:   b.gateway.Namespace,
-			Labels:      b.Labels(&rbacv1.RoleBinding{}),
-			Annotations: b.Annotations(&rbacv1.RoleBinding{}),
+			Labels:      b.labelsForRoleBinding(),
+			Annotations: b.annotationsForRoleBinding(),
 		},
 		Subjects: []rbacv1.Subject{
 			{

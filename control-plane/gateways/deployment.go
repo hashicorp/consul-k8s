@@ -24,8 +24,8 @@ func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        b.gateway.Name,
 			Namespace:   b.gateway.Namespace,
-			Labels:      b.Labels(&appsv1.Deployment{}),
-			Annotations: b.Annotations(&appsv1.Deployment{}),
+			Labels:      b.labelsForDeployment(),
+			Annotations: b.annotationsForDeployment(),
 		},
 		Spec: *spec,
 	}, err
@@ -57,11 +57,11 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	return &appsv1.DeploymentSpec{
 		Replicas: deploymentReplicaCount(deploymentConfig.Replicas, nil),
 		Selector: &metav1.LabelSelector{
-			MatchLabels: b.Labels(&appsv1.Deployment{}),
+			MatchLabels: b.labelsForDeployment(),
 		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: b.Labels(&appsv1.Deployment{}),
+				Labels: b.labelsForDeployment(),
 				Annotations: map[string]string{
 					// Indicate that this pod is a mesh gateway pod so that the Pod controller,
 					// consul-k8s CLI, etc. can key off of it
@@ -94,7 +94,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 								Weight: 1,
 								PodAffinityTerm: corev1.PodAffinityTerm{
 									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: b.Labels(&appsv1.Deployment{}),
+										MatchLabels: b.labelsForDeployment(),
 									},
 									TopologyKey: "kubernetes.io/hostname",
 								},

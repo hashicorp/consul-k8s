@@ -13,8 +13,8 @@ func (b *meshGatewayBuilder) ServiceAccount() *corev1.ServiceAccount {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        b.serviceAccountName(),
 			Namespace:   b.gateway.Namespace,
-			Labels:      b.Labels(&corev1.ServiceAccount{}),
-			Annotations: b.Annotations(&corev1.ServiceAccount{}),
+			Labels:      b.labelsForServiceAccount(),
+			Annotations: b.annotationsForServiceAccount(),
 		},
 	}
 }

@@ -4,11 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
@@ -81,16 +77,11 @@ func TestMeshGatewayBuilder_Annotations(t *testing.T) {
 	b := NewMeshGatewayBuilder(gateway, GatewayConfig{}, gatewayClassConfig)
 
 	for _, testCase := range []struct {
-		Object   client.Object
+		Actual   map[string]string
 		Expected map[string]string
 	}{
 		{
-			// Unhandled type should return empty set
-			Object:   &corev1.Namespace{},
-			Expected: map[string]string{},
-		},
-		{
-			Object: &appsv1.Deployment{},
+			Actual: b.annotationsForDeployment(),
 			Expected: map[string]string{
 				"gateway-annotation":            "true",
 				"global-set":                    "true",
@@ -99,7 +90,7 @@ func TestMeshGatewayBuilder_Annotations(t *testing.T) {
 			},
 		},
 		{
-			Object: &rbacv1.Role{},
+			Actual: b.annotationsForRole(),
 			Expected: map[string]string{
 				"gateway-annotation":      "true",
 				"global-set":              "true",
@@ -108,7 +99,7 @@ func TestMeshGatewayBuilder_Annotations(t *testing.T) {
 			},
 		},
 		{
-			Object: &rbacv1.RoleBinding{},
+			Actual: b.annotationsForRoleBinding(),
 			Expected: map[string]string{
 				"gateway-annotation":              "true",
 				"global-set":                      "true",
@@ -117,7 +108,7 @@ func TestMeshGatewayBuilder_Annotations(t *testing.T) {
 			},
 		},
 		{
-			Object: &corev1.Service{},
+			Actual: b.annotationsForService(),
 			Expected: map[string]string{
 				"gateway-annotation":         "true",
 				"global-set":                 "true",
@@ -126,7 +117,7 @@ func TestMeshGatewayBuilder_Annotations(t *testing.T) {
 			},
 		},
 		{
-			Object: &corev1.ServiceAccount{},
+			Actual: b.annotationsForServiceAccount(),
 			Expected: map[string]string{
 				"gateway-annotation":                 "true",
 				"global-set":                         "true",
@@ -135,8 +126,7 @@ func TestMeshGatewayBuilder_Annotations(t *testing.T) {
 			},
 		},
 	} {
-		actual := b.Annotations(testCase.Object)
-		assert.Equal(t, testCase.Expected, actual)
+		assert.Equal(t, testCase.Expected, testCase.Actual)
 	}
 }
 
@@ -208,16 +198,11 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 	b := NewMeshGatewayBuilder(gateway, GatewayConfig{}, gatewayClassConfig)
 
 	for _, testCase := range []struct {
-		Object   client.Object
+		Actual   map[string]string
 		Expected map[string]string
 	}{
 		{
-			// Unhandled type should return default set
-			Object:   &corev1.Namespace{},
-			Expected: defaultLabels,
-		},
-		{
-			Object: &appsv1.Deployment{},
+			Actual: b.labelsForDeployment(),
 			Expected: map[string]string{
 				"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 				"gateway-label":                        "true",
@@ -227,7 +212,7 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 			},
 		},
 		{
-			Object: &rbacv1.Role{},
+			Actual: b.labelsForRole(),
 			Expected: map[string]string{
 				"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 				"gateway-label":                        "true",
@@ -237,7 +222,7 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 			},
 		},
 		{
-			Object: &rbacv1.RoleBinding{},
+			Actual: b.labelsForRoleBinding(),
 			Expected: map[string]string{
 				"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 				"gateway-label":                        "true",
@@ -247,7 +232,7 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 			},
 		},
 		{
-			Object: &corev1.Service{},
+			Actual: b.labelsForService(),
 			Expected: map[string]string{
 				"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 				"gateway-label":                        "true",
@@ -257,7 +242,7 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 			},
 		},
 		{
-			Object: &corev1.ServiceAccount{},
+			Actual: b.labelsForServiceAccount(),
 			Expected: map[string]string{
 				"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
 				"gateway-label":                        "true",
@@ -267,8 +252,7 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 			},
 		},
 	} {
-		actual := b.Labels(testCase.Object)
-		assert.Equal(t, testCase.Expected, actual)
+		assert.Equal(t, testCase.Expected, testCase.Actual)
 	}
 }
 
