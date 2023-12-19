@@ -11,9 +11,10 @@ import (
 func (b *meshGatewayBuilder) ServiceAccount() *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      b.serviceAccountName(),
-			Namespace: b.gateway.Namespace,
-			Labels:    b.Labels(),
+			Name:        b.serviceAccountName(),
+			Namespace:   b.gateway.Namespace,
+			Labels:      b.labelsForServiceAccount(),
+			Annotations: b.annotationsForServiceAccount(),
 		},
 	}
 }

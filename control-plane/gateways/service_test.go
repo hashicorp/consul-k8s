@@ -52,16 +52,12 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 			},
 			want: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-					},
+					Labels:      defaultLabels,
 					Annotations: map[string]string{},
 				},
 				Spec: corev1.ServiceSpec{
-					Selector: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-					},
-					Type: corev1.ServiceTypeLoadBalancer,
+					Selector: defaultLabels,
+					Type:     corev1.ServiceTypeLoadBalancer,
 					Ports: []corev1.ServicePort{
 						{
 							Name: "wan",
@@ -88,16 +84,12 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 			},
 			want: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-					},
+					Labels:      defaultLabels,
 					Annotations: map[string]string{},
 				},
 				Spec: corev1.ServiceSpec{
-					Selector: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-					},
-					Type: "",
+					Selector: defaultLabels,
+					Type:     "",
 					Ports: []corev1.ServicePort{
 						{
 							Name: "wan",
