@@ -32,6 +32,9 @@ data:
               release: {{ .Release.Name }}
               component: mesh-gateway
           deployment:
+            {{- if .Values.meshGateway.priorityClassName }}
+            priorityClassName: {{ .Values.meshGateway.priorityClassName | quote }}
+            {{- end }}
             {{- if .Values.meshGateway.affinity }}
             affinity: {{ toJson (default "{}" .Values.meshGateway.affinity) }}
             {{- end }}
@@ -48,22 +51,35 @@ data:
                 logging:
                   level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
               portModifier: {{ sub .Values.meshGateway.containerPort .Values.meshGateway.service.port }}
+              {{- if .Values.meshGateway.hostPort }}
+              hostPort: {{ .Values.meshGateway.hostPort }}
+              {{- end }}
               resources: {{ toJson .Values.meshGateway.resources }}
             initContainer:
               consul:
                 logging:
                   level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
               resources: {{ toJson .Values.meshGateway.initServiceInitContainer.resources }}
-            {{- if .Values.meshGateway.nodeSelector }}
-            nodeSelector: {{ toJson .Values.meshGateway.nodeSelector }}
+            {{- with .Values.meshGateway.nodeSelector }}
+            nodeSelector: {{ fromYaml . | toJson }}
+            {{- end }}
+            {{- with .Values.meshGateway.hostNetwork }}
+            hostNetwork: {{ . }}
+            {{- end }}
+            {{- with .Values.meshGateway.dnsPolicy }}
+            dnsPolicy: {{ . }}
             {{- end }}
             priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
+            {{- if .Values.meshGateway.topologySpreadConstraints }}
+            topologySpreadConstraints:
+              {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 16 | trim }}
+            {{- end }}
             replicas:
               default: {{ .Values.meshGateway.replicas }}
               min: {{ .Values.meshGateway.replicas }}
               max: {{ .Values.meshGateway.replicas }}
             {{- if .Values.meshGateway.tolerations }}
-            tolerations: {{ toJson .Values.meshGateway.tolerations }}
+            tolerations: {{ fromYamlArray .Values.meshGateway.tolerations | toJson }}
             {{- end }}
           service:
             {{- if .Values.meshGateway.service.annotations }}

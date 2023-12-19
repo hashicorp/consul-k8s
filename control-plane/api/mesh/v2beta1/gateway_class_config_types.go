@@ -48,20 +48,33 @@ type GatewayClassConfigSpec struct {
 type GatewayClassDeploymentConfig struct {
 	GatewayClassAnnotationsAndLabels `json:",inline"`
 
-	// Container contains config specific to the created Deployment's container
+	// Container contains config specific to the created Deployment's container.
 	Container *GatewayClassContainerConfig `json:"container,omitempty"`
-	// InitContainer contains config specific to the created Deployment's init container
+	// InitContainer contains config specific to the created Deployment's init container.
 	InitContainer *GatewayClassInitContainerConfig `json:"initContainer,omitempty"`
-	// NodeSelector specifies the node selector to use on the created Deployment
-	NodeSelector *corev1.NodeSelector `json:"nodeSelector,omitempty"`
-	// PriorityClassName specifies the priority class name to use on the created Deployment
+	// NodeSelector is a feature that constrains the scheduling of a pod to nodes that
+	// match specified labels.
+	// By defining NodeSelector in a pod's configuration, you can ensure that the pod is
+	// only scheduled to nodes with the corresponding labels, providing a way to
+	// influence the placement of workloads based on node attributes.
+	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// PriorityClassName specifies the priority class name to use on the created Deployment.
 	PriorityClassName string `json:"priorityClassName,omitempty"`
-	// Replicas specifies the configuration to control the number of replicas for the created Deployment
+	// Replicas specifies the configuration to control the number of replicas for the created Deployment.
 	Replicas *GatewayClassReplicasConfig `json:"replicas,omitempty"`
-	// SecurityContext specifies the security context for the created Deployment's Pod
+	// SecurityContext specifies the security context for the created Deployment's Pod.
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
-	// Tolerations specifies the tolerations to use on the created Deployment
+	// Tolerations specifies the tolerations to use on the created Deployment.
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	// HostNetwork specifies whether the gateway pods should run on the host network.
+	HostNetwork bool `json:"hostNetwork,omitempty"`
+	// TopologySpreadConstraints is a feature that controls how pods are spead across your topology.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+	// DNSPolicy specifies the dns policy to use. These are set on a per pod basis.
+	// +kubebuilder:validation:Enum=Default;ClusterFirst;ClusterFirstWithHostNet;None
+	DNSPolicy corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
 }
 
 type GatewayClassReplicasConfig struct {
@@ -91,7 +104,9 @@ type GatewayClassContainerConfig struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 	// PortModifier specifies the value to be added to every port value for listeners on this gateway.
 	// This is generally used to avoid binding to privileged ports in the container.
-	PortModifier int `json:"portModifier,omitempty"`
+	PortModifier int32 `json:"portModifier,omitempty"`
+	// HostPort specifies a port to be exposed to the external host network
+	HostPort int32 `json:"hostPort,omitempty"`
 }
 
 type GatewayClassRoleConfig struct {
@@ -106,6 +121,7 @@ type GatewayClassServiceConfig struct {
 	GatewayClassAnnotationsAndLabels `json:",inline"`
 
 	// Type specifies the type of Service to use (LoadBalancer, ClusterIP, etc.)
+	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
 	Type *corev1.ServiceType `json:"type,omitempty"`
 }
 

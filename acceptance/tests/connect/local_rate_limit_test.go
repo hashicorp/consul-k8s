@@ -102,12 +102,12 @@ func assertRateLimits(t *testing.T, opts *assertRateLimitOptions, addr string) {
 		// Make up to the allowed numbers of calls in a second
 		t0 := time.Now()
 
-		output, err := k8s.RunKubectlAndGetOutputE(t, opts.k8sOpts, append(args, repeatAddr)...)
+		output, err := k8s.RunKubectlAndGetOutputE(r, opts.k8sOpts, append(args, repeatAddr)...)
 		require.NoError(r, err)
 		require.Contains(r, output, opts.successOutput)
 
 		// Exceed the configured rate limit.
-		output, err = k8s.RunKubectlAndGetOutputE(t, opts.k8sOpts, append(args, addr)...)
+		output, err = k8s.RunKubectlAndGetOutputE(r, opts.k8sOpts, append(args, addr)...)
 		require.True(r, time.Since(t0) < time.Second, "failed to make all requests within one second window")
 		if opts.enforced {
 			require.Error(r, err)

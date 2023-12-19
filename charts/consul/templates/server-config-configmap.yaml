@@ -95,8 +95,6 @@ data:
   {{- end }}
   {{- end }}
   {{- end }}
-  extra-from-values.json: |-
-{{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
   {{- if .Values.global.acls.manageSystemACLs }}
   acl-config.json: |-
     {
