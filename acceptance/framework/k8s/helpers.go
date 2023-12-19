@@ -114,8 +114,8 @@ func ServiceHost(t *testing.T, cfg *config.TestConfig, ctx environment.TestConte
 		// It can take some time for the load balancers to be ready and have an IP/Hostname.
 		// Wait for 5 minutes before failing.
 		retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
-			svc, err := ctx.KubernetesClient(t).CoreV1().Services(ctx.KubectlOptions(t).Namespace).Get(context.Background(), serviceName, metav1.GetOptions{})
-			require.NoError(t, err)
+			svc, err := ctx.KubernetesClient(r).CoreV1().Services(ctx.KubectlOptions(r).Namespace).Get(context.Background(), serviceName, metav1.GetOptions{})
+			require.NoError(r, err)
 			require.NotEmpty(r, svc.Status.LoadBalancer.Ingress)
 			// On AWS, load balancers have a hostname for ingress, while on Azure and GCP
 			// load balancers have IPs.
@@ -135,7 +135,7 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 	var secret *corev1.Secret
 	var err error
 	retry.Run(t, func(r *retry.R) {
-		secret, err = sourceContext.KubernetesClient(t).CoreV1().Secrets(sourceContext.KubectlOptions(t).Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
+		secret, err = sourceContext.KubernetesClient(r).CoreV1().Secrets(sourceContext.KubectlOptions(r).Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 		secret.ResourceVersion = ""
 		require.NoError(r, err)
 	})

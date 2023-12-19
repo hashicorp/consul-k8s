@@ -2,7 +2,10 @@ module github.com/hashicorp/consul-k8s/acceptance
 
 go 1.20
 
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f
+
 require (
+	github.com/google/uuid v1.3.0
 	github.com/gruntwork-io/terratest v0.31.2
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230609143603-198c4433d892
 	github.com/hashicorp/consul/api v1.10.1-0.20230906155245-56917eb4c968
@@ -62,7 +65,6 @@ require (
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/gruntwork-io/gruntwork-cli v0.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect

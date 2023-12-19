@@ -150,7 +150,12 @@ func (h *HelmCluster) Create(t *testing.T) {
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
-	helm.Install(t, h.helmOptions, chartName, h.releaseName)
+
+	// Retry the install in case previous tests have not finished cleaning up.
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
+		require.NoError(r, err)
+	})
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -200,7 +205,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	}
 
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
 		require.NoError(r, err)
 	})
 
@@ -211,77 +216,77 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		// graceful termination takes a long time and since this is an uninstall
 		// we don't care that they're stopped gracefully.
 		pods, err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, pod := range pods.Items {
 			if strings.Contains(pod.Name, h.releaseName) {
 				var gracePeriod int64 = 0
 				err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
 
 		// Delete PVCs.
 		err = h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 
 		// Delete any serviceaccounts that have h.releaseName in their name.
 		sas, err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, sa := range sas.Items {
 			if strings.Contains(sa.Name, h.releaseName) {
 				err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), sa.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
 
 		// Delete any roles that have h.releaseName in their name.
 		roles, err := h.kubernetesClient.RbacV1().Roles(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, role := range roles.Items {
 			if strings.Contains(role.Name, h.releaseName) {
 				err := h.kubernetesClient.RbacV1().Roles(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), role.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
 
 		// Delete any rolebindings that have h.releaseName in their name.
 		roleBindings, err := h.kubernetesClient.RbacV1().RoleBindings(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, roleBinding := range roleBindings.Items {
 			if strings.Contains(roleBinding.Name, h.releaseName) {
 				err := h.kubernetesClient.RbacV1().RoleBindings(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), roleBinding.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
 
 		// Delete any secrets that have h.releaseName in their name.
 		secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, secret := range secrets.Items {
 			if strings.Contains(secret.Name, h.releaseName) {
 				err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), secret.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
 
 		// Delete any jobs that have h.releaseName in their name.
 		jobs, err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, job := range jobs.Items {
 			if strings.Contains(job.Name, h.releaseName) {
 				err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}

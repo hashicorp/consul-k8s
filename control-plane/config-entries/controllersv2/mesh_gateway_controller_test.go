@@ -109,7 +109,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			},
 			expectedResult: ctrl.Result{},
 			postReconcile: func(t *testing.T, c client.Client) {
-				// Verify ClusterRole was created
+				// Verify Role was created
 				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
 				assert.NoError(t, c.Get(context.Background(), key, &rbacv1.Role{}))
 			},
@@ -190,7 +190,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			},
 			expectedResult: ctrl.Result{},
 			postReconcile: func(t *testing.T, c client.Client) {
-				// Verify ClusterRole was created
+				// Verify RoleBinding was created
 				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
 				assert.NoError(t, c.Get(context.Background(), key, &rbacv1.RoleBinding{}))
 			},
@@ -333,6 +333,87 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			expectedResult: ctrl.Result{},
 			expectedErr:    nil, // The Reconcile should be a no-op
 		},
+		// Service
+		{
+			name: "MeshGateway created with no existing Service",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "consul",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "consul",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			postReconcile: func(t *testing.T, c client.Client) {
+				// Verify Service was created
+				key := client.ObjectKey{Namespace: "consul", Name: "mesh-gateway"}
+				assert.NoError(t, c.Get(context.Background(), key, &corev1.Service{}))
+			},
+		},
+		{
+			name: "MeshGateway created with existing Service not owned by gateway",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "default",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			expectedErr:    errResourceNotOwned,
+		},
+		{
+			name: "MeshGateway created with existing Service owned by gateway",
+			k8sObjects: []runtime.Object{
+				&v2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+						UID:       "abc123",
+					},
+				},
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "mesh-gateway",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								UID:  "abc123",
+								Name: "mesh-gateway",
+							},
+						},
+					},
+				},
+			},
+			request: ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: "default",
+					Name:      "mesh-gateway",
+				},
+			},
+			expectedResult: ctrl.Result{},
+			expectedErr:    nil, // The Reconcile should be a no-op
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -345,6 +426,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
 			require.NoError(t, rbacv1.AddToScheme(s))
+			require.NoError(t, v2beta1.AddMeshToScheme(s))
 			s.AddKnownTypes(v2beta1.MeshGroupVersion, &v2beta1.MeshGateway{}, &v2beta1.GatewayClass{}, &v2beta1.GatewayClassConfig{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).
 				WithRuntimeObjects(testCase.k8sObjects...).

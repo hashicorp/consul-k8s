@@ -5,11 +5,14 @@
 package common
 
 import (
-	mapset "github.com/deckarep/golang-set"
 	"time"
+
+	mapset "github.com/deckarep/golang-set"
 )
 
 const (
+	// NOTE: these are only used in consul types, they do not map to k8s kinds.
+
 	// V1 config entries.
 	ServiceDefaults          string = "servicedefaults"
 	ProxyDefaults            string = "proxydefaults"
@@ -35,6 +38,7 @@ const (
 	MeshGateway        string = "meshgateway"
 	GatewayClass       string = "gatewayclass"
 	GatewayClassConfig string = "gatewayclassconfig"
+	MeshConfiguration  string = "meshconfiguration"
 
 	Global                 string = "global"
 	Mesh                   string = "mesh"

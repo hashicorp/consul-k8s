@@ -31,7 +31,7 @@ func CreateTunnelToResourcePort(t *testing.T, resourceName string, remotePort in
 		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
 		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
 		// get used to fail the test, just for logging.
-		require.NoError(r, tunnel.ForwardPortE(t))
+		require.NoError(r, tunnel.ForwardPortE(r))
 	})
 
 	doneChan := make(chan bool)

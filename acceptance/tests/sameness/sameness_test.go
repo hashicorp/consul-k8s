@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -173,8 +174,6 @@ func TestFailover_Connect(t *testing.T) {
 
 				"global.adminPartitions.enabled": "true",
 
-				"global.logLevel": "warn",
-
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
 				"connectInject.enabled":                       "true",
@@ -195,6 +194,7 @@ func TestFailover_Connect(t *testing.T) {
 			// create in same routine as 01-b depends on 01-a being created first
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				// Create the cluster-01-a
 				defaultPartitionHelmValues := map[string]string{
 					"global.datacenter": cluster01Datacenter,
@@ -265,12 +265,12 @@ func TestFailover_Connect(t *testing.T) {
 
 				testClusters[keyCluster01b].helmCluster = consul.NewHelmCluster(t, secondaryPartitionHelmValues, testClusters[keyCluster01b].context, cfg, releaseName)
 				testClusters[keyCluster01b].helmCluster.Create(t)
-				wg.Done()
 			}()
 
 			// Create cluster-02-a Cluster.
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				PeerOneHelmValues := map[string]string{
 					"global.datacenter": cluster02Datacenter,
 				}
@@ -284,12 +284,12 @@ func TestFailover_Connect(t *testing.T) {
 
 				testClusters[keyCluster02a].helmCluster = consul.NewHelmCluster(t, PeerOneHelmValues, testClusters[keyCluster02a].context, cfg, releaseName)
 				testClusters[keyCluster02a].helmCluster.Create(t)
-				wg.Done()
 			}()
 
 			// Create cluster-03-a Cluster.
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				PeerTwoHelmValues := map[string]string{
 					"global.datacenter": cluster03Datacenter,
 				}
@@ -303,10 +303,10 @@ func TestFailover_Connect(t *testing.T) {
 
 				testClusters[keyCluster03a].helmCluster = consul.NewHelmCluster(t, PeerTwoHelmValues, testClusters[keyCluster03a].context, cfg, releaseName)
 				testClusters[keyCluster03a].helmCluster.Create(t)
-				wg.Done()
 			}()
 
 			// Wait for the clusters to start up
+			logger.Log(t, "waiting for clusters to start up . . .")
 			wg.Wait()
 
 			// Create a ProxyDefaults resource to configure services to use the mesh
@@ -535,8 +535,8 @@ func TestFailover_Connect(t *testing.T) {
 					}{
 						{failoverServer: testClusters[keyCluster01b], expectedPQ: expectedPQ{partition: "ap1", peerName: "", namespace: "ns2"}},
 						{failoverServer: testClusters[keyCluster01a], expectedPQ: expectedPQ{partition: "default", peerName: "", namespace: "ns2"}},
-						{failoverServer: testClusters[keyCluster02a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster02a].name, namespace: "ns2"}},
-						{failoverServer: testClusters[keyCluster03a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster03a].name, namespace: "ns2"}},
+						{failoverServer: testClusters[keyCluster02a], expectedPQ: expectedPQ{partition: "ap1", peerName: testClusters[keyCluster02a].name, namespace: "ns2"}},
+						{failoverServer: testClusters[keyCluster03a], expectedPQ: expectedPQ{partition: "ap1", peerName: testClusters[keyCluster03a].name, namespace: "ns2"}},
 					},
 				},
 				{
@@ -574,9 +574,9 @@ func TestFailover_Connect(t *testing.T) {
 					// We're resetting the scale, so make sure we have all the new IP addresses saved
 					testClusters.setServerIP(t)
 
-					for _, v := range sc.failovers {
+					for i, v := range sc.failovers {
 						// Verify Failover (If this is the first check, then just verifying we're starting with the right server)
-						logger.Log(t, "checking service failover")
+						logger.Log(t, "checking service failover", i)
 
 						if cfg.EnableTransparentProxy {
 							sc.server.serviceTargetCheck(t, v.failoverServer.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", sc.server.fullTextPartition()))
@@ -589,10 +589,10 @@ func TestFailover_Connect(t *testing.T) {
 						// e.g kubectl --context kind-dc1 --namespace ns1 exec -i deploy/static-client -c static-client \
 						//	-- dig @test-3lmypr-consul-dns.default static-server.service.ns2.ns.mine.sg.ap1.ap.consul
 						// Verify DNS.
-						logger.Log(t, "verifying dns")
+						logger.Log(t, "verifying dns", i)
 						sc.server.dnsFailoverCheck(t, cfg, releaseName, v.failoverServer)
 
-						logger.Log(t, "verifying prepared query")
+						logger.Log(t, "verifying prepared query", i)
 						sc.server.preparedQueryFailoverCheck(t, releaseName, v.expectedPQ, v.failoverServer)
 
 						// Scale down static-server on the current failover, will fail over to the next.
@@ -646,7 +646,7 @@ func (c *cluster) serviceTargetCheck(t *testing.T, expectedName string, curlAddr
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// Use -s/--silent and -S/--show-error flags w/ curl to reduce noise during retries.
 		// This silences extra output like the request progress bar, but preserves errors.
-		resp, err = k8s.RunKubectlAndGetOutputE(t, c.clientOpts, "exec", "-i",
+		resp, err = k8s.RunKubectlAndGetOutputE(r, c.clientOpts, "exec", "-i",
 			staticClientDeployment, "-c", staticClientName, "--", "curl", "-sS", curlAddress)
 		require.NoError(r, err)
 		assert.Contains(r, resp, expectedName)
@@ -672,7 +672,7 @@ func (c *cluster) preparedQueryFailoverCheck(t *testing.T, releaseName string, e
 	// that failover occurred, that is left to client `Execute`
 	dnsPQLookup := []string{fmt.Sprintf("%s.query.consul", *c.pqName)}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		logs := dnsQuery(t, releaseName, dnsPQLookup, c.primaryCluster, failover)
+		logs := dnsQuery(r, releaseName, dnsPQLookup, c.primaryCluster, failover)
 		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", *c.primaryCluster.dnsIP))
 		assert.Contains(r, logs, "ANSWER SECTION:")
 		assert.Contains(r, logs, *failover.staticServerIP)
@@ -686,7 +686,7 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// Use the primary cluster when performing a DNS lookup, this mostly affects cases
 		// where we are verifying DNS for a partition
-		logs := dnsQuery(t, releaseName, dnsLookup, c.primaryCluster, failover)
+		logs := dnsQuery(r, releaseName, dnsLookup, c.primaryCluster, failover)
 
 		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", *c.primaryCluster.dnsIP))
 		assert.Contains(r, logs, "ANSWER SECTION:")
@@ -697,7 +697,7 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 		// the context can be used to determine that failover occured to the expected kubernetes cluster
 		// hosting Consul
 		assert.Contains(r, logs, "ADDITIONAL SECTION:")
-		expectedName := failover.context.KubectlOptions(t).ContextName
+		expectedName := failover.context.KubectlOptions(r).ContextName
 		if cfg.UseKind {
 			expectedName = strings.Replace(expectedName, "kind-", "", -1)
 		}
@@ -712,7 +712,7 @@ func (c *cluster) getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig,
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		var err error
-		acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status.secret.name}")
+		acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(r, c.context.KubectlOptions(r), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status.secret.name}")
 		require.NoError(r, err)
 		require.NotEmpty(r, acceptorSecretName)
 	})
@@ -830,16 +830,17 @@ func setK8sNodeLocality(t *testing.T, context environment.TestContext, c *cluste
 }
 
 // dnsQuery performs a dns query with the provided query string.
-func dnsQuery(t *testing.T, releaseName string, dnsQuery []string, dnsServer, failover *cluster) string {
+func dnsQuery(t testutil.TestingTB, releaseName string, dnsQuery []string, dnsServer, failover *cluster) string {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
 	var logs string
+
 	retry.RunWith(timer, t, func(r *retry.R) {
 		args := []string{"exec", "-i",
 			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default",
 				releaseName)}
 		args = append(args, dnsQuery...)
 		var err error
-		logs, err = k8s.RunKubectlAndGetOutputE(t, dnsServer.clientOpts, args...)
+		logs, err = k8s.RunKubectlAndGetOutputE(r, dnsServer.clientOpts, args...)
 		require.NoError(r, err)
 	})
 	logger.Logf(t, "%s: %s", failover.name, logs)
@@ -868,7 +869,7 @@ func localityForRegion(r string) api.Locality {
 func deployCustomizeAsync(t *testing.T, opts *terratestk8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		k8s.DeployKustomize(t, opts, noCleanupOnFailure, noCleanup, debugDirectory, kustomizeDir)
-		wg.Done()
 	}()
 }

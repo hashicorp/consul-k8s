@@ -4,17 +4,18 @@
 package gateways
 
 import (
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
-	globalDefaultInstances int32 = 1
+	globalDefaultInstances    int32 = 1
+	meshGatewayAnnotationKind       = "mesh-gateway"
 )
 
 func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
@@ -35,19 +36,26 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		return nil, err
 	}
 
-	var resources *corev1.ResourceRequirements
-	if b.gcc != nil && b.gcc.Spec.Deployment.Container != nil {
-		resources = b.gcc.Spec.Deployment.Container.Resources
+	var (
+		containerConfig  meshv2beta1.GatewayClassContainerConfig
+		deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
+	)
+
+	if b.gcc != nil {
+		deploymentConfig = b.gcc.Spec.Deployment
+		if deploymentConfig.Container != nil {
+			containerConfig = *b.gcc.Spec.Deployment.Container
+		}
 	}
 
-	container, err := consulDataplaneContainer(b.config, resources, b.gateway.Name, b.gateway.Namespace)
+	container, err := consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}
 
 	return &appsv1.DeploymentSpec{
-		//TODO NET-6721
-		Replicas: deploymentReplicaCount(nil, nil),
+		// TODO NET-6721
+		Replicas: deploymentReplicaCount(deploymentConfig.Replicas, nil),
 		Selector: &metav1.LabelSelector{
 			MatchLabels: b.Labels(),
 		},
@@ -55,7 +63,13 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: b.Labels(),
 				Annotations: map[string]string{
-					"consul.hashicorp.com/mesh-inject": "false",
+					// Indicate that this pod is a mesh gateway pod so that the Pod controller,
+					// consul-k8s CLI, etc. can key off of it
+					constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
+					// It's not logical to add a proxy sidecar since our workload is itself a proxy
+					constants.AnnotationMeshInject: "false",
+					// This functionality only applies when proxy sidecars are used
+					constants.AnnotationTransparentProxyOverwriteProbes: "false",
 				},
 			},
 			Spec: corev1.PodSpec{
@@ -88,9 +102,13 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 						},
 					},
 				},
-				NodeSelector:       nil,
-				Tolerations:        nil,
-				ServiceAccountName: b.serviceAccountName(),
+				NodeSelector:              deploymentConfig.NodeSelector,
+				PriorityClassName:         deploymentConfig.PriorityClassName,
+				TopologySpreadConstraints: deploymentConfig.TopologySpreadConstraints,
+				HostNetwork:               deploymentConfig.HostNetwork,
+				Tolerations:               deploymentConfig.Tolerations,
+				ServiceAccountName:        b.serviceAccountName(),
+				DNSPolicy:                 deploymentConfig.DNSPolicy,
 			},
 		},
 	}, nil
@@ -142,11 +160,31 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
-func deploymentReplicaCount(deployment *pbmesh.Deployment, currentReplicas *int32) *int32 {
-	//TODO NET-6721 tamp replica count up and down based on min and max values
-	instanceValue := globalDefaultInstances
+func deploymentReplicaCount(replicas *meshv2beta1.GatewayClassReplicasConfig, currentReplicas *int32) *int32 {
+	// if we have the replicas config, use it
+	if replicas != nil && replicas.Default != nil && currentReplicas == nil {
+		return replicas.Default
+	}
+
+	// if we have the replicas config and the current replicas, use the min/max to ensure
+	// the current replicas are within the min/max range
+	if replicas != nil && currentReplicas != nil {
+		if replicas.Max != nil && *currentReplicas > *replicas.Max {
+			return replicas.Max
+		}
+
+		if replicas.Min != nil && *currentReplicas < *replicas.Min {
+			return replicas.Min
+		}
+
+		return currentReplicas
+	}
+
+	// if we don't have the replicas config, use the current replicas if we have them
 	if currentReplicas != nil {
 		return currentReplicas
 	}
-	return pointer.Int32(instanceValue)
+
+	// otherwise use the global default
+	return pointer.Int32(globalDefaultInstances)
 }

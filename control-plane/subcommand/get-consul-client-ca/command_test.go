@@ -157,6 +157,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		// start the test server after 100ms
 		time.Sleep(100 * time.Millisecond)
 		a, err = testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
@@ -176,7 +177,6 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 			c.KeyFile = keyFile
 		})
 		require.NoError(t, err)
-		wg.Done()
 	}()
 	defer func() {
 		if a != nil {
