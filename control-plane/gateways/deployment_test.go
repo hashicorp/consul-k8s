@@ -314,7 +314,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: defaultLabels,
+					Labels:      defaultLabels,
 					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{

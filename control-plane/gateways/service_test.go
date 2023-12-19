@@ -52,12 +52,12 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 			},
 			want: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: defaultLabels,
+					Labels:      defaultLabels,
 					Annotations: map[string]string{},
 				},
 				Spec: corev1.ServiceSpec{
 					Selector: defaultLabels,
-					Type: corev1.ServiceTypeLoadBalancer,
+					Type:     corev1.ServiceTypeLoadBalancer,
 					Ports: []corev1.ServicePort{
 						{
 							Name: "wan",
@@ -84,12 +84,12 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 			},
 			want: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: defaultLabels,
+					Labels:      defaultLabels,
 					Annotations: map[string]string{},
 				},
 				Spec: corev1.ServiceSpec{
 					Selector: defaultLabels,
-					Type: "",
+					Type:     "",
 					Ports: []corev1.ServicePort{
 						{
 							Name: "wan",
