@@ -170,6 +170,13 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	// Write the proxy ID to the shared volume so `consul connect envoy` can use it for bootstrapping.
+	if err = common.WriteFileWithPerms("/consul/mesh-inject/proxyid", c.flagProxyName, os.FileMode(0444)); err != nil {
+		// Save an error but return nil so that we don't retry this step.
+		c.logger.Error("error writing proxyid file", "error", err)
+		return 1
+	}
+
 	dc, err := consul.NewDataplaneServiceClient(c.watcher)
 	if err != nil {
 		c.logger.Error("failed to create resource client", "error", err)
@@ -210,8 +217,8 @@ func (c *Command) Help() string {
 
 func (c *Command) getBootstrapParams(
 	client pbdataplane.DataplaneServiceClient,
-	bootstrapConfig *pbmesh.BootstrapConfig) backoff.Operation {
-
+	bootstrapConfig *pbmesh.BootstrapConfig,
+) backoff.Operation {
 	return func() error {
 		req := &pbdataplane.GetEnvoyBootstrapParamsRequest{
 			ProxyId:   c.flagProxyName,
@@ -234,7 +241,6 @@ func (c *Command) getBootstrapParams(
 // https://github.com/hashicorp/consul/blob/fe2d41ddad9ba2b8ff86cbdebbd8f05855b1523c/command/connect/redirecttraffic/redirect_traffic.go#L136.
 
 func (c *Command) applyTrafficRedirectionRules(config *pbmesh.BootstrapConfig) error {
-
 	err := json.Unmarshal([]byte(c.flagRedirectTrafficConfig), &c.iptablesConfig)
 	if err != nil {
 		return err
@@ -274,11 +280,13 @@ func (c *Command) applyTrafficRedirectionRules(config *pbmesh.BootstrapConfig) e
 	return nil
 }
 
-const synopsis = "Inject mesh init command."
-const help = `
+const (
+	synopsis = "Inject mesh init command."
+	help     = `
 Usage: consul-k8s-control-plane mesh-init [options]
 
   Bootstraps mesh-injected pod components.
   Uses V2 Consul Catalog APIs.
   Not intended for stand-alone use.
 `
+)

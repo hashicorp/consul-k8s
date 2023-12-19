@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	injectInitContainerName      = "consul-connect-inject-init"
+	injectInitContainerName      = "consul-mesh-init"
 	initContainersUserAndGroupID = 5996
 )
 
@@ -44,7 +44,7 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 	volMounts := []corev1.VolumeMount{
 		{
 			Name:      volumeName,
-			MountPath: "/consul/connect-inject",
+			MountPath: "/consul/mesh-inject",
 		},
 	}
 
@@ -157,13 +157,8 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 // the init container.
 // TODO @GatewayManagement parametrize gateway kind.
 const initContainerCommandTpl = `
-consul-k8s-control-plane connect-init \
-  -pod-name=${POD_NAME} \
-  -pod-namespace=${POD_NAMESPACE} \
-  -gateway-kind="mesh-gateway" \
+consul-k8s-control-plane mesh-init \
+  -proxy-name=${POD_NAME} \
+  -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
-  {{- if .AuthMethod }}
-  -service-account-name="{{ .ServiceAccountName }}" \
-  {{- end }}
-  -service-name="{{ .ServiceName }}"
 `

@@ -24,7 +24,7 @@ const (
 	consulDataplaneDNSBindPort   = 8600
 	defaultPrometheusScrapePath  = "/metrics"
 	defaultEnvoyProxyConcurrency = "1"
-	volumeName                   = "consul-connect-inject-data"
+	volumeName                   = "consul-mesh-inject-data"
 )
 
 func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.GatewayClassContainerConfig, name, namespace string) (corev1.Container, error) {
@@ -67,7 +67,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		Env: []corev1.EnvVar{
 			{
 				Name:  "TMPDIR",
-				Value: "/consul/connect-inject",
+				Value: "/consul/mesh-inject",
 			},
 			{
 				Name: "NODE_NAME",
@@ -85,7 +85,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
+				MountPath: "/consul/mesh-inject",
 			},
 		},
 		Args:           args,
@@ -138,7 +138,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 }
 
 func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
-	proxyIDFileName := "/consul/connect-inject/proxyid"
+	proxyIDFileName := "/consul/mesh-inject/proxyid"
 
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
