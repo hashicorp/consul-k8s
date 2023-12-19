@@ -1,4 +1,6 @@
 ```release-note:feature
+breaking-change: users who previously had agent `enable_debug` set in `global.server.extraConfig`, should remove the extraConfig entry to avoid configuration conflicts.
+breaking-change: users who previously had agent `telemetry` stanza settings for `disable_hostname`, `enable_host_metrics`, `prefix_filter`, `dogstatsd_addr`, and/or `dogstatsd_tags`, should remove the extraConfig entry/entries to avoid configuration conflicts.
 helm: introduces `global.metrics.datadogIntegration` overrides to streamline consul-k8s datadog integration.
 helm: introduces `global.metrics.enableConsulAgentDebug` to expose agent [`enable_debug`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#enable_debug) configuration.
 helm: introduces `global.metrics.disableAgentHostName` to expose agent [`telemetry.disable_hostname`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-disable_hostname) configuration.

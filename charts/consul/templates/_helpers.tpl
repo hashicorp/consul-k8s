@@ -523,14 +523,18 @@ Usage: {{ template "consul.validateResourceAPIs" . }}
 {{/*
 Validation for Consul Datadog Integration deployment:
 
-Fail if global.metrics.datadogIntegration.enabled=true and global.metrics.enabled or global.metrics.enableAgentMetrics are unset
+Fail if Datadog integration enabled and Consul server agent telemetry is not enabled.
     - global.metrics.datadogIntegration.enabled=true
     - global.metrics.enableAgentMetrics=false || global.metrics.enabled=false
 
-Fail if Consul OpenMetrics (Prometheus) and DogStatsD metrics are both enabled.
+Fail if Consul OpenMetrics (Prometheus) and DogStatsD metrics are both enabled and configured.
     - global.metrics.datadogIntegration.dogstatsd.enabled (scrapes `/v1/agent/metrics?format=prometheus` via the `use_prometheus_endpoint` option)
     - global.metrics.datadogIntegration.openMetricsPrometheus.enabled (scrapes `/v1/agent/metrics?format=prometheus`)
     - see https://docs.datadoghq.com/integrations/consul/?tab=host#host for recommendation to not have both
+
+Fail if Datadog OTLP forwarding is enabled and Consul Telemetry Collection is not enabled.
+    - global.metrics.datadogIntegration.datadogOpenTelemetryCollector.enabled=true
+    - telemetryCollector.enabled=false
 
 Fail if Consul Open Telemetry collector forwarding protocol is not one of either "http" or "grpc"
     - global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol!="http" || global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol!="grpc"
@@ -545,6 +549,9 @@ Usage: {{ template "consul.validateDatadogConfiguration" . }}
 {{- end }}
 {{- if and .Values.global.metrics.datadogIntegration.dogstatsd.enabled .Values.global.metrics.datadogIntegration.openMetricsPrometheus.enabled }}
 {{fail "You must have one of DogStatsD (global.metrics.datadogIntegration.dogstatsd.enabled) or OpenMetrics (global.metrics.datadogIntegration.openMetricsPrometheus.enabled) enabled, not both as this is an unsupported configuration." }}
+{{- end }}
+{{- if and .Values.global.metrics.datadogIntegration.datadogOpenTelemetryCollector.enabled (not .Values.telemetryCollector.enabled) }}
+{{fail "Cannot enable Datadog OTLP metrics collection (global.metrics.datadogIntegration.datadogOpenTelemetryCollector.enabled) without consul-telemetry-collector. Ensure Consul OTLP collection is enabled (telemetryCollector.enabled) and configured." }}
 {{- end }}
 {{- if and .Values.global.metrics.datadogIntegration.datadogOpenTelemetryCollector.enabled (or (eq (.Values.global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol | trimAll "\"" | quote) "http") (eq (.Values.global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol | trimAll "\"" | quote) "grpc")) }}
 {{fail "Valid values for global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol must be one of either \"http\" or \"grpc\"." }}

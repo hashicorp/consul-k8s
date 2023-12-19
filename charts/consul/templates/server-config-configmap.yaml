@@ -30,6 +30,7 @@ data:
       {{- if .Values.server.logLevel }}
       "log_level": "{{ .Values.server.logLevel | upper }}",
       {{- end }}
+      "enable_debug": {{ .Values.global.metrics.enableConsulAgentDebug }},
       "domain": "{{ .Values.global.domain }}",
       "limits": {
         "request_limits": {
@@ -199,8 +200,7 @@ data:
         "dogstatsd_tags": {{ .Values.global.metrics.datadogIntegration.dogstatsd.dogstatsdTags | toJson }}
         {{- end }}
         {{- end }}
-      },
-      "enable_debug": {{ .Values.global.metrics.enableConsulAgentDebug }}
+      }
     }
   {{- end }}
   {{- if and .Values.server.auditLogs.enabled .Values.global.acls.manageSystemACLs }}

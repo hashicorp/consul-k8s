@@ -619,9 +619,8 @@ global:
     enableAgentMetrics: false
 
     # When set to true, enables Consul to report additional debugging information, including runtime profiling (pprof) data.
-    # This setting is only required for clusters without ACL enabled.
+    # This setting is only required for clusters without ACL enabled. Sets `enable_debug` in server agent config to `true`.
     # If you change this setting, you must restart the agent for the change to take effect. Default is false.
-    # Only applicable if `global.metrics.enabled` and `global.metrics.AgentMetrics` is true.
     # @type: boolean
     enableConsulAgentDebug: false
 

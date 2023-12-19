@@ -1431,7 +1431,7 @@ load _helpers
 
 @test "server/ConfigMap: when global.metrics.metricsPrefixFiltering.blockList and allowList, sets correctly prepended telemetry.prefix_filter string list" {
   cd `chart_dir`
-  local actual=$(helm template --debug \
+  local actual=$(helm template \
   -s templates/server-config-configmap.yaml \
   --set 'global.metrics.enabled=true' \
   --set 'global.metrics.enableAgentMetrics=true' \
@@ -1446,27 +1446,23 @@ load _helpers
 #--------------------------------------------------------------------
 # Consul Agent Debug (PPROF)
 
-@test "server/ConfigMap: when global.metrics.enableConsulAgentDebug default, sets default enable_debug = false in agent config" {
+@test "server/ConfigMap: global.metrics.enableConsulAgentDebug default, sets default enable_debug = false in server agent config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
-      --set 'global.metrics.enabled=true'  \
-      --set 'global.metrics.enableAgentMetrics=true'  \
       . | tee /dev/stderr |
-      yq -r '.data["telemetry-config.json"]' | jq -r .enable_debug | tee /dev/stderr)
+      yq -r '.data["server.json"]' | jq -r .enable_debug | tee /dev/stderr)
 
   [ "${actual}" = "false" ]
 }
 
-@test "server/ConfigMap: when global.metrics.enableConsulAgentDebug=true, sets enable_debug = true in agent config" {
+@test "server/ConfigMap: when global.metrics.enableConsulAgentDebug=true, sets enable_debug = true in server agent config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
-      --set 'global.metrics.enabled=true'  \
-      --set 'global.metrics.enableAgentMetrics=true'  \
       --set 'global.metrics.enableConsulAgentDebug=true'  \
       . | tee /dev/stderr |
-      yq -r '.data["telemetry-config.json"]' | jq -r .enable_debug | tee /dev/stderr)
+      yq -r '.data["server.json"]' | jq -r .enable_debug | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
 }
