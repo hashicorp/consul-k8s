@@ -85,6 +85,11 @@ func TestMeshGatewayBuilder_Annotations(t *testing.T) {
 		Expected map[string]string
 	}{
 		{
+			// Unhandled type should return empty set
+			Object:   &corev1.Namespace{},
+			Expected: map[string]string{},
+		},
+		{
 			Object: &appsv1.Deployment{},
 			Expected: map[string]string{
 				"gateway-annotation":            "true",
@@ -206,6 +211,11 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 		Object   client.Object
 		Expected map[string]string
 	}{
+		{
+			// Unhandled type should return default set
+			Object:   &corev1.Namespace{},
+			Expected: defaultLabels,
+		},
 		{
 			Object: &appsv1.Deployment{},
 			Expected: map[string]string{
