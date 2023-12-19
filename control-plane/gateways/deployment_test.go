@@ -92,7 +92,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						Spec: corev1.PodSpec{
 							Volumes: []corev1.Volume{
 								{
-									Name: "consul-connect-inject-data",
+									Name: "consul-mesh-inject-data",
 									VolumeSource: corev1.VolumeSource{
 										EmptyDir: &corev1.EmptyDirVolumeSource{
 											Medium: "Memory",
@@ -102,11 +102,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							},
 							InitContainers: []corev1.Container{
 								{
-									Name: "consul-connect-inject-init",
+									Name: "consul-mesh-init",
 									Command: []string{
 										"/bin/sh",
 										"-ec",
-										"consul-k8s-control-plane connect-init \\\n  -pod-name=${POD_NAME} \\\n  -pod-namespace=${POD_NAMESPACE} \\\n  -gateway-kind=\"mesh-gateway\" \\\n  -log-json=false \\\n  -service-name=\"\"",
+										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-json=false",
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -167,9 +167,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Resources: corev1.ResourceRequirements{},
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "consul-connect-inject-data",
+											Name:      "consul-mesh-inject-data",
 											ReadOnly:  false,
-											MountPath: "/consul/connect-inject",
+											MountPath: "/consul/mesh-inject",
 										},
 									},
 								},
@@ -180,7 +180,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										"-addresses",
 										"",
 										"-grpc-port=0",
-										"-proxy-service-id-path=/consul/connect-inject/proxyid",
+										"-proxy-service-id-path=/consul/mesh-inject/proxyid",
 										"-log-level=",
 										"-log-json=false",
 										"-envoy-concurrency=1",
@@ -202,7 +202,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Env: []corev1.EnvVar{
 										{
 											Name:  "TMPDIR",
-											Value: "/consul/connect-inject",
+											Value: "/consul/mesh-inject",
 										},
 										{
 											Name:  "NODE_NAME",
@@ -231,8 +231,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "consul-connect-inject-data",
-											MountPath: "/consul/connect-inject",
+											Name:      "consul-mesh-inject-data",
+											MountPath: "/consul/mesh-inject",
 										},
 									},
 									ReadinessProbe: &corev1.Probe{
@@ -346,7 +346,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						Spec: corev1.PodSpec{
 							Volumes: []corev1.Volume{
 								{
-									Name: "consul-connect-inject-data",
+									Name: "consul-mesh-inject-data",
 									VolumeSource: corev1.VolumeSource{
 										EmptyDir: &corev1.EmptyDirVolumeSource{
 											Medium: "Memory",
@@ -356,11 +356,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							},
 							InitContainers: []corev1.Container{
 								{
-									Name: "consul-connect-inject-init",
+									Name: "consul-mesh-init",
 									Command: []string{
 										"/bin/sh",
 										"-ec",
-										"consul-k8s-control-plane connect-init \\\n  -pod-name=${POD_NAME} \\\n  -pod-namespace=${POD_NAMESPACE} \\\n  -gateway-kind=\"mesh-gateway\" \\\n  -log-json=false \\\n  -service-name=\"\"",
+										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-json=false",
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -421,9 +421,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Resources: corev1.ResourceRequirements{},
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "consul-connect-inject-data",
+											Name:      "consul-mesh-inject-data",
 											ReadOnly:  false,
-											MountPath: "/consul/connect-inject",
+											MountPath: "/consul/mesh-inject",
 										},
 									},
 								},
@@ -434,7 +434,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										"-addresses",
 										"",
 										"-grpc-port=0",
-										"-proxy-service-id-path=/consul/connect-inject/proxyid",
+										"-proxy-service-id-path=/consul/mesh-inject/proxyid",
 										"-log-level=",
 										"-log-json=false",
 										"-envoy-concurrency=1",
@@ -455,7 +455,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Env: []corev1.EnvVar{
 										{
 											Name:  "TMPDIR",
-											Value: "/consul/connect-inject",
+											Value: "/consul/mesh-inject",
 										},
 										{
 											Name:  "NODE_NAME",
@@ -484,8 +484,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "consul-connect-inject-data",
-											MountPath: "/consul/connect-inject",
+											Name:      "consul-mesh-inject-data",
+											MountPath: "/consul/mesh-inject",
 										},
 									},
 									ReadinessProbe: &corev1.Probe{

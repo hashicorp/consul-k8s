@@ -159,6 +159,9 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 const initContainerCommandTpl = `
 consul-k8s-control-plane mesh-init \
   -proxy-name=${POD_NAME} \
-  -log-level={{ .LogLevel }} \
-  -log-json={{ .LogJSON }} \
+  -namespace=${POD_NAMESPACE} \
+  {{- with .LogLevel }}
+  -log-level={{ . }} \
+  {{- end }}
+  -log-json={{ .LogJSON }}
 `
