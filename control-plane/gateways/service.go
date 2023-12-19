@@ -30,11 +30,11 @@ func (b *meshGatewayBuilder) Service() *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        b.gateway.Name,
 			Namespace:   b.gateway.Namespace,
-			Labels:      b.Labels(),
-			Annotations: b.Annotations(),
+			Labels:      b.labelsForService(),
+			Annotations: b.annotationsForService(),
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: b.Labels(),
+			Selector: b.labelsForDeployment(),
 			Type:     serviceType,
 			Ports: []corev1.ServicePort{
 				{
