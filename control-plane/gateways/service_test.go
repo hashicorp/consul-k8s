@@ -62,42 +62,24 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 			},
 			want: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-<<<<<<< HEAD
-					Labels:      defaultLabels,
-||||||| parent of bb907131 (use set labels for setting labels on deployments)
 					Labels: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+						labelManagedBy: "consul-k8s",
+						"app":          "consul",
+						"chart":        "consul-helm",
+						"heritage":     "Helm",
+						"release":      "consul",
 					},
-=======
-					Labels: map[string]string{
-						"mesh.consul.hashicorp.com/app":        "consul",
-						"mesh.consul.hashicorp.com/chart":      "consul-helm",
-						"mesh.consul.hashicorp.com/heritage":   "Helm",
-						"mesh.consul.hashicorp.com/release":    "consul",
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-					},
->>>>>>> bb907131 (use set labels for setting labels on deployments)
 					Annotations: map[string]string{},
 				},
 				Spec: corev1.ServiceSpec{
-<<<<<<< HEAD
-					Selector: defaultLabels,
-					Type:     corev1.ServiceTypeLoadBalancer,
-||||||| parent of bb907131 (use set labels for setting labels on deployments)
 					Selector: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+						labelManagedBy: "consul-k8s",
+						"app":          "consul",
+						"chart":        "consul-helm",
+						"heritage":     "Helm",
+						"release":      "consul",
 					},
 					Type: corev1.ServiceTypeLoadBalancer,
-=======
-					Selector: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-						"mesh.consul.hashicorp.com/app":        "consul",
-						"mesh.consul.hashicorp.com/chart":      "consul-helm",
-						"mesh.consul.hashicorp.com/heritage":   "Helm",
-						"mesh.consul.hashicorp.com/release":    "consul",
-					},
-					Type: corev1.ServiceTypeLoadBalancer,
->>>>>>> bb907131 (use set labels for setting labels on deployments)
 					Ports: []corev1.ServicePort{
 						{
 							Name: "wan",
