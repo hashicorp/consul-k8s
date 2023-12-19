@@ -171,7 +171,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Write the proxy ID to the shared volume so `consul connect envoy` can use it for bootstrapping.
-	if err = common.WriteFileWithPerms("/consul/mesh-inject/proxyid", c.flagProxyName, os.FileMode(0444)); err != nil {
+	if err = common.WriteFileWithPerms(fmt.Sprintf("%s/proxyid", constants.ProxyIDVolumeName), c.flagProxyName, os.FileMode(0444)); err != nil {
 		// Save an error but return nil so that we don't retry this step.
 		c.logger.Error("error writing proxyid file", "error", err)
 		return 1

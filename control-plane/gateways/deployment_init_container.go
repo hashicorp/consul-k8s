@@ -11,6 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
@@ -44,7 +45,7 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 	volMounts := []corev1.VolumeMount{
 		{
 			Name:      volumeName,
-			MountPath: "/consul/mesh-inject",
+			MountPath: constants.ProxyIDVolumeName,
 		},
 	}
 
