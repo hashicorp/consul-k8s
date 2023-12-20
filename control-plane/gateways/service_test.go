@@ -39,6 +39,16 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 				config: GatewayConfig{},
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: meshv2beta1.GatewayClassConfigSpec{
+						GatewayClassAnnotationsAndLabels: meshv2beta1.GatewayClassAnnotationsAndLabels{
+							Labels: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+								Set: map[string]string{
+									"app":      "consul",
+									"chart":    "consul-helm",
+									"heritage": "Helm",
+									"release":  "consul",
+								},
+							},
+						},
 						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
 							Container: &meshv2beta1.GatewayClassContainerConfig{
 								PortModifier: 8000,
@@ -52,12 +62,24 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 			},
 			want: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      defaultLabels,
+					Labels: map[string]string{
+						labelManagedBy: "consul-k8s",
+						"app":          "consul",
+						"chart":        "consul-helm",
+						"heritage":     "Helm",
+						"release":      "consul",
+					},
 					Annotations: map[string]string{},
 				},
 				Spec: corev1.ServiceSpec{
-					Selector: defaultLabels,
-					Type:     corev1.ServiceTypeLoadBalancer,
+					Selector: map[string]string{
+						labelManagedBy: "consul-k8s",
+						"app":          "consul",
+						"chart":        "consul-helm",
+						"heritage":     "Helm",
+						"release":      "consul",
+					},
+					Type: corev1.ServiceTypeLoadBalancer,
 					Ports: []corev1.ServicePort{
 						{
 							Name: "wan",
