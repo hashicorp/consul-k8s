@@ -54,6 +54,10 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 		return err
 	}
 
+	if err := g.upsertPodDisruptionBudget(ctx, gateway, gcc, config); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -61,6 +65,11 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 // This is done in the reverse order of Upsert due to dependencies between resources.
 func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedName) error {
 	g.Log.V(1).Info(fmt.Sprintf("Delete Gateway Deployment %s/%s", gatewayName.Namespace, gatewayName.Name))
+
+	// Delete pdb first, otherwise the respective apps won't get deleted
+	if err := g.deletePodDisruptionBudget(ctx, gatewayName); err != nil {
+		return err
+	}
 
 	if err := g.deleteDeployment(ctx, gatewayName); err != nil {
 		return err

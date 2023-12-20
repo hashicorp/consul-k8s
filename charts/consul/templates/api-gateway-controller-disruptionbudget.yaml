@@ -1,0 +1,30 @@
+{{- if (and .Values.apiGateway.disruptionBudget.enabled (and (ne (.Values.apiGateway.enabled | toString) "-") .Values.apiGateway.enabled)) }}
+# PodDisruptionBudget to prevent degrading the apiGateway cluster through
+# voluntary cluster changes.
+{{- if .Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
+apiVersion: policy/v1
+{{- else }}
+apiVersion: policy/v1beta1
+{{- end }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "consul.fullname" . }}-api-gateway-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: api-gateway-controller
+spec:
+  {{- if .Values.apiGateway.disruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.apiGateway.disruptionBudget.minAvailable }}
+  {{- else if .Values.apiGateway.disruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.apiGateway.disruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      release: "{{ .Release.Name }}"
+      component: api-gateway-controller
+{{- end }}

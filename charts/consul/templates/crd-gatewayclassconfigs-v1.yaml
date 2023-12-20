@@ -54,6 +54,26 @@ spec:
                   description: Deployment defines the deployment configuration for the
                     gateway.
                   properties:
+                    podDisruptionBudget:
+                      description: PodDisruptionBudget prevents the eviction of the gateway pods
+                        when the gateway is scaled down or during a voluntary disruption.
+                      properties:
+                        enabled:
+                          default: false
+                          description: Enabled indicates whether the pod disruption budget
+                            is enabled.
+                          type: boolean
+                        maxUnavailable:
+                          default: 1
+                          description: MaxUnavailable is the maximum number of gateway pods that can be unavailable during voluntary disruption.
+                          format: int32
+                          type: integer
+                        minAvailable:
+                          default: 1
+                          description: MinAvailable is the minimum number of gateway pods that must be available during voluntary disruption. Takes precedence over MaxUnavailable.
+                          format: int32
+                          type: integer
+                      type: object
                     defaultInstances:
                       default: 1
                       description: Number of gateway instances that should be deployed

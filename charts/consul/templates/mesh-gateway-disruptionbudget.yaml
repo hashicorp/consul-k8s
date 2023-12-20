@@ -1,0 +1,30 @@
+{{- if (and .Values.meshGateway.disruptionBudget.enabled (or (and (ne (.Values.meshGateway.enabled | toString) "-") .Values.meshGateway.enabled) (and (eq (.Values.meshGateway.enabled | toString) "-") .Values.connectInject.enabled))) }}
+# PodDisruptionBudget to prevent degrading the meshGateway through
+# voluntary cluster changes.
+{{- if .Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
+apiVersion: policy/v1
+{{- else }}
+apiVersion: policy/v1beta1
+{{- end }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "consul.fullname" . }}-mesh-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: mesh-gateway
+spec:
+  {{- if .Values.meshGateway.disruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.meshGateway.disruptionBudget.minAvailable }}
+  {{- else if .Values.meshGateway.disruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.meshGateway.disruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      release: "{{ .Release.Name }}"
+      component: mesh-gateway
+{{- end }}

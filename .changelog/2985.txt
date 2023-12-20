@@ -1,0 +1,3 @@
+```release-note:improvement
+gateways: create PodDisruptionBudget for all gateways
+```

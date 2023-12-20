@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,6 +76,7 @@ type resources struct {
 	roleBindings    []*rbac.RoleBinding
 	services        []*corev1.Service
 	serviceAccounts []*corev1.ServiceAccount
+	pdbs            []*policyv1.PodDisruptionBudget
 }
 
 func TestUpsert(t *testing.T) {
@@ -742,6 +744,225 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 		},
+		"create a new gateway deployment with pod disruption budget where enabled = true": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:        true,
+							MinAvailable:   &intstr.IntOrString{IntVal: 1},
+							MaxUnavailable: &intstr.IntOrString{IntVal: 2},
+						},
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
+			initialResources: resources{},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+				pdbs: []*policyv1.PodDisruptionBudget{
+					configurePodDisruptionBudget(name, namespace, labels, &intstr.IntOrString{IntVal: 1}, nil, "1"),
+				},
+			},
+		},
+		"create a new gateway deployment with pod disruption budget where enabled = true minAvailable = 1 and maxUnavailable = unset": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:      true,
+							MinAvailable: &intstr.IntOrString{IntVal: 1},
+						},
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
+			initialResources: resources{},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+				pdbs: []*policyv1.PodDisruptionBudget{
+					configurePodDisruptionBudget(name, namespace, labels, &intstr.IntOrString{IntVal: 1}, nil, "1"),
+				},
+			},
+		},
+		"create a new gateway deployment with pod disruption budget where minAvailable = unset and maxUnavailable = 1": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:        true,
+							MaxUnavailable: &intstr.IntOrString{IntVal: 1},
+						},
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
+			initialResources: resources{},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+				pdbs: []*policyv1.PodDisruptionBudget{
+					configurePodDisruptionBudget(name, namespace, labels, nil, &intstr.IntOrString{IntVal: 1}, "1"),
+				},
+			},
+		},
+		"create a new gateway deployment with pod disruption budget where enabled = true and minAvailable = unset and maxUnavailable = unset": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:        true,
+							MinAvailable:   nil,
+							MaxUnavailable: nil,
+						},
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
+			initialResources: resources{},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+				pdbs: []*policyv1.PodDisruptionBudget{
+					configurePodDisruptionBudget(name, namespace, labels, nil, nil, "1"),
+				},
+			},
+		},
+		"create a new gateway deployment with pod disruption budget where enabled = false": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled: false,
+						},
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
+			initialResources: resources{},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+				pdbs:            []*policyv1.PodDisruptionBudget{},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -752,6 +973,7 @@ func TestUpsert(t *testing.T) {
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
+			require.NoError(t, policyv1.AddToScheme(s))
 
 			log := logrtest.New(t)
 
@@ -928,6 +1150,52 @@ func TestDelete(t *testing.T) {
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
 		},
+		"delete a gateway deployment with pdb": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+						PodDisruptionBudgetSpec: &v1alpha1.PodDisruptionBudgetSpec{
+							Enabled:        true,
+							MinAvailable:   &intstr.IntOrString{IntVal: 1},
+							MaxUnavailable: &intstr.IntOrString{IntVal: 2},
+						},
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{},
+			initialResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				pdbs: []*policyv1.PodDisruptionBudget{
+					configurePodDisruptionBudget(name, namespace, labels, &intstr.IntOrString{IntVal: 1}, &intstr.IntOrString{IntVal: 2}, "1"),
+				},
+			},
+			finalResources: resources{
+				deployments:     []*appsv1.Deployment{},
+				roles:           []*rbac.Role{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+				pdbs:            []*policyv1.PodDisruptionBudget{},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -938,6 +1206,7 @@ func TestDelete(t *testing.T) {
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
+			require.NoError(t, policyv1.AddToScheme(s))
 
 			log := logrtest.New(t)
 
@@ -976,6 +1245,10 @@ func joinResources(resources resources) (objs []client.Object) {
 
 	for _, serviceAccount := range resources.serviceAccounts {
 		objs = append(objs, serviceAccount)
+	}
+
+	for _, pdb := range resources.pdbs {
+		objs = append(objs, pdb)
 	}
 
 	return objs
@@ -1090,6 +1363,23 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 		require.Equal(t, expected, actual)
 	}
 
+	for _, expected := range resources.pdbs {
+		actual := &policyv1.PodDisruptionBudget{}
+		err := client.Get(context.Background(), types.NamespacedName{
+			Name:      expected.Name,
+			Namespace: expected.Namespace,
+		}, actual)
+
+		if err != nil {
+			return err
+		}
+
+		actual.ObjectMeta.Labels[createdAtLabelKey] = createdAtLabelValue
+		actual.Spec.Selector.MatchLabels[createdAtLabelKey] = createdAtLabelValue
+
+		require.Equal(t, expected, actual)
+	}
+
 	return nil
 }
 
@@ -1152,6 +1442,19 @@ func validateResourcesAreDeleted(t *testing.T, k8sClient client.Client, resource
 		}, actual)
 		if !k8serrors.IsNotFound(err) {
 			return fmt.Errorf("expected service account %s to be deleted", expected.Name)
+		}
+		require.Error(t, err)
+	}
+
+	for _, expected := range resources.pdbs {
+		actual := &policyv1.PodDisruptionBudget{}
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
+			Name:      expected.Name,
+			Namespace: expected.Namespace,
+		}, actual)
+
+		if !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("expected pdb %s to be deleted", expected.Name)
 		}
 		require.Error(t, err)
 	}
@@ -1339,6 +1642,37 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 					Controller:         common.PointerTo(true),
 					BlockOwnerDeletion: common.PointerTo(true),
 				},
+			},
+		},
+	}
+}
+
+func configurePodDisruptionBudget(name, namespace string, labels map[string]string, minAvailable, maxUnavailable *intstr.IntOrString, resourceVersion string) *policyv1.PodDisruptionBudget {
+	return &policyv1.PodDisruptionBudget{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "policy/v1",
+			Kind:       "PodDisruptionBudget",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Namespace:       namespace,
+			Labels:          labels,
+			ResourceVersion: resourceVersion,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					Kind:               "Gateway",
+					Name:               name,
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
+				},
+			},
+		},
+		Spec: policyv1.PodDisruptionBudgetSpec{
+			MinAvailable:   minAvailable,
+			MaxUnavailable: maxUnavailable,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
 			},
 		},
 	}

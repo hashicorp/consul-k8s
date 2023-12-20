@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -67,6 +68,12 @@ type GatewayClassConfigSpec struct {
 	MapPrivilegedContainerPorts int32 `json:"mapPrivilegedContainerPorts,omitempty"`
 }
 
+type PodDisruptionBudgetSpec struct {
+	Enabled        bool                `json:"enabled,omitempty"`
+	MinAvailable   *intstr.IntOrString `json:"minAvailable,omitempty"`
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+}
+
 // +k8s:deepcopy-gen=true
 
 type DeploymentSpec struct {
@@ -88,6 +95,9 @@ type DeploymentSpec struct {
 
 	// Resources defines the resource requirements for the gateway.
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// The value to add pod disruption budgets, will prevent gateway pods from being evicted all at once.
+	PodDisruptionBudgetSpec *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 }
 
 //+kubebuilder:object:generate=true
