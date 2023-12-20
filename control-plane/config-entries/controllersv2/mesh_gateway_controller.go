@@ -129,7 +129,7 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		return fmt.Errorf("unable to create role binding: %w", err)
 	}
 
-	//Create Service
+	// Create Service
 
 	mergeServiceOp := func(ctx context.Context, existingObject, object client.Object) error {
 		existingService, ok := existingObject.(*corev1.Service)

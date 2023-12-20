@@ -66,6 +66,12 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		// TODO(nathancoleman): I don't believe consul-dataplane needs to write anymore, investigate.
 		Env: []corev1.EnvVar{
 			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
+			{
 				Name:  "TMPDIR",
 				Value: constants.ProxyIDVolumePath,
 			},
@@ -138,12 +144,10 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 }
 
 func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
-	proxyIDFileName := fmt.Sprintf("%s/proxyid", constants.ProxyIDVolumePath)
-
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
+		"-proxy-id=$(POD_NAME)",
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
-		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + defaultEnvoyProxyConcurrency,

@@ -174,8 +174,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Args: []string{
 										"-addresses",
 										"",
+										"-proxy-id=$(POD_NAME)",
 										"-grpc-port=0",
-										"-proxy-service-id-path=/consul/mesh-inject/proxyid",
 										"-log-level=",
 										"-log-json=false",
 										"-envoy-concurrency=1",
@@ -195,6 +195,16 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										},
 									},
 									Env: []corev1.EnvVar{
+										{
+											Name:  "POD_NAME",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.name",
+												},
+											},
+										},
 										{
 											Name:  "TMPDIR",
 											Value: "/consul/mesh-inject",
@@ -421,8 +431,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Args: []string{
 										"-addresses",
 										"",
+										"-proxy-id=$(POD_NAME)",
 										"-grpc-port=0",
-										"-proxy-service-id-path=/consul/mesh-inject/proxyid",
 										"-log-level=",
 										"-log-json=false",
 										"-envoy-concurrency=1",
@@ -441,6 +451,16 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										},
 									},
 									Env: []corev1.EnvVar{
+										{
+											Name:  "POD_NAME",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.name",
+												},
+											},
+										},
 										{
 											Name:  "TMPDIR",
 											Value: "/consul/mesh-inject",
