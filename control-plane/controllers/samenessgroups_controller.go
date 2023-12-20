@@ -16,9 +16,12 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
+var _ Controller = (*SamenessGroupController)(nil)
+
 // SamenessGroupController reconciles a SamenessGroups object.
 type SamenessGroupController struct {
 	client.Client
+	FinalizerPatcher
 	Log                   logr.Logger
 	Scheme                *runtime.Scheme
 	ConfigEntryController *ConfigEntryController
