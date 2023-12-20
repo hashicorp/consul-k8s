@@ -12,9 +12,12 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
+var _ Controller = (*ServiceRouterController)(nil)
+
 // ServiceRouterController is the controller for ServiceRouter resources.
 type ServiceRouterController struct {
 	client.Client
+	FinalizerPatcher
 	Log                   logr.Logger
 	Scheme                *runtime.Scheme
 	ConfigEntryController *ConfigEntryController
