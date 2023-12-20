@@ -1,4 +1,9 @@
 {{- if .Values.connectInject.enabled }}
+
+# Validation
+# For meshGateway.wanAddress, static must be set if source is "Static"
+{{if (and (eq .Values.meshGateway.wanAddress.source "Static") (eq .Values.meshGateway.wanAddress.static ""))}}{{fail ".meshGateway.wanAddress.static must be set to a value if .meshGateway.wanAddress.source is Static"}}{{ end }}
+
 # Configuration of Gateway Resources Job which creates managed Gateway configuration.
 apiVersion: v1
 kind: ConfigMap
@@ -104,5 +109,9 @@ data:
           namespace: {{ .Release.Namespace }}
         spec:
           gatewayClassName: consul-mesh-gateway
+          wanAddress:
+            source: {{ .Values.meshGateway.wanAddress.source }}
+            port: {{ .Values.meshGateway.wanAddress.port }}
+            static: {{ .Values.meshGateway.wanAddress.static }}
   {{- end }}
 {{- end }}

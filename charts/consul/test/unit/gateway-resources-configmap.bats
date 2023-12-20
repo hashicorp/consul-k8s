@@ -2,10 +2,12 @@
 
 load _helpers
 
+target=templates/gateway-resources-configmap.yaml
+
 @test "gateway-resources/ConfigMap: disabled with connectInject.enabled=false" {
     cd `chart_dir`
     assert_empty helm template \
-        -s templates/gateway-resources-configmap.yaml \
+        -s $target \
         --set 'connectInject.enabled=false' \
         .
 }
@@ -13,7 +15,7 @@ load _helpers
 @test "gateway-resources/ConfigMap: enabled with connectInject.enabled=true" {
     cd `chart_dir`
     local actual=$(helm template \
-        -s templates/gateway-resources-configmap.yaml \
+        -s $target \
         --set 'connectInject.enabled=true' \
         . | tee /dev/stderr |
         yq 'length > 0' | tee /dev/stderr)
@@ -23,7 +25,7 @@ load _helpers
 @test "gateway-resources/ConfigMap: contains resources configuration as JSON" {
     cd `chart_dir`
     local resources=$(helm template \
-        -s templates/gateway-resources-configmap.yaml \
+        -s $target \
         --set 'connectInject.enabled=true' \
         --set 'connectInject.apiGateway.managedGatewayClass.resources.requests.memory=200Mi' \
         --set 'connectInject.apiGateway.managedGatewayClass.resources.requests.cpu=200m' \
@@ -48,7 +50,7 @@ load _helpers
 @test "gateway-resources/ConfigMap: does not contain config.yaml resources without .global.experiments equal to resource-apis" {
     cd `chart_dir`
     local resources=$(helm template \
-        -s templates/gateway-resources-configmap.yaml \
+        -s $target \
         --set 'connectInject.enabled=true' \
         --set 'ui.enabled=false' \
         . | tee /dev/stderr |
@@ -60,7 +62,7 @@ load _helpers
 @test "gateway-resources/ConfigMap: contains config.yaml resources with .global.experiments equal to resource-apis" {
     cd `chart_dir`
     local resources=$(helm template \
-        -s templates/gateway-resources-configmap.yaml \
+        -s $target \
         --set 'connectInject.enabled=true' \
         --set 'meshGateway.enabled=true' \
         --set 'global.experiments[0]=resource-apis' \
@@ -70,3 +72,52 @@ load _helpers
 
     [ "$resources" != null ]
 }
+
+
+#--------------------------------------------------------------------
+# Mesh Gateway WAN Address configuration
+
+@test "gatewayresources/Job: Mesh Gateway WAN Address default configuration" {
+    cd `chart_dir`
+    local spec=$(helm template \
+        -s $target \
+        --set 'connectInject.enabled=true' \
+        --set 'meshGateway.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        . | tee /dev/stderr |
+        yq '.data["config.yaml"]' | yq '.meshGateways[0].spec.wanAddress' | tee /dev/stderr)
+
+    local actual=$(echo "$spec" | yq '.source')
+    [ "${actual}" = 'Service' ]
+
+    local actual=$(echo "$spec" | yq '.port')
+    [ "${actual}" = '443' ]
+
+    local actual=$(echo "$spec" | yq '.static')
+    [ "${actual}" = '' ]
+}
+
+@test "gatewayresources/Job: Mesh Gateway WAN Address static configuration" {
+    cd `chart_dir`
+    local spec=$(helm template \
+        -s $target \
+        --set 'connectInject.enabled=true' \
+        --set 'meshGateway.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'meshGateway.wanAddress.source=Static' \
+        --set 'meshGateway.wanAddress.static=127.0.0.1' \
+        . | tee /dev/stderr |
+        yq '.data["config.yaml"]' | yq '.meshGateways[0].spec.wanAddress' | tee /dev/stderr)
+
+    local actual=$(echo "$spec" | yq '.source')
+    [ "${actual}" = 'Static' ]
+
+    local actual=$(echo "$spec" | yq '.port')
+    [ "${actual}" = '443' ]
+
+    local actual=$(echo "$spec" | yq '.static')
+    [ "${actual}" = '127.0.0.1' ]
+}
+

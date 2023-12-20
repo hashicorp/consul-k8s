@@ -2763,7 +2763,7 @@ meshGateway:
     #   are routable from other datacenters.
     #
     # - `Static` - Use the address hardcoded in `meshGateway.wanAddress.static`.
-    source: "Service"
+    source: Service
 
     # Port that gets registered for WAN traffic.
     # If source is set to "Service" then this setting will have no effect.
