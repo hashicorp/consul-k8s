@@ -114,7 +114,8 @@ func TestRun_MeshServices(t *testing.T) {
 
 			// We build the consul-addr because normally it's defined by the init container setting
 			// CONSUL_HTTP_ADDR when it processes the command template.
-			flags := []string{"-proxy-name", testPodName,
+			flags := []string{
+				"-proxy-name", testPodName,
 				"-addresses", "127.0.0.1",
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
@@ -183,6 +184,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		UI:                 ui,
 		maxPollingAttempts: 10,
 	}
+
 	flags := []string{
 		"-proxy-name", testPodName,
 		"-addresses", "127.0.0.1",
@@ -232,7 +234,6 @@ func TestRun_TrafficRedirection(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-
 			// Start Consul server.
 			var serverCfg *testutil.TestServerConfig
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
@@ -265,6 +266,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			}
 			iptablesCfgJSON, err := json.Marshal(iptablesCfg)
 			require.NoError(t, err)
+
 			flags := []string{
 				"-proxy-name", testPodName,
 				"-addresses", "127.0.0.1",

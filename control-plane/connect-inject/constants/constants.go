@@ -62,7 +62,7 @@ const (
 	// DefaultGracefulShutdownPath is the default path that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulShutdownPath = "/graceful_shutdown"
 
-	//DefaultWANPort is the default port that consul-dataplane uses for WAN.
+	// DefaultWANPort is the default port that consul-dataplane uses for WAN.
 	DefaultWANPort = 8443
 
 	// ConsulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
@@ -72,6 +72,9 @@ const (
 	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
 
 	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
+
+	// ProxyIDVolumePath is the name of the volume that contains the proxy ID.
+	ProxyIDVolumePath = "/consul/mesh-inject"
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace
