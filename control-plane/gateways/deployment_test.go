@@ -174,7 +174,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Args: []string{
 										"-addresses",
 										"",
-										"-proxy-id=$(POD_NAME)",
 										"-grpc-port=0",
 										"-log-level=",
 										"-log-json=false",
@@ -196,12 +195,22 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 									Env: []corev1.EnvVar{
 										{
-											Name:  "POD_NAME",
+											Name:  "DP_PROXY_ID",
 											Value: "",
 											ValueFrom: &corev1.EnvVarSource{
 												FieldRef: &corev1.ObjectFieldSelector{
 													APIVersion: "",
 													FieldPath:  "metadata.name",
+												},
+											},
+										},
+										{
+											Name:  "POD_NAMESPACE",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.namespace",
 												},
 											},
 										},
@@ -218,6 +227,14 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 													FieldPath:  "spec.nodeName",
 												},
 											},
+										},
+										{
+											Name:  "DP_CREDENTIAL_LOGIN_META",
+											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
+										},
+										{
+											Name:  "DP_CREDENTIAL_LOGIN_META1",
+											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
 										},
 										{
 											Name:  "DP_SERVICE_NODE_NAME",
@@ -431,7 +448,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Args: []string{
 										"-addresses",
 										"",
-										"-proxy-id=$(POD_NAME)",
 										"-grpc-port=0",
 										"-log-level=",
 										"-log-json=false",
@@ -452,12 +468,22 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 									Env: []corev1.EnvVar{
 										{
-											Name:  "POD_NAME",
+											Name:  "DP_PROXY_ID",
 											Value: "",
 											ValueFrom: &corev1.EnvVarSource{
 												FieldRef: &corev1.ObjectFieldSelector{
 													APIVersion: "",
 													FieldPath:  "metadata.name",
+												},
+											},
+										},
+										{
+											Name:  "POD_NAMESPACE",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.namespace",
 												},
 											},
 										},
@@ -474,6 +500,14 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 													FieldPath:  "spec.nodeName",
 												},
 											},
+										},
+										{
+											Name:  "DP_CREDENTIAL_LOGIN_META",
+											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
+										},
+										{
+											Name:  "DP_CREDENTIAL_LOGIN_META1",
+											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
 										},
 										{
 											Name:  "DP_SERVICE_NODE_NAME",

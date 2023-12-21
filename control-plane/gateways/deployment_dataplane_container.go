@@ -66,9 +66,15 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		// TODO(nathancoleman): I don't believe consul-dataplane needs to write anymore, investigate.
 		Env: []corev1.EnvVar{
 			{
-				Name: "POD_NAME",
+				Name: "DP_PROXY_ID",
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
 				},
 			},
 			{
@@ -82,6 +88,14 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 						FieldPath: "spec.nodeName",
 					},
 				},
+			},
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META",
+				Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
+			},
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META1",
+				Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
 			},
 			{
 				Name:  "DP_SERVICE_NODE_NAME",
@@ -146,7 +160,6 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
-		"-proxy-id=$(POD_NAME)",
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
