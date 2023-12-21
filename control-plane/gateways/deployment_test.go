@@ -53,6 +53,27 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							},
 						},
 						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
+							Affinity: &corev1.Affinity{
+								PodAntiAffinity: &corev1.PodAntiAffinity{
+									PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+										{
+											Weight: 1,
+											PodAffinityTerm: corev1.PodAffinityTerm{
+												LabelSelector: &metav1.LabelSelector{
+													MatchLabels: map[string]string{
+														labelManagedBy: "consul-k8s",
+														"app":          "consul",
+														"chart":        "consul-helm",
+														"heritage":     "Helm",
+														"release":      "consul",
+													},
+												},
+												TopologyKey: "kubernetes.io/hostname",
+											},
+										},
+									},
+								},
+							},
 							Container: &meshv2beta1.GatewayClassContainerConfig{
 								HostPort:     8080,
 								PortModifier: 8000,
@@ -597,23 +618,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Stdin:     false,
 									StdinOnce: false,
 									TTY:       false,
-								},
-							},
-							Affinity: &corev1.Affinity{
-								NodeAffinity: nil,
-								PodAffinity:  nil,
-								PodAntiAffinity: &corev1.PodAntiAffinity{
-									PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-										{
-											Weight: 1,
-											PodAffinityTerm: corev1.PodAffinityTerm{
-												LabelSelector: &metav1.LabelSelector{
-													MatchLabels: defaultLabels,
-												},
-												TopologyKey: "kubernetes.io/hostname",
-											},
-										},
-									},
 								},
 							},
 						},
