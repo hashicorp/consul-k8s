@@ -74,6 +74,10 @@ data:
             topologySpreadConstraints:
               {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 16 | trim }}
             {{- end }}
+            {{- if .Values.meshGateway.affinity }}
+            affinity: 
+              {{ tpl .Values.meshGateway.affinity . | nindent 16 | trim }}
+            {{- end }}
             replicas:
               default: {{ .Values.meshGateway.replicas }}
               min: {{ .Values.meshGateway.replicas }}

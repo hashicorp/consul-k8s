@@ -75,6 +75,8 @@ type GatewayClassDeploymentConfig struct {
 	// DNSPolicy specifies the dns policy to use. These are set on a per pod basis.
 	// +kubebuilder:validation:Enum=Default;ClusterFirst;ClusterFirstWithHostNet;None
 	DNSPolicy corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+	// Affinity specifies the affinity to use on the created Deployment.
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 }
 
 type GatewayClassReplicasConfig struct {
