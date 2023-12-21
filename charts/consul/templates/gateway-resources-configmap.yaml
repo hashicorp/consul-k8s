@@ -107,11 +107,20 @@ data:
         metadata:
           name: mesh-gateway
           namespace: {{ .Release.Namespace }}
+          annotations: 
+            # TODO are these annotations even necessary?
+            "consul.hashicorp.com/gateway-wan-address-source": {{ .Values.meshGateway.wanAddress.source | quote }}
+            "consul.hashicorp.com/gateway-wan-address-static": {{ .Values.meshGateway.wanAddress.static | quote }}
+            {{- if eq .Values.meshGateway.wanAddress.source "Service" }}
+            {{- if eq .Values.meshGateway.service.type "NodePort" }}
+            "consul.hashicorp.com/gateway-wan-port": {{ .Values.meshGateway.service.nodePort | quote  }}
+            {{- else }}
+            "consul.hashicorp.com/gateway-wan-port": {{ .Values.meshGateway.service.port | quote }}
+            {{- end }}
+            {{- else }}
+            "consul.hashicorp.com/gateway-wan-port": {{ .Values.meshGateway.wanAddress.port | quote }}
+            {{- end }}
         spec:
           gatewayClassName: consul-mesh-gateway
-          wanAddress:
-            source: {{ .Values.meshGateway.wanAddress.source }}
-            port: {{ .Values.meshGateway.wanAddress.port }}
-            static: {{ .Values.meshGateway.wanAddress.static }}
   {{- end }}
 {{- end }}

@@ -77,7 +77,7 @@ target=templates/gateway-resources-configmap.yaml
 #--------------------------------------------------------------------
 # Mesh Gateway WAN Address configuration
 
-@test "gatewayresources/Job: Mesh Gateway WAN Address default configuration" {
+@test "gatewayresources/Job: Mesh Gateway WAN Address default annotations" {
     cd `chart_dir`
     local spec=$(helm template \
         -s $target \
@@ -86,15 +86,39 @@ target=templates/gateway-resources-configmap.yaml
         --set 'global.experiments[0]=resource-apis' \
         --set 'ui.enabled=false' \
         . | tee /dev/stderr |
-        yq '.data["config.yaml"]' | yq '.meshGateways[0].spec.wanAddress' | tee /dev/stderr)
+        yq '.data["config.yaml"]' | yq '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
 
-    local actual=$(echo "$spec" | yq '.source')
+    local actual=$(echo "$spec" | yq '.["consul.hashicorp.com/gateway-wan-address-source"]')
     [ "${actual}" = 'Service' ]
 
-    local actual=$(echo "$spec" | yq '.port')
+    local actual=$(echo "$spec" | yq '.["consul.hashicorp.com/gateway-wan-port"]')
     [ "${actual}" = '443' ]
 
-    local actual=$(echo "$spec" | yq '.static')
+    local actual=$(echo "$spec" | yq '.["consul.hashicorp.com/gateway-wan-address-static"]')
+    [ "${actual}" = '' ]
+}
+
+@test "gatewayresources/Job: Mesh Gateway WAN Address NodePort annotations" {
+    cd `chart_dir`
+    local spec=$(helm template \
+        -s $target \
+        --set 'connectInject.enabled=true' \
+        --set 'meshGateway.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'meshGateway.wanAddress.source=Service' \
+        --set 'meshGateway.service.type=NodePort' \
+        --set 'meshGateway.service.nodePort=30000' \
+        . | tee /dev/stderr |
+        yq '.data["config.yaml"]' | yq '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
+
+    local actual=$(echo "$spec" | yq '.["consul.hashicorp.com/gateway-wan-address-source"]')
+    [ "${actual}" = 'Service' ]
+
+    local actual=$(echo "$spec" | yq '.["consul.hashicorp.com/gateway-wan-port"]')
+    [ "${actual}" = '30000' ]
+
+    local actual=$(echo "$spec" | yq '.["consul.hashicorp.com/gateway-wan-address-static"]')
     [ "${actual}" = '' ]
 }
 
@@ -109,15 +133,15 @@ target=templates/gateway-resources-configmap.yaml
         --set 'meshGateway.wanAddress.source=Static' \
         --set 'meshGateway.wanAddress.static=127.0.0.1' \
         . | tee /dev/stderr |
-        yq '.data["config.yaml"]' | yq '.meshGateways[0].spec.wanAddress' | tee /dev/stderr)
+        yq '.data["config.yaml"]' | yq '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
 
-    local actual=$(echo "$spec" | yq '.source')
+    local actual=$(echo "$spec" | yq '.["consul.hashicorp.com/gateway-wan-address-source"]')
     [ "${actual}" = 'Static' ]
 
-    local actual=$(echo "$spec" | yq '.port')
+    local actual=$(echo "$spec" | yq '.["consul.hashicorp.com/gateway-wan-port"]')
     [ "${actual}" = '443' ]
 
-    local actual=$(echo "$spec" | yq '.static')
+    local actual=$(echo "$spec" | yq '.["consul.hashicorp.com/gateway-wan-address-static"]')
     [ "${actual}" = '127.0.0.1' ]
 }
 
