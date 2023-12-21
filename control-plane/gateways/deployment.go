@@ -70,6 +70,13 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 					constants.AnnotationMeshInject: "false",
 					// This functionality only applies when proxy sidecars are used
 					constants.AnnotationTransparentProxyOverwriteProbes: "false",
+					// This annotation determines which source to use to set the
+					// WAN address and WAN port for the Mesh Gateway service registration.
+					constants.AnnotationGatewayWANSource: b.gateway.Annotations[constants.AnnotationGatewayWANSource],
+					// This annotation determines the WAN port for the Mesh Gateway service registration.
+					constants.AnnotationGatewayWANPort: b.gateway.Annotations[constants.AnnotationGatewayWANPort],
+					// This annotation determines the address for the gateway when the source annotation is "Static".
+					constants.AnnotationGatewayWANAddress: b.gateway.Annotations[constants.AnnotationGatewayWANAddress],
 				},
 			},
 			Spec: corev1.PodSpec{
