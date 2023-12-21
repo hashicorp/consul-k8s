@@ -381,6 +381,15 @@ var validGWConfigurationKitchenSink = `gatewayClassConfigs:
       nodeSelector:
         beta.kubernetes.io/arch: amd64
         beta.kubernetes.io/os: linux
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: consul
+                  release: consul-helm
+                  component: mesh-gateway
+              topologyKey: kubernetes.io/hostname
       tolerations:
         - key: "key1"
           operator: "Equal"
@@ -468,6 +477,23 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 						Operator: "Equal",
 						Value:    "value1",
 						Effect:   "NoSchedule",
+					},
+				},
+
+				Affinity: &corev1.Affinity{
+					PodAntiAffinity: &corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app":       "consul",
+										"release":   "consul-helm",
+										"component": "mesh-gateway",
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+							},
+						},
 					},
 				},
 				Container: &v2beta1.GatewayClassContainerConfig{

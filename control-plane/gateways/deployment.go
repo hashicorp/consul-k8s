@@ -87,21 +87,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 				Containers: []corev1.Container{
 					container,
 				},
-				Affinity: &corev1.Affinity{
-					PodAntiAffinity: &corev1.PodAntiAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-							{
-								Weight: 1,
-								PodAffinityTerm: corev1.PodAffinityTerm{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: b.labelsForDeployment(),
-									},
-									TopologyKey: "kubernetes.io/hostname",
-								},
-							},
-						},
-					},
-				},
+				Affinity:                  deploymentConfig.Affinity,
 				NodeSelector:              deploymentConfig.NodeSelector,
 				PriorityClassName:         deploymentConfig.PriorityClassName,
 				TopologySpreadConstraints: deploymentConfig.TopologySpreadConstraints,
