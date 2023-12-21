@@ -1,3 +1,0 @@
-```release-note:feature
-Add support for new observability service principal in cloud preset
-```

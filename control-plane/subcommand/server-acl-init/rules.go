@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package serveraclinit
 
 import (
@@ -321,16 +318,15 @@ partition "{{ .PartitionName }}" {
 func (c *Command) injectRules() (string, error) {
 	// The Connect injector needs permissions to create namespaces when namespaces are enabled.
 	// It must also create/update service health checks via the endpoints controller.
-	// When ACLs are enabled, the endpoints controller (V1) or pod controller (v2)
-	// needs "acl:write" permissions to delete ACL tokens created via "consul login".
-	// policy = "write" is required when creating namespaces within a partition.
+	// When ACLs are enabled, the endpoints controller needs "acl:write" permissions
+	// to delete ACL tokens created via "consul login". policy = "write" is required when
+	// creating namespaces within a partition.
 	injectRulesTpl := `
 {{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"
 {{- else }}
-  mesh = "write"
   operator = "write"
   acl = "write"
 {{- end }}
@@ -348,10 +344,6 @@ partition "{{ .PartitionName }}" {
 {{- end }}
     acl = "write"
     service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-    identity_prefix "" {
       policy = "write"
       intentions = "write"
     }

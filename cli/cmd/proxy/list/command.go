@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package list
 
 import (
@@ -304,5 +301,4 @@ func (c *ListCommand) output(pods []v1.Pod) {
 	} else {
 		c.UI.Table(tbl)
 	}
-
 }

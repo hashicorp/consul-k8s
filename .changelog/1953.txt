@@ -1,3 +1,0 @@
-```release-note:improvement
-helm: update `imageConsulDataplane` value to `hashicorp/consul-dataplane:1.1.0`.
-```

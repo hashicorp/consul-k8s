@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package serveraclinit
 
 import (
@@ -15,7 +12,7 @@ import (
 
 func Test_configureAnonymousPolicy(t *testing.T) {
 
-	k8s, testClient := completeSetup(t, false)
+	k8s, testClient := completeSetup(t)
 	consulHTTPAddr := testClient.TestServer.HTTPAddr
 	consulGRPCAddr := testClient.TestServer.GRPCAddr
 

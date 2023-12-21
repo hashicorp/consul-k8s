@@ -115,7 +115,7 @@ func TestObservabilityCloud(t *testing.T) {
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, scadaAddressSecretName, scadaAddressSecretKey, scadaAddressSecretKeyValue)
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, bootstrapTokenSecretName, bootstrapTokenSecretKey, bootstrapToken)
 
-			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/cloud/hcp-mock")
+			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/cloud/hcp-mock")
 			podName, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "pod", "-l", "app=fake-server", "-o", `jsonpath="{.items[0].metadata.name}"`)
 			podName = strings.ReplaceAll(podName, "\"", "")
 			if err != nil {
@@ -217,7 +217,7 @@ func TestObservabilityCloud(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating static-server deployment")
-			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, options, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
 			t.Log("Finished deployment. Validating expected conditions now")
 
 			// Validate that the consul-telemetry-collector service was deployed to the expected namespace.

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -74,7 +71,6 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
-					MutualTLSMode: MutualTLSModePermissive,
 					AccessLogs: &AccessLogs{
 						Enabled:             true,
 						DisableListenerLogs: true,
@@ -93,13 +89,6 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
 							Required:  true,
 						},
-					},
-					FailoverPolicy: &FailoverPolicy{
-						Mode:    "sequential",
-						Regions: []string{"us-west-1"},
-					},
-					PrioritizeByLocality: &PrioritizeByLocality{
-						Mode: "failover",
 					},
 				},
 			},
@@ -133,7 +122,6 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
-				MutualTLSMode: capi.MutualTLSModePermissive,
 				AccessLogs: &capi.AccessLogsConfig{
 					Enabled:             true,
 					DisableListenerLogs: true,
@@ -159,13 +147,6 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 						},
 						Required: true,
 					},
-				},
-				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
-					Mode:    "sequential",
-					Regions: []string{"us-west-1"},
-				},
-				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
-					Mode: "failover",
 				},
 			},
 			Matches: true,
@@ -300,7 +281,6 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
-					MutualTLSMode: MutualTLSModeStrict,
 					AccessLogs: &AccessLogs{
 						Enabled:             true,
 						DisableListenerLogs: true,
@@ -319,13 +299,6 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
 							Required:  true,
 						},
-					},
-					FailoverPolicy: &FailoverPolicy{
-						Mode:    "sequential",
-						Regions: []string{"us-west-1"},
-					},
-					PrioritizeByLocality: &PrioritizeByLocality{
-						Mode: "none",
 					},
 				},
 			},
@@ -360,7 +333,6 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
-				MutualTLSMode: capi.MutualTLSModeStrict,
 				AccessLogs: &capi.AccessLogsConfig{
 					Enabled:             true,
 					DisableListenerLogs: true,
@@ -386,13 +358,6 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						},
 						Required: true,
 					},
-				},
-				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
-					Mode:    "sequential",
-					Regions: []string{"us-west-1"},
-				},
-				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
-					Mode: "none",
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
@@ -512,17 +477,6 @@ func TestProxyDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
-		},
-		"mutualTLSMode": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					MutualTLSMode: MutualTLSMode("asdf"),
-				},
-			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.mutualTLSMode: Invalid value: "asdf": Must be one of "", "strict", or "permissive".`,
 		},
 		"accessLogs.type": {
 			input: &ProxyDefaults{
@@ -650,32 +604,6 @@ func TestProxyDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.envoyExtensions.envoyExtension[0].arguments: Invalid value: "{\"SOME_INVALID_JSON\"}": must be valid map value: invalid character '}' after object key`,
-		},
-		"failoverPolicy.mode invalid": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					FailoverPolicy: &FailoverPolicy{
-						Mode: "wrong-mode",
-					},
-				},
-			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.failoverPolicy.mode: Invalid value: "wrong-mode": must be one of "", "sequential", "order-by-locality"`,
-		},
-		"prioritize by locality invalid": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					PrioritizeByLocality: &PrioritizeByLocality{
-						Mode: "wrong-mode",
-					},
-				},
-			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.prioritizeByLocality.mode: Invalid value: "wrong-mode": must be one of "", "none", "failover"`,
 		},
 		"multi-error": {
 			input: &ProxyDefaults{

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 // Package common holds code needed by multiple commands.
 package common
 
@@ -13,13 +10,12 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/go-logr/logr"
+	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 )
 
 const (

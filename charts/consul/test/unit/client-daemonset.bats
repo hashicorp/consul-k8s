@@ -530,11 +530,7 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject") |
-      del(."consul.hashicorp.com/config-checksum")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -2728,14 +2724,7 @@ rollingUpdate:
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject") |
-      del(."consul.hashicorp.com/config-checksum") |
-      del(."vault.hashicorp.com/agent-inject") |
-      del(."vault.hashicorp.com/role") |
-      del(."vault.hashicorp.com/agent-init-first")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."vault.hashicorp.com/agent-init-first")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 

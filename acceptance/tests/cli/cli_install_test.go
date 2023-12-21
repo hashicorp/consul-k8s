@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package cli
 
 import (
@@ -52,8 +49,8 @@ func TestInstall(t *testing.T) {
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
 			if c.secure {
-				connHelper.TestConnectionFailureWithoutIntention(t, connhelper.ConnHelperOpts{})
-				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
+				connHelper.TestConnectionFailureWithoutIntention(t)
+				connHelper.CreateIntention(t)
 			}
 
 			// Run proxy list and get the two results.
@@ -70,11 +67,11 @@ func TestInstall(t *testing.T) {
 			retrier := &retry.Timer{Timeout: 160 * time.Second, Wait: 2 * time.Second}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
-					out, err := cli.Run(r, ctx.KubectlOptions(r), "proxy", "read", podName)
+					out, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "read", podName)
 					require.NoError(r, err)
 
 					output := string(out)
-					r.Log(output)
+					logger.Log(t, output)
 
 					// Both proxies must see their own local agent and app as clusters.
 					require.Regexp(r, "consul-dataplane.*STATIC", output)
@@ -121,7 +118,7 @@ func TestInstall(t *testing.T) {
 				logger.Log(t, string(proxyOut))
 			}
 
-			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+			connHelper.TestConnectionSuccess(t)
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
 	}

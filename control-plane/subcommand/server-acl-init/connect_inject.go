@@ -1,17 +1,13 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package serveraclinit
 
 import (
 	"fmt"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 // We use the default Kubernetes service as the default host
@@ -78,27 +74,14 @@ func (c *Command) configureConnectInjectAuthMethod(client *consul.DynamicClient,
 		return err
 	}
 
-	var abr api.ACLBindingRule
-	if c.flagResourceAPIs {
-		c.log.Info("creating consul binding rule for WorkloadIdentityName")
-		abr = api.ACLBindingRule{
-			Description: "Kubernetes binding rule",
-			AuthMethod:  authMethodName,
-			BindType:    api.BindingRuleBindTypeTemplatedPolicy,
-			BindName:    api.ACLTemplatedPolicyWorkloadIdentityName,
-			BindVars: &api.ACLTemplatedPolicyVariables{
-				Name: "${serviceaccount.name}",
-			},
-			Selector: c.flagBindingRuleSelector,
-		}
-	} else {
-		abr = api.ACLBindingRule{
-			Description: "Kubernetes binding rule",
-			AuthMethod:  authMethodName,
-			BindType:    api.BindingRuleBindTypeService,
-			BindName:    "${serviceaccount.name}",
-			Selector:    c.flagBindingRuleSelector,
-		}
+	c.log.Info("creating inject binding rule")
+	// Create the binding rule.
+	abr := api.ACLBindingRule{
+		Description: "Kubernetes binding rule",
+		AuthMethod:  authMethodName,
+		BindType:    api.BindingRuleBindTypeService,
+		BindName:    "${serviceaccount.name}",
+		Selector:    c.flagBindingRuleSelector,
 	}
 
 	return c.createConnectBindingRule(client, authMethodName, &abr)

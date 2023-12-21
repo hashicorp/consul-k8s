@@ -1,17 +1,6 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
-terraform {
-  required_providers {
-    google = {
-      version = "~> 5.3.0"
-    }
-  }
-}
-
 provider "google" {
   project = var.project
-  zone    = var.zone
+  version = "~> 3.49.0"
 }
 
 resource "random_id" "suffix" {
@@ -21,12 +10,7 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.27."
-}
-
-# We assume that the subnets are already created to save time.
-data "google_compute_subnetwork" "subnet" {
-  name = var.subnet
+  version_prefix = "1.25."
 }
 
 resource "google_container_cluster" "cluster" {
@@ -37,17 +21,13 @@ resource "google_container_cluster" "cluster" {
   project            = var.project
   initial_node_count = 3
   location           = var.zone
-  # 2023-10-30 - There is a bug with the terraform provider where lastest_master_version is not being returned by the
-  # api. Hardcode GKE version for now.
   min_master_version = data.google_container_engine_versions.main.latest_master_version
   node_version       = data.google_container_engine_versions.main.latest_master_version
   node_config {
     tags         = ["consul-k8s-${random_id.suffix[count.index].dec}"]
-    machine_type = "e2-standard-8"
+    machine_type = "e2-standard-4"
   }
-  subnetwork          = data.google_compute_subnetwork.subnet.name
-  resource_labels     = var.labels
-  deletion_protection = false
+  resource_labels = var.labels
 }
 
 resource "google_compute_firewall" "firewall-rules" {

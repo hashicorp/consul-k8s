@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package webhook
 
 import (
@@ -10,13 +7,12 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
-
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -172,15 +168,6 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
 	}
 
-	// Container Ports
-	metricsPorts, err := w.getMetricsPorts(pod)
-	if err != nil {
-		return corev1.Container{}, err
-	}
-	if metricsPorts != nil {
-		container.Ports = append(container.Ports, metricsPorts...)
-	}
-
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
@@ -275,7 +262,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 			args = append(args, "-tls-server-name="+w.ConsulTLSServerName)
 		}
 		if w.ConsulCACert != "" {
-			args = append(args, "-ca-certs="+constants.LegacyConsulCAFile)
+			args = append(args, "-ca-certs="+constants.ConsulCAFile)
 		}
 	} else {
 		args = append(args, "-tls-disabled")
@@ -518,38 +505,4 @@ func useProxyHealthCheck(pod corev1.Pod) bool {
 		return useProxyHealthCheck
 	}
 	return false
-}
-
-// getMetricsPorts creates container ports for exposing services such as prometheus.
-// Prometheus in particular needs a named port for use with the operator.
-// https://github.com/hashicorp/consul-k8s/pull/1440
-func (w *MeshWebhook) getMetricsPorts(pod corev1.Pod) ([]corev1.ContainerPort, error) {
-	enableMetrics, err := w.MetricsConfig.EnableMetrics(pod)
-	if err != nil {
-		return nil, fmt.Errorf("error determining if metrics are enabled: %w", err)
-	}
-	if !enableMetrics {
-		return nil, nil
-	}
-
-	prometheusScrapePort, err := w.MetricsConfig.PrometheusScrapePort(pod)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
-	}
-	if prometheusScrapePort == "" {
-		return nil, nil
-	}
-
-	port, err := strconv.Atoi(prometheusScrapePort)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
-	}
-
-	return []corev1.ContainerPort{
-		{
-			Name:          "prometheus",
-			ContainerPort: int32(port),
-			Protocol:      corev1.ProtocolTCP,
-		},
-	}, nil
 }

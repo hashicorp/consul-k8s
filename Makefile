@@ -16,15 +16,6 @@ gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consu
 copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make copy-crds-to-chart
 	@cd hack/copy-crds-to-chart; go run ./...
 
-.PHONY: camel-crds
-camel-crds: ## Convert snake_case keys in yaml to camelCase. Usage: make camel-crds
-	@cd hack/camel-crds; go run ./...
-
-.PHONY: generate-external-crds
-generate-external-crds: ## Generate CRDs for externally defined CRDs and copy them to charts/consul. Usage: make generate-external-crds
-	@cd ./control-plane/config/crd/external; \
-		kustomize build | yq --split-exp '.metadata.name + ".yaml"' --no-doc
-
 .PHONY: bats-tests
 bats-tests: ## Run Helm chart bats tests.
 	 bats --jobs 4 charts/consul/test/unit
@@ -50,14 +41,6 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
-.PHONY: control-plane-dev-skaffold
-# DANGER: this target is experimental and could be modified/removed at any time.
-control-plane-dev-skaffold: ## Build consul-k8s-control-plane dev Docker image for use with skaffold or local development.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
-	@docker build -t '$(DEV_IMAGE)' \
-       --build-arg 'TARGETARCH=$(GOARCH)' \
-       -f $(CURDIR)/control-plane/Dockerfile.dev $(CURDIR)/control-plane
-
 .PHONY: check-remote-dev-image-env
 check-remote-dev-image-env:
 ifndef REMOTE_DEV_IMAGE
@@ -70,18 +53,6 @@ control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-
 	@docker buildx create --use && docker buildx build -t '$(REMOTE_DEV_IMAGE)' \
        --platform linux/amd64,linux/arm64 \
        --target=dev \
-       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
-       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
-       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
-       --push \
-       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
-
-.PHONY: control-plane-fips-dev-docker
-control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker image.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH) --fips
-	@docker build -t '$(DEV_IMAGE)' \
-       --target=dev \
-       --build-arg 'TARGETARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
@@ -116,8 +87,7 @@ cni-plugin-lint:
 
 .PHONY: ctrl-generate
 ctrl-generate: get-controller-gen ## Run CRD code generation.
-	make ensure-controller-gen-version
-	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
+	cd control-plane; $(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
 
 .PHONY: terraform-fmt-check
 terraform-fmt-check: ## Perform a terraform fmt check but don't change anything
@@ -137,11 +107,6 @@ check-preview-containers: ## Check for hashicorppreview containers
 cli-dev: ## run cli dev
 	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
 	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
-
-.PHONY: cli-fips-dev
-cli-fips-dev: ## run cli fips dev
-	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
-	@cd cli; CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -o ./bin/consul-k8s -tags "fips"; cp ./bin/consul-k8s ${GOPATH}/bin/
 
 .PHONY: cli-lint
 cli-lint: ## Run linter in the control-plane directory.
@@ -164,35 +129,22 @@ kind-cni-calico: ## install cni plugin on kind
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
 	@sleep 20
 
-.PHONY: kind-delete
-kind-delete:
-	kind delete cluster --name dc1
-	kind delete cluster --name dc2
-	kind delete cluster --name dc3
-	kind delete cluster --name dc4
-
 .PHONY: kind-cni
 kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
 
 .PHONY: kind
-kind: kind-delete ## Helper target for doing local acceptance testing (works in all cases)
+kind: kind-delete ## Helper target for doing local acceptance testing
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
 	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
 
-.PHONY: kind-small
-kind-small: kind-delete ## Helper target for doing local acceptance testing (when you only need two clusters)
-	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
 
 .PHONY: kind-load
 kind-load: ## Helper target for loading local dev images (run with `DEV_IMAGE=...` to load non-k8s images)
@@ -209,12 +161,8 @@ lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance di
 
 .PHONY: ctrl-manifests
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
-	make ensure-controller-gen-version
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	make camel-crds
 	make copy-crds-to-chart
-	make generate-external-crds
-	make add-copyright-header
 
 .PHONY: get-controller-gen
 get-controller-gen: ## Download controller-gen program needed for operator SDK.
@@ -224,35 +172,13 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.1 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
-
-.PHONY: ensure-controller-gen-version
-ensure-controller-gen-version: ## Ensure controller-gen version is v0.12.1.
-ifeq (, $(shell which $(CONTROLLER_GEN)))
-	@echo "You don't have $(CONTROLLER_GEN), please install it first."
-else
-ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.12.1))
-	@echo "controller-gen version is not v0.12.1, uninstall the binary and install the correct version with 'make get-controller-gen'."
-	@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
-	@exit 1
-else
-	@echo "Found correct version: $(shell $(CONTROLLER_GEN) --version)"
-endif
-endif
-
-.PHONY: add-copyright-header
-add-copyright-header: ## Add copyright header to all files in the project
-ifeq (, $(shell which copywrite))
-	@echo "Installing copywrite"
-	@go install github.com/hashicorp/copywrite@latest
-endif
-	@copywrite headers --spdx "MPL-2.0" 
 
 ##@ CI Targets
 
@@ -328,25 +254,6 @@ endif
 
 .PHONY: prepare-release
 prepare-release: prepare-release-script check-preview-containers
-
-.PHONY: prepare-rc-script
-prepare-rc-script: ## Sets the versions, updates changelog to prepare this repository to release
-ifndef CONSUL_K8S_RELEASE_VERSION
-	$(error CONSUL_K8S_RELEASE_VERSION is required)
-endif
-ifndef CONSUL_K8S_RELEASE_DATE
-	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
-endif
-ifndef CONSUL_K8S_LAST_RELEASE_GIT_TAG
-	$(error CONSUL_K8S_LAST_RELEASE_GIT_TAG is required)
-endif
-ifndef CONSUL_K8S_CONSUL_VERSION
-	$(error CONSUL_K8S_CONSUL_VERSION is required)
-endif
-	@source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_rc_branch $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION); \
-
-.PHONY: prepare-rc-branch
-prepare-rc-branch: prepare-rc-script
 
 .PHONY: prepare-main-dev
 prepare-main-dev: ## prepare main dev

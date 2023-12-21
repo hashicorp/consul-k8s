@@ -1,10 +1,6 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package test
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,19 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/consul/sdk/testutil"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/testing/protocmp"
-
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -54,7 +43,7 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	t.Cleanup(func() {
 		_ = consulServer.Stop()
 	})
-	consulServer.WaitForLeader(t)
+	consulServer.WaitForSerfCheck(t)
 
 	consulConfig := &consul.Config{
 		APIClientConfig: &api.Config{Address: consulServer.HTTPAddr},
@@ -70,33 +59,20 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 		TestServer: consulServer,
 		APIClient:  client,
 		Cfg:        consulConfig,
-		Watcher:    MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true),
+		Watcher:    MockConnMgrForIPAndPort("127.0.0.1", cfg.Ports.GRPC),
 	}
 }
 
-func MockConnMgrForIPAndPort(t *testing.T, ip string, port int, enableGRPCConn bool) *consul.MockServerConnectionManager {
+func MockConnMgrForIPAndPort(ip string, port int) *consul.MockServerConnectionManager {
 	parsedIP := net.ParseIP(ip)
 	connMgr := &consul.MockServerConnectionManager{}
-
 	mockState := discovery.State{
 		Address: discovery.Addr{
 			TCPAddr: net.TCPAddr{
 				IP:   parsedIP,
 				Port: port,
 			},
-		},
-	}
-
-	// If the connection is enabled, some tests will receive extra HTTP API calls where
-	// the server is being dialed.
-	if enableGRPCConn {
-		conn, err := grpc.DialContext(
-			context.Background(),
-			fmt.Sprintf("%s:%d", parsedIP, port),
-			grpc.WithTransportCredentials(insecure.NewCredentials()))
-		require.NoError(t, err)
-		mockState.GRPCConn = conn
-	}
+		}}
 	connMgr.On("State").Return(mockState, nil)
 	connMgr.On("Run").Return(nil)
 	connMgr.On("Stop").Return(nil)
@@ -219,19 +195,13 @@ func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, service
 // SetupK8sAuthMethod create a k8s auth method and a binding rule in Consul for the
 // given k8s service and namespace.
 func SetupK8sAuthMethod(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS string) {
-	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "", false)
-}
-
-// SetupK8sAuthMethodV2 create a k8s auth method and a binding rule in Consul for the
-// given k8s service and namespace.
-func SetupK8sAuthMethodV2(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS string) {
-	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "", true)
+	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "")
 }
 
 // SetupK8sAuthMethodWithNamespaces creates a k8s auth method and binding rule
 // in Consul for the k8s service name and namespace. It sets up the auth method and the binding
 // rule so that it works with consul namespaces.
-func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS, consulNS string, mirrorNS bool, nsPrefix string, useV2 bool) {
+func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS, consulNS string, mirrorNS bool, nsPrefix string) {
 	t.Helper()
 	// Start the mock k8s server.
 	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -268,57 +238,20 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	require.NoError(t, err)
 
 	// Create the binding rule.
-	var aclBindingRule api.ACLBindingRule
-	if useV2 {
-		aclBindingRule = api.ACLBindingRule{
-			Description: "Kubernetes binding rule",
-			AuthMethod:  AuthMethod,
-			BindType:    api.BindingRuleBindTypeTemplatedPolicy,
-			BindName:    api.ACLTemplatedPolicyWorkloadIdentityName,
-			BindVars: &api.ACLTemplatedPolicyVariables{
-				Name: "${serviceaccount.name}",
-			},
-			Selector:  "serviceaccount.name!=default",
-			Namespace: consulNS,
-		}
-	} else {
-		aclBindingRule = api.ACLBindingRule{
-			Description: "Kubernetes binding rule",
-			AuthMethod:  AuthMethod,
-			BindType:    api.BindingRuleBindTypeService,
-			BindName:    "${serviceaccount.name}",
-			Selector:    "serviceaccount.name!=default",
-			Namespace:   consulNS,
-		}
+	aclBindingRule := api.ACLBindingRule{
+		Description: "Kubernetes binding rule",
+		AuthMethod:  AuthMethod,
+		BindType:    api.BindingRuleBindTypeService,
+		BindName:    "${serviceaccount.name}",
+		Selector:    "serviceaccount.name!=default",
+		Namespace:   consulNS,
 	}
-
 	if mirrorNS {
 		aclBindingRule.Namespace = "default"
 	}
 	// This API call will idempotently create the binding rule (it won't fail if it already exists).
 	_, _, err = consulClient.ACL().BindingRuleCreate(&aclBindingRule, nil)
 	require.NoError(t, err)
-}
-
-// ResourceHasPersisted checks that a recently written resource exists in the Consul
-// state store with a valid version. This must be true before a resource is overwritten
-// or deleted.
-func ResourceHasPersisted(t *testing.T, ctx context.Context, client pbresource.ResourceServiceClient, id *pbresource.ID) {
-	req := &pbresource.ReadRequest{Id: id}
-
-	require.Eventually(t, func() bool {
-		res, err := client.Read(ctx, req)
-		if err != nil {
-			return false
-		}
-
-		if res.GetResource().GetVersion() == "" {
-			return false
-		}
-
-		return true
-	}, 5*time.Second,
-		time.Second)
 }
 
 func TokenReviewsResponse(name, ns string) string {
@@ -364,16 +297,6 @@ func ServiceAccountGetResponse(name, ns string) string {
    }
  ]
 }`, name, ns, ns, name, name)
-}
-
-// CmpProtoIgnoreOrder returns a slice of cmp.Option useful for comparing proto messages independent of the order of
-// their repeated fields.
-func CmpProtoIgnoreOrder() []cmp.Option {
-	return []cmp.Option{
-		protocmp.Transform(),
-		// Stringify any type passed to the sorter so that we can reliably compare most values.
-		cmpopts.SortSlices(func(a, b any) bool { return fmt.Sprintf("%v", a) < fmt.Sprintf("%v", b) }),
-	}
 }
 
 const AuthMethod = "consul-k8s-auth-method"
