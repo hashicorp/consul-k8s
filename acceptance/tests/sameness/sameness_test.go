@@ -535,8 +535,8 @@ func TestFailover_Connect(t *testing.T) {
 					}{
 						{failoverServer: testClusters[keyCluster01b], expectedPQ: expectedPQ{partition: "ap1", peerName: "", namespace: "ns2"}},
 						{failoverServer: testClusters[keyCluster01a], expectedPQ: expectedPQ{partition: "default", peerName: "", namespace: "ns2"}},
-						{failoverServer: testClusters[keyCluster02a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster02a].name, namespace: "ns2"}},
-						{failoverServer: testClusters[keyCluster03a], expectedPQ: expectedPQ{partition: "default", peerName: testClusters[keyCluster03a].name, namespace: "ns2"}},
+						{failoverServer: testClusters[keyCluster02a], expectedPQ: expectedPQ{partition: "ap1", peerName: testClusters[keyCluster02a].name, namespace: "ns2"}},
+						{failoverServer: testClusters[keyCluster03a], expectedPQ: expectedPQ{partition: "ap1", peerName: testClusters[keyCluster03a].name, namespace: "ns2"}},
 					},
 				},
 				{
@@ -574,9 +574,9 @@ func TestFailover_Connect(t *testing.T) {
 					// We're resetting the scale, so make sure we have all the new IP addresses saved
 					testClusters.setServerIP(t)
 
-					for _, v := range sc.failovers {
+					for i, v := range sc.failovers {
 						// Verify Failover (If this is the first check, then just verifying we're starting with the right server)
-						logger.Log(t, "checking service failover")
+						logger.Log(t, "checking service failover", i)
 
 						if cfg.EnableTransparentProxy {
 							sc.server.serviceTargetCheck(t, v.failoverServer.name, fmt.Sprintf("http://static-server.virtual.ns2.ns.%s.ap.consul", sc.server.fullTextPartition()))
@@ -589,10 +589,10 @@ func TestFailover_Connect(t *testing.T) {
 						// e.g kubectl --context kind-dc1 --namespace ns1 exec -i deploy/static-client -c static-client \
 						//	-- dig @test-3lmypr-consul-dns.default static-server.service.ns2.ns.mine.sg.ap1.ap.consul
 						// Verify DNS.
-						logger.Log(t, "verifying dns")
+						logger.Log(t, "verifying dns", i)
 						sc.server.dnsFailoverCheck(t, cfg, releaseName, v.failoverServer)
 
-						logger.Log(t, "verifying prepared query")
+						logger.Log(t, "verifying prepared query", i)
 						sc.server.preparedQueryFailoverCheck(t, releaseName, v.expectedPQ, v.failoverServer)
 
 						// Scale down static-server on the current failover, will fail over to the next.

@@ -192,6 +192,16 @@ func HasBeenMeshInjected(pod corev1.Pod) bool {
 	return false
 }
 
+func IsGateway(pod corev1.Pod) bool {
+	if pod.Annotations == nil {
+		return false
+	}
+	if anno, ok := pod.Annotations[constants.AnnotationGatewayKind]; ok && anno != "" {
+		return true
+	}
+	return false
+}
+
 // ConsulNamespaceIsNotFound checks the gRPC error code and message to determine
 // if a namespace does not exist. If the namespace exists this function returns false, true otherwise.
 func ConsulNamespaceIsNotFound(err error) bool {

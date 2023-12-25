@@ -150,7 +150,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	r.Log.Info("retrieved", "name", pod.Name, "ns", pod.Namespace)
 
-	if inject.HasBeenMeshInjected(pod) {
+	if inject.HasBeenMeshInjected(pod) || inject.IsGateway(pod) {
 
 		// It is possible the pod was scheduled but doesn't have an allocated IP yet, so safely requeue
 		if pod.Status.PodIP == "" {
@@ -336,9 +336,11 @@ func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 	}
 	data := inject.ToProtoAny(workload)
 
+	resourceID := getWorkloadID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition())
+	r.Log.Info("registering workload with Consul", getLogFieldsForResource(resourceID)...)
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
-			Id:       getWorkloadID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
+			Id:       resourceID,
 			Metadata: metaFromPod(pod),
 			Data:     data,
 		},
@@ -760,5 +762,13 @@ func getDestinationsID(name, namespace, partition string) *pbresource.ID {
 			// At a future point, this will move out of the Tenancy block.
 			PeerName: constants.DefaultConsulPeer,
 		},
+	}
+}
+
+func getLogFieldsForResource(id *pbresource.ID) []any {
+	return []any{
+		"name", id.Name,
+		"ns", id.Tenancy.Namespace,
+		"partition", id.Tenancy.Partition,
 	}
 }

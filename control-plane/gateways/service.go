@@ -11,12 +11,12 @@ import (
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
 
-const port = 443
+const port = int32(443)
 
 func (b *meshGatewayBuilder) Service() *corev1.Service {
 	var (
 		containerConfig *meshv2beta1.GatewayClassContainerConfig
-		portModifier    = 0
+		portModifier    = int32(0)
 		serviceType     = corev1.ServiceType("")
 	)
 
@@ -30,18 +30,18 @@ func (b *meshGatewayBuilder) Service() *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        b.gateway.Name,
 			Namespace:   b.gateway.Namespace,
-			Labels:      b.Labels(),
-			Annotations: b.Annotations(),
+			Labels:      b.labelsForService(),
+			Annotations: b.annotationsForService(),
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: b.Labels(),
+			Selector: b.labelsForDeployment(),
 			Type:     serviceType,
 			Ports: []corev1.ServicePort{
 				{
 					Name: "wan",
 					Port: port,
 					TargetPort: intstr.IntOrString{
-						IntVal: int32(port + portModifier),
+						IntVal: port + portModifier,
 					},
 				},
 			},

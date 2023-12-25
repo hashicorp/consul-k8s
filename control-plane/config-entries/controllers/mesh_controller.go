@@ -15,9 +15,12 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
+var _ Controller = (*MeshController)(nil)
+
 // MeshController reconciles a Mesh object.
 type MeshController struct {
 	client.Client
+	FinalizerPatcher
 	Log                   logr.Logger
 	Scheme                *runtime.Scheme
 	ConfigEntryController *ConfigEntryController

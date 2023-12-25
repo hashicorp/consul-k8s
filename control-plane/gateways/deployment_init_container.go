@@ -11,11 +11,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 const (
-	injectInitContainerName      = "consul-connect-inject-init"
+	injectInitContainerName      = "consul-mesh-init"
 	initContainersUserAndGroupID = 5996
 )
 
@@ -44,7 +45,7 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 	volMounts := []corev1.VolumeMount{
 		{
 			Name:      volumeName,
-			MountPath: "/consul/connect-inject",
+			MountPath: constants.ProxyIDVolumePath,
 		},
 	}
 
@@ -157,13 +158,11 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 // the init container.
 // TODO @GatewayManagement parametrize gateway kind.
 const initContainerCommandTpl = `
-consul-k8s-control-plane connect-init \
-  -pod-name=${POD_NAME} \
-  -pod-namespace=${POD_NAMESPACE} \
-  -gateway-kind="mesh-gateway" \
-  -log-json={{ .LogJSON }} \
-  {{- if .AuthMethod }}
-  -service-account-name="{{ .ServiceAccountName }}" \
+consul-k8s-control-plane mesh-init \
+  -proxy-name=${POD_NAME} \
+  -namespace=${POD_NAMESPACE} \
+  {{- with .LogLevel }}
+  -log-level={{ . }} \
   {{- end }}
-  -service-name="{{ .ServiceName }}"
+  -log-json={{ .LogJSON }}
 `

@@ -34,6 +34,7 @@ import (
 const (
 	// The number of times to attempt to read this proxy registration (120s).
 	defaultMaxPollingRetries = 120
+	defaultProxyIDFile       = "/consul/mesh-inject/proxyid"
 )
 
 type Command struct {
@@ -72,6 +73,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
+
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
@@ -210,8 +212,8 @@ func (c *Command) Help() string {
 
 func (c *Command) getBootstrapParams(
 	client pbdataplane.DataplaneServiceClient,
-	bootstrapConfig *pbmesh.BootstrapConfig) backoff.Operation {
-
+	bootstrapConfig *pbmesh.BootstrapConfig,
+) backoff.Operation {
 	return func() error {
 		req := &pbdataplane.GetEnvoyBootstrapParamsRequest{
 			ProxyId:   c.flagProxyName,
@@ -234,7 +236,6 @@ func (c *Command) getBootstrapParams(
 // https://github.com/hashicorp/consul/blob/fe2d41ddad9ba2b8ff86cbdebbd8f05855b1523c/command/connect/redirecttraffic/redirect_traffic.go#L136.
 
 func (c *Command) applyTrafficRedirectionRules(config *pbmesh.BootstrapConfig) error {
-
 	err := json.Unmarshal([]byte(c.flagRedirectTrafficConfig), &c.iptablesConfig)
 	if err != nil {
 		return err
@@ -274,11 +275,13 @@ func (c *Command) applyTrafficRedirectionRules(config *pbmesh.BootstrapConfig) e
 	return nil
 }
 
-const synopsis = "Inject mesh init command."
-const help = `
+const (
+	synopsis = "Inject mesh init command."
+	help     = `
 Usage: consul-k8s-control-plane mesh-init [options]
 
   Bootstraps mesh-injected pod components.
   Uses V2 Consul Catalog APIs.
   Not intended for stand-alone use.
 `
+)

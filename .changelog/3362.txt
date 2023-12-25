@@ -1,0 +1,3 @@
+```release-note:bug-fix
+crd-controllers: When the CRD controller reconciles a config entry CRD, only patch finalizers in the metadata of the CRD, rather than updating the entire entry, which causes changes to the CRD spec (such as adding in unspecified zero values) when using a Kubernetes client such as kubectl with `replace` mode.
+```

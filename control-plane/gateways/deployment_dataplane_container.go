@@ -24,7 +24,7 @@ const (
 	consulDataplaneDNSBindPort   = 8600
 	defaultPrometheusScrapePath  = "/metrics"
 	defaultEnvoyProxyConcurrency = "1"
-	volumeName                   = "consul-connect-inject-data"
+	volumeName                   = "consul-mesh-inject-data"
 )
 
 func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.GatewayClassContainerConfig, name, namespace string) (corev1.Container, error) {
@@ -66,8 +66,20 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		// TODO(nathancoleman): I don't believe consul-dataplane needs to write anymore, investigate.
 		Env: []corev1.EnvVar{
 			{
+				Name: "DP_PROXY_ID",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+				},
+			},
+			{
 				Name:  "TMPDIR",
-				Value: "/consul/connect-inject",
+				Value: constants.ProxyIDVolumePath,
 			},
 			{
 				Name: "NODE_NAME",
@@ -78,6 +90,14 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 				},
 			},
 			{
+				Name:  "DP_CREDENTIAL_LOGIN_META",
+				Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
+			},
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META1",
+				Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
+			},
+			{
 				Name:  "DP_SERVICE_NODE_NAME",
 				Value: "$(NODE_NAME)-virtual",
 			},
@@ -85,7 +105,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
+				MountPath: constants.ProxyIDVolumePath,
 			},
 		},
 		Args:           args,
@@ -138,12 +158,9 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 }
 
 func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
-	proxyIDFileName := "/consul/connect-inject/proxyid"
-
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
-		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + defaultEnvoyProxyConcurrency,

@@ -17,6 +17,7 @@ import (
 
 // IngressGatewayController is the controller for IngressGateway resources.
 type IngressGatewayController struct {
+	FinalizerPatcher
 	client.Client
 	Log                   logr.Logger
 	Scheme                *runtime.Scheme
