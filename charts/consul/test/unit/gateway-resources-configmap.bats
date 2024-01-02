@@ -77,7 +77,7 @@ target=templates/gateway-resources-configmap.yaml
 #--------------------------------------------------------------------
 # Mesh Gateway WAN Address configuration
 
-@test "gatewayresources/Job: Mesh Gateway WAN Address default annotations" {
+@test "gatewayresources/ConfigMap: Mesh Gateway WAN Address default annotations" {
     cd `chart_dir`
     local spec=$(helm template \
         -s $target \
@@ -98,7 +98,7 @@ target=templates/gateway-resources-configmap.yaml
     [ "${actual}" = '' ]
 }
 
-@test "gatewayresources/Job: Mesh Gateway WAN Address NodePort annotations" {
+@test "gatewayresources/ConfigMap: Mesh Gateway WAN Address NodePort annotations" {
     cd `chart_dir`
     local spec=$(helm template \
         -s $target \
@@ -122,7 +122,7 @@ target=templates/gateway-resources-configmap.yaml
     [ "${actual}" = '' ]
 }
 
-@test "gatewayresources/Job: Mesh Gateway WAN Address static configuration" {
+@test "gatewayresources/ConfigMap: Mesh Gateway WAN Address static configuration" {
     cd `chart_dir`
     local spec=$(helm template \
         -s $target \
