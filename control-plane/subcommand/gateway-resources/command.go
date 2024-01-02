@@ -9,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"io"
 	"os"
 	"sync"
@@ -104,14 +105,9 @@ type Command struct {
 	tolerations        []corev1.Toleration
 	serviceAnnotations []string
 	resources          corev1.ResourceRequirements
-	gatewayConfig      gatewayConfig
+	gatewayConfig      gateways.GatewayResources
 
 	ctx context.Context
-}
-
-type gatewayConfig struct {
-	GatewayClassConfigs []*v2beta1.GatewayClassConfig `json:"gatewayClassConfigs"`
-	MeshGateways        []*v2beta1.MeshGateway        `json:"meshGateways"`
 }
 
 func (c *Command) init() {

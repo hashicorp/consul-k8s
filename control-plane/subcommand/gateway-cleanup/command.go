@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"io"
 	"os"
 	"sync"
@@ -50,13 +51,9 @@ type Command struct {
 	once sync.Once
 	help string
 
-	gatewayConfig gatewayConfig
+	gatewayConfig gateways.GatewayResources
 
 	ctx context.Context
-}
-
-type gatewayConfig struct {
-	GatewayClassConfigs []*v2beta1.GatewayClassConfig `yaml:"gatewayClassConfigs"`
 }
 
 func (c *Command) init() {
@@ -144,7 +141,14 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(err.Error())
 		return 1
 	}
-	err = c.deleteV2GatewayClassAndClassConfigs()
+	err = c.deleteV2GatewayClassAndClassConfigs(c.ctx)
+	if err != nil {
+		c.UI.Error(err.Error())
+
+		return 1
+	}
+
+	err = c.deleteV2MeshGateways(c.ctx)
 	if err != nil {
 		c.UI.Error(err.Error())
 
@@ -277,13 +281,13 @@ func (c *Command) loadGatewayConfigs() error {
 	return nil
 }
 
-func (c *Command) deleteV2GatewayClassAndClassConfigs() error {
+func (c *Command) deleteV2GatewayClassAndClassConfigs(ctx context.Context) error {
 	for _, gcc := range c.gatewayConfig.GatewayClassConfigs {
 
 		// find the class config and mark it for deletion first so that we
 		// can do an early return if the gateway class isn't found
 		config := &v2beta1.GatewayClassConfig{}
-		err := c.k8sClient.Get(context.Background(), types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, config)
+		err := c.k8sClient.Get(ctx, types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, config)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				// no gateway class config, just ignore and continue
@@ -298,7 +302,7 @@ func (c *Command) deleteV2GatewayClassAndClassConfigs() error {
 		// find the gateway class
 		gatewayClass := &v2beta1.GatewayClass{}
 		//TODO: NET-6838 To pull the GatewayClassName from the Configmap
-		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, gatewayClass)
+		err = c.k8sClient.Get(ctx, types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, gatewayClass)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				// no gateway class, just ignore and continue
@@ -330,5 +334,22 @@ func (c *Command) deleteV2GatewayClassAndClassConfigs() error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Command) deleteV2MeshGateways(ctx context.Context) error {
+	for _, meshGw := range c.gatewayConfig.MeshGateways {
+		_ = c.k8sClient.Delete(ctx, meshGw)
+
+		err := c.k8sClient.Get(ctx, types.NamespacedName{Name: meshGw.Name, Namespace: meshGw.Namespace}, meshGw)
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				// no gateway, just ignore and continue
+				continue
+			}
+			return err
+		}
+
+	}
 	return nil
 }
