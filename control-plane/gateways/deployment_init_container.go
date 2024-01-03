@@ -11,6 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
@@ -18,6 +19,7 @@ import (
 const (
 	injectInitContainerName      = "consul-mesh-init"
 	initContainersUserAndGroupID = 5996
+	defaultBearerTokenFile       = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
 
 type initContainerCommandData struct {
@@ -51,7 +53,7 @@ func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace
 
 	var bearerTokenFile string
 	if config.AuthMethod != "" {
-		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+		bearerTokenFile = defaultBearerTokenFile
 	}
 
 	// Render the command
@@ -113,7 +115,7 @@ func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace
 		},
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
-		Resources:    corev1.ResourceRequirements{},
+		Resources:    initContainerResourcesOrDefault(b.gcc),
 	}
 
 	if config.AuthMethod != "" {
@@ -169,6 +171,14 @@ func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace
 	}
 
 	return container, nil
+}
+
+func initContainerResourcesOrDefault(gcc *meshv2beta1.GatewayClassConfig) corev1.ResourceRequirements {
+	if gcc != nil && gcc.Spec.Deployment.InitContainer != nil && gcc.Spec.Deployment.InitContainer.Resources != nil {
+		return *gcc.Spec.Deployment.InitContainer.Resources
+	}
+
+	return corev1.ResourceRequirements{}
 }
 
 // initContainerCommandTpl is the template for the command executed by

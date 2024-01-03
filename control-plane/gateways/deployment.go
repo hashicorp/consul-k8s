@@ -32,21 +32,23 @@ func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
 }
 
 func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
-	initContainer, err := b.initContainer(b.config, b.gateway.Name, b.gateway.Namespace)
-	if err != nil {
-		return nil, err
-	}
-
 	var (
-		containerConfig  meshv2beta1.GatewayClassContainerConfig
 		deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
+		containerConfig  meshv2beta1.GatewayClassContainerConfig
 	)
 
+	// If GatewayClassConfig is not nil, use it to override the defaults for
+	// the deployment and container configs.
 	if b.gcc != nil {
 		deploymentConfig = b.gcc.Spec.Deployment
 		if deploymentConfig.Container != nil {
 			containerConfig = *b.gcc.Spec.Deployment.Container
 		}
+	}
+
+	initContainer, err := b.initContainer(b.config, b.gateway.Name, b.gateway.Namespace)
+	if err != nil {
+		return nil, err
 	}
 
 	container, err := consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
