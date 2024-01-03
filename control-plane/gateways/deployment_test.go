@@ -42,7 +42,38 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 				config: GatewayConfig{},
 				gcc: &meshv2beta1.GatewayClassConfig{
 					Spec: meshv2beta1.GatewayClassConfigSpec{
+						GatewayClassAnnotationsAndLabels: meshv2beta1.GatewayClassAnnotationsAndLabels{
+							Labels: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+								Set: map[string]string{
+									"app":      "consul",
+									"chart":    "consul-helm",
+									"heritage": "Helm",
+									"release":  "consul",
+								},
+							},
+						},
 						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
+							Affinity: &corev1.Affinity{
+								PodAntiAffinity: &corev1.PodAntiAffinity{
+									PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+										{
+											Weight: 1,
+											PodAffinityTerm: corev1.PodAffinityTerm{
+												LabelSelector: &metav1.LabelSelector{
+													MatchLabels: map[string]string{
+														labelManagedBy: "consul-k8s",
+														"app":          "consul",
+														"chart":        "consul-helm",
+														"heritage":     "Helm",
+														"release":      "consul",
+													},
+												},
+												TopologyKey: "kubernetes.io/hostname",
+											},
+										},
+									},
+								},
+							},
 							Container: &meshv2beta1.GatewayClassContainerConfig{
 								HostPort:     8080,
 								PortModifier: 8000,
@@ -68,30 +99,46 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 			want: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+						labelManagedBy: "consul-k8s",
+						"app":          "consul",
+						"chart":        "consul-helm",
+						"heritage":     "Helm",
+						"release":      "consul",
 					},
+
+					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: pointer.Int32(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+							labelManagedBy: "consul-k8s",
+							"app":          "consul",
+							"chart":        "consul-helm",
+							"heritage":     "Helm",
+							"release":      "consul",
 						},
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+								labelManagedBy: "consul-k8s",
+								"app":          "consul",
+								"chart":        "consul-helm",
+								"heritage":     "Helm",
+								"release":      "consul",
 							},
+
 							Annotations: map[string]string{
-								constants.AnnotationMeshInject:  "false",
-								constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationMeshInject:                      "false",
+								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 							},
 						},
 						Spec: corev1.PodSpec{
 							Volumes: []corev1.Volume{
 								{
-									Name: "consul-connect-inject-data",
+									Name: "consul-mesh-inject-data",
 									VolumeSource: corev1.VolumeSource{
 										EmptyDir: &corev1.EmptyDirVolumeSource{
 											Medium: "Memory",
@@ -101,11 +148,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							},
 							InitContainers: []corev1.Container{
 								{
-									Name: "consul-connect-inject-init",
+									Name: "consul-mesh-init",
 									Command: []string{
 										"/bin/sh",
 										"-ec",
-										"consul-k8s-control-plane connect-init \\\n  -pod-name=${POD_NAME} \\\n  -pod-namespace=${POD_NAMESPACE} \\\n  -gateway-kind=\"mesh-gateway\" \\\n  -log-json=false \\\n  -service-name=\"\"",
+										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-json=false",
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -166,9 +213,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Resources: corev1.ResourceRequirements{},
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "consul-connect-inject-data",
+											Name:      "consul-mesh-inject-data",
 											ReadOnly:  false,
-											MountPath: "/consul/connect-inject",
+											MountPath: "/consul/mesh-inject",
 										},
 									},
 								},
@@ -179,7 +226,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										"-addresses",
 										"",
 										"-grpc-port=0",
-										"-proxy-service-id-path=/consul/connect-inject/proxyid",
 										"-log-level=",
 										"-log-json=false",
 										"-envoy-concurrency=1",
@@ -200,8 +246,28 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 									Env: []corev1.EnvVar{
 										{
+											Name:  "DP_PROXY_ID",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.name",
+												},
+											},
+										},
+										{
+											Name:  "POD_NAMESPACE",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.namespace",
+												},
+											},
+										},
+										{
 											Name:  "TMPDIR",
-											Value: "/consul/connect-inject",
+											Value: "/consul/mesh-inject",
 										},
 										{
 											Name:  "NODE_NAME",
@@ -212,6 +278,14 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 													FieldPath:  "spec.nodeName",
 												},
 											},
+										},
+										{
+											Name:  "DP_CREDENTIAL_LOGIN_META",
+											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
+										},
+										{
+											Name:  "DP_CREDENTIAL_LOGIN_META1",
+											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
 										},
 										{
 											Name:  "DP_SERVICE_NODE_NAME",
@@ -230,8 +304,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "consul-connect-inject-data",
-											MountPath: "/consul/connect-inject",
+											Name:      "consul-mesh-inject-data",
+											MountPath: "/consul/mesh-inject",
 										},
 									},
 									ReadinessProbe: &corev1.Probe{
@@ -286,7 +360,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											PodAffinityTerm: corev1.PodAffinityTerm{
 												LabelSelector: &metav1.LabelSelector{
 													MatchLabels: map[string]string{
-														"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
+														labelManagedBy: "consul-k8s",
+														"app":          "consul",
+														"chart":        "consul-helm",
+														"heritage":     "Helm",
+														"release":      "consul",
 													},
 												},
 												TopologyKey: "kubernetes.io/hostname",
@@ -320,31 +398,27 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-					},
+					Labels:      defaultLabels,
+					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: pointer.Int32(1),
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-						},
+						MatchLabels: defaultLabels,
 					},
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-							},
+							Labels: defaultLabels,
 							Annotations: map[string]string{
-								constants.AnnotationMeshInject:  "false",
-								constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationMeshInject:                      "false",
+								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 							},
 						},
 						Spec: corev1.PodSpec{
 							Volumes: []corev1.Volume{
 								{
-									Name: "consul-connect-inject-data",
+									Name: "consul-mesh-inject-data",
 									VolumeSource: corev1.VolumeSource{
 										EmptyDir: &corev1.EmptyDirVolumeSource{
 											Medium: "Memory",
@@ -354,11 +428,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							},
 							InitContainers: []corev1.Container{
 								{
-									Name: "consul-connect-inject-init",
+									Name: "consul-mesh-init",
 									Command: []string{
 										"/bin/sh",
 										"-ec",
-										"consul-k8s-control-plane connect-init \\\n  -pod-name=${POD_NAME} \\\n  -pod-namespace=${POD_NAMESPACE} \\\n  -gateway-kind=\"mesh-gateway\" \\\n  -log-json=false \\\n  -service-name=\"\"",
+										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-json=false",
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -419,9 +493,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Resources: corev1.ResourceRequirements{},
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "consul-connect-inject-data",
+											Name:      "consul-mesh-inject-data",
 											ReadOnly:  false,
-											MountPath: "/consul/connect-inject",
+											MountPath: "/consul/mesh-inject",
 										},
 									},
 								},
@@ -432,7 +506,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										"-addresses",
 										"",
 										"-grpc-port=0",
-										"-proxy-service-id-path=/consul/connect-inject/proxyid",
 										"-log-level=",
 										"-log-json=false",
 										"-envoy-concurrency=1",
@@ -452,8 +525,28 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 									Env: []corev1.EnvVar{
 										{
+											Name:  "DP_PROXY_ID",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.name",
+												},
+											},
+										},
+										{
+											Name:  "POD_NAMESPACE",
+											Value: "",
+											ValueFrom: &corev1.EnvVarSource{
+												FieldRef: &corev1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "metadata.namespace",
+												},
+											},
+										},
+										{
 											Name:  "TMPDIR",
-											Value: "/consul/connect-inject",
+											Value: "/consul/mesh-inject",
 										},
 										{
 											Name:  "NODE_NAME",
@@ -464,6 +557,14 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 													FieldPath:  "spec.nodeName",
 												},
 											},
+										},
+										{
+											Name:  "DP_CREDENTIAL_LOGIN_META",
+											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
+										},
+										{
+											Name:  "DP_CREDENTIAL_LOGIN_META1",
+											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
 										},
 										{
 											Name:  "DP_SERVICE_NODE_NAME",
@@ -482,8 +583,8 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
-											Name:      "consul-connect-inject-data",
-											MountPath: "/consul/connect-inject",
+											Name:      "consul-mesh-inject-data",
+											MountPath: "/consul/mesh-inject",
 										},
 									},
 									ReadinessProbe: &corev1.Probe{
@@ -517,25 +618,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Stdin:     false,
 									StdinOnce: false,
 									TTY:       false,
-								},
-							},
-							Affinity: &corev1.Affinity{
-								NodeAffinity: nil,
-								PodAffinity:  nil,
-								PodAntiAffinity: &corev1.PodAntiAffinity{
-									PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-										{
-											Weight: 1,
-											PodAffinityTerm: corev1.PodAffinityTerm{
-												LabelSelector: &metav1.LabelSelector{
-													MatchLabels: map[string]string{
-														"mesh.consul.hashicorp.com/managed-by": "consul-k8s",
-													},
-												},
-												TopologyKey: "kubernetes.io/hostname",
-											},
-										},
-									},
 								},
 							},
 						},

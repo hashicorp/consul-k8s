@@ -22,9 +22,10 @@ func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
 	spec, err := b.deploymentSpec()
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      b.gateway.Name,
-			Namespace: b.gateway.Namespace,
-			Labels:    b.Labels(),
+			Name:        b.gateway.Name,
+			Namespace:   b.gateway.Namespace,
+			Labels:      b.labelsForDeployment(),
+			Annotations: b.annotationsForDeployment(),
 		},
 		Spec: *spec,
 	}, err
@@ -54,17 +55,21 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	}
 
 	return &appsv1.DeploymentSpec{
-		// TODO NET-6721
 		Replicas: deploymentReplicaCount(deploymentConfig.Replicas, nil),
 		Selector: &metav1.LabelSelector{
-			MatchLabels: b.Labels(),
+			MatchLabels: b.labelsForDeployment(),
 		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: b.Labels(),
+				Labels: b.labelsForDeployment(),
 				Annotations: map[string]string{
-					constants.AnnotationMeshInject:  "false",
+					// Indicate that this pod is a mesh gateway pod so that the Pod controller,
+					// consul-k8s CLI, etc. can key off of it
 					constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
+					// It's not logical to add a proxy sidecar since our workload is itself a proxy
+					constants.AnnotationMeshInject: "false",
+					// This functionality only applies when proxy sidecars are used
+					constants.AnnotationTransparentProxyOverwriteProbes: "false",
 				},
 			},
 			Spec: corev1.PodSpec{
@@ -82,27 +87,14 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 				Containers: []corev1.Container{
 					container,
 				},
-				Affinity: &corev1.Affinity{
-					PodAntiAffinity: &corev1.PodAntiAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-							{
-								Weight: 1,
-								PodAffinityTerm: corev1.PodAffinityTerm{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: b.Labels(),
-									},
-									TopologyKey: "kubernetes.io/hostname",
-								},
-							},
-						},
-					},
-				},
+				Affinity:                  deploymentConfig.Affinity,
 				NodeSelector:              deploymentConfig.NodeSelector,
 				PriorityClassName:         deploymentConfig.PriorityClassName,
 				TopologySpreadConstraints: deploymentConfig.TopologySpreadConstraints,
 				HostNetwork:               deploymentConfig.HostNetwork,
 				Tolerations:               deploymentConfig.Tolerations,
 				ServiceAccountName:        b.serviceAccountName(),
+				DNSPolicy:                 deploymentConfig.DNSPolicy,
 			},
 		},
 	}, nil

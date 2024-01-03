@@ -31,6 +31,7 @@ import (
 const (
 	FinalizerName                = "finalizers.consul.hashicorp.com"
 	ConsulAgentError             = "ConsulAgentError"
+	ConsulPatchError             = "ConsulPatchError"
 	ExternallyManagedConfigError = "ExternallyManagedConfigError"
 	MigrationFailedError         = "MigrationFailedError"
 )
@@ -38,8 +39,13 @@ const (
 // Controller is implemented by CRD-specific controllers. It is used by
 // ConfigEntryController to abstract CRD-specific controllers.
 type Controller interface {
-	// Update updates the state of the whole object.
-	Update(context.Context, client.Object, ...client.UpdateOption) error
+	// AddFinalizersPatch creates a patch with the original finalizers with new ones appended to the end.
+	AddFinalizersPatch(obj client.Object, finalizers ...string) *FinalizerPatch
+	// RemoveFinalizersPatch creates a patch to remove a set of finalizers, while preserving the order.
+	RemoveFinalizersPatch(obj client.Object, finalizers ...string) *FinalizerPatch
+	// Patch patches the object. This should only ever be used for updating the metadata of an object, and not object
+	// spec or status. Updating the spec could have unintended consequences such as defaulting zero values.
+	Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error
 	// UpdateStatus updates the state of just the object's status.
 	UpdateStatus(context.Context, client.Object, ...client.SubResourceUpdateOption) error
 	// Get retrieves an obj for the given object key from the Kubernetes Cluster.
@@ -125,7 +131,13 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		// then let's add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
 		if !containsString(configEntry.GetFinalizers(), FinalizerName) {
-			configEntry.AddFinalizer(FinalizerName)
+			addPatch := crdCtrl.AddFinalizersPatch(configEntry, FinalizerName)
+			err := crdCtrl.Patch(ctx, configEntry, addPatch)
+			if err != nil {
+				return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulPatchError,
+					fmt.Errorf("adding finalizer: %w", err))
+			}
+
 			if err := r.syncUnknown(ctx, crdCtrl, configEntry); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -159,8 +171,8 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 				}
 			}
 			// remove our finalizer from the list and update it.
-			configEntry.RemoveFinalizer(FinalizerName)
-			if err := crdCtrl.Update(ctx, configEntry); err != nil {
+			removePatch := crdCtrl.RemoveFinalizersPatch(configEntry, FinalizerName)
+			if err := crdCtrl.Patch(ctx, configEntry, removePatch); err != nil {
 				return ctrl.Result{}, err
 			}
 			logger.Info("finalizer removed")
@@ -355,7 +367,9 @@ func (r *ConfigEntryController) syncSuccessful(ctx context.Context, updater Cont
 
 func (r *ConfigEntryController) syncUnknown(ctx context.Context, updater Controller, configEntry common.ConfigEntryResource) error {
 	configEntry.SetSyncedCondition(corev1.ConditionUnknown, "", "")
-	return updater.Update(ctx, configEntry)
+	timeNow := metav1.NewTime(time.Now())
+	configEntry.SetLastSyncedTime(&timeNow)
+	return updater.UpdateStatus(ctx, configEntry)
 }
 
 func (r *ConfigEntryController) syncUnknownWithError(ctx context.Context,
