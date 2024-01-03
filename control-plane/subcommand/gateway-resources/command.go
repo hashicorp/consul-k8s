@@ -9,7 +9,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"io"
 	"os"
 	"sync"
@@ -35,6 +34,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
