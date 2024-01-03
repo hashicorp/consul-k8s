@@ -69,7 +69,6 @@ data:
             {{- with .Values.meshGateway.dnsPolicy }}
             dnsPolicy: {{ . }}
             {{- end }}
-            priorityClassName: {{ toJson .Values.meshGateway.priorityClassName }}
             {{- if .Values.meshGateway.topologySpreadConstraints }}
             topologySpreadConstraints:
               {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 16 | trim }}
