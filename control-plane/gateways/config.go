@@ -3,7 +3,10 @@
 
 package gateways
 
-import "github.com/hashicorp/consul-k8s/control-plane/api/common"
+import (
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+)
 
 // GatewayConfig is a combination of settings relevant to Gateways.
 type GatewayConfig struct {
@@ -37,4 +40,9 @@ type GatewayConfig struct {
 	// MapPrivilegedServicePorts is the value which Consul will add to privileged container port values (ports < 1024)
 	// defined on a Gateway.
 	MapPrivilegedServicePorts int
+}
+
+type GatewayResources struct {
+	GatewayClassConfigs []*v2beta1.GatewayClassConfig `json:"gatewayClassConfigs"`
+	MeshGateways        []*v2beta1.MeshGateway        `json:"meshGateways"`
 }
