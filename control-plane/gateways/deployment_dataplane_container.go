@@ -203,7 +203,7 @@ func buildTLSArgs(config GatewayConfig) []string {
 	tlsArgs := make([]string, 0, 2)
 
 	if config.ConsulTLSServerName != "" {
-		tlsArgs = append(tlsArgs, "-tls-server-name="+config.ConsulTLSServerName)
+		tlsArgs = append(tlsArgs, fmt.Sprintf("-tls-server-name=%s", config.ConsulTLSServerName))
 	}
 	if config.ConsulCACert != "" {
 		tlsArgs = append(tlsArgs, fmt.Sprintf("-ca-certs=%s", constants.ConsulCAFile))
