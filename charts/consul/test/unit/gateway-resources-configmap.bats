@@ -77,30 +77,30 @@ target=templates/gateway-resources-configmap.yaml
 #--------------------------------------------------------------------
 # Mesh Gateway WAN Address configuration
 
-@test "gatewayresources/ConfigMap: Mesh Gateway WAN Address default annotations" {
+@test "gateway-resources/ConfigMap: Mesh Gateway WAN Address default annotations" {
     cd `chart_dir`
-    local actual=$(helm template \
+    local annotations=$(helm template \
         -s $target \
         --set 'connectInject.enabled=true' \
         --set 'meshGateway.enabled=true' \
         --set 'global.experiments[0]=resource-apis' \
         --set 'ui.enabled=false' \
         . | tee /dev/stderr |
-        yq '.data["config.yaml"]' | yq -r -j '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
+        yq -r '.data["config.yaml"]' | yq -r '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
 
-    local expected=$(echo '{
-        "consul.hashicorp.com/gateway-wan-address-source": "Service",
-        "consul.hashicorp.com/gateway-wan-port": "443",
-        "consul.hashicorp.com/gateway-wan-address-static": ""
-    }' | tee /dev/stderr)
+    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-source"]')
+    [ "${actual}" = 'Service' ]
 
-    local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
-    [ "${equal}" = 'true' ]
+    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-port"]')
+    [ "${actual}" = '443' ]
+
+    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-static"]')
+    [ "${actual}" = '' ]
 }
 
-@test "gatewayresources/ConfigMap: Mesh Gateway WAN Address NodePort annotations" {
+@test "gateway-resources/ConfigMap: Mesh Gateway WAN Address NodePort annotations" {
     cd `chart_dir`
-    local actual=$(helm template \
+    local annotations=$(helm template \
         -s $target \
         --set 'connectInject.enabled=true' \
         --set 'meshGateway.enabled=true' \
@@ -110,21 +110,21 @@ target=templates/gateway-resources-configmap.yaml
         --set 'meshGateway.service.type=NodePort' \
         --set 'meshGateway.service.nodePort=30000' \
         . | tee /dev/stderr |
-        yq '.data["config.yaml"]' | yq -r -j '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
+        yq -r '.data["config.yaml"]' | yq -r '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
 
-    local expected=$(echo '{
-        "consul.hashicorp.com/gateway-wan-address-source": "Service",
-        "consul.hashicorp.com/gateway-wan-port": "30000",
-        "consul.hashicorp.com/gateway-wan-address-static": ""
-    }' | tee /dev/stderr)
+    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-source"]')
+    [ "${actual}" = 'Service' ]
 
-    local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
-    [ "${equal}" = 'true' ]
+    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-port"]')
+    [ "${actual}" = '30000' ]
+
+    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-static"]')
+    [ "${actual}" = '' ]
 }
 
-@test "gatewayresources/ConfigMap: Mesh Gateway WAN Address static configuration" {
+@test "gateway-resources/ConfigMap: Mesh Gateway WAN Address static configuration" {
     cd `chart_dir`
-    local actual=$(helm template \
+    local annotations=$(helm template \
         -s $target \
         --set 'connectInject.enabled=true' \
         --set 'meshGateway.enabled=true' \
@@ -133,15 +133,15 @@ target=templates/gateway-resources-configmap.yaml
         --set 'meshGateway.wanAddress.source=Static' \
         --set 'meshGateway.wanAddress.static=127.0.0.1' \
         . | tee /dev/stderr |
-        yq '.data["config.yaml"]' | yq -r -j '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
+        yq -r '.data["config.yaml"]' | yq -r '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
 
-    local expected=$(echo '{
-        "consul.hashicorp.com/gateway-wan-address-source": "Static",
-        "consul.hashicorp.com/gateway-wan-port": "443",
-        "consul.hashicorp.com/gateway-wan-address-static": "127.0.0.1"
-    }' | tee /dev/stderr)
+    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-source"]')
+    [ "${actual}" = 'Static' ]
 
-    local equal=$(jq -n --argjson a "$actual" --argjson b "$expected" '$a == $b')
-    [ "${equal}" = 'true' ]
+    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-port"]')
+    [ "${actual}" = '443' ]
+
+    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-static"]')
+    [ "${actual}" = '127.0.0.1' ]
 }
 
