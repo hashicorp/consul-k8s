@@ -46,7 +46,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		}
 	}
 
-	initContainer, err := b.initContainer(b.config, b.gateway.Name, b.gateway.Namespace)
+	initContainer, err := b.initContainer()
 	if err != nil {
 		return nil, err
 	}

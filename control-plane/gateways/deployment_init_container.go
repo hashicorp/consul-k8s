@@ -34,13 +34,13 @@ type initContainerCommandData struct {
 
 // initContainer returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace string) (corev1.Container, error) {
+func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 	data := initContainerCommandData{
-		AuthMethod:         config.AuthMethod,
-		LogLevel:           config.LogLevel,
-		LogJSON:            config.LogJSON,
-		ServiceName:        name,
-		ServiceAccountName: name,
+		AuthMethod:         b.config.AuthMethod,
+		LogLevel:           b.config.LogLevel,
+		LogJSON:            b.config.LogJSON,
+		ServiceName:        b.gateway.Name,
+		ServiceAccountName: b.gateway.Name,
 	}
 
 	// Create expected volume mounts
@@ -52,7 +52,7 @@ func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace
 	}
 
 	var bearerTokenFile string
-	if config.AuthMethod != "" {
+	if b.config.AuthMethod != "" {
 		bearerTokenFile = defaultBearerTokenFile
 	}
 
@@ -64,12 +64,12 @@ func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace
 		return corev1.Container{}, err
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.ConsulDestinationNamespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.NSMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(b.gateway.Namespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
 
 	initContainerName := injectInitContainerName
 	container := corev1.Container{
 		Name:  initContainerName,
-		Image: config.ImageConsulK8S,
+		Image: b.config.ImageConsulK8S,
 
 		Env: []corev1.EnvVar{
 			{
@@ -94,19 +94,19 @@ func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace
 			},
 			{
 				Name:  "CONSUL_ADDRESSES",
-				Value: config.ConsulConfig.Address,
+				Value: b.config.ConsulConfig.Address,
 			},
 			{
 				Name:  "CONSUL_GRPC_PORT",
-				Value: strconv.Itoa(config.ConsulConfig.GRPCPort),
+				Value: strconv.Itoa(b.config.ConsulConfig.GRPCPort),
 			},
 			{
 				Name:  "CONSUL_HTTP_PORT",
-				Value: strconv.Itoa(config.ConsulConfig.HTTPPort),
+				Value: strconv.Itoa(b.config.ConsulConfig.HTTPPort),
 			},
 			{
 				Name:  "CONSUL_API_TIMEOUT",
-				Value: config.ConsulConfig.APITimeout.String(),
+				Value: b.config.ConsulConfig.APITimeout.String(),
 			},
 			{
 				Name:  "CONSUL_NODE_NAME",
@@ -118,11 +118,11 @@ func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace
 		Resources:    initContainerResourcesOrDefault(b.gcc),
 	}
 
-	if config.AuthMethod != "" {
+	if b.config.AuthMethod != "" {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_AUTH_METHOD",
-				Value: config.AuthMethod,
+				Value: b.config.AuthMethod,
 			},
 			corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
@@ -133,10 +133,10 @@ func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace
 				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 			})
 
-		if config.ConsulTenancyConfig.ConsulPartition != "" {
+		if b.config.ConsulTenancyConfig.ConsulPartition != "" {
 			container.Env = append(container.Env, corev1.EnvVar{
 				Name:  "CONSUL_LOGIN_PARTITION",
-				Value: config.ConsulTenancyConfig.ConsulPartition,
+				Value: b.config.ConsulTenancyConfig.ConsulPartition,
 			})
 		}
 	}
@@ -162,11 +162,11 @@ func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace
 			})
 	}
 
-	if config.ConsulTenancyConfig.ConsulPartition != "" {
+	if b.config.ConsulTenancyConfig.ConsulPartition != "" {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
 				Name:  "CONSUL_PARTITION",
-				Value: config.ConsulTenancyConfig.ConsulPartition,
+				Value: b.config.ConsulTenancyConfig.ConsulPartition,
 			})
 	}
 
