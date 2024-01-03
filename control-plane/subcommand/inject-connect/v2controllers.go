@@ -6,8 +6,6 @@ package connectinject
 import (
 	"context"
 
-	"github.com/hashicorp/consul-k8s/control-plane/gateways"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -24,7 +22,10 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/namespace"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhookv2"
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	namespacev2 "github.com/hashicorp/consul-k8s/control-plane/tenancy/namespace"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 )
 
 func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
@@ -109,8 +110,10 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if c.flagEnableNamespaces {
-		err := (&namespace.Controller{
+	if c.flagV2Tenancy {
+		// V2 tenancy implies non-default namespaces in CE, so we don't observe flagEnableNamespaces
+		// TODO: Maybe print out a warning if c.flagEnableNamespaces == false?
+		err := (&namespacev2.Controller{
 			Client:                     mgr.GetClient(),
 			ConsulClientConfig:         consulConfig,
 			ConsulServerConnMgr:        watcher,
@@ -120,11 +123,30 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 			EnableNSMirroring:          c.flagEnableK8SNSMirroring,
 			NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-			Log:                        ctrl.Log.WithName("controller").WithName("namespace"),
+			Log:                        ctrl.Log.WithName("controller").WithName("namespacev2"),
 		}).SetupWithManager(mgr)
 		if err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", namespace.Controller{})
+			setupLog.Error(err, "unable to create controller", "controller", "namespacev2")
 			return err
+		}
+	} else {
+		if c.flagEnableNamespaces {
+			err := (&namespace.Controller{
+				Client:                     mgr.GetClient(),
+				ConsulClientConfig:         consulConfig,
+				ConsulServerConnMgr:        watcher,
+				AllowK8sNamespacesSet:      allowK8sNamespaces,
+				DenyK8sNamespacesSet:       denyK8sNamespaces,
+				ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+				EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+				NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+				CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+				Log:                        ctrl.Log.WithName("controller").WithName("namespace"),
+			}).SetupWithManager(mgr)
+			if err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", namespace.Controller{})
+				return err
+			}
 		}
 	}
 
