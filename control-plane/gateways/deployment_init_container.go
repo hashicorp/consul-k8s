@@ -45,7 +45,7 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 	volMounts := []corev1.VolumeMount{
 		{
 			Name:      volumeName,
-			MountPath: constants.ProxyIDVolumePath,
+			MountPath: constants.MeshV2VolumePath,
 		},
 	}
 
@@ -142,6 +142,22 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 			Name:  "CONSUL_NAMESPACE",
 			Value: consulNamespace,
 		})
+
+	if config.TLSEnabled {
+		container.Env = append(container.Env,
+			corev1.EnvVar{
+				Name:  "CONSUL_USE_TLS",
+				Value: "true",
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_CACERT_PEM",
+				Value: config.ConsulCACert,
+			},
+			corev1.EnvVar{
+				Name:  "CONSUL_TLS_SERVER_NAME",
+				Value: config.ConsulTLSServerName,
+			})
+	}
 
 	if config.ConsulTenancyConfig.ConsulPartition != "" {
 		container.Env = append(container.Env,
