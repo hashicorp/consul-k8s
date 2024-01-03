@@ -420,6 +420,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 			name: "happy path tls enabled",
 			fields: fields{
 				gateway: &meshv2beta1.MeshGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							constants.AnnotationGatewayWANSource:  "Service",
+							constants.AnnotationGatewayWANPort:    "443",
+							constants.AnnotationGatewayWANAddress: "",
+						},
+					},
 					Spec: pbmesh.MeshGateway{
 						GatewayClassName: "test-gateway-class",
 					},
@@ -516,11 +523,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"heritage":     "Helm",
 								"release":      "consul",
 							},
-
 							Annotations: map[string]string{
 								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
 								constants.AnnotationTransparentProxyOverwriteProbes: "false",
+								constants.AnnotationGatewayWANSource:                "Service",
+								constants.AnnotationGatewayWANPort:                  "443",
+								constants.AnnotationGatewayWANAddress:               "",
 							},
 						},
 						Spec: corev1.PodSpec{
