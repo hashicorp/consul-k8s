@@ -30,9 +30,9 @@ type initContainerCommandData struct {
 	LogJSON  bool
 }
 
-// containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
+// initContainer returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func initContainer(config GatewayConfig, name, namespace string) (corev1.Container, error) {
+func (b *meshGatewayBuilder) initContainer(config GatewayConfig, name, namespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         config.AuthMethod,
 		LogLevel:           config.LogLevel,
@@ -113,6 +113,7 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 		},
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
+		Resources:    corev1.ResourceRequirements{},
 	}
 
 	if config.AuthMethod != "" {
