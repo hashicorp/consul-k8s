@@ -245,6 +245,12 @@ func (c *TestConfig) SkipWhenOpenshiftAndCNI(t *testing.T) {
 	}
 }
 
+func (c *TestConfig) SkipWhenCNI(t *testing.T) {
+	if c.EnableCNI {
+		t.Skip("skipping because -enable-cni is set and doesn't apply to this accepatance test")
+	}
+}
+
 // setIfNotEmpty sets key to val in map m if value is not empty.
 func setIfNotEmpty(m map[string]string, key, val string) {
 	if val != "" {
