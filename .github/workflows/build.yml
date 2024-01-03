@@ -10,6 +10,8 @@ on:
       - main
       # Push events to branches matching refs/heads/release/**
       - "release/**"
+      # Build on releng branches for testing build pipelines
+      - "releng/**"
 
 env:
   PKG_NAME: "consul-k8s"
@@ -21,7 +23,7 @@ jobs:
     outputs:
       go-version: ${{ steps.get-go-version.outputs.go-version }}
     steps:
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
       - name: Determine Go version
         id: get-go-version
         # We use .go-version as our source of truth for current Go
@@ -35,7 +37,7 @@ jobs:
     outputs:
       product-version: ${{ steps.get-product-version.outputs.product-version }}
     steps:
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
       - name: get product version
         id: get-product-version
         run: |
@@ -49,7 +51,7 @@ jobs:
       filepath: ${{ steps.generate-metadata-file.outputs.filepath }}
     steps:
       - name: "Checkout directory"
-        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
       - name: Generate metadata file
         id: generate-metadata-file
         uses: hashicorp/actions-generate-metadata@v1
@@ -68,12 +70,12 @@ jobs:
     strategy:
       matrix:
         include:
-        # cli 
+        # cli (We aren't build packages for the linux 32-bit platforms)
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s"}
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", "skip_packaging": "true"}
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" }
@@ -121,10 +123,10 @@ jobs:
 
     name: Go ${{ matrix.go }} ${{ matrix.goos }} ${{ matrix.goarch }} ${{ matrix.component }} ${{ matrix.fips }} build
     steps:
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
 
       - name: Setup go
-        uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
+        uses: actions/setup-go@fac708d6674e30b6ba41289acaab6d4b75aa0753 # v4.0.1
         with:
           go-version: ${{ matrix.go }}
 
@@ -142,7 +144,7 @@ jobs:
             exit 1
           fi
 
-      - name: Install cross-compiler for FIPS on arm
+      - name: Install cross-compiler for FIPS on arm64
         if: ${{ matrix.fips == '+fips1402' && matrix.goarch == 'arm64' }}
         run: |
           sudo apt-get update --allow-releaseinfo-change-suite --allow-releaseinfo-change-version && sudo apt-get install -y gcc-aarch64-linux-gnu
@@ -170,8 +172,8 @@ jobs:
           name: ${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
           path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
             
-      - name: Package rpm and deb files 
-        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+      - name: Package rpm and deb files
+        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
         uses: hashicorp/actions-packaging-linux@v1
         with:
           name: consul-k8s${{ matrix.pkg_suffix }}
@@ -186,21 +188,26 @@ jobs:
           rpm_depends: "openssl"
 
       - name: Set package names
-        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
         run: |
           echo "RPM_PACKAGE=$(basename out/*.rpm)" >> $GITHUB_ENV
           echo "DEB_PACKAGE=$(basename out/*.deb)" >> $GITHUB_ENV
 
-      - name: Test rpm package
-        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
-        uses: addnab/docker-run-action@v3  # TSCCR: no entry for repository "addnab/docker-run-action"
+      - name: Enable docker runtime emulation for testing packages
+        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true' && matrix.goarch != 'amd64'
+        run: |
+          docker run --privileged \
+                     --rm \
+                     docker.mirror.hashicorp.services/tonistiigi/binfmt@sha256:5540f38542290735d17da57d7084f684c62336105d018c605058daf03e4c8256 --install ${{ matrix.goarch }}
+
+      - name: Test rpm package on platforms on UBI
+        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
+        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
           image: registry.access.redhat.com/ubi9/ubi:latest
-          options: -v ${{ github.workspace }}:/work
+          options: -v ${{ github.workspace }}:/work --platform linux/${{matrix.goarch}}
           run: |
-            dnf install -qy openssl
-            cd /work
-            rpm -ivh out/${{ env.RPM_PACKAGE }}
+            dnf install -y /work/out/${{ env.RPM_PACKAGE }}
             CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
             VERSION="v${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}"
             if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
@@ -211,21 +218,20 @@ jobs:
 
       - name: Upload rpm package
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
-        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
         with:
           name: ${{ env.RPM_PACKAGE }}
           path: out/${{ env.RPM_PACKAGE }}
 
       - name: Test debian package
-        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
-        uses: addnab/docker-run-action@v3  # TSCCR: no entry for repository "addnab/docker-run-action"
+        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
+        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
           image: ubuntu:latest
-          options: -v ${{ github.workspace }}:/work
+          options: -v ${{ github.workspace }}:/work --platform linux/${{matrix.goarch}}
           run: |
-            apt update && apt install -y openssl
-            cd /work
-            apt install ./out/${{ env.DEB_PACKAGE }}
+            apt-get update -qq
+            apt-get install -y /work/out/${{ env.DEB_PACKAGE }}
             CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
             VERSION="v${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}"
             if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
@@ -236,7 +242,7 @@ jobs:
 
       - name: Upload debian packages 
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
-        if: ${{ matrix.goos == 'linux' && matrix.component == 'cli' && matrix.goarch == 'amd64'}}
+        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
         with:
           name: ${{ env.DEB_PACKAGE }}
           path: out/${{ env.DEB_PACKAGE }}
@@ -258,7 +264,7 @@ jobs:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
     steps:
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
       - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos}}_${{ matrix.goarch }}.zip
@@ -345,7 +351,7 @@ jobs:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
     steps:
-      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
       - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_linux_${{ matrix.arch }}.zip
