@@ -186,18 +186,7 @@ func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile st
 		args = append(args, "-service-partition="+config.ConsulTenancyConfig.ConsulPartition)
 	}
 
-	tlsArgs := []string{"-tls-disabled"}
-	if config.TLSEnabled {
-		tlsArgs = make([]string, 0, 2)
-
-		if config.ConsulTLSServerName != "" {
-			tlsArgs = append(args, "-tls-server-name="+config.ConsulTLSServerName)
-		}
-		if config.ConsulCACert != "" {
-			tlsArgs = append(tlsArgs, fmt.Sprintf("-ca-certs=%s", constants.ConsulCAFile))
-		}
-	}
-	args = append(args, tlsArgs...)
+	args = append(args, buildTLSArgs(config)...)
 
 	// Configure the readiness port on the dataplane sidecar if proxy health checks are enabled.
 	args = append(args, fmt.Sprintf("%s=%d", "-envoy-ready-bind-port", constants.ProxyDefaultHealthPort))
@@ -205,4 +194,20 @@ func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile st
 	args = append(args, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000))
 
 	return args, nil
+}
+
+func buildTLSArgs(config GatewayConfig) []string {
+	if !config.TLSEnabled {
+		return []string{"-tls-disabled"}
+	}
+	tlsArgs := make([]string, 0, 2)
+
+	if config.ConsulTLSServerName != "" {
+		tlsArgs = append(tlsArgs, "-tls-server-name="+config.ConsulTLSServerName)
+	}
+	if config.ConsulCACert != "" {
+		tlsArgs = append(tlsArgs, fmt.Sprintf("-ca-certs=%s", constants.ConsulCAFile))
+	}
+
+	return tlsArgs
 }
