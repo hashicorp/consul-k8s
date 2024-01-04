@@ -4,26 +4,25 @@
 package gateways
 
 import (
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
-
-const port = int32(443)
 
 func (b *meshGatewayBuilder) Service() *corev1.Service {
 	var (
-		containerConfig *meshv2beta1.GatewayClassContainerConfig
 		portModifier    = int32(0)
+		port            = int32(443)
 		serviceType     = corev1.ServiceType("")
+		containerConfig *meshv2beta1.GatewayClassContainerConfig
 	)
 
 	if b.gcc != nil {
 		containerConfig = b.gcc.Spec.Deployment.Container
 		portModifier = containerConfig.PortModifier
 		serviceType = *b.gcc.Spec.Service.Type
+		port = b.gcc.Spec.Service.Port
 	}
 
 	return &corev1.Service{

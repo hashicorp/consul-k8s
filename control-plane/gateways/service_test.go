@@ -56,6 +56,7 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 						},
 						Service: meshv2beta1.GatewayClassServiceConfig{
 							Type: &lbType,
+							Port: int32(443),
 						},
 					},
 				},

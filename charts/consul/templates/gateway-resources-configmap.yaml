@@ -95,6 +95,7 @@ data:
               set: {{ toJson .Values.meshGateway.service.annotations }}
             {{- end }}
             type: {{ .Values.meshGateway.service.type }}
+            port: {{ .Values.meshGateway.service.port }}
           {{- if .Values.meshGateway.serviceAccount.annotations }}
           serviceAccount:
             annotations:

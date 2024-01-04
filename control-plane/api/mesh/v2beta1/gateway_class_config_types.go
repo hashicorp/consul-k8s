@@ -125,6 +125,9 @@ type GatewayClassServiceConfig struct {
 	// Type specifies the type of Service to use (LoadBalancer, ClusterIP, etc.)
 	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
 	Type *corev1.ServiceType `json:"type,omitempty"`
+
+	// Port specifies the WAN port for the mesh-gateway service registration
+	Port int32 `json:"port,omitempty"`
 }
 
 type GatewayClassServiceAccountConfig struct {
