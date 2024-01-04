@@ -79,7 +79,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 			},
 			{
 				Name:  "TMPDIR",
-				Value: constants.ProxyIDVolumePath,
+				Value: constants.MeshV2VolumePath,
 			},
 			{
 				Name: "NODE_NAME",
@@ -105,7 +105,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      volumeName,
-				MountPath: constants.ProxyIDVolumePath,
+				MountPath: constants.MeshV2VolumePath,
 			},
 		},
 		Args:           args,
@@ -186,7 +186,7 @@ func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile st
 		args = append(args, "-service-partition="+config.ConsulTenancyConfig.ConsulPartition)
 	}
 
-	args = append(args, "-tls-disabled")
+	args = append(args, buildTLSArgs(config)...)
 
 	// Configure the readiness port on the dataplane sidecar if proxy health checks are enabled.
 	args = append(args, fmt.Sprintf("%s=%d", "-envoy-ready-bind-port", constants.ProxyDefaultHealthPort))
@@ -194,4 +194,20 @@ func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile st
 	args = append(args, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000))
 
 	return args, nil
+}
+
+func buildTLSArgs(config GatewayConfig) []string {
+	if !config.TLSEnabled {
+		return []string{"-tls-disabled"}
+	}
+	tlsArgs := make([]string, 0, 2)
+
+	if config.ConsulTLSServerName != "" {
+		tlsArgs = append(tlsArgs, fmt.Sprintf("-tls-server-name=%s", config.ConsulTLSServerName))
+	}
+	if config.ConsulCACert != "" {
+		tlsArgs = append(tlsArgs, fmt.Sprintf("-ca-certs=%s", constants.ConsulCAFile))
+	}
+
+	return tlsArgs
 }
