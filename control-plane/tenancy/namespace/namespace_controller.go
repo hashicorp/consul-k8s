@@ -41,16 +41,16 @@ type Controller struct {
 	// all config entries in. If EnableNSMirroring is true this is ignored.
 	ConsulDestinationNamespace string
 
-	// EnableNSMirroring causes Consul namespaces to be created to match the
+	// MirroringK8s causes Consul namespaces to be created to match the
 	// k8s namespace of any config entry custom resource. Config entries will
 	// be created in the matching Consul namespace.
-	EnableNSMirroring bool
+	MirroringK8s bool
 
-	// NSMirroringPrefix is an optional prefix that can be added to the Consul
+	// MirroringK8sPrefix is an optional prefix that can be added to the Consul
 	// namespaces created while mirroring. For example, if it is set to "k8s-",
 	// then the k8s `default` namespace will be mirrored in Consul's
 	// `k8s-default` namespace.
-	NSMirroringPrefix string
+	MirroringK8sPrefix string
 
 	// CrossNamespaceACLPolicy is the name of the ACL policy to attach to
 	// any created Consul namespaces to allow cross namespace service discovery.
@@ -86,7 +86,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// we need to remove the Namespace from Consul.
 	if k8serrors.IsNotFound(err) {
 		// if we are using a destination namespace, NEVER delete it.
-		if !r.EnableNSMirroring {
+		if !r.MirroringK8s {
 			return ctrl.Result{}, nil
 		}
 
@@ -126,8 +126,8 @@ func (r *Controller) consulNamespaceFor(kubeNamespace string) string {
 		kubeNamespace,
 		true,
 		r.ConsulDestinationNamespace,
-		r.EnableNSMirroring,
-		r.NSMirroringPrefix,
+		r.MirroringK8s,
+		r.MirroringK8sPrefix,
 	)
 
 	// TODO: remove this if and when the default namespace of resources change.

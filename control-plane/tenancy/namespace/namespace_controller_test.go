@@ -6,84 +6,230 @@ package namespace
 import (
 	"context"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
 	"github.com/hashicorp/consul/sdk/testutil"
 )
 
-const (
-	testNamespaceName  = "foo"
-	testCrossACLPolicy = "cross-namespace-policy"
-)
+// TODO: split into ent (non-default partition) and non-ent tests
 
-// Tests deleting a Namespace object, with and without matching Consul resources.
-func TestReconcileDeleteNamespace(t *testing.T) {
-	//t.Parallel()
+// TestReconcileCreateNamespace ensures that a new k8s namespace is reconciled to a
+// Consul namespace. The actual namespace in Consul depends on if the controller
+// is configured with a destination namespace or mirroring enabled.
+func TestReconcileCreateNamespace(t *testing.T) {
+	t.Parallel()
 
 	type testCase struct {
-		name              string
-		kubeNamespaceName string // this will default to "foo"
-		partition         string
-
-		destinationNamespace string
-		enableNSMirroring    bool
-		nsMirrorPrefix       string
-
-		existingConsulNamespace string
-		expectedConsulNamespace string
-		//existingConsulNamespace *capi.Namespace
-		//expectedConsulNamespace *capi.Namespace
+		name                       string
+		kubeNamespace              string
+		partition                  string
+		consulDestinationNamespace string
+		mirroringK8s               bool
+		mirroringK8sPrefix         string
+		expectedConsulNamespace    string
 	}
 
 	run := func(t *testing.T, tc testCase) {
-		fakeClient := fake.NewClientBuilder().WithRuntimeObjects().Build()
+		// Create the default kube namespace and kube namespace under test.
+		kubeNS := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: tc.kubeNamespace}}
+		kubeDefaultNS := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: metav1.NamespaceDefault}}
+		kubeObjects := []runtime.Object{
+			&kubeNS,
+			&kubeDefaultNS,
+		}
+		fakeClient := fake.NewClientBuilder().WithRuntimeObjects(kubeObjects...).Build()
 
-		// Create test consulServer server.
+		// Fire up consul server with v2tenancy enabled
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis", "v2tenancy"}
 		})
 
-		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-		require.NoError(t, err)
-
-		// Create the partition
+		// Create partition if needed
+		testClient.Cfg.APIClientConfig.Partition = tc.partition
 		if tc.partition != "" && tc.partition != "default" {
-			testClient.Cfg.APIClientConfig.Partition = tc.partition
-
-			_, err := resourceClient.Write(context.Background(), &pbresource.WriteRequest{Resource: &pbresource.Resource{
+			_, err := testClient.ResourceClient.Write(context.Background(), &pbresource.WriteRequest{Resource: &pbresource.Resource{
 				Id: &pbresource.ID{
 					Name: tc.partition,
 					Type: pbtenancy.PartitionType,
 				},
 			}})
 			require.NoError(t, err, "failed to create partition")
-			// TODO: require.ResourceExists()
 		}
 
-		// Create the namespace
-		if tc.existingConsulNamespace != "" && tc.existingConsulNamespace != "default" {
-			_, err = resourceClient.Write(context.Background(), &pbresource.WriteRequest{Resource: &pbresource.Resource{
+		// Create the namespace controller injecting config from tc
+		nc := &Controller{
+			Client:                     fakeClient,
+			Log:                        logrtest.New(t),
+			ConsulClientConfig:         testClient.Cfg,
+			ConsulServerConnMgr:        testClient.Watcher,
+			AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
+			DenyK8sNamespacesSet:       mapset.NewSetWith(),
+			MirroringK8s:               tc.mirroringK8s,
+			MirroringK8sPrefix:         tc.mirroringK8sPrefix,
+			ConsulDestinationNamespace: tc.consulDestinationNamespace,
+		}
+
+		// Reconcile the kube namespace under test
+		resp, err := nc.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name: tc.kubeNamespace,
+			},
+		})
+		require.NoError(t, err)
+		require.False(t, resp.Requeue)
+
+		// Verify consul namespace exists or was created during reconciliation
+		_, err = testClient.ResourceClient.Read(context.Background(), &pbresource.ReadRequest{
+			Id: &pbresource.ID{
+				Name:    tc.expectedConsulNamespace,
+				Type:    pbtenancy.NamespaceType,
+				Tenancy: &pbresource.Tenancy{Partition: tc.partition},
+			},
+		})
+		require.NoError(t, err, "expected partition/namespace %s/%s to exist", tc.partition, tc.expectedConsulNamespace)
+	}
+
+	testCases := []testCase{
+		{
+			name:                       "destination consul namespace is default/default",
+			kubeNamespace:              "kube-ns1",
+			partition:                  constants.DefaultConsulPartition,
+			mirroringK8s:               false,
+			consulDestinationNamespace: constants.DefaultConsulNS,
+			expectedConsulNamespace:    constants.DefaultConsulNS,
+		},
+		{
+			name:                       "destination consul namespace is default/ns1",
+			kubeNamespace:              "kube-ns1",
+			partition:                  constants.DefaultConsulPartition,
+			mirroringK8s:               false,
+			consulDestinationNamespace: "ns1",
+			expectedConsulNamespace:    "ns1",
+		},
+		{
+			name:                       "destination consul namespace is ap1/ns1",
+			kubeNamespace:              "kube-ns1",
+			partition:                  "ap1",
+			mirroringK8s:               false,
+			consulDestinationNamespace: "ns1",
+			expectedConsulNamespace:    "ns1",
+		},
+		{
+			name:                    "mirrored consul namespace is default/ns1",
+			kubeNamespace:           "ns1",
+			partition:               constants.DefaultConsulPartition,
+			mirroringK8s:            true,
+			expectedConsulNamespace: "ns1",
+		},
+		{
+			name:                    "mirrored consul namespace is ap1/ns1",
+			kubeNamespace:           "ns1",
+			partition:               "ap1",
+			mirroringK8s:            true,
+			expectedConsulNamespace: "ns1",
+		},
+		{
+			name:                    "mirrored consul namespace with prefix to default/k8s-ns1",
+			kubeNamespace:           "ns1",
+			partition:               constants.DefaultConsulPartition,
+			mirroringK8s:            true,
+			mirroringK8sPrefix:      "k8s-",
+			expectedConsulNamespace: "k8s-ns1",
+		},
+		{
+			name:                    "mirrored namespaces with prefix to ap1/k8s-ns1",
+			kubeNamespace:           "ns1",
+			partition:               "ap1",
+			mirroringK8s:            true,
+			mirroringK8sPrefix:      "k8s-",
+			expectedConsulNamespace: "k8s-ns1",
+		},
+		{
+			name:                       "mirrored namespaces overrides destination namespace",
+			kubeNamespace:              "ns1",
+			partition:                  constants.DefaultConsulPartition,
+			mirroringK8s:               true,
+			consulDestinationNamespace: "ns2",
+			expectedConsulNamespace:    "ns1",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			run(t, tc)
+		})
+	}
+}
+
+// Tests deleting a Namespace object, with and without matching Consul namespace.
+func TestReconcileDeleteNamespace(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		name                       string
+		kubeNamespace              string
+		partition                  string
+		consulDestinationNamespace string
+		mirroringK8s               bool
+		mirroringK8sPrefix         string
+		existingConsulNamespace    string // If non-empty, this namespace is created in consul pre-reconcile
+
+		// Pick one
+		expectNamespaceExists  string // If non-empty, this namespace should exist in consul post-reconcile
+		expectNamespaceDeleted string // If non-empty, this namespace should not exist in consul post-reconcile
+	}
+
+	run := func(t *testing.T, tc testCase) {
+		// Don't seed with any kube namespaces since we're testing deletion.
+		fakeClient := fake.NewClientBuilder().WithRuntimeObjects().Build()
+
+		// Fire up consul server with v2tenancy enabled
+		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+			c.Experiments = []string{"resource-apis", "v2tenancy"}
+		})
+
+		// Create partition if needed
+		testClient.Cfg.APIClientConfig.Partition = tc.partition
+		if tc.partition != "" && tc.partition != "default" {
+			_, err := testClient.ResourceClient.Write(context.Background(), &pbresource.WriteRequest{Resource: &pbresource.Resource{
 				Id: &pbresource.ID{
-					Name:    tc.existingConsulNamespace,
-					Type:    pbtenancy.NamespaceType,
-					Tenancy: &pbresource.Tenancy{Partition: tc.partition},
+					Name: tc.partition,
+					Type: pbtenancy.PartitionType,
 				},
 			}})
+			require.NoError(t, err, "failed to create partition")
+		}
+
+		// Create the consul namespace if needed
+		if tc.existingConsulNamespace != "" && tc.existingConsulNamespace != "default" {
+			id := &pbresource.ID{
+				Name:    tc.existingConsulNamespace,
+				Type:    pbtenancy.NamespaceType,
+				Tenancy: &pbresource.Tenancy{Partition: tc.partition},
+			}
+
+			rsp, err := testClient.ResourceClient.Write(context.Background(), &pbresource.WriteRequest{Resource: &pbresource.Resource{Id: id}})
 			require.NoError(t, err, "failed to create namespace")
-			// TODO: require.ResourceExists()
+
+			// TODO: Remove after https://hashicorp.atlassian.net/browse/NET-6719 implemented
+			RequireEventuallyAccepted(t, testClient.ResourceClient, rsp.Resource.Id)
 		}
 
 		// Create the namespace controller.
@@ -94,95 +240,130 @@ func TestReconcileDeleteNamespace(t *testing.T) {
 			ConsulServerConnMgr:        testClient.Watcher,
 			AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
 			DenyK8sNamespacesSet:       mapset.NewSetWith(),
-			EnableNSMirroring:          tc.enableNSMirroring,
-			NSMirroringPrefix:          tc.nsMirrorPrefix,
-			ConsulDestinationNamespace: tc.destinationNamespace,
+			MirroringK8s:               tc.mirroringK8s,
+			MirroringK8sPrefix:         tc.mirroringK8sPrefix,
+			ConsulDestinationNamespace: tc.consulDestinationNamespace,
 		}
 
-		if tc.kubeNamespaceName == "" {
-			tc.kubeNamespaceName = testNamespaceName
-		}
-
-		namespacedName := types.NamespacedName{
-			Name: tc.kubeNamespaceName,
-		}
-
+		// Reconcile the kube namespace under test - imagine it has just been deleted
 		resp, err := nc.Reconcile(context.Background(), ctrl.Request{
-			NamespacedName: namespacedName,
+			NamespacedName: types.NamespacedName{
+				Name: tc.kubeNamespace,
+			},
 		})
 		require.NoError(t, err)
 		require.False(t, resp.Requeue)
 
-		if tc.existingConsulNamespace != "" {
-			expectedNamespaceMatches2(t, resourceClient, tc.partition, tc.existingConsulNamespace, tc.expectedConsulNamespace)
+		// Verify appropriate action was taken on the counterpart consul namespace
+		if tc.expectNamespaceExists != "" {
+			// Verify consul namespace was not deleted
+			_, err = testClient.ResourceClient.Read(context.Background(), &pbresource.ReadRequest{
+				Id: &pbresource.ID{
+					Name:    tc.expectNamespaceExists,
+					Type:    pbtenancy.NamespaceType,
+					Tenancy: &pbresource.Tenancy{Partition: tc.partition},
+				},
+			})
+			require.NoError(t, err, "expected partition/namespace %s/%s to exist", tc.partition, tc.expectNamespaceExists)
+		} else if tc.expectNamespaceDeleted != "" {
+			// Verify consul namespace was deleted
+			id := &pbresource.ID{
+				Name:    tc.expectNamespaceDeleted,
+				Type:    pbtenancy.NamespaceType,
+				Tenancy: &pbresource.Tenancy{Partition: tc.partition},
+			}
+			RequireEventuallyNotFound(t, testClient.ResourceClient, id)
 		} else {
-			expectedNamespaceMatches2(t, resourceClient, tc.partition, testNamespaceName, tc.expectedConsulNamespace)
+			panic("tc.expectedNamespaceExists or tc.expectedNamespaceDeleted must be set")
 		}
 	}
 
 	testCases := []testCase{
-		// {
-		// 	name:                    "destination namespace with default is not cleaned up",
-		// 	partition:               "default",
-		// 	existingConsulNamespace: "default",
-		// 	expectedConsulNamespace: "default",
-		// },
-		// {
-		// 	name:                    "destination namespace with non-default is not cleaned up",
-		// 	partition:               "default",
-		// 	destinationNamespace:    "ns1",
-		// 	existingConsulNamespace: "ns1",
-		// 	expectedConsulNamespace: "ns1",
-		// },
-		// {
-		// 	name:                    "destination namespace with non-default is not cleaned up, non-default partition",
-		// 	partition:               "ap1",
-		// 	destinationNamespace:    "ns1",
-		// 	existingConsulNamespace: "ns1",
-		// 	expectedConsulNamespace: "ns1",
-		// },
+		{
+			name:                       "destination namespace is default and not cleaned up when kube namespace is deleted",
+			kubeNamespace:              "ns1",
+			partition:                  "default",
+			consulDestinationNamespace: "default",
+			mirroringK8s:               false,
+			expectNamespaceExists:      "default",
+		},
+		{
+			name:                       "destination namespace with non-default is not cleaned up",
+			kubeNamespace:              "ns1",
+			partition:                  "default",
+			consulDestinationNamespace: "ns1",
+			mirroringK8s:               false,
+			existingConsulNamespace:    "ns1",
+			expectNamespaceExists:      "ns1",
+		},
+		{
+			name:                       "destination namespace with non-default is not cleaned up, non-default partition",
+			kubeNamespace:              "ns1",
+			partition:                  "ap1",
+			consulDestinationNamespace: "ns1",
+			mirroringK8s:               false,
+			existingConsulNamespace:    "ns1",
+			expectNamespaceExists:      "ns1",
+		},
 		{
 			name:                    "mirrored namespaces",
+			kubeNamespace:           "ns1",
 			partition:               "default",
-			enableNSMirroring:       true,
-			existingConsulNamespace: "foo",
+			mirroringK8s:            true,
+			existingConsulNamespace: "ns1",
+			expectNamespaceDeleted:  "ns1",
 		},
-		// {
-		// 	name:                    "mirrored namespaces but it's the default namespace",
-		// 	kubeNamespaceName:       metav1.NamespaceDefault,
-		// 	enableNSMirroring:       true,
-		// 	existingConsulNamespace: getNamespace(constants.DefaultConsulNS, "", false),
-		// 	expectedConsulNamespace: getNamespace(constants.DefaultConsulNS, "", false), // Don't ever delete the Consul default NS
-		// },
-		// {
-		// 	name:                    "mirrored namespaces, non-default partition",
-		// 	partition:               "baz",
-		// 	enableNSMirroring:       true,
-		// 	existingConsulNamespace: getNamespace(testNamespaceName, "baz", false),
-		// },
-		// {
-		// 	name:                    "mirrored namespaces with prefix",
-		// 	nsMirrorPrefix:          "k8s-",
-		// 	enableNSMirroring:       true,
-		// 	existingConsulNamespace: getNamespace("k8s-foo", "", false),
-		// },
-		// {
-		// 	name:                    "mirrored namespaces with prefix, non-default partition",
-		// 	partition:               "baz",
-		// 	nsMirrorPrefix:          "k8s-",
-		// 	enableNSMirroring:       true,
-		// 	existingConsulNamespace: getNamespace("k8s-foo", "baz", false),
-		// },
-		// {
-		// 	name:                    "mirrored namespaces overrides destination namespace",
-		// 	enableNSMirroring:       true,
-		// 	destinationNamespace:    "baz",
-		// 	existingConsulNamespace: getNamespace(testNamespaceName, "", false),
-		// },
-		// {
-		// 	name:              "mirrored namespace, but the namespace is already removed from Consul",
-		// 	enableNSMirroring: true,
-		// },
+		{
+			name:                    "mirrored namespaces but it's the default namespace",
+			kubeNamespace:           metav1.NamespaceDefault,
+			partition:               "default",
+			mirroringK8s:            true,
+			existingConsulNamespace: "",
+			expectNamespaceExists:   "default", // Don't ever delete the Consul default NS
+		},
+		{
+			name:                    "mirrored namespaces, non-default partition",
+			kubeNamespace:           "ns1",
+			partition:               "ap1",
+			mirroringK8s:            true,
+			existingConsulNamespace: "ns1",
+			expectNamespaceDeleted:  "ns1",
+		},
+		{
+			name:                    "mirrored namespaces with prefix",
+			kubeNamespace:           "ns1",
+			partition:               "default",
+			mirroringK8s:            true,
+			mirroringK8sPrefix:      "k8s-",
+			existingConsulNamespace: "k8s-ns1",
+			expectNamespaceDeleted:  "k8s-ns1",
+		},
+		{
+			name:                    "mirrored namespaces with prefix, non-default partition",
+			kubeNamespace:           "ns1",
+			partition:               "ap1",
+			mirroringK8s:            true,
+			mirroringK8sPrefix:      "k8s-",
+			existingConsulNamespace: "k8s-ns1",
+			expectNamespaceDeleted:  "k8s-ns1",
+		},
+		{
+			name:                       "mirrored namespaces overrides destination namespace",
+			kubeNamespace:              "ns1",
+			partition:                  "default",
+			mirroringK8s:               true,
+			consulDestinationNamespace: "ns2",
+			existingConsulNamespace:    "ns1",
+			expectNamespaceDeleted:     "ns1",
+		},
+		{
+			name:                    "mirrored namespace, but the namespace is already removed from Consul",
+			kubeNamespace:           "ns1",
+			partition:               "default",
+			mirroringK8s:            true,
+			existingConsulNamespace: "",    // don't pre-create consul namespace
+			expectNamespaceDeleted:  "ns1", // read as "was never created"
+		},
 	}
 
 	for _, tc := range testCases {
@@ -192,86 +373,47 @@ func TestReconcileDeleteNamespace(t *testing.T) {
 	}
 }
 
-// getNamespace return a basic Consul V1 namespace for testing setup and comparison
-// func getNamespace(name string, partition string, acls bool) *capi.Namespace {
-// 	ns := &capi.Namespace{
-// 		Name:      name,
-// 		Partition: partition,
-// 	}
+// RequireStatusAccepted waits for a recently created resource to have a resource status of accepted so that
+// attempts to delete it by the single-shot controller under test's reconcile will not fail with a CAS error.
+//
+// Remove refs to this after https://hashicorp.atlassian.net/browse/NET-6719 is implemented.
+func RequireEventuallyAccepted(t *testing.T, resourceClient pbresource.ResourceServiceClient, id *pbresource.ID) {
+	require.Eventuallyf(t,
+		func() bool {
+			rsp, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{Id: id})
+			if err != nil {
+				return false
+			}
+			if rsp.Resource.Status == nil || len(rsp.Resource.Status) == 0 {
+				return false
+			}
 
-// 	if name != constants.DefaultConsulNS {
-// 		ns.Description = "Auto-generated by consul-k8s"
-// 		ns.Meta = map[string]string{"external-source": "kubernetes"}
-// 		ns.ACLs = &capi.NamespaceACLConfig{}
-// 	} else {
-// 		ns.Description = "Builtin Default Namespace"
-// 	}
-
-// 	if acls && name != constants.DefaultConsulNS {
-// 		// Create the ACLs config for the cross-Consul-namespace
-// 		// default policy that needs to be attached
-// 		ns.ACLs = &capi.NamespaceACLConfig{
-// 			PolicyDefaults: []capi.ACLLink{
-// 				{Name: testCrossACLPolicy},
-// 			},
-// 		}
-// 	}
-
-// 	return ns
-// }
-
-func getNamespace2(ap, ns string) *pbresource.Resource {
-	return &pbresource.Resource{Id: &pbresource.ID{
-		Name:    ns,
-		Type:    pbtenancy.NamespaceType,
-		Tenancy: &pbresource.Tenancy{Partition: ap},
-	}}
+			for _, status := range rsp.Resource.Status {
+				for _, condition := range status.Conditions {
+					// common.ConditionAccepted in consul namespace controller
+					if condition.Type == "accepted" && condition.State == pbresource.Condition_STATE_TRUE {
+						return true
+					}
+				}
+			}
+			return false
+		},
+		time.Second*5,
+		time.Millisecond*100,
+		"timed out out waiting for %s to have status accepted",
+		id,
+	)
 }
 
-func expectedNamespaceMatches(t *testing.T, client *capi.Client, name string, partition string, expectedNamespace *capi.Namespace) {
-	namespaceInfo, _, err := client.Namespaces().Read(name, &capi.QueryOptions{Partition: partition})
-
-	require.NoError(t, err)
-
-	if expectedNamespace == nil {
-		require.True(t, namespaceInfo == nil || namespaceInfo.DeletedAt != nil)
-		return
-	}
-
-	require.NotNil(t, namespaceInfo)
-	// Zero out the Raft Index, in this case it is irrelevant.
-	namespaceInfo.CreateIndex = 0
-	namespaceInfo.ModifyIndex = 0
-	if namespaceInfo.ACLs != nil && len(namespaceInfo.ACLs.PolicyDefaults) > 0 {
-		namespaceInfo.ACLs.PolicyDefaults[0].ID = "" // Zero out the ID for ACLs enabled to facilitate testing.
-	}
-	require.Equal(t, *expectedNamespace, *namespaceInfo)
-}
-
-func expectedNamespaceMatches2(t *testing.T, resourceClient pbresource.ResourceServiceClient, ap, ns, expectedNamespace string) {
-	_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{Id: &pbresource.ID{
-		Name:    ns,
-		Type:    pbtenancy.NamespaceType,
-		Tenancy: &pbresource.Tenancy{Partition: ap},
-	}})
-	//require.NoError(t, err)
-
-	//namespaceInfo, _, err := client.Namespaces().Read(name, &capi.QueryOptions{Partition: partition})
-	//require.NoError(t, err)
-
-	if expectedNamespace == "" {
-		require.Error(t, err)
-		require.True(t, status.Code(err) == codes.NotFound)
-		return
-	}
-
-	require.NoError(t, err)
-
-	// Zero out the Raft Index, in this case it is irrelevant.
-	//namespaceInfo.CreateIndex = 0
-	//namespaceInfo.ModifyIndex = 0
-	//if namespaceInfo.ACLs != nil && len(namespaceInfo.ACLs.PolicyDefaults) > 0 {
-	//	namespaceInfo.ACLs.PolicyDefaults[0].ID = "" // Zero out the ID for ACLs enabled to facilitate testing.
-	//}
-	//require.Equal(t, *expectedNamespace, *namespaceInfo)
+func RequireEventuallyNotFound(t *testing.T, resourceClient pbresource.ResourceServiceClient, id *pbresource.ID) {
+	require.EventuallyWithTf(t, func(collect *assert.CollectT) {
+		_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{Id: id})
+		require.Error(collect, err)
+		require.Equal(collect, codes.NotFound, status.Code(err), "expected %s to be deleted", id)
+	},
+		time.Second*5,
+		time.Millisecond*100,
+		"timed out waiting for %s to not be found",
+		id,
+	)
 }

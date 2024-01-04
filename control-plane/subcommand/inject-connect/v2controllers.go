@@ -112,7 +112,6 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 
 	if c.flagV2Tenancy {
 		// V2 tenancy implies non-default namespaces in CE, so we don't observe flagEnableNamespaces
-		// TODO: Maybe print out a warning if c.flagEnableNamespaces == false?
 		err := (&namespacev2.Controller{
 			Client:                     mgr.GetClient(),
 			ConsulClientConfig:         consulConfig,
@@ -120,8 +119,8 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 			AllowK8sNamespacesSet:      allowK8sNamespaces,
 			DenyK8sNamespacesSet:       denyK8sNamespaces,
 			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-			EnableNSMirroring:          c.flagEnableK8SNSMirroring,
-			NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+			MirroringK8s:               c.flagEnableK8SNSMirroring,
+			MirroringK8sPrefix:         c.flagK8SNSMirroringPrefix,
 			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
 			Log:                        ctrl.Log.WithName("controller").WithName("namespacev2"),
 		}).SetupWithManager(mgr)
