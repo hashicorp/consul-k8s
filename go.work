@@ -1,9 +1,0 @@
-go 1.20
-
-use (
-	./acceptance
-	./charts
-	./cli
-	./control-plane
-	./control-plane/cni
-)
