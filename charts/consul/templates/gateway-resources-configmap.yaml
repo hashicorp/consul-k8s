@@ -76,7 +76,7 @@ data:
             {{- end }}
             {{- if .Values.meshGateway.topologySpreadConstraints }}
             topologySpreadConstraints:
-              {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 16 | trim }}
+            {{ tpl .Values.meshGateway.topologySpreadConstraints . | nindent 16 | trim }}
             {{- end }}
             {{- if .Values.meshGateway.affinity }}
             affinity: 
@@ -121,5 +121,8 @@ data:
             {{- end }}
         spec:
           gatewayClassName: consul-mesh-gateway
+          listeners: 
+          - name: "wan"
+            port: {{ .Values.meshGateway.service.port }}
   {{- end }}
 {{- end }}
