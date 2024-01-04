@@ -23,7 +23,7 @@ func (b *meshGatewayBuilder) Service() *corev1.Service {
 	if b.gcc != nil {
 		fmt.Println("PORT", b.gcc.Spec.Service.Port)
 
-		if b.gcc.Spec.Service.Port != int32(0) {
+		if b.gcc.Spec.Service.Port != 0 {
 			port = b.gcc.Spec.Service.Port
 		}
 		containerConfig = b.gcc.Spec.Deployment.Container

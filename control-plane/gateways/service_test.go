@@ -95,6 +95,71 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 			},
 		},
 		{
+			name: "service resource crd created -- no service port set",
+			fields: fields{
+				gateway: &meshv2beta1.MeshGateway{
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "test-gateway-class",
+					},
+				},
+				config: GatewayConfig{},
+				gcc: &meshv2beta1.GatewayClassConfig{
+					Spec: meshv2beta1.GatewayClassConfigSpec{
+						GatewayClassAnnotationsAndLabels: meshv2beta1.GatewayClassAnnotationsAndLabels{
+							Labels: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+								Set: map[string]string{
+									"app":      "consul",
+									"chart":    "consul-helm",
+									"heritage": "Helm",
+									"release":  "consul",
+								},
+							},
+						},
+						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
+							Container: &meshv2beta1.GatewayClassContainerConfig{
+								PortModifier: 8000,
+							},
+						},
+						Service: meshv2beta1.GatewayClassServiceConfig{
+							Type: &lbType,
+						},
+					},
+				},
+			},
+			want: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						labelManagedBy: "consul-k8s",
+						"app":          "consul",
+						"chart":        "consul-helm",
+						"heritage":     "Helm",
+						"release":      "consul",
+					},
+					Annotations: map[string]string{},
+				},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{
+						labelManagedBy: "consul-k8s",
+						"app":          "consul",
+						"chart":        "consul-helm",
+						"heritage":     "Helm",
+						"release":      "consul",
+					},
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{
+						{
+							Name: "wan",
+							Port: int32(443),
+							TargetPort: intstr.IntOrString{
+								IntVal: int32(8443),
+							},
+						},
+					},
+				},
+				Status: corev1.ServiceStatus{},
+			},
+		},
+		{
 			name: "create service resource crd - gcc is nil",
 			fields: fields{
 				gateway: &meshv2beta1.MeshGateway{
