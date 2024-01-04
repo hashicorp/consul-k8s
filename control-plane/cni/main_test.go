@@ -51,6 +51,7 @@ func Test_cmdAdd(t *testing.T) {
 		cmd           *Command
 		podName       string
 		stdInData     string
+		cmdArgs       *skel.CmdArgs
 		configuredPod func(*corev1.Pod, *Command) *corev1.Pod
 		expectedRules bool
 		expectedErr   error
@@ -127,12 +128,33 @@ func Test_cmdAdd(t *testing.T) {
 			expectedErr:   nil,
 			expectedRules: true, // Rules will be applied
 		},
+		{
+			name: "Parsing iptables from CNI_ARGs as in Nomad",
+			cmd: &Command{
+				client:           fake.NewSimpleClientset(),
+				iptablesProvider: &fakeIptablesProvider{},
+			},
+			cmdArgs: &skel.CmdArgs{ContainerID: "some-container-id",
+				IfName: "eth0",
+				Args:   fmt.Sprintf("IPTABLES_CONFIG=%s", minimalIPTablesJSON(t)),
+				Path:   "/some/bin/path",
+			},
+			stdInData:     nomadStdinData,
+			expectedErr:   nil,
+			expectedRules: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_ = c.configuredPod(minimalPod(c.podName), c.cmd)
-			err := c.cmd.cmdAdd(minimalSkelArgs(c.podName, defaultNamespace, c.stdInData))
-			require.Equal(t, c.expectedErr, err)
+			if c.cmdArgs != nil {
+				c.cmdArgs.StdinData = []byte(c.stdInData)
+				err := c.cmd.cmdAdd(c.cmdArgs)
+				require.Equal(t, c.expectedErr, err)
+			} else {
+				_ = c.configuredPod(minimalPod(c.podName), c.cmd)
+				err := c.cmd.cmdAdd(minimalSkelArgs(c.podName, defaultNamespace, c.stdInData))
+				require.Equal(t, c.expectedErr, err)
+			}
 
 			// Check to see that rules have been generated
 			if c.expectedErr == nil && c.expectedRules {
@@ -355,3 +377,65 @@ const missingIPsStdinData = `{
     "name": "consul-cni",
     "type": "consul-cni"
 }`
+
+// TODO: need to make this match what Nomad emits
+const nomadStdinData = `{
+    "cniVersion": "0.3.1",
+	"name": "kindnet",
+	"type": "kindnet",
+    "capabilities": {
+        "testCapability": false
+    },
+    "ipam": {
+        "type": "host-local"
+    },
+    "dns": {
+        "nameservers": ["nameserver"],
+        "domain": "domain",
+        "search": ["search"],
+        "options": ["option"]
+    },
+    "prevResult": {
+        "cniversion": "0.3.1",
+        "interfaces": [
+            {
+                "name": "eth0",
+                "sandbox": "/tmp"
+            }
+        ],
+        "ips": [
+            {
+                "version": "4",
+                "address": "10.0.0.2/24",
+                "gateway": "10.0.0.1",
+                "interface": 0
+            }
+        ],
+        "routes": []
+
+    },
+    "cni_bin_dir": "/opt/cni/bin",
+    "cni_net_dir": "/etc/cni/net.d",
+    "log_level": "info",
+    "name": "consul-cni",
+    "type": "consul-cni"
+}
+`
+
+func minimalIPTablesJSON(t *testing.T) string {
+	cfg := iptables.Config{
+		ConsulDNSIP:          "127.0.0.1",
+		ConsulDNSPort:        8600,
+		ProxyUserID:          "101",
+		ProxyInboundPort:     20000,
+		ProxyOutboundPort:    15001,
+		ExcludeInboundPorts:  []string{"9000"},
+		ExcludeOutboundPorts: []string{"15002"},
+		ExcludeOutboundCIDRs: []string{"10.0.0.0/24"},
+		ExcludeUIDs:          []string{"1", "42"},
+		NetNS:                "/some/netns/path",
+	}
+	buf, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	return string(buf)
+}
