@@ -57,6 +57,7 @@ type Command struct {
 	flagLogLevel              string
 	flagLogJSON               bool
 	flagResourceAPIs          bool // Use V2 APIs
+	flagV2Tenancy             bool // Use V2 partitions (ent only) and namespaces instead of V1 counterparts
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -235,6 +236,8 @@ func (c *Command) init() {
 		"Enable or disable JSON output format for logging.")
 	c.flagSet.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
 		"Enable or disable Consul V2 Resource APIs.")
+	c.flagSet.BoolVar(&c.flagV2Tenancy, "enable-v2tenancy", false,
+		"Enable or disable Consul V2 tenancy.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -418,6 +421,10 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagConsulDataplaneImage == "" {
 		return errors.New("-consul-dataplane-image must be set")
+	}
+
+	if c.flagV2Tenancy && !c.flagResourceAPIs {
+		return errors.New("-enable-resource-apis must be set to 'true' if -enable-v2tenancy is set")
 	}
 
 	if c.flagEnablePartitions && c.consul.Partition == "" {

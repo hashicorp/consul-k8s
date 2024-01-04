@@ -20,13 +20,17 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/testing/protocmp"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
 )
 
 const (
@@ -34,10 +38,11 @@ const (
 )
 
 type TestServerClient struct {
-	TestServer *testutil.TestServer
-	APIClient  *api.Client
-	Cfg        *consul.Config
-	Watcher    consul.ServerConnectionManager
+	TestServer     *testutil.TestServer
+	APIClient      *api.Client
+	Cfg            *consul.Config
+	Watcher        consul.ServerConnectionManager
+	ResourceClient pbresource.ResourceServiceClient
 }
 
 func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConfigCallback) *TestServerClient {
@@ -66,11 +71,42 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	client, err := api.NewClient(consulConfig.APIClientConfig)
 	require.NoError(t, err)
 
+	watcher := MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true)
+
+	// Create a gRPC resource service client when the resource-apis experiment is enabled.
+	var resourceClient pbresource.ResourceServiceClient
+	if slices.Contains(cfg.Experiments, "resource-apis") {
+		resourceClient, err = consul.NewResourceServiceClient(watcher)
+		require.NoError(t, err)
+
+		// There is a window of time post-leader election on startup where v2 tenancy builtins
+		// (default partition and namespace) have not yet been created.
+		// Wait for them to exist before considering the server "open for business".
+		// Only check for default namespace existence since it implies the default partition exists.
+		if slices.Contains(cfg.Experiments, "v2tenancy") {
+			require.EventuallyWithT(t, func(collect *assert.CollectT) {
+				_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{
+					Id: &pbresource.ID{
+						Name:    constants.DefaultConsulNS,
+						Type:    pbtenancy.NamespaceType,
+						Tenancy: &pbresource.Tenancy{Partition: constants.DefaultConsulPartition},
+					},
+				})
+				require.NoError(collect, err)
+			},
+				time.Second*5,
+				time.Millisecond*100,
+				"timed out waiting for v2 builtin default namespace creation",
+			)
+		}
+	}
+
 	return &TestServerClient{
-		TestServer: consulServer,
-		APIClient:  client,
-		Cfg:        consulConfig,
-		Watcher:    MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true),
+		TestServer:     consulServer,
+		APIClient:      client,
+		Cfg:            consulConfig,
+		Watcher:        watcher,
+		ResourceClient: resourceClient,
 	}
 }
 
