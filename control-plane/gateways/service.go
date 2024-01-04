@@ -4,14 +4,13 @@
 package gateways
 
 import (
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
-
-const port = int32(443)
 
 func (b *meshGatewayBuilder) Service() *corev1.Service {
 	var (
@@ -47,10 +46,24 @@ func (b *meshGatewayBuilder) Ports(portModifier int32) []corev1.ServicePort {
 
 	ports := []corev1.ServicePort{}
 
+	if len(b.gateway.Spec.Listeners) == 0 {
+		//If empty use the default value. This should always be set, but in case it's not, this check
+		//will prevent a panic.
+		return []corev1.ServicePort{
+			{
+				Name: "wan",
+				Port: constants.DefaultWANPort,
+				TargetPort: intstr.IntOrString{
+					IntVal: constants.DefaultWANPort + portModifier,
+				},
+			},
+		}
+	}
 	for _, listener := range b.gateway.Spec.Listeners {
+		port := int32(listener.Port)
 		ports = append(ports, corev1.ServicePort{
 			Name: listener.Name,
-			Port: int32(listener.Port),
+			Port: port,
 			TargetPort: intstr.IntOrString{
 				IntVal: port + portModifier,
 			},

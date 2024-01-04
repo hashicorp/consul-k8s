@@ -34,6 +34,12 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 				gateway: &meshv2beta1.MeshGateway{
 					Spec: pbmesh.MeshGateway{
 						GatewayClassName: "test-gateway-class",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name: "wan",
+								Port: 443,
+							},
+						},
 					},
 				},
 				config: GatewayConfig{},
@@ -99,6 +105,12 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 				gateway: &meshv2beta1.MeshGateway{
 					Spec: pbmesh.MeshGateway{
 						GatewayClassName: "test-gateway-class",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name: "wan",
+								Port: 443,
+							},
+						},
 					},
 				},
 				config: GatewayConfig{},
