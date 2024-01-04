@@ -56,7 +56,7 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 						},
 						Service: meshv2beta1.GatewayClassServiceConfig{
 							Type: &lbType,
-							Port: int32(443),
+							Port: int32(8081),
 						},
 					},
 				},
@@ -84,9 +84,9 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Name: "wan",
-							Port: int32(443),
+							Port: int32(8081),
 							TargetPort: intstr.IntOrString{
-								IntVal: int32(8443),
+								IntVal: int32(16081),
 							},
 						},
 					},

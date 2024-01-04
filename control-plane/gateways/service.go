@@ -4,6 +4,8 @@
 package gateways
 
 import (
+	"fmt"
+
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,10 +21,14 @@ func (b *meshGatewayBuilder) Service() *corev1.Service {
 	)
 
 	if b.gcc != nil {
+		fmt.Println("PORT", b.gcc.Spec.Service.Port)
+
+		if b.gcc.Spec.Service.Port != int32(0) {
+			port = b.gcc.Spec.Service.Port
+		}
 		containerConfig = b.gcc.Spec.Deployment.Container
 		portModifier = containerConfig.PortModifier
 		serviceType = *b.gcc.Spec.Service.Type
-		port = b.gcc.Spec.Service.Port
 	}
 
 	return &corev1.Service{
