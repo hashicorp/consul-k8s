@@ -5,9 +5,8 @@ name: weekly-acceptance-1-2-x
 on:
   schedule:
     # * is a special character in YAML so you have to quote this string
-    # Run weekly on Wednesday at 3AM UTC/11PM EST/8PM PST
-   # - cron:  '0 3 * * 3'
-    - cron:  '0 0 * * *' # Temporarily nightly until 1.2.0 GA
+    # Run weekly on Tuesday at 3AM UTC/11PM EST/8PM PST
+    - cron:  '0 3 * * 2'
 
 
 # these should be the only settings that you will ever need to change

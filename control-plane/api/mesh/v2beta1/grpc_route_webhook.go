@@ -27,7 +27,7 @@ type GRPCRouteWebhook struct {
 	client.Client
 }
 
-var _ common.MeshConfigLister = &GRPCRouteWebhook{}
+var _ common.ConsulResourceLister = &GRPCRouteWebhook{}
 
 // NOTE: The path value in the below line is the path to the webhook.
 // If it is updated, run code-gen, update subcommand/inject-connect/command.go
@@ -44,17 +44,17 @@ func (v *GRPCRouteWebhook) Handle(ctx context.Context, req admission.Request) ad
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	return common.ValidateMeshConfig(ctx, req, v.Logger, v, &resource, v.ConsulTenancyConfig)
+	return common.ValidateConsulResource(ctx, req, v.Logger, v, &resource, v.ConsulTenancyConfig)
 }
 
-func (v *GRPCRouteWebhook) List(ctx context.Context) ([]common.MeshConfig, error) {
+func (v *GRPCRouteWebhook) List(ctx context.Context) ([]common.ConsulResource, error) {
 	var resourceList GRPCRouteList
 	if err := v.Client.List(ctx, &resourceList); err != nil {
 		return nil, err
 	}
-	var entries []common.MeshConfig
+	var entries []common.ConsulResource
 	for _, item := range resourceList.Items {
-		entries = append(entries, common.MeshConfig(item))
+		entries = append(entries, common.ConsulResource(item))
 	}
 	return entries, nil
 }

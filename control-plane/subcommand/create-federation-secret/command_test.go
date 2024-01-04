@@ -993,7 +993,7 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 		timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 		retry.RunWith(timer, t, func(r *retry.R) {
 			var err error
-			testserver, err = testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
+			testserver, err = testutil.NewTestServerConfigT(r, func(cfg *testutil.TestServerConfig) {
 				cfg.CAFile = caFile
 				cfg.CertFile = certFile
 				cfg.KeyFile = keyFile

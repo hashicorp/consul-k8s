@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // Test MatchesConsul.
@@ -86,6 +87,7 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
+								RetryOn:               []string{"gateway-error"},
 								RetryOnStatusCodes:    []uint32{500, 400},
 								RequestHeaders: &HTTPHeaderModifiers{
 									Add: map[string]string{
@@ -158,11 +160,13 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 							Service:               "service",
 							ServiceSubset:         "serviceSubset",
 							Namespace:             "namespace",
+							Partition:             "default",
 							PrefixRewrite:         "prefixRewrite",
 							IdleTimeout:           1 * time.Second,
 							RequestTimeout:        1 * time.Second,
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
+							RetryOn:               []string{"gateway-error"},
 							RetryOnStatusCodes:    []uint32{500, 400},
 							RequestHeaders: &capi.HTTPHeaderModifiers{
 								Add: map[string]string{
@@ -289,6 +293,7 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
+								RetryOn:               []string{"gateway-error"},
 								RetryOnStatusCodes:    []uint32{500, 400},
 								RequestHeaders: &HTTPHeaderModifiers{
 									Add: map[string]string{
@@ -366,6 +371,7 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 							RequestTimeout:        1 * time.Second,
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
+							RetryOn:               []string{"gateway-error"},
 							RetryOnStatusCodes:    []uint32{500, 400},
 							RequestHeaders: &capi.HTTPHeaderModifiers{
 								Add: map[string]string{

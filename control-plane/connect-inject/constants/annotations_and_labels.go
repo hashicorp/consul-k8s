@@ -73,6 +73,11 @@ const (
 	// connections to.
 	AnnotationPort = "consul.hashicorp.com/connect-service-port"
 
+	// AnnotationProxyConfigMap allows for default values to be set in the opaque config map
+	// during proxy registration. The value for this annotation is expected to be valid json.
+	// Other annotations / configuration may overwrite the values in the map.
+	AnnotationProxyConfigMap = "consul.hashicorp.com/proxy-config-map"
+
 	// AnnotationUpstreams is a list of upstreams to register with the
 	// proxy in the format of `<service-name>:<local-port>,...`. The
 	// service name should map to a Consul service name and the local port
@@ -195,6 +200,11 @@ const (
 	// LabelPeeringToken is a label that can be added to a secret to allow it to be watched
 	// by the peering controllers.
 	LabelPeeringToken = "consul.hashicorp.com/peering-token"
+
+	// LabelTelemetryCollector is a label signaling the pod is associated with the deployment of a Consul Telemetry
+	// Collector. If this is set, during connect-inject, the endpoints-controller ensures the deployed Namespace exists in Consul and create it if it does not.
+	// This is only meant to be used by Deployment/consul-telemetry-collector.
+	LabelTelemetryCollector = "consul.hashicorp.com/telemetry-collector"
 
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	Injected = "injected"

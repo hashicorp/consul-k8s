@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
@@ -124,7 +125,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 func (v *VaultCluster) VaultClient(*testing.T) *vapi.Client { return v.vaultClient }
 
 // SetupVaultClient sets up and returns a Vault Client.
-func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
+func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 	t.Helper()
 
 	if v.vaultClient != nil {
@@ -144,12 +145,8 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 		remotePort,
 		v.logger)
 
-	// Retry creating the port forward since it can fail occasionally.
 	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
-		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
-		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
-		// get used to fail the test, just for logging.
-		require.NoError(r, tunnel.ForwardPortE(t))
+		require.NoError(r, tunnel.ForwardPortE(r))
 	})
 
 	t.Cleanup(func() {
@@ -201,7 +198,7 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 				},
 				Type: corev1.SecretTypeServiceAccountToken,
 			}, metav1.CreateOptions{})
-			require.NoError(t, err)
+			require.NoError(r, err)
 		}
 	})
 	v.ConfigureAuthMethod(t, v.vaultClient, "kubernetes", "https://kubernetes.default.svc", vaultServerServiceAccountName, namespace)
@@ -422,7 +419,7 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		require.Equal(r, corev1.PodRunning, serverPod.Status.Phase)
 
 		// Set up the client so that we can make API calls to initialize and unseal.
-		v.vaultClient = v.SetupVaultClient(t)
+		v.vaultClient = v.SetupVaultClient(r)
 
 		// Initialize Vault with 1 secret share. We don't need to
 		// more key shares for this test installation.

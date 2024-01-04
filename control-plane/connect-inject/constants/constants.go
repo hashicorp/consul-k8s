@@ -27,6 +27,10 @@ const (
 	// ProxyDefaultHealthPort is the default HTTP health check port for the proxy.
 	ProxyDefaultHealthPort = 21000
 
+	// MetaGatewayKind is the meta key name for indicating which kind of gateway a Pod is for, if any.
+	// The value should be one of "mesh", "api", or "terminating".
+	MetaGatewayKind = "gateway-kind"
+
 	// MetaKeyManagedBy is the meta key name for indicating which Kubernetes controller manages a Consul resource.
 	MetaKeyManagedBy = "managed-by"
 
@@ -49,11 +53,17 @@ const (
 	// MetaKeyPodName is the meta key name for Kubernetes pod name used for the Consul services.
 	MetaKeyPodName = "pod-name"
 
+	// MetaKeyPodUID is the meta key name for Kubernetes pod uid used for the Consul services.
+	MetaKeyPodUID = "pod-uid"
+
 	// DefaultGracefulPort is the default port that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulPort = 20600
 
 	// DefaultGracefulShutdownPath is the default path that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulShutdownPath = "/graceful_shutdown"
+
+	// DefaultWANPort is the default port that consul-dataplane uses for WAN.
+	DefaultWANPort = 8443
 
 	// ConsulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
 	ConsulKubernetesCheckType = "kubernetes-readiness"
@@ -62,6 +72,14 @@ const (
 	ConsulKubernetesCheckName = "Kubernetes Readiness Check"
 
 	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
+
+	// MeshV2VolumePath is the name of the volume that contains the proxy ID.
+	MeshV2VolumePath = "/consul/mesh-inject"
+
+	UseTLSEnvVar        = "CONSUL_USE_TLS"
+	CACertFileEnvVar    = "CONSUL_CACERT_FILE"
+	CACertPEMEnvVar     = "CONSUL_CACERT_PEM"
+	TLSServerNameEnvVar = "CONSUL_TLS_SERVER_NAME"
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace

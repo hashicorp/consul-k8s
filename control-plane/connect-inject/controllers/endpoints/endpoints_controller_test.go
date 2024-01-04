@@ -15,6 +15,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -715,6 +716,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags: []string{},
 				},
@@ -729,6 +731,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags: []string{},
 				},
@@ -758,6 +761,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags: []string{},
 				},
@@ -778,6 +782,7 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags: []string{},
 				},
@@ -982,6 +987,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			},
 			k8sObjects: func() []runtime.Object {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[constants.AnnotationProxyConfigMap] = `{ "xds_fetch_timeout_ms": 9999 }`
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "service-created",
@@ -1010,7 +1016,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags:    []string{},
 					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 					NodeMeta: map[string]string{
@@ -1030,9 +1036,12 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						DestinationServiceID:   "pod1-service-created",
 						LocalServiceAddress:    "",
 						LocalServicePort:       0,
-						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
+						Config: map[string]any{
+							"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject"),
+							"xds_fetch_timeout_ms":                      float64(9999),
+						},
 					},
-					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags: []string{},
 					NodeMeta: map[string]string{
 						"synthetic-node": "true",
@@ -1075,6 +1084,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					constants.AnnotationGatewayWANAddress:        "2.3.4.5",
 					constants.AnnotationGatewayWANPort:           "443",
 					constants.AnnotationMeshGatewayContainerPort: "8443",
+					constants.AnnotationProxyConfigMap:           `{ "xds_fetch_timeout_ms": 9999 }`,
 					constants.AnnotationGatewayKind:              meshGateway})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1104,7 +1114,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "mesh-gateway",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    8443,
-					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "mesh-gateway", metaKeyKubeServiceName: "mesh-gateway", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "mesh-gateway", metaKeyKubeServiceName: "mesh-gateway", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags:    []string{},
 					ServiceTaggedAddresses: map[string]api.ServiceAddress{
 						"lan": {
@@ -1117,7 +1127,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						},
 					},
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{
-						Config: map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/service")},
+						Config: map[string]any{
+							"envoy_telemetry_collector_bind_socket_dir": string("/consul/service"),
+							"xds_fetch_timeout_ms":                      float64(9999),
+						},
 					},
 					NodeMeta: map[string]string{
 						"synthetic-node": "true",
@@ -1177,7 +1190,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "mesh-gateway",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    8443,
-					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "mesh-gateway", metaKeyKubeServiceName: "mesh-gateway", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "mesh-gateway", metaKeyKubeServiceName: "mesh-gateway", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags:    []string{},
 					ServiceTaggedAddresses: map[string]api.ServiceAddress{
 						"lan": {
@@ -1251,7 +1264,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "mesh-gateway",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    8443,
-					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "mesh-gateway", metaKeyKubeServiceName: "mesh-gateway", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "mesh-gateway", metaKeyKubeServiceName: "mesh-gateway", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags:    []string{},
 					ServiceTaggedAddresses: map[string]api.ServiceAddress{
 						"lan": {
@@ -1291,6 +1304,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 				gateway := createGatewayPod("terminating-gateway", "1.2.3.4", map[string]string{
 					constants.AnnotationGatewayKind:              terminatingGateway,
 					constants.AnnotationGatewayConsulServiceName: "terminating-gateway",
+					constants.AnnotationProxyConfigMap:           `{ "xds_fetch_timeout_ms": 9999 }`,
 				})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1326,10 +1340,14 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags: []string{},
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{
-						Config: map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/service")},
+						Config: map[string]any{
+							"envoy_telemetry_collector_bind_socket_dir": string("/consul/service"),
+							"xds_fetch_timeout_ms":                      float64(9999),
+						},
 					},
 				},
 			},
@@ -1389,6 +1407,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags: []string{},
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{
@@ -1421,6 +1440,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					constants.AnnotationGatewayKind:              ingressGateway,
 					constants.AnnotationGatewayWANSource:         "Service",
 					constants.AnnotationGatewayWANPort:           "8443",
+					constants.AnnotationProxyConfigMap:           `{ "xds_fetch_timeout_ms": 9999 }`,
 				})
 				endpoint := &corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1474,6 +1494,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags: []string{},
 					ServiceTaggedAddresses: map[string]api.ServiceAddress{
@@ -1495,6 +1516,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 								},
 							},
 							"envoy_telemetry_collector_bind_socket_dir": "/consul/service",
+							"xds_fetch_timeout_ms":                      float64(9999),
 						},
 					},
 				},
@@ -1575,6 +1597,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags: []string{},
 					ServiceTaggedAddresses: map[string]api.ServiceAddress{
@@ -1656,7 +1679,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags:    []string{},
 					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
@@ -1665,7 +1688,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "2.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags:    []string{},
 					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
@@ -1683,7 +1706,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
-					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags: []string{},
 				},
 				{
@@ -1698,7 +1721,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
-					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags: []string{},
 				},
 			},
@@ -1797,7 +1820,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags:    []string{},
 					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
@@ -1806,7 +1829,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "2.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags:    []string{},
 					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
@@ -1824,7 +1847,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
-					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags: []string{},
 				},
 				{
@@ -1839,7 +1862,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
-					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod2", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags: []string{},
 				},
 			},
@@ -1937,6 +1960,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags:  []string{"abc,123", "pod1"},
 					ServiceProxy: &api.AgentServiceConnectProxyConfig{},
@@ -1982,6 +2006,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						constants.MetaKeyKubeNS:  "default",
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodUID:  "",
 					},
 					ServiceTags: []string{"abc,123", "pod1"},
 				},
@@ -2055,7 +2080,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					ServiceName:    "service-created",
 					ServiceAddress: "1.2.3.4",
 					ServicePort:    0,
-					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags:    []string{},
 					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
 				},
@@ -2073,7 +2098,7 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 						LocalServicePort:       0,
 						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
 					},
-					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true"},
+					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
 					ServiceTags: []string{},
 				},
 			},
@@ -2531,6 +2556,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyKubeServiceName:   "service-updated",
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -2552,6 +2578,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyKubeServiceName:   "service-updated",
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
+							constants.MetaKeyPodUID:  "",
 						},
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
@@ -2619,6 +2646,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							constants.MetaKeyKubeNS:  "default",
 							constants.MetaKeyPodName: "pod1",
 							metaKeyKubeServiceName:   "service-updated",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -2644,6 +2672,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							constants.MetaKeyKubeNS:  "default",
 							constants.MetaKeyPodName: "pod1",
 							metaKeyKubeServiceName:   "service-updated",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -3222,6 +3251,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyKubeServiceName:   "service-updated",
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -3243,6 +3273,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyKubeServiceName:   "service-updated",
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
+							constants.MetaKeyPodUID:  "",
 						},
 						Proxy: &api.AgentServiceConnectProxyConfig{
 							DestinationServiceName: "service-updated",
@@ -3261,6 +3292,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "pod2",
+						constants.MetaKeyPodUID:  "",
 					},
 				},
 			},
@@ -3274,6 +3306,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "pod2",
+						constants.MetaKeyPodUID:  "",
 					},
 				},
 			},
@@ -3324,6 +3357,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "pod1",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -3349,6 +3383,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "pod1",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -3369,6 +3404,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "pod2",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -3394,6 +3430,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "pod2",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -3409,6 +3446,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "",
 					},
 				},
 			},
@@ -3423,6 +3461,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "",
 					},
 				},
 			},
@@ -3475,6 +3514,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "pod1",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -3500,6 +3540,7 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "pod1",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				},
@@ -3526,14 +3567,19 @@ func TestReconcileUpdateEndpoint(t *testing.T) {
 				}
 			})
 			consulClient := testClient.APIClient
+			// Wait so that bootstrap finishes
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			// Holds token accessorID for each service ID.
 			tokensForServices := make(map[string]string)
 
 			// Register service and proxy in consul.
 			for _, svc := range tt.initialConsulSvcs {
-				_, err := consulClient.Catalog().Register(svc, nil)
-				require.NoError(t, err)
+				// Retry because ACLs may not have been initialized yet.
+				retry.Run(t, func(r *retry.R) {
+					_, err := consulClient.Catalog().Register(svc, nil)
+					require.NoError(r, err)
+				})
 
 				// Create a token for this service if ACLs are enabled.
 				if tt.enableACLs {
@@ -3859,6 +3905,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 	cases := []struct {
 		name                      string
 		consulSvcName             string
+		consulPodUid              string
 		expectServicesToBeDeleted bool
 		initialConsulSvcs         []*api.AgentService
 		enableACLs                bool
@@ -3944,6 +3991,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 		{
 			name:                      "When ACLs are enabled, the token should be deleted",
 			consulSvcName:             "service-deleted",
+			consulPodUid:              "123",
 			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentService{
 				{
@@ -3957,6 +4005,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "123",
 					},
 				},
 				{
@@ -3975,6 +4024,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "123",
 					},
 				},
 			},
@@ -4014,6 +4064,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 		{
 			name:                      "When ACLs are enabled, the mesh-gateway token should be deleted",
 			consulSvcName:             "service-deleted",
+			consulPodUid:              "124",
 			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentService{
 				{
@@ -4028,6 +4079,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "mesh-gateway",
+						constants.MetaKeyPodUID:  "124",
 					},
 					TaggedAddresses: map[string]api.ServiceAddress{
 						"lan": {
@@ -4077,6 +4129,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 		{
 			name:                      "When ACLs are enabled, the ingress-gateway token should be deleted",
 			consulSvcName:             "service-deleted",
+			consulPodUid:              "125",
 			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentService{
 				{
@@ -4091,6 +4144,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "ingress-gateway",
+						constants.MetaKeyPodUID:  "125",
 					},
 					TaggedAddresses: map[string]api.ServiceAddress{
 						"lan": {
@@ -4130,6 +4184,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 		{
 			name:                      "When ACLs are enabled, the terminating-gateway token should be deleted",
 			consulSvcName:             "service-deleted",
+			consulPodUid:              "126",
 			expectServicesToBeDeleted: true,
 			initialConsulSvcs: []*api.AgentService{
 				{
@@ -4144,6 +4199,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						metaKeyManagedBy:         constants.ManagedByValue,
 						metaKeySyntheticNode:     "true",
 						constants.MetaKeyPodName: "terminating-gateway",
+						constants.MetaKeyPodUID:  "126",
 					},
 				},
 			},
@@ -4167,10 +4223,12 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				}
 			})
 			consulClient := testClient.APIClient
-			// TODO: stabilize this test by waiting for the ACL bootstrap
+			// Wait so that bootstrap finishes
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			// Register service and proxy in consul
 			var token *api.ACLToken
+			var err error
 			for _, svc := range tt.initialConsulSvcs {
 				serviceRegistration := &api.CatalogRegistration{
 					Node:    consulNodeName,
@@ -4180,8 +4238,11 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 					},
 					Service: svc,
 				}
-				_, err := consulClient.Catalog().Register(serviceRegistration, nil)
-				require.NoError(t, err)
+				// Retry because the ACLs may not have been fully initialized yet.
+				retry.Run(t, func(r *retry.R) {
+					_, err = consulClient.Catalog().Register(serviceRegistration, nil)
+					require.NoError(r, err)
+				})
 
 				// Create a token for it if ACLs are enabled.
 				if tt.enableACLs {
@@ -4190,8 +4251,9 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 						AuthMethod:  test.AuthMethod,
 						BearerToken: test.ServiceAccountJWTToken,
 						Meta: map[string]string{
-							"pod":       fmt.Sprintf("%s/%s", svc.Meta[constants.MetaKeyKubeNS], svc.Meta[constants.MetaKeyPodName]),
-							"component": tt.consulSvcName,
+							"pod":                   fmt.Sprintf("%s/%s", svc.Meta[constants.MetaKeyKubeNS], svc.Meta[constants.MetaKeyPodName]),
+							"component":             tt.consulSvcName,
+							constants.MetaKeyPodUID: tt.consulPodUid,
 						},
 					}, nil)
 					require.NoError(t, err)
@@ -4338,6 +4400,7 @@ func TestReconcileIgnoresServiceIgnoreLabel(t *testing.T) {
 							metaKeyManagedBy:         constants.ManagedByValue,
 							metaKeySyntheticNode:     "true",
 							constants.MetaKeyPodName: "pod1",
+							constants.MetaKeyPodUID:  "",
 						},
 					},
 				}
@@ -5945,12 +6008,12 @@ func TestGetTokenMetaFromDescription(t *testing.T) {
 		expectedTokenMeta map[string]string
 	}{
 		"no description prefix": {
-			description:       `{"pod":"default/pod"}`,
-			expectedTokenMeta: map[string]string{"pod": "default/pod"},
+			description:       `{"pod":"default/pod","pod-uid": "123"}`,
+			expectedTokenMeta: map[string]string{"pod": "default/pod", "pod-uid": "123"},
 		},
 		"consul's default description prefix": {
-			description:       `token created via login: {"pod":"default/pod"}`,
-			expectedTokenMeta: map[string]string{"pod": "default/pod"},
+			description:       `token created via login: {"pod":"default/pod","pod-uid": "123"}`,
+			expectedTokenMeta: map[string]string{"pod": "default/pod", "pod-uid": "123"},
 		},
 	}
 

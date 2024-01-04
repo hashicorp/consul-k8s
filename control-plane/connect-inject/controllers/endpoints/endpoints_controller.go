@@ -204,6 +204,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
+				if isTelemetryCollector(pod) {
+					if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
+						r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
+						errs = multierror.Append(errs, err)
+					}
+				}
+
 				if hasBeenInjected(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if isConsulDataplaneSupported(pod) {
@@ -231,6 +238,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						continue
 					}
 				}
+
 				if isGateway(pod) {
 					endpointPods.Add(address.TargetRef.Name)
 					if err = r.registerGateway(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
@@ -284,7 +292,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 
 		// Register the service instance with Consul.
 		r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
-			"id", serviceRegistration.ID)
+			"id", serviceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(serviceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register service", "name", serviceRegistration.Service.Service)
@@ -300,7 +308,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		}
 
 		// Register the proxy service instance with Consul.
-		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service)
+		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service, "id", proxyServiceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(proxyServiceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Service.Service)
@@ -390,6 +398,18 @@ func proxyServiceID(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
 	return fmt.Sprintf("%s-%s", pod.Name, proxySvcName)
 }
 
+func annotationProxyConfigMap(pod corev1.Pod) (map[string]any, error) {
+	parsed := make(map[string]any)
+	if config, ok := pod.Annotations[constants.AnnotationProxyConfigMap]; ok && config != "" {
+		err := json.Unmarshal([]byte(config), &parsed)
+		if err != nil {
+			// Always return an empty map on error
+			return make(map[string]any), fmt.Errorf("unable to parse `%v` annotation for pod `%v`: %w", constants.AnnotationProxyConfigMap, pod.Name, err)
+		}
+	}
+	return parsed, nil
+}
+
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
 func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
@@ -429,6 +449,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		metaKeyKubeServiceName:   serviceEndpoints.Name,
 		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
 		metaKeyManagedBy:         constants.ManagedByValue,
+		constants.MetaKeyPodUID:  string(pod.UID),
 		metaKeySyntheticNode:     "true",
 	}
 	for k, v := range pod.Annotations {
@@ -443,6 +464,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
+
 	service := &api.AgentService{
 		ID:        svcID,
 		Service:   svcName,
@@ -475,10 +497,16 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 
 	proxySvcName := proxyServiceName(pod, serviceEndpoints)
 	proxySvcID := proxyServiceID(pod, serviceEndpoints)
+
+	// Set the default values from the annotation, if possible.
+	baseConfig, err := annotationProxyConfigMap(pod)
+	if err != nil {
+		r.Log.Error(err, "annotation unable to be applied")
+	}
 	proxyConfig := &api.AgentServiceConnectProxyConfig{
 		DestinationServiceName: svcName,
 		DestinationServiceID:   svcID,
-		Config:                 make(map[string]interface{}),
+		Config:                 baseConfig,
 	}
 
 	// If metrics are enabled, the proxyConfig should set envoy_prometheus_bind_addr to a listener on 0.0.0.0 on
@@ -679,6 +707,13 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
 		metaKeyManagedBy:         constants.ManagedByValue,
 		metaKeySyntheticNode:     "true",
+		constants.MetaKeyPodUID:  string(pod.UID),
+	}
+
+	// Set the default values from the annotation, if possible.
+	baseConfig, err := annotationProxyConfigMap(pod)
+	if err != nil {
+		r.Log.Error(err, "annotation unable to be applied")
 	}
 
 	service := &api.AgentService{
@@ -686,7 +721,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		Address: pod.Status.PodIP,
 		Meta:    meta,
 		Proxy: &api.AgentServiceConnectProxyConfig{
-			Config: map[string]interface{}{},
+			Config: baseConfig,
 		},
 	}
 
@@ -760,14 +795,10 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 				Port:    wanPort,
 			},
 		}
-		service.Proxy = &api.AgentServiceConnectProxyConfig{
-			Config: map[string]interface{}{
-				"envoy_gateway_no_default_bind": true,
-				"envoy_gateway_bind_addresses": map[string]interface{}{
-					"all-interfaces": map[string]interface{}{
-						"address": "0.0.0.0",
-					},
-				},
+		service.Proxy.Config["envoy_gateway_no_default_bind"] = true
+		service.Proxy.Config["envoy_gateway_bind_addresses"] = map[string]interface{}{
+			"all-interfaces": map[string]interface{}{
+				"address": "0.0.0.0",
 			},
 		}
 
@@ -776,15 +807,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
-		if pod.Annotations[constants.AnnotationGatewayKind] == ingressGateway {
-			service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", pod.Status.PodIP)
-		} else {
-			service.Proxy = &api.AgentServiceConnectProxyConfig{
-				Config: map[string]interface{}{
-					"envoy_prometheus_bind_addr": fmt.Sprintf("%s:20200", pod.Status.PodIP),
-				},
-			}
-		}
+		service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", pod.Status.PodIP)
 	}
 
 	if r.EnableTelemetryCollector && service.Proxy != nil && service.Proxy.Config != nil {
@@ -958,9 +981,17 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 
 			if r.AuthMethod != "" && serviceDeregistered {
 				r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
-				err := r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
+				err := r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName], svc.Meta[constants.MetaKeyPodUID])
 				if err != nil {
 					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
+					errs = multierror.Append(errs, err)
+				}
+			}
+
+			if serviceDeregistered {
+				err = r.deregisterNode(apiClient, nodeSvcs.Node.Node)
+				if err != nil {
+					r.Log.Error(err, "failed to deregister node", "svc", svc.Service)
 					errs = multierror.Append(errs, err)
 				}
 			}
@@ -971,10 +1002,41 @@ func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvc
 
 }
 
+// deregisterNode removes a node if it does not have any associated services attached to it.
+// When using Consul Enterprise, serviceInstancesForK8SServiceNameAndNamespace will search across all namespaces
+// (wildcard) to determine if there any other services associated with the Node. We also only search for nodes that have
+// the correct kubernetes metadata (managed-by-endpoints-controller and synthetic-node).
+func (r *Controller) deregisterNode(apiClient *api.Client, nodeName string) error {
+	var (
+		serviceList *api.CatalogNodeServiceList
+		err         error
+	)
+
+	filter := fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q`,
+		"synthetic-node", "true", metaKeyManagedBy, constants.ManagedByValue)
+	if r.EnableConsulNamespaces {
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
+	} else {
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter})
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get a list of node services: %s", err)
+	}
+
+	if len(serviceList.Services) == 0 {
+		r.Log.Info("deregistering node from consul", "node", nodeName, "services", serviceList.Services)
+		_, err := apiClient.Catalog().Deregister(&api.CatalogDeregistration{Node: nodeName}, nil)
+		if err != nil {
+			r.Log.Error(err, "failed to deregister node", "name", nodeName)
+		}
+	}
+	return nil
+}
+
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
-// has been configured with and will only delete tokens for the provided podName.
-func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, svc *api.AgentService, k8sNS, podName string) error {
+// has been configured with and will only delete tokens for the provided podName and podUID.
+func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, svc *api.AgentService, k8sNS, podName, podUID string) error {
 	// Skip if podName is empty.
 	if podName == "" {
 		return nil
@@ -1010,8 +1072,11 @@ func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, sv
 
 			tokenPodName := strings.TrimPrefix(tokenMeta[tokenMetaPodNameKey], k8sNS+"/")
 
+			// backward compability logic on token with no podUID in metadata
+			podUIDMatched := tokenMeta[constants.MetaKeyPodUID] == podUID || tokenMeta[constants.MetaKeyPodUID] == ""
+
 			// If we can't find token's pod, delete it.
-			if tokenPodName == podName {
+			if tokenPodName == podName && podUIDMatched {
 				r.Log.Info("deleting ACL token for pod", "name", podName)
 				if _, err := apiClient.ACL().TokenDelete(token.AccessorID, &api.WriteOptions{Namespace: svc.Namespace}); err != nil {
 					return fmt.Errorf("failed to delete token from Consul: %s", err)
@@ -1334,6 +1399,28 @@ func hasBeenInjected(pod corev1.Pod) bool {
 func isGateway(pod corev1.Pod) bool {
 	anno, ok := pod.Annotations[constants.AnnotationGatewayKind]
 	return ok && anno != ""
+}
+
+// isTelemetryCollector checks whether a pod is part of a deployment for a Consul Telemetry Collector. If so,
+// and this is the first pod deployed to a Namespace, we need to create the Namespace in Consul. Otherwise the
+// deployment may fail out during service registration because it is deployed to a Namespace that does not exist.
+func isTelemetryCollector(pod corev1.Pod) bool {
+	anno, ok := pod.Annotations[constants.LabelTelemetryCollector]
+	return ok && anno != ""
+}
+
+// ensureNamespaceExists creates a Consul namespace for a pod in the event it does not exist.
+// At the time of writing, we use this for the Consul Telemetry Collector which may be the first
+// pod deployed to a namespace. If it is, it's connect-inject will fail for lack of a namespace.
+func (r *Controller) ensureNamespaceExists(apiClient *api.Client, pod corev1.Pod) error {
+	if r.EnableConsulNamespaces {
+		consulNS := r.consulNamespace(pod.Namespace)
+		if _, err := namespaces.EnsureExists(apiClient, consulNS, r.CrossNSACLPolicy); err != nil {
+			r.Log.Error(err, "failed to ensure Consul namespace exists", "ns", pod.Namespace, "consul ns", consulNS)
+			return err
+		}
+	}
+	return nil
 }
 
 // mapAddresses combines all addresses to a mapping of address to its health status.

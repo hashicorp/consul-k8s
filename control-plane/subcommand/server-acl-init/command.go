@@ -115,6 +115,9 @@ type Command struct {
 	ctx           context.Context
 	retryDuration time.Duration
 
+	// the amount of time to contact the Consul API before timing out
+	apiTimeoutDuration time.Duration
+
 	// log
 	log hclog.Logger
 
@@ -233,6 +236,12 @@ func (c *Command) init() {
 	if c.retryDuration == 0 {
 		c.retryDuration = 1 * time.Second
 	}
+
+	// Most of the API calls are in an infinite loop until the command cancels. This timeout
+	// allows us to refresh the server IPs so that calls will succeed.
+	if c.apiTimeoutDuration == 0 {
+		c.apiTimeoutDuration = 2 * time.Minute
+	}
 }
 
 func (c *Command) Synopsis() string { return synopsis }
@@ -302,18 +311,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	var ipAddrs []net.IPAddr
-	if err := backoff.Retry(func() error {
-		ipAddrs, err = netaddrs.IPAddrs(c.ctx, c.consulFlags.Addresses, c.log)
-		if err != nil {
-			c.log.Error("Error resolving IP Address", "err", err)
-			return err
-		}
-		return nil
-	}, exponentialBackoffWithMaxInterval()); err != nil {
-		c.UI.Error(err.Error())
-	}
-
 	if err := c.configureSecretsBackend(); err != nil {
 		c.log.Error(err.Error())
 		return 1
@@ -328,8 +325,22 @@ func (c *Command) Run(args []string) int {
 		c.log.Info("ACL replication is enabled so skipping Consul server ACL bootstrapping")
 		bootstrapToken = aclReplicationToken
 	} else {
-		bootstrapToken, err = c.bootstrapServers(ipAddrs, c.backend)
-		if err != nil {
+		// During upgrades, there is a rare case where a consul-server statefulset may be rotated out while the
+		// bootstrap tokens are being updated. Catch this case, refresh the server ip addresses and try again.
+		if err := backoff.Retry(func() error {
+			ipAddrs, err := c.serverIPAddresses()
+			if err != nil {
+				c.log.Error(err.Error())
+				return err
+			}
+
+			bootstrapToken, err = c.bootstrapServers(ipAddrs, c.backend)
+			if err != nil {
+				c.log.Error(err.Error())
+				return err
+			}
+			return nil
+		}, exponentialBackoffWithMaxInterval()); err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
@@ -363,12 +374,12 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	consulClient, err := consul.NewClientFromConnMgrState(c.consulFlags.ConsulClientConfig(), c.state)
+	dynamicClient, err := consul.NewDynamicClientFromConnMgr(c.consulFlags.ConsulClientConfig(), watcher)
 	if err != nil {
 		c.log.Error(fmt.Sprintf("Error creating Consul client for addr %q: %s", c.state.Address, err))
 		return 1
 	}
-	consulDC, primaryDC, err := c.consulDatacenterList(consulClient)
+	consulDC, primaryDC, err := c.consulDatacenterList(dynamicClient)
 	if err != nil {
 		c.log.Error("Error getting datacenter name", "err", err)
 		return 1
@@ -379,9 +390,9 @@ func (c *Command) Run(args []string) int {
 	if c.consulFlags.Partition == consulDefaultPartition && primary {
 		// Partition token is local because only the Primary datacenter can have Admin Partitions.
 		if c.flagPartitionTokenFile != "" {
-			err = c.createACLWithSecretID("partitions", partitionRules, consulDC, primary, consulClient, partitionToken, true)
+			err = c.createACLWithSecretID("partitions", partitionRules, consulDC, primary, dynamicClient, partitionToken, true)
 		} else {
-			err = c.createLocalACL("partitions", partitionRules, consulDC, primary, consulClient)
+			err = c.createLocalACL("partitions", partitionRules, consulDC, primary, dynamicClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -408,7 +419,7 @@ func (c *Command) Run(args []string) int {
 		}
 		err = c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
 			func() error {
-				return c.createOrUpdateACLPolicy(policyTmpl, consulClient)
+				return c.createOrUpdateACLPolicy(policyTmpl, dynamicClient)
 			})
 		if err != nil {
 			c.log.Error("Error creating or updating the cross namespace policy", "err", err)
@@ -425,7 +436,7 @@ func (c *Command) Run(args []string) int {
 			Name: consulDefaultNamespace,
 			ACLs: &aclConfig,
 		}
-		_, _, err = consulClient.Namespaces().Update(&consulNamespace, &api.WriteOptions{})
+		_, _, err = dynamicClient.ConsulClient.Namespaces().Update(&consulNamespace, &api.WriteOptions{})
 		if err != nil {
 			if strings.Contains(strings.ToLower(err.Error()), "unexpected response code: 404") {
 				// If this returns a 404 it's most likely because they're not running
@@ -441,7 +452,7 @@ func (c *Command) Run(args []string) int {
 	// Create the component auth method, this is the auth method that Consul components will use
 	// to issue an `ACL().Login()` against at startup, for local tokens.
 	localComponentAuthMethodName := c.withPrefix("k8s-component-auth-method")
-	err = c.configureLocalComponentAuthMethod(consulClient, localComponentAuthMethodName)
+	err = c.configureLocalComponentAuthMethod(dynamicClient, localComponentAuthMethodName)
 	if err != nil {
 		c.log.Error(err.Error())
 		return 1
@@ -449,7 +460,7 @@ func (c *Command) Run(args []string) int {
 
 	globalComponentAuthMethodName := fmt.Sprintf("%s-%s", localComponentAuthMethodName, consulDC)
 	if !primary && c.flagAuthMethodHost != "" {
-		err = c.configureGlobalComponentAuthMethod(consulClient, globalComponentAuthMethodName, primaryDC)
+		err = c.configureGlobalComponentAuthMethod(dynamicClient, globalComponentAuthMethodName, primaryDC)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -464,7 +475,7 @@ func (c *Command) Run(args []string) int {
 		}
 
 		serviceAccountName := c.withPrefix("client")
-		err = c.createACLPolicyRoleAndBindingRule("client", agentRules, consulDC, primaryDC, false, primary, localComponentAuthMethodName, serviceAccountName, consulClient)
+		err = c.createACLPolicyRoleAndBindingRule("client", agentRules, consulDC, primaryDC, false, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -480,7 +491,7 @@ func (c *Command) Run(args []string) int {
 		if c.consulFlags.Partition != "" {
 			anonTokenConfig.APIClientConfig.Partition = consulDefaultPartition
 		}
-		anonTokenClient, err := consul.NewClientFromConnMgrState(anonTokenConfig, c.state)
+		anonTokenClient, err := consul.NewDynamicClientFromConnMgr(anonTokenConfig, watcher)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -511,9 +522,9 @@ func (c *Command) Run(args []string) int {
 			if !primary {
 				componentAuthMethodName = globalComponentAuthMethodName
 			}
-			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
+			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, dynamicClient)
 		} else {
-			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, localPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
+			err = c.createACLPolicyRoleAndBindingRule("sync-catalog", syncRules, consulDC, primaryDC, localPolicy, primary, componentAuthMethodName, serviceAccountName, dynamicClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -523,7 +534,7 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagConnectInject {
 		connectAuthMethodName := c.withPrefix("k8s-auth-method")
-		err := c.configureConnectInjectAuthMethod(consulClient, connectAuthMethodName)
+		err := c.configureConnectInjectAuthMethod(dynamicClient, connectAuthMethodName)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -545,7 +556,7 @@ func (c *Command) Run(args []string) int {
 		if !primary {
 			componentAuthMethodName = globalComponentAuthMethodName
 		}
-		err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, consulClient)
+		err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, dynamicClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -555,9 +566,9 @@ func (c *Command) Run(args []string) int {
 	if c.flagCreateEntLicenseToken {
 		var err error
 		if c.consulFlags.Partition != "" {
-			err = c.createLocalACL("enterprise-license", entPartitionLicenseRules, consulDC, primary, consulClient)
+			err = c.createLocalACL("enterprise-license", entPartitionLicenseRules, consulDC, primary, dynamicClient)
 		} else {
-			err = c.createLocalACL("enterprise-license", entLicenseRules, consulDC, primary, consulClient)
+			err = c.createLocalACL("enterprise-license", entLicenseRules, consulDC, primary, dynamicClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -567,7 +578,7 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagSnapshotAgent {
 		serviceAccountName := c.withPrefix("server")
-		if err := c.createACLPolicyRoleAndBindingRule("snapshot-agent", snapshotAgentRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, consulClient); err != nil {
+		if err := c.createACLPolicyRoleAndBindingRule("snapshot-agent", snapshotAgentRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
@@ -588,7 +599,7 @@ func (c *Command) Run(args []string) int {
 		if !primary {
 			authMethodName = globalComponentAuthMethodName
 		}
-		err = c.createACLPolicyRoleAndBindingRule("api-gateway-controller", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, consulClient)
+		err = c.createACLPolicyRoleAndBindingRule("api-gateway-controller", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, dynamicClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -609,7 +620,7 @@ func (c *Command) Run(args []string) int {
 		if !primary {
 			authMethodName = globalComponentAuthMethodName
 		}
-		err = c.createACLPolicyRoleAndBindingRule("mesh-gateway", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, consulClient)
+		err = c.createACLPolicyRoleAndBindingRule("mesh-gateway", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, dynamicClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -626,7 +637,7 @@ func (c *Command) Run(args []string) int {
 			PrimaryDC:      primaryDC,
 			Primary:        primary,
 		}
-		err := c.configureGateway(params, consulClient)
+		err := c.configureGateway(params, dynamicClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -643,7 +654,7 @@ func (c *Command) Run(args []string) int {
 			PrimaryDC:      primaryDC,
 			Primary:        primary,
 		}
-		err := c.configureGateway(params, consulClient)
+		err := c.configureGateway(params, dynamicClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -659,9 +670,9 @@ func (c *Command) Run(args []string) int {
 		// Policy must be global because it replicates from the primary DC
 		// and so the primary DC needs to be able to accept the token.
 		if aclReplicationToken != "" {
-			err = c.createACLWithSecretID(common.ACLReplicationTokenName, rules, consulDC, primary, consulClient, aclReplicationToken, false)
+			err = c.createACLWithSecretID(common.ACLReplicationTokenName, rules, consulDC, primary, dynamicClient, aclReplicationToken, false)
 		} else {
-			err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, primary, consulClient)
+			err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, primary, dynamicClient)
 		}
 		if err != nil {
 			c.log.Error(err.Error())
@@ -685,7 +696,7 @@ func exponentialBackoffWithMaxInterval() *backoff.ExponentialBackOff {
 
 // configureGlobalComponentAuthMethod sets up an AuthMethod in the primary datacenter,
 // that the Consul components will use to issue global ACL tokens with.
-func (c *Command) configureGlobalComponentAuthMethod(consulClient *api.Client, authMethodName, primaryDC string) error {
+func (c *Command) configureGlobalComponentAuthMethod(client *consul.DynamicClient, authMethodName, primaryDC string) error {
 	// Create the auth method template. This requires calls to the kubernetes environment.
 	authMethod, err := c.createAuthMethodTmpl(authMethodName, false)
 	if err != nil {
@@ -693,29 +704,33 @@ func (c *Command) configureGlobalComponentAuthMethod(consulClient *api.Client, a
 	}
 	authMethod.TokenLocality = "global"
 	writeOptions := &api.WriteOptions{Datacenter: primaryDC}
-	return c.createAuthMethod(consulClient, &authMethod, writeOptions)
+	return c.createAuthMethod(client, &authMethod, writeOptions)
 }
 
 // configureLocalComponentAuthMethod sets up an AuthMethod in the same datacenter,
 // that the Consul components will use to issue local ACL tokens with.
-func (c *Command) configureLocalComponentAuthMethod(consulClient *api.Client, authMethodName string) error {
+func (c *Command) configureLocalComponentAuthMethod(client *consul.DynamicClient, authMethodName string) error {
 	// Create the auth method template. This requires calls to the kubernetes environment.
 	authMethod, err := c.createAuthMethodTmpl(authMethodName, false)
 	if err != nil {
 		return err
 	}
-	return c.createAuthMethod(consulClient, &authMethod, &api.WriteOptions{})
+	return c.createAuthMethod(client, &authMethod, &api.WriteOptions{})
 }
 
 // createAuthMethod creates the desired Authmethod.
-func (c *Command) createAuthMethod(consulClient *api.Client, authMethod *api.ACLAuthMethod, writeOptions *api.WriteOptions) error {
+func (c *Command) createAuthMethod(client *consul.DynamicClient, authMethod *api.ACLAuthMethod, writeOptions *api.WriteOptions) error {
 	return c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethod.Name),
 		func() error {
 			var err error
+			err = client.RefreshClient()
+			if err != nil {
+				c.log.Error("could not refresh client", err)
+			}
 			// `AuthMethodCreate` will also be able to update an existing
 			// AuthMethod based on the name provided. This means that any
 			// configuration changes will correctly update the AuthMethod.
-			_, _, err = consulClient.ACL().AuthMethodCreate(authMethod, writeOptions)
+			_, _, err = client.ConsulClient.ACL().AuthMethodCreate(authMethod, writeOptions)
 			return err
 		})
 }
@@ -740,7 +755,7 @@ type ConfigureGatewayParams struct {
 	Primary bool
 }
 
-func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulClient *api.Client) error {
+func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, client *consul.DynamicClient) error {
 	// Each gateway needs to be configured
 	// separately because users may need to attach different policies
 	// to each gateway role depending on what services it represents.
@@ -795,7 +810,7 @@ func (c *Command) configureGateway(gatewayParams ConfigureGatewayParams, consulC
 		serviceAccountName := c.withPrefix(name)
 		err = c.createACLPolicyRoleAndBindingRule(name, rules,
 			gatewayParams.ConsulDC, gatewayParams.PrimaryDC, localPolicy,
-			gatewayParams.Primary, gatewayParams.AuthMethodName, serviceAccountName, consulClient)
+			gatewayParams.Primary, gatewayParams.AuthMethodName, serviceAccountName, client)
 		if err != nil {
 			c.log.Error(err.Error())
 			return err
@@ -866,8 +881,10 @@ func (c *Command) configureSecretsBackend() error {
 }
 
 // untilSucceeds runs op until it returns a nil error.
+// If c.timeoutDuration is reached it will exit so that the command can be retried with updated server settings
 // If c.cmdTimeout is cancelled it will exit.
 func (c *Command) untilSucceeds(opName string, op func() error) error {
+	timeoutCh := time.After(c.apiTimeoutDuration)
 	for {
 		err := op()
 		if err == nil {
@@ -881,6 +898,8 @@ func (c *Command) untilSucceeds(opName string, op func() error) error {
 		select {
 		case <-time.After(c.retryDuration):
 			continue
+		case <-timeoutCh:
+			return errors.New("reached api timeout")
 		case <-c.ctx.Done():
 			return errors.New("reached command timeout")
 		}
@@ -896,12 +915,16 @@ func (c *Command) withPrefix(resource string) string {
 
 // consulDatacenterList returns the current datacenter name and the primary datacenter using the
 // /agent/self API endpoint.
-func (c *Command) consulDatacenterList(client *api.Client) (string, string, error) {
+func (c *Command) consulDatacenterList(client *consul.DynamicClient) (string, string, error) {
 	var agentCfg map[string]map[string]interface{}
 	err := c.untilSucceeds("calling /agent/self to get datacenter",
 		func() error {
 			var opErr error
-			agentCfg, opErr = client.Agent().Self()
+			opErr = client.RefreshClient()
+			if opErr != nil {
+				c.log.Error("could not refresh client", opErr)
+			}
+			agentCfg, opErr = client.ConsulClient.Agent().Self()
 			return opErr
 		})
 	if err != nil {
@@ -1030,6 +1053,25 @@ func (c *Command) quitVaultAgent() {
 	if err != nil {
 		c.log.Error("Error telling Vault agent to quit", "error", err)
 	}
+}
+
+// serverIPAddresses attempts to refresh the server IPs using netaddrs methods. These 'raw' IPs are used
+// when boostrapping ACLs and before consul-server-connection-manager runs.
+func (c *Command) serverIPAddresses() ([]net.IPAddr, error) {
+	var ipAddrs []net.IPAddr
+	var err error
+	if err = backoff.Retry(func() error {
+		ipAddrs, err = netaddrs.IPAddrs(c.ctx, c.consulFlags.Addresses, c.log)
+		if err != nil {
+			c.log.Error("Error resolving IP Address", "err", err)
+			return err
+		}
+		c.log.Info("Refreshing server IP addresses", "addresses", ipAddrs)
+		return nil
+	}, exponentialBackoffWithMaxInterval()); err != nil {
+		return nil, err
+	}
+	return ipAddrs, nil
 }
 
 const (

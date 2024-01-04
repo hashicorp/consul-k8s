@@ -13,8 +13,6 @@ spec:
     kind: MeshGateway
     listKind: MeshGatewayList
     plural: meshgateways
-    shortNames:
-    - mesh-gateway
     singular: meshgateway
   scope: Namespaced
   versions:
@@ -49,6 +47,11 @@ spec:
           metadata:
             type: object
           spec:
+            properties:
+              gatewayClassName:
+                description: GatewayClassName is the name of the GatewayClass used
+                  by the MeshGateway
+                type: string
             type: object
           status:
             properties:

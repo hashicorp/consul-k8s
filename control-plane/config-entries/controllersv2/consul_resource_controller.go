@@ -38,14 +38,14 @@ const (
 	ExternallyManagedConfigError = "ExternallyManagedConfigError"
 )
 
-// Controller is implemented by CRD-specific config-entries. It is used by
-// MeshConfigController to abstract CRD-specific config-entries.
-type Controller interface {
+// ResourceController is implemented by controllers syncing Consul Resources from their CRD counterparts.
+// It is used by ConsulResourceController to abstract CRD-specific Consul Resources.
+type ResourceController interface {
 	// Update updates the state of the whole object.
 	Update(context.Context, client.Object, ...client.UpdateOption) error
 	// UpdateStatus updates the state of just the object's status.
 	UpdateStatus(context.Context, client.Object, ...client.SubResourceUpdateOption) error
-	// Get retrieves an obj for the given object key from the Kubernetes Cluster.
+	// Get retrieves an object for the given object key from the Kubernetes Cluster.
 	// obj must be a struct pointer so that obj can be updated with the response
 	// returned by the Server.
 	Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error
@@ -54,10 +54,10 @@ type Controller interface {
 	Logger(types.NamespacedName) logr.Logger
 }
 
-// MeshConfigController is a generic controller that is used to reconcile
-// all resource types, e.g. TrafficPermissions, ProxyConfiguration, etc., since
+// ConsulResourceController is a generic controller that is used to reconcile
+// all Consul Resource types, e.g. TrafficPermissions, ProxyConfiguration, etc., since
 // they share the same reconcile behaviour.
-type MeshConfigController struct {
+type ConsulResourceController struct {
 	// ConsulClientConfig is the config for the Consul API client.
 	ConsulClientConfig *consul.Config
 
@@ -73,9 +73,9 @@ type MeshConfigController struct {
 // CRD-specific controller should pass themselves in as updater since we
 // need to call back into their own update methods to ensure they update their
 // internal state.
-func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Controller, req ctrl.Request, meshConfig common.MeshConfig) (ctrl.Result, error) {
+func (r *ConsulResourceController) ReconcileEntry(ctx context.Context, crdCtrl ResourceController, req ctrl.Request, resource common.ConsulResource) (ctrl.Result, error) {
 	logger := crdCtrl.Logger(req.NamespacedName)
-	err := crdCtrl.Get(ctx, req.NamespacedName, meshConfig)
+	err := crdCtrl.Get(ctx, req.NamespacedName, resource)
 	if k8serr.IsNotFound(err) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	} else if err != nil {
@@ -99,24 +99,24 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 		ctx = metadata.AppendToOutgoingContext(ctx, "x-consul-token", state.Token)
 	}
 
-	if meshConfig.GetDeletionTimestamp().IsZero() {
+	if resource.GetDeletionTimestamp().IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then let's add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
-		if !slices.Contains(meshConfig.GetFinalizers(), FinalizerName) {
-			meshConfig.AddFinalizer(FinalizerName)
-			if err := r.syncUnknown(ctx, crdCtrl, meshConfig); err != nil {
+		if !slices.Contains(resource.GetFinalizers(), FinalizerName) {
+			resource.AddFinalizer(FinalizerName)
+			if err := r.syncUnknown(ctx, crdCtrl, resource); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	}
 
-	if !meshConfig.GetDeletionTimestamp().IsZero() {
-		if slices.Contains(meshConfig.GetFinalizers(), FinalizerName) {
+	if !resource.GetDeletionTimestamp().IsZero() {
+		if slices.Contains(resource.GetFinalizers(), FinalizerName) {
 			// The object is being deleted
 			logger.Info("deletion event")
 			// Check to see if consul has config entry with the same name
-			res, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+			res, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: resource.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 
 			// Ignore the error where the resource isn't found in Consul.
 			// It is indicative of desired state.
@@ -125,21 +125,21 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 			}
 
 			// In the case this resource was created outside of consul, skip the deletion process and continue
-			if !managedByMeshController(res.GetResource()) {
-				logger.Info("resource in Consul was created outside of kubernetes - skipping delete from Consul")
+			if !managedByConsulResourceController(res.GetResource()) {
+				logger.Info("resource in Consul was created outside of Kubernetes - skipping delete from Consul")
 			}
 
-			if err == nil && managedByMeshController(res.GetResource()) {
-				_, err := resourceClient.Delete(ctx, &pbresource.DeleteRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+			if err == nil && managedByConsulResourceController(res.GetResource()) {
+				_, err := resourceClient.Delete(ctx, &pbresource.DeleteRequest{Id: resource.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 				if err != nil {
-					return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ConsulAgentError,
-						fmt.Errorf("deleting config entry from consul: %w", err))
+					return r.syncFailed(ctx, logger, crdCtrl, resource, ConsulAgentError,
+						fmt.Errorf("deleting resource from Consul: %w", err))
 				}
 				logger.Info("deletion from Consul successful")
 			}
 			// remove our finalizer from the list and update it.
-			meshConfig.RemoveFinalizer(FinalizerName)
-			if err := crdCtrl.Update(ctx, meshConfig); err != nil {
+			resource.RemoveFinalizer(FinalizerName)
+			if err := crdCtrl.Update(ctx, resource); err != nil {
 				return ctrl.Result{}, err
 			}
 			logger.Info("finalizer removed")
@@ -150,7 +150,7 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 	}
 
 	// Check to see if consul has config entry with the same name
-	res, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: meshConfig.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+	res, err := resourceClient.Read(ctx, &pbresource.ReadRequest{Id: resource.ResourceID(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 
 	// In the case the namespace doesn't exist in Consul yet, assume we are racing with the namespace controller
 	// and requeue.
@@ -163,42 +163,42 @@ func (r *MeshConfigController) ReconcileEntry(ctx context.Context, crdCtrl Contr
 
 	// If resource with this name does not exist
 	if isNotFoundErr(err) {
-		logger.Info("resource not found in consul")
+		logger.Info("resource not found in Consul")
 
 		// Create the config entry
-		_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: meshConfig.Resource(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+		_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: resource.Resource(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 		if err != nil {
-			return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ConsulAgentError,
-				fmt.Errorf("writing resource to consul: %w", err))
+			return r.syncFailed(ctx, logger, crdCtrl, resource, ConsulAgentError,
+				fmt.Errorf("writing resource to Consul: %w", err))
 		}
 
 		logger.Info("resource created")
-		return r.syncSuccessful(ctx, crdCtrl, meshConfig)
+		return r.syncSuccessful(ctx, crdCtrl, resource)
 	}
 
 	// If there is an error when trying to get the resource from the api server,
 	// fail the reconcile.
 	if err != nil {
-		return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ConsulAgentError, err)
+		return r.syncFailed(ctx, logger, crdCtrl, resource, ConsulAgentError, err)
 	}
 
 	// TODO: consider the case where we want to migrate a resource existing into Consul to a CRD with an annotation
-	if !managedByMeshController(res.Resource) {
-		return r.syncFailed(ctx, logger, crdCtrl, meshConfig, ExternallyManagedConfigError,
+	if !managedByConsulResourceController(res.Resource) {
+		return r.syncFailed(ctx, logger, crdCtrl, resource, ExternallyManagedConfigError,
 			fmt.Errorf("resource already exists in Consul"))
 	}
 
-	if !meshConfig.MatchesConsul(res.Resource, r.consulNamespace(req.Namespace), r.getConsulPartition()) {
+	if !resource.MatchesConsul(res.Resource, r.consulNamespace(req.Namespace), r.getConsulPartition()) {
 		logger.Info("resource does not match Consul")
-		_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: meshConfig.Resource(r.consulNamespace(req.Namespace), r.getConsulPartition())})
+		_, err := resourceClient.Write(ctx, &pbresource.WriteRequest{Resource: resource.Resource(r.consulNamespace(req.Namespace), r.getConsulPartition())})
 		if err != nil {
-			return r.syncUnknownWithError(ctx, logger, crdCtrl, meshConfig, ConsulAgentError,
+			return r.syncUnknownWithError(ctx, logger, crdCtrl, resource, ConsulAgentError,
 				fmt.Errorf("updating resource in Consul: %w", err))
 		}
-		logger.Info("config entry updated")
-		return r.syncSuccessful(ctx, crdCtrl, meshConfig)
-	} else if meshConfig.SyncedConditionStatus() != corev1.ConditionTrue {
-		return r.syncSuccessful(ctx, crdCtrl, meshConfig)
+		logger.Info("resource updated")
+		return r.syncSuccessful(ctx, crdCtrl, resource)
+	} else if resource.SyncedConditionStatus() != corev1.ConditionTrue {
+		return r.syncSuccessful(ctx, crdCtrl, resource)
 	}
 
 	return ctrl.Result{}, nil
@@ -235,7 +235,7 @@ func setupWithManager(mgr ctrl.Manager, resource client.Object, reconciler recon
 		Complete(reconciler)
 }
 
-func (r *MeshConfigController) syncFailed(ctx context.Context, logger logr.Logger, updater Controller, resource common.MeshConfig, errType string, err error) (ctrl.Result, error) {
+func (r *ConsulResourceController) syncFailed(ctx context.Context, logger logr.Logger, updater ResourceController, resource common.ConsulResource, errType string, err error) (ctrl.Result, error) {
 	resource.SetSyncedCondition(corev1.ConditionFalse, errType, err.Error())
 	if updateErr := updater.UpdateStatus(ctx, resource); updateErr != nil {
 		// Log the original error here because we are returning the updateErr.
@@ -246,22 +246,22 @@ func (r *MeshConfigController) syncFailed(ctx context.Context, logger logr.Logge
 	return ctrl.Result{}, err
 }
 
-func (r *MeshConfigController) syncSuccessful(ctx context.Context, updater Controller, resource common.MeshConfig) (ctrl.Result, error) {
+func (r *ConsulResourceController) syncSuccessful(ctx context.Context, updater ResourceController, resource common.ConsulResource) (ctrl.Result, error) {
 	resource.SetSyncedCondition(corev1.ConditionTrue, "", "")
 	timeNow := metav1.NewTime(time.Now())
 	resource.SetLastSyncedTime(&timeNow)
 	return ctrl.Result{}, updater.UpdateStatus(ctx, resource)
 }
 
-func (r *MeshConfigController) syncUnknown(ctx context.Context, updater Controller, resource common.MeshConfig) error {
+func (r *ConsulResourceController) syncUnknown(ctx context.Context, updater ResourceController, resource common.ConsulResource) error {
 	resource.SetSyncedCondition(corev1.ConditionUnknown, "", "")
 	return updater.Update(ctx, resource)
 }
 
-func (r *MeshConfigController) syncUnknownWithError(ctx context.Context,
+func (r *ConsulResourceController) syncUnknownWithError(ctx context.Context,
 	logger logr.Logger,
-	updater Controller,
-	resource common.MeshConfig,
+	updater ResourceController,
+	resource common.ConsulResource,
 	errType string,
 	err error) (ctrl.Result, error) {
 
@@ -287,7 +287,7 @@ func isNotFoundErr(err error) bool {
 	return codes.NotFound == s.Code()
 }
 
-func (r *MeshConfigController) consulNamespace(namespace string) string {
+func (r *ConsulResourceController) consulNamespace(namespace string) string {
 	ns := namespaces.ConsulNamespace(
 		namespace,
 		r.EnableConsulNamespaces,
@@ -303,14 +303,14 @@ func (r *MeshConfigController) consulNamespace(namespace string) string {
 	return ns
 }
 
-func (r *MeshConfigController) getConsulPartition() string {
+func (r *ConsulResourceController) getConsulPartition() string {
 	if !r.EnableConsulPartitions || r.ConsulPartition == "" {
 		return constants.DefaultConsulPartition
 	}
 	return r.ConsulPartition
 }
 
-func managedByMeshController(resource *pbresource.Resource) bool {
+func managedByConsulResourceController(resource *pbresource.Resource) bool {
 	if resource == nil {
 		return false
 	}

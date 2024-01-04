@@ -18,16 +18,16 @@ import (
 // TCPRouteController reconciles a TCPRoute object.
 type TCPRouteController struct {
 	client.Client
-	Log                  logr.Logger
-	Scheme               *runtime.Scheme
-	MeshConfigController *MeshConfigController
+	Log        logr.Logger
+	Scheme     *runtime.Scheme
+	Controller *ConsulResourceController
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=tcproute,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=tcproute/status,verbs=get;update;patch
 
 func (r *TCPRouteController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.MeshConfigController.ReconcileEntry(ctx, r, req, &meshv2beta1.TCPRoute{})
+	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.TCPRoute{})
 }
 
 func (r *TCPRouteController) Logger(name types.NamespacedName) logr.Logger {

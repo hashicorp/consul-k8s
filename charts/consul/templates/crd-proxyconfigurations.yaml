@@ -127,24 +127,6 @@ spec:
                         format: int32
                         type: string
                     type: object
-                  envoyExtensions:
-                    items:
-                      description: EnvoyExtension has configuration for an extension
-                        that patches Envoy resources.
-                      properties:
-                        arguments:
-                          type: object
-                          x-kubernetes-preserve-unknown-fields: true
-                        consulVersion:
-                          type: string
-                        envoyVersion:
-                          type: string
-                        name:
-                          type: string
-                        required:
-                          type: boolean
-                      type: object
-                    type: array
                   exposeConfig:
                     properties:
                       exposePaths:
@@ -178,7 +160,7 @@ spec:
                         format: int32
                         type: string
                       maxInboundConnections:
-                        format: int64
+                        format: int32
                         type: integer
                     type: object
                   listenerTracingJson:

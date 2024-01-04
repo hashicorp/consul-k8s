@@ -113,6 +113,12 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				},
 			},
 			{
+				Name: "POD_UID",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.uid"},
+				},
+			},
+			{
 				Name:  "DP_CREDENTIAL_LOGIN_META",
 				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 			},
@@ -121,6 +127,10 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			{
 				Name:  "DP_CREDENTIAL_LOGIN_META1",
 				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+			},
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META2",
+				Value: "pod-uid=$(POD_UID)",
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
@@ -160,6 +170,15 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			return corev1.Container{}, err
 		}
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
+	}
+
+	// Container Ports
+	metricsPorts, err := w.getMetricsPorts(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	if metricsPorts != nil {
+		container.Ports = append(container.Ports, metricsPorts...)
 	}
 
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
@@ -499,4 +518,38 @@ func useProxyHealthCheck(pod corev1.Pod) bool {
 		return useProxyHealthCheck
 	}
 	return false
+}
+
+// getMetricsPorts creates container ports for exposing services such as prometheus.
+// Prometheus in particular needs a named port for use with the operator.
+// https://github.com/hashicorp/consul-k8s/pull/1440
+func (w *MeshWebhook) getMetricsPorts(pod corev1.Pod) ([]corev1.ContainerPort, error) {
+	enableMetrics, err := w.MetricsConfig.EnableMetrics(pod)
+	if err != nil {
+		return nil, fmt.Errorf("error determining if metrics are enabled: %w", err)
+	}
+	if !enableMetrics {
+		return nil, nil
+	}
+
+	prometheusScrapePort, err := w.MetricsConfig.PrometheusScrapePort(pod)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
+	}
+	if prometheusScrapePort == "" {
+		return nil, nil
+	}
+
+	port, err := strconv.Atoi(prometheusScrapePort)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
+	}
+
+	return []corev1.ContainerPort{
+		{
+			Name:          "prometheus",
+			ContainerPort: int32(port),
+			Protocol:      corev1.ProtocolTCP,
+		},
+	}, nil
 }
