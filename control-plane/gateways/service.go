@@ -36,15 +36,25 @@ func (b *meshGatewayBuilder) Service() *corev1.Service {
 		Spec: corev1.ServiceSpec{
 			Selector: b.labelsForDeployment(),
 			Type:     serviceType,
-			Ports: []corev1.ServicePort{
-				{
-					Name: "wan",
-					Port: port,
-					TargetPort: intstr.IntOrString{
-						IntVal: port + portModifier,
-					},
-				},
-			},
+			Ports:    b.Ports(portModifier),
 		},
 	}
+}
+
+// Ports build a list of ports from the listener objects. In theory there should only ever be a WAN port on
+// mesh gateway but building the ports from a list of listeners will
+func (b *meshGatewayBuilder) Ports(portModifier int32) []corev1.ServicePort {
+
+	ports := []corev1.ServicePort{}
+
+	for _, listener := range b.gateway.Spec.Listeners {
+		ports = append(ports, corev1.ServicePort{
+			Name: listener.Name,
+			Port: int32(listener.Port),
+			TargetPort: intstr.IntOrString{
+				IntVal: port + portModifier,
+			},
+		})
+	}
+	return ports
 }

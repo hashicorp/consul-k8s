@@ -52,6 +52,16 @@ spec:
                 description: GatewayClassName is the name of the GatewayClass used
                   by the MeshGateway
                 type: string
+              listeners:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    port:
+                      format: int32
+                      type: integer
+                  type: object
+                type: array
             type: object
           status:
             properties:
