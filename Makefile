@@ -48,6 +48,7 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
 .PHONY: control-plane-dev-skaffold
@@ -56,6 +57,7 @@ control-plane-dev-skaffold: ## Build consul-k8s-control-plane dev Docker image f
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
 	@docker build -t '$(DEV_IMAGE)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
+       --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        -f $(CURDIR)/control-plane/Dockerfile.dev $(CURDIR)/control-plane
 
 .PHONY: check-remote-dev-image-env
@@ -73,6 +75,7 @@ control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --push \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
@@ -85,6 +88,7 @@ control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --push \
        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
@@ -389,6 +393,9 @@ endif
 # ===========> Makefile config
 .DEFAULT_GOAL := help
 SHELL = bash
+# When changing the method of Go version detection, also update
+# version detection in CI workflows (build.yml).
+GOLANG_VERSION?=$(shell head -n 1 .go-version)
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
 DEV_IMAGE?=consul-k8s-control-plane-dev

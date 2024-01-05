@@ -3,6 +3,10 @@ SHELL = bash
 ################
 # CI Variables #
 ################
+
+# When changing the method of Go version detection, also update
+# version detection in CI workflows (build.yml).
+GOLANG_VERSION?=$(shell head -n 1 ../.go-version)
 GIT_COMMIT?=$(shell git rev-parse --short HEAD)
 GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_DESCRIBE?=$(shell git describe --tags --always)
@@ -33,6 +37,7 @@ ci.dev-docker:
 	@docker buildx build -t '$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT)' \
 	--platform linux/amd64,linux/arm64 \
 	--target=dev \
+	--build-arg GOLANG_VERSION=$(GOLANG_VERSION) \
 	--push \
 	--label COMMIT_SHA=$(CIRCLE_SHA1) \
 	--label PULL_REQUEST=$(CIRCLE_PULL_REQUEST) \
@@ -43,6 +48,7 @@ ifeq ($(CIRCLE_BRANCH), main)
 	@docker buildx build -t '$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest' \
 	--platform linux/amd64,linux/arm64 \
 	--target=dev \
+	--build-arg GOLANG_VERSION=$(GOLANG_VERSION) \
 	--push \
 	--label COMMIT_SHA=$(CIRCLE_SHA1) \
 	--label PULL_REQUEST=$(CIRCLE_PULL_REQUEST) \
