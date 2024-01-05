@@ -25,6 +25,8 @@ func TestConnectInject_LocalRateLimiting(t *testing.T) {
 
 	if !cfg.EnableEnterprise {
 		t.Skipf("rate limiting is an enterprise only feature. -enable-enterprise must be set to run this test.")
+	} else if !cfg.UseKind {
+		t.Skipf("rate limiting tests are time sensitive and can be flaky on cloud providers. Only test on Kind.")
 	}
 
 	ctx := suite.Environment().DefaultContext(t)
