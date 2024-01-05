@@ -99,6 +99,7 @@ func testReconcileCreateNamespace(t *testing.T, testCases []createTestCase) {
 		// Fire up consul server with v2tenancy enabled
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis", "v2tenancy"}
+			c.LogLevel = "trace"
 		})
 
 		// Create partition if needed
