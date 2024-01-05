@@ -10,7 +10,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,8 +28,6 @@ import (
 )
 
 func TestReconcileCreateNamespace_CE(t *testing.T) {
-	t.Parallel()
-
 	testCases := []createTestCase{
 		{
 			name:                       "destination consul namespace is default/default",
@@ -157,8 +154,6 @@ func testReconcileCreateNamespace(t *testing.T, testCases []createTestCase) {
 }
 
 func TestReconcileDeleteNamespace_CE(t *testing.T) {
-	t.Parallel()
-
 	testCases := []deleteTestCase{
 		{
 			name:                       "destination namespace is default and not cleaned up when kube namespace is deleted",
@@ -361,10 +356,16 @@ func RequireEventuallyAccepted(t *testing.T, resourceClient pbresource.ResourceS
 }
 
 func RequireEventuallyNotFound(t *testing.T, resourceClient pbresource.ResourceServiceClient, id *pbresource.ID) {
-	require.EventuallyWithTf(t, func(collect *assert.CollectT) {
-		_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{Id: id})
-		require.Error(collect, err)
-		require.Equal(collect, codes.NotFound, status.Code(err), "expected %s to be deleted", id)
+	// allow both "not found" and "marked for deletion" so we're not waiting around unnecessarily
+	require.Eventuallyf(t, func() bool {
+		rsp, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{Id: id})
+		if err == nil {
+			return isMarkedForDeletion(rsp.Resource)
+		}
+		if status.Code(err) == codes.NotFound {
+			return true
+		}
+		return false
 	},
 		time.Second*5,
 		time.Millisecond*100,

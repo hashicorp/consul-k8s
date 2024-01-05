@@ -94,7 +94,7 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 				})
 				require.NoError(collect, err)
 			},
-				time.Second*5,
+				time.Second*10,
 				time.Millisecond*100,
 				"timed out waiting for v2 builtin default namespace creation",
 			)

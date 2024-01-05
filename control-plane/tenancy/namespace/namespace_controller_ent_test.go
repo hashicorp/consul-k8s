@@ -10,8 +10,6 @@ import (
 )
 
 func TestReconcileCreateNamespace_ENT(t *testing.T) {
-	t.Parallel()
-
 	testCases := []createTestCase{
 		{
 			name:                       "destination consul namespace is ap1/ns1",
@@ -41,8 +39,6 @@ func TestReconcileCreateNamespace_ENT(t *testing.T) {
 }
 
 func TestReconcileDeleteNamespace_ENT(t *testing.T) {
-	t.Parallel()
-
 	testCases := []deleteTestCase{
 		{
 			name:                       "destination namespace with non-default is not cleaned up, non-default partition",
