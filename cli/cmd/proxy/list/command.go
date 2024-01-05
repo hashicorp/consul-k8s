@@ -219,6 +219,46 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	}
 	pods = append(pods, gatewaypods.Items...)
 
+	// Fetch API Gateway pods with depricated label and append if they aren't already in the list
+	//TODO this block can be deleted if and when we decide we are ok with no longer listing pods of people using previous API Gateway
+	//versions.
+	// ---
+	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
+		LabelSelector: "api-gateway.consul.hashicorp.com/managed=true",
+	})
+
+	namespacedName := func(pod v1.Pod) string {
+		return pod.Namespace + pod.Name
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(apigatewaypods.Items) > 0 {
+		//Deduplicated pod list
+		seenPods := map[string]bool{}
+		for _, pod := range apigatewaypods.Items {
+			if seenPods[namespacedName(pod)] {
+				continue
+			}
+			found := false
+			for _, gatewayPod := range gatewaypods.Items {
+				//note that we already have this pod in the list so we can exit early.
+				seenPods[namespacedName(gatewayPod)] = true
+
+				if (namespacedName(gatewayPod)) == namespacedName(pod) {
+					found = true
+					break
+				}
+			}
+			//pod isn't in the list already, we can add it.
+			if !found {
+				pods = append(pods, pod)
+			}
+
+		}
+	}
+	//---
+
 	// Fetch all pods in the namespace with a label indicating they are a service networked by Consul.
 	sidecarpods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "consul.hashicorp.com/connect-inject-status=injected",
@@ -271,6 +311,11 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		default:
 			// Fallback to "Sidecar" as a default
 			proxyType = "Sidecar"
+
+			// Determine if depreciated API Gateway pod.
+			if pod.Labels["api-gateway.consul.hashicorp.com/managed"] == "true" {
+				proxyType = "API Gateway"
+			}
 		}
 
 		if c.flagAllNamespaces {
