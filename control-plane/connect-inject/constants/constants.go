@@ -73,8 +73,13 @@ const (
 
 	KubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 
-	// ProxyIDVolumePath is the name of the volume that contains the proxy ID.
-	ProxyIDVolumePath = "/consul/mesh-inject"
+	// MeshV2VolumePath is the name of the volume that contains the proxy ID.
+	MeshV2VolumePath = "/consul/mesh-inject"
+
+	UseTLSEnvVar        = "CONSUL_USE_TLS"
+	CACertFileEnvVar    = "CONSUL_CACERT_FILE"
+	CACertPEMEnvVar     = "CONSUL_CACERT_PEM"
+	TLSServerNameEnvVar = "CONSUL_TLS_SERVER_NAME"
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace
