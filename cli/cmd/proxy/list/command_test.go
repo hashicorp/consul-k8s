@@ -399,7 +399,7 @@ func TestListCommandOutputInJsonFormat(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "depricated-api-gateway",
+				Name:      "deprecated-api-gateway",
 				Namespace: "consul",
 				Labels: map[string]string{
 					"api-gateway.consul.hashicorp.com/managed": "true",
