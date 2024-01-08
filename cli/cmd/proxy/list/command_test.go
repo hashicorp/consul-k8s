@@ -342,7 +342,7 @@ func TestListCommandOutput(t *testing.T) {
 
 func TestListCommandOutputInJsonFormat(t *testing.T) {
 	// These regular expressions must be present in the output.
-	expected := ".*Name.*api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*both-labels-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*mesh-gateway.*\n.*Namespace.*consul.*\n.*Type.*Mesh Gateway.*\n.*\n.*\n.*Name.*terminating-gateway.*\n.*Namespace.*consul.*\n.*Type.*Terminating Gateway.*\n.*\n.*\n.*Name.*ingress-gateway.*\n.*Namespace.*default.*\n.*Type.*Ingress Gateway.*\n.*\n.*\n.*Name.*depricated-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*pod1.*\n.*Namespace.*default.*\n.*Type.*Sidecar.*"
+	expected := ".*Name.*api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*both-labels-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*mesh-gateway.*\n.*Namespace.*consul.*\n.*Type.*Mesh Gateway.*\n.*\n.*\n.*Name.*terminating-gateway.*\n.*Namespace.*consul.*\n.*Type.*Terminating Gateway.*\n.*\n.*\n.*Name.*ingress-gateway.*\n.*Namespace.*default.*\n.*Type.*Ingress Gateway.*\n.*\n.*\n.*Name.*deprecated-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*pod1.*\n.*Namespace.*default.*\n.*Type.*Sidecar.*"
 	notExpected := "default.*dont-fetch.*Sidecar"
 
 	pods := []v1.Pod{
