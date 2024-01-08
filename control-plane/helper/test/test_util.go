@@ -74,11 +74,10 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	require.NoError(t, err)
 
 	// Prevent test flakes due to "ACL system must be bootstrapped before ..." error
-	// requiring successful retrieval of the initial mgmt token.
+	// by requiring successful retrieval of the initial mgmt token.
 	if cfg.ACL.Enabled && cfg.ACL.Tokens.InitialManagement != "" {
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			_, _, err = client.ACL().TokenReadSelf(nil)
-			t.Logf("WWWW waiting for self token errored with: %v", err)
 			assert.NoError(c, err)
 		},
 			eventuallyWaitFor,

@@ -36,7 +36,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
@@ -119,13 +118,6 @@ func TestWorkloadWrite(t *testing.T) {
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis"}
 		})
-		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-			return err == nil
-		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -137,16 +129,16 @@ func TestWorkloadWrite(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 			},
-			ResourceClient: resourceClient,
+			ResourceClient: testClient.ResourceClient,
 		}
 
-		err = pc.writeWorkload(context.Background(), *tc.pod)
+		err := pc.writeWorkload(context.Background(), *tc.pod)
 		require.NoError(t, err)
 
 		req := &pbresource.ReadRequest{
 			Id: getWorkloadID(tc.pod.GetName(), metav1.NamespaceDefault, constants.DefaultConsulPartition),
 		}
-		actualRes, err := resourceClient.Read(context.Background(), req)
+		actualRes, err := testClient.ResourceClient.Read(context.Background(), req)
 		require.NoError(t, err)
 		require.NotNil(t, actualRes)
 
@@ -310,13 +302,6 @@ func TestWorkloadDelete(t *testing.T) {
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis"}
 		})
-		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-			return err == nil
-		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -328,7 +313,7 @@ func TestWorkloadDelete(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 			},
-			ResourceClient: resourceClient,
+			ResourceClient: testClient.ResourceClient,
 		}
 
 		workload, err := anypb.New(tc.existingWorkload)
@@ -342,9 +327,9 @@ func TestWorkloadDelete(t *testing.T) {
 			},
 		}
 
-		_, err = resourceClient.Write(context.Background(), writeReq)
+		_, err = testClient.ResourceClient.Write(context.Background(), writeReq)
 		require.NoError(t, err)
-		test.ResourceHasPersisted(t, context.Background(), resourceClient, workloadID)
+		test.ResourceHasPersisted(t, context.Background(), testClient.ResourceClient, workloadID)
 
 		reconcileReq := types.NamespacedName{
 			Namespace: metav1.NamespaceDefault,
@@ -356,7 +341,7 @@ func TestWorkloadDelete(t *testing.T) {
 		readReq := &pbresource.ReadRequest{
 			Id: getWorkloadID(tc.pod.GetName(), metav1.NamespaceDefault, constants.DefaultConsulPartition),
 		}
-		_, err = resourceClient.Read(context.Background(), readReq)
+		_, err = testClient.ResourceClient.Read(context.Background(), readReq)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
@@ -399,13 +384,6 @@ func TestHealthStatusWrite(t *testing.T) {
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis"}
 		})
-		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-			return err == nil
-		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -417,7 +395,7 @@ func TestHealthStatusWrite(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 			},
-			ResourceClient: resourceClient,
+			ResourceClient: testClient.ResourceClient,
 		}
 
 		// The owner of a resource is validated, so create a dummy workload for the HealthStatus
@@ -431,7 +409,7 @@ func TestHealthStatusWrite(t *testing.T) {
 				Data: workloadData,
 			},
 		}
-		_, err = resourceClient.Write(context.Background(), writeReq)
+		_, err = testClient.ResourceClient.Write(context.Background(), writeReq)
 		require.NoError(t, err)
 
 		// Test writing the pod to a HealthStatus
@@ -441,7 +419,7 @@ func TestHealthStatusWrite(t *testing.T) {
 		req := &pbresource.ReadRequest{
 			Id: getHealthStatusID(tc.pod.GetName(), metav1.NamespaceDefault, constants.DefaultConsulPartition),
 		}
-		actualRes, err := resourceClient.Read(context.Background(), req)
+		actualRes, err := testClient.ResourceClient.Read(context.Background(), req)
 		require.NoError(t, err)
 		require.NotNil(t, actualRes)
 
@@ -520,13 +498,6 @@ func TestProxyConfigurationWrite(t *testing.T) {
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis"}
 		})
-		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-			return err == nil
-		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -541,7 +512,7 @@ func TestProxyConfigurationWrite(t *testing.T) {
 			EnableTransparentProxy:   tc.tproxy,
 			TProxyOverwriteProbes:    tc.overwriteProbes,
 			EnableTelemetryCollector: tc.telemetry,
-			ResourceClient:           resourceClient,
+			ResourceClient:           testClient.ResourceClient,
 		}
 
 		if tc.metrics {
@@ -552,13 +523,13 @@ func TestProxyConfigurationWrite(t *testing.T) {
 		}
 
 		// Test writing the pod to a HealthStatus
-		err = pc.writeProxyConfiguration(context.Background(), *tc.pod)
+		err := pc.writeProxyConfiguration(context.Background(), *tc.pod)
 		require.NoError(t, err)
 
 		req := &pbresource.ReadRequest{
 			Id: getProxyConfigurationID(tc.pod.GetName(), metav1.NamespaceDefault, constants.DefaultConsulPartition),
 		}
-		actualRes, err := resourceClient.Read(context.Background(), req)
+		actualRes, err := testClient.ResourceClient.Read(context.Background(), req)
 
 		if tc.expectedProxyConfiguration == nil {
 			require.Error(t, err)
@@ -727,13 +698,6 @@ func TestProxyConfigurationDelete(t *testing.T) {
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis"}
 		})
-		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-			return err == nil
-		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -745,7 +709,7 @@ func TestProxyConfigurationDelete(t *testing.T) {
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSetWith(),
 			},
-			ResourceClient: resourceClient,
+			ResourceClient: testClient.ResourceClient,
 		}
 
 		// Create the existing ProxyConfiguration
@@ -760,9 +724,9 @@ func TestProxyConfigurationDelete(t *testing.T) {
 			},
 		}
 
-		_, err = resourceClient.Write(context.Background(), writeReq)
+		_, err = testClient.ResourceClient.Write(context.Background(), writeReq)
 		require.NoError(t, err)
-		test.ResourceHasPersisted(t, context.Background(), resourceClient, pcID)
+		test.ResourceHasPersisted(t, context.Background(), testClient.ResourceClient, pcID)
 
 		reconcileReq := types.NamespacedName{
 			Namespace: metav1.NamespaceDefault,
@@ -774,7 +738,7 @@ func TestProxyConfigurationDelete(t *testing.T) {
 		readReq := &pbresource.ReadRequest{
 			Id: getProxyConfigurationID(tc.pod.GetName(), metav1.NamespaceDefault, constants.DefaultConsulPartition),
 		}
-		_, err = resourceClient.Read(context.Background(), readReq)
+		_, err = testClient.ResourceClient.Read(context.Background(), readReq)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
@@ -1011,13 +975,6 @@ func TestDestinationsWrite(t *testing.T) {
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
 			})
-			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-			require.NoError(t, err)
-
-			require.Eventually(t, func() bool {
-				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-				return err == nil
-			}, 5*time.Second, 500*time.Millisecond)
 
 			pc := &Controller{
 				Log: logrtest.New(t),
@@ -1029,17 +986,17 @@ func TestDestinationsWrite(t *testing.T) {
 					EnableConsulNamespaces: tt.consulNamespacesEnabled,
 					EnableConsulPartitions: tt.consulPartitionsEnabled,
 				},
-				ResourceClient: resourceClient,
+				ResourceClient: testClient.ResourceClient,
 			}
 
-			err = pc.writeDestinations(context.Background(), *tt.pod())
+			err := pc.writeDestinations(context.Background(), *tt.pod())
 
 			if tt.expErr != "" {
 				require.EqualError(t, err, tt.expErr)
 			} else {
 				require.NoError(t, err)
 				uID := getDestinationsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-				expectedDestinationMatches(t, context.Background(), resourceClient, uID, tt.expected)
+				expectedDestinationMatches(t, context.Background(), testClient.ResourceClient, uID, tt.expected)
 			}
 		})
 	}
@@ -1099,13 +1056,6 @@ func TestDestinationsDelete(t *testing.T) {
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
 			})
-			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-			require.NoError(t, err)
-
-			require.Eventually(t, func() bool {
-				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-				return err == nil
-			}, 5*time.Second, 500*time.Millisecond)
 
 			pc := &Controller{
 				Log: logrtest.New(t),
@@ -1113,17 +1063,17 @@ func TestDestinationsDelete(t *testing.T) {
 					AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 					DenyK8sNamespacesSet:  mapset.NewSetWith(),
 				},
-				ResourceClient: resourceClient,
+				ResourceClient: testClient.ResourceClient,
 			}
 
 			// Load in the upstream for us to delete and check that it's there
-			loadResource(t, context.Background(), resourceClient, getDestinationsID(tt.pod().Name, constants.DefaultConsulNS, constants.DefaultConsulPartition), tt.existingDestinations, nil)
+			loadResource(t, context.Background(), testClient.ResourceClient, getDestinationsID(tt.pod().Name, constants.DefaultConsulNS, constants.DefaultConsulPartition), tt.existingDestinations, nil)
 			uID := getDestinationsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-			expectedDestinationMatches(t, context.Background(), resourceClient, uID, tt.existingDestinations)
+			expectedDestinationMatches(t, context.Background(), testClient.ResourceClient, uID, tt.existingDestinations)
 
 			// Delete the upstream
 			nn := types.NamespacedName{Name: tt.pod().Name}
-			err = pc.deleteDestinations(context.Background(), nn)
+			err := pc.deleteDestinations(context.Background(), nn)
 
 			// Verify the upstream has been deleted or that an expected error has been returned
 			if tt.expErr != "" {
@@ -1131,7 +1081,7 @@ func TestDestinationsDelete(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				uID := getDestinationsID(tt.pod().Name, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-				expectedDestinationMatches(t, context.Background(), resourceClient, uID, nil)
+				expectedDestinationMatches(t, context.Background(), testClient.ResourceClient, uID, nil)
 			}
 		})
 	}
@@ -1150,20 +1100,6 @@ func TestDeleteACLTokens(t *testing.T) {
 		c.ACL.Tokens.InitialManagement = masterToken
 		c.Experiments = []string{"resource-apis"}
 	})
-	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-	require.NoError(t, err)
-
-	// Wait for the ACL system to be bootstraped
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.ACL().PolicyList(nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
-
-	// Wait for the default partition to be created
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
 
 	test.SetupK8sAuthMethodV2(t, testClient.APIClient, serviceName, metav1.NamespaceDefault)
 	token, _, err := testClient.APIClient.ACL().Login(&api.ACLLoginParams{
@@ -1182,7 +1118,7 @@ func TestDeleteACLTokens(t *testing.T) {
 			AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 			DenyK8sNamespacesSet:  mapset.NewSetWith(),
 		},
-		ResourceClient:      resourceClient,
+		ResourceClient:      testClient.ResourceClient,
 		AuthMethod:          test.AuthMethod,
 		ConsulClientConfig:  testClient.Cfg,
 		ConsulServerConnMgr: testClient.Watcher,
@@ -1244,13 +1180,6 @@ func TestReconcileCreatePod(t *testing.T) {
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis"}
 		})
-		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-			return err == nil
-		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -1294,16 +1223,16 @@ func TestReconcileCreatePod(t *testing.T) {
 		require.Equal(t, tc.requeue, resp.Requeue)
 
 		wID := getWorkloadID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedWorkloadMatches(t, context.Background(), resourceClient, wID, tc.expectedWorkload)
+		expectedWorkloadMatches(t, context.Background(), testClient.ResourceClient, wID, tc.expectedWorkload)
 
 		hsID := getHealthStatusID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedHealthStatusMatches(t, context.Background(), resourceClient, hsID, tc.expectedHealthStatus)
+		expectedHealthStatusMatches(t, context.Background(), testClient.ResourceClient, hsID, tc.expectedHealthStatus)
 
 		pcID := getProxyConfigurationID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedProxyConfigurationMatches(t, context.Background(), resourceClient, pcID, tc.expectedProxyConfiguration)
+		expectedProxyConfigurationMatches(t, context.Background(), testClient.ResourceClient, pcID, tc.expectedProxyConfiguration)
 
 		uID := getDestinationsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedDestinationMatches(t, context.Background(), resourceClient, uID, tc.expectedDestinations)
+		expectedDestinationMatches(t, context.Background(), testClient.ResourceClient, uID, tc.expectedDestinations)
 	}
 
 	testCases := []testCase{
@@ -1474,13 +1403,6 @@ func TestReconcileUpdatePod(t *testing.T) {
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis"}
 		})
-		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-			return err == nil
-		}, 5*time.Second, 500*time.Millisecond)
 
 		// Create the pod controller.
 		pc := &Controller{
@@ -1509,10 +1431,10 @@ func TestReconcileUpdatePod(t *testing.T) {
 		}
 
 		workloadID := getWorkloadID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition)
-		loadResource(t, context.Background(), resourceClient, workloadID, tc.existingWorkload, nil)
-		loadResource(t, context.Background(), resourceClient, getHealthStatusID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingHealthStatus, workloadID)
-		loadResource(t, context.Background(), resourceClient, getProxyConfigurationID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingProxyConfiguration, nil)
-		loadResource(t, context.Background(), resourceClient, getDestinationsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingDestinations, nil)
+		loadResource(t, context.Background(), testClient.ResourceClient, workloadID, tc.existingWorkload, nil)
+		loadResource(t, context.Background(), testClient.ResourceClient, getHealthStatusID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingHealthStatus, workloadID)
+		loadResource(t, context.Background(), testClient.ResourceClient, getProxyConfigurationID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingProxyConfiguration, nil)
+		loadResource(t, context.Background(), testClient.ResourceClient, getDestinationsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingDestinations, nil)
 
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
@@ -1530,16 +1452,16 @@ func TestReconcileUpdatePod(t *testing.T) {
 		require.False(t, resp.Requeue)
 
 		wID := getWorkloadID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedWorkloadMatches(t, context.Background(), resourceClient, wID, tc.expectedWorkload)
+		expectedWorkloadMatches(t, context.Background(), testClient.ResourceClient, wID, tc.expectedWorkload)
 
 		hsID := getHealthStatusID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedHealthStatusMatches(t, context.Background(), resourceClient, hsID, tc.expectedHealthStatus)
+		expectedHealthStatusMatches(t, context.Background(), testClient.ResourceClient, hsID, tc.expectedHealthStatus)
 
 		pcID := getProxyConfigurationID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedProxyConfigurationMatches(t, context.Background(), resourceClient, pcID, tc.expectedProxyConfiguration)
+		expectedProxyConfigurationMatches(t, context.Background(), testClient.ResourceClient, pcID, tc.expectedProxyConfiguration)
 
 		uID := getDestinationsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedDestinationMatches(t, context.Background(), resourceClient, uID, tc.expectedDestinations)
+		expectedDestinationMatches(t, context.Background(), testClient.ResourceClient, uID, tc.expectedDestinations)
 	}
 
 	testCases := []testCase{
@@ -1736,16 +1658,6 @@ func TestReconcileDeletePod(t *testing.T) {
 			}
 			c.Experiments = []string{"resource-apis"}
 		})
-		resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-		require.NoError(t, err)
-
-		if tc.aclsEnabled {
-			// Wait for the ACL system to be bootstraped
-			require.Eventually(t, func() bool {
-				_, _, err := testClient.APIClient.ACL().PolicyList(nil)
-				return err == nil
-			}, 5*time.Second, 500*time.Millisecond)
-		}
 
 		ctx := context.Background()
 		if tc.aclsEnabled {
@@ -1779,12 +1691,13 @@ func TestReconcileDeletePod(t *testing.T) {
 		}
 
 		workloadID := getWorkloadID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition)
-		loadResource(t, ctx, resourceClient, workloadID, tc.existingWorkload, nil)
-		loadResource(t, ctx, resourceClient, getHealthStatusID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingHealthStatus, workloadID)
-		loadResource(t, ctx, resourceClient, getProxyConfigurationID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingProxyConfiguration, nil)
-		loadResource(t, ctx, resourceClient, getDestinationsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingDestinations, nil)
+		loadResource(t, ctx, testClient.ResourceClient, workloadID, tc.existingWorkload, nil)
+		loadResource(t, ctx, testClient.ResourceClient, getHealthStatusID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingHealthStatus, workloadID)
+		loadResource(t, ctx, testClient.ResourceClient, getProxyConfigurationID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingProxyConfiguration, nil)
+		loadResource(t, ctx, testClient.ResourceClient, getDestinationsID(tc.podName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tc.existingDestinations, nil)
 
 		var token *api.ACLToken
+		var err error
 		if tc.aclsEnabled {
 			test.SetupK8sAuthMethodV2(t, testClient.APIClient, tc.podName, metav1.NamespaceDefault) //podName is a standin for the service name
 			token, _, err = testClient.APIClient.ACL().Login(&api.ACLLoginParams{
@@ -1822,16 +1735,16 @@ func TestReconcileDeletePod(t *testing.T) {
 		require.False(t, resp.Requeue)
 
 		wID := getWorkloadID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedWorkloadMatches(t, ctx, resourceClient, wID, tc.expectedWorkload)
+		expectedWorkloadMatches(t, ctx, testClient.ResourceClient, wID, tc.expectedWorkload)
 
 		hsID := getHealthStatusID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedHealthStatusMatches(t, ctx, resourceClient, hsID, tc.expectedHealthStatus)
+		expectedHealthStatusMatches(t, ctx, testClient.ResourceClient, hsID, tc.expectedHealthStatus)
 
 		pcID := getProxyConfigurationID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedProxyConfigurationMatches(t, ctx, resourceClient, pcID, tc.expectedProxyConfiguration)
+		expectedProxyConfigurationMatches(t, ctx, testClient.ResourceClient, pcID, tc.expectedProxyConfiguration)
 
 		uID := getDestinationsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-		expectedDestinationMatches(t, ctx, resourceClient, uID, tc.expectedDestinations)
+		expectedDestinationMatches(t, ctx, testClient.ResourceClient, uID, tc.expectedDestinations)
 
 		if tc.aclsEnabled {
 			_, _, err = testClient.APIClient.ACL().TokenRead(token.AccessorID, nil)
