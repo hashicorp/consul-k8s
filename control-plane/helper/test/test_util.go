@@ -119,8 +119,8 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 		// also cause test flakes.
 		require.Eventually(t,
 			func() bool {
-				_, _, err := client.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-				return err == nil
+				partition, _, err := client.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+				return err == nil && partition != nil
 			},
 			eventuallyWaitFor,
 			eventuallyTickEvery,

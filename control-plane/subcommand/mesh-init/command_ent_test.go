@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
@@ -52,10 +51,8 @@ func TestRun_WithNamespaces(t *testing.T) {
 				c.Experiments = []string{"resource-apis"}
 				serverCfg = c
 			})
-			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-			require.NoError(t, err)
 
-			_, err = EnsurePartitionExists(testClient.APIClient, c.consulPartition)
+			_, err := EnsurePartitionExists(testClient.APIClient, c.consulPartition)
 			require.NoError(t, err)
 
 			partitionedCfg := testClient.Cfg.APIClientConfig
@@ -68,7 +65,7 @@ func TestRun_WithNamespaces(t *testing.T) {
 			require.NoError(t, err)
 
 			// Register Consul workload.
-			loadResource(t, resourceClient, getWorkloadID(testPodName, c.consulNamespace, c.consulPartition), getWorkload(), nil)
+			loadResource(t, testClient.ResourceClient, getWorkloadID(testPodName, c.consulNamespace, c.consulPartition), getWorkload(), nil)
 
 			ui := cli.NewMockUi()
 			cmd := Command{
