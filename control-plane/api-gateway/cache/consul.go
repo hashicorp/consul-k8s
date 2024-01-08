@@ -426,9 +426,12 @@ func (c *Cache) Delete(ctx context.Context, ref api.ResourceReference) error {
 		return err
 	}
 
-	options := &api.WriteOptions{}
+	options := &api.WriteOptions{Namespace: ref.Namespace, Partition: ref.Partition}
 
 	_, err = client.ConfigEntries().Delete(ref.Kind, ref.Name, options.WithContext(ctx))
+	if err != nil {
+		c.logger.Info("delete error", "err", err)
+	}
 	return err
 }
 
