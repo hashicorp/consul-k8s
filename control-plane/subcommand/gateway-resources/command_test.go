@@ -272,14 +272,24 @@ func TestRun(t *testing.T) {
 }
 
 var validResourceConfiguration = `{
-    "requests": {
-        "memory": "200Mi",
-        "cpu": "200m"
-    },
+  "initContainer": {
     "limits": {
-        "memory": "200Mi",
-        "cpu": "200m"
+      "cpu": "200m",
+      "memory": "200Mi"
+    },
+    "requests": {
+      "cpu": "200m",
+      "memory": "200Mi"
     }
+  },
+  "limits": {
+    "cpu": "200m",
+    "memory": "200Mi"
+  },
+  "requests": {
+    "cpu": "200m",
+    "memory": "200Mi"
+  }
 }
 `
 
@@ -310,7 +320,7 @@ func TestRun_loadResourceConfig(t *testing.T) {
 		k8sClient: client,
 	}
 
-	expectedResources := corev1.ResourceRequirements{
+	expectedResources := combinedGatewayContainerResources{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("200Mi"),
 			corev1.ResourceCPU:    resource.MustParse("200m"),
@@ -318,6 +328,16 @@ func TestRun_loadResourceConfig(t *testing.T) {
 		Limits: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("200Mi"),
 			corev1.ResourceCPU:    resource.MustParse("200m"),
+		},
+		InitContainerResources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("200Mi"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("200Mi"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+			},
 		},
 	}
 
@@ -516,7 +536,10 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 			filename: "minimalConfig.yaml",
 			expectedDeployment: v2beta1.GatewayClassDeploymentConfig{
 				Container: &v2beta1.GatewayClassContainerConfig{
-					Resources: &defaultResourceRequirements,
+					Resources: &corev1.ResourceRequirements{
+						Limits:   defaultResourceRequirements.Limits,
+						Requests: defaultResourceRequirements.Requests,
+					},
 				},
 			},
 		},

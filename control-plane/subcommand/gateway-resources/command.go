@@ -104,7 +104,7 @@ type Command struct {
 	nodeSelector       map[string]string
 	tolerations        []corev1.Toleration
 	serviceAnnotations []string
-	resources          corev1.ResourceRequirements
+	resources          combinedGatewayContainerResources
 	gatewayConfig      gateways.GatewayResources
 
 	ctx context.Context
@@ -257,10 +257,14 @@ func (c *Command) Run(args []string) int {
 				DefaultInstances: nonZeroOrNil(c.flagDeploymentDefaultInstances),
 				MaxInstances:     nonZeroOrNil(c.flagDeploymentMaxInstances),
 				MinInstances:     nonZeroOrNil(c.flagDeploymentMinInstances),
-				Resources:        &c.resources,
+				Resources: &corev1.ResourceRequirements{
+					Limits:   c.resources.Limits,
+					Requests: c.resources.Requests,
+				},
 			},
 			OpenshiftSCCName:            c.flagOpenshiftSCCName,
 			MapPrivilegedContainerPorts: int32(c.flagMapPrivilegedContainerPorts),
+			InitContainerResources:      &c.resources.InitContainerResources,
 		},
 	}
 
@@ -351,12 +355,20 @@ func (c *Command) validateFlags() error {
 	return nil
 }
 
-func (c *Command) loadResourceConfig(filename string) (corev1.ResourceRequirements, error) {
+// combinedGatewayContainerResources includes the resource requests for the gateway container and the
+// connect-inject-init container
+type combinedGatewayContainerResources struct {
+	Requests               corev1.ResourceList         `json:"requests"`
+	Limits                 corev1.ResourceList         `json:"limits"`
+	InitContainerResources corev1.ResourceRequirements `json:"initContainer"`
+}
+
+func (c *Command) loadResourceConfig(filename string) (combinedGatewayContainerResources, error) {
 	// Load resources.json
 	file, err := os.Open(filename)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return corev1.ResourceRequirements{}, err
+			return combinedGatewayContainerResources{}, err
 		}
 		c.UI.Info("No resources.json found, using defaults")
 		return defaultResourceRequirements, nil
@@ -368,13 +380,13 @@ func (c *Command) loadResourceConfig(filename string) (corev1.ResourceRequiremen
 		return defaultResourceRequirements, err
 	}
 
-	reqs := corev1.ResourceRequirements{}
+	reqs := combinedGatewayContainerResources{}
 	if err := json.Unmarshal(resources, &reqs); err != nil {
-		return corev1.ResourceRequirements{}, err
+		return combinedGatewayContainerResources{}, err
 	}
 
 	if err := file.Close(); err != nil {
-		return corev1.ResourceRequirements{}, err
+		return combinedGatewayContainerResources{}, err
 	}
 	return reqs, nil
 }
@@ -406,7 +418,12 @@ func (c *Command) loadGatewayConfigs() error {
 	// ensure default resources requirements are set
 	for idx := range c.gatewayConfig.MeshGateways {
 		if c.gatewayConfig.GatewayClassConfigs[idx].Spec.Deployment.Container == nil {
-			c.gatewayConfig.GatewayClassConfigs[idx].Spec.Deployment.Container = &v2beta1.GatewayClassContainerConfig{Resources: &defaultResourceRequirements}
+			c.gatewayConfig.GatewayClassConfigs[idx].Spec.Deployment.Container = &v2beta1.GatewayClassContainerConfig{
+				Resources: &corev1.ResourceRequirements{
+					Limits:   defaultResourceRequirements.Limits,
+					Requests: defaultResourceRequirements.Requests,
+				},
+			}
 		}
 	}
 	if err := file.Close(); err != nil {
@@ -493,7 +510,7 @@ Usage: consul-k8s-control-plane gateway-resources [options]
 `
 )
 
-var defaultResourceRequirements = corev1.ResourceRequirements{
+var defaultResourceRequirements = combinedGatewayContainerResources{
 	Requests: corev1.ResourceList{
 		corev1.ResourceMemory: resource.MustParse("100Mi"),
 		corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -501,6 +518,16 @@ var defaultResourceRequirements = corev1.ResourceRequirements{
 	Limits: corev1.ResourceList{
 		corev1.ResourceMemory: resource.MustParse("100Mi"),
 		corev1.ResourceCPU:    resource.MustParse("100m"),
+	},
+	InitContainerResources: corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+		},
 	},
 }
 

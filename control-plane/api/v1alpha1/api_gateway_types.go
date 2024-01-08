@@ -54,6 +54,9 @@ type GatewayClassConfigSpec struct {
 	// Deployment defines the deployment configuration for the gateway.
 	DeploymentSpec DeploymentSpec `json:"deployment,omitempty"`
 
+	// InitContainerResources defines the deployment configuration for the gateway.
+	InitContainerResources *corev1.ResourceRequirements `json:"initContainerResources,omitempty"`
+
 	// Annotation Information to copy to services or deployments
 	CopyAnnotations CopyAnnotationsSpec `json:"copyAnnotations,omitempty"`
 

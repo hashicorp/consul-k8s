@@ -2266,6 +2266,13 @@ connectInject:
         limits:
           memory: "100Mi"
           cpu: "100m"
+        initContainer:
+          requests:
+            memory: "100Mi"
+            cpu: "100m"
+          limits:
+            memory: "100Mi"
+            cpu: "100m"
 
       # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
       deployment:
