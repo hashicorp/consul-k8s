@@ -1,0 +1,3 @@
+```release-note:bug-fix
+api-gateways: API Gateways now support annotations consistent with other Consul gateway types.
+```
