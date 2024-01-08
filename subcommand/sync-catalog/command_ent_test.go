@@ -1,3 +1,4 @@
+//go:build enterprise
 // +build enterprise
 
 package synccatalog

@@ -5,8 +5,9 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/consul"
 	"github.com/hashicorp/consul/api"
+
+	"github.com/hashicorp/consul-k8s/consul"
 )
 
 // Taken from https://github.com/hashicorp/consul/blob/b5b9c8d953cd3c79c6b795946839f4cf5012f507/command/flags/http.go

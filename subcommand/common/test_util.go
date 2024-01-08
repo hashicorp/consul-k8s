@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul-k8s/helper/cert"
 )
 
 // GenerateServerCerts generates Consul CA
@@ -52,4 +53,19 @@ func GenerateServerCerts(t *testing.T) (string, string, string, func()) {
 		os.Remove(certKeyFile.Name())
 	}
 	return caFile.Name(), certFile.Name(), certKeyFile.Name(), cleanupFunc
+}
+
+// WriteTempFile writes contents to a temporary file and returns the file
+// name. It will remove the file once the test completes.
+func WriteTempFile(t *testing.T, contents string) string {
+	t.Helper()
+	file, err := os.CreateTemp("", "testName")
+	require.NoError(t, err)
+	_, err = file.WriteString(contents)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.Remove(file.Name())
+	})
+	return file.Name()
 }

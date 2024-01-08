@@ -9,14 +9,15 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/consul"
-	godiscover "github.com/hashicorp/consul-k8s/helper/go-discover"
-	"github.com/hashicorp/consul-k8s/subcommand/common"
-	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+
+	"github.com/hashicorp/consul-k8s/consul"
+	godiscover "github.com/hashicorp/consul-k8s/helper/go-discover"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 )
 
 // get-consul-client-ca command talks to the Consul servers
@@ -157,11 +158,11 @@ func (c *Command) consulClient(logger hclog.Logger) (*api.Client, error) {
 // consulServerAddr returns the consul server address
 // as a string in the <server_ip_or_dns_name>:<server_port> format.
 //
-// 1. If the server address is a cloud auto-join URL,
-//    it calls go-discover library to discover server addresses,
-//    picks the first address from the list and uses the provided port.
-// 2. Otherwise, it uses the address provided by the -server-addr
-//    and the -server-port flags.
+//  1. If the server address is a cloud auto-join URL,
+//     it calls go-discover library to discover server addresses,
+//     picks the first address from the list and uses the provided port.
+//  2. Otherwise, it uses the address provided by the -server-addr
+//     and the -server-port flags.
 func (c *Command) consulServerAddr(logger hclog.Logger) (string, error) {
 
 	// First, check if the server address is a cloud auto-join string.

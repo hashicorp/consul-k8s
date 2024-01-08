@@ -7,6 +7,9 @@ import (
 )
 
 type rulesData struct {
+	EnablePartitions        bool
+	EnablePeering           bool
+	PartitionName           string
 	EnableNamespaces        bool
 	SyncConsulDestNS        string
 	SyncEnableNSMirroring   bool
@@ -15,8 +18,6 @@ type rulesData struct {
 	InjectEnableNSMirroring bool
 	InjectNSMirroringPrefix string
 	SyncConsulNodeName      string
-	EnableHealthChecks      bool
-	EnableCleanupController bool
 }
 
 type gatewayRulesData struct {
@@ -36,29 +37,62 @@ service "consul-snapshot" {
    policy = "write"
 }`
 
+// The enterprise license rules are acl="write" inside partitions as operator="write"
+// is unsupported in partitions.
 const entLicenseRules = `operator = "write"`
+const entPartitionLicenseRules = `acl = "write"`
 
-const crossNamespaceRules = `namespace_prefix "" {
-  service_prefix "" {
-    policy = "read"
+// The partition token is utilized by the partition-init job and server-acl-init in
+// non-default partitions. This token requires permissions to create partitions, read the
+// agent endpoint during startup and have the ability to create an auth-method within a namespace
+// for any partition.
+const partitionRules = `operator = "write"
+agent_prefix "" {
+  policy = "read"
+}
+partition_prefix "" {
+  namespace_prefix "" {
+    acl = "write"
   }
-  node_prefix "" {
-    policy = "read"
+}`
+
+func (c *Command) crossNamespaceRules() (string, error) {
+	crossNamespaceRulesTpl := `{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+{{- end }}
+  namespace_prefix "" {
+    service_prefix "" {
+      policy = "read"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
   }
-} `
+{{- if .EnablePartitions }}
+}
+{{- end }}`
+
+	return c.renderRules(crossNamespaceRulesTpl)
+}
 
 func (c *Command) agentRules() (string, error) {
 	agentRulesTpl := `
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+{{- end }}
   node_prefix "" {
     policy = "write"
   }
 {{- if .EnableNamespaces }}
-namespace_prefix "" {
+  namespace_prefix "" {
 {{- end }}
-  service_prefix "" {
-    policy = "read"
-  }
+    service_prefix "" {
+      policy = "read"
+    }
 {{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -82,21 +116,57 @@ func (c *Command) anonymousTokenRules() (string, error) {
 	// ACL token. Thus the anonymous policy must
 	// allow reading all services.
 	anonTokenRulesTpl := `
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
+{{- if .EnablePartitions }}
+partition_prefix "" {
 {{- end }}
-  node_prefix "" {
-     policy = "read"
-  }
-  service_prefix "" {
-     policy = "read"
-  }
 {{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+    node_prefix "" {
+       policy = "read"
+    }
+    service_prefix "" {
+       policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
 
 	return c.renderRules(anonTokenRulesTpl)
+}
+
+func (c *Command) apiGatewayControllerRules() (string, error) {
+	apiGatewayRulesTpl := `{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+  mesh = "write"
+  acl = "write"
+{{- else }}
+operator = "write"
+acl = "write"
+{{- end }}
+{{- if .EnableNamespaces }}
+namespace_prefix "" {
+{{- end }}
+  service_prefix "" {
+    policy = "write"
+    intentions = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+{{- if .EnableNamespaces }}
+}
+{{- end }}
+{{- if .EnablePartitions }}
+}
+{{- end }}
+  `
+
+	return c.renderRules(apiGatewayRulesTpl)
 }
 
 // This assumes users are using the default name for the service, i.e.
@@ -135,19 +205,25 @@ namespace_prefix "" {
 
 func (c *Command) ingressGatewayRules(name, namespace string) (string, error) {
 	ingressGatewayRulesTpl := `
-{{- if .EnableNamespaces }}
-namespace "{{ .GatewayNamespace }}" {
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
 {{- end }}
-  service "{{ .GatewayName }}" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-  service_prefix "" {
-    policy = "read"
-  }
 {{- if .EnableNamespaces }}
+  namespace "{{ .GatewayNamespace }}" {
+{{- end }}
+    service "{{ .GatewayName }}" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -158,19 +234,25 @@ namespace "{{ .GatewayNamespace }}" {
 // Creating a separate terminating gateway rule function because
 // eventually this may need to be created with permissions for
 // all of the services it represents, though that is not part
-// of the initial implementation
+// of the initial implementation.
 func (c *Command) terminatingGatewayRules(name, namespace string) (string, error) {
 	terminatingGatewayRulesTpl := `
-{{- if .EnableNamespaces }}
-namespace "{{ .GatewayNamespace }}" {
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
 {{- end }}
-  service "{{ .GatewayName }}" {
-     policy = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
 {{- if .EnableNamespaces }}
+  namespace "{{ .GatewayNamespace }}" {
+{{- end }}
+    service "{{ .GatewayName }}" {
+       policy = "write"
+    }
+    node_prefix "" {
+      policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -178,26 +260,42 @@ namespace "{{ .GatewayNamespace }}" {
 	return c.renderGatewayRules(terminatingGatewayRulesTpl, name, namespace)
 }
 
+// acl = "write" is required when creating namespace with a default policy.
+// Attaching a default ACL policy to a namespace requires acl = "write" in the
+// namespace that the policy is defined in, which in our case is "default".
 func (c *Command) syncRules() (string, error) {
 	syncRulesTpl := `
   node "{{ .SyncConsulNodeName }}" {
     policy = "write"
   }
 {{- if .EnableNamespaces }}
-operator = "write"
-{{- if .SyncEnableNSMirroring }}
-namespace_prefix "{{ .SyncNSMirroringPrefix }}" {
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+  mesh = "write"
+  acl = "write"
 {{- else }}
-namespace "{{ .SyncConsulDestNS }}" {
+  operator = "write"
+  acl = "write"
 {{- end }}
+{{- if .SyncEnableNSMirroring }}
+  namespace_prefix "{{ .SyncNSMirroringPrefix }}" {
+{{- else }}
+  namespace "{{ .SyncConsulDestNS }}" {
 {{- end }}
-  node_prefix "" {
-    policy = "read"
-  }
-  service_prefix "" {
+{{- if .EnablePartitions }}
     policy = "write"
-  }
+{{- end }}
+{{- end }}
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "write"
+    }
 {{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -207,27 +305,39 @@ namespace "{{ .SyncConsulDestNS }}" {
 
 func (c *Command) injectRules() (string, error) {
 	// The Connect injector needs permissions to create namespaces when namespaces are enabled.
-	// If health checks are enabled it must also create/update service checks.
-	// If the cleanup controller is enabled, it must be able to delete service
-	// instances from every client.
+	// It must also create/update service health checks via the endpoints controller.
+	// When ACLs are enabled, the endpoints controller needs "acl:write" permissions
+	// to delete ACL tokens created via "consul login". policy = "write" is required when
+	// creating namespaces within a partition.
 	injectRulesTpl := `
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+{{- else }}
 {{- if .EnableNamespaces }}
-operator = "write"
+  operator = "write"
 {{- end }}
-{{- if (or .EnableHealthChecks .EnableCleanupController) }}
-node_prefix "" {
-  policy = "write"
-}
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
 {{- end }}
-  acl = "write"
-  service_prefix "" {
+{{- if .EnablePeering }}
+  peering = "write"
+{{- end }}
+  node_prefix "" {
     policy = "write"
   }
 {{- if .EnableNamespaces }}
-}
+  namespace_prefix "" {
 {{- end }}
+{{- if .EnablePartitions }}
+    policy = "write"
+{{- end }}
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
+}
 {{- end }}`
 	return c.renderRules(injectRulesTpl)
 }
@@ -241,43 +351,66 @@ func (c *Command) aclReplicationRules() (string, error) {
 	// datacenters during federation since in order to start ACL replication,
 	// we need a token with both replication and agent permissions.
 	aclReplicationRulesTpl := `
-operator = "write"
-agent_prefix "" {
-  policy = "read"
-}
-node_prefix "" {
-  policy = "write"
-}
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
+{{- if .EnablePartitions }}
+partition "default" {
 {{- end }}
-  acl = "write"
-  service_prefix "" {
+  operator = "write"
+  agent_prefix "" {
     policy = "read"
-    intentions = "read"
+  }
+  node_prefix "" {
+    policy = "write"
   }
 {{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+    acl = "write"
+    service_prefix "" {
+      policy = "read"
+      intentions = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
 	return c.renderRules(aclReplicationRulesTpl)
 }
 
+// policy = "write" is required when creating namespaces within a partition.
+// acl = "write" is required when creating namespace with a default policy.
+// Attaching a default ACL policy to a namespace requires acl = "write" in the
+// namespace that the policy is defined in, which in our case is "default".
 func (c *Command) controllerRules() (string, error) {
 	controllerRules := `
-operator = "write"
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+  mesh = "write"
+  acl = "write"
+{{- else }}
+  operator = "write"
+  acl = "write"
+{{- end }}
 {{- if .EnableNamespaces }}
 {{- if .InjectEnableNSMirroring }}
-namespace_prefix "{{ .InjectNSMirroringPrefix }}" {
+  namespace_prefix "{{ .InjectNSMirroringPrefix }}" {
 {{- else }}
-namespace "{{ .InjectConsulDestNS }}" {
+  namespace "{{ .InjectConsulDestNS }}" {
 {{- end }}
 {{- end }}
-  service_prefix "" {
+{{- if .EnablePartitions }}
     policy = "write"
-    intentions = "write"
-  }
+{{- end }}
+    service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
 {{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -286,6 +419,9 @@ namespace "{{ .InjectConsulDestNS }}" {
 
 func (c *Command) rulesData() rulesData {
 	return rulesData{
+		EnablePartitions:        c.flagEnablePartitions,
+		EnablePeering:           c.flagEnablePeering,
+		PartitionName:           c.flagPartitionName,
 		EnableNamespaces:        c.flagEnableNamespaces,
 		SyncConsulDestNS:        c.flagConsulSyncDestinationNamespace,
 		SyncEnableNSMirroring:   c.flagEnableSyncK8SNSMirroring,
@@ -294,8 +430,6 @@ func (c *Command) rulesData() rulesData {
 		InjectEnableNSMirroring: c.flagEnableInjectK8SNSMirroring,
 		InjectNSMirroringPrefix: c.flagInjectK8SNSMirroringPrefix,
 		SyncConsulNodeName:      c.flagSyncConsulNodeName,
-		EnableHealthChecks:      c.flagEnableHealthChecks,
-		EnableCleanupController: c.flagEnableCleanupController,
 	}
 }
 

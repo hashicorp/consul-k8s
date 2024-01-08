@@ -17,12 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
-	"github.com/hashicorp/consul-k8s/consul"
-	"github.com/hashicorp/consul-k8s/helper/cert"
-	"github.com/hashicorp/consul-k8s/helper/controller"
-	"github.com/hashicorp/consul-k8s/subcommand/common"
-	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/mitchellh/cli"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	connectinject "github.com/hashicorp/consul-k8s/connect-inject"
+	"github.com/hashicorp/consul-k8s/consul"
+	"github.com/hashicorp/consul-k8s/helper/cert"
+	"github.com/hashicorp/consul-k8s/helper/controller"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 )
 
 type Command struct {

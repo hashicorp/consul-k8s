@@ -13,9 +13,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mitchellh/cli"
+
 	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul-k8s/subcommand/flags"
-	"github.com/mitchellh/cli"
 )
 
 type Command struct {

@@ -13,18 +13,19 @@ import (
 	"time"
 
 	"github.com/deckarep/golang-set"
-	catalogtoconsul "github.com/hashicorp/consul-k8s/catalog/to-consul"
-	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
-	"github.com/hashicorp/consul-k8s/helper/controller"
-	"github.com/hashicorp/consul-k8s/subcommand"
-	"github.com/hashicorp/consul-k8s/subcommand/common"
-	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+
+	catalogtoconsul "github.com/hashicorp/consul-k8s/catalog/to-consul"
+	catalogtok8s "github.com/hashicorp/consul-k8s/catalog/to-k8s"
+	"github.com/hashicorp/consul-k8s/helper/controller"
+	"github.com/hashicorp/consul-k8s/subcommand"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 )
 
 // Command is the command for syncing the K8S and Consul service

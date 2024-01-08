@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/helper/cert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/hashicorp/consul-k8s/helper/cert"
 )
 
 type MockCertSource struct {

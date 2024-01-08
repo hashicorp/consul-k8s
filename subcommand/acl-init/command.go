@@ -12,11 +12,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/subcommand"
-	"github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/mitchellh/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/hashicorp/consul-k8s/subcommand"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
 )
 
 type Command struct {
