@@ -234,15 +234,15 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	}
 	if len(apigatewaypods.Items) > 0 {
 		//Deduplicated pod list
-		seenPods := map[string]bool{}
+		seenPods := map[string]struct{}{}
 		for _, pod := range apigatewaypods.Items {
-			if seenPods[namespacedName(pod)] {
+			if _, ok := seenPods[namespacedName(pod)]; ok {
 				continue
 			}
 			found := false
 			for _, gatewayPod := range gatewaypods.Items {
 				//note that we already have this pod in the list so we can exit early.
-				seenPods[namespacedName(gatewayPod)] = true
+				seenPods[namespacedName(gatewayPod)] = struct{}{}
 
 				if (namespacedName(gatewayPod)) == namespacedName(pod) {
 					found = true

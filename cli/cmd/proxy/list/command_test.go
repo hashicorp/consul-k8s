@@ -433,7 +433,6 @@ func TestListCommandOutputInJsonFormat(t *testing.T) {
 	require.Equal(t, 0, out)
 
 	actual := buf.String()
-	fmt.Println(actual)
 
 	require.Regexp(t, expected, actual)
 	for _, expression := range notExpected {
