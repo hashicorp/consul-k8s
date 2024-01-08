@@ -146,7 +146,7 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 			Value: consulNamespace,
 		})
 
-	if config.TLSEnabled {
+	if b.config.TLSEnabled {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
 				Name:  constants.UseTLSEnvVar,
@@ -154,11 +154,11 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 			},
 			corev1.EnvVar{
 				Name:  constants.CACertPEMEnvVar,
-				Value: config.ConsulCACert,
+				Value: b.config.ConsulCACert,
 			},
 			corev1.EnvVar{
 				Name:  constants.TLSServerNameEnvVar,
-				Value: config.ConsulTLSServerName,
+				Value: b.config.ConsulTLSServerName,
 			})
 	}
 
