@@ -99,6 +99,7 @@ func testReconcileCreateNamespace(t *testing.T, testCases []createTestCase) {
 		// Fire up consul server with v2tenancy enabled
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis", "v2tenancy"}
+			// TODO: remove me
 			c.LogLevel = "trace"
 		})
 
@@ -242,6 +243,8 @@ func testReconcileDeleteNamespace(t *testing.T, testCases []deleteTestCase) {
 		// Fire up consul server with v2tenancy enabled
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 			c.Experiments = []string{"resource-apis", "v2tenancy"}
+			// TODO: remove me
+			c.LogLevel = "trace"
 		})
 
 		// Create partition if needed
@@ -360,6 +363,10 @@ func RequireEventuallyNotFound(t *testing.T, resourceClient pbresource.ResourceS
 	// allow both "not found" and "marked for deletion" so we're not waiting around unnecessarily
 	require.Eventuallyf(t, func() bool {
 		rsp, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{Id: id})
+
+		// TODO: remove me
+		t.Logf("YYY waiting for %s not found: %v", id, err)
+
 		if err == nil {
 			return isMarkedForDeletion(rsp.Resource)
 		}

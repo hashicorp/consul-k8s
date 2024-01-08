@@ -105,6 +105,7 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 						Tenancy: &pbresource.Tenancy{Partition: constants.DefaultConsulPartition},
 					},
 				})
+				t.Logf("XXX waiting for default namespace errored with: %v", err)
 				require.NoError(collect, err)
 			},
 				time.Second*10,
