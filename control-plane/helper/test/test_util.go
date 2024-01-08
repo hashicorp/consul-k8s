@@ -35,6 +35,8 @@ import (
 
 const (
 	componentAuthMethod = "consul-k8s-component-auth-method"
+	eventuallyWaitFor   = 5 * time.Second
+	eventuallyTickEvery = 100 * time.Millisecond
 )
 
 type TestServerClient struct {
@@ -79,8 +81,8 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 			t.Logf("WWWW waiting for self token errored with: %v", err)
 			assert.NoError(c, err)
 		},
-			time.Second*5,
-			time.Millisecond*100,
+			eventuallyWaitFor,
+			eventuallyTickEvery,
 			"failed to eventually read self token as a proxy for the ACL system bootstrap completion",
 		)
 	}
@@ -107,13 +109,11 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 					Tenancy: &pbresource.Tenancy{Partition: constants.DefaultConsulPartition},
 				},
 			})
-			// TODO: remove me
-			t.Logf("XXX waiting for default namespace errored with: %v", err)
 			assert.NoError(c, err)
 		},
-			time.Second*10,
-			time.Millisecond*100,
-			"timed out waiting for v2 builtin default namespace creation",
+			eventuallyWaitFor,
+			eventuallyTickEvery,
+			"failed to eventually read v2 builtin default namespace",
 		)
 	} else {
 		// Do the same for V1 counterparts since tests running before they're created
@@ -123,9 +123,9 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 				_, _, err := client.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
 				return err == nil
 			},
-			5*time.Second,
-			100*time.Millisecond,
-			"timed out waiting for v1 builtin default partition creation")
+			eventuallyWaitFor,
+			eventuallyTickEvery,
+			"failed to eventually read v1 builtin default partition")
 	}
 
 	return &TestServerClient{
