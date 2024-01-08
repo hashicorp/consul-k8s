@@ -32,7 +32,6 @@ const (
 
 	LoginAuthMethodEnvVar      = "CONSUL_LOGIN_AUTH_METHOD"
 	LoginBearerTokenFileEnvVar = "CONSUL_LOGIN_BEARER_TOKEN_FILE"
-	LoginDatacenterEnvVar      = "CONSUL_LOGIN_DATACENTER"
 	LoginPartitionEnvVar       = "CONSUL_LOGIN_PARTITION"
 	LoginNamespaceEnvVar       = "CONSUL_LOGIN_NAMESPACE"
 	LoginMetaEnvVar            = "CONSUL_LOGIN_META"
@@ -76,7 +75,6 @@ type ConsulACLFlags struct {
 type ConsulLoginFlags struct {
 	AuthMethod      string
 	BearerTokenFile string
-	Datacenter      string
 	Namespace       string
 	Partition       string
 	Meta            map[string]string
@@ -158,9 +156,6 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 	fs.StringVar(&f.ConsulLogin.BearerTokenFile, "consul-login-bearer-token-file", defaultConsulLoginBearerTokenFile,
 		"Bearer token file to use for login to Consul."+
 			"This can also be specified via the CONSUL_LOGIN_BEARER_TOKEN_FILE environment variable.")
-	fs.StringVar(&f.ConsulLogin.Datacenter, "consul-login-datacenter", os.Getenv(LoginDatacenterEnvVar),
-		"Auth method datacenter to use for login to Consul."+
-			"This can also be specified via the CONSUL_LOGIN_DATACENTER environment variable.")
 	fs.StringVar(&f.ConsulLogin.Partition, "consul-login-partition", os.Getenv(LoginPartitionEnvVar),
 		"Auth method partition to use for login to Consul."+
 			"This can also be specified via the CONSUL_LOGIN_PARTITION environment variable.")
@@ -209,7 +204,6 @@ func (f *ConsulFlags) ConsulServerConnMgrConfig() (discovery.Config, error) {
 		cfg.Credentials.Login.AuthMethod = f.ConsulLogin.AuthMethod
 		cfg.Credentials.Login.Namespace = f.ConsulLogin.Namespace
 		cfg.Credentials.Login.Partition = f.ConsulLogin.Partition
-		cfg.Credentials.Login.Datacenter = f.ConsulLogin.Datacenter
 		cfg.Credentials.Login.Meta = f.ConsulLogin.Meta
 
 		bearerToken, err := os.ReadFile(f.ConsulLogin.BearerTokenFile)
