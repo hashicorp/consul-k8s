@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
@@ -1755,9 +1754,6 @@ func TestEnsureService(t *testing.T) {
 		c.Experiments = []string{"resource-apis"}
 	})
 
-	// Anti-flake: Ensure default partition exists
-	requireDefaultV1Partition(t, testClient)
-
 	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
 	require.NoError(t, err)
 
@@ -2184,13 +2180,6 @@ func (m *MockPodFetcher) GetPod(_ context.Context, name types.NamespacedName) (*
 	}
 }
 
-func requireDefaultV1Partition(t *testing.T, testClient *test.TestServerClient) {
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
-}
-
 func runReconcileCase(t *testing.T, tc reconcileCase) {
 	t.Helper()
 
@@ -2205,9 +2194,6 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
 	})
-
-	// Anti-flake: Ensure default partition exists
-	requireDefaultV1Partition(t, testClient)
 
 	// Create the Endpoints controller.
 	ep := &Controller{

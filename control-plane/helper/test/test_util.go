@@ -74,9 +74,10 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	// Prevent test flakes due to "ACL system must be bootstrapped before ..." error
 	// requiring successful retrieval of the initial mgmt token.
 	if cfg.ACL.Enabled && cfg.ACL.Tokens.InitialManagement != "" {
-		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			_, _, err = client.ACL().TokenReadSelf(nil)
-			require.NoError(collect, err)
+			t.Logf("WWWW waiting for self token errored with: %v", err)
+			assert.NoError(c, err)
 		},
 			time.Second*5,
 			time.Millisecond*100,
@@ -91,28 +92,40 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	if slices.Contains(cfg.Experiments, "resource-apis") {
 		resourceClient, err = consul.NewResourceServiceClient(watcher)
 		require.NoError(t, err)
+	}
 
-		// There is a window of time post-leader election on startup where v2 tenancy builtins
-		// (default partition and namespace) have not yet been created.
-		// Wait for them to exist before considering the server "open for business".
-		// Only check for default namespace existence since it implies the default partition exists.
-		if slices.Contains(cfg.Experiments, "v2tenancy") {
-			require.EventuallyWithT(t, func(collect *assert.CollectT) {
-				_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{
-					Id: &pbresource.ID{
-						Name:    constants.DefaultConsulNS,
-						Type:    pbtenancy.NamespaceType,
-						Tenancy: &pbresource.Tenancy{Partition: constants.DefaultConsulPartition},
-					},
-				})
-				t.Logf("XXX waiting for default namespace errored with: %v", err)
-				require.NoError(collect, err)
+	// There is a window of time post-leader election on startup where v2 tenancy builtins
+	// (default partition and namespace) have not yet been created.
+	// Wait for them to exist before considering the server "open for business".
+	// Only check for default namespace existence since it implies the default partition exists.
+	if slices.Contains(cfg.Experiments, "v2tenancy") {
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{
+				Id: &pbresource.ID{
+					Name:    constants.DefaultConsulNS,
+					Type:    pbtenancy.NamespaceType,
+					Tenancy: &pbresource.Tenancy{Partition: constants.DefaultConsulPartition},
+				},
+			})
+			// TODO: remove me
+			t.Logf("XXX waiting for default namespace errored with: %v", err)
+			assert.NoError(c, err)
+		},
+			time.Second*10,
+			time.Millisecond*100,
+			"timed out waiting for v2 builtin default namespace creation",
+		)
+	} else {
+		// Do the same for V1 counterparts since tests running before they're created
+		// also cause test flakes.
+		require.Eventually(t,
+			func() bool {
+				_, _, err := client.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
+				return err == nil
 			},
-				time.Second*10,
-				time.Millisecond*100,
-				"timed out waiting for v2 builtin default namespace creation",
-			)
-		}
+			5*time.Second,
+			100*time.Millisecond,
+			"timed out waiting for v1 builtin default partition creation")
 	}
 
 	return &TestServerClient{
