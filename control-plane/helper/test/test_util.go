@@ -71,6 +71,19 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	client, err := api.NewClient(consulConfig.APIClientConfig)
 	require.NoError(t, err)
 
+	// Prevent test flakes due to "ACL system must be bootstrapped before ..." error
+	// requiring successful retrieval of the initial mgmt token.
+	if cfg.ACL.Enabled && cfg.ACL.Tokens.InitialManagement != "" {
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			_, _, err = client.ACL().TokenReadSelf(nil)
+			require.NoError(collect, err)
+		},
+			time.Second*5,
+			time.Millisecond*100,
+			"failed to eventually read self token as a proxy for the ACL system bootstrap completion",
+		)
+	}
+
 	watcher := MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true)
 
 	// Create a gRPC resource service client when the resource-apis experiment is enabled.

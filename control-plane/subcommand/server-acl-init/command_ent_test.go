@@ -19,7 +19,6 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/mitchellh/cli"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1450,13 +1449,6 @@ func partitionedSetup(t *testing.T, bootToken string, partitionName string) *tes
 	server.Cfg.APIClientConfig.Token = bootToken
 	serverAPIClient, err := consul.NewClient(server.Cfg.APIClientConfig, 5*time.Second)
 	require.NoError(t, err)
-
-	// Anti-flake: This can fail with "ACL system must be bootstrapped before making any requests that require authorization ..."
-	// hence the retries on error.
-	require.EventuallyWithTf(t, func(collect *assert.CollectT) {
-		_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})
-		require.NoError(collect, err)
-	}, 5*time.Second, 100*time.Millisecond, "failed to create partition: %s", partitionName)
-
+	_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})
 	return server.TestServer
 }
