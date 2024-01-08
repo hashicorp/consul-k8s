@@ -40,7 +40,7 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 		LogLevel:           b.config.LogLevel,
 		LogJSON:            b.config.LogJSON,
 		ServiceName:        b.gateway.Name,
-		ServiceAccountName: b.gateway.Name,
+		ServiceAccountName: b.serviceAccountName(),
 	}
 
 	// Create expected volume mounts
