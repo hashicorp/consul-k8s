@@ -41,7 +41,8 @@ func (b *meshGatewayBuilder) Service() *corev1.Service {
 }
 
 // Ports build a list of ports from the listener objects. In theory there should only ever be a WAN port on
-// mesh gateway but building the ports from a list of listeners will
+// mesh gateway but building the ports from a list of listeners will allow for easier compatability with other
+// gateway patterns in the future.
 func (b *meshGatewayBuilder) Ports(portModifier int32) []corev1.ServicePort {
 
 	ports := []corev1.ServicePort{}
