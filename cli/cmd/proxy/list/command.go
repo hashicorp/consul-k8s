@@ -220,9 +220,8 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	pods = append(pods, gatewaypods.Items...)
 
 	// Fetch API Gateway pods with deprecated label and append if they aren't already in the list
-	//TODO this block can be deleted if and when we decide we are ok with no longer listing pods of people using previous API Gateway
-	//versions.
-	// ---
+	// TODO this block can be deleted if and when we decide we are ok with no longer listing pods of people using previous API Gateway
+	// versions.
 	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "api-gateway.consul.hashicorp.com/managed=true",
 	})
