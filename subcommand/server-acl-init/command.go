@@ -11,6 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/consul"
+	"github.com/hashicorp/consul-k8s/subcommand"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
+	"github.com/hashicorp/consul-k8s/subcommand/flags"
+	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
@@ -21,12 +26,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-
-	"github.com/hashicorp/consul-k8s/consul"
-	"github.com/hashicorp/consul-k8s/subcommand"
-	"github.com/hashicorp/consul-k8s/subcommand/common"
-	"github.com/hashicorp/consul-k8s/subcommand/flags"
-	k8sflags "github.com/hashicorp/consul-k8s/subcommand/flags"
 )
 
 type Command struct {

@@ -2,7 +2,6 @@ package cert
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,7 +19,7 @@ func init() {
 	hasOpenSSL = err == nil
 }
 
-// Test that valid certificates are generated
+// Test that valid certificates are generated.
 func TestGenSource_valid(t *testing.T) {
 	t.Parallel()
 
@@ -36,7 +35,7 @@ func TestGenSource_valid(t *testing.T) {
 	testBundleVerify(t, &bundle)
 }
 
-// Test that certs are regenerated near expiry
+// Test that certs are regenerated near expiry.
 func TestGenSource_expiry(t *testing.T) {
 	t.Parallel()
 
@@ -58,7 +57,7 @@ func TestGenSource_expiry(t *testing.T) {
 	// Generate again
 	start := time.Now()
 	next, err := source.Certificate(context.Background(), &bundle)
-	dur := time.Now().Sub(start)
+	dur := time.Since(start)
 	require.NoError(t, err)
 	require.False(t, bundle.Equal(&next))
 	require.True(t, dur > time.Second)
@@ -72,29 +71,21 @@ func testGenSource() *GenSource {
 	}
 }
 
-// testBundle returns a valid bundle.
-func testBundle(t *testing.T) *Bundle {
-	source := testGenSource()
-	bundle, err := source.Certificate(context.Background(), nil)
-	require.NoError(t, err)
-	return &bundle
-}
-
 // testBundleDir writes the bundle contents to a directory and returns the
 // directory. The directory must be removed by the caller. The files in the
 // directory are ca.pem, leaf.pem, and leaf.key.pem.
 func testBundleDir(t *testing.T, bundle *Bundle, dir string) string {
 	if dir == "" {
 		// Create a temporary directory for storing the certs
-		td, err := ioutil.TempDir("", "consul")
+		td, err := os.MkdirTemp("", "consul")
 		require.NoError(t, err)
 		dir = td
 	}
 
 	// Write the cert
-	require.NoError(t, ioutil.WriteFile(filepath.Join(dir, "ca.pem"), bundle.CACert, 0644))
-	require.NoError(t, ioutil.WriteFile(filepath.Join(dir, "leaf.pem"), bundle.Cert, 0644))
-	require.NoError(t, ioutil.WriteFile(filepath.Join(dir, "leaf.key.pem"), bundle.Key, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ca.pem"), bundle.CACert, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "leaf.pem"), bundle.Cert, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "leaf.key.pem"), bundle.Key, 0644))
 
 	return dir
 }

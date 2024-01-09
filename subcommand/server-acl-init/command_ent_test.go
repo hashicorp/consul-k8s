@@ -10,11 +10,10 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/consul"
+	"github.com/hashicorp/consul-k8s/helper/test"
+	"github.com/hashicorp/consul-k8s/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -1288,7 +1287,7 @@ func partitionedSetup(t *testing.T, bootToken string, partitionName string) (*te
 	serverAPIClient, err := consul.NewClient(&api.Config{
 		Address: server.HTTPAddr,
 		Token:   bootToken,
-	}, 5*time.Second)
+	})
 	require.NoError(t, err)
 
 	_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})

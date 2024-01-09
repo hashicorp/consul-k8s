@@ -34,7 +34,7 @@ type GenSource struct {
 	caSigner       crypto.Signer
 }
 
-// Certificate implements Source
+// Certificate implements Source.
 func (s *GenSource) Certificate(ctx context.Context, last *Bundle) (Bundle, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -58,7 +58,7 @@ func (s *GenSource) Certificate(ctx context.Context, last *Bundle) (Bundle, erro
 			return result, err
 		}
 
-		waitTime := cert.NotAfter.Sub(time.Now()) - s.expiryWithin()
+		waitTime := time.Until(cert.NotAfter) - s.expiryWithin()
 		if waitTime < 0 {
 			waitTime = 1 * time.Millisecond
 		}
