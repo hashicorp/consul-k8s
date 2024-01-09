@@ -3,7 +3,7 @@
 
 // Package v2beta1 contains API Schema definitions for the consul.hashicorp.com v2beta1 API group
 // +kubebuilder:object:generate=true
-// +groupName=MultiCluster.consul.hashicorp.com
+// +groupName=multicluster.consul.hashicorp.com
 package v2beta1
 
 import (
@@ -14,7 +14,7 @@ import (
 var (
 
 	// MultiClusterGroup is a collection of multi-cluster resources.
-	MultiClusterGroup = "MultiCluster.consul.hashicorp.com"
+	MultiClusterGroup = "multicluster.consul.hashicorp.com"
 
 	// MultiClusterGroupVersion is group version used to register these objects.
 	MultiClusterGroupVersion = schema.GroupVersion{Group: MultiClusterGroup, Version: "v2beta1"}

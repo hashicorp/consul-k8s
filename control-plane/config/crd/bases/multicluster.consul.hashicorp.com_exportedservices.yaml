@@ -6,9 +6,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.1
-  name: exportedservices.MultiCluster.consul.hashicorp.com
+  name: exportedservices.multicluster.consul.hashicorp.com
 spec:
-  group: MultiCluster.consul.hashicorp.com
+  group: multicluster.consul.hashicorp.com
   names:
     kind: ExportedServices
     listKind: ExportedServicesList
