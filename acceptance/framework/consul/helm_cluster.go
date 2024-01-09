@@ -197,6 +197,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
+
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall
 		// we don't care that they're stopped gracefully.
@@ -208,6 +209,66 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 				err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
 				if !errors.IsNotFound(err) {
 					require.NoError(t, err)
+				}
+			}
+		}
+
+		// Delete any deployments that have h.releaseName in their name.
+		deployments, err := h.kubernetesClient.AppsV1().Deployments(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, deployment := range deployments.Items {
+			if strings.Contains(deployment.Name, h.releaseName) {
+				err := h.kubernetesClient.AppsV1().Deployments(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), deployment.Name, metav1.DeleteOptions{})
+				if !errors.IsNotFound(err) {
+					require.NoError(r, err)
+				}
+			}
+		}
+
+		// Delete any replicasets that have h.releaseName in their name.
+		replicasets, err := h.kubernetesClient.AppsV1().ReplicaSets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, replicaset := range replicasets.Items {
+			if strings.Contains(replicaset.Name, h.releaseName) {
+				err := h.kubernetesClient.AppsV1().ReplicaSets(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), replicaset.Name, metav1.DeleteOptions{})
+				if !errors.IsNotFound(err) {
+					require.NoError(r, err)
+				}
+			}
+		}
+
+		// Delete any statefulsets that have h.releaseName in their name.
+		statefulsets, err := h.kubernetesClient.AppsV1().StatefulSets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, statefulset := range statefulsets.Items {
+			if strings.Contains(statefulset.Name, h.releaseName) {
+				err := h.kubernetesClient.AppsV1().StatefulSets(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), statefulset.Name, metav1.DeleteOptions{})
+				if !errors.IsNotFound(err) {
+					require.NoError(r, err)
+				}
+			}
+		}
+
+		// Delete any daemonsets that have h.releaseName in their name.
+		daemonsets, err := h.kubernetesClient.AppsV1().DaemonSets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, daemonset := range daemonsets.Items {
+			if strings.Contains(daemonset.Name, h.releaseName) {
+				err := h.kubernetesClient.AppsV1().DaemonSets(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), daemonset.Name, metav1.DeleteOptions{})
+				if !errors.IsNotFound(err) {
+					require.NoError(r, err)
+				}
+			}
+		}
+
+		// Delete any services that have h.releaseName in their name.
+		services, err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, service := range services.Items {
+			if strings.Contains(service.Name, h.releaseName) {
+				err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
+				if !errors.IsNotFound(err) {
+					require.NoError(r, err)
 				}
 			}
 		}
@@ -273,6 +334,51 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 				if !errors.IsNotFound(err) {
 					require.NoError(t, err)
 				}
+			}
+		}
+
+		// Verify that all deployments have been deleted.
+		deployments, err = h.kubernetesClient.AppsV1().Deployments(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, deployment := range deployments.Items {
+			if strings.Contains(deployment.Name, h.releaseName) {
+				r.Errorf("Found deployment which should have been deleted: %s", deployment.Name)
+			}
+		}
+
+		// Verify that all replicasets have been deleted.
+		replicasets, err = h.kubernetesClient.AppsV1().ReplicaSets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, replicaset := range replicasets.Items {
+			if strings.Contains(replicaset.Name, h.releaseName) {
+				r.Errorf("Found replicaset which should have been deleted: %s", replicaset.Name)
+			}
+		}
+
+		// Verify that all statefulets have been deleted.
+		statefulsets, err = h.kubernetesClient.AppsV1().StatefulSets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, statefulset := range statefulsets.Items {
+			if strings.Contains(statefulset.Name, h.releaseName) {
+				r.Errorf("Found statefulset which should have been deleted: %s", statefulset.Name)
+			}
+		}
+
+		// Verify that all daemonsets have been deleted.
+		daemonsets, err = h.kubernetesClient.AppsV1().DaemonSets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, daemonset := range daemonsets.Items {
+			if strings.Contains(daemonset.Name, h.releaseName) {
+				r.Errorf("Found daemonset which should have been deleted: %s", daemonset.Name)
+			}
+		}
+
+		// Verify that all services have been deleted.
+		services, err = h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
+		require.NoError(r, err)
+		for _, service := range services.Items {
+			if strings.Contains(service.Name, h.releaseName) {
+				r.Errorf("Found service which should have been deleted: %s", service.Name)
 			}
 		}
 
