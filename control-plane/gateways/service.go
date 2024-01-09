@@ -4,11 +4,12 @@
 package gateways
 
 import (
-	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 func (b *meshGatewayBuilder) Service() *corev1.Service {
