@@ -127,6 +127,30 @@ rules:
     - get
     - patch
     - update
+- apiGroups:
+    - multicluster.consul.hashicorp.com
+  resources:
+    - exportedservices
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - multicluster.consul.hashicorp.com
+  resources:
+    - exportedservices/status
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
 {{- end }}
 - apiGroups: [ "" ]
   resources: [ "secrets", "serviceaccounts", "endpoints", "services", "namespaces", "nodes" ]
