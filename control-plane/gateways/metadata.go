@@ -7,11 +7,12 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const labelManagedBy = "mesh.consul.hashicorp.com/managed-by"
 
-var defaultLabels = map[string]string{labelManagedBy: "consul-k8s"}
+var defaultLabels = map[string]string{labelManagedBy: "consul-k8s-gateways-controller-v2"}
 
 func (b *meshGatewayBuilder) annotationsForDeployment() map[string]string {
 	if b.gcc == nil {
@@ -49,6 +50,10 @@ func (b *meshGatewayBuilder) annotationsForServiceAccount() map[string]string {
 }
 
 func (b *meshGatewayBuilder) labelsForDeployment() map[string]string {
+	defaultLabels := defaultLabels
+	defaultLabels[constants.AnnotationGatewayConsulServiceName] = b.Service().Name
+	defaultLabels[constants.AnnotationGatewayKind] = "mesh-gateway"
+
 	if b.gcc == nil {
 		return defaultLabels
 	}
