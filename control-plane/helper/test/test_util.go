@@ -115,16 +115,26 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 			"failed to eventually read v2 builtin default namespace",
 		)
 	} else {
-		// Do the same for V1 counterparts since tests running before they're created
-		// also cause test flakes.
+		// Do the same for V1 counterparts in ent only since to prevent known test flakes.
 		require.Eventually(t,
 			func() bool {
-				partition, _, err := client.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-				return err == nil && partition != nil
+				self, err := client.Agent().Self()
+				if err != nil {
+					return false
+				}
+				if self["DebugConfig"]["VersionMetadata"] != "ent" {
+					return true
+				}
+
+				namespace, _, err := client.Namespaces().Read(
+					constants.DefaultConsulNS,
+					&api.QueryOptions{Partition: constants.DefaultConsulPartition},
+				)
+				return err == nil && namespace != nil
 			},
 			eventuallyWaitFor,
 			eventuallyTickEvery,
-			"failed to eventually read v1 builtin default partition")
+			"failed to eventually read v1 builtin default namespace")
 	}
 
 	return &TestServerClient{

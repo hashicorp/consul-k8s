@@ -27,7 +27,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil"
 )
 
-func TestReconcileCreateNamespace_CE(t *testing.T) {
+func TestReconcileCreateNamespace(t *testing.T) {
 	testCases := []createTestCase{
 		{
 			name:                       "destination consul namespace is default/default",
@@ -153,7 +153,7 @@ func testReconcileCreateNamespace(t *testing.T, testCases []createTestCase) {
 	}
 }
 
-func TestReconcileDeleteNamespace_CE(t *testing.T) {
+func TestReconcileDeleteNamespace(t *testing.T) {
 	testCases := []deleteTestCase{
 		{
 			name:                       "destination namespace is default and not cleaned up when kube namespace is deleted",
@@ -267,7 +267,7 @@ func testReconcileDeleteNamespace(t *testing.T, testCases []deleteTestCase) {
 			require.NoError(t, err, "failed to create namespace")
 
 			// TODO: Remove after https://hashicorp.atlassian.net/browse/NET-6719 implemented
-			RequireEventuallyAccepted(t, testClient.ResourceClient, rsp.Resource.Id)
+			requireEventuallyAccepted(t, testClient.ResourceClient, rsp.Resource.Id)
 		}
 
 		// Create the namespace controller.
@@ -310,7 +310,7 @@ func testReconcileDeleteNamespace(t *testing.T, testCases []deleteTestCase) {
 				Type:    pbtenancy.NamespaceType,
 				Tenancy: &pbresource.Tenancy{Partition: tc.partition},
 			}
-			RequireEventuallyNotFound(t, testClient.ResourceClient, id)
+			requireEventuallyNotFound(t, testClient.ResourceClient, id)
 		} else {
 			panic("tc.expectedNamespaceExists or tc.expectedNamespaceDeleted must be set")
 		}
@@ -327,7 +327,7 @@ func testReconcileDeleteNamespace(t *testing.T, testCases []deleteTestCase) {
 // attempts to delete it by the single-shot controller under test's reconcile will not fail with a CAS error.
 //
 // Remove refs to this after https://hashicorp.atlassian.net/browse/NET-6719 is implemented.
-func RequireEventuallyAccepted(t *testing.T, resourceClient pbresource.ResourceServiceClient, id *pbresource.ID) {
+func requireEventuallyAccepted(t *testing.T, resourceClient pbresource.ResourceServiceClient, id *pbresource.ID) {
 	require.Eventuallyf(t,
 		func() bool {
 			rsp, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{Id: id})
@@ -355,7 +355,7 @@ func RequireEventuallyAccepted(t *testing.T, resourceClient pbresource.ResourceS
 	)
 }
 
-func RequireEventuallyNotFound(t *testing.T, resourceClient pbresource.ResourceServiceClient, id *pbresource.ID) {
+func requireEventuallyNotFound(t *testing.T, resourceClient pbresource.ResourceServiceClient, id *pbresource.ID) {
 	// allow both "not found" and "marked for deletion" so we're not waiting around unnecessarily
 	require.Eventuallyf(t, func() bool {
 		rsp, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{Id: id})
