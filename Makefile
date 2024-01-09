@@ -1,212 +1,251 @@
-SHELL = bash
+VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
+CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
+CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
+CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-dataplane-version.sh charts/consul/values.yaml)
+KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindVersion)
+KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
+KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
 
-GOOS?=$(shell go env GOOS)
-GOARCH?=$(shell go env GOARCH)
-GOPATH=$(shell go env GOPATH)
-GOTAGS ?=
-GOTOOLS = \
-	github.com/magiconair/vendorfmt/cmd/vendorfmt \
-	github.com/mitchellh/gox \
-	golang.org/x/tools/cmd/cover \
-	golang.org/x/tools/cmd/stringer
+# ===========> Helm Targets
 
-DEV_IMAGE?=consul-k8s-dev
-GO_BUILD_TAG?=consul-k8s-build-go
-GIT_COMMIT?=$(shell git rev-parse --short HEAD)
-GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
-GIT_DESCRIBE?=$(shell git describe --tags --always)
-GIT_IMPORT=github.com/hashicorp/consul-k8s/version
-GOLDFLAGS=-X $(GIT_IMPORT).GitCommit=$(GIT_COMMIT)$(GIT_DIRTY) -X $(GIT_IMPORT).GitDescribe=$(GIT_DESCRIBE)
+gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consul website. Usage: make gen-helm-docs consul=<path-to-consul-repo>.
+	@cd hack/helm-reference-gen; go run ./... $(consul)
 
-export GIT_COMMIT
-export GIT_DIRTY
-export GIT_DESCRIBE
-export GOLDFLAGS
-export GOTAGS
+copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make copy-crds-to-chart
+	@cd hack/copy-crds-to-chart; go run ./...
 
-CRD_OPTIONS ?= "crd:allowDangerousTypes=true"
+bats-tests: ## Run Helm chart bats tests.
+	 bats --jobs 4 charts/consul/test/unit
 
-################
-# CI Variables #
-################
-CI_DEV_DOCKER_NAMESPACE?=hashicorpdev
-CI_DEV_DOCKER_IMAGE_NAME?=consul-k8s
-CI_DEV_DOCKER_WORKDIR?=.
-CONSUL_K8S_IMAGE_VERSION?=latest
-################
 
-DIST_TAG?=1
-DIST_BUILD?=1
-DIST_SIGN?=1
+# ===========> Control Plane Targets
 
-ifdef DIST_VERSION
-DIST_VERSION_ARG=-v "$(DIST_VERSION)"
-else
-DIST_VERSION_ARG=
+control-plane-dev: ## Build consul-k8s-control-plane binary.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a amd64
+
+control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
+	@docker build -t '$(DEV_IMAGE)' \
+       --target=dev \
+       --build-arg 'TARGETARCH=$(GOARCH)' \
+       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
+       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
+       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+
+check-remote-dev-image-env:
+ifndef REMOTE_DEV_IMAGE
+	$(error REMOTE_DEV_IMAGE is undefined: set this image to <your_docker_repo>/<your_docker_image>:<image_tag>, e.g. hashicorp/consul-k8s-dev:latest)
 endif
 
-ifdef DIST_RELEASE_DATE
-DIST_DATE_ARG=-d "$(DIST_RELEASE_DATE)"
-else
-DIST_DATE_ARG=
-endif
+control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-k8s-control-plane dev multi-arch Docker image.
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a "arm64 amd64"
+	@docker buildx create --use && docker buildx build -t '$(REMOTE_DEV_IMAGE)' \
+       --platform linux/amd64,linux/arm64 \
+       --target=dev \
+       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
+       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
+       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+       --push \
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
-ifdef DIST_PRERELEASE
-DIST_REL_ARG=-r "$(DIST_PRERELEASE)"
-else
-DIST_REL_ARG=
-endif
+control-plane-test: ## Run go test for the control plane.
+	cd control-plane; go test ./...
 
-PUB_GIT?=1
-PUB_WEBSITE?=1
+control-plane-ent-test: ## Run go test with Consul enterprise tests. The consul binary in your PATH must be Consul Enterprise.
+	cd control-plane; go test ./... -tags=enterprise
 
-ifeq ($(PUB_GIT),1)
-PUB_GIT_ARG=-g
-else
-PUB_GIT_ARG=
-endif
+control-plane-cov: ## Run go test with code coverage.
+	cd control-plane; go test ./... -coverprofile=coverage.out; go tool cover -html=coverage.out
 
-ifeq ($(PUB_WEBSITE),1)
-PUB_WEBSITE_ARG=-w
-else
-PUB_WEBSITE_ARG=
-endif
-
-DEV_PUSH?=0
-ifeq ($(DEV_PUSH),1)
-DEV_PUSH_ARG=
-else
-DEV_PUSH_ARG=--no-push
-endif
-
-all: bin ctrl-generate
-
-bin:
-	@$(SHELL) $(CURDIR)/build-support/scripts/build-local.sh
-
-dev:
-	@$(SHELL) $(CURDIR)/build-support/scripts/build-local.sh -o $(GOOS) -a $(GOARCH)
-
-dev-docker:
-	@$(SHELL) $(CURDIR)/build-support/scripts/build-local.sh -o linux -a amd64
-	@docker build --platform linux/amd64 -t '$(DEV_IMAGE)' --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' -f $(CURDIR)/build-support/docker/Dev.dockerfile $(CURDIR)
-
-dev-tree:
-	@$(SHELL) $(CURDIR)/build-support/scripts/dev.sh $(DEV_PUSH_ARG)
-
-test:
-	go test ./...
-
-# requires a consul enterprise binary on the path
-ent-test:
-	go test ./... -tags=enterprise
-
-cov:
-	go test ./... -coverprofile=coverage.out
-	go tool cover -html=coverage.out
-
-tools:
-	go get -u -v $(GOTOOLS)
-
-# dist builds binaries for all platforms and packages them for distribution
-# make dist DIST_VERSION=<Desired Version> DIST_RELEASE_DATE=<release date>
-# date is in "month day, year" format.
-dist:
-	@$(SHELL) $(CURDIR)/build-support/scripts/release.sh -t '$(DIST_TAG)' -b '$(DIST_BUILD)' -S '$(DIST_SIGN)' $(DIST_VERSION_ARG) $(DIST_DATE_ARG) $(DIST_REL_ARG)
-
-publish:
-	@$(SHELL) $(CURDIR)/build-support/scripts/publish.sh $(PUB_GIT_ARG) $(PUB_WEBSITE_ARG)
-
-docker-images: go-build-image
-
-go-build-image:
-	@echo "Building Golang build container"
-	@docker build $(NOCACHE) $(QUIET) --build-arg 'GOTOOLS=$(GOTOOLS)' -t $(GO_BUILD_TAG) - < build-support/docker/Build-Go.dockerfile
-
-clean:
+control-plane-clean: ## Delete bin and pkg dirs.
 	@rm -rf \
-		$(CURDIR)/bin \
-		$(CURDIR)/pkg
+		$(CURDIR)/control-plane/bin \
+		$(CURDIR)/control-plane/pkg
 
-# Run controller tests
-ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-ctrl-test: ctrl-generate ctrl-manifests
-	mkdir -p ${ENVTEST_ASSETS_DIR}
-	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/master/hack/setup-envtest.sh
-	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./...
+control-plane-lint: cni-plugin-lint ## Run linter in the control-plane directory.
+	cd control-plane; golangci-lint run -c ../.golangci.yml
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-ctrl-deploy: ctrl-manifests kustomize
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+cni-plugin-lint:
+	cd control-plane/cni; golangci-lint run -c ../../.golangci.yml
 
-# Generate manifests e.g. CRD, RBAC etc.
-ctrl-manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+ctrl-generate: get-controller-gen ## Run CRD code generation.
+	cd control-plane; $(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
 
-# Generate code
-ctrl-generate: controller-gen
-	$(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
+# Perform a terraform fmt check but don't change anything
+terraform-fmt-check:
+	@$(CURDIR)/control-plane/build-support/scripts/terraformfmtcheck.sh $(TERRAFORM_DIR)
+.PHONY: terraform-fmt-check
 
-# Copy CRD YAML to consul-helm.
-# Usage: make ctrl-crd-copy helm=<path-to-consul-helm-repo>
-ctrl-crd-copy:
-	@cd hack/crds-to-consul-helm; go run ./... $(helm)
+# Format all terraform files according to terraform fmt
+terraform-fmt:
+	@terraform fmt -recursive
+.PHONY: terraform-fmt
 
-# find or download controller-gen
-# download controller-gen if necessary
-controller-gen:
+# Check for hashicorppreview containers
+check-preview-containers:
+	@source $(CURDIR)/control-plane/build-support/scripts/check-hashicorppreview.sh
+
+
+# ===========> CLI Targets
+cli-dev:
+	@echo "==> Installing consul-k8s CLI tool for ${GOOS}/${GOARCH}"
+	@cd cli; go build -o ./bin/consul-k8s; cp ./bin/consul-k8s ${GOPATH}/bin/
+
+cli-lint: ## Run linter in the control-plane directory.
+	cd cli; golangci-lint run -c ../.golangci.yml
+
+
+# ===========> Acceptance Tests Targets
+
+acceptance-lint: ## Run linter in the control-plane directory.
+	cd acceptance; golangci-lint run -c ../.golangci.yml
+
+# For CNI acceptance tests, the calico CNI pluging needs to be installed on Kind. Our consul-cni plugin will not work
+# without another plugin installed first
+kind-cni-calico:
+	kubectl create namespace calico-system ||true
+	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
+	# Sleeps are needed as installs can happen too quickly for Kind to handle it
+	@sleep 30
+	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
+	@sleep 20
+
+# Helper target for doing local cni acceptance testing
+kind-cni:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
+	make kind-cni-calico
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
+	make kind-cni-calico
+
+# Helper target for doing local acceptance testing
+kind:
+	kind delete cluster --name dc1
+	kind delete cluster --name dc2
+	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
+	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
+
+
+# Helper target for loading local dev images (run with `DEV_IMAGE=...` to load non-k8s images)
+kind-load:
+	kind load docker-image --name dc1 $(DEV_IMAGE)
+	kind load docker-image --name dc2 $(DEV_IMAGE)
+
+# ===========> Shared Targets
+
+help: ## Show targets and their descriptions.
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-38s\033[0m %s\n", $$1, $$2}'
+
+lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance directories.
+	for p in control-plane cli acceptance;  do cd $$p; golangci-lint run --path-prefix $$p -c ../.golangci.yml; cd ..; done
+
+ctrl-manifests: get-controller-gen ## Generate CRD manifests.
+	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	make copy-crds-to-chart
+
+get-controller-gen: ## Download controller-gen program needed for operator SDK.
 ifeq (, $(shell which controller-gen))
 	@{ \
 	set -e ;\
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.0 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
+CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
-kustomize:
-ifeq (, $(shell which kustomize))
-	@{ \
-	set -e ;\
-	KUSTOMIZE_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$KUSTOMIZE_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/kustomize/kustomize/v3@v3.5.4 ;\
-	rm -rf $$KUSTOMIZE_GEN_TMP_DIR ;\
-	}
-KUSTOMIZE=$(GOBIN)/kustomize
-else
-KUSTOMIZE=$(shell which kustomize)
-endif
+# ===========> CI Targets
 
-# In CircleCI, the linux binary will be attached from a previous step at pkg/bin/linux_amd64/. This make target
-# should only run in CI and not locally.
-ci.dev-docker:
-	@echo "Pulling consul-k8s container image - $(CONSUL_K8S_IMAGE_VERSION)"
-	@docker pull hashicorp/$(CI_DEV_DOCKER_IMAGE_NAME):$(CONSUL_K8S_IMAGE_VERSION) >/dev/null
-	@echo "Building consul-k8s Development container - $(CI_DEV_DOCKER_IMAGE_NAME)"
-	@docker build -t '$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT)' \
-	--build-arg CONSUL_K8S_IMAGE_VERSION=$(CONSUL_K8S_IMAGE_VERSION) \
-	--label COMMIT_SHA=$(CIRCLE_SHA1) \
-	--label PULL_REQUEST=$(CIRCLE_PULL_REQUEST) \
-	--label CIRCLE_BUILD_URL=$(CIRCLE_BUILD_URL) \
-	$(CI_DEV_DOCKER_WORKDIR) -f $(CURDIR)/build-support/docker/Dev.dockerfile
-	@echo $(DOCKER_PASS) | docker login -u="$(DOCKER_USER)" --password-stdin
-	@echo "Pushing dev image to: https://cloud.docker.com/u/$(CI_DEV_DOCKER_NAMESPACE)/repository/docker/$(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME)"
-	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT)
-ifeq ($(CIRCLE_BRANCH), master)
-	@docker tag $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT) $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest
-	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):latest
-endif
-ifeq ($(CIRCLE_BRANCH), crd-controller-base)
-	@docker tag $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):$(GIT_COMMIT) $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):crd-controller-base-latest
-	@docker push $(CI_DEV_DOCKER_NAMESPACE)/$(CI_DEV_DOCKER_IMAGE_NAME):crd-controller-base-latest
-endif
+ci.aws-acceptance-test-cleanup: ## Deletes AWS resources left behind after failed acceptance tests.
+	@cd hack/aws-acceptance-test-cleanup; go run ./... -auto-approve
 
-.PHONY: all bin clean dev dist docker-images go-build-image test tools ci.dev-docker
+version:
+	@echo $(VERSION)
+
+consul-version:
+	@echo $(CONSUL_IMAGE_VERSION)
+
+consul-enterprise-version:
+	@echo $(CONSUL_ENTERPRISE_IMAGE_VERSION)
+
+consul-dataplane-version:
+	@echo "docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.0-dev"
+
+kind-version:
+	@echo $(KIND_VERSION)
+
+kind-node-image:
+	@echo $(KIND_NODE_IMAGE)
+
+kubectl-version:
+	@echo $(KUBECTL_VERSION)
+
+kind-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/kind_acceptance_test_packages.yaml"
+
+gke-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/gke_acceptance_test_packages.yaml"
+
+eks-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/eks_acceptance_test_packages.yaml"
+
+aks-test-packages:
+	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
+
+# ===========> Release Targets
+check-env:
+	@printenv | grep "CONSUL_K8S"
+
+prepare-release-script: ## Sets the versions, updates changelog to prepare this repository to release
+ifndef CONSUL_K8S_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
+endif
+ifndef CONSUL_K8S_RELEASE_DATE
+	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+endif
+ifndef CONSUL_K8S_LAST_RELEASE_GIT_TAG
+	$(error CONSUL_K8S_LAST_RELEASE_GIT_TAG is required)
+endif
+ifndef CONSUL_K8S_CONSUL_VERSION
+	$(error CONSUL_K8S_CONSUL_VERSION is required)
+endif
+	@source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_release $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION); \
+
+prepare-release: prepare-release-script check-preview-containers
+
+prepare-dev:
+ifndef CONSUL_K8S_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
+endif
+ifndef CONSUL_K8S_RELEASE_DATE
+	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+endif
+ifndef CONSUL_K8S_NEXT_RELEASE_VERSION
+	$(error CONSUL_K8S_NEXT_RELEASE_VERSION is required)
+endif
+ifndef CONSUL_K8S_NEXT_CONSUL_VERSION
+	$(error CONSUL_K8S_NEXT_CONSUL_VERSION is required)
+endif
+ifndef CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION
+	$(error CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION is required)
+endif
+	source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_dev $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" "" $(CONSUL_K8S_NEXT_RELEASE_VERSION) $(CONSUL_K8S_NEXT_CONSUL_VERSION) $(CONSUL_K8S_NEXT_CONSUL_DATAPLANE_VERSION)
+
+# ===========> Makefile config
+.DEFAULT_GOAL := help
+.PHONY: gen-helm-docs copy-crds-to-chart bats-tests help ci.aws-acceptance-test-cleanup version cli-dev prepare-dev prepare-release
+SHELL = bash
+GOOS?=$(shell go env GOOS)
+GOARCH?=$(shell go env GOARCH)
+DEV_IMAGE?=consul-k8s-control-plane-dev
+DOCKER_HUB_USER=$(shell cat $(HOME)/.dockerhub)
+GIT_COMMIT?=$(shell git rev-parse --short HEAD)
+GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
+GIT_DESCRIBE?=$(shell git describe --tags --always)
+CRD_OPTIONS ?= "crd:allowDangerousTypes=true"
