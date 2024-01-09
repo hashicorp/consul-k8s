@@ -126,15 +126,18 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 					return true
 				}
 
-				namespace, _, err := client.Namespaces().Read(
-					constants.DefaultConsulNS,
-					&api.QueryOptions{Partition: constants.DefaultConsulPartition},
+				// Check for the default partition instead of the default namespace since this is a thing:
+				// error="Namespaces are currently disabled until all servers in the datacenter supports the feature"
+				partition, _, err := client.Partitions().Read(
+					context.Background(),
+					constants.DefaultConsulPartition,
+					nil,
 				)
-				return err == nil && namespace != nil
+				return err == nil && partition != nil
 			},
 			eventuallyWaitFor,
 			eventuallyTickEvery,
-			"failed to eventually read v1 builtin default namespace")
+			"failed to eventually read v1 builtin default partition")
 	}
 
 	return &TestServerClient{
