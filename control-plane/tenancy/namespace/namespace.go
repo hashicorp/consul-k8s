@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
 )
@@ -19,9 +20,7 @@ const DeletionTimestampKey = "deletionTimestamp"
 // EnsureDeleted ensures a Consul namespace with name ns in partition ap is deleted or is in the
 // process of being deleted. If neither, it will mark it for deletion.
 func EnsureDeleted(ctx context.Context, client pbresource.ResourceServiceClient, ap, ns string) error {
-	// TODO: fix common imports
-	//if ns == common.WildcardNamespace || ns == common.DefaultNamespaceName {
-	if ns == "*" || ns == "default" {
+	if ns == common.WildcardNamespace || ns == common.DefaultNamespaceName {
 		return nil
 	}
 
@@ -58,8 +57,7 @@ func EnsureDeleted(ctx context.Context, client pbresource.ResourceServiceClient,
 //
 // Boolean return value indicates if the namespace was created by this call.
 func EnsureExists(ctx context.Context, client pbresource.ResourceServiceClient, ap, ns string) (bool, error) {
-	// TOOD: make constants
-	if ns == "*" || ns == "default" {
+	if ns == common.WildcardNamespace || ns == common.DefaultNamespaceName {
 		return false, nil
 	}
 
@@ -100,7 +98,7 @@ func EnsureExists(ctx context.Context, client pbresource.ResourceServiceClient, 
 	}})
 
 	if err != nil {
-		return false, fmt.Errorf("consul namespace create failed: %w", err)
+		return false, fmt.Errorf("consul namespace creation failed: %w", err)
 	}
 	return true, nil
 }

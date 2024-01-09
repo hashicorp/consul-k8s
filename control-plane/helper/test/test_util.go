@@ -73,19 +73,7 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	client, err := api.NewClient(consulConfig.APIClientConfig)
 	require.NoError(t, err)
 
-	// Prevent test flakes due to "ACL system must be bootstrapped before ..." error
-	// by requiring successful retrieval of the initial mgmt token.
-	if cfg.ACL.Enabled && cfg.ACL.Tokens.InitialManagement != "" {
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
-			_, _, err = client.ACL().TokenReadSelf(nil)
-			assert.NoError(c, err)
-		},
-			eventuallyWaitFor,
-			eventuallyTickEvery,
-			"failed to eventually read self token as a proxy for the ACL system bootstrap completion",
-		)
-	}
-
+	requireACLBootstrapped(t, cfg, client)
 	watcher := MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true)
 
 	// Create a gRPC resource service client when the resource-apis experiment is enabled.
@@ -95,50 +83,7 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 		require.NoError(t, err)
 	}
 
-	// There is a window of time post-leader election on startup where v2 tenancy builtins
-	// (default partition and namespace) have not yet been created.
-	// Wait for them to exist before considering the server "open for business".
-	// Only check for default namespace existence since it implies the default partition exists.
-	if slices.Contains(cfg.Experiments, "v2tenancy") {
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
-			_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{
-				Id: &pbresource.ID{
-					Name:    constants.DefaultConsulNS,
-					Type:    pbtenancy.NamespaceType,
-					Tenancy: &pbresource.Tenancy{Partition: constants.DefaultConsulPartition},
-				},
-			})
-			assert.NoError(c, err)
-		},
-			eventuallyWaitFor,
-			eventuallyTickEvery,
-			"failed to eventually read v2 builtin default namespace",
-		)
-	} else {
-		// Do the same for V1 counterparts in ent only since to prevent known test flakes.
-		require.Eventually(t,
-			func() bool {
-				self, err := client.Agent().Self()
-				if err != nil {
-					return false
-				}
-				if self["DebugConfig"]["VersionMetadata"] != "ent" {
-					return true
-				}
-
-				// Check for the default partition instead of the default namespace since this is a thing:
-				// error="Namespaces are currently disabled until all servers in the datacenter supports the feature"
-				partition, _, err := client.Partitions().Read(
-					context.Background(),
-					constants.DefaultConsulPartition,
-					nil,
-				)
-				return err == nil && partition != nil
-			},
-			eventuallyWaitFor,
-			eventuallyTickEvery,
-			"failed to eventually read v1 builtin default partition")
-	}
+	requireTenancyBuiltins(t, cfg, client, resourceClient)
 
 	return &TestServerClient{
 		TestServer:     consulServer,
@@ -472,3 +417,69 @@ w7/VeA7lzmj3TQRE/W0U0ZGeoAxn9b6JtT0iMucYvP0hXKTPBWlnzIijamU50r2Y
 Z23jGuk6rn9DUHC2xPj3wCTmd8SGEJoV31noJV5dVeQ90wusXz3vTG7ficKnvHFS
 xtr5PSwH1DusYfVaGH2O
 -----END CERTIFICATE-----`
+
+func requireTenancyBuiltins(t *testing.T, cfg *testutil.TestServerConfig, client *api.Client, resourceClient pbresource.ResourceServiceClient) {
+	t.Helper()
+
+	// There is a window of time post-leader election on startup where v2 tenancy builtins
+	// (default partition and namespace) have not yet been created.
+	// Wait for them to exist before considering the server "open for business".
+	// Only check for default namespace existence since it implies the default partition exists.
+	if slices.Contains(cfg.Experiments, "v2tenancy") {
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{
+				Id: &pbresource.ID{
+					Name:    constants.DefaultConsulNS,
+					Type:    pbtenancy.NamespaceType,
+					Tenancy: &pbresource.Tenancy{Partition: constants.DefaultConsulPartition},
+				},
+			})
+			assert.NoError(c, err)
+		},
+			eventuallyWaitFor,
+			eventuallyTickEvery,
+			"failed to eventually read v2 builtin default namespace",
+		)
+	} else {
+		// Do the same for V1 counterparts in ent only to prevent known test flakes.
+		require.Eventually(t,
+			func() bool {
+				self, err := client.Agent().Self()
+				if err != nil {
+					return false
+				}
+				if self["DebugConfig"]["VersionMetadata"] != "ent" {
+					return true
+				}
+
+				// Check for the default partition instead of the default namespace since this is a thing:
+				// error="Namespaces are currently disabled until all servers in the datacenter supports the feature"
+				partition, _, err := client.Partitions().Read(
+					context.Background(),
+					constants.DefaultConsulPartition,
+					nil,
+				)
+				return err == nil && partition != nil
+			},
+			eventuallyWaitFor,
+			eventuallyTickEvery,
+			"failed to eventually read v1 builtin default partition")
+	}
+}
+
+func requireACLBootstrapped(t *testing.T, cfg *testutil.TestServerConfig, client *api.Client) {
+	t.Helper()
+
+	// Prevent test flakes due to "ACL system must be bootstrapped before ..." error
+	// by requiring successful retrieval of the initial mgmt token.
+	if cfg.ACL.Enabled && cfg.ACL.Tokens.InitialManagement != "" {
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			_, _, err := client.ACL().TokenReadSelf(nil)
+			assert.NoError(c, err)
+		},
+			eventuallyWaitFor,
+			eventuallyTickEvery,
+			"failed to eventually read self token as a proxy for the ACL system bootstrap completion",
+		)
+	}
+}
