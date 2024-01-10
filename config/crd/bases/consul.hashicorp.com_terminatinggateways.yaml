@@ -1,11 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: terminatinggateways.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
@@ -13,6 +11,8 @@ spec:
     kind: TerminatingGateway
     listKind: TerminatingGatewayList
     plural: terminatinggateways
+    shortNames:
+    - terminating-gateway
     singular: terminatinggateway
   scope: Namespaced
   versions:
@@ -21,6 +21,10 @@ spec:
       jsonPath: .status.conditions[?(@.type=="Synced")].status
       name: Synced
       type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
     - description: The age of the resource
       jsonPath: .metadata.creationTimestamp
       name: Age
@@ -44,14 +48,14 @@ spec:
           metadata:
             type: object
           spec:
-            description: TerminatingGatewaySpec defines the desired state of TerminatingGateway
+            description: TerminatingGatewaySpec defines the desired state of TerminatingGateway.
             properties:
               services:
                 description: Services is a list of service names represented by the
                   terminating gateway.
                 items:
                   description: A LinkedService is a service represented by a terminating
-                    gateway
+                    gateway.
                   properties:
                     caFile:
                       description: CAFile is the optional path to a CA certificate
@@ -119,9 +123,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

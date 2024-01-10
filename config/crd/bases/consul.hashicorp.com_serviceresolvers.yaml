@@ -1,11 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: serviceresolvers.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
@@ -13,6 +11,8 @@ spec:
     kind: ServiceResolver
     listKind: ServiceResolverList
     plural: serviceresolvers
+    shortNames:
+    - service-resolver
     singular: serviceresolver
   scope: Namespaced
   versions:
@@ -21,6 +21,10 @@ spec:
       jsonPath: .status.conditions[?(@.type=="Synced")].status
       name: Synced
       type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
     - description: The age of the resource
       jsonPath: .metadata.creationTimestamp
       name: Age
@@ -43,13 +47,12 @@ spec:
           metadata:
             type: object
           spec:
-            description: ServiceResolverSpec defines the desired state of ServiceResolver
+            description: ServiceResolverSpec defines the desired state of ServiceResolver.
             properties:
               connectTimeout:
                 description: ConnectTimeout is the timeout for establishing new network
                   connections to this service.
-                format: int64
-                type: integer
+                type: string
               defaultSubset:
                 description: DefaultSubset is the subset to use when no explicit subset
                   is requested. If empty the unnamed subset is used.
@@ -109,8 +112,7 @@ spec:
                             ttl:
                               description: TTL is the ttl for generated cookies. Cannot
                                 be specified for session cookies.
-                              format: int64
-                              type: integer
+                              type: string
                           type: object
                         field:
                           description: Field is the attribute type to hash on. Must
@@ -178,8 +180,14 @@ spec:
                       from instead of the current one.
                     type: string
                   namespace:
-                    description: Namespace is the namespace to resolve the service
-                      from instead of the current one.
+                    description: Namespace is the Consul namespace to resolve the
+                      service from instead of the current namespace. If empty the
+                      current namespace is assumed.
+                    type: string
+                  partition:
+                    description: Partition is the Consul partition to resolve the
+                      service from instead of the current partition. If empty the
+                      current partition is assumed.
                     type: string
                   service:
                     description: Service is a service to resolve instead of the current
@@ -253,9 +261,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

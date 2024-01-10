@@ -15,8 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/helper/cert"
-	"github.com/hashicorp/consul-k8s/helper/go-discover/mocks"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -28,6 +26,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/helper/cert"
+	"github.com/hashicorp/consul-k8s/helper/go-discover/mocks"
 )
 
 var ns = "default"
@@ -1926,7 +1927,7 @@ func completeBootstrappedSetup(t *testing.T, masterToken string) (*fake.Clientse
 
 	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
-		c.ACL.Tokens.Master = masterToken
+		c.ACL.Tokens.InitialManagement = masterToken
 	})
 	require.NoError(t, err)
 	svr.WaitForActiveCARoot(t)
@@ -1971,7 +1972,7 @@ func replicatedSetup(t *testing.T, bootToken string) (*fake.Clientset, *api.Clie
 	primarySvr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 		if bootToken != "" {
-			c.ACL.Tokens.Master = bootToken
+			c.ACL.Tokens.InitialManagement = bootToken
 		}
 	})
 	require.NoError(t, err)

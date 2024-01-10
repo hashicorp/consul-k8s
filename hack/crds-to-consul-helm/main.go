@@ -77,7 +77,7 @@ func realMain(helmPathAbs string) error {
 			`    release: {{ .Release.Name }}`,
 			`    component: crd`,
 		}
-		withLabels := append(splitOnNewlines[0:9], append(labelLines, splitOnNewlines[9:]...)...)
+		withLabels := append(splitOnNewlines[0:7], append(labelLines, splitOnNewlines[7:]...)...)
 		contents = strings.Join(withLabels, "\n")
 
 		// Construct the destination filename.

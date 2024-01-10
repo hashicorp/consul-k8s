@@ -5,13 +5,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/namespaces"
 )
 
 const (
@@ -27,7 +28,9 @@ func init() {
 
 // TerminatingGateway is the Schema for the terminatinggateways API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+// +kubebuilder:resource:shortName="terminating-gateway"
 type TerminatingGateway struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -38,20 +41,20 @@ type TerminatingGateway struct {
 
 // +kubebuilder:object:root=true
 
-// TerminatingGatewayList contains a list of TerminatingGateway
+// TerminatingGatewayList contains a list of TerminatingGateway.
 type TerminatingGatewayList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []TerminatingGateway `json:"items"`
 }
 
-// TerminatingGatewaySpec defines the desired state of TerminatingGateway
+// TerminatingGatewaySpec defines the desired state of TerminatingGateway.
 type TerminatingGatewaySpec struct {
 	// Services is a list of service names represented by the terminating gateway.
 	Services []LinkedService `json:"services,omitempty"`
 }
 
-// A LinkedService is a service represented by a terminating gateway
+// A LinkedService is a service represented by a terminating gateway.
 type LinkedService struct {
 	// The namespace the service is registered in.
 	Namespace string `json:"namespace,omitempty"`
@@ -168,7 +171,7 @@ func (in *TerminatingGateway) MatchesConsul(candidate capi.ConfigEntry) bool {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.TerminatingGatewayConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.TerminatingGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *TerminatingGateway) Validate(namespacesEnabled bool) error {

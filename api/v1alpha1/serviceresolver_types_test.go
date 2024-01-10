@@ -4,11 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 func TestServiceResolver_MatchesConsul(t *testing.T) {
@@ -74,7 +75,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 						},
 					},
-					ConnectTimeout: 1 * time.Second,
+					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -90,7 +91,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 								FieldValue: "value",
 								CookieConfig: &CookieConfig{
 									Session: true,
-									TTL:     1,
+									TTL:     metav1.Duration{Duration: 1 * time.Second},
 									Path:    "path",
 								},
 								SourceIP: true,
@@ -150,7 +151,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							FieldValue: "value",
 							CookieConfig: &capi.CookieConfig{
 								Session: true,
-								TTL:     1,
+								TTL:     1 * time.Second,
 								Path:    "path",
 							},
 							SourceIP: true,
@@ -243,7 +244,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							Datacenters:   []string{"failover2_dc1", "failover2_dc2"},
 						},
 					},
-					ConnectTimeout: 1 * time.Second,
+					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -259,7 +260,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 								FieldValue: "value",
 								CookieConfig: &CookieConfig{
 									Session: true,
-									TTL:     1,
+									TTL:     metav1.Duration{Duration: 1 * time.Second},
 									Path:    "path",
 								},
 								SourceIP: true,
@@ -319,7 +320,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 							FieldValue: "value",
 							CookieConfig: &capi.CookieConfig{
 								Session: true,
-								TTL:     1,
+								TTL:     1 * time.Second,
 								Path:    "path",
 							},
 							SourceIP: true,
@@ -534,7 +535,8 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].field: Invalid value: "invalid": must be one of "header", "cookie", "query_parameter"`,
+				`spec.loadBalancer.hashPolicies[0].field: Invalid value: "invalid": must be one of "header", "cookie", "query_parameter"`,
+				`spec.loadBalancer.hashPolicies[0].fieldValue: Invalid value: "": fieldValue cannot be empty if field is set`,
 			},
 		},
 		"hashPolicy sourceIP and field set": {
@@ -570,7 +572,7 @@ func TestServiceResolver_Validate(t *testing.T) {
 								Field: "cookie",
 								CookieConfig: &CookieConfig{
 									Session: true,
-									TTL:     100,
+									TTL:     metav1.Duration{Duration: 100 * time.Second},
 								},
 							},
 						},
@@ -579,7 +581,8 @@ func TestServiceResolver_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`serviceresolver.consul.hashicorp.com "foo" is invalid: spec.loadBalancer.hashPolicies[0].cookieConfig: Invalid value: "{\"session\":true,\"ttl\":100}": cannot set both session and ttl`,
+				`spec.loadBalancer.hashPolicies[0].fieldValue: Invalid value: "": fieldValue cannot be empty if field is set`,
+				`spec.loadBalancer.hashPolicies[0].cookieConfig: Invalid value: "{\"session\":true,\"ttl\":\"1m40s\"}": cannot set both session and ttl`,
 			},
 		},
 		"namespaces disabled: redirect namespace specified": {
