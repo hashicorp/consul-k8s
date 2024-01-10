@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -66,10 +67,19 @@ func (in *MeshGateway) ResourceID(_, partition string) *pbresource.ID {
 	}
 }
 
+// Resource converts the `MeshGateway` CRD into the equivalent Consul resource.
+// This includes adding a pbcatalog.WorkloadSelector that will target the Pods created
+// for this MeshGateway.
 func (in *MeshGateway) Resource(namespace, partition string) *pbresource.Resource {
 	return &pbresource.Resource{
-		Id:       in.ResourceID(namespace, partition),
-		Data:     inject.ToProtoAny(&in.Spec),
+		Id: in.ResourceID(namespace, partition),
+		Data: inject.ToProtoAny(&pbmesh.MeshGateway{
+			GatewayClassName: in.Spec.GatewayClassName,
+			Listeners:        in.Spec.Listeners,
+			Workloads: &pbcatalog.WorkloadSelector{
+				Prefixes: []string{in.Name},
+			},
+		}),
 		Metadata: meshConfigMeta(),
 	}
 }

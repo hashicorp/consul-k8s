@@ -69,6 +69,20 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+              workloads:
+                description: Selection of workloads to be configured as mesh gateways
+                properties:
+                  filter:
+                    type: string
+                  names:
+                    items:
+                      type: string
+                    type: array
+                  prefixes:
+                    items:
+                      type: string
+                    type: array
+                type: object
             type: object
           status:
             properties:

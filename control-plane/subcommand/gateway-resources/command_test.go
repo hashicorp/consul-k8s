@@ -17,10 +17,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 )
 
 func TestRun_flagValidation(t *testing.T) {
@@ -574,7 +573,7 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 					Name:      "mesh-gateway",
 					Namespace: "consul",
 				},
-				Spec: meshv2beta1.MeshGateway{
+				Spec: pbmesh.MeshGateway{
 					GatewayClassName: "consul-mesh-gateway",
 				},
 			}
