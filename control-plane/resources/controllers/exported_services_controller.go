@@ -29,7 +29,7 @@ type ExportedServicesController struct {
 // +kubebuilder:rbac:groups=multicluster.consul.hashicorp.com,resources=exportedservices/status,verbs=get;update;patch
 
 func (r *ExportedServicesController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.Controller.ReconcileEntry(ctx, r, req, &multiclusterv2beta1.ExportedServices{})
+	return r.Controller.ReconcileResource(ctx, r, req, &multiclusterv2beta1.ExportedServices{})
 }
 
 func (r *ExportedServicesController) Logger(name types.NamespacedName) logr.Logger {
