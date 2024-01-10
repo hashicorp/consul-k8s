@@ -63,6 +63,8 @@ spec:
                       type: string
                     port:
                       format: int32
+                      maximum: 65535
+                      minimum: 0
                       type: integer
                   type: object
                 minItems: 1
