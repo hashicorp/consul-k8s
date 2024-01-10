@@ -27,7 +27,7 @@ type TCPRouteController struct {
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=tcproute/status,verbs=get;update;patch
 
 func (r *TCPRouteController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.TCPRoute{})
+	return r.Controller.ReconcileResource(ctx, r, req, &meshv2beta1.TCPRoute{})
 }
 
 func (r *TCPRouteController) Logger(name types.NamespacedName) logr.Logger {

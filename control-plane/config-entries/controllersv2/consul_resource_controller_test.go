@@ -476,7 +476,7 @@ func TestConsulResourceController_ErrorUpdatesSyncStatus(t *testing.T) {
 		},
 	}
 
-	// ReconcileEntry should result in an error.
+	// ReconcileResource should result in an error.
 	namespacedName := types.NamespacedName{
 		Namespace: metav1.NamespaceDefault,
 		Name:      trafficpermissions.KubernetesName(),

@@ -27,7 +27,7 @@ type GRPCRouteController struct {
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=grpcroute/status,verbs=get;update;patch
 
 func (r *GRPCRouteController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.GRPCRoute{})
+	return r.Controller.ReconcileResource(ctx, r, req, &meshv2beta1.GRPCRoute{})
 }
 
 func (r *GRPCRouteController) Logger(name types.NamespacedName) logr.Logger {

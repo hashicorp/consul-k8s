@@ -65,7 +65,7 @@ func (r *MeshGatewayController) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.MeshGateway{})
+	return r.Controller.ReconcileResource(ctx, r, req, &meshv2beta1.MeshGateway{})
 }
 
 func (r *MeshGatewayController) Logger(name types.NamespacedName) logr.Logger {

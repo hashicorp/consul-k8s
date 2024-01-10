@@ -67,13 +67,13 @@ type ConsulResourceController struct {
 	common.ConsulTenancyConfig
 }
 
-// ReconcileEntry reconciles an update to a resource. CRD-specific controller's
+// ReconcileResource reconciles an update to a resource. CRD-specific controller's
 // call this function because it handles reconciliation of config entries
 // generically.
 // CRD-specific controller should pass themselves in as updater since we
 // need to call back into their own update methods to ensure they update their
 // internal state.
-func (r *ConsulResourceController) ReconcileEntry(ctx context.Context, crdCtrl ResourceController, req ctrl.Request, resource common.ConsulResource) (ctrl.Result, error) {
+func (r *ConsulResourceController) ReconcileResource(ctx context.Context, crdCtrl ResourceController, req ctrl.Request, resource common.ConsulResource) (ctrl.Result, error) {
 	logger := crdCtrl.Logger(req.NamespacedName)
 	err := crdCtrl.Get(ctx, req.NamespacedName, resource)
 	if k8serr.IsNotFound(err) {
@@ -263,8 +263,8 @@ func (r *ConsulResourceController) syncUnknownWithError(ctx context.Context,
 	updater ResourceController,
 	resource common.ConsulResource,
 	errType string,
-	err error) (ctrl.Result, error) {
-
+	err error,
+) (ctrl.Result, error) {
 	resource.SetSyncedCondition(corev1.ConditionUnknown, errType, err.Error())
 	if updateErr := updater.UpdateStatus(ctx, resource); updateErr != nil {
 		// Log the original error here because we are returning the updateErr.

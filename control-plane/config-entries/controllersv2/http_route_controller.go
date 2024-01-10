@@ -27,7 +27,7 @@ type HTTPRouteController struct {
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=httproute/status,verbs=get;update;patch
 
 func (r *HTTPRouteController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.HTTPRoute{})
+	return r.Controller.ReconcileResource(ctx, r, req, &meshv2beta1.HTTPRoute{})
 }
 
 func (r *HTTPRouteController) Logger(name types.NamespacedName) logr.Logger {

@@ -27,7 +27,7 @@ type TrafficPermissionsController struct {
 // +kubebuilder:rbac:groups=auth.consul.hashicorp.com,resources=trafficpermissions/status,verbs=get;update;patch
 
 func (r *TrafficPermissionsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.Controller.ReconcileEntry(ctx, r, req, &consulv2beta1.TrafficPermissions{})
+	return r.Controller.ReconcileResource(ctx, r, req, &consulv2beta1.TrafficPermissions{})
 }
 
 func (r *TrafficPermissionsController) Logger(name types.NamespacedName) logr.Logger {

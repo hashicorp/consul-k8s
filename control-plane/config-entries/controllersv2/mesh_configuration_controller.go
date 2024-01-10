@@ -27,7 +27,7 @@ type MeshConfigurationController struct {
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=meshconfiguration/status,verbs=get;update;patch
 
 func (r *MeshConfigurationController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.Controller.ReconcileEntry(ctx, r, req, &meshv2beta1.MeshConfiguration{})
+	return r.Controller.ReconcileResource(ctx, r, req, &meshv2beta1.MeshConfiguration{})
 }
 
 func (r *MeshConfigurationController) Logger(name types.NamespacedName) logr.Logger {
