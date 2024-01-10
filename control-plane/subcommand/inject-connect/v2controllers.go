@@ -6,11 +6,12 @@ package connectinject
 import (
 	"context"
 
-	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 
 	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -240,6 +241,15 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		Scheme:     mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.GatewayClass)
+		return err
+	}
+
+	if err := (&controllersv2.ExportedServicesController{
+		Controller: consulResourceController,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.ExportedServices),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.ExportedServices)
 		return err
 	}
 

@@ -32,6 +32,7 @@ import (
 
 	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	multiclusterv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/multicluster/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -166,6 +167,7 @@ func init() {
 	// V2 resources
 	utilruntime.Must(authv2beta1.AddAuthToScheme(scheme))
 	utilruntime.Must(meshv2beta1.AddMeshToScheme(scheme))
+	utilruntime.Must(multiclusterv2beta1.AddMultiClusterToScheme(scheme))
 
 	//+kubebuilder:scaffold:scheme
 }
