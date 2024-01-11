@@ -161,7 +161,7 @@ func (b *meshGatewayBuilder) dataplaneArgs(config GatewayConfig, containerConfig
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
-		"-log-level=" + containerConfig.Consul.Logging.Level,
+		"-log-level=" + b.logLevelForDataplaneContainer(),
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + defaultEnvoyProxyConcurrency,
 	}
