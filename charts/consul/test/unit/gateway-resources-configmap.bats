@@ -150,6 +150,24 @@ target=templates/gateway-resources-configmap.yaml
 }
 
 #--------------------------------------------------------------------
+# Mesh Gateway Extra Labels configuration
+
+@test "gateway-resources/ConfigMap: Mesh Gateway gets Extra Labels when set" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s $target \
+        --set 'connectInject.enabled=true' \
+        --set 'meshGateway.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.extraLabels.foo'='bar' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment.labels.set.foo' | tee /dev/stderr
+    )
+    [ "$actual" = 'bar' ]
+}
+
+#--------------------------------------------------------------------
 # Mesh Gateway WAN Address configuration
 
 @test "gateway-resources/ConfigMap: Mesh Gateway WAN Address default annotations" {
