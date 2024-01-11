@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: Add new `consul.hashicorp.com/sidecar-proxy-startup-failure-seconds` and `consul.hashicorp.com/sidecar-proxy-liveness-failure-seconds` annotations that allow users to manually configure startup and liveness probes for Envoy sidecar proxies.
+```

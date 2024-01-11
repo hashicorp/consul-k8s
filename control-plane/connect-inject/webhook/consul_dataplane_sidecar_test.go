@@ -414,48 +414,143 @@ func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
-	h := MeshWebhook{
-		ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
-		ConsulAddress: "1.1.1.1",
-		LogLevel:      "info",
-	}
-	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				constants.AnnotationUseProxyHealthCheck: "true",
-			},
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "web",
+	tests := map[string]struct {
+		changeHook        func(*MeshWebhook)
+		changePod         func(*corev1.Pod)
+		expectedReadiness *corev1.Probe
+		expectedStartup   *corev1.Probe
+		expectedLiveness  *corev1.Probe
+	}{
+		"readiness-only": {
+			changeHook: func(h *MeshWebhook) {},
+			changePod:  func(p *corev1.Pod) {},
+			expectedReadiness: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(21000),
+						Path: "/ready",
+					},
 				},
+				InitialDelaySeconds: 1,
+			},
+		},
+		"default-values": {
+			changeHook: func(h *MeshWebhook) {
+				h.DefaultSidecarProxyStartupFailureSeconds = 11
+				h.DefaultSidecarProxyLivenessFailureSeconds = 22
+			},
+			changePod: func(p *corev1.Pod) {},
+			expectedReadiness: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(21000),
+						Path: "/ready",
+					},
+				},
+				InitialDelaySeconds: 1,
+			},
+			expectedStartup: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(21000),
+						Path: "/ready",
+					},
+				},
+				PeriodSeconds:    1,
+				FailureThreshold: 11,
+			},
+			expectedLiveness: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(21000),
+						Path: "/ready",
+					},
+				},
+				PeriodSeconds:    1,
+				FailureThreshold: 22,
+			},
+		},
+		"override-default": {
+			changeHook: func(h *MeshWebhook) {
+				h.DefaultSidecarProxyStartupFailureSeconds = 11
+				h.DefaultSidecarProxyLivenessFailureSeconds = 22
+			},
+			changePod: func(p *corev1.Pod) {
+				p.ObjectMeta.Annotations[constants.AnnotationSidecarProxyStartupFailureSeconds] = "111"
+				p.ObjectMeta.Annotations[constants.AnnotationSidecarProxyLivenessFailureSeconds] = "222"
+			},
+			expectedReadiness: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(21000),
+						Path: "/ready",
+					},
+				},
+				InitialDelaySeconds: 1,
+			},
+			expectedStartup: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(21000),
+						Path: "/ready",
+					},
+				},
+				PeriodSeconds:    1,
+				FailureThreshold: 111,
+			},
+			expectedLiveness: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Port: intstr.FromInt(21000),
+						Path: "/ready",
+					},
+				},
+				PeriodSeconds:    1,
+				FailureThreshold: 222,
 			},
 		},
 	}
-	container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
-	expectedProbe := &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Port: intstr.FromInt(21000),
-				Path: "/ready",
-			},
-		},
-		InitialDelaySeconds: 1,
+	for tn, tc := range tests {
+		t.Run(tn, func(t *testing.T) {
+			hook := MeshWebhook{
+				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+				ConsulAddress: "1.1.1.1",
+				LogLevel:      "info",
+			}
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationUseProxyHealthCheck: "true",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+						},
+					},
+				},
+			}
+			tc.changeHook(&hook)
+			tc.changePod(&pod)
+			container, err := hook.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
+			require.NoError(t, err)
+			require.Contains(t, container.Args, "-envoy-ready-bind-port=21000")
+			require.Equal(t, tc.expectedReadiness, container.ReadinessProbe)
+			require.Equal(t, tc.expectedStartup, container.StartupProbe)
+			require.Equal(t, tc.expectedLiveness, container.LivenessProbe)
+			require.Contains(t, container.Env, corev1.EnvVar{
+				Name: "DP_ENVOY_READY_BIND_ADDRESS",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
+				},
+			})
+			require.Contains(t, container.Ports, corev1.ContainerPort{
+				Name:          "proxy-health-0",
+				ContainerPort: 21000,
+			})
+		})
 	}
-	require.NoError(t, err)
-	require.Contains(t, container.Args, "-envoy-ready-bind-port=21000")
-	require.Equal(t, expectedProbe, container.ReadinessProbe)
-	require.Contains(t, container.Env, corev1.EnvVar{
-		Name: "DP_ENVOY_READY_BIND_ADDRESS",
-		ValueFrom: &corev1.EnvVarSource{
-			FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
-		},
-	})
-	require.Contains(t, container.Ports, corev1.ContainerPort{
-		Name:          "proxy-health-0",
-		ContainerPort: 21000,
-	})
 }
 
 func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) {

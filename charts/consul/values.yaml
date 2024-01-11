@@ -2552,6 +2552,13 @@ connectInject:
       # @type: string
       defaultGracefulShutdownPath: "/graceful_shutdown"
 
+    # Configures how long the k8s startup probe will wait before the proxy is considered to be unhealthy and the container is restarted.
+    # A value of zero disables the probe.
+    defaultStartupFailureSeconds: 0
+    # Configures how long the k8s liveness probe will wait before the proxy is considered to be unhealthy and the container is restarted.
+    # A value of zero disables the probe.
+    defaultLivenessFailureSeconds: 0
+
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of
   # Kubernetes, however they should be tweaked with the recommended defaults as shown below to speed up service registration times.
