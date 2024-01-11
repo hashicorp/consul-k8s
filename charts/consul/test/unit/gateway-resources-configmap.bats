@@ -168,6 +168,24 @@ target=templates/gateway-resources-configmap.yaml
 }
 
 #--------------------------------------------------------------------
+# Mesh Gateway annotations configuration
+
+@test "gateway-resources/ConfigMap: Mesh Gateway gets annotations when set" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s $target \
+        --set 'connectInject.enabled=true' \
+        --set 'meshGateway.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'meshGateway.annotations.foo'='bar' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment.annotations.set.foo' | tee /dev/stderr
+    )
+    [ "$actual" = 'bar' ]
+}
+
+#--------------------------------------------------------------------
 # Mesh Gateway WAN Address configuration
 
 @test "gateway-resources/ConfigMap: Mesh Gateway WAN Address default annotations" {
