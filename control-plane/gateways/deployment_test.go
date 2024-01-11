@@ -103,6 +103,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 								},
 							},
+							GatewayClassAnnotationsAndLabels: meshv2beta1.GatewayClassAnnotationsAndLabels{
+								Labels: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+									Set: map[string]string{
+										"foo": "bar",
+									},
+								},
+							},
 							Container: &meshv2beta1.GatewayClassContainerConfig{
 								HostPort:     8080,
 								PortModifier: 8000,
@@ -155,6 +162,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						"chart":        "consul-helm",
 						"heritage":     "Helm",
 						"release":      "consul",
+						"foo":          "bar",
 					},
 					Annotations: map[string]string{},
 				},
@@ -167,6 +175,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							"chart":        "consul-helm",
 							"heritage":     "Helm",
 							"release":      "consul",
+							"foo":          "bar",
 						},
 					},
 					Template: corev1.PodTemplateSpec{
@@ -176,9 +185,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"app":          "consul",
 								"chart":        "consul-helm",
 								"heritage":     "Helm",
+								"foo":          "bar",
 								"release":      "consul",
 							},
-
 							Annotations: map[string]string{
 								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
