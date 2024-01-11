@@ -73,6 +73,81 @@ target=templates/gateway-resources-configmap.yaml
     [ "$resources" != null ]
 }
 
+#--------------------------------------------------------------------
+# Mesh Gateway logLevel configuration
+
+@test "gateway-resources/ConfigMap: Mesh Gateway logLevel default configuration" {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'meshGateway.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.container.consul.logging.level')
+    [ "${actual}" = 'info' ]
+
+    local actual=$(echo "$config" | yq -r '.initContainer.consul.logging.level')
+    [ "${actual}" = 'info' ]
+}
+
+
+@test "gateway-resources/ConfigMap: Mesh Gateway logLevel custom global configuration" {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'meshGateway.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=debug' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.container.consul.logging.level')
+    [ "${actual}" = 'debug' ]
+
+    local actual=$(echo "$config" | yq -r '.initContainer.consul.logging.level')
+    [ "${actual}" = 'debug' ]
+}
+
+@test "gateway-resources/ConfigMap: Mesh Gateway logLevel custom meshGateway configuration" {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'meshGateway.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'meshGateway.logLevel=debug' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.container.consul.logging.level')
+    [ "${actual}" = 'debug' ]
+
+    local actual=$(echo "$config" | yq -r '.initContainer.consul.logging.level')
+    [ "${actual}" = 'debug' ]
+}
+
+@test "gateway-resources/ConfigMap: Mesh Gateway logLevel custom meshGateway configuration overrides global configuration" {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'meshGateway.enabled=true' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        --set 'meshGateway.logLevel=debug' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.container.consul.logging.level')
+    [ "${actual}" = 'debug' ]
+
+    local actual=$(echo "$config" | yq -r '.initContainer.consul.logging.level')
+    [ "${actual}" = 'debug' ]
+}
 
 #--------------------------------------------------------------------
 # Mesh Gateway WAN Address configuration
