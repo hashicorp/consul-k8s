@@ -60,7 +60,23 @@ func (b *meshGatewayBuilder) labelsForDeployment() map[string]string {
 	return labels
 }
 
+func (b *meshGatewayBuilder) logLevelForDataplaneContainer() string {
+	if b.config.LogLevel != "" {
+		return b.config.LogLevel
+	}
+
+	if b.gcc == nil || b.gcc.Spec.Deployment.Container == nil {
+		return ""
+	}
+
+	return b.gcc.Spec.Deployment.Container.Consul.Logging.Level
+}
+
 func (b *meshGatewayBuilder) logLevelForInitContainer() string {
+	if b.config.LogLevel != "" {
+		return b.config.LogLevel
+	}
+
 	if b.gcc == nil || b.gcc.Spec.Deployment.InitContainer == nil {
 		return ""
 	}
