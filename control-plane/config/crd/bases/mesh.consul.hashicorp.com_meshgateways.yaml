@@ -62,6 +62,10 @@ spec:
                       maximum: 65535
                       minimum: 0
                       type: integer
+                    protocol:
+                      enum:
+                      - TCP
+                      type: string
                   type: object
                 minItems: 1
                 type: array
