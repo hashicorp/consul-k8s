@@ -51,7 +51,7 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		return nil, err
 	}
 
-	container, err := consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
+	container, err := b.consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}

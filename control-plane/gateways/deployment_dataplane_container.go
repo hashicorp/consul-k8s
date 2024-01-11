@@ -27,7 +27,7 @@ const (
 	volumeName                   = "consul-mesh-inject-data"
 )
 
-func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.GatewayClassContainerConfig, name, namespace string) (corev1.Container, error) {
+func (b *meshGatewayBuilder) consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.GatewayClassContainerConfig, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -40,7 +40,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := dataplaneArgs(config, containerConfig, namespace, name, bearerTokenFile)
+	args, err := b.dataplaneArgs(config, containerConfig, namespace, name, bearerTokenFile)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -157,7 +157,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 	return container, nil
 }
 
-func dataplaneArgs(config GatewayConfig, containerConfig v2beta1.GatewayClassContainerConfig, namespace, name, bearerTokenFile string) ([]string, error) {
+func (b *meshGatewayBuilder) dataplaneArgs(config GatewayConfig, containerConfig v2beta1.GatewayClassContainerConfig, namespace, name, bearerTokenFile string) ([]string, error) {
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
