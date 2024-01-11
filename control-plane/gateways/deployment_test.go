@@ -106,6 +106,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							Container: &meshv2beta1.GatewayClassContainerConfig{
 								HostPort:     8080,
 								PortModifier: 8000,
+								Consul: meshv2beta1.GatewayClassConsulConfig{
+									Logging: meshv2beta1.GatewayClassConsulLoggingConfig{
+										Level: "debug",
+									},
+								},
 							},
 							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
@@ -132,6 +137,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										"memory": resource.MustParse("228Mi"),
 									},
 								},
+								Consul: meshv2beta1.GatewayClassConsulConfig{
+									Logging: meshv2beta1.GatewayClassConsulLoggingConfig{
+										Level: "debug",
+									},
+								},
 							},
 						},
 					},
@@ -146,7 +156,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						"heritage":     "Helm",
 						"release":      "consul",
 					},
-
 					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{
@@ -196,7 +205,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Command: []string{
 										"/bin/sh",
 										"-ec",
-										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-json=false",
+										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-level=debug \\\n  -log-json=false",
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -279,7 +288,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										"-addresses",
 										"",
 										"-grpc-port=0",
-										"-log-level=",
+										"-log-level=debug",
 										"-log-json=false",
 										"-envoy-concurrency=1",
 										"-tls-disabled",
@@ -494,6 +503,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							Container: &meshv2beta1.GatewayClassContainerConfig{
 								HostPort:     8080,
 								PortModifier: 8000,
+								Consul: meshv2beta1.GatewayClassConsulConfig{
+									Logging: meshv2beta1.GatewayClassConsulLoggingConfig{
+										Level: "debug",
+									},
+								},
 							},
 							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
@@ -507,6 +521,23 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									MaxSkew:           1,
 									TopologyKey:       "key",
 									WhenUnsatisfiable: "DoNotSchedule",
+								},
+							},
+							InitContainer: &meshv2beta1.GatewayClassInitContainerConfig{
+								Resources: &corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										"cpu":    resource.MustParse("100m"),
+										"memory": resource.MustParse("128Mi"),
+									},
+									Limits: corev1.ResourceList{
+										"cpu":    resource.MustParse("200m"),
+										"memory": resource.MustParse("228Mi"),
+									},
+								},
+								Consul: meshv2beta1.GatewayClassConsulConfig{
+									Logging: meshv2beta1.GatewayClassConsulLoggingConfig{
+										Level: "debug",
+									},
 								},
 							},
 						},
@@ -571,7 +602,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Command: []string{
 										"/bin/sh",
 										"-ec",
-										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-json=false",
+										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-level=debug \\\n  -log-json=false",
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -641,7 +672,16 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Value: "",
 										},
 									},
-									Resources: corev1.ResourceRequirements{},
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											"cpu":    resource.MustParse("100m"),
+											"memory": resource.MustParse("128Mi"),
+										},
+										Limits: corev1.ResourceList{
+											"cpu":    resource.MustParse("200m"),
+											"memory": resource.MustParse("228Mi"),
+										},
+									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
 											Name:      "consul-mesh-inject-data",
@@ -657,7 +697,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										"-addresses",
 										"",
 										"-grpc-port=0",
-										"-log-level=",
+										"-log-level=debug",
 										"-log-json=false",
 										"-envoy-concurrency=1",
 										"-ca-certs=/consul/mesh-inject/consul-ca.pem",

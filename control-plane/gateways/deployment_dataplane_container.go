@@ -40,7 +40,7 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(namespace, config, bearerTokenFile, name)
+	args, err := dataplaneArgs(config, containerConfig, namespace, name, bearerTokenFile)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -157,11 +157,11 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig v2beta1.Gate
 	return container, nil
 }
 
-func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
+func dataplaneArgs(config GatewayConfig, containerConfig v2beta1.GatewayClassContainerConfig, namespace, name, bearerTokenFile string) ([]string, error) {
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
-		"-log-level=" + config.LogLevel,
+		"-log-level=" + containerConfig.Consul.Logging.Level,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + defaultEnvoyProxyConcurrency,
 	}

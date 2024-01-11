@@ -37,7 +37,7 @@ type initContainerCommandData struct {
 func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         b.config.AuthMethod,
-		LogLevel:           b.config.LogLevel,
+		LogLevel:           b.logLevelForInitContainer(),
 		LogJSON:            b.config.LogJSON,
 		ServiceName:        b.gateway.Name,
 		ServiceAccountName: b.serviceAccountName(),

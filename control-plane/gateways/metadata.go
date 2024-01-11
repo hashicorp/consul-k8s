@@ -60,6 +60,14 @@ func (b *meshGatewayBuilder) labelsForDeployment() map[string]string {
 	return labels
 }
 
+func (b *meshGatewayBuilder) logLevelForInitContainer() string {
+	if b.gcc == nil || b.gcc.Spec.Deployment.InitContainer == nil {
+		return ""
+	}
+
+	return b.gcc.Spec.Deployment.InitContainer.Consul.Logging.Level
+}
+
 func (b *meshGatewayBuilder) labelsForRole() map[string]string {
 	if b.gcc == nil {
 		return defaultLabels
