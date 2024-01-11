@@ -124,5 +124,6 @@ data:
           listeners: 
           - name: "wan"
             port: {{ .Values.meshGateway.service.port }}
+            protocol: "TCP"
   {{- end }}
 {{- end }}
