@@ -222,7 +222,11 @@ func TestObservabilityCloud(t *testing.T) {
 
 			// Validate that the consul-telemetry-collector service was deployed to the expected namespace.
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
-			instances, _, err := consulClient.Catalog().Service("consul-telemetry-collector", "", &api.QueryOptions{Namespace: ns})
+			q := &api.QueryOptions{}
+			if cfg.EnableEnterprise {
+				q.Namespace = ns
+			}
+			instances, _, err := consulClient.Catalog().Service("consul-telemetry-collector", "", q)
 			require.NoError(t, err)
 			require.Len(t, instances, 1)
 			require.Equal(t, "passing", instances[0].Checks.AggregatedStatus())
