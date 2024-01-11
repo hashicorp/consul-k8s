@@ -2711,3 +2711,31 @@ reservedNameTest() {
 
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# v2tenancy
+
+@test "connectInject/Deployment: v2tenancy is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-v2tenancy=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -enable-v2tenancy=true is set when global.experiments contains [\"resource-apis\", \"v2tenancy\"]" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.experiments[0]=resource-apis' \
+      --set 'global.experiments[1]=v2tenancy' \
+      --set 'ui.enabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-enable-v2tenancy=true"))' | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
