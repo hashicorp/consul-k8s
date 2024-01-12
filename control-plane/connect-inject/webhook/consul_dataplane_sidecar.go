@@ -47,11 +47,11 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		containerName = fmt.Sprintf("%s-%s", sidecarContainer, mpi.serviceName)
 	}
 
-	var probe *corev1.Probe
+	var readinessProbe *corev1.Probe
 	if useProxyHealthCheck(pod) {
 		// If using the proxy health check for a service, configure an HTTP handler
 		// that queries the '/ready' endpoint of the proxy.
-		probe = &corev1.Probe{
+		readinessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(constants.ProxyDefaultHealthPort + mpi.serviceIndex),
@@ -61,13 +61,34 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			InitialDelaySeconds: 1,
 		}
 	} else {
-		probe = &corev1.Probe{
+		readinessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
 					Port: intstr.FromInt(constants.ProxyDefaultInboundPort + mpi.serviceIndex),
 				},
 			},
 			InitialDelaySeconds: 1,
+		}
+	}
+
+	// Configure optional probes on the proxy to force restart it in failure scenarios.
+	var startupProbe, livenessProbe *corev1.Probe
+	startupSeconds := w.getStartupFailureSeconds(pod)
+	livenessSeconds := w.getLivenessFailureSeconds(pod)
+	if startupSeconds > 0 {
+		startupProbe = &corev1.Probe{
+			// Use the same handler as the readiness probe.
+			ProbeHandler:     readinessProbe.ProbeHandler,
+			PeriodSeconds:    1,
+			FailureThreshold: startupSeconds,
+		}
+	}
+	if livenessSeconds > 0 {
+		livenessProbe = &corev1.Probe{
+			// Use the same handler as the readiness probe.
+			ProbeHandler:     readinessProbe.ProbeHandler,
+			PeriodSeconds:    1,
+			FailureThreshold: livenessSeconds,
 		}
 	}
 
@@ -136,7 +157,9 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			},
 		},
 		Args:           args,
-		ReadinessProbe: probe,
+		ReadinessProbe: readinessProbe,
+		StartupProbe:   startupProbe,
+		LivenessProbe:  livenessProbe,
 	}
 
 	if w.AuthMethod != "" {
@@ -505,4 +528,30 @@ func useProxyHealthCheck(pod corev1.Pod) bool {
 		return useProxyHealthCheck
 	}
 	return false
+}
+
+// getStartupFailureSeconds returns number of seconds configured by the annotation 'consul.hashicorp.com/sidecar-proxy-startup-failure-seconds'
+// and indicates how long we should wait for the sidecar proxy to initialize before considering the pod unhealthy.
+func (w *MeshWebhook) getStartupFailureSeconds(pod corev1.Pod) int32 {
+	seconds := w.DefaultSidecarProxyStartupFailureSeconds
+	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyStartupFailureSeconds]; ok {
+		seconds, _ = strconv.Atoi(v)
+	}
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
+}
+
+// getLivenessFailureSeconds returns number of seconds configured by the annotation 'consul.hashicorp.com/sidecar-proxy-liveness-failure-seconds'
+// and indicates how long we should wait for the sidecar proxy to initialize before considering the pod unhealthy.
+func (w *MeshWebhook) getLivenessFailureSeconds(pod corev1.Pod) int32 {
+	seconds := w.DefaultSidecarProxyLivenessFailureSeconds
+	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyLivenessFailureSeconds]; ok {
+		seconds, _ = strconv.Atoi(v)
+	}
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
 }
