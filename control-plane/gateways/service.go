@@ -68,6 +68,7 @@ func (b *meshGatewayBuilder) Ports(portModifier int32) []corev1.ServicePort {
 			TargetPort: intstr.IntOrString{
 				IntVal: port + portModifier,
 			},
+			Protocol: corev1.Protocol(listener.Protocol),
 		})
 	}
 	return ports
