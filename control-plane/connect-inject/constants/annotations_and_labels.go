@@ -99,6 +99,14 @@ const (
 	// Enable this only if the application does not support health checks.
 	AnnotationUseProxyHealthCheck = "consul.hashicorp.com/use-proxy-health-check"
 
+	// AnnotationSidecarProxyStartupFailureSeconds configures how long the k8s startup probe will wait for
+	// success before the proxy is considered to be unhealthy and the container is restarted.
+	AnnotationSidecarProxyStartupFailureSeconds = "consul.hashicorp.com/sidecar-proxy-startup-failure-seconds"
+
+	// AnnotationSidecarProxyLivenessFailureSeconds configures how long the k8s liveness probe will wait for
+	// before the proxy is considered to be unhealthy and the container is restarted.
+	AnnotationSidecarProxyLivenessFailureSeconds = "consul.hashicorp.com/sidecar-proxy-liveness-failure-seconds"
+
 	// annotations for sidecar proxy resource limits.
 	AnnotationSidecarProxyCPULimit      = "consul.hashicorp.com/sidecar-proxy-cpu-limit"
 	AnnotationSidecarProxyCPURequest    = "consul.hashicorp.com/sidecar-proxy-cpu-request"
