@@ -6,14 +6,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.1
-  name: meshgateways.mesh.consul.hashicorp.com
+  name: exportedservices.multicluster.consul.hashicorp.com
 spec:
-  group: mesh.consul.hashicorp.com
+  group: multicluster.consul.hashicorp.com
   names:
-    kind: MeshGateway
-    listKind: MeshGatewayList
-    plural: meshgateways
-    singular: meshgateway
+    kind: ExportedServices
+    listKind: ExportedServicesList
+    plural: exportedservices
+    singular: exportedservices
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -32,7 +32,7 @@ spec:
     name: v2beta1
     schema:
       openAPIV3Schema:
-        description: MeshGateway is the Schema for the Mesh Gateway API
+        description: ExportedServices is the Schema for the Exported Services API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -48,26 +48,14 @@ spec:
             type: object
           spec:
             properties:
-              gatewayClassName:
-                description: GatewayClassName is the name of the GatewayClass used
-                  by the MeshGateway
-                type: string
-              listeners:
+              consumers:
                 items:
-                  properties:
-                    name:
-                      type: string
-                    port:
-                      format: int32
-                      maximum: 65535
-                      minimum: 0
-                      type: integer
-                    protocol:
-                      enum:
-                      - TCP
-                      type: string
                   type: object
-                minItems: 1
+                  x-kubernetes-preserve-unknown-fields: true
+                type: array
+              services:
+                items:
+                  type: string
                 type: array
             type: object
           status:

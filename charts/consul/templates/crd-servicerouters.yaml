@@ -149,9 +149,9 @@ spec:
                               type: object
                           type: object
                         retryOn:
-                          description: RetryOn is a flat list of conditions for Consul
+                          description: 'RetryOn is a flat list of conditions for Consul
                             to retry requests based on the response from an upstream
-                            service.
+                            service. Refer to the valid conditions here: https://developer.hashicorp.com/consul/docs/connect/config-entries/service-router#routes-destination-retryon'
                           items:
                             type: string
                           type: array

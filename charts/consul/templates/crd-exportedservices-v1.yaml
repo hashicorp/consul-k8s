@@ -1,19 +1,25 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
+{{- if .Values.connectInject.enabled }}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.1
-  name: meshgateways.mesh.consul.hashicorp.com
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+  name: exportedservices.consul.hashicorp.com
 spec:
-  group: mesh.consul.hashicorp.com
+  group: consul.hashicorp.com
   names:
-    kind: MeshGateway
-    listKind: MeshGatewayList
-    plural: meshgateways
-    singular: meshgateway
+    kind: ExportedServices
+    listKind: ExportedServicesList
+    plural: exportedservices
+    shortNames:
+    - exported-services
+    singular: exportedservices
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -29,10 +35,10 @@ spec:
       jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v2beta1
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: MeshGateway is the Schema for the Mesh Gateway API
+        description: ExportedServices is the Schema for the exportedservices API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -47,27 +53,44 @@ spec:
           metadata:
             type: object
           spec:
+            description: ExportedServicesSpec defines the desired state of ExportedServices.
             properties:
-              gatewayClassName:
-                description: GatewayClassName is the name of the GatewayClass used
-                  by the MeshGateway
-                type: string
-              listeners:
+              services:
+                description: Services is a list of services to be exported and the
+                  list of partitions to expose them to.
                 items:
+                  description: ExportedService manages the exporting of a service
+                    in the local partition to other partitions.
                   properties:
+                    consumers:
+                      description: Consumers is a list of downstream consumers of
+                        the service to be exported.
+                      items:
+                        description: ServiceConsumer represents a downstream consumer
+                          of the service to be exported.
+                        properties:
+                          partition:
+                            description: Partition is the admin partition to export
+                              the service to.
+                            type: string
+                          peer:
+                            description: Peer is the name of the peer to export the
+                              service to.
+                            type: string
+                          samenessGroup:
+                            description: SamenessGroup is the name of the sameness
+                              group to export the service to.
+                            type: string
+                        type: object
+                      type: array
                     name:
+                      description: Name is the name of the service to be exported.
                       type: string
-                    port:
-                      format: int32
-                      maximum: 65535
-                      minimum: 0
-                      type: integer
-                    protocol:
-                      enum:
-                      - TCP
+                    namespace:
+                      description: Namespace is the namespace to export the service
+                        from.
                       type: string
                   type: object
-                minItems: 1
                 type: array
             type: object
           status:
@@ -113,3 +136,4 @@ spec:
     storage: true
     subresources:
       status: {}
+{{- end }}
