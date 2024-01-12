@@ -172,7 +172,6 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 			c.CertFile = certFile
 			c.KeyFile = keyFile
 		})
-		require.NoError(t, err)
 		wg.Done()
 	}()
 	defer func() {
@@ -191,6 +190,8 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	require.Equal(t, 0, exitCode, ui.ErrorWriter)
 
 	wg.Wait()
+	require.NoError(t, err)
+
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPSAddr,
 		Scheme:  "https",
