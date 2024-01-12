@@ -36,8 +36,9 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 						GatewayClassName: "test-gateway-class",
 						Listeners: []*pbmesh.MeshGatewayListener{
 							{
-								Name: "wan",
-								Port: 443,
+								Name:     "wan",
+								Port:     443,
+								Protocol: "TCP",
 							},
 						},
 					},
@@ -93,6 +94,7 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 							TargetPort: intstr.IntOrString{
 								IntVal: int32(8443),
 							},
+							Protocol: "TCP",
 						},
 					},
 				},
@@ -107,8 +109,9 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 						GatewayClassName: "test-gateway-class",
 						Listeners: []*pbmesh.MeshGatewayListener{
 							{
-								Name: "wan",
-								Port: 443,
+								Name:     "wan",
+								Port:     443,
+								Protocol: "TCP",
 							},
 						},
 					},
@@ -131,6 +134,7 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 							TargetPort: intstr.IntOrString{
 								IntVal: int32(443),
 							},
+							Protocol: "TCP",
 						},
 					},
 				},
