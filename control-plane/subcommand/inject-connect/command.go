@@ -431,6 +431,15 @@ func (c *Command) validateFlags() error {
 		return errors.New("-consul-dataplane-image must be set")
 	}
 
+	// In Consul 1.17, multiport beta shipped with v2 catalog + mesh resources backed by v1 tenancy
+	// and acls (experiments=[resource-apis]).
+	//
+	// With Consul 1.18, we built out v2 tenancy with no support for acls, hence need to be explicit
+	// about which combination of v1 + v2 features are enabled.
+	//
+	// To summarize:
+	// - experiments=[resource-apis] => v2 catalog and mesh + v1 tenancy and acls
+	// - experiments=[resource-apis, v2tenancy] => v2 catalog and mesh + v2 tenancy + acls disabled
 	if c.flagV2Tenancy && !c.flagResourceAPIs {
 		return errors.New("-enable-resource-apis must be set to 'true' if -enable-v2tenancy is set")
 	}
