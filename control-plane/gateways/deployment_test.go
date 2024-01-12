@@ -80,6 +80,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									"release":  "consul",
 								},
 							},
+							Annotations: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+								Set: map[string]string{
+									"a": "b",
+								},
+							},
 						},
 						Deployment: meshv2beta1.GatewayClassDeploymentConfig{
 							Affinity: &corev1.Affinity{
@@ -107,6 +112,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								Labels: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
 									Set: map[string]string{
 										"foo": "bar",
+									},
+								},
+								Annotations: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+									Set: map[string]string{
+										"baz": "qux",
 									},
 								},
 							},
@@ -164,7 +174,10 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						"release":      "consul",
 						"foo":          "bar",
 					},
-					Annotations: map[string]string{},
+					Annotations: map[string]string{
+						"a":   "b",
+						"baz": "qux",
+					},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: pointer.Int32(1),
