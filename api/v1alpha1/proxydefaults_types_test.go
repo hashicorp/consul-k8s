@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 // Test MatchesConsul for cases that should return true.
@@ -46,10 +47,10 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				},
 				Spec: ProxyDefaultsSpec{
 					Config: json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "local",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Checks: true,
 						Paths: []ExposePath{
 							{
@@ -146,10 +147,10 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 				},
 				Spec: ProxyDefaultsSpec{
 					Config: json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
-					Expose: ExposeConfig{
+					Expose: Expose{
 						Checks: true,
 						Paths: []ExposePath{
 							{

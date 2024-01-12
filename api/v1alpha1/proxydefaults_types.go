@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -14,6 +13,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 const (
@@ -29,7 +30,9 @@ func init() {
 
 // ProxyDefaults is the Schema for the proxydefaults API
 // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
+// +kubebuilder:resource:shortName="proxy-defaults"
 type ProxyDefaults struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -39,7 +42,7 @@ type ProxyDefaults struct {
 
 // +kubebuilder:object:root=true
 
-// ProxyDefaultsList contains a list of ProxyDefaults
+// ProxyDefaultsList contains a list of ProxyDefaults.
 type ProxyDefaultsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -48,16 +51,31 @@ type ProxyDefaultsList struct {
 
 // RawMessage for Config based on recommendation here: https://github.com/kubernetes-sigs/controller-tools/issues/294#issuecomment-518380816
 
-// ProxyDefaultsSpec defines the desired state of ProxyDefaults
+// ProxyDefaultsSpec defines the desired state of ProxyDefaults.
 type ProxyDefaultsSpec struct {
+	// Mode can be one of "direct" or "transparent". "transparent" represents that inbound and outbound
+	// application traffic is being captured and redirected through the proxy. This mode does not
+	// enable the traffic redirection itself. Instead it signals Consul to configure Envoy as if
+	// traffic is already being redirected. "direct" represents that the proxy's listeners must be
+	// dialed directly by the local application and other proxies.
+	// Note: This cannot be set using the CRD and should be set using annotations on the
+	// services that are part of the mesh.
+	Mode *ProxyMode `json:"mode,omitempty"`
+	// TransparentProxy controls configuration specific to proxies in transparent mode.
+	// Note: This cannot be set using the CRD and should be set using annotations on the
+	// services that are part of the mesh.
+	TransparentProxy *TransparentProxy `json:"transparentProxy,omitempty"`
 	// Config is an arbitrary map of configuration values used by Connect proxies.
 	// Any values that your proxy allows can be configured globally here.
 	// Supports JSON config values. See https://www.consul.io/docs/connect/proxies/envoy#configuration-formatting
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:pruning:PreserveUnknownFields
 	Config json.RawMessage `json:"config,omitempty"`
 	// MeshGateway controls the default mesh gateway configuration for this service.
-	MeshGateway MeshGatewayConfig `json:"meshGateway,omitempty"`
+	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
-	Expose ExposeConfig `json:"expose,omitempty"`
+	Expose Expose `json:"expose,omitempty"`
 }
 
 func (in *ProxyDefaults) GetObjectMeta() metav1.ObjectMeta {
@@ -138,12 +156,13 @@ func (in *ProxyDefaults) SetSyncedCondition(status corev1.ConditionStatus, reaso
 func (in *ProxyDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 	consulConfig := in.convertConfig()
 	return &capi.ProxyConfigEntry{
-		Kind:        in.ConsulKind(),
-		Name:        in.ConsulName(),
-		MeshGateway: in.Spec.MeshGateway.toConsul(),
-		Expose:      in.Spec.Expose.toConsul(),
-		Config:      consulConfig,
-		Meta:        meta(datacenter),
+		Kind:             in.ConsulKind(),
+		Name:             in.ConsulName(),
+		MeshGateway:      in.Spec.MeshGateway.toConsul(),
+		Expose:           in.Spec.Expose.toConsul(),
+		Config:           consulConfig,
+		TransparentProxy: in.Spec.TransparentProxy.toConsul(),
+		Meta:             meta(datacenter),
 	}
 }
 
@@ -153,7 +172,8 @@ func (in *ProxyDefaults) MatchesConsul(candidate api.ConfigEntry) bool {
 		return false
 	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ProxyConfigEntry{}, "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ProxyConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(),
+		cmp.Comparer(transparentProxyConfigComparer))
 }
 
 func (in *ProxyDefaults) Validate(namespacesEnabled bool) error {
@@ -161,6 +181,12 @@ func (in *ProxyDefaults) Validate(namespacesEnabled bool) error {
 	path := field.NewPath("spec")
 
 	if err := in.Spec.MeshGateway.validate(path.Child("meshGateway")); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := in.Spec.TransparentProxy.validate(path.Child("transparentProxy")); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := in.Spec.Mode.validate(path.Child("mode")); err != nil {
 		allErrs = append(allErrs, err)
 	}
 	if err := in.validateConfig(path.Child("config")); err != nil {
@@ -192,7 +218,7 @@ func (in *ProxyDefaults) convertConfig() map[string]interface{} {
 	// We explicitly ignore the error returned by Unmarshall
 	// because validate() ensures that if we get to here that it
 	// won't return an error.
-	json.Unmarshal(in.Spec.Config, &outConfig)
+	_ = json.Unmarshal(in.Spec.Config, &outConfig)
 	return outConfig
 }
 

@@ -30,7 +30,7 @@ func TestCreateOrUpdateACLPolicy_ErrorsIfDescriptionDoesNotMatch(t *testing.T) {
 	bootToken := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	svr, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
-		c.ACL.Tokens.Master = bootToken
+		c.ACL.Tokens.InitialManagement = bootToken
 	})
 	require.NoError(err)
 	svr.WaitForLeader(t)

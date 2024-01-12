@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/api/common"
 	"github.com/stretchr/testify/require"
 	admissionV1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/api/common"
 )
 
 func TestValidateProxyDefault(t *testing.T) {
@@ -59,7 +60,7 @@ func TestValidateProxyDefault(t *testing.T) {
 					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{
-					MeshGateway: MeshGatewayConfig{
+					MeshGateway: MeshGateway{
 						Mode: "local",
 					},
 				},
