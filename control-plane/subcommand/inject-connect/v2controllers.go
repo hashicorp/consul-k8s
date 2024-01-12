@@ -113,16 +113,11 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 	if c.flagV2Tenancy {
 		// V2 tenancy implies non-default namespaces in CE, so we don't observe flagEnableNamespaces
 		err := (&namespacev2.Controller{
-			Client:                     mgr.GetClient(),
-			ConsulClientConfig:         consulConfig,
-			ConsulServerConnMgr:        watcher,
-			AllowK8sNamespacesSet:      allowK8sNamespaces,
-			DenyK8sNamespacesSet:       denyK8sNamespaces,
-			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-			MirroringK8s:               c.flagEnableK8SNSMirroring,
-			MirroringK8sPrefix:         c.flagK8SNSMirroringPrefix,
-			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-			Log:                        ctrl.Log.WithName("controller").WithName("namespacev2"),
+			Client:              mgr.GetClient(),
+			ConsulServerConnMgr: watcher,
+			K8sNamespaceConfig:  k8sNsConfig,
+			ConsulTenancyConfig: consulTenancyConfig,
+			Log:                 ctrl.Log.WithName("controller").WithName("namespacev2"),
 		}).SetupWithManager(mgr)
 		if err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "namespacev2")

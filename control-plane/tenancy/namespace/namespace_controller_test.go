@@ -20,6 +20,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/proto-public/pbresource"
@@ -30,56 +31,20 @@ import (
 func TestReconcileCreateNamespace(t *testing.T) {
 	testCases := []createTestCase{
 		{
-			name:                       "destination consul namespace is default/default",
-			kubeNamespace:              "kube-ns1",
-			partition:                  constants.DefaultConsulPartition,
-			mirroringK8s:               false,
-			consulDestinationNamespace: constants.DefaultConsulNS,
-			expectedConsulNamespace:    constants.DefaultConsulNS,
-		},
-		{
-			name:                       "destination consul namespace is default/ns1",
-			kubeNamespace:              "kube-ns1",
-			partition:                  constants.DefaultConsulPartition,
-			mirroringK8s:               false,
-			consulDestinationNamespace: "ns1",
-			expectedConsulNamespace:    "ns1",
-		},
-		{
-			name:                    "mirrored consul namespace is default/ns1",
+			name:                    "consul namespace is default/ns1",
 			kubeNamespace:           "ns1",
 			partition:               constants.DefaultConsulPartition,
-			mirroringK8s:            true,
 			expectedConsulNamespace: "ns1",
-		},
-		{
-			name:                    "mirrored consul namespace with prefix to default/k8s-ns1",
-			kubeNamespace:           "ns1",
-			partition:               constants.DefaultConsulPartition,
-			mirroringK8s:            true,
-			mirroringK8sPrefix:      "k8s-",
-			expectedConsulNamespace: "k8s-ns1",
-		},
-		{
-			name:                       "mirrored namespaces overrides destination namespace",
-			kubeNamespace:              "ns1",
-			partition:                  constants.DefaultConsulPartition,
-			mirroringK8s:               true,
-			consulDestinationNamespace: "ns2",
-			expectedConsulNamespace:    "ns1",
 		},
 	}
 	testReconcileCreateNamespace(t, testCases)
 }
 
 type createTestCase struct {
-	name                       string
-	kubeNamespace              string
-	partition                  string
-	consulDestinationNamespace string
-	mirroringK8s               bool
-	mirroringK8sPrefix         string
-	expectedConsulNamespace    string
+	name                    string
+	kubeNamespace           string
+	partition               string
+	expectedConsulNamespace string
 }
 
 // testReconcileCreateNamespace ensures that a new k8s namespace is reconciled to a
@@ -115,15 +80,16 @@ func testReconcileCreateNamespace(t *testing.T, testCases []createTestCase) {
 
 		// Create the namespace controller injecting config from tc
 		nc := &Controller{
-			Client:                     fakeClient,
-			Log:                        logrtest.New(t),
-			ConsulClientConfig:         testClient.Cfg,
-			ConsulServerConnMgr:        testClient.Watcher,
-			AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:       mapset.NewSetWith(),
-			MirroringK8s:               tc.mirroringK8s,
-			MirroringK8sPrefix:         tc.mirroringK8sPrefix,
-			ConsulDestinationNamespace: tc.consulDestinationNamespace,
+			Client:              fakeClient,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
+			ConsulTenancyConfig: common.ConsulTenancyConfig{
+				ConsulPartition: tc.partition,
+			},
+			Log: logrtest.New(t),
 		}
 
 		// Reconcile the kube namespace under test
@@ -156,61 +122,23 @@ func testReconcileCreateNamespace(t *testing.T, testCases []createTestCase) {
 func TestReconcileDeleteNamespace(t *testing.T) {
 	testCases := []deleteTestCase{
 		{
-			name:                       "destination namespace is default and not cleaned up when kube namespace is deleted",
-			kubeNamespace:              "ns1",
-			partition:                  "default",
-			consulDestinationNamespace: "default",
-			mirroringK8s:               false,
-			expectNamespaceExists:      "default",
-		},
-		{
-			name:                       "destination namespace with non-default is not cleaned up",
-			kubeNamespace:              "ns1",
-			partition:                  "default",
-			consulDestinationNamespace: "ns1",
-			mirroringK8s:               false,
-			existingConsulNamespace:    "ns1",
-			expectNamespaceExists:      "ns1",
-		},
-		{
-			name:                    "mirrored namespaces",
+			name:                    "consul namespace ns1",
 			kubeNamespace:           "ns1",
 			partition:               "default",
-			mirroringK8s:            true,
 			existingConsulNamespace: "ns1",
 			expectNamespaceDeleted:  "ns1",
 		},
 		{
-			name:                    "mirrored namespaces but it's the default namespace",
+			name:                    "consul default namespace does not get deleted",
 			kubeNamespace:           metav1.NamespaceDefault,
 			partition:               "default",
-			mirroringK8s:            true,
 			existingConsulNamespace: "",
-			expectNamespaceExists:   "default", // Don't ever delete the Consul default NS
+			expectNamespaceExists:   "default",
 		},
 		{
-			name:                    "mirrored namespaces with prefix",
+			name:                    "namespace is already removed from Consul",
 			kubeNamespace:           "ns1",
 			partition:               "default",
-			mirroringK8s:            true,
-			mirroringK8sPrefix:      "k8s-",
-			existingConsulNamespace: "k8s-ns1",
-			expectNamespaceDeleted:  "k8s-ns1",
-		},
-		{
-			name:                       "mirrored namespaces overrides destination namespace",
-			kubeNamespace:              "ns1",
-			partition:                  "default",
-			mirroringK8s:               true,
-			consulDestinationNamespace: "ns2",
-			existingConsulNamespace:    "ns1",
-			expectNamespaceDeleted:     "ns1",
-		},
-		{
-			name:                    "mirrored namespace, but the namespace is already removed from Consul",
-			kubeNamespace:           "ns1",
-			partition:               "default",
-			mirroringK8s:            true,
 			existingConsulNamespace: "",    // don't pre-create consul namespace
 			expectNamespaceDeleted:  "ns1", // read as "was never created"
 		},
@@ -219,13 +147,10 @@ func TestReconcileDeleteNamespace(t *testing.T) {
 }
 
 type deleteTestCase struct {
-	name                       string
-	kubeNamespace              string
-	partition                  string
-	consulDestinationNamespace string
-	mirroringK8s               bool
-	mirroringK8sPrefix         string
-	existingConsulNamespace    string // If non-empty, this namespace is created in consul pre-reconcile
+	name                    string
+	kubeNamespace           string
+	partition               string
+	existingConsulNamespace string // If non-empty, this namespace is created in consul pre-reconcile
 
 	// Pick one
 	expectNamespaceExists  string // If non-empty, this namespace should exist in consul post-reconcile
@@ -272,15 +197,16 @@ func testReconcileDeleteNamespace(t *testing.T, testCases []deleteTestCase) {
 
 		// Create the namespace controller.
 		nc := &Controller{
-			Client:                     fakeClient,
-			Log:                        logrtest.New(t),
-			ConsulClientConfig:         testClient.Cfg,
-			ConsulServerConnMgr:        testClient.Watcher,
-			AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
-			DenyK8sNamespacesSet:       mapset.NewSetWith(),
-			MirroringK8s:               tc.mirroringK8s,
-			MirroringK8sPrefix:         tc.mirroringK8sPrefix,
-			ConsulDestinationNamespace: tc.consulDestinationNamespace,
+			Client:              fakeClient,
+			ConsulServerConnMgr: testClient.Watcher,
+			K8sNamespaceConfig: common.K8sNamespaceConfig{
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+			},
+			ConsulTenancyConfig: common.ConsulTenancyConfig{
+				ConsulPartition: tc.partition,
+			},
+			Log: logrtest.New(t),
 		}
 
 		// Reconcile the kube namespace under test - imagine it has just been deleted
