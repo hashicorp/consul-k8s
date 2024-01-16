@@ -73,19 +73,19 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 
 		Env: []corev1.EnvVar{
 			{
-				Name: "POD_NAME",
+				Name: envPodName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
 				},
 			},
 			{
-				Name: "POD_NAMESPACE",
+				Name: envPodNamespace,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
 				},
 			},
 			{
-				Name: "NODE_NAME",
+				Name: envNodeName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
 						FieldPath: "spec.nodeName",
@@ -93,23 +93,23 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 				},
 			},
 			{
-				Name:  "CONSUL_ADDRESSES",
+				Name:  envConsulAddresses,
 				Value: b.config.ConsulConfig.Address,
 			},
 			{
-				Name:  "CONSUL_GRPC_PORT",
+				Name:  envConsulGRPCPort,
 				Value: strconv.Itoa(b.config.ConsulConfig.GRPCPort),
 			},
 			{
-				Name:  "CONSUL_HTTP_PORT",
+				Name:  envConsulHTTPPort,
 				Value: strconv.Itoa(b.config.ConsulConfig.HTTPPort),
 			},
 			{
-				Name:  "CONSUL_API_TIMEOUT",
+				Name:  envConsulAPITimeout,
 				Value: b.config.ConsulConfig.APITimeout.String(),
 			},
 			{
-				Name:  "CONSUL_NODE_NAME",
+				Name:  envConsulNodeName,
 				Value: "$(NODE_NAME)-virtual",
 			},
 		},
@@ -121,28 +121,28 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 	if b.config.AuthMethod != "" {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
-				Name:  "CONSUL_LOGIN_AUTH_METHOD",
+				Name:  envConsulLoginAuthMethod,
 				Value: b.config.AuthMethod,
 			},
 			corev1.EnvVar{
-				Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
+				Name:  envConsulLoginBearerTokenFile,
 				Value: bearerTokenFile,
 			},
 			corev1.EnvVar{
-				Name:  "CONSUL_LOGIN_META",
+				Name:  envConsulLoginMeta,
 				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 			})
 
 		if b.config.ConsulTenancyConfig.ConsulPartition != "" {
 			container.Env = append(container.Env, corev1.EnvVar{
-				Name:  "CONSUL_LOGIN_PARTITION",
+				Name:  envConsulLoginPartition,
 				Value: b.config.ConsulTenancyConfig.ConsulPartition,
 			})
 		}
 	}
 	container.Env = append(container.Env,
 		corev1.EnvVar{
-			Name:  "CONSUL_NAMESPACE",
+			Name:  envConsulNamespace,
 			Value: consulNamespace,
 		})
 
@@ -165,7 +165,7 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 	if b.config.ConsulTenancyConfig.ConsulPartition != "" {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
-				Name:  "CONSUL_PARTITION",
+				Name:  envConsulPartition,
 				Value: b.config.ConsulTenancyConfig.ConsulPartition,
 			})
 	}
