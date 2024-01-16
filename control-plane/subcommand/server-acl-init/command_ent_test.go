@@ -1450,5 +1450,6 @@ func partitionedSetup(t *testing.T, bootToken string, partitionName string) *tes
 	serverAPIClient, err := consul.NewClient(server.Cfg.APIClientConfig, 5*time.Second)
 	require.NoError(t, err)
 	_, _, err = serverAPIClient.Partitions().Create(context.Background(), &api.Partition{Name: partitionName}, &api.WriteOptions{})
+	require.NoError(t, err)
 	return server.TestServer
 }
