@@ -21,7 +21,6 @@ import (
 	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
 	"github.com/hashicorp/consul/sdk/testutil"
 
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
@@ -96,10 +95,7 @@ func TestRun_PartitionCreate(t *testing.T) {
 			v2tenancy:   true,
 			experiments: []string{"resource-apis", "v2tenancy"},
 			requirePartitionCreated: func(testClient *test.TestServerClient) {
-				resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-				require.NoError(t, err)
-
-				_, err = resourceClient.Read(context.Background(), &pbresource.ReadRequest{
+				_, err := testClient.ResourceClient.Read(context.Background(), &pbresource.ReadRequest{
 					Id: &pbresource.ID{
 						Name: partitionName,
 						Type: pbtenancy.PartitionType,
@@ -180,13 +176,10 @@ func TestRun_PartitionExists(t *testing.T) {
 			v2tenancy:   true,
 			experiments: []string{"resource-apis", "v2tenancy"},
 			preCreatePartition: func(testClient *test.TestServerClient) {
-				resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-				require.NoError(t, err)
-
 				data, err := anypb.New(&pbtenancy.Partition{Description: partitionDesc})
 				require.NoError(t, err)
 
-				_, err = resourceClient.Write(context.Background(), &pbresource.WriteRequest{
+				_, err = testClient.ResourceClient.Write(context.Background(), &pbresource.WriteRequest{
 					Resource: &pbresource.Resource{
 						Id: &pbresource.ID{
 							Name: partitionName,
@@ -198,10 +191,7 @@ func TestRun_PartitionExists(t *testing.T) {
 				require.NoError(t, err)
 			},
 			requirePartitionNotCreated: func(testClient *test.TestServerClient) {
-				resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-				require.NoError(t, err)
-
-				rsp, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{
+				rsp, err := testClient.ResourceClient.Read(context.Background(), &pbresource.ReadRequest{
 					Id: &pbresource.ID{
 						Name: partitionName,
 						Type: pbtenancy.PartitionType,

@@ -24,7 +24,6 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
@@ -100,11 +99,9 @@ func TestRun_MeshServices(t *testing.T) {
 				c.Experiments = []string{"resource-apis"}
 				serverCfg = c
 			})
-			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-			require.NoError(t, err)
 
-			loadResource(t, resourceClient, getWorkloadID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tt.workload, nil)
-			loadResource(t, resourceClient, getProxyConfigurationID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tt.proxyConfiguration, nil)
+			loadResource(t, testClient.ResourceClient, getWorkloadID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tt.workload, nil)
+			loadResource(t, testClient.ResourceClient, getProxyConfigurationID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), tt.proxyConfiguration, nil)
 
 			ui := cli.NewMockUi()
 			cmd := Command{
@@ -164,8 +161,6 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		c.Experiments = []string{"resource-apis"}
 		serverCfg = c
 	})
-	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-	require.NoError(t, err)
 
 	// Start the consul service registration in a go func and delay it so that it runs
 	// after the cmd.Run() starts.
@@ -176,7 +171,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		// Wait a moment, this ensures that we are already in the retry logic.
 		time.Sleep(time.Second * 2)
 		// Register counting service.
-		loadResource(t, resourceClient, getWorkloadID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), getWorkload(), nil)
+		loadResource(t, testClient.ResourceClient, getWorkloadID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), getWorkload(), nil)
 	}()
 
 	ui := cli.NewMockUi()
@@ -240,16 +235,14 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				c.Experiments = []string{"resource-apis"}
 				serverCfg = c
 			})
-			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-			require.NoError(t, err)
 
 			// Add additional proxy configuration either to a config entry or to the service itself.
 			if c.registerProxyConfiguration {
-				loadResource(t, resourceClient, getProxyConfigurationID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), getProxyConfiguration(), nil)
+				loadResource(t, testClient.ResourceClient, getProxyConfigurationID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), getProxyConfiguration(), nil)
 			}
 
 			// Register Consul workload.
-			loadResource(t, resourceClient, getWorkloadID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), getWorkload(), nil)
+			loadResource(t, testClient.ResourceClient, getWorkloadID(testPodName, constants.DefaultConsulNS, constants.DefaultConsulPartition), getWorkload(), nil)
 
 			iptablesProvider := &fakeIptablesProvider{}
 			iptablesCfg := iptables.Config{

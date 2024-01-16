@@ -157,6 +157,9 @@ spec:
                 {{- if (mustHas "resource-apis" .Values.global.experiments) }}
                 -enable-resource-apis=true \
                 {{- end }}
+                {{- if (mustHas "v2tenancy" .Values.global.experiments) }}
+                -enable-v2tenancy=true \
+                {{- end }}
                 {{- range $k, $v := .Values.connectInject.consulNode.meta }}
                 -node-meta={{ $k }}={{ $v }} \
                 {{- end }}

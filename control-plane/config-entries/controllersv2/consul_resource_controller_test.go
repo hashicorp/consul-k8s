@@ -143,13 +143,6 @@ func TestConsulResourceController_CreatesConsulResource(t *testing.T) {
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
 			})
-			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-			require.NoError(t, err)
-
-			require.Eventually(t, func() bool {
-				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-				return err == nil
-			}, 5*time.Second, 500*time.Millisecond)
 
 			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
 			namespacedName := types.NamespacedName{
@@ -163,7 +156,7 @@ func TestConsulResourceController_CreatesConsulResource(t *testing.T) {
 			require.False(t, resp.Requeue)
 
 			req := &pbresource.ReadRequest{Id: c.resource.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
-			res, err := resourceClient.Read(ctx, req)
+			res, err := testClient.ResourceClient.Read(ctx, req)
 			require.NoError(t, err)
 			require.NotNil(t, res)
 			require.Equal(t, c.resource.GetName(), res.GetResource().GetId().GetName())
@@ -289,20 +282,13 @@ func TestConsulResourceController_UpdatesConsulResource(t *testing.T) {
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
 			})
-			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-			require.NoError(t, err)
-
-			require.Eventually(t, func() bool {
-				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-				return err == nil
-			}, 5*time.Second, 500*time.Millisecond)
 
 			// We haven't run reconcile yet, so we must create the resource
 			// in Consul ourselves.
 			{
 				resource := c.resource.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
 				req := &pbresource.WriteRequest{Resource: resource}
-				_, err := resourceClient.Write(ctx, req)
+				_, err := testClient.ResourceClient.Write(ctx, req)
 				require.NoError(t, err)
 			}
 
@@ -329,7 +315,7 @@ func TestConsulResourceController_UpdatesConsulResource(t *testing.T) {
 
 				// Now check that the object in Consul is as expected.
 				req := &pbresource.ReadRequest{Id: c.resource.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
-				res, err := resourceClient.Read(ctx, req)
+				res, err := testClient.ResourceClient.Read(ctx, req)
 				require.NoError(t, err)
 				require.NotNil(t, res)
 				require.Equal(t, c.resource.GetName(), res.GetResource().GetId().GetName())
@@ -411,20 +397,13 @@ func TestConsulResourceController_DeletesConsulResource(t *testing.T) {
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
 			})
-			resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-			require.NoError(t, err)
-
-			require.Eventually(t, func() bool {
-				_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-				return err == nil
-			}, 5*time.Second, 500*time.Millisecond)
 
 			// We haven't run reconcile yet, so we must create the config entry
 			// in Consul ourselves.
 			{
 				resource := c.resource.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
 				req := &pbresource.WriteRequest{Resource: resource}
-				_, err := resourceClient.Write(ctx, req)
+				_, err := testClient.ResourceClient.Write(ctx, req)
 				require.NoError(t, err)
 			}
 
@@ -443,7 +422,7 @@ func TestConsulResourceController_DeletesConsulResource(t *testing.T) {
 
 				// Now check that the object in Consul is as expected.
 				req := &pbresource.ReadRequest{Id: c.resource.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
-				_, err = resourceClient.Read(ctx, req)
+				_, err = testClient.ResourceClient.Read(ctx, req)
 				require.Error(t, err)
 				require.True(t, isNotFoundErr(err))
 			}
@@ -484,11 +463,6 @@ func TestConsulResourceController_ErrorUpdatesSyncStatus(t *testing.T) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
 	})
-
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
 
 	// Stop the server before calling reconcile imitating a server that's not running.
 	_ = testClient.TestServer.Stop()
@@ -568,13 +542,6 @@ func TestConsulResourceController_SetsSyncedToTrue(t *testing.T) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
 	})
-	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
 
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
@@ -590,7 +557,7 @@ func TestConsulResourceController_SetsSyncedToTrue(t *testing.T) {
 	{
 		resource := trafficpermissions.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
 		req := &pbresource.WriteRequest{Resource: resource}
-		_, err := resourceClient.Write(ctx, req)
+		_, err := testClient.ResourceClient.Write(ctx, req)
 		require.NoError(t, err)
 	}
 
@@ -648,13 +615,6 @@ func TestConsulResourceController_DoesNotCreateUnownedResource(t *testing.T) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
 	})
-	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
 
 	unmanagedResource := trafficpermissions.Resource(constants.DefaultConsulNS, constants.DefaultConsulPartition)
 	unmanagedResource.Metadata = make(map[string]string) // Zero out the metadata
@@ -663,7 +623,7 @@ func TestConsulResourceController_DoesNotCreateUnownedResource(t *testing.T) {
 	// in Consul ourselves, without the metadata indicating it is owned by the controller.
 	{
 		req := &pbresource.WriteRequest{Resource: unmanagedResource}
-		_, err := resourceClient.Write(ctx, req)
+		_, err := testClient.ResourceClient.Write(ctx, req)
 		require.NoError(t, err)
 	}
 
@@ -694,7 +654,7 @@ func TestConsulResourceController_DoesNotCreateUnownedResource(t *testing.T) {
 
 		// Now check that the object in Consul is as expected.
 		req := &pbresource.ReadRequest{Id: trafficpermissions.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
-		readResp, err := resourceClient.Read(ctx, req)
+		readResp, err := testClient.ResourceClient.Read(ctx, req)
 		require.NoError(t, err)
 		require.NotNil(t, readResp.GetResource())
 		opts := append([]cmp.Option{
@@ -756,13 +716,6 @@ func TestConsulResourceController_doesNotDeleteUnownedConfig(t *testing.T) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
 	})
-	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
 
 	reconciler := &TrafficPermissionsController{
 		Client: fakeClient,
@@ -780,7 +733,7 @@ func TestConsulResourceController_doesNotDeleteUnownedConfig(t *testing.T) {
 	// in Consul ourselves, without the metadata indicating it is owned by the controller.
 	{
 		req := &pbresource.WriteRequest{Resource: unmanagedResource}
-		_, err := resourceClient.Write(ctx, req)
+		_, err := testClient.ResourceClient.Write(ctx, req)
 		require.NoError(t, err)
 	}
 
@@ -799,7 +752,7 @@ func TestConsulResourceController_doesNotDeleteUnownedConfig(t *testing.T) {
 
 		// Now check that the object in Consul is as expected.
 		req := &pbresource.ReadRequest{Id: trafficpermissionsWithDeletion.ResourceID(constants.DefaultConsulNS, constants.DefaultConsulPartition)}
-		readResp, err := resourceClient.Read(ctx, req)
+		readResp, err := testClient.ResourceClient.Read(ctx, req)
 		require.NoError(t, err)
 		require.NotNil(t, readResp.GetResource())
 		opts := append([]cmp.Option{
