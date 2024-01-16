@@ -16,6 +16,8 @@ import (
 const (
 	globalDefaultInstances    int32 = 1
 	meshGatewayAnnotationKind       = "mesh-gateway"
+	// defaultBearerTokenFile is the default location where the init container will store the bearer token for the dataplane container to read
+	defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
 
 func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {

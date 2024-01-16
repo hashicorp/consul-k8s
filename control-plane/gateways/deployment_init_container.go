@@ -19,7 +19,10 @@ import (
 const (
 	injectInitContainerName      = "consul-mesh-init"
 	initContainersUserAndGroupID = 5996
-	defaultBearerTokenFile       = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+)
+
+var (
+	tpl = template.Must(template.New("root").Parse(strings.TrimSpace(initContainerCommandTpl)))
 )
 
 type initContainerCommandData struct {
@@ -42,6 +45,11 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 		ServiceName:        b.gateway.Name,
 		ServiceAccountName: b.serviceAccountName(),
 	}
+	// Render the command
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, &data); err != nil {
+		return corev1.Container{}, err
+	}
 
 	// Create expected volume mounts
 	volMounts := []corev1.VolumeMount{
@@ -54,14 +62,6 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 	var bearerTokenFile string
 	if b.config.AuthMethod != "" {
 		bearerTokenFile = defaultBearerTokenFile
-	}
-
-	// Render the command
-	var buf bytes.Buffer
-	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(initContainerCommandTpl)))
-
-	if err := tpl.Execute(&buf, &data); err != nil {
-		return corev1.Container{}, err
 	}
 
 	consulNamespace := namespaces.ConsulNamespace(b.gateway.Namespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
