@@ -29,7 +29,7 @@ import (
 // - global.enableConsulNamespaces
 // - connectInject.consulNamespaces.consulDestinationNamespace
 // - connectInject.consulNamespaces.mirroringK8S
-// - connectInject.consulNamespaces.mirroringK8SPrefix
+// - connectInject.consulNamespaces.mirroringK8SPrefix.
 type Controller struct {
 	client.Client
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
