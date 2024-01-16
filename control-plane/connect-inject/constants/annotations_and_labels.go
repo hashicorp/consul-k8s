@@ -25,7 +25,8 @@ const (
 
 	// AnnotationGatewayKind is the key of the annotation that indicates pods
 	// that represent Consul Connect Gateways. This should be set to a
-	// value that is either "mesh", "ingress" or "terminating".
+	// value that is either "mesh-gateway", "ingress-gateway", "terminating-gateway",
+	// or "api-gateway".
 	AnnotationGatewayKind = "consul.hashicorp.com/gateway-kind"
 
 	// AnnotationGatewayConsulServiceName is the key of the annotation whose value

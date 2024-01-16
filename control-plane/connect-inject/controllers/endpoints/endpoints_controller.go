@@ -43,6 +43,7 @@ const (
 	meshGateway        = "mesh-gateway"
 	terminatingGateway = "terminating-gateway"
 	ingressGateway     = "ingress-gateway"
+	apiGateway         = "api-gateway"
 
 	kubernetesSuccessReasonMsg           = "Kubernetes health checks passing"
 	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
@@ -786,9 +787,11 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 				"address": "0.0.0.0",
 			},
 		}
-
+	case apiGateway:
+		// Do nothing. This is only here so that API gateway pods have annotations
+		// consistent with other gateway types but don't return an error below.
 	default:
-		return nil, fmt.Errorf("%s must be one of %s, %s, or %s", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway)
+		return nil, fmt.Errorf("%s must be one of %s, %s, %s, or %s", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway)
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
@@ -1448,10 +1451,11 @@ func hasBeenInjected(pod corev1.Pod) bool {
 	return false
 }
 
-// isGateway checks the value of the gateway annotation and returns true if the Pod represents a Gateway.
+// isGateway checks the value of the gateway annotation and returns true if the Pod
+// represents a Gateway kind that should be acted upon by the endpoints controller.
 func isGateway(pod corev1.Pod) bool {
 	anno, ok := pod.Annotations[constants.AnnotationGatewayKind]
-	return ok && anno != ""
+	return ok && anno != "" && anno != apiGateway
 }
 
 // isTelemetryCollector checks whether a pod is part of a deployment for a Consul Telemetry Collector. If so,
