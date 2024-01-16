@@ -311,7 +311,7 @@ func (c *ListCommand) output(pods []v1.Pod) {
 			// Fallback to "Sidecar" as a default
 			proxyType = "Sidecar"
 
-			// Determine if depreciated API Gateway pod.
+			// Determine if deprecated API Gateway pod.
 			if pod.Labels["api-gateway.consul.hashicorp.com/managed"] == "true" {
 				proxyType = "API Gateway"
 			}
