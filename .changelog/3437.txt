@@ -1,0 +1,3 @@
+```release-note:bug-fix
+api-gateways: API Gateway pods now include `gateway-kind` and `gateway-consul-service-name` annotations consistent with other Consul gateway types.
+```
