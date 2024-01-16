@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/namespace"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhookv2"
+	resourceControllers "github.com/hashicorp/consul-k8s/control-plane/controllers/resources"
 	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	namespacev2 "github.com/hashicorp/consul-k8s/control-plane/tenancy/namespace"
@@ -143,13 +144,13 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		}
 	}
 
-	consulResourceController := &controllersv2.ConsulResourceController{
+	consulResourceController := &resourceControllers.ConsulResourceController{
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,
 		ConsulTenancyConfig: consulTenancyConfig,
 	}
 
-	if err := (&controllersv2.TrafficPermissionsController{
+	if err := (&resourceControllers.TrafficPermissionsController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.TrafficPermissions),
@@ -159,7 +160,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllersv2.GRPCRouteController{
+	if err := (&resourceControllers.GRPCRouteController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.GRPCRoute),
@@ -169,7 +170,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllersv2.HTTPRouteController{
+	if err := (&resourceControllers.HTTPRouteController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.HTTPRoute),
@@ -179,7 +180,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllersv2.TCPRouteController{
+	if err := (&resourceControllers.TCPRouteController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.TCPRoute),
@@ -189,7 +190,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllersv2.ProxyConfigurationController{
+	if err := (&resourceControllers.ProxyConfigurationController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.ProxyConfiguration),
@@ -199,7 +200,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllersv2.MeshConfigurationController{
+	if err := (&resourceControllers.MeshConfigurationController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.MeshConfiguration),
@@ -209,7 +210,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllersv2.MeshGatewayController{
+	if err := (&resourceControllers.MeshGatewayController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.MeshGateway),
@@ -238,7 +239,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllersv2.GatewayClassConfigController{
+	if err := (&resourceControllers.GatewayClassConfigController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.GatewayClassConfig),
@@ -248,7 +249,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllersv2.GatewayClassController{
+	if err := (&resourceControllers.GatewayClassController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.GatewayClass),
@@ -258,7 +259,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllersv2.ExportedServicesController{
+	if err := (&resourceControllers.ExportedServicesController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.ExportedServices),
