@@ -67,9 +67,6 @@ func (in *MeshGateway) ResourceID(_, partition string) *pbresource.ID {
 	}
 }
 
-// Resource converts the `MeshGateway` CRD into the equivalent Consul resource.
-// This includes adding a pbcatalog.WorkloadSelector that will target the Pods created
-// for this MeshGateway.
 func (in *MeshGateway) Resource(namespace, partition string) *pbresource.Resource {
 	return &pbresource.Resource{
 		Id: in.ResourceID(namespace, partition),
