@@ -23,7 +23,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/config-entries/configentries"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
