@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -69,8 +68,8 @@ func (in *MeshGateway) ResourceID(_, partition string) *pbresource.ID {
 
 func (in *MeshGateway) Resource(namespace, partition string) *pbresource.Resource {
 	return &pbresource.Resource{
-		Id: in.ResourceID(namespace, partition),
-		Data: inject.ToProtoAny(&in.Spec),
+		Id:       in.ResourceID(namespace, partition),
+		Data:     inject.ToProtoAny(&in.Spec),
 		Metadata: meshConfigMeta(),
 	}
 }
