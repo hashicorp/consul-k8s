@@ -19,7 +19,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
+	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 )
 
 func TestRun_flagValidation(t *testing.T) {
@@ -573,7 +573,7 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 					Name:      "mesh-gateway",
 					Namespace: "consul",
 				},
-				Spec: pbmesh.MeshGateway{
+				Spec: meshv2beta1.MeshGateway{
 					GatewayClassName: "consul-mesh-gateway",
 				},
 			}
