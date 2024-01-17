@@ -70,13 +70,7 @@ func (in *MeshGateway) ResourceID(_, partition string) *pbresource.ID {
 func (in *MeshGateway) Resource(namespace, partition string) *pbresource.Resource {
 	return &pbresource.Resource{
 		Id: in.ResourceID(namespace, partition),
-		Data: inject.ToProtoAny(&pbmesh.MeshGateway{
-			GatewayClassName: in.Spec.GatewayClassName,
-			Listeners:        in.Spec.Listeners,
-			Workloads: &pbcatalog.WorkloadSelector{
-				Prefixes: []string{in.Name},
-			},
-		}),
+		Data: inject.ToProtoAny(&in.Spec),
 		Metadata: meshConfigMeta(),
 	}
 }
