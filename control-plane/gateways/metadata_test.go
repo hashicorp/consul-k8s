@@ -262,23 +262,24 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 // The LogLevel for deployment containers may be set on the Gateway Class Config or the Gateway Config.
 // If it is set on both, the Gateway Config takes precedence.
 func TestMeshGatewayBuilder_LogLevel(t *testing.T) {
-	expected := "debug"
+	debug := "debug"
+	info := "info"
 
 	testCases := map[string]struct {
 		GatewayLogLevel string
 		GCCLogLevel     string
 	}{
 		"Set on Gateway": {
-			GatewayLogLevel: expected,
+			GatewayLogLevel: debug,
 			GCCLogLevel:     "",
 		},
 		"Set on GCC": {
 			GatewayLogLevel: "",
-			GCCLogLevel:     expected,
+			GCCLogLevel:     debug,
 		},
 		"Set on both": {
-			GatewayLogLevel: expected,
-			GCCLogLevel:     "info",
+			GatewayLogLevel: debug,
+			GCCLogLevel:     info,
 		},
 	}
 
@@ -300,7 +301,7 @@ func TestMeshGatewayBuilder_LogLevel(t *testing.T) {
 			}
 			b := NewMeshGatewayBuilder(&meshv2beta1.MeshGateway{}, GatewayConfig{LogLevel: testCase.GatewayLogLevel}, gcc)
 
-			assert.Equal(t, expected, b.logLevelForDataplaneContainer())
+			assert.Equal(t, debug, b.logLevelForDataplaneContainer())
 		})
 	}
 }
