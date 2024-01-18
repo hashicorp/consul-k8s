@@ -125,5 +125,8 @@ data:
           - name: "wan"
             port: {{ .Values.meshGateway.service.port }}
             protocol: "TCP"
+          workloads:
+            prefixes: 
+              - "mesh-gateway"
   {{- end }}
 {{- end }}
