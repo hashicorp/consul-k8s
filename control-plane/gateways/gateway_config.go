@@ -17,6 +17,7 @@ type GatewayConfig struct {
 	// AuthMethod method used to authenticate with Consul Server.
 	AuthMethod string
 
+	// ConsulTenancyConfig is the configuration for the Consul Tenancy feature.
 	ConsulTenancyConfig common.ConsulTenancyConfig
 
 	// LogLevel is the logging level of the deployed Consul Dataplanes.
@@ -42,7 +43,13 @@ type GatewayConfig struct {
 	MapPrivilegedServicePorts int
 }
 
+// GatewayResources is a collection of Kubernetes resources for a Gateway.
 type GatewayResources struct {
+	// GatewayClassConfigs is a list of GatewayClassConfig resources which are
+	// responsible for defining configuration shared across all gateway kinds.
 	GatewayClassConfigs []*v2beta1.GatewayClassConfig `json:"gatewayClassConfigs"`
-	MeshGateways        []*v2beta1.MeshGateway        `json:"meshGateways"`
+	// MeshGateways is a list of MeshGateway resources which are responsible for
+	// defining the configuration for a specific mesh gateway.
+	// Deployments of mesh gateways have a one-to-one relationship with MeshGateway resources.
+	MeshGateways []*v2beta1.MeshGateway `json:"meshGateways"`
 }

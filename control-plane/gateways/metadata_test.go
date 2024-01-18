@@ -259,6 +259,53 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 	}
 }
 
+// The LogLevel for deployment containers may be set on the Gateway Class Config or the Gateway Config.
+// If it is set on both, the Gateway Config takes precedence.
+func TestMeshGatewayBuilder_LogLevel(t *testing.T) {
+	debug := "debug"
+	info := "info"
+
+	testCases := map[string]struct {
+		GatewayLogLevel string
+		GCCLogLevel     string
+	}{
+		"Set on Gateway": {
+			GatewayLogLevel: debug,
+			GCCLogLevel:     "",
+		},
+		"Set on GCC": {
+			GatewayLogLevel: "",
+			GCCLogLevel:     debug,
+		},
+		"Set on both": {
+			GatewayLogLevel: debug,
+			GCCLogLevel:     info,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+
+			gcc := &meshv2beta1.GatewayClassConfig{
+				Spec: meshv2beta1.GatewayClassConfigSpec{
+					Deployment: meshv2beta1.GatewayClassDeploymentConfig{
+						Container: &meshv2beta1.GatewayClassContainerConfig{
+							Consul: meshv2beta1.GatewayClassConsulConfig{
+								Logging: meshv2beta1.GatewayClassConsulLoggingConfig{
+									Level: testCase.GCCLogLevel,
+								},
+							},
+						},
+					},
+				},
+			}
+			b := NewMeshGatewayBuilder(&meshv2beta1.MeshGateway{}, GatewayConfig{LogLevel: testCase.GatewayLogLevel}, gcc)
+
+			assert.Equal(t, debug, b.logLevelForDataplaneContainer())
+		})
+	}
+}
+
 func Test_computeAnnotationsOrLabels(t *testing.T) {
 	gatewaySet := map[string]string{
 		"service.beta.kubernetes.io/aws-load-balancer-internal": "true",  // Will not be inherited
