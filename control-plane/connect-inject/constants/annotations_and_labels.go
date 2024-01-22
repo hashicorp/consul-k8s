@@ -25,7 +25,8 @@ const (
 
 	// AnnotationGatewayKind is the key of the annotation that indicates pods
 	// that represent Consul Connect Gateways. This should be set to a
-	// value that is either "mesh", "ingress" or "terminating".
+	// value that is either "mesh-gateway", "ingress-gateway", "terminating-gateway",
+	// or "api-gateway".
 	AnnotationGatewayKind = "consul.hashicorp.com/gateway-kind"
 
 	// AnnotationGatewayConsulServiceName is the key of the annotation whose value
@@ -73,9 +74,14 @@ const (
 	// connections to.
 	AnnotationPort = "consul.hashicorp.com/connect-service-port"
 
+	// AnnotationProxyConfigMap allows for default values to be set in the opaque config map
+	// during proxy registration. The value for this annotation is expected to be valid json.
+	// Other annotations / configuration may overwrite the values in the map.
+	AnnotationProxyConfigMap = "consul.hashicorp.com/proxy-config-map"
+
 	// AnnotationUpstreams is a list of upstreams to register with the
 	// proxy in the format of `<service-name>:<local-port>,...`. The
-	// service name should map to a Consul service namd and the local port
+	// service name should map to a Consul service name and the local port
 	// is the local port in the pod that the listener will bind to. It can
 	// be a named port.
 	AnnotationUpstreams = "consul.hashicorp.com/connect-service-upstreams"
@@ -93,6 +99,14 @@ const (
 	// queries this instead of the application health check for the status of the application.
 	// Enable this only if the application does not support health checks.
 	AnnotationUseProxyHealthCheck = "consul.hashicorp.com/use-proxy-health-check"
+
+	// AnnotationSidecarProxyStartupFailureSeconds configures how long the k8s startup probe will wait for
+	// success before the proxy is considered to be unhealthy and the container is restarted.
+	AnnotationSidecarProxyStartupFailureSeconds = "consul.hashicorp.com/sidecar-proxy-startup-failure-seconds"
+
+	// AnnotationSidecarProxyLivenessFailureSeconds configures how long the k8s liveness probe will wait for
+	// before the proxy is considered to be unhealthy and the container is restarted.
+	AnnotationSidecarProxyLivenessFailureSeconds = "consul.hashicorp.com/sidecar-proxy-liveness-failure-seconds"
 
 	// annotations for sidecar proxy resource limits.
 	AnnotationSidecarProxyCPULimit      = "consul.hashicorp.com/sidecar-proxy-cpu-limit"
@@ -181,8 +195,12 @@ const (
 	// to explicitly perform the peering operation again.
 	AnnotationPeeringVersion = "consul.hashicorp.com/peering-version"
 
+	// LegacyAnnotationConsulK8sVersion is the current version of this binary.
+	// TODO: remove this annotation in a future release.
+	LegacyAnnotationConsulK8sVersion = "consul.hashicorp.com/connect-k8s-version"
+
 	// AnnotationConsulK8sVersion is the current version of this binary.
-	AnnotationConsulK8sVersion = "consul.hashicorp.com/connect-k8s-version"
+	AnnotationConsulK8sVersion = "consul.hashicorp.com/consul-k8s-version"
 
 	// LabelServiceIgnore is a label that can be added to a service to prevent it from being
 	// registered with Consul.
@@ -192,6 +210,11 @@ const (
 	// by the peering controllers.
 	LabelPeeringToken = "consul.hashicorp.com/peering-token"
 
+	// LabelTelemetryCollector is a label signaling the pod is associated with the deployment of a Consul Telemetry
+	// Collector. If this is set, during connect-inject, the endpoints-controller ensures the deployed Namespace exists in Consul and create it if it does not.
+	// This is only meant to be used by Deployment/consul-telemetry-collector.
+	LabelTelemetryCollector = "consul.hashicorp.com/telemetry-collector"
+
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	Injected = "injected"
 
@@ -199,7 +222,48 @@ const (
 	Enabled = "enabled"
 
 	// ManagedByValue is the value for keyManagedBy.
+	//TODO(zalimeni) rename this to ManagedByLegacyEndpointsValue.
 	ManagedByValue = "consul-k8s-endpoints-controller"
+)
+
+// ********************
+// V2 Exclusive Annotations & Labels
+// ********************
+
+const (
+	// AnnotationMeshInject is the key of the annotation that controls whether
+	// V2 mesh injection is explicitly enabled or disabled for a pod using.
+	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
+	AnnotationMeshInject = "consul.hashicorp.com/mesh-inject"
+
+	// KeyMeshInjectStatus is the key of the annotation that is added to
+	// a pod after an injection is done.
+	KeyMeshInjectStatus = "consul.hashicorp.com/mesh-inject-status"
+
+	// ManagedByEndpointsValue is used in Consul metadata to identify the manager
+	// of resources. The 'v2' suffix is used to differentiate from the legacy
+	// endpoints controller of the same name.
+	ManagedByEndpointsValue = "consul-k8s-endpoints-controller-v2"
+
+	// ManagedByPodValue is used in Consul metadata to identify the manager
+	// of resources.
+	ManagedByPodValue = "consul-k8s-pod-controller"
+
+	// ManagedByServiceAccountValue is used in Consul metadata to identify the manager
+	// of resources.
+	ManagedByServiceAccountValue = "consul-k8s-service-account-controller"
+
+	// AnnotationMeshDestinations is a list of destinations to register with the
+	// proxy. The service name should map to a Consul service name and the local
+	// port is the local port in the pod that the listener will bind to. It can
+	// be a named port.
+	AnnotationMeshDestinations = "consul.hashicorp.com/mesh-service-destinations"
+
+	// AnnotationMeshInjectMountVolumes is the key of the annotation that controls whether
+	// the data volume that mesh inject uses to store data including the Consul ACL token
+	// is mounted to other containers in the pod. It is a comma-separated list of container names
+	// to mount the volume on. It will be mounted at the path `/consul/mesh-inject`.
+	AnnotationMeshInjectMountVolumes = "consul.hashicorp.com/mesh-inject-mount-volume"
 )
 
 // Annotations used by Prometheus.

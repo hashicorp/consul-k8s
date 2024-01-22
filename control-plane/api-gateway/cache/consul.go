@@ -29,6 +29,7 @@ func init() {
 
 type templateArgs struct {
 	EnableNamespaces bool
+	APIGatewayName   string
 }
 
 var (
@@ -41,7 +42,10 @@ mesh = "read"
 		node_prefix "" {
 			policy = "read"
 		}
-    service_prefix "" {
+		service_prefix "" {
+			policy = "read"
+		}
+    service "{{.APIGatewayName}}" {
       policy = "write"
     }
 {{- if .EnableNamespaces }}
@@ -55,7 +59,7 @@ const (
 	apiTimeout        = 5 * time.Minute
 )
 
-var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate}
+var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate, api.JWTProvider}
 
 type Config struct {
 	ConsulClientConfig      *consul.Config
@@ -94,6 +98,7 @@ func New(config Config) *Cache {
 	for _, kind := range Kinds {
 		cache[kind] = common.NewReferenceMap()
 	}
+
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
@@ -196,7 +201,9 @@ func (c *Cache) subscribeToConsul(ctx context.Context, kind string) {
 		if err != nil {
 			// if we timeout we don't care about the error message because it's expected to happen on long polls
 			// any other error we want to alert on
-			if !strings.Contains(strings.ToLower(err.Error()), "timeout") {
+			if !strings.Contains(strings.ToLower(err.Error()), "timeout") &&
+				!strings.Contains(strings.ToLower(err.Error()), "no such host") &&
+				!strings.Contains(strings.ToLower(err.Error()), "connection refused") {
 				c.logger.Error(err, fmt.Sprintf("error fetching config entries for kind: %s", kind))
 			}
 			continue
@@ -222,16 +229,18 @@ func (c *Cache) updateAndNotify(ctx context.Context, once *sync.Once, kind strin
 
 	for _, entry := range entries {
 		meta := entry.GetMeta()
-		if meta[constants.MetaKeyKubeName] == "" || meta[constants.MetaKeyDatacenter] != c.datacenter {
-			// Don't process things that don't belong to us. The main reason
-			// for this is so that we don't garbage collect config entries that
-			// are either user-created or that another controller running in a
-			// federated datacenter creates. While we still allow for competing controllers
-			// syncing/overriding each other due to conflicting Kubernetes objects in
-			// two federated clusters (which is what the rest of the controllers also allow
-			// for), we don't want to delete a config entry just because we don't have
-			// its corresponding Kubernetes object if we know it belongs to another datacenter.
-			continue
+		if kind != api.JWTProvider {
+			if meta[constants.MetaKeyKubeName] == "" || meta[constants.MetaKeyDatacenter] != c.datacenter {
+				// Don't process things that don't belong to us. The main reason
+				// for this is so that we don't garbage collect config entries that
+				// are either user-created or that another controller running in a
+				// federated datacenter creates. While we still allow for competing controllers
+				// syncing/overriding each other due to conflicting Kubernetes objects in
+				// two federated clusters (which is what the rest of the controllers also allow
+				// for), we don't want to delete a config entry just because we don't have
+				// its corresponding Kubernetes object if we know it belongs to another datacenter.
+				continue
+			}
 		}
 
 		cache.Set(common.EntryToReference(entry), entry)
@@ -329,8 +338,8 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	return nil
 }
 
-func (c *Cache) ensurePolicy(client *api.Client) (string, error) {
-	policy := c.gatewayPolicy()
+func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, error) {
+	policy := c.gatewayPolicy(gatewayName)
 
 	created, _, err := client.ACL().PolicyCreate(&policy, &api.WriteOptions{})
 
@@ -347,13 +356,13 @@ func (c *Cache) ensurePolicy(client *api.Client) (string, error) {
 	return created.ID, nil
 }
 
-func (c *Cache) ensureRole(client *api.Client) (string, error) {
-	policyID, err := c.ensurePolicy(client)
+func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, error) {
+	policyID, err := c.ensurePolicy(client, gatewayName)
 	if err != nil {
 		return "", err
 	}
 
-	aclRoleName := "managed-gateway-acl-role"
+	aclRoleName := fmt.Sprint("managed-gateway-acl-role-", gatewayName)
 
 	aclRole, _, err := client.ACL().RoleReadByName(aclRoleName, &api.QueryOptions{})
 	if err != nil {
@@ -373,10 +382,11 @@ func (c *Cache) ensureRole(client *api.Client) (string, error) {
 	return aclRoleName, err
 }
 
-func (c *Cache) gatewayPolicy() api.ACLPolicy {
+func (c *Cache) gatewayPolicy(gatewayName string) api.ACLPolicy {
 	var data bytes.Buffer
 	if err := gatewayTpl.Execute(&data, templateArgs{
 		EnableNamespaces: c.namespacesEnabled,
+		APIGatewayName:   gatewayName,
 	}); err != nil {
 		// just panic if we can't compile the simple template
 		// as it means something else is going severly wrong.
@@ -384,7 +394,7 @@ func (c *Cache) gatewayPolicy() api.ACLPolicy {
 	}
 
 	return api.ACLPolicy{
-		Name:        "api-gateway-token-policy",
+		Name:        fmt.Sprint("api-gateway-policy-for-", gatewayName),
 		Description: "API Gateway token Policy",
 		Rules:       data.String(),
 	}
@@ -424,9 +434,12 @@ func (c *Cache) Delete(ctx context.Context, ref api.ResourceReference) error {
 		return err
 	}
 
-	options := &api.WriteOptions{}
+	options := &api.WriteOptions{Namespace: ref.Namespace, Partition: ref.Partition}
 
 	_, err = client.ConfigEntries().Delete(ref.Kind, ref.Name, options.WithContext(ctx))
+	if err != nil {
+		c.logger.Info("delete error", "err", err)
+	}
 	return err
 }
 
@@ -449,7 +462,7 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 		return err
 	}
 
-	role, err := c.ensureRole(client)
+	role, err := c.ensureRole(client, service)
 	if err != nil {
 		return ignoreACLsDisabled(err)
 	}

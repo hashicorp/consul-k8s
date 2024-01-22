@@ -44,6 +44,9 @@ spec:
     rollingUpdate:
       partition: {{ .Values.server.updatePartition }}
   {{- end }}
+  {{- if and (semverCompare ">= 1.23-0" .Capabilities.KubeVersion.Version) (.Values.server.persistentVolumeClaimRetentionPolicy) }}
+  persistentVolumeClaimRetentionPolicy: {{ toYaml .Values.server.persistentVolumeClaimRetentionPolicy | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       app: {{ template "consul.name" . }}
@@ -98,6 +101,9 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- if .Values.global.enterpriseLicense.secretName }}
         {{- with .Values.global.enterpriseLicense }}
         "vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt": "{{ .secretName }}"
@@ -112,7 +118,8 @@ spec:
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/server-config-configmap.yaml") . | sha256sum }}
+        "consul.hashicorp.com/mesh-inject": "false"
+        "consul.hashicorp.com/config-checksum": {{ print (include (print $.Template.BasePath "/server-config-configmap.yaml") .) (include (print $.Template.BasePath "/server-tmp-extra-config-configmap.yaml") .) | sha256sum }}
         {{- if .Values.server.annotations }}
           {{- tpl .Values.server.annotations . | nindent 8 }}
         {{- end }}
@@ -152,6 +159,9 @@ spec:
             name: {{ template "consul.fullname" . }}-server-config
         - name: extra-config
           emptyDir: {}
+        - name: tmp-extra-config
+          configMap:
+            name: {{ template "consul.fullname" . }}-server-tmp-extra-config
         {{- if (and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled)) }}
         - name: consul-ca-cert
           secret:
@@ -416,13 +426,21 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
-                -config-file=/consul/extra-config/extra-from-values.json \
-                -config-file=/consul/extra-config/locality.json
+                -config-dir=/consul/extra-config \
                 {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
                 -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
                 {{- end }}
-                {{- if (mustHas "resource-apis" .Values.global.experiments) }}
-                -hcl="experiments=[\"resource-apis\"]"
+                
+                {{- if .Values.global.experiments }}
+                {{- $commaSeparatedValues := "" }}
+                {{- range $index, $value := .Values.global.experiments }}
+                  {{- if ne $index 0 }}
+                    {{- $commaSeparatedValues = printf "%s,\\\"%s\\\"" $commaSeparatedValues $value }}
+                  {{- else }}
+                    {{- $commaSeparatedValues = printf "\\\"%s\\\"" $value }}
+                  {{- end }}
+                {{- end }}
+                -hcl="experiments=[{{ $commaSeparatedValues }}]"
                 {{- end }}
           volumeMounts:
             - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
@@ -431,6 +449,8 @@ spec:
               mountPath: /consul/config
             - name: extra-config
               mountPath: /consul/extra-config
+            - name: tmp-extra-config
+              mountPath: /consul/tmp/extra-config
             {{- if (and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca/

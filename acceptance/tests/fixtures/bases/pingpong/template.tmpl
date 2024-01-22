@@ -1,0 +1,123 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: pingpong-client-{{.Iteration}}
+spec:
+  protocol: 'http'
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pingpong-client-{{.Iteration}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pingpong-client-{{.Iteration}}
+spec:
+  selector:
+    app: pingpong-client-{{.Iteration}}
+  ports:
+    - port: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pingpong-client-{{.Iteration}}
+  name: pingpong-client-{{.Iteration}}
+spec:
+  replicas: {{.Replicas}}
+  selector:
+    matchLabels:
+      app: pingpong-client-{{.Iteration}}
+  template:
+    metadata:
+      annotations:
+        consul.hashicorp.com/connect-inject: 'true'
+      labels:
+        app: pingpong-client-{{.Iteration}}
+    spec:
+      serviceAccountName: pingpong-client-{{.Iteration}}
+      containers:
+        - name: pingpong-client-{{.Iteration}}
+          image: rancher/curlimages-curl:7.73.0
+          command: ['/bin/sh', '-c', '--']
+          args: ['while true; do sleep 1; curl -s --output /dev/null http://pingpong-server-{{.Iteration}} ; done;']
+          resources:
+            requests:
+              memory: "10Mi"
+              cpu: "5m"
+            limits:
+              memory: "10Mi"
+              cpu: "5m"
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: pingpong-server-{{.Iteration}}
+spec:
+  protocol: 'http'
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pingpong-server-{{.Iteration}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pingpong-server-{{.Iteration}}
+spec:
+  selector:
+    app: pingpong-server-{{.Iteration}}
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pingpong-server-{{.Iteration}}
+  name: pingpong-server-{{.Iteration}}
+spec:
+  replicas: {{.Replicas}}
+  selector:
+    matchLabels:
+      app: pingpong-server-{{.Iteration}}
+  template:
+    metadata:
+      annotations:
+        consul.hashicorp.com/connect-inject: 'true'
+      labels:
+        app: pingpong-server-{{.Iteration}}
+    spec:
+      serviceAccountName: pingpong-server-{{.Iteration}}
+      containers:
+        - name: pingpong-server-{{.Iteration}}
+          image: hashicorp/http-echo:latest
+          args:
+            - -text="hello world"
+            - -listen=:8080
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "10Mi"
+              cpu: "5m"
+            limits:
+              memory: "10Mi"
+              cpu: "5m"
+---
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: client-to-server-{{.Iteration}}
+spec:
+  destination:
+    name: pingpong-server-{{.Iteration}}
+  sources:
+    - name: pingpong-client-{{.Iteration}}
+      action: allow

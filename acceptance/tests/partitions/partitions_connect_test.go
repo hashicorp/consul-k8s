@@ -30,6 +30,11 @@ func TestPartitions_Connect(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
+	// TODO: We are monitoring that NET-5819 is fixed, if this test is still flaking in CNI, re-enable this skip
+	//if cfg.EnableCNI {
+	//	t.Skipf("TODO(flaky): NET-5819")
+	//}
+
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}

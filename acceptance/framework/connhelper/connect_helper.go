@@ -158,11 +158,11 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
 		}
 	} else {
-		k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 		} else {
-			k8s.DeployKustomize(t, c.Ctx.KubectlOptions(t), c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 		}
 	}
 	// Check that both static-server and static-client have been injected and
@@ -171,7 +171,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		&retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}, t,
 		func(r *retry.R) {
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-				podList, err := c.Ctx.KubernetesClient(t).CoreV1().
+				podList, err := c.Ctx.KubernetesClient(r).CoreV1().
 					Pods(opts.Namespace).
 					List(context.Background(), metav1.ListOptions{
 						LabelSelector: labelSelector,

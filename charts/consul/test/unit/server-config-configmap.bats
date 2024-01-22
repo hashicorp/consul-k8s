@@ -38,16 +38,6 @@ load _helpers
       .
 }
 
-@test "server/ConfigMap: extraConfig is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'server.extraConfig="{\"hello\": \"world\"}"' \
-      . | tee /dev/stderr |
-      yq '.data["extra-from-values.json"] | match("world") | length' | tee /dev/stderr)
-  [ ! -z "${actual}" ]
-}
-
 #--------------------------------------------------------------------
 # retry-join
 
@@ -658,6 +648,83 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "server/ConfigMap: doesn't set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is blank in values.yaml" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("namespace")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is not blank in values.yaml" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vault-namespace' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"namespace\": \"vault-namespace\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+
+@test "server/ConfigMap: do not set Vault Namespace in connect CA config from global.secretsBackend.vault.vaultNamespace when also set in connectCA.additionalConfig" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vault-namespace' \
+      --set 'global.secretsBackend.vault.connectCA.additionalConfig=\{\"connect\":\[\{\"ca_config\":\[\{\"namespace\": \"vns\"}\]\}\]\}' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"namespace\": \"vault-namespace\"")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is not blank and connectCA.additionalConfig is blank" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vault-namespace' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"namespace\": \"vault-namespace\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "server/ConfigMap: doesn't add federation config when global.federation.enabled is false (default)" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -1138,6 +1205,8 @@ load _helpers
       --set 'server.auditLogs.sinks[0].format=json' \
       --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
       --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].rotate_max_files=20' \
+      --set 'server.auditLogs.sinks[0].rotate_bytes=12455355' \
       --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
       . | tee /dev/stderr |
       yq -r '.data["audit-logging.json"]' | tee /dev/stderr)
@@ -1150,6 +1219,12 @@ load _helpers
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_duration | tee /dev/stderr)
   [ "${actual}" = "24h" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 20 ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_bytes | tee /dev/stderr)
+  [ ${actual} = 12455355 ]
 }
 
 @test "server/ConfigMap: server.auditLogs is enabled with 1 sink input object and it does not contain the name attribute" {
@@ -1163,6 +1238,8 @@ load _helpers
       --set 'server.auditLogs.sinks[0].format=json' \
       --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
       --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].rotate_max_files=20' \
+      --set 'server.auditLogs.sinks[0].rotate_bytes=12455355' \
       --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
       . | tee /dev/stderr |
       yq -r '.data["audit-logging.json"]' | jq -r .audit.sink.name | tee /dev/stderr)
@@ -1181,13 +1258,16 @@ load _helpers
       --set 'server.auditLogs.sinks[0].format=json' \
       --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
       --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].rotate_max_files=15' \
+      --set 'server.auditLogs.sinks[0].rotate_bytes=12445' \
       --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
       --set 'server.auditLogs.sinks[1].name=MySink2' \
       --set 'server.auditLogs.sinks[1].type=file' \
       --set 'server.auditLogs.sinks[1].format=json' \
       --set 'server.auditLogs.sinks[1].delivery_guarantee=best-effort' \
-      --set 'server.auditLogs.sinks[1].rotate_max_files=15' \
       --set 'server.auditLogs.sinks[1].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[1].rotate_max_files=25' \
+      --set 'server.auditLogs.sinks[1].rotate_bytes=152445' \
       --set 'server.auditLogs.sinks[1].path=/tmp/audit-2.json' \
       --set 'server.auditLogs.sinks[2].name=MySink3' \
       --set 'server.auditLogs.sinks[2].type=file' \
@@ -1195,6 +1275,7 @@ load _helpers
       --set 'server.auditLogs.sinks[2].delivery_guarantee=best-effort' \
       --set 'server.auditLogs.sinks[2].rotate_max_files=20' \
       --set 'server.auditLogs.sinks[2].rotate_duration=18h' \
+      --set 'server.auditLogs.sinks[2].rotate_bytes=12445' \
       --set 'server.auditLogs.sinks[2].path=/tmp/audit-3.json' \
       . | tee /dev/stderr |
       yq -r '.data["audit-logging.json"]' | tee /dev/stderr)
@@ -1211,17 +1292,26 @@ load _helpers
   local actual=$(echo $object |  jq -r .audit.sink.MySink1.name | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 15 ]
+
   local actual=$(echo $object |  jq -r .audit.sink.MySink3.delivery_guarantee | tee /dev/stderr)
   [ "${actual}" = "best-effort" ]
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink2.rotate_duration | tee /dev/stderr)
   [ "${actual}" = "24h" ]
 
+  local actual=$(echo $object |  jq -r .audit.sink.MySink2.rotate_bytes | tee /dev/stderr)
+  [ ${actual} = 152445 ]
+
   local actual=$(echo $object |  jq -r .audit.sink.MySink1.format | tee /dev/stderr)
   [ "${actual}" = "json" ]
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink3.type | tee /dev/stderr)
   [ "${actual}" = "file" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink3.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 20 ]
 }
 
 @test "server/ConfigMap: server.logLevel is empty" {
@@ -1243,4 +1333,62 @@ load _helpers
       yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
 
   [ "${configmap}" = "DEBUG" ]
+}
+
+#--------------------------------------------------------------------
+# server.autopilot.min_quorum
+
+@test "server/ConfigMap: autopilot.min_quorum=1 when replicas=1" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=1' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "1" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=2 when replicas=2" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=2' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "2" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=2 when replicas=3" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=3' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "2" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=3 when replicas=4" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=4' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "3" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=3 when replicas=5" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=5' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "3" ]
 }

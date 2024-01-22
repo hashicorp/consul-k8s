@@ -197,6 +197,73 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# persistentVolumeClaimRetentionPolicy
+
+@test "server/StatefulSet: persistentVolumeClaimRetentionPolicy not set by default when kubernetes < 1.23" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --kube-version "1.22" \
+      . | tee /dev/stderr |
+      yq -r '.spec.persistentVolumeClaimRetentionPolicy' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/StatefulSet: unset persistentVolumeClaimRetentionPolicy.whenDeleted when kubernetes < 1.23" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --kube-version "1.22" \
+      --set 'server.persistentVolumeClaimRetentionPolicy.whenDeleted=Delete' \
+      . | tee /dev/stderr |
+      yq -r '.spec.persistentVolumeClaimRetentionPolicy.whenDeleted' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/StatefulSet: unset persistentVolumeClaimRetentionPolicy.whenScaled when kubernetes < 1.23" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --kube-version "1.22" \
+      --set 'server.persistentVolumeClaimRetentionPolicy.whenScaled=Delete' \
+      . | tee /dev/stderr |
+      yq -r '.spec.persistentVolumeClaimRetentionPolicy.whenScaled' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/StatefulSet: persistentVolumeClaimRetentionPolicy not set by default when kubernetes >= 1.23" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --kube-version "1.23" \
+      . | tee /dev/stderr |
+      yq -r '.spec.persistentVolumeClaimRetentionPolicy' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "server/StatefulSet: can set persistentVolumeClaimRetentionPolicy.whenDeleted when kubernetes >= 1.23" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --kube-version "1.23" \
+      --set 'server.persistentVolumeClaimRetentionPolicy.whenDeleted=Delete' \
+      . | tee /dev/stderr |
+      yq -r '.spec.persistentVolumeClaimRetentionPolicy.whenDeleted' | tee /dev/stderr)
+  [ "${actual}" = "Delete" ]
+}
+
+@test "server/StatefulSet: can set persistentVolumeClaimRetentionPolicy.whenScaled when kubernetes >= 1.23" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --kube-version "1.23" \
+      --set 'server.persistentVolumeClaimRetentionPolicy.whenScaled=Delete' \
+      . | tee /dev/stderr |
+      yq -r '.spec.persistentVolumeClaimRetentionPolicy.whenScaled' | tee /dev/stderr)
+  [ "${actual}" = "Delete" ]
+}
+
+#--------------------------------------------------------------------
 # serverCert
 
 @test "server/StatefulSet: consul-server-cert uses default cert when serverCert.secretName not set" {
@@ -627,7 +694,11 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -721,7 +792,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 3714bf1fbca840dcd10b5aeb40c6ef35e349bd534727abe80b831c77f88da7da ]
+  [ "${actual}" = 59777d0692f3bf9143a09e96e58cc95296c0eaeb7565b1c49bc932954fe4423a ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -731,7 +802,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 87126fac3c7704fba1d4265201ad0345f4d972d2123df6e6fb416b40c5823d80 ]
+  [ "${actual}" = 326eeb3fd8f497297671791c0091e7f804727b3aaeff79a47841b65571bd4cf9 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -741,7 +812,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = d98ff135c5dee661058f33e29970675761ecf235676db0d4d24f354908eee425 ]
+  [ "${actual}" = e14ba19e37a6b79b6fd8566597464154abe9cdc4aa7079012fb3c445ac08c526 ]
 }
 
 #--------------------------------------------------------------------
@@ -1621,6 +1692,71 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
+@test "server/StatefulSet: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "server/StatefulSet: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set without vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/agent-extra-secret: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "server/StatefulSet: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "bar" ]
+}
+
 @test "server/StatefulSet: vault CA is not configured when secretName is set but secretKey is not" {
   cd `chart_dir`
   local object=$(helm template \
@@ -1914,7 +2050,13 @@ load _helpers
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum") |
+      del(."vault.hashicorp.com/agent-inject") |
+      del(."vault.hashicorp.com/role")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 

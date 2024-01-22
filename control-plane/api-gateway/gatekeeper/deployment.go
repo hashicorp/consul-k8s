@@ -6,18 +6,19 @@ package gatekeeper
 import (
 	"context"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/types"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -110,7 +111,9 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: common.LabelsForGateway(&gateway),
 					Annotations: map[string]string{
-						"consul.hashicorp.com/connect-inject": "false",
+						constants.AnnotationInject:                   "false",
+						constants.AnnotationGatewayConsulServiceName: gateway.Name,
+						constants.AnnotationGatewayKind:              "api-gateway",
 					},
 				},
 				Spec: corev1.PodSpec{

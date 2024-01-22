@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestIngressGateway_MatchesConsul(t *testing.T) {
@@ -102,7 +103,6 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 									Name:      "name1",
 									Hosts:     []string{"host1_1", "host1_2"},
 									Namespace: "ns1",
-									Partition: "default",
 									IngressServiceConfig: IngressServiceConfig{
 										MaxConnections:        &maxConnections,
 										MaxPendingRequests:    &maxPendingRequests,

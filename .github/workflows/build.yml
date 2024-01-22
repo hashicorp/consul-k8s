@@ -28,7 +28,7 @@ jobs:
         # version, because "goenv" can react to it automatically.
         run: |
           echo "Building with Go $(cat .go-version)"
-          echo "::set-output name=go-version::$(cat .go-version)"
+          echo "go-version=$(cat .go-version)" >> $GITHUB_OUTPUT
 
   get-product-version:
     runs-on: ubuntu-latest
@@ -40,7 +40,7 @@ jobs:
         id: get-product-version
         run: |
           make version
-          echo "::set-output name=product-version::$(make version)"
+          echo "product-version=$(make version)" >> $GITHUB_OUTPUT
 
   generate-metadata-file:
     needs: get-product-version
@@ -243,7 +243,7 @@ jobs:
 
   build-docker:
     name: Docker ${{ matrix.goarch }} ${{ matrix.fips }} default release build
-    needs: [get-product-version, build]
+    needs: [get-product-version, get-go-version, build]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -269,8 +269,17 @@ jobs:
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
+
+      # This naming convention will be used ONLY for per-commit dev images
+      - name: Set docker dev tag
+        run: |
+          echo "full_dev_tag=${{ env.version }}"
+          echo "full_dev_tag=${{ env.version }}" >> $GITHUB_ENV
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" 
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" >> $GITHUB_ENV
+
       - name: Docker Build (Action)
-        uses: hashicorp/actions-docker-build@v1
+        uses: hashicorp/actions-docker-build@76d2fc91532d816ca2660d8f3139e432ac3700fd
         if: ${{ !matrix.fips }}
         with:
           smoke_test: |
@@ -289,11 +298,15 @@ jobs:
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-${{ github.sha }}
+          extra_build_args: |
+            GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
 
       - name: Docker FIPS Build (Action)
-        uses: hashicorp/actions-docker-build@v1
+        uses: hashicorp/actions-docker-build@76d2fc91532d816ca2660d8f3139e432ac3700fd
         if: ${{ matrix.fips }}
         with:
           smoke_test: |
@@ -312,12 +325,16 @@ jobs:
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.minor_dev_tag }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.minor_dev_tag }}-${{ github.sha }}
+          extra_build_args: |
+            GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
 
-  build-docker-ubi-redhat-registry:
-    name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI build for RedHat Registry
-    needs: [get-product-version, build]
+  build-docker-ubi:
+    name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI builds
+    needs: [get-product-version, get-go-version, build]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -341,73 +358,19 @@ jobs:
           unzip -j *.zip
       - name: Copy LICENSE
         run:
-         cp LICENSE ./control-plane
-      - name: Docker Build (Action)
-        if: ${{ !matrix.fips }}
-        uses: hashicorp/actions-docker-build@v1
-        with:
-          smoke_test: |
-            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
-            if [ "${TEST_VERSION}" != "v${version}" ]; then
-              echo "Test FAILED"
-              exit 1
-            fi
-            echo "Test PASSED"
-          version: ${{ env.version }}
-          target: ubi
-          arch: ${{ matrix.arch }}
-          pkg_name: consul-k8s-control-plane_${{ env.version }}
-          bin_name: consul-k8s-control-plane
-          workdir: control-plane
-          redhat_tag: quay.io/redhat-isv-containers/611ca2f89a9b407267837100:${{env.version}}-ubi
-      - name: Docker FIPS Build (Action)
-        if: ${{ matrix.fips }}
-        uses: hashicorp/actions-docker-build@v1
-        with:
-          smoke_test: |
-            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
-            if [ "${TEST_VERSION}" != "v${version}" ]; then
-              echo "Test FAILED"
-              exit 1
-            fi
-            echo "Test PASSED"
-          version: ${{ env.version }}
-          target: ubi-fips # duplicate target to distinguish FIPS builds in CRT machinery
-          arch: ${{ matrix.arch }}
-          pkg_name: consul-k8s-control-plane_${{ env.version }}
-          bin_name: consul-k8s-control-plane
-          workdir: control-plane
-          redhat_tag: quay.io/redhat-isv-containers/6486b1beabfc4e51588c0416:${{env.version}}-ubi # this is different than the non-FIPS one
-
-  build-docker-ubi-dockerhub:
-    name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI build for DockerHub
-    needs: [ get-product-version, build ]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [ "amd64" ]
-        fips: [ "+fips1402", "" ]
-    env:
-      repo: ${{ github.event.repository.name }}
-      version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
-    steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
-      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
-        with:
-          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_linux_${{ matrix.arch }}.zip
-          path: control-plane/dist/cni/linux/${{ matrix.arch }}
-      - name: extract consul-cni zip
-        env:
-          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
-        run: |
-          cd ${ZIP_LOCATION}
-          unzip -j *.zip
-      - name: Copy LICENSE
-        run:
           cp LICENSE ./control-plane
+
+      # This naming convention will be used ONLY for per-commit dev images
+      - name: Set docker dev tag
+        run: |
+          echo "full_dev_tag=${{ env.version }}"
+          echo "full_dev_tag=${{ env.version }}" >> $GITHUB_ENV
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" 
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" >> $GITHUB_ENV
+
       - name: Docker Build (Action)
-        uses: hashicorp/actions-docker-build@v1
         if: ${{ !matrix.fips }}
+        uses: hashicorp/actions-docker-build@76d2fc91532d816ca2660d8f3139e432ac3700fd
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
@@ -425,11 +388,17 @@ jobs:
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
           dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.version }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi-${{ github.sha }}
+          redhat_tag: quay.io/redhat-isv-containers/611ca2f89a9b407267837100:${{env.version}}-ubi
+          extra_build_args: |
+            GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
+
       - name: Docker FIPS Build (Action)
-        uses: hashicorp/actions-docker-build@v1
         if: ${{ matrix.fips }}
+        uses: hashicorp/actions-docker-build@76d2fc91532d816ca2660d8f3139e432ac3700fd
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
@@ -444,8 +413,6 @@ jobs:
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane
           workdir: control-plane
-          tags: |
-            docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
-          dev_tags: |
-            hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
-            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi-${{ github.sha }}
+          redhat_tag: quay.io/redhat-isv-containers/6486b1beabfc4e51588c0416:${{env.version}}-ubi # this is different than the non-FIPS one
+          extra_build_args: |
+            GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}

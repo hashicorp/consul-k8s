@@ -1,0 +1,3 @@
+```release-note:bug
+consul-telemetry-collector: fix deployments to non-default namespaces when global.enableConsulNamespaces
+```

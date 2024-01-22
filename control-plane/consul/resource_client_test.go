@@ -8,12 +8,14 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
-	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v1alpha1"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 func Test_NewResourceServiceClient(t *testing.T) {
@@ -94,14 +96,11 @@ func createWriteRequest(t *testing.T, name string) *pbresource.WriteRequest {
 		Resource: &pbresource.Resource{
 			Id: &pbresource.ID{
 				Name: name,
-				Type: &pbresource.Type{
-					Group:        "catalog",
-					GroupVersion: "v1alpha1",
-					Kind:         "Workload",
-				},
+				Type: pbcatalog.WorkloadType,
 				Tenancy: &pbresource.Tenancy{
-					Partition: "default",
-					Namespace: "default",
+					Namespace: constants.DefaultConsulNS,
+					Partition: constants.DefaultConsulPartition,
+					PeerName:  constants.DefaultConsulPeer,
 				},
 			},
 			Data: proto,

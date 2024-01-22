@@ -31,9 +31,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        {{- if .Values.global.acls.annotations }}
-          {{- tpl .Values.global.acls.annotations . | nindent 8 }}
-        {{- end }}
+        "consul.hashicorp.com/mesh-inject": "false"
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-gateway-resources
@@ -53,7 +51,7 @@ spec:
             - -heritage={{ .Release.Service }}
             - -release-name={{ .Release.Name }}
             - -component=api-gateway
-            {{- if .Values.apiGateway.enabled }} # Overide values from the old stanza. To be removed in 1.17 (t-eckert 2023-05-19)
+            {{- if .Values.apiGateway.enabled }} # Override values from the old stanza. To be removed after ~1.18 (t-eckert 2023-05-19) NET-6263
             {{- if .Values.apiGateway.managedGatewayClass.deployment }}
             {{- if .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
             - -deployment-default-instances={{ .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
@@ -118,10 +116,6 @@ spec:
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
-      {{- end }}
-      {{- if .Values.global.acls.nodeSelector }}
-      nodeSelector:
-        {{ tpl .Values.global.acls.nodeSelector . | indent 8 | trim }}
       {{- end }}
       volumes:
         - name: config

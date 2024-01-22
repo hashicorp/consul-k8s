@@ -5,7 +5,9 @@ package serveraclinit
 
 import (
 	"testing"
+	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/go-hclog"
@@ -40,7 +42,7 @@ func TestCreateOrUpdateACLPolicy_ErrorsIfDescriptionDoesNotMatch(t *testing.T) {
 	svr.WaitForLeader(t)
 
 	// Get a Consul client.
-	consul, err := api.NewClient(&api.Config{
+	client, err := consul.NewDynamicClient(&api.Config{
 		Address: svr.HTTPAddr,
 		Token:   bootToken,
 	})
@@ -49,7 +51,7 @@ func TestCreateOrUpdateACLPolicy_ErrorsIfDescriptionDoesNotMatch(t *testing.T) {
 	// Create the policy manually.
 	policyDescription := "not the expected description"
 	policyName := "policy-name"
-	policy, _, err := consul.ACL().PolicyCreate(&api.ACLPolicy{
+	policy, _, err := client.ConsulClient.ACL().PolicyCreate(&api.ACLPolicy{
 		Name:        policyName,
 		Description: policyDescription,
 	}, nil)
@@ -59,14 +61,14 @@ func TestCreateOrUpdateACLPolicy_ErrorsIfDescriptionDoesNotMatch(t *testing.T) {
 	err = cmd.createOrUpdateACLPolicy(api.ACLPolicy{
 		Name:        policyName,
 		Description: "expected description",
-	}, consul)
+	}, client)
 	require.EqualError(err,
 		"policy found with name \"policy-name\" but not with expected description \"expected description\";"+
 			" if this policy was created manually it must be renamed to something else because this name is reserved by consul-k8s",
 	)
 
 	// Check that the policy wasn't modified.
-	rereadPolicy, _, err := consul.ACL().PolicyRead(policy.ID, nil)
+	rereadPolicy, _, err := client.ConsulClient.ACL().PolicyRead(policy.ID, nil)
 	require.NoError(err)
 	require.Equal(policyDescription, rereadPolicy.Description)
 }
@@ -92,10 +94,17 @@ func TestCreateOrUpdateACLPolicy(t *testing.T) {
 	svr.WaitForLeader(t)
 
 	// Get a Consul client.
-	consul, err := api.NewClient(&api.Config{
+	client, err := consul.NewDynamicClient(&api.Config{
 		Address: svr.HTTPAddr,
 		Token:   bootToken,
 	})
+
+	// Make sure the ACL system is bootstrapped first
+	require.Eventually(func() bool {
+		_, _, err := client.ConsulClient.ACL().PolicyList(nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
+
 	require.NoError(err)
 	connectInjectRule, err := cmd.injectRules()
 	require.NoError(err)
@@ -128,9 +137,9 @@ func TestCreateOrUpdateACLPolicy(t *testing.T) {
 				Name:        tt.PolicyName,
 				Description: tt.PolicyDescription,
 				Rules:       tt.Rules,
-			}, consul)
+			}, client)
 			require.Nil(err)
-			policy, _, err := consul.ACL().PolicyReadByName(tt.PolicyName, nil)
+			policy, _, err := client.ConsulClient.ACL().PolicyReadByName(tt.PolicyName, nil)
 			require.Nil(err)
 			require.Equal(tt.Rules, policy.Rules)
 			require.Equal(tt.PolicyName, policy.Name)

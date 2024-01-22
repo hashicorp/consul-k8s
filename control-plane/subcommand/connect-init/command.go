@@ -199,13 +199,14 @@ func (c *Command) Run(args []string) int {
 
 	// todo (agentless): this should eventually be passed to consul-dataplane as a string so we don't need to write it to file.
 	if c.consul.UseTLS && c.consul.CACertPEM != "" {
-		if err = common.WriteFileWithPerms(constants.ConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
+		if err = common.WriteFileWithPerms(constants.LegacyConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
 			c.logger.Error("error writing CA cert file", "error", err)
 			return 1
 		}
 	}
 
 	if c.flagRedirectTrafficConfig != "" {
+		c.watcher.Stop() // Explicitly stop the watcher so that ACLs are cleaned up before we apply re-direction.
 		err = c.applyTrafficRedirectionRules(proxyService)
 		if err != nil {
 			c.logger.Error("error applying traffic redirection rules", "err", err)

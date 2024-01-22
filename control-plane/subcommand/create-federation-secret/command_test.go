@@ -14,8 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -25,6 +23,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 func TestRun_FlagValidation(t *testing.T) {
@@ -992,7 +993,7 @@ func TestRun_ConsulClientDelay(t *testing.T) {
 		timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 		retry.RunWith(timer, t, func(r *retry.R) {
 			var err error
-			testserver, err = testutil.NewTestServerConfigT(t, func(cfg *testutil.TestServerConfig) {
+			testserver, err = testutil.NewTestServerConfigT(r, func(cfg *testutil.TestServerConfig) {
 				cfg.CAFile = caFile
 				cfg.CertFile = certFile
 				cfg.KeyFile = keyFile

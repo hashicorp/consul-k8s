@@ -352,6 +352,74 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
+@test "telemetryCollector/Deployment: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "telemetryCollector/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set without vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/agent-extra-secret: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "telemetryCollector/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=foo' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "bar" ]
+}
+
 @test "telemetryCollector/Deployment: vault CA is not configured when secretKey is set but secretName is not" {
   cd `chart_dir`
   local object=$(helm template \
@@ -460,20 +528,86 @@ load _helpers
 #--------------------------------------------------------------------
 # telemetryCollector.cloud
 
-@test "telemetryCollector/Deployment: success with all cloud bits set" {
+@test "telemetryCollector/Deployment: success with global.cloud env vars" {
   cd `chart_dir`
-  run helm template \
+  local object=$(helm template \
       -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.image=bar' \
       --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.resourceId.secretName=client-resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=client-resource-id-key' \
       --set 'global.cloud.clientSecret.secretName=client-secret-name' \
       --set 'global.cloud.clientSecret.secretKey=client-secret-key' \
       --set 'global.cloud.clientId.secretName=client-id-name' \
       --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.resourceId.secretName=client-resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=client-resource-id-key' \
-      .
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_RESOURCE_ID")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-resource-id-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_RESOURCE_ID")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-resource-id-key" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_ID")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-id-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_ID")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-id-key" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_SECRET")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-secret-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_SECRET")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-secret-key" ]
+}
+
+@test "telemetryCollector/Deployment: success with telemetryCollector.cloud env vars" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'global.cloud.enabled=false' \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'telemetryCollector.cloud.resourceId.secretName=client-resource-id-name' \
+      --set 'telemetryCollector.cloud.resourceId.secretKey=client-resource-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-key' \
+      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
+      --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_RESOURCE_ID")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-resource-id-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_RESOURCE_ID")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-resource-id-key" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_ID")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-id-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_ID")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-id-key" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_SECRET")) | .[0].valueFrom.secretKeyRef.name' | tee /dev/stderr)
+  [ "${actual}" = "client-secret-name" ]
+
+  local actual=$(echo $object |
+      yq -r 'map(select(.name == "HCP_CLIENT_SECRET")) | .[0].valueFrom.secretKeyRef.key' | tee /dev/stderr)
+  [ "${actual}" = "client-secret-key" ]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId is set and global.cloud.resourceId is not set or global.cloud.clientSecret.secretName is not set" {
@@ -708,14 +842,16 @@ load _helpers
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
-      --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
-      --set 'telemetryCollector.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.resourceId.secretName=resource-id-name' \
-      --set 'global.resourceId.secretKey=resource-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When either telemetryCollector.cloud.clientId.secretName or telemetryCollector.cloud.clientId.secretKey is defined, both must be set." ]]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId.secretKey is set but telemetryCollector.cloud.clientId.secretName is not set." {
@@ -726,13 +862,15 @@ load _helpers
       --set 'telemetryCollector.image=bar' \
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
-      --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.resourceId.secretName=resource-id-name' \
-      --set 'global.resourceId.secretKey=resource-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set." ]]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientSecret.secretName is set but telemetryCollector.cloud.clientId.secretName is not set." {
@@ -741,14 +879,17 @@ load _helpers
       -s templates/telemetry-collector-deployment.yaml  \
       --set 'telemetryCollector.enabled=true' \
       --set 'telemetryCollector.image=bar' \
-      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
-      --set 'telemetryCollector.clientSecret.secretName=client-secret-id-name' \
-      --set 'telemetryCollector.clientSecret.secretKey=client-secret-key-name'  \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-key-name'  \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set." ]]
+  echo "$output" > /dev/stderr
+
+  [[ "$output" =~ "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set." ]]
 }
 
 @test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.clientId.secretName is set but telemetry.cloud.clientId.secretKey is not set." {
@@ -760,6 +901,7 @@ load _helpers
       --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
       --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
@@ -776,6 +918,7 @@ load _helpers
       --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
       --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       .
   [ "$status" -eq 1 ]
 
@@ -796,7 +939,47 @@ load _helpers
       .
   [ "$status" -eq 1 ]
 
-  [[ "$output" =~ "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set" ]]
+  [[ "$output" =~ "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretKey or global.cloud.resourceId.secretKey must be set" ]]
+}
+
+@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.resourceId.secretName differs from global.cloud.resourceId.secretName." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.cloud.resourceId.secretName=resource-id-1' \
+      --set 'global.cloud.resourceId.secretKey=key' \
+      --set 'telemetryCollector.cloud.resourceId.secretName=resource-id-2' \
+      --set 'telemetryCollector.cloud.resourceId.secretKey=key' \
+      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
+      --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-name' \
+      .
+  [ "$status" -eq 1 ]
+
+  [[ "$output" =~ "When both global.cloud.resourceId.secretName and telemetryCollector.cloud.resourceId.secretName are set, they should be the same." ]]
+}
+
+@test "telemetryCollector/Deployment: fails when telemetryCollector.cloud.resourceId.secretKey differs from global.cloud.resourceId.secretKey." {
+  cd `chart_dir`
+  run helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.cloud.resourceId.secretName=name' \
+      --set 'global.cloud.resourceId.secretKey=key-1' \
+      --set 'telemetryCollector.cloud.resourceId.secretName=name' \
+      --set 'telemetryCollector.cloud.resourceId.secretKey=key-2' \
+      --set 'telemetryCollector.cloud.clientId.secretName=client-id-name' \
+      --set 'telemetryCollector.cloud.clientId.secretKey=client-id-key' \
+      --set 'telemetryCollector.cloud.clientSecret.secretName=client-secret-name' \
+      --set 'telemetryCollector.cloud.clientSecret.secretKey=client-secret-name' \
+      .
+  [ "$status" -eq 1 ]
+
+  [[ "$output" =~ "When both global.cloud.resourceId.secretKey and telemetryCollector.cloud.resourceId.secretKey are set, they should be the same." ]]
 }
 
 #--------------------------------------------------------------------
@@ -1130,4 +1313,61 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   local actual=$(echo "$cmd" |
     yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# global.experiments=["resource-apis"]
+
+@test "telemetryCollector/Deployment: disabled when V2 is enabled" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
+      .
+}
+
+#--------------------------------------------------------------------
+# Namespaces
+
+@test "telemetryCollector/Deployment: namespace flags when mirroringK8S" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --namespace 'test-namespace' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-login-namespace=default"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  local actual=$(echo $object | jq -r '.containers[1].args | any(contains("-service-namespace=test-namespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+}
+
+@test "telemetryCollector/Deployment: namespace flags when not mirroringK8S" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=false' \
+      --set 'connectInject.consulNamespaces.consulDestinationNamespace=fakenamespace' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers' | tee /dev/stderr)
+
+  local actual=$(echo $object | jq -r '.[1].args | any(contains("-login-namespace=fakenamespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
+
+  local actual=$(echo $object | jq -r '.[1].args | any(contains("-service-namespace=fakenamespace"))' | tee /dev/stderr)
+  [ "${actual}" = 'true' ]
 }

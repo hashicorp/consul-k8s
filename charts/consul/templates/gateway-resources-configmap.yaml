@@ -1,11 +1,16 @@
 {{- if .Values.connectInject.enabled }}
+
+# Validation
+# For meshGateway.wanAddress, static must be set if source is "Static"
+{{if (and (eq .Values.meshGateway.wanAddress.source "Static") (eq .Values.meshGateway.wanAddress.static ""))}}{{fail ".meshGateway.wanAddress.static must be set to a value if .meshGateway.wanAddress.source is Static"}}{{ end }}
+
 # Configuration of Gateway Resources Job which creates managed Gateway configuration.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ template "consul.fullname" . }}-gateway-resources-config
   namespace: {{ .Release.Namespace }}
-  labels: 
+  labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
@@ -15,5 +20,113 @@ data:
   {{- if .Values.connectInject.apiGateway.managedGatewayClass.resources }}
   resources.json: |
     {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
+  {{- end }}
+  {{- if and (mustHas "resource-apis" .Values.global.experiments) .Values.meshGateway.enabled }}
+  config.yaml: |
+    gatewayClassConfigs:
+      - apiVersion: mesh.consul.hashicorp.com/v2beta1
+        metadata:
+          name: consul-mesh-gateway
+        kind: GatewayClassConfig
+        spec:
+          labels:
+            set:
+              app: {{ template "consul.name" . }}
+              chart: {{ template "consul.chart" . }}
+              heritage: {{ .Release.Service }}
+              release: {{ .Release.Name }}
+              component: mesh-gateway
+          deployment:
+            {{- if .Values.meshGateway.priorityClassName }}
+            priorityClassName: {{ .Values.meshGateway.priorityClassName | quote }}
+            {{- end }}
+            {{- if .Values.meshGateway.affinity }}
+            affinity: {{ toJson (default "{}" .Values.meshGateway.affinity) }}
+            {{- end }}
+            {{- if .Values.meshGateway.annotations }}
+            annotations:
+              set: {{ toJson .Values.meshGateway.annotations }}
+            {{- end }}
+            {{- if .Values.global.extraLabels }}
+            labels:
+              set: {{ toJson .Values.global.extraLabels }}
+            {{- end }}
+            container:
+              consul:
+                logging:
+                  level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
+              portModifier: {{ sub .Values.meshGateway.containerPort .Values.meshGateway.service.port }}
+              {{- if .Values.meshGateway.hostPort }}
+              hostPort: {{ .Values.meshGateway.hostPort }}
+              {{- end }}
+              resources: {{ toJson .Values.meshGateway.resources }}
+            initContainer:
+              consul:
+                logging:
+                  level: {{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
+              resources: {{ toJson .Values.meshGateway.initServiceInitContainer.resources }}
+            {{- with .Values.meshGateway.nodeSelector }}
+            nodeSelector: {{ fromYaml . | toJson }}
+            {{- end }}
+            {{- with .Values.meshGateway.hostNetwork }}
+            hostNetwork: {{ . }}
+            {{- end }}
+            {{- with .Values.meshGateway.dnsPolicy }}
+            dnsPolicy: {{ . }}
+            {{- end }}
+            {{- with .Values.meshGateway.topologySpreadConstraints }}
+            topologySpreadConstraints:
+              {{ fromYamlArray . | toJson }}
+            {{- end }}
+            {{- if .Values.meshGateway.affinity }}
+            affinity: 
+              {{ tpl .Values.meshGateway.affinity . | nindent 16 | trim }}
+            {{- end }}
+            replicas:
+              default: {{ .Values.meshGateway.replicas }}
+              min: {{ .Values.meshGateway.replicas }}
+              max: {{ .Values.meshGateway.replicas }}
+            {{- if .Values.meshGateway.tolerations }}
+            tolerations: {{ fromYamlArray .Values.meshGateway.tolerations | toJson }}
+            {{- end }}
+          service:
+            {{- if .Values.meshGateway.service.annotations }}
+            annotations:
+              set: {{ toJson .Values.meshGateway.service.annotations }}
+            {{- end }}
+            type: {{ .Values.meshGateway.service.type }}
+          {{- if .Values.meshGateway.serviceAccount.annotations }}
+          serviceAccount:
+            annotations:
+              set: {{ toJson .Values.meshGateway.serviceAccount.annotations }}
+          {{- end }}
+    meshGateways:
+      - apiVersion: mesh.consul.hashicorp.com/v2beta1
+        kind: MeshGateway
+        metadata:
+          name: mesh-gateway
+          namespace: {{ .Release.Namespace }}
+          annotations: 
+            # TODO are these annotations even necessary?
+            "consul.hashicorp.com/gateway-wan-address-source": {{ .Values.meshGateway.wanAddress.source | quote }}
+            "consul.hashicorp.com/gateway-wan-address-static": {{ .Values.meshGateway.wanAddress.static | quote }}
+            {{- if eq .Values.meshGateway.wanAddress.source "Service" }}
+            {{- if eq .Values.meshGateway.service.type "NodePort" }}
+            "consul.hashicorp.com/gateway-wan-port": {{ .Values.meshGateway.service.nodePort | quote  }}
+            {{- else }}
+            "consul.hashicorp.com/gateway-wan-port": {{ .Values.meshGateway.service.port | quote }}
+            {{- end }}
+            {{- else }}
+            "consul.hashicorp.com/gateway-wan-port": {{ .Values.meshGateway.wanAddress.port | quote }}
+            {{- end }}
+        spec:
+          gatewayClassName: consul-mesh-gateway
+          listeners: 
+          - name: "wan"
+            port: {{ .Values.meshGateway.service.port }}
+            protocol: "TCP"
+          workloads:
+            prefixes: 
+              - "mesh-gateway"
   {{- end }}
 {{- end }}

@@ -18,6 +18,13 @@ var (
 		"consul.hashicorp.com_peeringacceptors.yaml": {},
 		"consul.hashicorp.com_peeringdialers.yaml":   {},
 	}
+
+	// includeV1Suffix is used to add a ...-v1.yaml suffix for types that exist in
+	// v1 and v2 APIs with the same name and would otherwise result in last man wins
+	includeV1Suffix = map[string]struct{}{
+		"consul.hashicorp.com_exportedservices.yaml":    {},
+		"consul.hashicorp.com_gatewayclassconfigs.yaml": {},
+	}
 )
 
 func main() {
@@ -79,17 +86,29 @@ func realMain(helmPath string) error {
 				`    release: {{ .Release.Name }}`,
 				`    component: crd`,
 			}
-			withLabels := append(splitOnNewlines[0:9], append(labelLines, splitOnNewlines[9:]...)...)
+			var split int
+			if dir == "bases" {
+				split = 6
+			} else {
+				split = 9
+			}
+			withLabels := append(splitOnNewlines[0:split], append(labelLines, splitOnNewlines[split:]...)...)
 			contents = strings.Join(withLabels, "\n")
+
+			suffix := ""
+			if _, ok := includeV1Suffix[info.Name()]; ok {
+				suffix = "-v1"
+			}
 
 			var crdName string
 			if dir == "bases" {
 				// Construct the destination filename.
 				filenameSplit := strings.Split(info.Name(), "_")
-				crdName = filenameSplit[1]
+				filenameSplit = strings.Split(filenameSplit[1], ".")
+				crdName = filenameSplit[0] + suffix + ".yaml"
 			} else if dir == "external" {
 				filenameSplit := strings.Split(info.Name(), ".")
-				crdName = filenameSplit[0] + ".yaml"
+				crdName = filenameSplit[0] + suffix + "-external.yaml"
 			}
 
 			destinationPath := filepath.Join(helmPath, "templates", fmt.Sprintf("crd-%s", crdName))

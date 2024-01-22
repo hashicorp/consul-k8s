@@ -145,7 +145,7 @@ substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The out
 is passed to consul as a -config-file param on command line.
 */}}
 {{- define "consul.extraconfig" -}}
-              cp /consul/config/extra-from-values.json /consul/extra-config/extra-from-values.json
+              cp /consul/tmp/extra-config/extra-from-values.json /consul/extra-config/extra-from-values.json
               [ -n "${HOST_IP}" ] && sed -Ei "s|HOST_IP|${HOST_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${POD_IP}" ] && sed -Ei "s|POD_IP|${POD_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
@@ -166,24 +166,27 @@ Expand the name of the chart.
 {{- end -}}
 
 {{/*
-Compute the maximum number of unavailable replicas for the PodDisruptionBudget.
-This defaults to (n/2)-1 where n is the number of members of the server cluster.
-Special case of replica equaling 3 and allowing a minor disruption of 1 otherwise
-use the integer value
-Add a special case for replicas=1, where it should default to 0 as well.
+Calculate max number of server pods that are allowed to be voluntarily disrupted.
+When there's 1 server, this is set to 0 because this pod should not be disrupted. This is an edge
+case and I'm not sure it makes a difference when there's only one server but that's what the previous config was and
+I don't want to change it for this edge case.
+Otherwise we've changed this to always be 1 as part of the move to set leave_on_terminate
+to true. With leave_on_terminate set to true, whenever a server pod is stopped, the number of peers in raft
+is reduced. If the number of servers is odd and the count is reduced by 1, the quorum size doesn't change,
+but if it's reduced by more than 1, the quorum size can change so that's why this is now always hardcoded to 1.
 */}}
-{{- define "consul.pdb.maxUnavailable" -}}
+{{- define "consul.server.pdb.maxUnavailable" -}}
 {{- if eq (int .Values.server.replicas) 1 -}}
 {{ 0 }}
 {{- else if .Values.server.disruptionBudget.maxUnavailable -}}
 {{ .Values.server.disruptionBudget.maxUnavailable -}}
 {{- else -}}
-{{- if eq (int .Values.server.replicas) 3 -}}
-{{- 1 -}}
-{{- else -}}
-{{- sub (div (int .Values.server.replicas) 2) 1 -}}
+{{ 1 }}
 {{- end -}}
 {{- end -}}
+
+{{- define "consul.server.autopilotMinQuorum" -}}
+{{- add (div (int .Values.server.replicas) 2) 1 -}}
 {{- end -}}
 
 {{- define "consul.pdb.connectInject.maxUnavailable" -}}
@@ -415,7 +418,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 
 {{/*
-Fails if temeletryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
+Fails if telemetryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
 - telemetryCollector.cloud.clientId.secretName
 - telemetryCollector.cloud.clientSecret.secretName
 - global.cloud.resourceId.secretName
@@ -424,11 +427,11 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 
 */}}
 {{- define "consul.validateTelemetryCollectorCloud" -}}
-{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
+{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (and (not .Values.global.cloud.clientSecret.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
 {{- end }}
-{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, global.cloud.resourceId.secretName,telemetryCollector.cloud.clientId.secretName must also be set."}}
+{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (and (not .Values.global.cloud.clientId.secretName) (not .Values.telemetryCollector.cloud.clientId.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set."}}
 {{- end }}
 {{- end }}
 
@@ -441,13 +444,32 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 {{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName (not .Values.telemetryCollector.cloud.clientSecret.secretKey)) (and .Values.telemetryCollector.cloud.clientSecret.secretKey (not .Values.telemetryCollector.cloud.clientSecret.secretName)) }}
 {{fail "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set."}}
 {{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
-{{fail "When telemetryCollector has clientId and clientSecret global.cloud.resourceId.secretName must be set"}}
+{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName))) }}
+{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretName or global.cloud.resourceId.secretName must be set"}}
 {{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretKey)) }}
-{{fail "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set"}}
+{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey))) }}
+{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretKey or global.cloud.resourceId.secretKey must be set"}}
 {{- end }}
 {{- end -}}
+
+{{/*
+Fails if telemetryCollector.cloud.resourceId is set but differs from global.cloud.resourceId. This should never happen. Either one or both are set, but they should never differ.
+If they differ, that implies we're configuring servers for one HCP Consul cluster but pushing envoy metrics for a different HCP Consul cluster. A user could set the same value
+in two secrets (it's questionable whether resourceId should be a secret at all) but we won't know at this point, so we just check secret name+key.
+
+Usage: {{ template "consul.validateTelemetryCollectorResourceId" . }}
+
+*/}}
+{{- define "consul.validateTelemetryCollectorResourceId" -}}
+{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName) (not (eq .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName)) }}
+{{fail "When both global.cloud.resourceId.secretName and telemetryCollector.cloud.resourceId.secretName are set, they should be the same."}}
+{{- end }}
+{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey) (not (eq .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey)) }}
+{{fail "When both global.cloud.resourceId.secretKey and telemetryCollector.cloud.resourceId.secretKey are set, they should be the same."}}
+{{- end }}
+{{- end }}
+
+{{/**/}}
 
 {{/*
 Fails if global.experiments.resourceAPIs is set along with any of these unsupported features.
@@ -469,6 +491,9 @@ Usage: {{ template "consul.validateResourceAPIs" . }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.peering.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, global.peering.enabled is currently unsupported."}}
 {{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) (not (mustHas "v2tenancy" .Values.global.experiments)) .Values.global.adminPartitions.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, global.experiments.v2tenancy must also be set to support global.adminPartitions.enabled."}}
+{{- end }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.federation.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, global.federation.enabled is currently unsupported."}}
 {{- end }}
@@ -483,9 +508,6 @@ Usage: {{ template "consul.validateResourceAPIs" . }}
 {{- end }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.syncCatalog.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, syncCatalog.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.meshGateway.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, meshGateway.enabled is currently unsupported."}}
 {{- end }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ingressGateways.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, ingressGateways.enabled is currently unsupported."}}

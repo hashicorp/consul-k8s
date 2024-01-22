@@ -36,6 +36,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         {{- if (and .Values.global.secretsBackend.vault.enabled (or .Values.global.tls.enabled .Values.global.acls.manageSystemACLs)) }}
         "vault.hashicorp.com/agent-pre-populate-only": "true"
         "vault.hashicorp.com/agent-inject": "true"
@@ -58,6 +59,9 @@ spec:
         {{- end }}
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
         {{- end }}
         {{- end }}
     spec:
@@ -114,8 +118,8 @@ spec:
                 {{- if .Values.global.cloud.enabled }}
                 -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
                 {{- end }}
-                {{- if (mustHas "resource-apis" .Values.global.experiments) }}
-                -enable-resource-apis=true
+                {{- if and (mustHas "resource-apis" .Values.global.experiments) (mustHas "v2tenancy" .Values.global.experiments) }}
+                -enable-v2tenancy=true
                 {{- end }}
           resources:
             requests:

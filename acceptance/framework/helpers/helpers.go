@@ -18,6 +18,7 @@ import (
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +44,7 @@ func CheckForPriorInstallations(t *testing.T, client kubernetes.Interface, optio
 		// NOTE: It's okay to pass in `t` to RunHelmCommandAndGetOutputE despite being in a retry
 		// because we're using RunHelmCommandAndGetOutputE (not RunHelmCommandAndGetOutput) so the `t` won't
 		// get used to fail the test, just for logging.
-		helmListOutput, err = helm.RunHelmCommandAndGetOutputE(t, options, "list", "--output", "json")
+		helmListOutput, err = helm.RunHelmCommandAndGetOutputE(r, options, "list", "--output", "json")
 		require.NoError(r, err)
 	})
 
@@ -84,10 +85,9 @@ func SetupInterruptHandler(cleanup func()) {
 	}()
 }
 
-// Cleanup will both register a cleanup function with t
-// and SetupInterruptHandler to make sure resources get cleaned up
-// if an interrupt signal is caught.
-func Cleanup(t *testing.T, noCleanupOnFailure bool, noCleanup bool, cleanup func()) {
+// Cleanup will both register a cleanup function with t and SetupInterruptHandler to make sure resources
+// get cleaned up if an interrupt signal is caught.
+func Cleanup(t testutil.TestingTB, noCleanupOnFailure bool, noCleanup bool, cleanup func()) {
 	t.Helper()
 
 	// Always clean up when an interrupt signal is caught.
@@ -149,4 +149,39 @@ func MergeMaps(a, b map[string]string) {
 	for k, v := range b {
 		a[k] = v
 	}
+}
+
+// RegisterExternalService registers an external service to a virtual node in Consul for testing purposes.
+// This function takes a testing.T object, a Consul client, service namespace, service name, address, and port as
+// parameters. It registers the service with Consul, and if a namespace is provided, it also creates the namespace
+// in Consul. It uses the provided testing.T object to log registration details and verify the registration process.
+// If the registration fails, the test calling the function will fail.
+func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, name, address string, port int) {
+	t.Helper()
+
+	service := &api.AgentService{
+		ID:      name,
+		Service: name,
+		Port:    port,
+	}
+
+	if namespace != "" {
+		address = fmt.Sprintf("%s.%s", name, namespace)
+		service.Namespace = namespace
+
+		logger.Logf(t, "creating the %s namespace in Consul", namespace)
+		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
+			Name: namespace,
+		}, nil)
+		require.NoError(t, err)
+	}
+
+	logger.Log(t, "registering the external service %s", name)
+	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
+		Node:     "external",
+		Address:  address,
+		NodeMeta: map[string]string{"external-node": "true", "external-probe": "true"},
+		Service:  service,
+	}, nil)
+	require.NoError(t, err)
 }

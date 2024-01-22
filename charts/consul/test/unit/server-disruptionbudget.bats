@@ -59,6 +59,16 @@ load _helpers
   [ "${actual}" = "0" ]
 }
 
+@test "server/DisruptionBudget: correct maxUnavailable with replicas=2" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-disruptionbudget.yaml  \
+      --set 'server.replicas=2' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
 @test "server/DisruptionBudget: correct maxUnavailable with replicas=3" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -97,7 +107,7 @@ load _helpers
       --set 'server.replicas=6' \
       . | tee /dev/stderr |
       yq '.spec.maxUnavailable' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "server/DisruptionBudget: correct maxUnavailable with replicas=7" {
@@ -107,7 +117,7 @@ load _helpers
       --set 'server.replicas=7' \
       . | tee /dev/stderr |
       yq '.spec.maxUnavailable' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "server/DisruptionBudget: correct maxUnavailable with replicas=8" {
@@ -117,8 +127,20 @@ load _helpers
       --set 'server.replicas=8' \
       . | tee /dev/stderr |
       yq '.spec.maxUnavailable' | tee /dev/stderr)
-  [ "${actual}" = "3" ]
+  [ "${actual}" = "1" ]
 }
+
+@test "server/DisruptionBudget: correct maxUnavailable when set with value" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-disruptionbudget.yaml  \
+      --set 'server.replicas=5' \
+      --set 'server.disruptionBudget.maxUnavailable=5' \
+      . | tee /dev/stderr |
+      yq '.spec.maxUnavailable' | tee /dev/stderr)
+  [ "${actual}" = "5" ]
+}
+
 
 #--------------------------------------------------------------------
 # apiVersion

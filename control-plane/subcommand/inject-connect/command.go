@@ -30,6 +30,9 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	multiclusterv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/multicluster/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -55,6 +58,7 @@ type Command struct {
 	flagLogLevel              string
 	flagLogJSON               bool
 	flagResourceAPIs          bool // Use V2 APIs
+	flagV2Tenancy             bool // Use V2 partitions (ent only) and namespaces instead of V1 counterparts
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -85,6 +89,9 @@ type Command struct {
 	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
 	flagDefaultSidecarProxyLifecycleGracefulPort                 string
 	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
+
+	flagDefaultSidecarProxyStartupFailureSeconds  int
+	flagDefaultSidecarProxyLivenessFailureSeconds int
 
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
@@ -155,10 +162,17 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
+
+	// V2 resources
+	utilruntime.Must(authv2beta1.AddAuthToScheme(scheme))
+	utilruntime.Must(meshv2beta1.AddMeshToScheme(scheme))
+	utilruntime.Must(multiclusterv2beta1.AddMultiClusterToScheme(scheme))
+
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -226,7 +240,9 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 	c.flagSet.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
-		"Enable of disable Consul V2 Resource APIs.")
+		"Enable or disable Consul V2 Resource APIs.")
+	c.flagSet.BoolVar(&c.flagV2Tenancy, "enable-v2tenancy", false,
+		"Enable or disable Consul V2 tenancy.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -240,6 +256,9 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds, "default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds", 0, "Default sidecar proxy shutdown grace period in seconds.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulPort, "default-sidecar-proxy-lifecycle-graceful-port", strconv.Itoa(constants.DefaultGracefulPort), "Default port for sidecar proxy lifecycle management HTTP endpoints.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath, "default-sidecar-proxy-lifecycle-graceful-shutdown-path", "/graceful_shutdown", "Default sidecar proxy lifecycle management graceful shutdown path.")
+
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyStartupFailureSeconds, "default-sidecar-proxy-startup-failure-seconds", 0, "Default number of seconds for the k8s startup probe to fail before the proxy container is restarted. Zero disables the probe.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLivenessFailureSeconds, "default-sidecar-proxy-liveness-failure-seconds", 0, "Default number of seconds for the k8s liveness probe to fail before the proxy container is restarted. Zero disables the probe.")
 
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
@@ -381,8 +400,8 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	//Right now we exclusively start controllers for V1 or V2.
-	//In the future we might add a flag to pick and choose from both.
+	// Right now we exclusively start controllers for V1 or V2.
+	// In the future we might add a flag to pick and choose from both.
 	if c.flagResourceAPIs {
 		err = c.configureV2Controllers(ctx, mgr, watcher)
 	} else {
@@ -410,6 +429,19 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagConsulDataplaneImage == "" {
 		return errors.New("-consul-dataplane-image must be set")
+	}
+
+	// In Consul 1.17, multiport beta shipped with v2 catalog + mesh resources backed by v1 tenancy
+	// and acls (experiments=[resource-apis]).
+	//
+	// With Consul 1.18, we built out v2 tenancy with no support for acls, hence need to be explicit
+	// about which combination of v1 + v2 features are enabled.
+	//
+	// To summarize:
+	// - experiments=[resource-apis] => v2 catalog and mesh + v1 tenancy and acls
+	// - experiments=[resource-apis, v2tenancy] => v2 catalog and mesh + v2 tenancy + acls disabled
+	if c.flagV2Tenancy && !c.flagResourceAPIs {
+		return errors.New("-enable-resource-apis must be set to 'true' if -enable-v2tenancy is set")
 	}
 
 	if c.flagEnablePartitions && c.consul.Partition == "" {
@@ -453,7 +485,7 @@ func (c *Command) parseAndValidateSidecarProxyFlags() error {
 			return fmt.Errorf("-default-sidecar-proxy-cpu-limit is invalid: %w", err)
 		}
 	}
-	if c.sidecarProxyCPULimit.Value() != 0 && c.sidecarProxyCPURequest.Cmp(c.sidecarProxyMemoryLimit) > 0 {
+	if c.sidecarProxyCPULimit.Value() != 0 && c.sidecarProxyCPURequest.Cmp(c.sidecarProxyCPULimit) > 0 {
 		return fmt.Errorf("request must be <= limit: -default-sidecar-proxy-cpu-request value of %q is greater than the -default-sidecar-proxy-cpu-limit value of %q",
 			c.flagDefaultSidecarProxyCPURequest, c.flagDefaultSidecarProxyCPULimit)
 	}

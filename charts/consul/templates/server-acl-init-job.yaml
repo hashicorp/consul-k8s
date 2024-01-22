@@ -46,6 +46,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         {{- if .Values.global.acls.annotations }}
           {{- tpl .Values.global.acls.annotations . | nindent 8 }}
         {{- end }}
@@ -97,6 +98,9 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- end }}
     spec:
       restartPolicy: Never
@@ -147,9 +151,12 @@ spec:
               fieldPath: metadata.name
         # Extract the Vault namespace from the Vault agent annotations.
         {{- if .Values.global.secretsBackend.vault.enabled }}
-        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{- if and (.Values.global.secretsBackend.vault.agentAnnotations) (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace") }}
         - name: VAULT_NAMESPACE
           value: {{ get (tpl .Values.global.secretsBackend.vault.agentAnnotations . | fromYaml) "vault.hashicorp.com/namespace" }}
+        {{- else if .Values.global.secretsBackend.vault.vaultNamespace }}
+        - name: VAULT_NAMESPACE
+          value: {{ .Values.global.secretsBackend.vault.vaultNamespace }}
         {{- end }}
         {{- end }}
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
@@ -184,6 +191,10 @@ spec:
             -secrets-backend=vault \
             {{- else }}
             -secrets-backend=kubernetes \
+            {{- end }}
+          
+            {{- if (mustHas "resource-apis" .Values.global.experiments) }}
+            -enable-resource-apis=true \
             {{- end }}
 
             {{- if .Values.global.acls.bootstrapToken.secretName }}

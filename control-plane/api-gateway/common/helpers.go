@@ -38,7 +38,7 @@ func FilterIsExternalFilter(filter gwv1beta1.HTTPRouteFilter) bool {
 	}
 
 	switch filter.ExtensionRef.Kind {
-	case v1alpha1.RouteRetryFilterKind, v1alpha1.RouteTimeoutFilterKind:
+	case v1alpha1.RouteRetryFilterKind, v1alpha1.RouteTimeoutFilterKind, v1alpha1.RouteAuthFilterKind:
 		return true
 	}
 

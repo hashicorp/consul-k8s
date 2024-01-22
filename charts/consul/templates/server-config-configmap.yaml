@@ -56,7 +56,12 @@ data:
         "enabled": true
       },
       {{- end }}
-      "server": true
+      "server": true,
+      "leave_on_terminate": true,
+      "autopilot": {
+        "min_quorum": {{ template "consul.server.autopilotMinQuorum" . }},
+        "disable_upgrade_migration": true
+      }
     }
   {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}
   {{- if and .Values.global.secretsBackend.vault.enabled $vaultConnectCAEnabled }}
@@ -72,6 +77,9 @@ data:
               "ca_file": "/consul/vault-ca/tls.crt",
               {{- end }}
               "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
+              {{- if (and (.vaultNamespace) (not (contains "namespace" (default "" .connectCA.additionalConfig)))) }}
+              "namespace": "{{ .vaultNamespace }}",
+              {{- end }}
               "root_pki_path": "{{ .connectCA.rootPKIPath }}",
               "auth_method": {
                 "type": "kubernetes",
@@ -92,8 +100,6 @@ data:
   {{- end }}
   {{- end }}
   {{- end }}
-  extra-from-values.json: |-
-{{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
   {{- if .Values.global.acls.manageSystemACLs }}
   acl-config.json: |-
     {
@@ -199,16 +205,7 @@ data:
         "sink": {
           {{- range $index, $element := .Values.server.auditLogs.sinks }}
           {{- if ne $index 0 }},{{end}}
-          "{{ $element.name }}": {
-            {{- $firstKeyValuePair := false }}
-            {{- range $k, $v := $element }}
-              {{- if ne $k "name" }}
-              {{- if ne $firstKeyValuePair false }},{{end}}
-              {{- $firstKeyValuePair = true }}
-              "{{ $k }}": "{{ $v }}"
-              {{- end }}
-            {{- end }}
-          }
+          "{{ get $element "name" }}": {{ omit $element "name" | toJson }}
           {{- end }}
         }
       }

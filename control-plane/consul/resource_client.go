@@ -6,14 +6,13 @@ package consul
 import (
 	"fmt"
 
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 )
 
 // NewResourceServiceClient creates a pbresource.ResourceServiceClient for creating V2 Consul resources.
 // It is initialized with a consul-server-connection-manager Watcher to continuously find Consul
 // server addresses.
-func NewResourceServiceClient(watcher *discovery.Watcher) (pbresource.ResourceServiceClient, error) {
+func NewResourceServiceClient(watcher ServerConnectionManager) (pbresource.ResourceServiceClient, error) {
 
 	// We recycle the GRPC connection from the discovery client because it
 	// should have all the necessary dial options, including the resolver that

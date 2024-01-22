@@ -5,7 +5,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"time"
 )
 
 func init() {
@@ -41,10 +40,14 @@ type RouteTimeoutFilterList struct {
 // RouteTimeoutFilterSpec defines the desired state of RouteTimeoutFilter.
 type RouteTimeoutFilterSpec struct {
 	// +kubebuilder:validation:Optional
-	RequestTimeout time.Duration `json:"requestTimeout"`
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Format=duration
+	RequestTimeout metav1.Duration `json:"requestTimeout"`
 
 	// +kubebuilder:validation:Optional
-	IdleTimeout time.Duration `json:"idleTimeout"`
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Format=duration
+	IdleTimeout metav1.Duration `json:"idleTimeout"`
 }
 
 func (h *RouteTimeoutFilter) GetNamespace() string {
