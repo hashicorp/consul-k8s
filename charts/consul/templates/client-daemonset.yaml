@@ -445,9 +445,11 @@ spec:
               hostPort: 8501
               name: https
             {{- end }}
+            {{- if .Values.client.grpc }}
             - containerPort: 8502
               hostPort: 8502
               name: grpc
+            {{- end }}
             - containerPort: 8301
               {{- if .Values.client.exposeGossipPorts }}
               hostPort: 8301
