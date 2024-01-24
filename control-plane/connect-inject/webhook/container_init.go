@@ -263,6 +263,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
 				},
+				ReadOnlyRootFilesystem:   pointer.Bool(true),
+				AllowPrivilegeEscalation: pointer.Bool(false),
 			}
 		}
 	}
