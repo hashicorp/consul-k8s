@@ -53,9 +53,10 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 						{
 							Match: &ServiceRouteMatch{
 								HTTP: &ServiceRouteHTTPMatch{
-									PathExact:  "pathExact",
-									PathPrefix: "pathPrefix",
-									PathRegex:  "pathRegex",
+									CaseInsensitive: true,
+									PathExact:       "pathExact",
+									PathPrefix:      "pathPrefix",
+									PathRegex:       "pathRegex",
 									Header: []ServiceRouteHTTPMatchHeader{
 										{
 											Name:    "name",
@@ -131,9 +132,10 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 					{
 						Match: &capi.ServiceRouteMatch{
 							HTTP: &capi.ServiceRouteHTTPMatch{
-								PathExact:  "pathExact",
-								PathPrefix: "pathPrefix",
-								PathRegex:  "pathRegex",
+								CaseInsensitive: true,
+								PathExact:       "pathExact",
+								PathPrefix:      "pathPrefix",
+								PathRegex:       "pathRegex",
 								Header: []capi.ServiceRouteHTTPMatchHeader{
 									{
 										Name:    "name",
@@ -259,9 +261,10 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 						{
 							Match: &ServiceRouteMatch{
 								HTTP: &ServiceRouteHTTPMatch{
-									PathExact:  "pathExact",
-									PathPrefix: "pathPrefix",
-									PathRegex:  "pathRegex",
+									CaseInsensitive: true,
+									PathExact:       "pathExact",
+									PathPrefix:      "pathPrefix",
+									PathRegex:       "pathRegex",
 									Header: []ServiceRouteHTTPMatchHeader{
 										{
 											Name:    "name",
@@ -337,9 +340,10 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 					{
 						Match: &capi.ServiceRouteMatch{
 							HTTP: &capi.ServiceRouteHTTPMatch{
-								PathExact:  "pathExact",
-								PathPrefix: "pathPrefix",
-								PathRegex:  "pathRegex",
+								CaseInsensitive: true,
+								PathExact:       "pathExact",
+								PathPrefix:      "pathPrefix",
+								PathRegex:       "pathRegex",
 								Header: []capi.ServiceRouteHTTPMatchHeader{
 									{
 										Name:    "name",

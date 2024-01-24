@@ -75,6 +75,8 @@ type ServiceRouteMatch struct {
 }
 
 type ServiceRouteHTTPMatch struct {
+	// CaseInsensitive configures PathExact and PathPrefix matches to ignore upper/lower casing.
+	CaseInsensitive bool `json:"caseInsensitive,omitempty"`
 	// PathExact is an exact path to match on the HTTP request path.
 	PathExact string `json:"pathExact,omitempty"`
 	// PathPrefix is a path prefix to match on the HTTP request path.
@@ -422,12 +424,13 @@ func (in *ServiceRouteHTTPMatch) toConsul() *capi.ServiceRouteHTTPMatch {
 		query = append(query, q.toConsul())
 	}
 	return &capi.ServiceRouteHTTPMatch{
-		PathExact:  in.PathExact,
-		PathPrefix: in.PathPrefix,
-		PathRegex:  in.PathRegex,
-		Header:     header,
-		QueryParam: query,
-		Methods:    in.Methods,
+		CaseInsensitive: in.CaseInsensitive,
+		PathExact:       in.PathExact,
+		PathPrefix:      in.PathPrefix,
+		PathRegex:       in.PathRegex,
+		Header:          header,
+		QueryParam:      query,
+		Methods:         in.Methods,
 	}
 }
 
