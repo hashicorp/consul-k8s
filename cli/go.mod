@@ -8,7 +8,7 @@ require (
 	github.com/fatih/color v1.14.1
 	github.com/google/go-cmp v0.5.9
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
-	github.com/hashicorp/consul/troubleshoot v0.1.3-0.20240110200054-19e293bff4ba
+	github.com/hashicorp/consul/troubleshoot v0.3.1
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/hcp-sdk-go v0.23.1-0.20220921131124-49168300a7dc
 	github.com/kr/text v0.2.0
