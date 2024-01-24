@@ -1,3 +1,20 @@
+## 1.2.5 (Jan 25, 2024)
+
+SECURITY:
+
+* Update `golang.org/x/crypto` to v0.17.0 to address [CVE-2023-48795](https://nvd.nist.gov/vuln/detail/CVE-2023-48795). [[GH-3442](https://github.com/hashicorp/consul-k8s/issues/3442)]
+* Upgrade to use `ubi-minimal:9.3` for OpenShift container images. [[GH-3418](https://github.com/hashicorp/consul-k8s/issues/3418)]
+
+IMPROVEMENTS:
+
+* Upgrade to use Go 1.21.6. [[GH-3478](https://github.com/hashicorp/consul-k8s/issues/3478)]
+* control-plane: Add new `consul.hashicorp.com/sidecar-proxy-startup-failure-seconds` and `consul.hashicorp.com/sidecar-proxy-liveness-failure-seconds` annotations that allow users to manually configure startup and liveness probes for Envoy sidecar proxies. [[GH-3450](https://github.com/hashicorp/consul-k8s/issues/3450)]
+* control-plane: reduce Consul Catalog API requests required for endpoints reconcile in large clusters [[GH-3322](https://github.com/hashicorp/consul-k8s/issues/3322)]
+
+BUG FIXES:
+
+* api-gateway: fix issue where deleting an http-route in a non-default namespace would not remove the route from Consul. [[GH-3440](https://github.com/hashicorp/consul-k8s/issues/3440)]
+
 ## 1.2.4 (December 19, 2023)
 
 SECURITY:
