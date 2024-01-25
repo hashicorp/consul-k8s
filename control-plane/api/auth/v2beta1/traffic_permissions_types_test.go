@@ -186,14 +186,16 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 									PathExact:  "/hello",
 									PathPrefix: "/world",
 									PathRegex:  "/.*/foo",
-									Header: &pbauth.DestinationRuleHeader{
-										Name:    "x-consul-test",
-										Present: true,
-										Exact:   "true",
-										Prefix:  "prefix",
-										Suffix:  "suffix",
-										Regex:   "reg.*ex",
-										Invert:  true,
+									Headers: []*pbauth.DestinationRuleHeader{
+										{
+											Name:    "x-consul-test",
+											Present: true,
+											Exact:   "true",
+											Prefix:  "prefix",
+											Suffix:  "suffix",
+											Regex:   "reg.*ex",
+											Invert:  true,
+										},
 									},
 									Methods: []string{"GET", "POST"},
 									Exclude: []*pbauth.ExcludePermissionRule{
@@ -201,14 +203,16 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 											PathExact:  "/hello",
 											PathPrefix: "/world",
 											PathRegex:  "/.*/foo",
-											Header: &pbauth.DestinationRuleHeader{
-												Name:    "x-consul-not-test",
-												Present: true,
-												Exact:   "false",
-												Prefix:  "~prefix",
-												Suffix:  "~suffix",
-												Regex:   "~reg.*ex",
-												Invert:  true,
+											Headers: []*pbauth.DestinationRuleHeader{
+												{
+													Name:    "x-consul-not-test",
+													Present: true,
+													Exact:   "false",
+													Prefix:  "~prefix",
+													Suffix:  "~suffix",
+													Regex:   "~reg.*ex",
+													Invert:  true,
+												},
 											},
 											Methods:   []string{"DELETE"},
 											PortNames: []string{"log"},
@@ -257,14 +261,16 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 								PathExact:  "/hello",
 								PathPrefix: "/world",
 								PathRegex:  "/.*/foo",
-								Header: &pbauth.DestinationRuleHeader{
-									Name:    "x-consul-test",
-									Present: true,
-									Exact:   "true",
-									Prefix:  "prefix",
-									Suffix:  "suffix",
-									Regex:   "reg.*ex",
-									Invert:  true,
+								Headers: []*pbauth.DestinationRuleHeader{
+									{
+										Name:    "x-consul-test",
+										Present: true,
+										Exact:   "true",
+										Prefix:  "prefix",
+										Suffix:  "suffix",
+										Regex:   "reg.*ex",
+										Invert:  true,
+									},
 								},
 								Methods: []string{"GET", "POST"},
 								Exclude: []*pbauth.ExcludePermissionRule{
@@ -272,14 +278,16 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 										PathExact:  "/hello",
 										PathPrefix: "/world",
 										PathRegex:  "/.*/foo",
-										Header: &pbauth.DestinationRuleHeader{
-											Name:    "x-consul-not-test",
-											Present: true,
-											Exact:   "false",
-											Prefix:  "~prefix",
-											Suffix:  "~suffix",
-											Regex:   "~reg.*ex",
-											Invert:  true,
+										Headers: []*pbauth.DestinationRuleHeader{
+											{
+												Name:    "x-consul-not-test",
+												Present: true,
+												Exact:   "false",
+												Prefix:  "~prefix",
+												Suffix:  "~suffix",
+												Regex:   "~reg.*ex",
+												Invert:  true,
+											},
 										},
 										Methods:   []string{"DELETE"},
 										PortNames: []string{"log"},
@@ -391,7 +399,7 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 									PathExact:  "/hello",
 									PathPrefix: "/world",
 									PathRegex:  "/.*/foo",
-									Header: &pbauth.DestinationRuleHeader{
+									Headers: []*pbauth.DestinationRuleHeader{{
 										Name:    "x-consul-test",
 										Present: true,
 										Exact:   "true",
@@ -399,14 +407,14 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 										Suffix:  "suffix",
 										Regex:   "reg.*ex",
 										Invert:  true,
-									},
+									}},
 									Methods: []string{"GET", "POST"},
 									Exclude: []*pbauth.ExcludePermissionRule{
 										{
 											PathExact:  "/hello",
 											PathPrefix: "/world",
 											PathRegex:  "/.*/foo",
-											Header: &pbauth.DestinationRuleHeader{
+											Headers: []*pbauth.DestinationRuleHeader{{
 												Name:    "x-consul-not-test",
 												Present: true,
 												Exact:   "false",
@@ -414,7 +422,7 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 												Suffix:  "~suffix",
 												Regex:   "~reg.*ex",
 												Invert:  true,
-											},
+											}},
 											Methods:   []string{"DELETE"},
 											PortNames: []string{"log"},
 										},
@@ -462,7 +470,7 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 								PathExact:  "/hello",
 								PathPrefix: "/world",
 								PathRegex:  "/.*/foo",
-								Header: &pbauth.DestinationRuleHeader{
+								Headers: []*pbauth.DestinationRuleHeader{{
 									Name:    "x-consul-test",
 									Present: true,
 									Exact:   "true",
@@ -470,14 +478,14 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 									Suffix:  "suffix",
 									Regex:   "reg.*ex",
 									Invert:  true,
-								},
+								}},
 								Methods: []string{"GET", "POST"},
 								Exclude: []*pbauth.ExcludePermissionRule{
 									{
 										PathExact:  "/hello",
 										PathPrefix: "/world",
 										PathRegex:  "/.*/foo",
-										Header: &pbauth.DestinationRuleHeader{
+										Headers: []*pbauth.DestinationRuleHeader{{
 											Name:    "x-consul-not-test",
 											Present: true,
 											Exact:   "false",
@@ -485,7 +493,7 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 											Suffix:  "~suffix",
 											Regex:   "~reg.*ex",
 											Invert:  true,
-										},
+										}},
 										Methods:   []string{"DELETE"},
 										PortNames: []string{"log"},
 									},
@@ -642,27 +650,31 @@ func TestTrafficPermissions_Validate(t *testing.T) {
 							DestinationRules: []*pbauth.DestinationRule{
 								{
 									PathExact: "/hello",
-									Header: &pbauth.DestinationRuleHeader{
-										Name:    "x-consul-test",
-										Present: true,
-										Exact:   "true",
-										Prefix:  "prefix",
-										Suffix:  "suffix",
-										Regex:   "reg.*ex",
-										Invert:  true,
+									Headers: []*pbauth.DestinationRuleHeader{
+										{
+											Name:    "x-consul-test",
+											Present: true,
+											Exact:   "true",
+											Prefix:  "prefix",
+											Suffix:  "suffix",
+											Regex:   "reg.*ex",
+											Invert:  true,
+										},
 									},
 									Methods: []string{"GET", "POST"},
 									Exclude: []*pbauth.ExcludePermissionRule{
 										{
 											PathPrefix: "/world",
-											Header: &pbauth.DestinationRuleHeader{
-												Name:    "x-consul-not-test",
-												Present: true,
-												Exact:   "false",
-												Prefix:  "~prefix",
-												Suffix:  "~suffix",
-												Regex:   "~reg.*ex",
-												Invert:  true,
+											Headers: []*pbauth.DestinationRuleHeader{
+												{
+													Name:    "x-consul-not-test",
+													Present: true,
+													Exact:   "false",
+													Prefix:  "~prefix",
+													Suffix:  "~suffix",
+													Regex:   "~reg.*ex",
+													Invert:  true,
+												},
 											},
 											Methods:   []string{"DELETE"},
 											PortNames: []string{"log"},
