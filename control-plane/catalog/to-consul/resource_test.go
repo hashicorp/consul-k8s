@@ -830,10 +830,14 @@ func TestServiceResource_nodePort(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
 		require.Equal(r, 30000, actual[0].Service.Port)
+		require.Equal(r, "us-east-2", actual[0].Service.Meta[ConsulK8STopologyRegion])
+		require.Equal(r, "us-east-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "k8s-sync", actual[0].Node)
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
 		require.Equal(r, 30000, actual[1].Service.Port)
+		require.NotContains(r, actual[1].Service.Meta, ConsulK8STopologyRegion)
+		require.NotContains(r, actual[1].Service.Meta, ConsulK8STopologyZone)
 		require.Equal(r, "k8s-sync", actual[1].Node)
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 	})
@@ -2034,6 +2038,10 @@ func createNodes(t *testing.T, client *fake.Clientset) (*corev1.Node, *corev1.No
 	node1 := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName1,
+			Labels: map[string]string{
+				corev1.LabelTopologyRegion: "us-east-2",
+				corev1.LabelTopologyZone:   "us-east-2a",
+			},
 		},
 
 		Status: corev1.NodeStatus{

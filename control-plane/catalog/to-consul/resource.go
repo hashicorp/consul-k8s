@@ -38,6 +38,10 @@ const (
 	ConsulK8SRefValue = "external-k8s-ref-name"
 	ConsulK8SNodeName = "external-k8s-node-name"
 
+	// Kubernetes topology on region and zone for node port service.
+	ConsulK8STopologyRegion = "external-k8s-topology-region"
+	ConsulK8STopologyZone   = "external-k8s-topology-zone"
+
 	// consulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckType = "kubernetes-readiness"
 	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
@@ -625,6 +629,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 						r.Service = &rs
 						r.Service.ID = serviceID(r.Service.Service, subsetAddr.IP)
 						r.Service.Address = address.Address
+						r.Service.Meta = updateServiceK8sTopology(r.Service.Meta, node.Labels)
 
 						t.consulMap[key] = append(t.consulMap[key], &r)
 						// Only consider the first address that matches. In some cases
@@ -646,6 +651,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							r.Service = &rs
 							r.Service.ID = serviceID(r.Service.Service, subsetAddr.IP)
 							r.Service.Address = address.Address
+							r.Service.Meta = updateServiceK8sTopology(r.Service.Meta, node.Labels)
 
 							t.consulMap[key] = append(t.consulMap[key], &r)
 							// Only consider the first address that matches. In some cases
@@ -1039,4 +1045,20 @@ func getServiceWeight(weight string) (int, error) {
 	}
 
 	return weightI, nil
+}
+
+// Update service meta with k8s topology info.
+func updateServiceK8sTopology(meta, nodeLabels map[string]string) map[string]string {
+	// metadata can vary by service
+	serviceMetaClone := make(map[string]string, len(meta))
+	for k, v := range meta {
+		serviceMetaClone[k] = v
+	}
+	if region := nodeLabels[corev1.LabelTopologyRegion]; region != "" {
+		serviceMetaClone[ConsulK8STopologyRegion] = region
+	}
+	if zone := nodeLabels[corev1.LabelTopologyZone]; zone != "" {
+		serviceMetaClone[ConsulK8STopologyZone] = zone
+	}
+	return serviceMetaClone
 }
