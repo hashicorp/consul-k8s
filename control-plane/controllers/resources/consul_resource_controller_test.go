@@ -11,9 +11,6 @@ import (
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
-	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -24,6 +21,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/consul/sdk/testutil"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -226,7 +227,7 @@ func TestConsulResourceController_UpdatesConsulResource(t *testing.T) {
 				Destination: &pbauth.Destination{
 					IdentityName: "destination-identity",
 				},
-				Action: pbauth.Action_ACTION_DENY,
+				Action: pbauth.Action_ACTION_ALLOW,
 				Permissions: []*pbauth.Permission{
 					{
 						Sources: []*pbauth.Source{
@@ -258,7 +259,6 @@ func TestConsulResourceController_UpdatesConsulResource(t *testing.T) {
 			},
 			updateF: func(resource common.ConsulResource) {
 				trafficPermissions := resource.(*v2beta1.TrafficPermissions)
-				trafficPermissions.Spec.Action = pbauth.Action_ACTION_DENY
 				trafficPermissions.Spec.Permissions[0].Sources = trafficPermissions.Spec.Permissions[0].Sources[:1]
 			},
 			unmarshal: func(t *testing.T, resource *pbresource.Resource) proto.Message {
