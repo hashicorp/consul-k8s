@@ -233,7 +233,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 			TLSEnabled:          c.consul.UseTLS,
 			ConsulTLSServerName: c.consul.TLSServerName,
 			ConsulCACert:        string(c.caCertPem),
-			SkipServerWatch: c.consul.SkipServerWatch,
+			SkipServerWatch:     c.consul.SkipServerWatch,
 		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.MeshGateway)
