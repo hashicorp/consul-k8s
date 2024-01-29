@@ -93,10 +93,6 @@ func (b *meshGatewayBuilder) consulDataplaneContainer(containerConfig v2beta1.Ga
 				Name:  envDPCredentialLoginMeta,
 				Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
 			},
-			{
-				Name:  envDPServiceNodeName,
-				Value: "$(NODE_NAME)-virtual",
-			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -175,11 +171,14 @@ func (b *meshGatewayBuilder) dataplaneArgs(bearerTokenFile string) ([]string, er
 			args = append(args, "-login-partition="+b.config.ConsulTenancyConfig.ConsulPartition)
 		}
 	}
+	if b.config.SkipServerWatch {
+		args = append(args, "-server-watch-disabled=true")
+	}
 	if b.config.ConsulTenancyConfig.EnableConsulNamespaces {
-		args = append(args, "-service-namespace="+consulNamespace)
+		args = append(args, "-proxy-namespace="+consulNamespace)
 	}
 	if b.config.ConsulTenancyConfig.ConsulPartition != "" {
-		args = append(args, "-service-partition="+b.config.ConsulTenancyConfig.ConsulPartition)
+		args = append(args, "-proxy-partition="+b.config.ConsulTenancyConfig.ConsulPartition)
 	}
 
 	args = append(args, buildTLSArgs(b.config)...)

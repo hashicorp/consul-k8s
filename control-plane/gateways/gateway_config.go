@@ -41,6 +41,9 @@ type GatewayConfig struct {
 	// MapPrivilegedServicePorts is the value which Consul will add to privileged container port values (ports < 1024)
 	// defined on a Gateway.
 	MapPrivilegedServicePorts int
+
+	// TODO(nathancoleman) Add doc
+	SkipServerWatch bool
 }
 
 // GatewayResources is a collection of Kubernetes resources for a Gateway.
