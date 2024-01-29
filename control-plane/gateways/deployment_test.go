@@ -367,10 +367,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
 										},
 										{
-											Name:  "DP_SERVICE_NODE_NAME",
-											Value: "$(NODE_NAME)-virtual",
-										},
-										{
 											Name:  "DP_ENVOY_READY_BIND_ADDRESS",
 											Value: "",
 											ValueFrom: &corev1.EnvVarSource{
@@ -772,10 +768,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
 										},
 										{
-											Name:  "DP_SERVICE_NODE_NAME",
-											Value: "$(NODE_NAME)-virtual",
-										},
-										{
 											Name:  "DP_ENVOY_READY_BIND_ADDRESS",
 											Value: "",
 											ValueFrom: &corev1.EnvVarSource{
@@ -1055,10 +1047,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										{
 											Name:  "DP_CREDENTIAL_LOGIN_META",
 											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
-										},
-										{
-											Name:  "DP_SERVICE_NODE_NAME",
-											Value: "$(NODE_NAME)-virtual",
 										},
 										{
 											Name:  "DP_ENVOY_READY_BIND_ADDRESS",

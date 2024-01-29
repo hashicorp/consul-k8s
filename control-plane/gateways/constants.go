@@ -13,7 +13,6 @@ const (
 	// Dataplane Configuration Environment variables.
 	envDPProxyId             = "DP_PROXY_ID"
 	envDPCredentialLoginMeta = "DP_CREDENTIAL_LOGIN_META"
-	envDPServiceNodeName     = "DP_SERVICE_NODE_NAME"
 
 	// Init Container Configuration Environment variables.
 	envConsulAddresses            = "CONSUL_ADDRESSES"
