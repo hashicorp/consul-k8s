@@ -16,5 +16,5 @@ resources:
 
 
 patches:
-- path: httproute.yaml
+- path: tcproute.yaml
 - path: api-gateway.yaml
