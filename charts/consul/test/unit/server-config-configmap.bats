@@ -1312,76 +1312,76 @@ load _helpers
 #--------------------------------------------------------------------
 # Datadog Consul on Kubernetes Integration
 
-@test "server/ConfigMap: when global.metrics.datadogIntegration.enabled=true, sets default telemetry.dogstatsd_addr config" {
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets default telemetry.dogstatsd_addr config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.enabled=true'  \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
       . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_addr | tee /dev/stderr)
 
   [ "${actual}" = "unix:///var/run/datadog/dsd.socket" ]
 }
 
-@test "server/ConfigMap: when global.metrics.datadogIntegration.enabled=true, sets non-default namespace telemetry.dogstatsd_addr config" {
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets non-default namespace telemetry.dogstatsd_addr config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.enabled=true'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.socketTransportType="UDP"'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.dogstatsdAddr="127.0.0.1"'  \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.socketTransportType="UDP"'  \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdAddr="127.0.0.1"'  \
       . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_addr | tee /dev/stderr)
 
   [ "${actual}" = "127.0.0.1:8125" ]
 }
 
-@test "server/ConfigMap: when global.metrics.datadogIntegration.enabled=true, sets non-default namespace telemetry.dogstatsd_addr with non-default port config" {
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets non-default namespace telemetry.dogstatsd_addr with non-default port config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.enabled=true'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.socketTransportType="UDP"'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.dogstatsdAddr="127.0.0.1"'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.dogstatsdPort=8000'  \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.socketTransportType="UDP"'  \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdAddr="127.0.0.1"'  \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdPort=8000'  \
       . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_addr | tee /dev/stderr)
 
   [ "${actual}" = "127.0.0.1:8000" ]
 }
 
-@test "server/ConfigMap: when global.metrics.datadogIntegration.enabled=true, sets default telemetry.dogstatsd_tags config" {
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets default telemetry.dogstatsd_tags config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.enabled=true'  \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
       . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_tags | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
 
   [ "${actual}" = "source:consul consul_service:consul-server" ]
 }
 
-@test "server/ConfigMap: when global.metrics.enableDatadogIntegration.enabled=true, sets non-default telemetry.dogstatsd_tags config" {
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets non-default telemetry.dogstatsd_tags config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.enabled=true'  \
-      --set 'global.metrics.datadogIntegration.dogstatsd.dogstatsdTags'='[\"source:consul-dataplane\"\,\"service:consul-server-connection-manager\"]' \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdTags'='[\"source:consul-dataplane\"\,\"service:consul-server-connection-manager\"]' \
       . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_tags | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
 
@@ -1391,7 +1391,7 @@ load _helpers
 #--------------------------------------------------------------------
 # Consul Agent Metrics Prefix Filtering
 
-@test "server/ConfigMap: when global.metrics.metricsPrefixFiltering default, empty telemetry.prefix_filter string list" {
+@test "server/ConfigMap: when global.metrics.prefixFilter default, empty telemetry.prefix_filter string list" {
   cd `chart_dir`
   local actual=$(helm template \
   -s templates/server-config-configmap.yaml \
@@ -1403,40 +1403,40 @@ load _helpers
   [ "${actual}" = "" ]
 }
 
-@test "server/ConfigMap: when global.metrics.metricsPrefixFiltering.allowList, sets correctly prepended telemetry.prefix_filter string list" {
+@test "server/ConfigMap: when global.metrics.prefixFilter.allowList, sets correctly prepended telemetry.prefix_filter string list" {
   cd `chart_dir`
   local actual=$(helm template \
   -s templates/server-config-configmap.yaml \
   --set 'global.metrics.enabled=true' \
   --set 'global.metrics.enableAgentMetrics=true' \
-  --set 'global.metrics.metricsPrefixFiltering.allowList'={'"consul.rpc.server.call"'\,'"consul.grpc.server.call"'} \
+  --set 'global.metrics.prefixFilter.allowList'={'"consul.rpc.server.call"'\,'"consul.grpc.server.call"'} \
   . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prefix_filter | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
 
   [ "${actual}" = "+consul.rpc.server.call +consul.grpc.server.call" ]
 }
 
-@test "server/ConfigMap: when global.metrics.metricsPrefixFiltering.blockList, sets correctly prepended telemetry.prefix_filter string list" {
+@test "server/ConfigMap: when global.metrics.prefixFilter.blockList, sets correctly prepended telemetry.prefix_filter string list" {
   cd `chart_dir`
   local actual=$(helm template \
   -s templates/server-config-configmap.yaml \
   --set 'global.metrics.enabled=true' \
   --set 'global.metrics.enableAgentMetrics=true' \
-  --set 'global.metrics.metricsPrefixFiltering.blockList'={'"consul.rpc.server.call"'\,'"consul.grpc.server.call"'} \
+  --set 'global.metrics.prefixFilter.blockList'={'"consul.rpc.server.call"'\,'"consul.grpc.server.call"'} \
   . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prefix_filter | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
 
   [ "${actual}" = "-consul.rpc.server.call -consul.grpc.server.call" ]
 }
 
-@test "server/ConfigMap: when global.metrics.metricsPrefixFiltering.blockList and allowList, sets correctly prepended telemetry.prefix_filter string list" {
+@test "server/ConfigMap: when global.metrics.prefixFilter.blockList and allowList, sets correctly prepended telemetry.prefix_filter string list" {
   cd `chart_dir`
   local actual=$(helm template \
   -s templates/server-config-configmap.yaml \
   --set 'global.metrics.enabled=true' \
   --set 'global.metrics.enableAgentMetrics=true' \
-  --set 'global.metrics.metricsPrefixFiltering.allowList'={'"consul.rpc.server.call"'\,'"consul.http.GET"'} \
-  --set 'global.metrics.metricsPrefixFiltering.blockList'={'"consul.http"'\,'"consul.raft.apply"'} \
+  --set 'global.metrics.prefixFilter.allowList'={'"consul.rpc.server.call"'\,'"consul.http.GET"'} \
+  --set 'global.metrics.prefixFilter.blockList'={'"consul.http"'\,'"consul.raft.apply"'} \
   . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prefix_filter | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
 
@@ -1446,7 +1446,7 @@ load _helpers
 #--------------------------------------------------------------------
 # Consul Agent Debug (PPROF)
 
-@test "server/ConfigMap: global.metrics.enableConsulAgentDebug default, sets default enable_debug = false in server agent config" {
+@test "server/ConfigMap: global.server.enableAgentDebug default, sets default enable_debug = false in server agent config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
@@ -1456,11 +1456,11 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "server/ConfigMap: when global.metrics.enableConsulAgentDebug=true, sets enable_debug = true in server agent config" {
+@test "server/ConfigMap: when global.server.enableAgentDebug=true, sets enable_debug = true in server agent config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
-      --set 'global.metrics.enableConsulAgentDebug=true'  \
+      --set 'server.enableAgentDebug=true'  \
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .enable_debug | tee /dev/stderr)
 

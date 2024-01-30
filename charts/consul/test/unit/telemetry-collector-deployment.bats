@@ -1373,7 +1373,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 }
 
 #--------------------------------------------------------------------
-# global.metrics.datadogIntegration.datadogOpenTelemetryCollector
+# global.metrics.datadog.otlp
 
 @test "telemetryCollector/Deployment: DataDog OTLP Collector HTTP protocol verification" {
   cd `chart_dir`
@@ -1383,9 +1383,9 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.cloud.enabled=false' \
       --set 'global.metrics.enabled=true' \
       --set 'global.metrics.enableAgentMetrics=true' \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
-      --set 'global.metrics.datadogIntegration.datadogOpenTelemetryCollector.enabled=true' \
-      --set 'global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol'="http" \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.otlp.protocol'="http" \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
 
@@ -1402,9 +1402,9 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.cloud.enabled=false' \
       --set 'global.metrics.enabled=true' \
       --set 'global.metrics.enableAgentMetrics=true' \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
-      --set 'global.metrics.datadogIntegration.datadogOpenTelemetryCollector.enabled=true' \
-      --set 'global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol'="HTTP" \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.otlp.protocol'="HTTP" \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
 
@@ -1421,9 +1421,9 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.cloud.enabled=false' \
       --set 'global.metrics.enabled=true' \
       --set 'global.metrics.enableAgentMetrics=true' \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
-      --set 'global.metrics.datadogIntegration.datadogOpenTelemetryCollector.enabled=true' \
-      --set 'global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol'="grpc" \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.otlp.protocol'="grpc" \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
 
@@ -1440,9 +1440,9 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'telemetryCollector.cloud.enabled=false' \
       --set 'global.metrics.enabled=true' \
       --set 'global.metrics.enableAgentMetrics=true' \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
-      --set 'global.metrics.datadogIntegration.datadogOpenTelemetryCollector.enabled=true' \
-      --set 'global.metrics.datadogIntegration.datadogOpenTelemetryCollector.protocol'="gRPC" \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.otlp.protocol'="gRPC" \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
 
