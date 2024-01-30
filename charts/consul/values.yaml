@@ -618,18 +618,12 @@ global:
     # @type: boolean
     enableAgentMetrics: false
 
-    # When set to true, enables Consul to report additional debugging information, including runtime profiling (pprof) data.
-    # This setting is only required for clusters without ACL enabled. Sets `enable_debug` in server agent config to `true`.
-    # If you change this setting, you must restart the agent for the change to take effect. Default is false.
-    # @type: boolean
-    enableConsulAgentDebug: false
-
     # Set to true to stop prepending the machine's hostname to gauge-type metrics. Default is false.
     # Only applicable if `global.metrics.enabled` and `global.metrics.AgentMetrics` is true.
     # @type: boolean
     disableAgentHostName: false
 
-    # Configures consul agent metrics. Only applicable if
+    # Configures consul agent underlying host metrics. Only applicable if
     # Only applicable if `global.metrics.enabled` and `global.metrics.AgentMetrics` is true.
     # @type: boolean
     enableHostMetrics: false
@@ -660,7 +654,7 @@ global:
     # Blocking will take priority if the same prefix is listed multiple times.
     #
     # - allowList:
-    metricsPrefixFiltering:
+    prefixFilter:
       # @type: array<string>
       allowList: []
       # @type: array<string>
@@ -668,14 +662,14 @@ global:
 
     # Configures consul integration configurations for datadog on kubernetes.
     # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
-    datadogIntegration:
+    datadog:
       # Enables datadog [Consul Autodiscovery Integration](https://docs.datadoghq.com/integrations/consul/?tab=containerized#metric-collection)
       # by configuring the required `ad.datadoghq.com/consul.checks` annotation. The following _Consul_ agent metrics/health statuses
       # are monitored by Datadog unless monitoring via OpenMetrics (Prometheus) or DogStatsD:
       #   - Serf events and member flaps
       #   - The Raft protocol
       #   - DNS performance
-      #   - API Endpoints Scraped:
+      #   - API Endpoints scraped:
       #     - `/v1/agent/metrics?format=prometheus`
       #     - `/v1/agent/self`
       #     - `/v1/status/leader`
@@ -706,7 +700,7 @@ global:
         # @type: boolean
         enabled: false
 
-      datadogOpenTelemetryCollector:
+      otlp:
         # Enables forwarding of Consul's Telemetry Collector OTLP metrics for
         # ingestion by Datadog Agent.
         # @default: false
@@ -786,7 +780,7 @@ global:
       #
       # @default: "default"
       # @type: string
-      datadogNamespace: "default"
+      namespace: "default"
 
 
   # The name (and tag) of the consul-dataplane Docker image used for the
@@ -1067,6 +1061,12 @@ server:
   # a new CA and set of certificates. Additional service mesh settings can be configured
   # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries).
   connect: true
+
+  # When set to true, enables Consul to report additional debugging information, including runtime profiling (pprof) data.
+  # This setting is only required for clusters without ACL enabled. Sets `enable_debug` in server agent config to `true`.
+  # If you change this setting, you must restart the agent for the change to take effect. Default is false.
+  # @type: boolean
+  enableAgentDebug: false
 
   serviceAccount:
     # This value defines additional annotations for the server service account. This should be formatted as a multi-line

@@ -783,13 +783,13 @@ load _helpers
   [ "${actual}" = "https" ]
 }
 
-@test "server/StatefulSet: when global.metrics.datadogIntegration.enabled=true, adds ad.datadoghq.com annotations" {
+@test "server/StatefulSet: when global.metrics.datadog.enabled=true, adds ad.datadoghq.com annotations" {
   cd `chart_dir`
   local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.metrics.datadog.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
 
@@ -825,14 +825,14 @@ load _helpers
   [ "${actual}" = "basic" ]
 }
 
-@test "server/StatefulSet: when global.metrics.datadogIntegration.enabled=true and global.tls.enabled, adds tls altered ad.datadoghq.com annotations" {
+@test "server/StatefulSet: when global.metrics.datadog.enabled=true and global.tls.enabled, adds tls altered ad.datadoghq.com annotations" {
   cd `chart_dir`
   local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
       --set 'global.tls.enabled=true'  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.metrics.datadog.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
 
@@ -880,13 +880,13 @@ load _helpers
   [ "${actual}" = "basic" ]
 }
 
-@test "server/StatefulSet: when global.metrics.datadogIntegration.enabled=true and global.acls.manageSystemACLs=true, adds ad.datadoghq.com annotations for datadog-agent-metrics-acl-token secret rendering" {
+@test "server/StatefulSet: when global.metrics.datadog.enabled=true and global.acls.manageSystemACLs=true, adds ad.datadoghq.com annotations for datadog-agent-metrics-acl-token secret rendering" {
   cd `chart_dir`
   local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.metrics.datadog.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
@@ -899,14 +899,15 @@ load _helpers
   [ "${actual}" = "ENC[k8s_secret@default/default-datadog-agent-metrics-acl-token/token]" ]
 }
 
-@test "server/StatefulSet: when global.metrics.datadogIntegration.openMetricsPrometheus.enabled, applicable openmetrics annotation is set" {
+@test "server/StatefulSet: when global.metrics.datadog.otlp.enabled, applicable openmetrics annotation is set" {
   cd `chart_dir`
   local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
       --set 'global.metrics.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
-      --set 'global.metrics.datadogIntegration.openMetricsPrometheus.enabled=true' \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
 
@@ -935,15 +936,16 @@ load _helpers
 
 }
 
-@test "server/StatefulSet: when datadogIntegration.openMetricsPrometheus.enabled, applicable openmetrics annotation is set with tls url" {
+@test "server/StatefulSet: when datadog.otlp.enabled, applicable openmetrics annotation is set with tls url" {
   cd `chart_dir`
   local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.tls.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
-      --set 'global.metrics.datadogIntegration.openMetricsPrometheus.enabled=true' \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
 
@@ -983,15 +985,16 @@ load _helpers
   [ "${actual}" = ".*" ]
 }
 
-@test "server/StatefulSet: when global.metrics.datadogIntegration.openMetricsPrometheus.enabled, applicable openmetrics annotation is set with acls.manageSystemACLs enabled" {
+@test "server/StatefulSet: when global.metrics.datadog.otlp.enabled, applicable openmetrics annotation is set with acls.manageSystemACLs enabled" {
   cd `chart_dir`
   local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
       --set 'global.metrics.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
-      --set 'global.metrics.datadogIntegration.openMetricsPrometheus.enabled=true' \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
 
@@ -1021,14 +1024,15 @@ load _helpers
 }
 
 
-@test "server/StatefulSet: datadog unified tagging labels get added when global.metrics.datadogIntegration.enabled=true" {
+@test "server/StatefulSet: datadog unified tagging labels get added when global.metrics.datadog.enabled=true" {
   cd `chart_dir`
   local labels=$(helm template \
       -s templates/server-statefulset.yaml \
       --set 'global.image=hashicorp/consul-enterprise:1.17.0-ent' \
       --set 'global.metrics.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.metrics.datadog.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.labels' | tee /dev/stderr)
 

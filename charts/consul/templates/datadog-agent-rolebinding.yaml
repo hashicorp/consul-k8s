@@ -1,4 +1,4 @@
-{{- if .Values.global.metrics.datadogIntegration.enabled }}
+{{- if .Values.global.metrics.datadog.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -17,6 +17,6 @@ subjects:
     namespace: datadog
 roleRef:
   kind: Role
-  name: {{ template "consul.fullname" . }}-datadog-metrics-agent
+  name: {{ template "consul.fullname" . }}-datadog-metrics
   apiGroup: ""
 {{- end }}

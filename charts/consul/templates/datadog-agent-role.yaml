@@ -1,8 +1,8 @@
-{{- if .Values.global.metrics.datadogIntegration.enabled }}
+{{- if .Values.global.metrics.datadog.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ template "consul.fullname" . }}-datadog-metrics-agent
+  name: {{ template "consul.fullname" . }}-datadog-metrics
   namespace: {{ .Release.Namespace }}
   labels:
     app: datadog
@@ -15,7 +15,7 @@ rules:
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
     resourceNames:
-      - {{ template "consul.fullname" . }}-datadog-metrics-agent
+      - {{ template "consul.fullname" . }}-datadog-metrics
     verbs:
       - use
 {{- end }}
@@ -23,7 +23,7 @@ rules:
   - apiGroups: ["security.openshift.io"]
     resources: ["securitycontextconstraints"]
     resourceNames:
-      - {{ template "consul.fullname" . }}-datadog-metrics-agent
+      - {{ template "consul.fullname" . }}-datadog-metrics
     verbs:
       - use
 {{- end }}

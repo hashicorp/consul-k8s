@@ -2446,9 +2446,9 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# global.metrics.datadogIntegration
+# global.metrics.datadog
 
-@test "serverACLInit/Job: -create-dd-agent-token not set when datadogIntegration=false and manageSystemACLs=true" {
+@test "serverACLInit/Job: -create-dd-agent-token not set when datadog=false and manageSystemACLs=true" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/server-acl-init-job.yaml  \
@@ -2461,13 +2461,13 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
-@test "serverACLInit/Job: -create-dd-agent-token set when global.metrics.datadogIntegration=true and global.acls.manageSystemACLs=true" {
+@test "serverACLInit/Job: -create-dd-agent-token set when global.metrics.datadog=true and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
+      --set 'global.metrics.datadog.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
@@ -2477,14 +2477,14 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "serverACLInit/Job: -create-dd-agent-token NOT set when global.metrics.datadogIntegration=true, global.metrics.datadogIntegration.dogstatsd.enabled=true, and global.acls.manageSystemACLs=true" {
+@test "serverACLInit/Job: -create-dd-agent-token NOT set when global.metrics.datadog=true, global.metrics.datadog.dogstatsd.enabled=true, and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   local command=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.metrics.enabled=true'  \
       --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadogIntegration.enabled=true' \
-      --set 'global.metrics.datadogIntegration.dogstatsd.enabled=true' \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
