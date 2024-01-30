@@ -4,7 +4,7 @@ name: build
 on:
   workflow_dispatch:
   push:
-    # Sequence of patterns matched against refs/heads
+    # Sequence of patterns matched against refs/heads just a change
     branches:
       # Push events on main branch
       - main
