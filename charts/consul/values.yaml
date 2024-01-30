@@ -619,12 +619,12 @@ global:
     enableAgentMetrics: false
 
     # Set to true to stop prepending the machine's hostname to gauge-type metrics. Default is false.
-    # Only applicable if `global.metrics.enabled` and `global.metrics.AgentMetrics` is true.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
     # @type: boolean
     disableAgentHostName: false
 
     # Configures consul agent underlying host metrics. Only applicable if
-    # Only applicable if `global.metrics.enabled` and `global.metrics.AgentMetrics` is true.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
     # @type: boolean
     enableHostMetrics: false
 
