@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -445,10 +446,14 @@ func getEffectiveTargetPort(targetPort intstr.IntOrString, prefixedPods selector
 	var mostPrevalentContainerPort *corev1.ContainerPort
 	maxCount := 0
 	effectiveNameForPort := func(port *corev1.ContainerPort) string {
-		if port.Name != "" {
-			return port.Name
+		var isNum bool
+		if _, err := strconv.Atoi(port.Name); err == nil {
+			isNum = true
 		}
-		return targetPort.String()
+		if port.Name == "" || isNum {
+			return "cslport-" + targetPort.String()
+		}
+		return port.Name
 	}
 	for _, podData := range prefixedPods {
 		containerPort := getTargetContainerPort(targetPortInt, podData.samplePod)
@@ -493,7 +498,7 @@ func getEffectiveTargetPort(targetPort intstr.IntOrString, prefixedPods selector
 
 	// If still no match for the target port, fall back to string-ifying the target port name, which
 	// is what the PodController will do when converting unnamed ContainerPorts to Workload ports.
-	return targetPort.String()
+	return "cslport-" + targetPort.String()
 }
 
 // getTargetContainerPort returns the pod ContainerPort matching the given numeric port value, or nil if none is found.

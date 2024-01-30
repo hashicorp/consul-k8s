@@ -620,8 +620,12 @@ func getWorkloadPorts(pod corev1.Pod) ([]string, map[string]*pbcatalog.WorkloadP
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
 			name := port.Name
-			if name == "" {
-				name = strconv.Itoa(int(port.ContainerPort))
+			var isNum bool
+			if _, err := strconv.Atoi(name); err == nil {
+				isNum = true
+			}
+			if name == "" || isNum {
+				name = "cslport-" + strconv.Itoa(int(port.ContainerPort))
 			}
 
 			// TODO: error check reserved "mesh" keyword and 20000
