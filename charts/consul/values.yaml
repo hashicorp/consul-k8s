@@ -680,7 +680,7 @@ global:
       #     - `/v1/coordinate/datacenters`
       #     - `/v1/coordinate/nodes`
       #
-      # Setting either `global.metrics.datadogIntegration.openMetricsPrometheus.enabled=true` or `global.metrics.datadogIntegration.dogstatsd.enabled=true` disables the above checks
+      # Setting either `global.metrics.datadog.otlp.enabled=true` or `global.metrics.datadog.dogstatsd.enabled=true` disables the above checks
       # in lieu of metrics data collection via DogStatsD or by a customer OpenMetrics (Prometheus) collection endpoint.
       #
       # ~> **Note:** If you have a [dogstatsd_mapper_profile](https://docs.datadoghq.com/integrations/consul/?tab=host#dogstatsd) configured for Consul

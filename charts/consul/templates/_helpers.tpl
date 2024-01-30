@@ -589,8 +589,8 @@ Usage: {{ template "consul.validateDatadogConfiguration" . }}
 {{- if and .Values.global.metrics.datadog.enabled (or (not .Values.global.metrics.enableAgentMetrics) (not .Values.global.metrics.enabled) )}}
 {{fail "When enabling datadog metrics collection, the /v1/agent/metrics is required to be accessible, therefore global.metrics.enableAgentMetrics and global.metrics.enabled must be also be enabled."}}
 {{- end }}
-{{- if and .Values.global.metrics.datadog.dogstatsd.enabled .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
-{{fail "You must have one of DogStatsD (global.metrics.datadog.dogstatsd.enabled) or OpenMetrics (global.metrics.datadog.openMetricsPrometheus.enabled) enabled, not both as this is an unsupported configuration." }}
+{{- if and .Values.global.metrics.datadog.dogstatsd.enabled .Values.global.metrics.datadog.otlp.enabled }}
+{{fail "You must have one of DogStatsD (global.metrics.datadog.dogstatsd.enabled) or OpenMetrics (global.metrics.datadog.otlp.enabled) enabled, not both as this is an unsupported configuration." }}
 {{- end }}
 {{- if and .Values.global.metrics.datadog.otlp.enabled (not .Values.telemetryCollector.enabled) }}
 {{fail "Cannot enable Datadog OTLP metrics collection (global.metrics.datadog.otlp.enabled) without consul-telemetry-collector. Ensure Consul OTLP collection is enabled (telemetryCollector.enabled) and configured." }}

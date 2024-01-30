@@ -1023,6 +1023,27 @@ load _helpers
 
 }
 
+@test "server/StatefulSet: consul metrics exclusion annotation when using metrics.datadog.dogstatsd.enabled=true" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.image=hashicorp/consul-enterprise:1.17.0-ent' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
+
+  local actual=$( echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr )
+  [ -n "${actual}" ]
+
+  local actual=$( echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.metrics_exclude"' | tee /dev/stderr )
+  [ "${actual}" = "true" ]
+}
+
 
 @test "server/StatefulSet: datadog unified tagging labels get added when global.metrics.datadog.enabled=true" {
   cd `chart_dir`
