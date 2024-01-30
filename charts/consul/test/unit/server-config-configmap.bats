@@ -1310,7 +1310,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# Datadog Consul on Kubernetes Integration
+# Datadog
 
 @test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets default telemetry.dogstatsd_addr config" {
   cd `chart_dir`

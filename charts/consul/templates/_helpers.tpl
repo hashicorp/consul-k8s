@@ -152,6 +152,48 @@ is passed to consul as a -config-file param on command line.
 {{- end -}}
 
 {{/*
+Cleanup server.extraConfig entries to avoid conflicting entries:
+    - server.enableAgentDebug:
+      - `enable_debug` should not exist in extraConfig
+    - metrics.disableAgentHostName:
+      - if global.metrics.enabled and global.metrics.enableAgentMetrics are enabled, `disable_hostname` should not exist in extraConfig
+    - metrics.enableHostMetrics:
+      - if global.metrics.enabled and global.metrics.enableAgentMetrics are enabled, `enable_host_metrics` should not exist in extraConfig
+    - metrics.prefixFilter
+      - if global.metrics.enabled and global.metrics.enableAgentMetrics are enabled, `prefix_filter` should not exist in extraConfig
+    - metrics.datadog.enabled:
+      - if global.metrics.datadog.enabled and global.metrics.datadog.dogstatsd.enabled, `dogstatsd_tags` and `dogstatsd_addr` should not exist in extraConfig
+
+Usage: {{ template "consul.validateExtraConfig" . }}
+*/}}
+{{- define "consul.validateExtraConfig" -}}
+{{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+{{- if (contains "enable_debug" .Values.server.extraConfig) }}
+{{ fail "The 'enable_debug' key is present in extra-from-values.json. Use 'server.enableAgentDebug' to set this value." }}
+{{- end }}
+{{- if (contains "disable_hostname" .Values.server.extraConfig) }}
+{{ fail "The 'disable_hostname' key is present in extra-from-values.json. Use 'global.metrics.disableAgentHostName' to set this value." }}
+{{- end }}
+{{- if (contains "enable_host_metrics" .Values.server.extraConfig) }}
+{{ fail "The 'enable_host_metrics' key is present in extra-from-values.json. Use 'global.metrics.enableHostMetrics' to set this value." }}
+{{- end }}
+{{- if (contains "prefix_filter" .Values.server.extraConfig) }}
+{{ fail "The 'prefix_filter' key is present in extra-from-values.json. Use 'global.metrics.prefix_filter' to set this value." }}
+{{- end }}
+{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}
+{{- if (contains "dogstatsd_tags" .Values.server.extraConfig) }}
+{{ fail "The 'dogstatsd_tags' key is present in extra-from-values.json. Use 'global.metrics.datadog.dogstatsd.dogstatsdTags' to set this value." }}
+{{- end }}
+{{- end }}
+{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}
+{{- if (contains "dogstatsd_addr" .Values.server.extraConfig) }}
+{{ fail "The 'dogstatsd_addr' key is present in extra-from-values.json. Use 'global.metrics.datadog.dogstatsd.dogstatsd_addr' to set this value." }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "consul.chart" -}}
@@ -589,8 +631,8 @@ Usage: {{ template "consul.validateDatadogConfiguration" . }}
 {{- if and .Values.global.metrics.datadog.enabled (or (not .Values.global.metrics.enableAgentMetrics) (not .Values.global.metrics.enabled) )}}
 {{fail "When enabling datadog metrics collection, the /v1/agent/metrics is required to be accessible, therefore global.metrics.enableAgentMetrics and global.metrics.enabled must be also be enabled."}}
 {{- end }}
-{{- if and .Values.global.metrics.datadog.dogstatsd.enabled .Values.global.metrics.datadog.otlp.enabled }}
-{{fail "You must have one of DogStatsD (global.metrics.datadog.dogstatsd.enabled) or OpenMetrics (global.metrics.datadog.otlp.enabled) enabled, not both as this is an unsupported configuration." }}
+{{- if and .Values.global.metrics.datadog.dogstatsd.enabled .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
+{{fail "You must have one of DogStatsD (global.metrics.datadog.dogstatsd.enabled) or OpenMetrics (global.metrics.datadog.openMetricsPrometheus.enabled) enabled, not both as this is an unsupported configuration." }}
 {{- end }}
 {{- if and .Values.global.metrics.datadog.otlp.enabled (not .Values.telemetryCollector.enabled) }}
 {{fail "Cannot enable Datadog OTLP metrics collection (global.metrics.datadog.otlp.enabled) without consul-telemetry-collector. Ensure Consul OTLP collection is enabled (telemetryCollector.enabled) and configured." }}

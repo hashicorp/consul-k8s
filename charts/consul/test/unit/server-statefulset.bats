@@ -899,7 +899,7 @@ load _helpers
   [ "${actual}" = "ENC[k8s_secret@default/default-datadog-agent-metrics-acl-token/token]" ]
 }
 
-@test "server/StatefulSet: when global.metrics.datadog.otlp.enabled, applicable openmetrics annotation is set" {
+@test "server/StatefulSet: when global.metrics.datadog.openMetricsPrometheus.enabled, applicable openmetrics annotation is set" {
   cd `chart_dir`
   local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -907,7 +907,7 @@ load _helpers
       --set 'telemetryCollector.enabled=true' \
       --set 'global.metrics.enableAgentMetrics=true'  \
       --set 'global.metrics.datadog.enabled=true' \
-      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.openMetricsPrometheus.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
 
@@ -936,7 +936,7 @@ load _helpers
 
 }
 
-@test "server/StatefulSet: when datadog.otlp.enabled, applicable openmetrics annotation is set with tls url" {
+@test "server/StatefulSet: when datadog.openMetricsPrometheus.enabled, applicable openmetrics annotation is set with tls url" {
   cd `chart_dir`
   local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -945,7 +945,7 @@ load _helpers
       --set 'telemetryCollector.enabled=true' \
       --set 'global.metrics.enableAgentMetrics=true'  \
       --set 'global.metrics.datadog.enabled=true' \
-      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.openMetricsPrometheus.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
 
@@ -985,7 +985,7 @@ load _helpers
   [ "${actual}" = ".*" ]
 }
 
-@test "server/StatefulSet: when global.metrics.datadog.otlp.enabled, applicable openmetrics annotation is set with acls.manageSystemACLs enabled" {
+@test "server/StatefulSet: when global.metrics.datadog.openMetricsPrometheus.enabled, applicable openmetrics annotation is set with acls.manageSystemACLs enabled" {
   cd `chart_dir`
   local annotations=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -994,7 +994,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       --set 'global.metrics.enableAgentMetrics=true'  \
       --set 'global.metrics.datadog.enabled=true' \
-      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.openMetricsPrometheus.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
 

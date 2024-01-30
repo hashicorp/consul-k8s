@@ -21,6 +21,7 @@
 {{ template "consul.validateCloudSecretKeys" . }}
 {{ template "consul.validateMetricsConfig" . }}
 {{ template "consul.validateDatadogConfiguration" . }}
+{{ template "consul.validateExtraConfig" . }}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
@@ -143,7 +144,7 @@ spec:
         {{- if .Values.global.metrics.datadog.enabled }}
         "ad.datadoghq.com/tolerate-unready": "true"
         "ad.datadoghq.com/consul.logs": {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdTags | squote }}
-        {{- if .Values.global.metrics.datadog.otlp.enabled }}
+        {{- if .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
         "ad.datadoghq.com/consul.checks": |
           {
             "openmetrics": {
