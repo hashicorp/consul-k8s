@@ -2,9 +2,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: datadog-read-secrets
-  namespace: consul
+  name: {{ template "consul.fullname" . }}-datadog-metrics
+  namespace: {{ .Release.Namespace }}
   labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
     component: agent
 subjects:
   - kind: ServiceAccount
