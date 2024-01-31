@@ -9,7 +9,8 @@ on:
 
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: ${{ github.ref_name }}
+  #BRANCH: ${{ github.ref_name }}
+  BRANCH: "curtbushko/update-azure-subscription"
   CONTEXT: "nightly"
 
 jobs:
@@ -23,6 +24,6 @@ jobs:
         workflow: cloud.yml
         repo: hashicorp/consul-k8s-workflows
           #ref: main
-        ref: 'curtbushko/update-azure-subscription'
+        ref: "curtbushko/update-azure-subscription"
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
