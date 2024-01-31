@@ -38,8 +38,8 @@ type APIGateway struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   pbmesh.APIGateway `json:"spec,omitempty"`
-	Status `json:"status,omitempty"`
+	Spec             pbmesh.APIGateway `json:"spec,omitempty"`
+	APIGatewayStatus `json:"status,omitempty"`
 }
 
 type APIGatewayStatus struct {
