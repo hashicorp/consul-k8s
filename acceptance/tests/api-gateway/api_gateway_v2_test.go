@@ -20,7 +20,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
@@ -118,7 +118,7 @@ func TestAPIGateway_V2_Basic(t *testing.T) {
 			var gatewayAddress string
 			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
-				var gateway v2beta1.APIGateway
+				var gateway meshv2beta1.APIGateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
 				require.NoError(r, err)
 
@@ -145,7 +145,7 @@ func TestAPIGateway_V2_Basic(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 
 				// check that we have an address to use
-				require.Len(r, gateway.Status.Addresses, 1)
+				require.Len(r, gateway.Spec., 1)
 				// now we know we have an address, set it so we can use it
 				gatewayAddress = gateway.Status.Addresses[0].Value
 			})

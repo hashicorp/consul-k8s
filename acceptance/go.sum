@@ -106,8 +106,10 @@ github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kB
 github.com/blang/semver v3.5.0+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc h1:biVzkmvwrH8WK8raXaxBx6fRVTlJILwEwQGL1I/ByEI=
 github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
+github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
 github.com/cenkalti/backoff/v3 v3.0.0 h1:ske+9nBpD9qZsTBoF41nW5L+AIuFBKMeze18XQ3eG1c=
 github.com/cenkalti/backoff/v3 v3.0.0/go.mod h1:cIeZDE3IrqwwJl6VUwCN6trj1oXrTS4rc0ij+ULvLYs=
+github.com/cenkalti/backoff/v4 v4.1.3 h1:cFAlzYUlVYDysBEH2T5hyJZMh3+5+WCBvSnK6Q8UtC4=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/cespare/xxhash/v2 v2.1.2/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
@@ -182,8 +184,8 @@ github.com/evanphx/json-patch/v5 v5.6.0/go.mod h1:G79N1coSVB93tBe7j6PhzjmR3/2Vvl
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fatih/color v1.9.0/go.mod h1:eQcE1qtQxscV5RaZvpXrrb8Drkc3/DdQ+uUYCNjL+zU=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
-github.com/fatih/color v1.14.1 h1:qfhVLaG5s+nCROl1zJsZRxFeYrHLqWroPOQ8BWiNb4w=
-github.com/fatih/color v1.14.1/go.mod h1:2oHN61fhTpgcxD3TSWCgKDiH1+x4OiDVVGH8WlgGZGg=
+github.com/fatih/color v1.15.0 h1:kOqh6YHBtK8aywxGerMG2Eq3H6Qgoqeo13Bk2Mv/nBs=
+github.com/fatih/color v1.15.0/go.mod h1:0h5ZqXfHYED7Bhv2ZJamyIOUej9KtShiJESRwBDUSsw=
 github.com/fatih/structs v1.1.0 h1:Q7juDM0QtcnhCpeyLGQKyg4TOIghuNXrkL32pHAUMxo=
 github.com/frankban/quicktest v1.13.0 h1:yNZif1OkDfNoDfb9zZa9aXIpejNR4F23Wely0c+Qdqk=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
@@ -391,10 +393,11 @@ github.com/gruntwork-io/gruntwork-cli v0.7.0 h1:YgSAmfCj9c61H+zuvHwKfYUwlMhu5arn
 github.com/gruntwork-io/gruntwork-cli v0.7.0/go.mod h1:jp6Z7NcLF2avpY8v71fBx6hds9eOFPELSuD/VPv7w00=
 github.com/gruntwork-io/terratest v0.31.2 h1:xvYHA80MUq5kx670dM18HInewOrrQrAN+XbVVtytUHg=
 github.com/gruntwork-io/terratest v0.31.2/go.mod h1:EEgJie28gX/4AD71IFqgMj6e99KP5mi81hEtzmDjxTo=
-github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230609143603-198c4433d892 h1:4iI0ztWbVPTSDax+m1/XDs4jIRorxY4kSMyuM0fX+Dc=
-github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230609143603-198c4433d892/go.mod h1:iZ8BJGSnY52wnxJTo2VIfGX63CPjqiNzbuqdOtJCKnI=
-github.com/hashicorp/consul/api v1.10.1-0.20230906155245-56917eb4c968 h1:lQ7QmlL0N4/ftLBex8n73Raji29o7EVssqCoeeczKac=
-github.com/hashicorp/consul/api v1.10.1-0.20230906155245-56917eb4c968/go.mod h1:NZJGRFYruc/80wYowkPFCp1LbGmJC9L8izrwfyVx/Wg=
+github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240129190418-1e67acc165ea h1:kXmHp6NTTIQ2mwNzQ4WSCqx9hK2/Mx46/vqvHJD2Wlc=
+github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240129190418-1e67acc165ea/go.mod h1:Yj8VIjM3SElLcOVTkjy/A0igua8XBuhteYuQ1O84FDY=
+github.com/hashicorp/consul-server-connection-manager v0.1.6 h1:ktj8Fi+dRXn9hhM+FXsfEJayhzzgTqfH08Ne5M6Fmug=
+github.com/hashicorp/consul/api v1.10.1-0.20240122152324-758ddf84e9c9 h1:qaS6rE768dt5hGPl2y4DIABXF4eA23BNSmWFpEr3kWQ=
+github.com/hashicorp/consul/api v1.10.1-0.20240122152324-758ddf84e9c9/go.mod h1:gInwZGrnWlE1Vvq6rSD5pUf6qwNa69NTLLknbdwQRUk=
 github.com/hashicorp/consul/proto-public v0.1.2-0.20231212195019-69e3f93ee8a3 h1:FFRKi+IpoXHwXZDgqG+BNAG1duAuokbzm+5b2pcY1us=
 github.com/hashicorp/consul/proto-public v0.1.2-0.20231212195019-69e3f93ee8a3/go.mod h1:fCFq3EfW2Iwu5her/hgqVqcJikY8nBtDiKFgfOdBvvw=
 github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f h1:GKsa7bfoL7xgvCkzYJMF9eYYNfLWQyk8QuRZZl4nMTo=
@@ -420,6 +423,7 @@ github.com/hashicorp/go-multierror v1.0.0/go.mod h1:dHtQlpGsu+cZNNAkkCN/P3hoUDHh
 github.com/hashicorp/go-multierror v1.1.0/go.mod h1:spPvp8C1qA32ftKqdAHm4hHTbPw+vmowP0z+KUhOZdA=
 github.com/hashicorp/go-multierror v1.1.1 h1:H5DkEtf6CXdFp0N0Em5UCwQpXMWke8IA0+lD48awMYo=
 github.com/hashicorp/go-multierror v1.1.1/go.mod h1:iw975J/qwKPdAO1clOe2L8331t/9/fmwbPZ6JB6eMoM=
+github.com/hashicorp/go-netaddrs v0.1.0 h1:TnlYvODD4C/wO+j7cX1z69kV5gOzI87u3OcUinANaW8=
 github.com/hashicorp/go-plugin v1.4.5 h1:oTE/oQR4eghggRg8VY7PAz3dr++VwDNBGCcOfIvHpBo=
 github.com/hashicorp/go-plugin v1.4.5/go.mod h1:viDMjcLJuDui6pXb8U4HVfb8AamCWhHGUjr2IrTF67s=
 github.com/hashicorp/go-retryablehttp v0.5.3/go.mod h1:9B5zBasrRhHXnJnui7y6sL7es7NDiJgTc6Er0maI1Xs=
@@ -543,8 +547,8 @@ github.com/mattn/go-isatty v0.0.11/go.mod h1:PhnuNfih5lzO57/f3n+odYbM4JtupLOxQOA
 github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=
 github.com/mattn/go-isatty v0.0.14/go.mod h1:7GGIvUiUoEMVVmxf/4nioHXj79iQHKdU27kJ6hsGG94=
 github.com/mattn/go-isatty v0.0.16/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=
-github.com/mattn/go-isatty v0.0.17 h1:BTarxUcIeDqL27Mc+vyvdWYSL28zpIhv3RoTdsLMPng=
-github.com/mattn/go-isatty v0.0.17/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=
+github.com/mattn/go-isatty v0.0.19 h1:JITubQf0MOLdlGRuRq+jtsDlekdYPia9ZFsB8h/APPA=
+github.com/mattn/go-isatty v0.0.19/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mattn/go-runewidth v0.0.2/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/mattn/go-zglob v0.0.1/go.mod h1:9fxibJccNxU2cnpIKLRRFA7zX7qhkJIQWBb449FYHOo=
 github.com/mattn/go-zglob v0.0.2-0.20190814121620-e3c945676326/go.mod h1:9fxibJccNxU2cnpIKLRRFA7zX7qhkJIQWBb449FYHOo=
@@ -979,6 +983,7 @@ golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.1.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.15.0 h1:h48lPFYpsTvQJZF4EKyI4aLHaev3CxivZmv7yZig9pc=
 golang.org/x/sys v0.15.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=

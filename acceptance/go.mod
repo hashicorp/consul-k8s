@@ -9,8 +9,8 @@ replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/
 require (
 	github.com/google/uuid v1.3.0
 	github.com/gruntwork-io/terratest v0.31.2
-	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230609143603-198c4433d892
-	github.com/hashicorp/consul/api v1.10.1-0.20230906155245-56917eb4c968
+	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240129190418-1e67acc165ea
+	github.com/hashicorp/consul/api v1.10.1-0.20240122152324-758ddf84e9c9
 	github.com/hashicorp/consul/proto-public v0.5.1
 	github.com/hashicorp/consul/sdk v0.15.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -47,7 +47,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
-	github.com/fatih/color v1.14.1 // indirect
+	github.com/fatih/color v1.15.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
@@ -94,7 +94,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
