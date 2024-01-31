@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -619,14 +618,7 @@ func getWorkloadPorts(pod corev1.Pod) ([]string, map[string]*pbcatalog.WorkloadP
 
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
-			name := port.Name
-			var isNum bool
-			if _, err := strconv.Atoi(name); err == nil {
-				isNum = true
-			}
-			if name == "" || isNum {
-				name = "cslport-" + strconv.Itoa(int(port.ContainerPort))
-			}
+			name := inject.WorkloadPortName(&port)
 
 			// TODO: error check reserved "mesh" keyword and 20000
 

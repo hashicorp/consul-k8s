@@ -256,7 +256,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// created by the pod controller when creating workloads.
 	for _, c := range pod.Spec.Containers {
 		for _, p := range c.Ports {
-			if strings.HasPrefix(p.Name, "cslport-") {
+			if strings.HasPrefix(p.Name, constants.UnnamedWorkloadPortNamePrefix) {
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error creating pod: port names cannot be prefixed with \"cslport-\" as that prefix is reserved"))
 			}
 		}
