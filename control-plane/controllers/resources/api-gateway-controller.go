@@ -27,6 +27,7 @@ type APIGatewayController struct {
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=tcproute/status,verbs=get;update;patch
 
 func (r *APIGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.Logger(req.NamespacedName).Info("Reconciling APIGateway")
 	return r.Controller.ReconcileResource(ctx, r, req, &meshv2beta1.APIGateway{})
 }
 

@@ -23,7 +23,7 @@ const (
 )
 
 func init() {
-	MeshSchemeBuilder.Register(&GatewayClass{}, &GatewayClassList{})
+	MeshSchemeBuilder.Register(&GatewayClass{}, &GatewayClassList{}, &APIGateway{}, &APIGatewayList{})
 }
 
 // +kubebuilder:object:root=true

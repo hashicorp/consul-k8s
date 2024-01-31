@@ -240,7 +240,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&resourceControllers.MeshGatewayController{
+	if err := (&resourceControllers.APIGatewayController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
 		Log:        ctrl.Log.WithName("controller").WithName(common.APIGateway),
