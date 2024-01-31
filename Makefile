@@ -206,6 +206,14 @@ kind-load: ## Helper target for loading local dev images (run with `DEV_IMAGE=..
 	kind load docker-image --name dc3 $(DEV_IMAGE)
 	kind load docker-image --name dc4 $(DEV_IMAGE)
 
+#Helper target for doing local api gateway conformance testing
+run-api-gateway-conformance:
+	@$(SHELL) $(CURDIR)/hack/run-api-gateway-conformance-tests/run_conformance_tests_locally.sh
+
+#Helper target to cleanup resources created by conformance testing
+cleanup-api-gateway-conformance:
+	@$(SHELL) $(CURDIR)/hack/run-api-gateway-conformance-tests/cleanup_conformance_tests_locally.sh
+
 ##@ Shared Targets
 
 .PHONY: lint
