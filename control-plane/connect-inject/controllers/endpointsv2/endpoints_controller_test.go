@@ -229,7 +229,7 @@ func TestReconcile_CreateService(t *testing.T) {
 								Name:       "other",
 								Port:       10001,
 								Protocol:   "TCP",
-								TargetPort: intstr.FromString("10001"),
+								TargetPort: intstr.FromString("cslport-10001"),
 								// no app protocol specified
 							},
 						},
@@ -260,7 +260,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 10001,
-							TargetPort:  "10001",
+							TargetPort:  "cslport-10001",
 							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
 						},
 						{
@@ -554,12 +554,12 @@ func TestReconcile_CreateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 9090,
-							TargetPort:  "6789", // Matches service target number
+							TargetPort:  "cslport-6789", // Matches service target number
 							Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
 						},
 						{
 							VirtualPort: 10010,
-							TargetPort:  "10010", // Matches service target number (unmatched by container ports)
+							TargetPort:  "cslport-10010", // Matches service target number (unmatched by container ports)
 							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
 						},
 						{
@@ -713,7 +713,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 9090,
-							TargetPort:  "6789", // Matches service target number due to unnamed being most common
+							TargetPort:  "cslport-6789", // Matches service target number due to unnamed being most common
 							Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
 						},
 						{
@@ -1269,7 +1269,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 10001,
-							TargetPort:  "10001",
+							TargetPort:  "unspec-port", //this might need to be changed to "my_unspecified_port"
 							Protocol:    pbcatalog.Protocol_PROTOCOL_UNSPECIFIED,
 						},
 						{
@@ -1390,7 +1390,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 								Name:       "other",
 								Port:       10001,
 								Protocol:   "TCP",
-								TargetPort: intstr.FromString("10001"),
+								TargetPort: intstr.FromString("cslport-10001"),
 								// no app protocol specified
 							},
 						},
@@ -1421,7 +1421,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 10001,
-							TargetPort:  "10001",
+							TargetPort:  "cslport-10001",
 							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
 						},
 						{

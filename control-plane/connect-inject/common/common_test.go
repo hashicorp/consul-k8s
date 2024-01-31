@@ -167,6 +167,46 @@ func TestCommonDetermineAndValidatePort(t *testing.T) {
 	}
 }
 
+func TestWorkloadPortName(t *testing.T) {
+	cases := []struct {
+		Name     string
+		Port     *corev1.ContainerPort
+		Expected string
+	}{
+		{
+			Name: "named port",
+			Port: &corev1.ContainerPort{
+				Name:          "http",
+				ContainerPort: 8080,
+			},
+			Expected: "http",
+		},
+		{
+			Name: "unnamed port",
+			Port: &corev1.ContainerPort{
+				Name:          "",
+				ContainerPort: 8080,
+			},
+			Expected: "cslport-8080",
+		},
+		{
+			Name: "number port name",
+			Port: &corev1.ContainerPort{
+				Name:          "8080",
+				ContainerPort: 8080,
+			},
+			Expected: "cslport-8080",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			name := WorkloadPortName(tt.Port)
+			require.Equal(t, tt.Expected, name)
+		})
+	}
+}
+
 func TestPortValue(t *testing.T) {
 	cases := []struct {
 		Name     string

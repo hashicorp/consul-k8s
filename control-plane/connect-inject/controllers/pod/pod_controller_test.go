@@ -239,14 +239,14 @@ func TestWorkloadWrite(t *testing.T) {
 			},
 			expectedWorkload: &pbcatalog.Workload{
 				Addresses: []*pbcatalog.WorkloadAddress{
-					{Host: "10.0.0.1", Ports: []string{"80", "8080", "mesh"}},
+					{Host: "10.0.0.1", Ports: []string{"cslport-80", "cslport-8080", "mesh"}},
 				},
 				Ports: map[string]*pbcatalog.WorkloadPort{
-					"80": {
+					"cslport-80": {
 						Port:     80,
 						Protocol: pbcatalog.Protocol_PROTOCOL_UNSPECIFIED,
 					},
-					"8080": {
+					"cslport-8080": {
 						Port:     8080,
 						Protocol: pbcatalog.Protocol_PROTOCOL_UNSPECIFIED,
 					},
