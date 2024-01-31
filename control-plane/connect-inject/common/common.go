@@ -82,7 +82,7 @@ func WorkloadPortName(port *corev1.ContainerPort) string {
 		isNum = true
 	}
 	if name == "" || isNum {
-		name = "cslport-" + strconv.Itoa(int(port.ContainerPort))
+		name = constants.UnnamedWorkloadPortNamePrefix + strconv.Itoa(int(port.ContainerPort))
 	}
 	return name
 }
