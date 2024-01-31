@@ -10,7 +10,7 @@ on:
 # these should be the only settings that you will ever need to change
 env:
   #BRANCH: ${{ github.ref_name }}
-  BRANCH: "curtbushko/update-azure-subscription"
+  BRANCH: "curtbushko/ci-testing"
   CONTEXT: "nightly"
 
 jobs:
