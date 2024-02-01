@@ -240,6 +240,16 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
+	if err := (&resourceControllers.APIGatewayController{
+		Controller: consulResourceController,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.APIGateway),
+		Scheme:     mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", common.APIGateway)
+		return err
+	}
+
 	if err := (&resourceControllers.GatewayClassConfigController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
