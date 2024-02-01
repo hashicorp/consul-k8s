@@ -38,8 +38,26 @@ type APIGateway struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   pbmesh.APIGateway `json:"spec,omitempty"`
-	Status `json:"status,omitempty"`
+	Spec             pbmesh.APIGateway `json:"spec,omitempty"`
+	APIGatewayStatus `json:"status,omitempty"`
+}
+
+type APIGatewayStatus struct {
+	Status
+	Addresses []GatewayAddress
+	Listeners []ListenerStatus
+}
+
+type ListenerStatus struct {
+	Status
+	Name           string `json:"name"`
+	AttachedRoutes int32  `json:"attachedRoutes"`
+}
+
+type GatewayAddress struct {
+	// +kubebuilder:default=IPAddress
+	Type  string `json:"type"`
+	Value string `json:"value"`
 }
 
 // +kubebuilder:object:root=true
