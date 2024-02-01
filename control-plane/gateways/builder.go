@@ -9,7 +9,7 @@ import (
 )
 
 type Gateway interface {
-	*meshv2beta1.MeshGateway
+	*meshv2beta1.MeshGateway | *meshv2beta1.APIGateway
 	GetName() string
 	GetNamespace() string
 	ListenersToPorts(int32) []corev1.ServicePort
