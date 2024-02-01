@@ -164,6 +164,7 @@ func (in *MeshGateway) Validate(tenancy common.ConsulTenancyConfig) error {
 // DefaultNamespaceFields is required as part of the common.MeshConfig interface.
 func (in *MeshGateway) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
 
+// ListenersToPorts converts the MeshGateway listeners to ServicePorts.
 func (in *MeshGateway) ListenersToPorts(portModifier int32) []corev1.ServicePort {
 	ports := []corev1.ServicePort{}
 
