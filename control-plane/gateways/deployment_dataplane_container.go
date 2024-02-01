@@ -24,26 +24,23 @@ const (
 	consulDataplaneDNSBindPort   = 8600
 	defaultPrometheusScrapePath  = "/metrics"
 	defaultEnvoyProxyConcurrency = "1"
-	volumeName                   = "consul-connect-inject-data"
+	volumeName                   = "consul-mesh-inject-data"
 )
 
-func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.GatewayClassContainerConfig, name, namespace string) (corev1.Container, error) {
+func (b *meshGatewayBuilder) consulDataplaneContainer(containerConfig v2beta1.GatewayClassContainerConfig) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
 		bearerTokenFile string
 	)
 
-	var resources *corev1.ResourceRequirements
-	if containerConfig != nil {
-		resources = containerConfig.Resources
-	}
+	resources := containerConfig.Resources
 
-	if config.AuthMethod != "" {
+	if b.config.AuthMethod != "" {
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(namespace, config, bearerTokenFile, name)
+	args, err := b.dataplaneArgs(bearerTokenFile)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -59,8 +56,8 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.Gat
 	}
 
 	container := corev1.Container{
-		Name:  name,
-		Image: config.ImageDataplane,
+		Name:  b.gateway.Name,
+		Image: b.config.ImageDataplane,
 
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
 		// consul-dataplane can write files to it. Otherwise, it wouldn't be able to
@@ -69,11 +66,23 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.Gat
 		// TODO(nathancoleman): I don't believe consul-dataplane needs to write anymore, investigate.
 		Env: []corev1.EnvVar{
 			{
-				Name:  "TMPDIR",
-				Value: "/consul/connect-inject",
+				Name: envDPProxyId,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
 			},
 			{
-				Name: "NODE_NAME",
+				Name: envPodNamespace,
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+				},
+			},
+			{
+				Name:  envTmpDir,
+				Value: constants.MeshV2VolumePath,
+			},
+			{
+				Name: envNodeName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
 						FieldPath: "spec.nodeName",
@@ -81,14 +90,14 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.Gat
 				},
 			},
 			{
-				Name:  "DP_SERVICE_NODE_NAME",
-				Value: "$(NODE_NAME)-virtual",
+				Name:  envDPCredentialLoginMeta,
+				Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
+				MountPath: constants.MeshV2VolumePath,
 			},
 		},
 		Args:           args,
@@ -112,11 +121,10 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.Gat
 	wanPort := corev1.ContainerPort{
 		Name:          "wan",
 		ContainerPort: int32(constants.DefaultWANPort),
+		HostPort:      containerConfig.HostPort,
 	}
 
-	if containerConfig != nil {
-		wanPort.ContainerPort = int32(443 + containerConfig.PortModifier)
-	}
+	wanPort.ContainerPort = 443 + containerConfig.PortModifier
 
 	container.Ports = append(container.Ports, wanPort)
 
@@ -141,39 +149,39 @@ func consulDataplaneContainer(config GatewayConfig, containerConfig *v2beta1.Gat
 	return container, nil
 }
 
-func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile string, name string) ([]string, error) {
-	proxyIDFileName := "/consul/connect-inject/proxyid"
-
+func (b *meshGatewayBuilder) dataplaneArgs(bearerTokenFile string) ([]string, error) {
 	args := []string{
-		"-addresses", config.ConsulConfig.Address,
-		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
-		"-proxy-service-id-path=" + proxyIDFileName,
-		"-log-level=" + config.LogLevel,
-		"-log-json=" + strconv.FormatBool(config.LogJSON),
+		"-addresses", b.config.ConsulConfig.Address,
+		"-grpc-port=" + strconv.Itoa(b.config.ConsulConfig.GRPCPort),
+		"-log-level=" + b.logLevelForDataplaneContainer(),
+		"-log-json=" + strconv.FormatBool(b.config.LogJSON),
 		"-envoy-concurrency=" + defaultEnvoyProxyConcurrency,
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.ConsulDestinationNamespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.NSMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(b.gateway.Namespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
 
-	if config.AuthMethod != "" {
+	if b.config.AuthMethod != "" {
 		args = append(args,
 			"-credential-type=login",
-			"-login-auth-method="+config.AuthMethod,
+			"-login-auth-method="+b.config.AuthMethod,
 			"-login-bearer-token-path="+bearerTokenFile,
-			"-login-meta="+fmt.Sprintf("gateway=%s/%s", namespace, name),
+			"-login-meta="+fmt.Sprintf("gateway=%s/%s", b.gateway.Namespace, b.gateway.Name),
 		)
-		if config.ConsulTenancyConfig.ConsulPartition != "" {
-			args = append(args, "-login-partition="+config.ConsulTenancyConfig.ConsulPartition)
+		if b.config.ConsulTenancyConfig.ConsulPartition != "" {
+			args = append(args, "-login-partition="+b.config.ConsulTenancyConfig.ConsulPartition)
 		}
 	}
-	if config.ConsulTenancyConfig.EnableConsulNamespaces {
-		args = append(args, "-service-namespace="+consulNamespace)
+	if b.config.SkipServerWatch {
+		args = append(args, "-server-watch-disabled=true")
 	}
-	if config.ConsulTenancyConfig.ConsulPartition != "" {
-		args = append(args, "-service-partition="+config.ConsulTenancyConfig.ConsulPartition)
+	if b.config.ConsulTenancyConfig.EnableConsulNamespaces {
+		args = append(args, "-proxy-namespace="+consulNamespace)
+	}
+	if b.config.ConsulTenancyConfig.ConsulPartition != "" {
+		args = append(args, "-proxy-partition="+b.config.ConsulTenancyConfig.ConsulPartition)
 	}
 
-	args = append(args, "-tls-disabled")
+	args = append(args, buildTLSArgs(b.config)...)
 
 	// Configure the readiness port on the dataplane sidecar if proxy health checks are enabled.
 	args = append(args, fmt.Sprintf("%s=%d", "-envoy-ready-bind-port", constants.ProxyDefaultHealthPort))
@@ -181,4 +189,20 @@ func getDataplaneArgs(namespace string, config GatewayConfig, bearerTokenFile st
 	args = append(args, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000))
 
 	return args, nil
+}
+
+func buildTLSArgs(config GatewayConfig) []string {
+	if !config.TLSEnabled {
+		return []string{"-tls-disabled"}
+	}
+	tlsArgs := make([]string, 0, 2)
+
+	if config.ConsulTLSServerName != "" {
+		tlsArgs = append(tlsArgs, fmt.Sprintf("-tls-server-name=%s", config.ConsulTLSServerName))
+	}
+	if config.ConsulCACert != "" {
+		tlsArgs = append(tlsArgs, fmt.Sprintf("-ca-certs=%s", constants.ConsulCAFile))
+	}
+
+	return tlsArgs
 }

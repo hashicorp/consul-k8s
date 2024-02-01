@@ -792,7 +792,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 3714bf1fbca840dcd10b5aeb40c6ef35e349bd534727abe80b831c77f88da7da ]
+  [ "${actual}" = 59777d0692f3bf9143a09e96e58cc95296c0eaeb7565b1c49bc932954fe4423a ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -802,7 +802,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 87126fac3c7704fba1d4265201ad0345f4d972d2123df6e6fb416b40c5823d80 ]
+  [ "${actual}" = 326eeb3fd8f497297671791c0091e7f804727b3aaeff79a47841b65571bd4cf9 ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -812,7 +812,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = d98ff135c5dee661058f33e29970675761ecf235676db0d4d24f354908eee425 ]
+  [ "${actual}" = e14ba19e37a6b79b6fd8566597464154abe9cdc4aa7079012fb3c445ac08c526 ]
 }
 
 #--------------------------------------------------------------------

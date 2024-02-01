@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
@@ -250,6 +251,16 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	}
 
 	w.Log.Info("received pod", "name", req.Name, "ns", req.Namespace)
+
+	// Validate that none of the pod ports start with the prefix "cslport-" as that may result in conflicts with ports
+	// created by the pod controller when creating workloads.
+	for _, c := range pod.Spec.Containers {
+		for _, p := range c.Ports {
+			if strings.HasPrefix(p.Name, constants.UnnamedWorkloadPortNamePrefix) {
+				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error creating pod: port names cannot be prefixed with \"cslport-\" as that prefix is reserved"))
+			}
+		}
+	}
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.

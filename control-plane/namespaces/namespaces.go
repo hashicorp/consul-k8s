@@ -93,3 +93,12 @@ func ConsulNamespace(kubeNS string, enableConsulNamespaces bool, consulDestNS st
 
 	return consulDestNS
 }
+
+// NonDefaultConsulNamespace returns the given Consul namespace if it is not default or empty.
+// Otherwise, it returns the empty string.
+func NonDefaultConsulNamespace(consulNS string) string {
+	if consulNS == "" || consulNS == DefaultNamespace {
+		return ""
+	}
+	return consulNS
+}

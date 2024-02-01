@@ -25,7 +25,8 @@ const (
 
 	// AnnotationGatewayKind is the key of the annotation that indicates pods
 	// that represent Consul Connect Gateways. This should be set to a
-	// value that is either "mesh", "ingress" or "terminating".
+	// value that is either "mesh-gateway", "ingress-gateway", "terminating-gateway",
+	// or "api-gateway".
 	AnnotationGatewayKind = "consul.hashicorp.com/gateway-kind"
 
 	// AnnotationGatewayConsulServiceName is the key of the annotation whose value
@@ -98,6 +99,14 @@ const (
 	// queries this instead of the application health check for the status of the application.
 	// Enable this only if the application does not support health checks.
 	AnnotationUseProxyHealthCheck = "consul.hashicorp.com/use-proxy-health-check"
+
+	// AnnotationSidecarProxyStartupFailureSeconds configures how long the k8s startup probe will wait for
+	// success before the proxy is considered to be unhealthy and the container is restarted.
+	AnnotationSidecarProxyStartupFailureSeconds = "consul.hashicorp.com/sidecar-proxy-startup-failure-seconds"
+
+	// AnnotationSidecarProxyLivenessFailureSeconds configures how long the k8s liveness probe will wait for
+	// before the proxy is considered to be unhealthy and the container is restarted.
+	AnnotationSidecarProxyLivenessFailureSeconds = "consul.hashicorp.com/sidecar-proxy-liveness-failure-seconds"
 
 	// annotations for sidecar proxy resource limits.
 	AnnotationSidecarProxyCPULimit      = "consul.hashicorp.com/sidecar-proxy-cpu-limit"

@@ -86,6 +86,7 @@ func TestPeering_Connect(t *testing.T) {
 			var staticServerPeerCluster *consul.HelmCluster
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				staticServerPeerHelmValues := map[string]string{
 					"global.datacenter":                        staticServerPeer,
 					"terminatingGateways.enabled":              "true",
@@ -111,12 +112,12 @@ func TestPeering_Connect(t *testing.T) {
 				// Install the first peer where static-server will be deployed in the static-server kubernetes context.
 				staticServerPeerCluster = consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
 				staticServerPeerCluster.Create(t)
-				wg.Done()
 			}()
 
 			var staticClientPeerCluster *consul.HelmCluster
 			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				// Create a second cluster to be peered with
 				staticClientPeerHelmValues := map[string]string{
 					"global.datacenter": staticClientPeer,
@@ -137,7 +138,6 @@ func TestPeering_Connect(t *testing.T) {
 				// Install the second peer where static-client will be deployed in the static-client kubernetes context.
 				staticClientPeerCluster = consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
 				staticClientPeerCluster.Create(t)
-				wg.Done()
 			}()
 
 			// Wait for the clusters to start up
@@ -187,7 +187,7 @@ func TestPeering_Connect(t *testing.T) {
 
 			// Ensure the secret is created.
 			retry.RunWith(timer, t, func(r *retry.R) {
-				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 				require.NoError(r, err)
 				require.NotEmpty(r, acceptorSecretName)
 			})

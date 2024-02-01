@@ -73,6 +73,20 @@ func PortValue(pod corev1.Pod, value string) (int32, error) {
 	return int32(raw), err
 }
 
+// WorkloadPortName returns the container port's name if it has one, and if not, constructs a name from the port number
+// and adds a constant prefix. The port name must be 1-15 characters and must have at least 1 alpha character.
+func WorkloadPortName(port *corev1.ContainerPort) string {
+	name := port.Name
+	var isNum bool
+	if _, err := strconv.Atoi(name); err == nil {
+		isNum = true
+	}
+	if name == "" || isNum {
+		name = constants.UnnamedWorkloadPortNamePrefix + strconv.Itoa(int(port.ContainerPort))
+	}
+	return name
+}
+
 // TransparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
 // to read the pod's namespace label when it exists.
@@ -187,6 +201,16 @@ func HasBeenMeshInjected(pod corev1.Pod) bool {
 		return false
 	}
 	if anno, ok := pod.Annotations[constants.KeyMeshInjectStatus]; ok && anno == constants.Injected {
+		return true
+	}
+	return false
+}
+
+func IsGateway(pod corev1.Pod) bool {
+	if pod.Annotations == nil {
+		return false
+	}
+	if anno, ok := pod.Annotations[constants.AnnotationGatewayKind]; ok && anno != "" {
 		return true
 	}
 	return false

@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 		os.Exit(suite.Run())
 	} else {
 		fmt.Println(fmt.Sprintf("Skipping partitions tests because either -enable-multi-cluster is "+
-			"not set or the number of clusters did not match the expected count of %d", expectedNumberOfClusters))
+			"not set or the number of clusters, %d, did not match the expected count of %d", len(suite.Config().KubeEnvs), expectedNumberOfClusters))
 		os.Exit(0)
 	}
 }

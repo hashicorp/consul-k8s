@@ -34,6 +34,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
@@ -104,14 +105,9 @@ type Command struct {
 	tolerations        []corev1.Toleration
 	serviceAnnotations []string
 	resources          corev1.ResourceRequirements
-	gatewayConfig      gatewayConfig
+	gatewayConfig      gateways.GatewayResources
 
 	ctx context.Context
-}
-
-type gatewayConfig struct {
-	GatewayClassConfigs []*v2beta1.GatewayClassConfig `json:"gatewayClassConfigs"`
-	MeshGateways        []*v2beta1.MeshGateway        `json:"meshGateways"`
 }
 
 func (c *Command) init() {
@@ -407,6 +403,12 @@ func (c *Command) loadGatewayConfigs() error {
 		return err
 	}
 
+	// ensure default resources requirements are set
+	for idx := range c.gatewayConfig.MeshGateways {
+		if c.gatewayConfig.GatewayClassConfigs[idx].Spec.Deployment.Container == nil {
+			c.gatewayConfig.GatewayClassConfigs[idx].Spec.Deployment.Container = &v2beta1.GatewayClassContainerConfig{Resources: &defaultResourceRequirements}
+		}
+	}
 	if err := file.Close(); err != nil {
 		return err
 	}
@@ -430,6 +432,7 @@ func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, compo
 			return err
 		}
 
+		// TODO: NET-6934 remove hardcoded values
 		class := &v2beta1.GatewayClass{
 			ObjectMeta: metav1.ObjectMeta{Name: cfg.Name, Labels: labels},
 			TypeMeta:   metav1.TypeMeta{Kind: "GatewayClass"},

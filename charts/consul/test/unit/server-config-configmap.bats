@@ -38,16 +38,6 @@ load _helpers
       .
 }
 
-@test "server/ConfigMap: extraConfig is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'server.extraConfig="{\"hello\": \"world\"}"' \
-      . | tee /dev/stderr |
-      yq '.data["extra-from-values.json"] | match("world") | length' | tee /dev/stderr)
-  [ ! -z "${actual}" ]
-}
-
 #--------------------------------------------------------------------
 # retry-join
 
@@ -1317,4 +1307,62 @@ load _helpers
       yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
 
   [ "${configmap}" = "DEBUG" ]
+}
+
+#--------------------------------------------------------------------
+# server.autopilot.min_quorum
+
+@test "server/ConfigMap: autopilot.min_quorum=1 when replicas=1" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=1' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "1" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=2 when replicas=2" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=2' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "2" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=2 when replicas=3" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=3' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "2" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=3 when replicas=4" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=4' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "3" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=3 when replicas=5" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=5' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "3" ]
 }

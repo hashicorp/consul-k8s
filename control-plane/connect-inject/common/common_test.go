@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/consul/proto-public/pbresource"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
@@ -164,6 +163,46 @@ func TestCommonDetermineAndValidatePort(t *testing.T) {
 			} else {
 				require.EqualError(err, tt.Err)
 			}
+		})
+	}
+}
+
+func TestWorkloadPortName(t *testing.T) {
+	cases := []struct {
+		Name     string
+		Port     *corev1.ContainerPort
+		Expected string
+	}{
+		{
+			Name: "named port",
+			Port: &corev1.ContainerPort{
+				Name:          "http",
+				ContainerPort: 8080,
+			},
+			Expected: "http",
+		},
+		{
+			Name: "unnamed port",
+			Port: &corev1.ContainerPort{
+				Name:          "",
+				ContainerPort: 8080,
+			},
+			Expected: "cslport-8080",
+		},
+		{
+			Name: "number port name",
+			Port: &corev1.ContainerPort{
+				Name:          "8080",
+				ContainerPort: 8080,
+			},
+			Expected: "cslport-8080",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			name := WorkloadPortName(tt.Port)
+			require.Equal(t, tt.Expected, name)
 		})
 	}
 }
@@ -529,8 +568,6 @@ func Test_ConsulNamespaceIsNotFound_ErrorMsg(t *testing.T) {
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
 	})
-	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-	require.NoError(t, err)
 
 	id := &pbresource.ID{
 		Name: "foo",
@@ -566,7 +603,7 @@ func Test_ConsulNamespaceIsNotFound_ErrorMsg(t *testing.T) {
 		Data: data,
 	}
 
-	_, err = resourceClient.Write(context.Background(), &pbresource.WriteRequest{Resource: resource})
+	_, err := testClient.ResourceClient.Write(context.Background(), &pbresource.WriteRequest{Resource: resource})
 	require.Error(t, err)
 
 	s, ok := status.FromError(err)

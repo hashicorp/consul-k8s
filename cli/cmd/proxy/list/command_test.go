@@ -276,10 +276,31 @@ func TestListCommandOutput(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "api-gateway",
+				Name:      "depricated-api-gateway",
 				Namespace: "consul",
 				Labels: map[string]string{
 					"api-gateway.consul.hashicorp.com/managed": "true",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"component": "api-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "both-labels-api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"api-gateway.consul.hashicorp.com/managed": "true",
+					"component": "api-gateway",
+					"chart":     "consul-helm",
 				},
 			},
 		},
@@ -321,7 +342,7 @@ func TestListCommandOutput(t *testing.T) {
 
 func TestListCommandOutputInJsonFormat(t *testing.T) {
 	// These regular expressions must be present in the output.
-	expected := ".*Name.*mesh-gateway.*\n.*Namespace.*consul.*\n.*Type.*Mesh Gateway.*\n.*\n.*\n.*Name.*terminating-gateway.*\n.*Namespace.*consul.*\n.*Type.*Terminating Gateway.*\n.*\n.*\n.*Name.*ingress-gateway.*\n.*Namespace.*default.*\n.*Type.*Ingress Gateway.*\n.*\n.*\n.*Name.*api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*pod1.*\n.*Namespace.*default.*\n.*Type.*Sidecar.*"
+	expected := ".*Name.*api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*both-labels-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*mesh-gateway.*\n.*Namespace.*consul.*\n.*Type.*Mesh Gateway.*\n.*\n.*\n.*Name.*terminating-gateway.*\n.*Namespace.*consul.*\n.*Type.*Terminating Gateway.*\n.*\n.*\n.*Name.*ingress-gateway.*\n.*Namespace.*default.*\n.*Type.*Ingress Gateway.*\n.*\n.*\n.*Name.*deprecated-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*pod1.*\n.*Namespace.*default.*\n.*Type.*Sidecar.*"
 	notExpected := "default.*dont-fetch.*Sidecar"
 
 	pods := []v1.Pod{
@@ -358,6 +379,27 @@ func TestListCommandOutputInJsonFormat(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"component": "api-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "both-labels-api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"api-gateway.consul.hashicorp.com/managed": "true",
+					"component": "api-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "deprecated-api-gateway",
 				Namespace: "consul",
 				Labels: map[string]string{
 					"api-gateway.consul.hashicorp.com/managed": "true",

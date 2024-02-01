@@ -8,7 +8,6 @@ package pod
 import (
 	"context"
 	"testing"
-	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
@@ -27,7 +26,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
@@ -101,7 +99,7 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			expectedConsulNamespace:    constants.DefaultConsulNS,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:         "kitchen sink new pod, non-default ns and partition",
@@ -127,7 +125,7 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			expectedConsulNamespace:    "bar",
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:         "new pod with namespace prefix",
@@ -194,7 +192,7 @@ func TestReconcileCreatePodWithMirrorNamespaces(t *testing.T) {
 			expectedConsulNamespace:    constants.DefaultConsulNS,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			expectedDestinations:       createDestinations(),
 		},
 		{
@@ -273,12 +271,12 @@ func TestReconcileUpdatePodWithMirrorNamespaces(t *testing.T) {
 			existingConsulNamespace:    "bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 
 			expectedConsulNamespace:    "bar",
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 	}
 
@@ -311,7 +309,7 @@ func TestReconcileDeletePodWithMirrorNamespaces(t *testing.T) {
 			existingConsulNamespace:    "bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 
 			expectedConsulNamespace: "bar",
 		},
@@ -330,7 +328,7 @@ func TestReconcileDeletePodWithMirrorNamespaces(t *testing.T) {
 			existingConsulNamespace:    "bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			existingDestinations:       createDestinations(),
 
 			expectedConsulNamespace: "bar",
@@ -415,7 +413,7 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			expectedConsulNamespace:    constants.DefaultConsulNS,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:      "new pod with explicit destinations, ns and partition",
@@ -439,7 +437,7 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			expectedConsulNamespace:    constants.DefaultConsulNS,
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			expectedDestinations:       createDestinations(),
 		},
 		{
@@ -466,7 +464,7 @@ func TestReconcileCreatePodWithDestinationNamespace(t *testing.T) {
 			expectedConsulNamespace:    "a-penguin-walks-into-a-bar",
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 		{
 			name:         "namespace in Consul does not exist",
@@ -543,12 +541,12 @@ func TestReconcileUpdatePodWithDestinationNamespace(t *testing.T) {
 			existingConsulNamespace:    "a-penguin-walks-into-a-bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 
 			expectedConsulNamespace:    "a-penguin-walks-into-a-bar",
 			expectedWorkload:           createWorkload(),
 			expectedHealthStatus:       createPassingHealthStatus(),
-			expectedProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			expectedProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 		},
 	}
 
@@ -581,7 +579,7 @@ func TestReconcileDeletePodWithDestinationNamespace(t *testing.T) {
 			existingConsulNamespace:    "a-penguin-walks-into-a-bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_TRANSPARENT),
 
 			expectedConsulNamespace: "a-penguin-walks-into-a-bar",
 		},
@@ -600,7 +598,7 @@ func TestReconcileDeletePodWithDestinationNamespace(t *testing.T) {
 			existingConsulNamespace:    "a-penguin-walks-into-a-bar",
 			existingWorkload:           createWorkload(),
 			existingHealthStatus:       createPassingHealthStatus(),
-			existingProxyConfiguration: createProxyConfiguration(testPodName, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
+			existingProxyConfiguration: createProxyConfiguration(testPodName, true, pbmesh.ProxyMode_PROXY_MODE_DEFAULT),
 			existingDestinations:       createDestinations(),
 
 			expectedConsulNamespace: "a-penguin-walks-into-a-bar",
@@ -672,14 +670,6 @@ func runControllerTest(t *testing.T, tc testCase) {
 		}
 	})
 
-	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
-
 	// Create the partition in Consul.
 	if tc.partition != "" {
 		testClient.Cfg.APIClientConfig.Partition = tc.partition
@@ -740,10 +730,10 @@ func runControllerTest(t *testing.T, tc testCase) {
 	}
 
 	workloadID := getWorkloadID(tc.podName, tc.expectedConsulNamespace, tc.partition)
-	loadResource(t, context.Background(), resourceClient, workloadID, tc.existingWorkload, nil)
-	loadResource(t, context.Background(), resourceClient, getHealthStatusID(tc.podName, tc.expectedConsulNamespace, tc.partition), tc.existingHealthStatus, workloadID)
-	loadResource(t, context.Background(), resourceClient, getProxyConfigurationID(tc.podName, tc.expectedConsulNamespace, tc.partition), tc.existingProxyConfiguration, nil)
-	loadResource(t, context.Background(), resourceClient, getDestinationsID(tc.podName, tc.expectedConsulNamespace, tc.partition), tc.existingDestinations, nil)
+	loadResource(t, context.Background(), testClient.ResourceClient, workloadID, tc.existingWorkload, nil)
+	loadResource(t, context.Background(), testClient.ResourceClient, getHealthStatusID(tc.podName, tc.expectedConsulNamespace, tc.partition), tc.existingHealthStatus, workloadID)
+	loadResource(t, context.Background(), testClient.ResourceClient, getProxyConfigurationID(tc.podName, tc.expectedConsulNamespace, tc.partition), tc.existingProxyConfiguration, nil)
+	loadResource(t, context.Background(), testClient.ResourceClient, getDestinationsID(tc.podName, tc.expectedConsulNamespace, tc.partition), tc.existingDestinations, nil)
 
 	namespacedName := types.NamespacedName{
 		Namespace: podNamespace,
@@ -762,14 +752,14 @@ func runControllerTest(t *testing.T, tc testCase) {
 	require.Equal(t, tc.expRequeue, resp.Requeue)
 
 	wID := getWorkloadID(tc.podName, tc.expectedConsulNamespace, tc.partition)
-	expectedWorkloadMatches(t, context.Background(), resourceClient, wID, tc.expectedWorkload)
+	expectedWorkloadMatches(t, context.Background(), testClient.ResourceClient, wID, tc.expectedWorkload)
 
 	hsID := getHealthStatusID(tc.podName, tc.expectedConsulNamespace, tc.partition)
-	expectedHealthStatusMatches(t, context.Background(), resourceClient, hsID, tc.expectedHealthStatus)
+	expectedHealthStatusMatches(t, context.Background(), testClient.ResourceClient, hsID, tc.expectedHealthStatus)
 
 	pcID := getProxyConfigurationID(tc.podName, tc.expectedConsulNamespace, tc.partition)
-	expectedProxyConfigurationMatches(t, context.Background(), resourceClient, pcID, tc.expectedProxyConfiguration)
+	expectedProxyConfigurationMatches(t, context.Background(), testClient.ResourceClient, pcID, tc.expectedProxyConfiguration)
 
 	uID := getDestinationsID(tc.podName, metav1.NamespaceDefault, constants.DefaultConsulPartition)
-	expectedDestinationMatches(t, context.Background(), resourceClient, uID, tc.expectedDestinations)
+	expectedDestinationMatches(t, context.Background(), testClient.ResourceClient, uID, tc.expectedDestinations)
 }

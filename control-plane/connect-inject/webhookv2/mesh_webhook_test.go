@@ -1164,6 +1164,115 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 	}
 }
 
+func TestHandlerValidatePorts(t *testing.T) {
+	cases := []struct {
+		Name string
+		Pod  *corev1.Pod
+		Err  string
+	}{
+		{
+			"basic pod, with ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: 8080,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			"",
+		},
+		{
+			"basic pod, with unnamed ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 8080,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			"",
+		},
+		{
+			"basic pod, with invalid prefix name",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "cslport-8080",
+									ContainerPort: 8080,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			"error creating pod: port names cannot be prefixed with \"cslport-\" as that prefix is reserved",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			s.AddKnownTypes(schema.GroupVersion{
+				Group:   "",
+				Version: "v1",
+			}, &corev1.Pod{})
+			decoder, err := admission.NewDecoder(s)
+			require.NoError(t, err)
+
+			w := MeshWebhook{
+				Log:                    logrtest.New(t),
+				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:   mapset.NewSet(),
+				EnableTransparentProxy: true,
+				TProxyOverwriteProbes:  true,
+				decoder:                decoder,
+				ConsulConfig:           &consul.Config{HTTPPort: 8500},
+				Clientset:              defaultTestClientWithNamespace(),
+			}
+			req := admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object:    encodeRaw(t, tt.Pod),
+				},
+			}
+			resp := w.Handle(context.Background(), req)
+			if tt.Err == "" {
+				require.True(t, resp.Allowed)
+			} else {
+				require.False(t, resp.Allowed)
+				require.Contains(t, resp.Result.Message, tt.Err)
+			}
+
+		})
+	}
+}
 func TestHandlerDefaultAnnotations(t *testing.T) {
 	cases := []struct {
 		Name     string

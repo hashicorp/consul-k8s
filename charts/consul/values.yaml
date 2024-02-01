@@ -759,6 +759,14 @@ global:
   #   upgrade could risk breaking your Consul cluster.
   #   If this flag is set, Consul components will use the
   #   V2 resources APIs for all operations.
+  # * `v2tenancy`:
+  #   _**Danger**_! This feature is under active development. It is not
+  #   recommended for production use. Setting this flag during an
+  #   upgrade could risk breaking your Consul cluster.
+  #   If this flag is set, Consul V2 resources (catalog, mesh, auth, etc)
+  #   will use V2 implementations for tenancy (partitions and namesapces)
+  #   instead of bridging to the existing V1 implementations. The
+  #   `resource-apis` feature flag must also be set.
   #
   # Example:
   #
@@ -997,8 +1005,14 @@ server:
     # the server cluster is enabled. To disable, set to `false`.
     enabled: true
 
-    # The maximum number of unavailable pods. By default, this will be
-    # automatically computed based on the `server.replicas` value to be `(n/2)-1`.
+    # The maximum number of unavailable pods. In most cases you should not change this as it is automatically set to
+    # the correct number when left as null. This setting has been kept to not break backwards compatibility.
+    #
+    # By default, this is set to 1 internally in the chart. When server pods are stopped gracefully, they leave the Raft
+    # consensus pool. When running an odd number of servers, one server leaving the pool does not change the quorum
+    # size, and so fault tolerance is not affected. However, if more than one server were to leave the pool, the quorum
+    # size would change. That's why this is set to 1 internally and should not be changed in most cases.
+    #
     # If you need to set this to `0`, you will need to add a
     # --set 'server.disruptionBudget.maxUnavailable=0'` flag to the helm chart installation
     # command because of a limitation in the Helm templating language.
@@ -2701,6 +2715,13 @@ connectInject:
       # @type: string
       defaultGracefulShutdownPath: "/graceful_shutdown"
 
+    # Configures how long the k8s startup probe will wait before the proxy is considered to be unhealthy and the container is restarted.
+    # A value of zero disables the probe.
+    defaultStartupFailureSeconds: 0
+    # Configures how long the k8s liveness probe will wait before the proxy is considered to be unhealthy and the container is restarted.
+    # A value of zero disables the probe.
+    defaultLivenessFailureSeconds: 0
+
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of
   # Kubernetes, however they should be tweaked with the recommended defaults as shown below to speed up service registration times.
@@ -2763,7 +2784,7 @@ meshGateway:
     #   are routable from other datacenters.
     #
     # - `Static` - Use the address hardcoded in `meshGateway.wanAddress.static`.
-    source: "Service"
+    source: Service
 
     # Port that gets registered for WAN traffic.
     # If source is set to "Service" then this setting will have no effect.

@@ -153,6 +153,9 @@ type MeshWebhook struct {
 	DefaultProxyMemoryRequest resource.Quantity
 	DefaultProxyMemoryLimit   resource.Quantity
 
+	DefaultSidecarProxyStartupFailureSeconds  int
+	DefaultSidecarProxyLivenessFailureSeconds int
+
 	// LifecycleConfig contains proxy lifecycle management configuration from the inject-connect command and has methods to determine whether
 	// configuration should come from the default flags or annotations. The meshWebhook uses this to configure container sidecar proxy args.
 	LifecycleConfig lifecycle.Config
