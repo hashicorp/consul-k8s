@@ -11,9 +11,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"k8s.io/utils/pointer"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -166,6 +167,10 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 				Name:  "CONSUL_PARTITION",
 				Value: config.ConsulPartition,
 			})
+	}
+
+	if config.InitContainerResources != nil {
+		container.Resources = *config.InitContainerResources
 	}
 
 	// Openshift Assigns the security context for us, do not enable if it is enabled.
