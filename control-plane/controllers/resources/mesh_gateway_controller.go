@@ -19,6 +19,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/gateways"
@@ -42,6 +45,7 @@ type MeshGatewayController struct {
 
 func (r *MeshGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Logger(req.NamespacedName)
+	logger.Info("reconciling MeshGateway")
 
 	// Fetch the resource being reconciled
 	resource := &meshv2beta1.MeshGateway{}
@@ -84,6 +88,59 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ServiceAccount{}).
+		Watches(
+			source.NewKindWithCache(&meshv2beta1.GatewayClass{}, mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+				log := r.Log.WithValues("modified", "gatewayclass/"+o.GetNamespace()+"/"+o.GetName())
+
+				gateways, err := r.getGatewaysReferencingGatewayClass(context.Background(), o.(*meshv2beta1.GatewayClass))
+				if err != nil {
+					return nil
+				}
+
+				requests := make([]reconcile.Request, 0, len(gateways.Items))
+				for _, gateway := range gateways.Items {
+					log.Info("found affected gateway", "name", gateway.Name, "namespace", gateway.Namespace)
+
+					requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{
+						Namespace: gateway.Namespace,
+						Name:      gateway.Name,
+					}})
+				}
+
+				return requests
+			})).
+		Watches(
+			source.NewKindWithCache(&meshv2beta1.GatewayClassConfig{}, mgr.GetCache()),
+			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+				log := r.Log.WithValues("modified", "gatewayclassconfig/"+o.GetNamespace()+"/"+o.GetName())
+
+				classes, err := r.getGatewayClassesReferencingGatewayClassConfig(context.Background(), o.(*meshv2beta1.GatewayClassConfig))
+				if err != nil {
+					return nil
+				}
+
+				var requests []reconcile.Request
+				for _, class := range classes.Items {
+					log.Info("found affected gateway class", "name", class.Name)
+
+					gateways, err := r.getGatewaysReferencingGatewayClass(context.Background(), class)
+					if err != nil {
+						continue
+					}
+
+					for _, gateway := range gateways.Items {
+						log.Info("found affected gateway", "name", gateway.Name, "namespace", gateway.Namespace)
+
+						requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{
+							Namespace: gateway.Namespace,
+							Name:      gateway.Name,
+						}})
+					}
+				}
+
+				return requests
+			})).
 		Complete(r)
 }
 
@@ -286,6 +343,48 @@ func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, g
 		return nil, client.IgnoreNotFound(err)
 	}
 	return &gatewayClass, nil
+}
+
+// getGatewayClassesReferencingGatewayClassConfig queries all GatewayClass resources in the
+// cluster and returns any that reference the given GatewayClassConfig.
+func (r *MeshGatewayController) getGatewayClassesReferencingGatewayClassConfig(ctx context.Context, config *meshv2beta1.GatewayClassConfig) (*meshv2beta1.GatewayClassList, error) {
+	if config == nil {
+		return nil, nil
+	}
+
+	allClasses := &meshv2beta1.GatewayClassList{}
+	if err := r.Client.List(ctx, allClasses); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+
+	matchingClasses := &meshv2beta1.GatewayClassList{}
+	for _, class := range allClasses.Items {
+		if class.Spec.ParametersRef != nil && class.Spec.ParametersRef.Name == config.Name {
+			matchingClasses.Items = append(matchingClasses.Items, class)
+		}
+	}
+	return matchingClasses, nil
+}
+
+// getGatewaysReferencingGatewayClass queries all MeshGateway resources in the cluster
+// and returns any that reference the given GatewayClass.
+func (r *MeshGatewayController) getGatewaysReferencingGatewayClass(ctx context.Context, class *meshv2beta1.GatewayClass) (*meshv2beta1.MeshGatewayList, error) {
+	if class == nil {
+		return nil, nil
+	}
+
+	allGateways := &meshv2beta1.MeshGatewayList{}
+	if err := r.Client.List(ctx, allGateways); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+
+	matchingGateways := &meshv2beta1.MeshGatewayList{}
+	for _, gateway := range allGateways.Items {
+		if gateway.Spec.GatewayClassName == class.Name {
+			matchingGateways.Items = append(matchingGateways.Items, gateway)
+		}
+	}
+	return matchingGateways, nil
 }
 
 func areServicesEqual(a, b *corev1.Service) bool {
