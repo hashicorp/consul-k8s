@@ -42,7 +42,7 @@ RQIgXg8YtejEgGNxswtyXsvqzhLpt7k44L7TJMUhfIw0lUECIQCIxKNowmv0/XVz                
 nRnYLmGy79EZ2Y+CZS9nSm9Es6QNwg==                                                                                                                         │
 -----END CERTIFICATE-----`
 
-func Test_meshGatewayBuilder_Deployment(t *testing.T) {
+func Test_gatewayBuilder_Deployment(t *testing.T) {
 	type fields struct {
 		gateway *meshv2beta1.MeshGateway
 		config  GatewayConfig
