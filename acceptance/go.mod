@@ -2,16 +2,14 @@ module github.com/hashicorp/consul-k8s/acceptance
 
 go 1.20
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f
-
-replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231212195019-69e3f93ee8a3
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20240117162921-4d20e54273ca
 
 require (
 	github.com/google/uuid v1.3.0
 	github.com/gruntwork-io/terratest v0.31.2
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230609143603-198c4433d892
-	github.com/hashicorp/consul/api v1.10.1-0.20230906155245-56917eb4c968
-	github.com/hashicorp/consul/proto-public v0.5.1
+	github.com/hashicorp/consul/api v1.10.1-0.20240129223144-3b9bb8d6f9f5
+	github.com/hashicorp/consul/proto-public v0.1.2-0.20240131194705-383d92e9ab27
 	github.com/hashicorp/consul/sdk v0.15.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-uuid v1.0.3
