@@ -149,7 +149,7 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		return err
 	}
 
-	builder := gateways.NewMeshGatewayBuilder(resource, r.GatewayConfig, gcc)
+	builder := gateways.NewGatewayBuilder[*meshv2beta1.MeshGateway](resource, r.GatewayConfig, gcc)
 
 	// Create ServiceAccount
 	desiredAccount := builder.ServiceAccount()

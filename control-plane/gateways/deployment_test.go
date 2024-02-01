@@ -1115,7 +1115,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &meshGatewayBuilder{
+			b := &gatewayBuilder[*meshv2beta1.MeshGateway]{
 				gateway: tt.fields.gateway,
 				config:  tt.fields.config,
 				gcc:     tt.fields.gcc,
