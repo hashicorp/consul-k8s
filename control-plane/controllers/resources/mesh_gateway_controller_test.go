@@ -58,7 +58,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -91,7 +91,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -127,7 +127,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -160,7 +160,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -196,7 +196,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -238,7 +238,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -271,7 +271,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -307,7 +307,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -349,7 +349,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -382,7 +382,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -418,7 +418,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -460,7 +460,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -493,7 +493,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
@@ -529,7 +529,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 							{
 								Name:     "wan",
 								Port:     8443,
-								Protocol: "mesh",
+								Protocol: "tcp",
 							},
 						},
 					},
