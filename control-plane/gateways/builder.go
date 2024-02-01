@@ -5,21 +5,31 @@ package gateways
 
 import (
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// meshGatewayBuilder is a helper struct for building the Kubernetes resources for a mesh gateway.
-// This includes Deployment, Role, Service, and ServiceAccount resources.
-// Configuration is combined from the MeshGateway, GatewayConfig, and GatewayClassConfig.
-type meshGatewayBuilder struct {
-	gateway *meshv2beta1.MeshGateway
-	config  GatewayConfig
-	gcc     *meshv2beta1.GatewayClassConfig
+type Gateway interface {
+	*meshv2beta1.MeshGateway
+	GetName() string
+	GetNamespace() string
+	ListenersToPorts(int32) []corev1.ServicePort
+	GetAnnotations() map[string]string
+	GetLabels() map[string]string
 }
 
-// NewMeshGatewayBuilder returns a new meshGatewayBuilder for the given MeshGateway,
+// gatewayBuilder is a helper struct for building the Kubernetes resources for a mesh gateway.
+// This includes Deployment, Role, Service, and ServiceAccount resources.
+// Configuration is combined from the MeshGateway, GatewayConfig, and GatewayClassConfig.
+type gatewayBuilder[T Gateway] struct {
+	gateway T
+	gcc     *meshv2beta1.GatewayClassConfig
+	config  GatewayConfig
+}
+
+// NewGatewayBuilder returns a new meshGatewayBuilder for the given MeshGateway,
 // GatewayConfig, and GatewayClassConfig.
-func NewMeshGatewayBuilder(gateway *meshv2beta1.MeshGateway, gatewayConfig GatewayConfig, gatewayClassConfig *meshv2beta1.GatewayClassConfig) *meshGatewayBuilder {
-	return &meshGatewayBuilder{
+func NewGatewayBuilder[T Gateway](gateway T, gatewayConfig GatewayConfig, gatewayClassConfig *meshv2beta1.GatewayClassConfig) *gatewayBuilder[T] {
+	return &gatewayBuilder[T]{
 		gateway: gateway,
 		config:  gatewayConfig,
 		gcc:     gatewayClassConfig,

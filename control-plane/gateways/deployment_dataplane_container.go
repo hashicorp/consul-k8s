@@ -27,7 +27,7 @@ const (
 	volumeName                   = "consul-mesh-inject-data"
 )
 
-func (b *meshGatewayBuilder) consulDataplaneContainer(containerConfig v2beta1.GatewayClassContainerConfig) (corev1.Container, error) {
+func (b *gatewayBuilder[T]) consulDataplaneContainer(containerConfig v2beta1.GatewayClassContainerConfig) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -56,7 +56,7 @@ func (b *meshGatewayBuilder) consulDataplaneContainer(containerConfig v2beta1.Ga
 	}
 
 	container := corev1.Container{
-		Name:  b.gateway.Name,
+		Name:  b.gateway.GetName(),
 		Image: b.config.ImageDataplane,
 
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
@@ -149,7 +149,7 @@ func (b *meshGatewayBuilder) consulDataplaneContainer(containerConfig v2beta1.Ga
 	return container, nil
 }
 
-func (b *meshGatewayBuilder) dataplaneArgs(bearerTokenFile string) ([]string, error) {
+func (b *gatewayBuilder[T]) dataplaneArgs(bearerTokenFile string) ([]string, error) {
 	args := []string{
 		"-addresses", b.config.ConsulConfig.Address,
 		"-grpc-port=" + strconv.Itoa(b.config.ConsulConfig.GRPCPort),
@@ -158,14 +158,14 @@ func (b *meshGatewayBuilder) dataplaneArgs(bearerTokenFile string) ([]string, er
 		"-envoy-concurrency=" + defaultEnvoyProxyConcurrency,
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(b.gateway.Namespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(b.gateway.GetNamespace(), b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
 
 	if b.config.AuthMethod != "" {
 		args = append(args,
 			"-credential-type=login",
 			"-login-auth-method="+b.config.AuthMethod,
 			"-login-bearer-token-path="+bearerTokenFile,
-			"-login-meta="+fmt.Sprintf("gateway=%s/%s", b.gateway.Namespace, b.gateway.Name),
+			"-login-meta="+fmt.Sprintf("gateway=%s/%s", b.gateway.GetNamespace(), b.gateway.GetName()),
 		)
 		if b.config.ConsulTenancyConfig.ConsulPartition != "" {
 			args = append(args, "-login-partition="+b.config.ConsulTenancyConfig.ConsulPartition)
