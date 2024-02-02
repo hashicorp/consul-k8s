@@ -95,5 +95,5 @@ resource "local_file" "kubeconfigs" {
   count           = var.cluster_count
   content         = azurerm_kubernetes_cluster.default[count.index].kube_config_raw
   filename        = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
-  file_permission = "0660"
+  file_permission = "0664"
 }
