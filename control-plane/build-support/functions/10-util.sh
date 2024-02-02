@@ -629,7 +629,8 @@ function update_version_helm {
 		full_consul_version="$5-$3"
 		full_consul_dataplane_version="$7-$3"
 	elif test "$3" == "dev"; then
-		full_version="$2-$3"
+		full_version="${2%.*}-$3"
+		full_version_k8s_for_chart_version="$2-$3"
 		# strip off the last minor patch version so that the consul image can be set to something like 1.16-dev. The image
 		# is produced by Consul every night
 		full_consul_version="${5%.*}-$3"
@@ -637,7 +638,7 @@ function update_version_helm {
 	fi
 
 	sed_i ${SED_EXT} -e "s/(imageK8S:.*\/consul-k8s-control-plane:)[^\"]*/imageK8S: $4${full_version}/g" "${vfile}"
-	sed_i ${SED_EXT} -e "s/(version:[[:space:]]*)[^\"]*/\1${full_version}/g" "${cfile}"
+	sed_i ${SED_EXT} -e "s/(version:[[:space:]]*)[^\"]*/\1${full_version_k8s_for_chart_version}/g" "${cfile}"
 	sed_i ${SED_EXT} -e "s/(appVersion:[[:space:]]*)[^\"]*/\1${full_consul_version}/g" "${cfile}"
 	sed_i ${SED_EXT} -e "s/(image:.*\/consul-k8s-control-plane:)[^\"]*/image: $4${full_version}/g" "${cfile}"
 
