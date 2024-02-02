@@ -1364,7 +1364,7 @@ load _helpers
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
       --set 'global.metrics.enabled=true'  \
-      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.enableAgentMetrics=true' \
       --set 'global.metrics.datadog.enabled=true'  \
       --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
       . | tee /dev/stderr |
