@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -20,6 +19,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
+	"github.com/hashicorp/consul/sdk/testutil"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -50,6 +52,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						Namespace: "consul",
 						Name:      "mesh-gateway",
 					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
+					},
 				},
 			},
 			request: ctrl.Request{
@@ -72,6 +84,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "mesh-gateway",
+					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				&corev1.ServiceAccount{
@@ -99,6 +121,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						Namespace: "consul",
 						Name:      "mesh-gateway",
 					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
+					},
 				},
 			},
 			request: ctrl.Request{
@@ -121,6 +153,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "mesh-gateway",
+					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				&rbacv1.Role{
@@ -147,6 +189,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						Namespace: "default",
 						Name:      "mesh-gateway",
 						UID:       "abc123",
+					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				&rbacv1.Role{
@@ -180,6 +232,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						Namespace: "consul",
 						Name:      "mesh-gateway",
 					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
+					},
 				},
 			},
 			request: ctrl.Request{
@@ -202,6 +264,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "mesh-gateway",
+					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				&rbacv1.RoleBinding{
@@ -228,6 +300,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						Namespace: "default",
 						Name:      "mesh-gateway",
 						UID:       "abc123",
+					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				&rbacv1.RoleBinding{
@@ -261,6 +343,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						Namespace: "consul",
 						Name:      "mesh-gateway",
 					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
+					},
 				},
 			},
 			request: ctrl.Request{
@@ -283,6 +375,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "mesh-gateway",
+					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				&appsv1.Deployment{
@@ -309,6 +411,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						Namespace: "default",
 						Name:      "mesh-gateway",
 						UID:       "abc123",
+					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				&appsv1.Deployment{
@@ -342,6 +454,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						Namespace: "consul",
 						Name:      "mesh-gateway",
 					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
+					},
 				},
 			},
 			request: ctrl.Request{
@@ -364,6 +486,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "mesh-gateway",
+					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				&corev1.Service{
@@ -390,6 +522,16 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 						Namespace: "default",
 						Name:      "mesh-gateway",
 						UID:       "abc123",
+					},
+					Spec: pbmesh.MeshGateway{
+						GatewayClassName: "consul",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     8443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				&corev1.Service{
@@ -444,7 +586,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 
 			res, err := controller.Reconcile(context.Background(), testCase.request)
 			if testCase.expectedErr != nil {
-				//require.EqualError(t, err, testCase.expectedErr.Error())
+				// require.EqualError(t, err, testCase.expectedErr.Error())
 				require.ErrorIs(t, err, testCase.expectedErr)
 			} else {
 				require.NoError(t, err)
