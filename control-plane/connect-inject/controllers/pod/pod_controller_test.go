@@ -793,7 +793,6 @@ func TestDestinationsWrite(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -867,7 +866,6 @@ func TestDestinationsWrite(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "part1",
 								Namespace: "ns1",
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -914,7 +912,6 @@ func TestDestinationsWrite(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -950,7 +947,6 @@ func TestDestinationsWrite(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "bar",
 								Namespace: "foo",
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -1033,7 +1029,6 @@ func TestDestinationsDelete(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -1577,7 +1572,6 @@ func TestReconcileUpdatePod(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "mySVC3",
 						},
@@ -1980,7 +1974,6 @@ func createDestinations() *pbmesh.Destinations {
 					Tenancy: &pbresource.Tenancy{
 						Partition: constants.GetNormalizedConsulPartition(""),
 						Namespace: constants.GetNormalizedConsulNamespace(""),
-						PeerName:  constants.GetNormalizedConsulPeer(""),
 					},
 					Name: "mySVC",
 				},
