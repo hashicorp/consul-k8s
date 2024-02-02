@@ -143,7 +143,7 @@ spec:
         {{- end }}
         {{- if .Values.global.metrics.datadog.enabled }}
         "ad.datadoghq.com/tolerate-unready": "true"
-        "ad.datadoghq.com/consul.logs": {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdTags | toJson | squote }}
+        "ad.datadoghq.com/consul.logs": {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdTags | toJson | replace "[" "[{" | replace "]" "}]" | replace ":" "\": \"" | join "\",\"" | squote }}
         {{- if .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
         "ad.datadoghq.com/consul.checks": |
           {
