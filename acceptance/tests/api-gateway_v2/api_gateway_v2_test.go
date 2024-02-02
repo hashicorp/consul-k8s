@@ -1,13 +1,12 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package apigateway
+package apigateway_v2
 
 import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
 	"strconv"
 	"testing"
 	"time"
@@ -27,6 +26,7 @@ import (
 
 // Test that api gateway basic functionality works in a default installation and a secure installation for V2
 func TestAPIGateway_V2_Basic(t *testing.T) {
+
 	cases := []struct {
 		secure bool
 	}{
@@ -182,33 +182,5 @@ func TestAPIGateway_V2_Basic(t *testing.T) {
 			k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetTCPAddress)
 
 		})
-	}
-}
-
-func checkV2StatusCondition(t require.TestingT, conditions []meshv2beta1.Condition, toCheck meshv2beta1.Condition) {
-	for _, c := range conditions {
-		if c.Type == toCheck.Type {
-			require.EqualValues(t, toCheck.Reason, c.Reason)
-			require.EqualValues(t, toCheck.Status, c.Status)
-			return
-		}
-	}
-
-	t.Errorf("expected condition not found: %s", toCheck.Type)
-}
-
-func trueV2Condition(conditionType, reason string) meshv2beta1.Condition {
-	return meshv2beta1.Condition{
-		Type:   meshv2beta1.ConditionType(conditionType),
-		Reason: reason,
-		Status: corev1.ConditionTrue,
-	}
-}
-
-func falseV2Condition(conditionType, reason string) meshv2beta1.Condition {
-	return meshv2beta1.Condition{
-		Type:   meshv2beta1.ConditionType(conditionType),
-		Reason: reason,
-		Status: corev1.ConditionFalse,
 	}
 }

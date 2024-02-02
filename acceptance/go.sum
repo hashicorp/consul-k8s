@@ -393,13 +393,13 @@ github.com/gruntwork-io/gruntwork-cli v0.7.0 h1:YgSAmfCj9c61H+zuvHwKfYUwlMhu5arn
 github.com/gruntwork-io/gruntwork-cli v0.7.0/go.mod h1:jp6Z7NcLF2avpY8v71fBx6hds9eOFPELSuD/VPv7w00=
 github.com/gruntwork-io/terratest v0.31.2 h1:xvYHA80MUq5kx670dM18HInewOrrQrAN+XbVVtytUHg=
 github.com/gruntwork-io/terratest v0.31.2/go.mod h1:EEgJie28gX/4AD71IFqgMj6e99KP5mi81hEtzmDjxTo=
-github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240129190418-1e67acc165ea h1:kXmHp6NTTIQ2mwNzQ4WSCqx9hK2/Mx46/vqvHJD2Wlc=
-github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240129190418-1e67acc165ea/go.mod h1:Yj8VIjM3SElLcOVTkjy/A0igua8XBuhteYuQ1O84FDY=
+github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240201210635-25708a18e4aa h1:T9u/mKHEqqQvv8jJ3+S4cLj9sn7KDMSW+n4Uc8YlVos=
+github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240201210635-25708a18e4aa/go.mod h1:Yj8VIjM3SElLcOVTkjy/A0igua8XBuhteYuQ1O84FDY=
 github.com/hashicorp/consul-server-connection-manager v0.1.6 h1:ktj8Fi+dRXn9hhM+FXsfEJayhzzgTqfH08Ne5M6Fmug=
 github.com/hashicorp/consul/api v1.10.1-0.20240122152324-758ddf84e9c9 h1:qaS6rE768dt5hGPl2y4DIABXF4eA23BNSmWFpEr3kWQ=
 github.com/hashicorp/consul/api v1.10.1-0.20240122152324-758ddf84e9c9/go.mod h1:gInwZGrnWlE1Vvq6rSD5pUf6qwNa69NTLLknbdwQRUk=
-github.com/hashicorp/consul/proto-public v0.1.2-0.20231212195019-69e3f93ee8a3 h1:FFRKi+IpoXHwXZDgqG+BNAG1duAuokbzm+5b2pcY1us=
-github.com/hashicorp/consul/proto-public v0.1.2-0.20231212195019-69e3f93ee8a3/go.mod h1:fCFq3EfW2Iwu5her/hgqVqcJikY8nBtDiKFgfOdBvvw=
+github.com/hashicorp/consul/proto-public v0.1.2-0.20240129174413-a2d50af1bdfb h1:4LCdNw3DTe5WRe3fJvY+hkRLNtRlunl/9PJuOlQmPa8=
+github.com/hashicorp/consul/proto-public v0.1.2-0.20240129174413-a2d50af1bdfb/go.mod h1:ar/M/Gv31GeE7DxektZgAydwsCiOf6sBeJFcjQVTlVs=
 github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f h1:GKsa7bfoL7xgvCkzYJMF9eYYNfLWQyk8QuRZZl4nMTo=
 github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f/go.mod h1:r/OmRRPbHOe0yxNahLw7G9x5WG17E1BIECMtCjcPSNo=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=

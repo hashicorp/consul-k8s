@@ -4,12 +4,12 @@ go 1.20
 
 replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f
 
-replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231212195019-69e3f93ee8a3
+replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20240129174413-a2d50af1bdfb
 
 require (
 	github.com/google/uuid v1.3.0
 	github.com/gruntwork-io/terratest v0.31.2
-	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240129190418-1e67acc165ea
+	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240201210635-25708a18e4aa
 	github.com/hashicorp/consul/api v1.10.1-0.20240122152324-758ddf84e9c9
 	github.com/hashicorp/consul/proto-public v0.5.1
 	github.com/hashicorp/consul/sdk v0.15.0
