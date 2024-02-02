@@ -799,7 +799,7 @@ load _helpers
 
   local actual=$(echo "$annotations" | \
     yq -r '."ad.datadoghq.com/consul.logs"' | tee /dev/stderr)
-  [ "${actual}" = "[source:consul consul_service:consul-server]" ]
+  [ "${actual}" = '[{"source": "consul","consul_service": "consul-server"}]' ]
 
   local consul_checks=$(echo "$annotations" | \
     yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr)
@@ -842,7 +842,7 @@ load _helpers
 
   local actual=$(echo "$annotations" | \
     yq -r '."ad.datadoghq.com/consul.logs"' | tee /dev/stderr)
-  [ "${actual}" = "[source:consul consul_service:consul-server]" ]
+  [ "${actual}" = '[{"source": "consul","consul_service": "consul-server"}]' ]
 
   local consul_checks=$(echo "$annotations" | \
     yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr)
