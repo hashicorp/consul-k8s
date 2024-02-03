@@ -1326,7 +1326,7 @@ load _helpers
   [ "${actual}" = "unix:///var/run/datadog/dsd.socket" ]
 }
 
-@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets non-default namespace telemetry.dogstatsd_addr config" {
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets non-default telemetry.dogstatsd_addr config" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-config-configmap.yaml  \
@@ -1335,11 +1335,11 @@ load _helpers
       --set 'global.metrics.datadog.enabled=true'  \
       --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
       --set 'global.metrics.datadog.dogstatsd.socketTransportType="UDP"'  \
-      --set 'global.metrics.datadog.dogstatsd.dogstatsdAddr="127.0.0.1"'  \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdAddr="datadog-agent.default.svc.cluster.local"'  \
       . | tee /dev/stderr |
       yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_addr | tee /dev/stderr)
 
-  [ "${actual}" = "127.0.0.1:8125" ]
+  [ "${actual}" = "datadog-agent.default.svc.cluster.local" ]
 }
 
 @test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets non-default namespace telemetry.dogstatsd_addr with non-default port config" {
