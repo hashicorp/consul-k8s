@@ -132,14 +132,16 @@ spec:
           {{- tpl .Values.server.annotations . | nindent 8 }}
         {{- end }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+        {{- if not .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
         "prometheus.io/scrape": "true"
         "prometheus.io/path": "/v1/agent/metrics"
-        {{- if .Values.global.tls.enabled }}
+        {{- if and .Values.global.tls.enabled }}
         "prometheus.io/port": "8501"
         "prometheus.io/scheme": "https"
         {{- else }}
         "prometheus.io/port": "8500"
         "prometheus.io/scheme": "http"
+        {{- end }}
         {{- end }}
         {{- if .Values.global.metrics.datadog.enabled }}
         "ad.datadoghq.com/tolerate-unready": "true"
