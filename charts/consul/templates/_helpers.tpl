@@ -637,7 +637,7 @@ Usage: {{ template "consul.validateDatadogConfiguration" . }}
 {{- if and .Values.global.metrics.datadog.otlp.enabled (not .Values.telemetryCollector.enabled) }}
 {{fail "Cannot enable Datadog OTLP metrics collection (global.metrics.datadog.otlp.enabled) without consul-telemetry-collector. Ensure Consul OTLP collection is enabled (telemetryCollector.enabled) and configured." }}
 {{- end }}
-{{- if and .Values.global.metrics.datadog.otlp.enabled (or (eq (.Values.global.metrics.datadog.otlp.protocol | trimAll "\"" | quote) "http") (eq (.Values.global.metrics.datadog.otlp.protocol | trimAll "\"" | quote) "grpc")) }}
+{{- if and (ne .Values.global.metrics.datadog.otlp.protocol "http") (ne .Values.global.metrics.datadog.otlp.protocol "grpc") }}
 {{fail "Valid values for global.metrics.datadog.otlp.protocol must be one of either \"http\" or \"grpc\"." }}
 {{- end }}
 {{- end -}}
