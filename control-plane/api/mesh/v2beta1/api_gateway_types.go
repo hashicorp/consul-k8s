@@ -43,13 +43,13 @@ type APIGateway struct {
 }
 
 type APIGatewayStatus struct {
-	Status
-	Addresses []GatewayAddress
-	Listeners []ListenerStatus
+	Status    `json:"status,omitempty"`
+	Addresses []GatewayAddress `json:"addresses"`
+	Listeners []ListenerStatus `json:"listeners"`
 }
 
 type ListenerStatus struct {
-	Status
+	Status         `json:"status,omitempty"`
 	Name           string `json:"name"`
 	AttachedRoutes int32  `json:"attachedRoutes"`
 }
