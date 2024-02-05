@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// Test that api gateway basic functionality works in a default installation and a secure installation for V2
+// Test that api gateway basic functionality works in a default installation and a secure installation for V2.
 func TestAPIGateway_V2_Basic(t *testing.T) {
 
 	cases := []struct {

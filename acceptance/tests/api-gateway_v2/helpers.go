@@ -15,14 +15,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
 
 const (
 	StaticClientName           = "static-client"
 	gatewayClassControllerName = "mesh.consul.hashicorp.com/gateway-controller"
-	//TODO these values will likely need to be update to their V2 values for the test to pass
+	//TODO these values will likely need to be update to their V2 values for the test to pass.
 	gatewayClassFinalizer = "gateway-exists-finalizer.consul.hashicorp.com"
 	gatewayFinalizer      = "gateway-finalizer.consul.hashicorp.com"
 )
@@ -121,15 +120,4 @@ func generateCertificate(t *testing.T, ca *certificateInfo, commonName string) *
 		PrivateKey:    privateKey,
 		PrivateKeyPEM: privateKeyBytes,
 	}
-}
-
-func retryCheck(t *testing.T, count int, fn func(r *retry.R)) {
-	retryCheckWithWait(t, count, 2*time.Second, fn)
-}
-
-func retryCheckWithWait(t *testing.T, count int, wait time.Duration, fn func(r *retry.R)) {
-	t.Helper()
-
-	counter := &retry.Counter{Count: count, Wait: wait}
-	retry.RunWith(counter, t, fn)
 }
