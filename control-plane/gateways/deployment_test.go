@@ -1177,7 +1177,7 @@ func Test_MergeDeployment(t *testing.T) {
 				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Annotations)
 				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Labels)
 
-				require.Equal(t, 1, len(result.Spec.Template.Spec.Containers))
+				require.Len(t, result.Spec.Template.Spec.Containers, 1)
 				assert.Equal(t, "b", result.Spec.Template.Spec.Containers[0].Name)
 			},
 		},
@@ -1219,10 +1219,10 @@ func Test_MergeDeployment(t *testing.T) {
 				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Annotations)
 				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Labels)
 
-				require.Equal(t, 1, len(result.Spec.Template.Spec.InitContainers))
+				require.Len(t, result.Spec.Template.Spec.InitContainers, 1)
 				assert.Equal(t, "b", result.Spec.Template.Spec.InitContainers[0].Name)
 
-				require.Equal(t, 1, len(result.Spec.Template.Spec.Containers))
+				require.Len(t, result.Spec.Template.Spec.Containers, 1)
 				assert.Equal(t, "b", result.Spec.Template.Spec.Containers[0].Name)
 			},
 		},
