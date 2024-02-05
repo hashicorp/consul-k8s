@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package apigateway_v2
+package apigatewayv2
 
 import (
 	"crypto/rand"
