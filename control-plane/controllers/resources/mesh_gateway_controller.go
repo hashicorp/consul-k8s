@@ -12,8 +12,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -91,8 +91,6 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			source.NewKindWithCache(&meshv2beta1.GatewayClass{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				log := r.Log.WithValues("modified", "gatewayclass/"+o.GetNamespace()+"/"+o.GetName())
-
 				gateways, err := r.getGatewaysReferencingGatewayClass(context.Background(), o.(*meshv2beta1.GatewayClass))
 				if err != nil {
 					return nil
@@ -100,8 +98,6 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 
 				requests := make([]reconcile.Request, 0, len(gateways.Items))
 				for _, gateway := range gateways.Items {
-					log.Info("found affected gateway", "name", gateway.Name, "namespace", gateway.Namespace)
-
 					requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{
 						Namespace: gateway.Namespace,
 						Name:      gateway.Name,
@@ -113,8 +109,6 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			source.NewKindWithCache(&meshv2beta1.GatewayClassConfig{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				log := r.Log.WithValues("modified", "gatewayclassconfig/"+o.GetNamespace()+"/"+o.GetName())
-
 				classes, err := r.getGatewayClassesReferencingGatewayClassConfig(context.Background(), o.(*meshv2beta1.GatewayClassConfig))
 				if err != nil {
 					return nil
@@ -122,16 +116,12 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 
 				var requests []reconcile.Request
 				for _, class := range classes.Items {
-					log.Info("found affected gateway class", "name", class.Name)
-
 					gateways, err := r.getGatewaysReferencingGatewayClass(context.Background(), class)
 					if err != nil {
 						continue
 					}
 
 					for _, gateway := range gateways.Items {
-						log.Info("found affected gateway", "name", gateway.Name, "namespace", gateway.Namespace)
-
 						requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{
 							Namespace: gateway.Namespace,
 							Name:      gateway.Name,
@@ -153,7 +143,7 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 //  4. Role
 //  5. RoleBinding
 func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.MeshGateway) error {
-	// fetch gatewayclassconfig
+	// Fetch GatewayClassConfig for the gateway
 	gcc, err := r.getGatewayClassConfigForGateway(ctx, resource)
 	if err != nil {
 		r.Log.Error(err, "unable to get gatewayclassconfig for gateway: %s gatewayclass: %s", resource.Name, resource.Spec.GatewayClassName)
@@ -162,77 +152,77 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 
 	builder := gateways.NewMeshGatewayBuilder(resource, r.GatewayConfig, gcc)
 
+	// Create ServiceAccount
+	desiredAccount := builder.ServiceAccount()
+	existingAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: desiredAccount.Namespace, Name: desiredAccount.Name}}
+
 	upsertOp := func(ctx context.Context, _, object client.Object) error {
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, object, func() error { return nil })
 		return err
 	}
 
-	err = r.opIfNewOrOwned(ctx, resource, &corev1.ServiceAccount{}, builder.ServiceAccount(), upsertOp)
+	err = r.opIfNewOrOwned(ctx, resource, existingAccount, desiredAccount, upsertOp)
 	if err != nil {
 		return fmt.Errorf("unable to create service account: %w", err)
 	}
 
 	// Create Role
+	desiredRole := builder.Role()
+	existingRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Namespace: desiredRole.Namespace, Name: desiredRole.Name}}
 
-	err = r.opIfNewOrOwned(ctx, resource, &rbacv1.Role{}, builder.Role(), upsertOp)
+	err = r.opIfNewOrOwned(ctx, resource, existingRole, desiredRole, upsertOp)
 	if err != nil {
 		return fmt.Errorf("unable to create role: %w", err)
 	}
 
 	// Create RoleBinding
+	desiredBinding := builder.RoleBinding()
+	existingBinding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Namespace: desiredBinding.Namespace, Name: desiredBinding.Name}}
 
-	err = r.opIfNewOrOwned(ctx, resource, &rbacv1.RoleBinding{}, builder.RoleBinding(), upsertOp)
+	err = r.opIfNewOrOwned(ctx, resource, existingBinding, desiredBinding, upsertOp)
 	if err != nil {
 		return fmt.Errorf("unable to create role binding: %w", err)
 	}
 
 	// Create Service
+	desiredService := builder.Service()
+	existingService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: desiredService.Namespace, Name: desiredService.Name}}
 
-	mergeServiceOp := func(ctx context.Context, existingObject, object client.Object) error {
-		existingService, ok := existingObject.(*corev1.Service)
-		if !ok && existingService != nil {
-			return fmt.Errorf("unable to infer existing service type")
-		}
-		builtService, ok := object.(*corev1.Service)
-		if !ok {
-			return fmt.Errorf("unable to infer built service type")
-		}
+	mergeServiceOp := func(ctx context.Context, existingObj, desiredObj client.Object) error {
+		existing := existingObj.(*corev1.Service)
+		desired := desiredObj.(*corev1.Service)
 
-		mergedService := mergeService(existingService, builtService)
-
-		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, mergedService, func() error { return nil })
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, existing, func() error {
+			gateways.MergeService(existing, desired)
+			return nil
+		})
 		return err
 	}
 
-	err = r.opIfNewOrOwned(ctx, resource, &corev1.Service{}, builder.Service(), mergeServiceOp)
+	err = r.opIfNewOrOwned(ctx, resource, existingService, desiredService, mergeServiceOp)
 	if err != nil {
 		return fmt.Errorf("unable to create service: %w", err)
 	}
 
-	// Create deployment
+	// Create Deployment
+	desiredDeployment, err := builder.Deployment()
+	if err != nil {
+		return fmt.Errorf("unable to create deployment: %w", err)
+	}
+	existingDeployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: desiredDeployment.Namespace, Name: desiredDeployment.Name}}
 
-	mergeDeploymentOp := func(ctx context.Context, existingObject, object client.Object) error {
-		existingDeployment, ok := existingObject.(*appsv1.Deployment)
-		if !ok && existingDeployment != nil {
-			return fmt.Errorf("unable to infer existing deployment type")
-		}
-		builtDeployment, ok := object.(*appsv1.Deployment)
-		if !ok {
-			return fmt.Errorf("unable to infer built deployment type")
-		}
+	mergeDeploymentOp := func(ctx context.Context, existingObj, desiredObj client.Object) error {
+		existing := existingObj.(*appsv1.Deployment)
+		desired := desiredObj.(*appsv1.Deployment)
 
-		mergedDeployment := builder.MergeDeployments(gcc, existingDeployment, builtDeployment)
-
-		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, mergedDeployment, func() error { return nil })
+		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, existing, func() error {
+			gateways.MergeDeployment(existing, desired)
+			return nil
+		})
 		return err
 	}
 
-	builtDeployment, err := builder.Deployment()
-	if err != nil {
-		return fmt.Errorf("unable to build deployment: %w", err)
-	}
-
-	err = r.opIfNewOrOwned(ctx, resource, &appsv1.Deployment{}, builtDeployment, mergeDeploymentOp)
+	err = r.opIfNewOrOwned(ctx, resource, existingDeployment, desiredDeployment, mergeDeploymentOp)
 	if err != nil {
 		return fmt.Errorf("unable to create deployment: %w", err)
 	}
@@ -256,24 +246,24 @@ func (r *MeshGatewayController) onDelete(ctx context.Context, req ctrl.Request, 
 // The existing and new object are available in case any merging needs
 // to occur, such as unknown annotations and values from the existing object
 // that need to be carried forward onto the new object.
-type ownedObjectOp func(ctx context.Context, existingObject client.Object, newObject client.Object) error
+type ownedObjectOp func(ctx context.Context, existing, desired client.Object) error
 
 // opIfNewOrOwned runs a given ownedObjectOp to create, update, or delete a resource.
 // The purpose of opIfNewOrOwned is to ensure that we aren't updating or deleting a
 // resource that was not created by us. If this scenario is encountered, we error.
-func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, scanTarget, writeSource client.Object, op ownedObjectOp) error {
+func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, existing, desired client.Object, op ownedObjectOp) error {
 	// Ensure owner reference is always set on objects that we write
-	if err := ctrl.SetControllerReference(gateway, writeSource, r.Client.Scheme()); err != nil {
+	if err := ctrl.SetControllerReference(gateway, desired, r.Client.Scheme()); err != nil {
 		return err
 	}
 
 	key := client.ObjectKey{
-		Namespace: writeSource.GetNamespace(),
-		Name:      writeSource.GetName(),
+		Namespace: existing.GetNamespace(),
+		Name:      existing.GetName(),
 	}
 
 	exists := false
-	if err := r.Get(ctx, key, scanTarget); err != nil {
+	if err := r.Get(ctx, key, existing); err != nil {
 		// We failed to fetch the object in a way that doesn't tell us about its existence
 		if !k8serr.IsNotFound(err) {
 			return err
@@ -285,12 +275,12 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 
 	// None exists, so we need only execute the operation
 	if !exists {
-		return op(ctx, nil, writeSource)
+		return op(ctx, existing, desired)
 	}
 
 	// Ensure the existing object was put there by us so that we don't overwrite random objects
 	owned := false
-	for _, reference := range scanTarget.GetOwnerReferences() {
+	for _, reference := range existing.GetOwnerReferences() {
 		if reference.UID == gateway.GetUID() && reference.Name == gateway.GetName() {
 			owned = true
 			break
@@ -299,7 +289,7 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 	if !owned {
 		return errResourceNotOwned
 	}
-	return op(ctx, scanTarget, writeSource)
+	return op(ctx, existing, desired)
 }
 
 func (r *MeshGatewayController) getGatewayClassConfigForGateway(ctx context.Context, gateway *meshv2beta1.MeshGateway) (*meshv2beta1.GatewayClassConfig, error) {
@@ -385,41 +375,4 @@ func (r *MeshGatewayController) getGatewaysReferencingGatewayClass(ctx context.C
 		}
 	}
 	return matchingGateways, nil
-}
-
-func areServicesEqual(a, b *corev1.Service) bool {
-	// If either service "a" or "b" is nil, don't want to try and merge the nil service
-	if a == nil || b == nil {
-		return true
-	}
-
-	if !equality.Semantic.DeepEqual(a.Annotations, b.Annotations) {
-		return false
-	}
-
-	if len(b.Spec.Ports) != len(a.Spec.Ports) {
-		return false
-	}
-
-	for i, port := range a.Spec.Ports {
-		otherPort := b.Spec.Ports[i]
-		if port.Port != otherPort.Port || port.Protocol != otherPort.Protocol {
-			return false
-		}
-	}
-	return true
-}
-
-// mergeService is used to keep annotations and ports from the `from` Service
-// to the `to` service. This prevents an infinite reconciliation loop when
-// Kubernetes adds this configuration back in.
-func mergeService(from, to *corev1.Service) *corev1.Service {
-	if areServicesEqual(from, to) {
-		return to
-	}
-
-	to.Annotations = from.Annotations
-	to.Spec.Ports = from.Spec.Ports
-
-	return to
 }
