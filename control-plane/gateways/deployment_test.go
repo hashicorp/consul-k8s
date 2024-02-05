@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -14,9 +15,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
+
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 )
 
 const testCert = `-----BEGIN CERTIFICATE-----                                                                                                                              │
@@ -1123,6 +1125,113 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 				assert.Errorf(t, err, "Error")
 			}
 			assert.Equalf(t, tt.want, got, "Deployment()")
+		})
+	}
+}
+
+func Test_MergeDeployment(t *testing.T) {
+	testCases := []struct {
+		name     string
+		a, b     *appsv1.Deployment
+		assertFn func(*testing.T, *appsv1.Deployment)
+	}{
+		{
+			name: "new deployment gets desired annotations + labels + containers",
+			a:    &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "deployment"}},
+			b: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+				Namespace:   "default",
+				Name:        "deployment",
+				Annotations: map[string]string{"b": "b"},
+				Labels:      map[string]string{"b": "b"},
+			}},
+			assertFn: func(t *testing.T, result *appsv1.Deployment) {
+				assert.Equal(t, map[string]string{"b": "b"}, result.Annotations)
+				assert.Equal(t, map[string]string{"b": "b"}, result.Labels)
+			},
+		},
+		{
+			name: "existing deployment keeps existing annotations + labels and gains desired annotations + labels + containers",
+			a: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+				Namespace:         "default",
+				Name:              "deployment",
+				CreationTimestamp: metav1.Now(),
+				Annotations:       map[string]string{"a": "a"},
+				Labels:            map[string]string{"a": "a"},
+			}},
+			b: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   "default",
+					Name:        "deployment",
+					Annotations: map[string]string{"b": "b"},
+					Labels:      map[string]string{"b": "b"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{Name: "b"}},
+						},
+					},
+				},
+			},
+			assertFn: func(t *testing.T, result *appsv1.Deployment) {
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Annotations)
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Labels)
+
+				require.Equal(t, 1, len(result.Spec.Template.Spec.Containers))
+				assert.Equal(t, "b", result.Spec.Template.Spec.Containers[0].Name)
+			},
+		},
+		{
+			name: "existing deployment with injected initContainer retains it",
+			a: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         "default",
+					Name:              "deployment",
+					CreationTimestamp: metav1.Now(),
+					Annotations:       map[string]string{"a": "a"},
+					Labels:            map[string]string{"a": "a"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							InitContainers: []corev1.Container{{Name: "b"}},
+							Containers:     []corev1.Container{{Name: "b"}},
+						},
+					},
+				},
+			},
+			b: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   "default",
+					Name:        "deployment",
+					Annotations: map[string]string{"b": "b"},
+					Labels:      map[string]string{"b": "b"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{Name: "b"}},
+						},
+					},
+				},
+			},
+			assertFn: func(t *testing.T, result *appsv1.Deployment) {
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Annotations)
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Labels)
+
+				require.Equal(t, 1, len(result.Spec.Template.Spec.InitContainers))
+				assert.Equal(t, "b", result.Spec.Template.Spec.InitContainers[0].Name)
+
+				require.Equal(t, 1, len(result.Spec.Template.Spec.Containers))
+				assert.Equal(t, "b", result.Spec.Template.Spec.Containers[0].Name)
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			MergeDeployment(testCase.a, testCase.b)
+			testCase.assertFn(t, testCase.a)
 		})
 	}
 }
