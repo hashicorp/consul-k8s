@@ -110,13 +110,6 @@ spec:
                                       provide the wildcard value \"*\" to list resources
                                       across all partitions."
                                     type: string
-                                  peerName:
-                                    description: "PeerName identifies which peer the
-                                      resource is imported from. https://developer.hashicorp.com/consul/docs/connect/cluster-peering
-                                      \n When using the List and WatchList endpoints,
-                                      provide the wildcard value \"*\" to list resources
-                                      across all peers."
-                                    type: string
                                 type: object
                               type:
                                 description: Type identifies the resource's type.

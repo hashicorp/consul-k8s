@@ -99,7 +99,7 @@ func processPodLabeledDestination(pod corev1.Pod, rawUpstream string, enablePart
 	service := parts[0]
 	pieces := strings.Split(service, ".")
 
-	var portName, datacenter, svcName, namespace, partition, peer string
+	var portName, datacenter, svcName, namespace, partition string
 	if enablePartitions || enableNamespaces {
 		switch len(pieces) {
 		case 8:
@@ -180,7 +180,6 @@ func processPodLabeledDestination(pod corev1.Pod, rawUpstream string, enablePart
 			Tenancy: &pbresource.Tenancy{
 				Partition: constants.GetNormalizedConsulPartition(partition),
 				Namespace: constants.GetNormalizedConsulNamespace(namespace),
-				PeerName:  constants.GetNormalizedConsulPeer(peer),
 			},
 			Name: svcName,
 		},
@@ -250,7 +249,6 @@ func processPodUnlabeledDestination(pod corev1.Pod, rawUpstream string, enablePa
 				Tenancy: &pbresource.Tenancy{
 					Partition: constants.GetNormalizedConsulPartition(partition),
 					Namespace: constants.GetNormalizedConsulNamespace(namespace),
-					PeerName:  constants.GetNormalizedConsulPeer(""),
 				},
 				Name: svcName,
 			},

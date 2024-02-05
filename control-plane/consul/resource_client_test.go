@@ -100,7 +100,6 @@ func createWriteRequest(t *testing.T, name string) *pbresource.WriteRequest {
 				Tenancy: &pbresource.Tenancy{
 					Namespace: constants.DefaultConsulNS,
 					Partition: constants.DefaultConsulPartition,
-					PeerName:  constants.DefaultConsulPeer,
 				},
 			},
 			Data: proto,
