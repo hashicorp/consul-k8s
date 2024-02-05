@@ -1,18 +1,14 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // Test MatchesConsul for cases that should return true.
@@ -60,9 +56,6 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 								{
 									Peer: "second-peer",
 								},
-								{
-									SamenessGroup: "sg1",
-								},
 							},
 						},
 						{
@@ -77,9 +70,6 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 								},
 								{
 									Peer: "third-peer",
-								},
-								{
-									SamenessGroup: "sg2",
 								},
 							},
 						},
@@ -102,10 +92,6 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 							{
 								Peer: "second-peer",
 							},
-							{
-								SamenessGroup: "sg1",
-								Partition:     "default",
-							},
 						},
 					},
 					{
@@ -120,9 +106,6 @@ func TestExportedServices_MatchesConsul(t *testing.T) {
 							},
 							{
 								Peer: "third-peer",
-							},
-							{
-								SamenessGroup: "sg2",
 							},
 						},
 					},
@@ -197,9 +180,6 @@ func TestExportedServices_ToConsul(t *testing.T) {
 								{
 									Peer: "second-peer",
 								},
-								{
-									SamenessGroup: "sg2",
-								},
 							},
 						},
 						{
@@ -214,9 +194,6 @@ func TestExportedServices_ToConsul(t *testing.T) {
 								},
 								{
 									Peer: "third-peer",
-								},
-								{
-									SamenessGroup: "sg3",
 								},
 							},
 						},
@@ -239,9 +216,6 @@ func TestExportedServices_ToConsul(t *testing.T) {
 							{
 								Peer: "second-peer",
 							},
-							{
-								SamenessGroup: "sg2",
-							},
 						},
 					},
 					{
@@ -256,9 +230,6 @@ func TestExportedServices_ToConsul(t *testing.T) {
 							},
 							{
 								Peer: "third-peer",
-							},
-							{
-								SamenessGroup: "sg3",
 							},
 						},
 					},
@@ -303,9 +274,6 @@ func TestExportedServices_Validate(t *testing.T) {
 								},
 								{
 									Peer: "second-peer",
-								},
-								{
-									SamenessGroup: "sg2",
 								},
 							},
 						},
@@ -360,10 +328,10 @@ func TestExportedServices_Validate(t *testing.T) {
 			namespaceEnabled:  true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`service consumer must define at most one of Peer, Partition, or SamenessGroup`,
+				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"second", Peer:"second-peer"}: both partition and peer cannot be specified.`,
 			},
 		},
-		"none of peer, partition, or sameness group defined": {
+		"neither partition nor peer name specified": {
 			input: &ExportedServices{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: common.DefaultConsulPartition,
@@ -383,7 +351,7 @@ func TestExportedServices_Validate(t *testing.T) {
 			namespaceEnabled:  true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`service consumer must define at least one of Peer, Partition, or SamenessGroup`,
+				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"", Peer:""}: either partition or peer must be specified.`,
 			},
 		},
 		"partition provided when partitions are disabled": {
@@ -408,7 +376,7 @@ func TestExportedServices_Validate(t *testing.T) {
 			namespaceEnabled:  true,
 			partitionsEnabled: false,
 			expectedErrMsgs: []string{
-				`spec.services[0].consumers[0].partition: Invalid value: "test-partition": Consul Admin Partitions need to be enabled to specify partition.`,
+				`spec.services[0].consumers[0].partitions: Invalid value: "test-partition": Consul Admin Partitions need to be enabled to specify partition.`,
 			},
 		},
 		"namespace provided when namespaces are disabled": {
@@ -436,81 +404,6 @@ func TestExportedServices_Validate(t *testing.T) {
 				`spec.services[0]: Invalid value: "frontend": Consul Namespaces must be enabled to specify service namespace.`,
 			},
 		},
-		"exporting to all partitions is not supported": {
-			input: &ExportedServices{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: common.DefaultConsulPartition,
-				},
-				Spec: ExportedServicesSpec{
-					Services: []ExportedService{
-						{
-							Name:      "service-frontend",
-							Namespace: "frontend",
-							Consumers: []ServiceConsumer{
-								{
-									Partition: "*",
-								},
-							},
-						},
-					},
-				},
-			},
-			namespaceEnabled:  true,
-			partitionsEnabled: true,
-			expectedErrMsgs: []string{
-				`exporting to all partitions (wildcard) is not supported`,
-			},
-		},
-		"exporting to all peers (wildcard) is not supported": {
-			input: &ExportedServices{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: common.DefaultConsulPartition,
-				},
-				Spec: ExportedServicesSpec{
-					Services: []ExportedService{
-						{
-							Name:      "service-frontend",
-							Namespace: "frontend",
-							Consumers: []ServiceConsumer{
-								{
-									Peer: "*",
-								},
-							},
-						},
-					},
-				},
-			},
-			namespaceEnabled:  true,
-			partitionsEnabled: true,
-			expectedErrMsgs: []string{
-				`exporting to all peers (wildcard) is not supported`,
-			},
-		},
-		"exporting to all sameness groups (wildcard) is not supported": {
-			input: &ExportedServices{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: common.DefaultConsulPartition,
-				},
-				Spec: ExportedServicesSpec{
-					Services: []ExportedService{
-						{
-							Name:      "service-frontend",
-							Namespace: "frontend",
-							Consumers: []ServiceConsumer{
-								{
-									SamenessGroup: "*",
-								},
-							},
-						},
-					},
-				},
-			},
-			namespaceEnabled:  true,
-			partitionsEnabled: true,
-			expectedErrMsgs: []string{
-				`exporting to all sameness groups (wildcard) is not supported`,
-			},
-		},
 		"multiple errors": {
 			input: &ExportedServices{
 				ObjectMeta: metav1.ObjectMeta{
@@ -527,10 +420,6 @@ func TestExportedServices_Validate(t *testing.T) {
 									Peer:      "second-peer",
 								},
 								{},
-								{
-									SamenessGroup: "sg2",
-									Partition:     "partition2",
-								},
 							},
 						},
 					},
@@ -539,9 +428,8 @@ func TestExportedServices_Validate(t *testing.T) {
 			namespaceEnabled:  true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"second", Peer:"second-peer", SamenessGroup:""}: service consumer must define at most one of Peer, Partition, or SamenessGroup`,
-				`spec.services[0].consumers[1]: Invalid value: v1alpha1.ServiceConsumer{Partition:"", Peer:"", SamenessGroup:""}: service consumer must define at least one of Peer, Partition, or SamenessGroup`,
-				`spec.services[0].consumers[2]: Invalid value: v1alpha1.ServiceConsumer{Partition:"partition2", Peer:"", SamenessGroup:"sg2"}: service consumer must define at most one of Peer, Partition, or SamenessGroup`,
+				`spec.services[0].consumers[0]: Invalid value: v1alpha1.ServiceConsumer{Partition:"second", Peer:"second-peer"}: both partition and peer cannot be specified.`,
+				`spec.services[0].consumers[1]: Invalid value: v1alpha1.ServiceConsumer{Partition:"", Peer:""}: either partition or peer must be specified.`,
 			},
 		},
 	}

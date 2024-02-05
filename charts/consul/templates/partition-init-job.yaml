@@ -36,7 +36,6 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/mesh-inject": "false"
         {{- if (and .Values.global.secretsBackend.vault.enabled (or .Values.global.tls.enabled .Values.global.acls.manageSystemACLs)) }}
         "vault.hashicorp.com/agent-pre-populate-only": "true"
         "vault.hashicorp.com/agent-inject": "true"
@@ -117,9 +116,6 @@ spec:
                 -log-json={{ .Values.global.logJSON }} \
                 {{- if .Values.global.cloud.enabled }}
                 -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
-                {{- end }}
-                {{- if and (mustHas "resource-apis" .Values.global.experiments) (mustHas "v2tenancy" .Values.global.experiments) }}
-                -enable-v2tenancy=true
                 {{- end }}
           resources:
             requests:

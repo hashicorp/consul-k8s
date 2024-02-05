@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package webhook
 
 import (
@@ -302,8 +299,6 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 					Capabilities: &corev1.Capabilities{
 						Drop: []corev1.Capability{"ALL"},
 					},
-					ReadOnlyRootFilesystem:   pointer.Bool(true),
-					AllowPrivilegeEscalation: pointer.Bool(false),
 				}
 			} else if c.expTproxyEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{

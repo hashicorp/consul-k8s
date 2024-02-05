@@ -5,8 +5,8 @@ name: weekly-acceptance-1-1-x
 on:
   schedule:
     # * is a special character in YAML so you have to quote this string
-    # Run weekly on Monday at 3AM UTC/11PM EST/8PM PST
-    - cron:  '0 3 * * 1'
+    # Run weekly on Wednesday at 3AM UTC/11PM EST/8PM PST
+    - cron:  '0 3 * * 3'
 
 
 # these should be the only settings that you will ever need to change
@@ -19,7 +19,7 @@ jobs:
     name: cloud
     runs-on: ubuntu-latest
     steps:
-    - uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+    - uses: benc-uk/workflow-dispatch@v1.2.2
       name: cloud
       with:
         workflow: cloud.yml

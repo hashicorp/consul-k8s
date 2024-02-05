@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package webhook
 
 import (
@@ -9,17 +6,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
-
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 const nodeName = "test-node"
@@ -419,143 +414,48 @@ func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
-	tests := map[string]struct {
-		changeHook        func(*MeshWebhook)
-		changePod         func(*corev1.Pod)
-		expectedReadiness *corev1.Probe
-		expectedStartup   *corev1.Probe
-		expectedLiveness  *corev1.Probe
-	}{
-		"readiness-only": {
-			changeHook: func(h *MeshWebhook) {},
-			changePod:  func(p *corev1.Pod) {},
-			expectedReadiness: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(21000),
-						Path: "/ready",
-					},
-				},
-				InitialDelaySeconds: 1,
+	h := MeshWebhook{
+		ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
+		ConsulAddress: "1.1.1.1",
+		LogLevel:      "info",
+	}
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				constants.AnnotationUseProxyHealthCheck: "true",
 			},
 		},
-		"default-values": {
-			changeHook: func(h *MeshWebhook) {
-				h.DefaultSidecarProxyStartupFailureSeconds = 11
-				h.DefaultSidecarProxyLivenessFailureSeconds = 22
-			},
-			changePod: func(p *corev1.Pod) {},
-			expectedReadiness: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(21000),
-						Path: "/ready",
-					},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "web",
 				},
-				InitialDelaySeconds: 1,
-			},
-			expectedStartup: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(21000),
-						Path: "/ready",
-					},
-				},
-				PeriodSeconds:    1,
-				FailureThreshold: 11,
-			},
-			expectedLiveness: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(21000),
-						Path: "/ready",
-					},
-				},
-				PeriodSeconds:    1,
-				FailureThreshold: 22,
-			},
-		},
-		"override-default": {
-			changeHook: func(h *MeshWebhook) {
-				h.DefaultSidecarProxyStartupFailureSeconds = 11
-				h.DefaultSidecarProxyLivenessFailureSeconds = 22
-			},
-			changePod: func(p *corev1.Pod) {
-				p.ObjectMeta.Annotations[constants.AnnotationSidecarProxyStartupFailureSeconds] = "111"
-				p.ObjectMeta.Annotations[constants.AnnotationSidecarProxyLivenessFailureSeconds] = "222"
-			},
-			expectedReadiness: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(21000),
-						Path: "/ready",
-					},
-				},
-				InitialDelaySeconds: 1,
-			},
-			expectedStartup: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(21000),
-						Path: "/ready",
-					},
-				},
-				PeriodSeconds:    1,
-				FailureThreshold: 111,
-			},
-			expectedLiveness: &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Port: intstr.FromInt(21000),
-						Path: "/ready",
-					},
-				},
-				PeriodSeconds:    1,
-				FailureThreshold: 222,
 			},
 		},
 	}
-	for tn, tc := range tests {
-		t.Run(tn, func(t *testing.T) {
-			hook := MeshWebhook{
-				ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
-				ConsulAddress: "1.1.1.1",
-				LogLevel:      "info",
-			}
-			pod := corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						constants.AnnotationUseProxyHealthCheck: "true",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name: "web",
-						},
-					},
-				},
-			}
-			tc.changeHook(&hook)
-			tc.changePod(&pod)
-			container, err := hook.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
-			require.NoError(t, err)
-			require.Contains(t, container.Args, "-envoy-ready-bind-port=21000")
-			require.Equal(t, tc.expectedReadiness, container.ReadinessProbe)
-			require.Equal(t, tc.expectedStartup, container.StartupProbe)
-			require.Equal(t, tc.expectedLiveness, container.LivenessProbe)
-			require.Contains(t, container.Env, corev1.EnvVar{
-				Name: "DP_ENVOY_READY_BIND_ADDRESS",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
-				},
-			})
-			require.Contains(t, container.Ports, corev1.ContainerPort{
-				Name:          "proxy-health-0",
-				ContainerPort: 21000,
-			})
-		})
+	container, err := h.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
+	expectedProbe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Port: intstr.FromInt(21000),
+				Path: "/ready",
+			},
+		},
+		InitialDelaySeconds: 1,
 	}
+	require.NoError(t, err)
+	require.Contains(t, container.Args, "-envoy-ready-bind-port=21000")
+	require.Equal(t, expectedProbe, container.ReadinessProbe)
+	require.Contains(t, container.Env, corev1.EnvVar{
+		Name: "DP_ENVOY_READY_BIND_ADDRESS",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
+		},
+	})
+	require.Contains(t, container.Ports, corev1.ContainerPort{
+		Name:          "proxy-health-0",
+		ContainerPort: 21000,
+	})
 }
 
 func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) {
@@ -803,22 +703,20 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    false,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
+				RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
+				RunAsNonRoot:           pointer.Bool(true),
+				ReadOnlyRootFilesystem: pointer.Bool(true),
 			},
 		},
 		"tproxy enabled; openshift disabled": {
 			tproxyEnabled:    true,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
+				RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
+				RunAsNonRoot:           pointer.Bool(true),
+				ReadOnlyRootFilesystem: pointer.Bool(true),
 			},
 		},
 		"tproxy disabled; openshift enabled": {
@@ -830,11 +728,10 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
+				RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
+				RunAsNonRoot:           pointer.Bool(true),
+				ReadOnlyRootFilesystem: pointer.Bool(true),
 			},
 		},
 	}
@@ -1290,7 +1187,6 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 		name       string
 		pod        corev1.Pod
 		expCmdArgs string
-		expPorts   []corev1.ContainerPort
 		expErr     string
 	}{
 		{
@@ -1313,37 +1209,6 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 				},
 			},
 			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics",
-			expPorts: []corev1.ContainerPort{
-				{
-					Name:          "prometheus",
-					ContainerPort: 20200,
-					Protocol:      corev1.ProtocolTCP,
-				},
-			},
-		},
-		{
-			name: "metrics with prometheus port override",
-			pod: corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						constants.AnnotationService:              "web",
-						constants.AnnotationEnableMetrics:        "true",
-						constants.AnnotationEnableMetricsMerging: "true",
-						constants.AnnotationMergedMetricsPort:    "20123",
-						constants.AnnotationPort:                 "1234",
-						constants.AnnotationPrometheusScrapePath: "/scrape-path",
-						constants.AnnotationPrometheusScrapePort: "6789",
-					},
-				},
-			},
-			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20123 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics",
-			expPorts: []corev1.ContainerPort{
-				{
-					Name:          "prometheus",
-					ContainerPort: 6789,
-					Protocol:      corev1.ProtocolTCP,
-				},
-			},
 		},
 		{
 			name: "merged metrics with TLS enabled",
@@ -1364,13 +1229,6 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 				},
 			},
 			expCmdArgs: "-telemetry-prom-scrape-path=/scrape-path -telemetry-prom-merge-port=20100 -telemetry-prom-service-metrics-url=http://127.0.0.1:1234/metrics -telemetry-prom-ca-certs-file=/certs/ca.crt -telemetry-prom-ca-certs-path=/certs/ca -telemetry-prom-cert-file=/certs/server.crt -telemetry-prom-key-file=/certs/key.pem",
-			expPorts: []corev1.ContainerPort{
-				{
-					Name:          "prometheus",
-					ContainerPort: 20200,
-					Protocol:      corev1.ProtocolTCP,
-				},
-			},
 		},
 		{
 			name: "merge metrics with TLS enabled, missing CA gives an error",
@@ -1435,12 +1293,6 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			h := MeshWebhook{
 				ConsulConfig: &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
-				MetricsConfig: metrics.Config{
-					// These are all the default values passed from the CLI
-					DefaultPrometheusScrapePort: "20200",
-					DefaultPrometheusScrapePath: "/metrics",
-					DefaultMergedMetricsPort:    "20100",
-				},
 			}
 			container, err := h.consulDataplaneSidecar(testNS, c.pod, multiPortInfo{})
 			if c.expErr != "" {
@@ -1449,9 +1301,6 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Contains(t, strings.Join(container.Args, " "), c.expCmdArgs)
-				if c.expPorts != nil {
-					require.ElementsMatch(t, container.Ports, c.expPorts)
-				}
 			}
 		})
 	}

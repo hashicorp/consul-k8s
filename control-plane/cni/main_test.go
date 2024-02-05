@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package main
 
 import (
@@ -169,15 +166,6 @@ func TestSkipTrafficRedirection(t *testing.T) {
 			name: "Pod with both annotations correctly set",
 			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[keyInjectStatus] = "foo"
-				pod.Annotations[keyTransparentProxyStatus] = "bar"
-				return pod
-			},
-			expectedSkip: false,
-		},
-		{
-			name: "Pod with v2 annotations correctly set",
-			annotatedPod: func(pod *corev1.Pod) *corev1.Pod {
-				pod.Annotations[keyMeshInjectStatus] = "foo"
 				pod.Annotations[keyTransparentProxyStatus] = "bar"
 				return pod
 			},

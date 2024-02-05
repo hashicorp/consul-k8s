@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 // Rename package to your test package.
 package example
 
@@ -44,7 +41,7 @@ func TestExample(t *testing.T) {
 	k8s.KubectlApply(t, ctx.KubectlOptions(t), "path/to/config")
 
 	// Clean up any Kubernetes resources you have created
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 		k8s.KubectlDelete(t, ctx.KubectlOptions(t), "path/to/config")
 	})
 

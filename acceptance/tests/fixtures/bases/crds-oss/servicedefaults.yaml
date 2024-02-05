@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: ServiceDefaults
 metadata:
@@ -22,35 +19,9 @@ spec:
         interval: 1s
         maxFailures: 10
         enforcingConsecutive5xx: 60
-        maxEjectionPercent: 100
-        baseEjectionTime: 20s
     - name: "bar"
       limits:
         maxConnections: 5
       passiveHealthCheck:
         interval: 10s
         maxFailures: 2
-  balanceInboundConnections: "exact_balance"
-  rateLimits:
-    instanceLevel:
-      requestsPerSecond: 1234
-      requestsMaxBurst: 2345
-      routes:
-        - pathExact: "/exact"
-          requestsPerSecond: 222
-          requestsMaxBurst: 333
-        - pathPrefix: "/prefix"
-          requestsPerSecond: 444
-        - pathRegex: "/regex"
-          requestsPerSecond: 555
-  envoyExtensions:
-    - name: builtin/aws/lambda
-      required: false
-      arguments:
-        payloadPassthrough: false
-        arn: arn:aws:lambda:us-west-2:111111111111:function:lambda-1234
-    - name: builtin/aws/lambda
-      required: false
-      arguments:
-        payloadPassthrough: false
-        arn: arn:aws:lambda:us-east-1:111111111111:function:lambda-1234

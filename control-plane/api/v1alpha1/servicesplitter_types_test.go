@@ -1,18 +1,14 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // Test MatchesConsul.
@@ -97,7 +93,6 @@ func TestServiceSplitter_MatchesConsul(t *testing.T) {
 						Service:       "foo",
 						ServiceSubset: "bar",
 						Namespace:     "baz",
-						Partition:     "default",
 						RequestHeaders: &capi.HTTPHeaderModifiers{
 							Add: map[string]string{
 								"foo":    "bar",

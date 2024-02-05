@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package terminal
 
 import (
@@ -8,21 +5,15 @@ import (
 )
 
 const (
-	Yellow  = "yellow"
-	Green   = "green"
-	Red     = "red"
-	Blue    = "blue"
-	Magenta = "magenta"
-	HiWhite = "hiwhite"
+	Yellow = "yellow"
+	Green  = "green"
+	Red    = "red"
 )
 
 var colorMapping = map[string]int{
-	Green:   tablewriter.FgGreenColor,
-	Yellow:  tablewriter.FgYellowColor,
-	Red:     tablewriter.FgRedColor,
-	Blue:    tablewriter.FgBlueColor,
-	Magenta: tablewriter.FgMagentaColor,
-	HiWhite: tablewriter.FgHiWhiteColor,
+	Green:  tablewriter.FgGreenColor,
+	Yellow: tablewriter.FgYellowColor,
+	Red:    tablewriter.FgRedColor,
 }
 
 // Passed to UI.Table to provide a nicely formatted table.
@@ -57,21 +48,6 @@ func (t *Table) AddRow(cols []string, colors []string) {
 	}
 
 	t.Rows = append(t.Rows, row)
-}
-
-func (t *Table) ToJson() []map[string]interface{} {
-	if t == nil {
-		return make([]map[string]interface{}, 0)
-	}
-	jsonRes := make([]map[string]interface{}, 0)
-	for _, row := range t.Rows {
-		jsonRow := make(map[string]interface{})
-		for i, ent := range row {
-			jsonRow[t.Headers[i]] = ent.Value
-		}
-		jsonRes = append(jsonRes, jsonRow)
-	}
-	return jsonRes
 }
 
 // Table implements UI.

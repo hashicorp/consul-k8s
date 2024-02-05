@@ -1,4 +1,4 @@
-{{ $hasConfiguredWebhookCertsUsingVault := (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName) -}}
+{{ $hasConfiguredWebhookCertsUsingVault := (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.controllerRole .Values.global.secretsBackend.vault.controller.tlsCert.secretName  .Values.global.secretsBackend.vault.controller.caCert.secretName) -}}
 {{- if (and .Values.connectInject.enabled (not $hasConfiguredWebhookCertsUsingVault)) }}
 apiVersion: apps/v1
 kind: Deployment
@@ -36,7 +36,6 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/webhook-cert-manager-configmap.yaml") . | sha256sum }}
     spec:
       containers:

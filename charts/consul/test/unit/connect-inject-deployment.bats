@@ -211,19 +211,6 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: metrics.enableTelemetryCollector can be configured" {
-  cd `chart_dir`
-  local cmd=$(helm template \
-      -s templates/connect-inject-deployment.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'global.metrics.enableTelemetryCollector=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
-
-  local actual=$(echo "$cmd" |
-    yq 'any(contains("-enable-telemetry-collector=true"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
 #--------------------------------------------------------------------
 # consul and consul-dataplane images
 
@@ -1461,10 +1448,7 @@ load _helpers
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -1881,6 +1865,9 @@ load _helpers
       --set 'global.secretsBackend.vault.connectInjectRole=test' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=foo/tls' \
+      --set 'global.secretsBackend.vault.controllerRole=test' \
+      --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
+      --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-enable-webhook-ca-update"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
@@ -1987,7 +1974,7 @@ load _helpers
       --set 'global.secretsBackend.vault.connectInjectRole=connectinjectcarole' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName" ]]
+  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.controllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
 @test "connectInject/Deployment: fails if vault is enabled and global.secretsBackend.vault.connectInject.tlsCert.secretName is set but global.secretsBackend.vault.connectInjectRole and global.secretsBackend.vault.connectInject.caCert.secretName are not" {
@@ -2004,7 +1991,7 @@ load _helpers
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=foo/tls' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName" ]]
+  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.controllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
 @test "connectInject/Deployment: fails if vault is enabled and global.secretsBackend.vault.connectInject.caCert.secretName is set but global.secretsBackend.vault.connectInjectRole and global.secretsBackend.vault.connectInject.tlsCert.secretName are not" {
@@ -2021,7 +2008,7 @@ load _helpers
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.agentAnnotations=foo: bar' .
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName" ]]
+  [[ "$output" =~ "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.controllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName." ]]
 }
 
 @test "connectInject/Deployment: vault tls annotations are set when tls is enabled" {
@@ -2039,6 +2026,9 @@ load _helpers
       --set 'global.secretsBackend.vault.connectInjectRole=test' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=foo/ca' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.controllerRole=test' \
+      --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
+      --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata' | tee /dev/stderr)
 
@@ -2112,6 +2102,9 @@ load _helpers
       --set 'global.secretsBackend.vault.connectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.controllerRole=test' \
+      --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
+      --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       --set 'global.secretsBackend.vault.consulClientRole=foo' \
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
@@ -2134,6 +2127,9 @@ load _helpers
       --set 'global.secretsBackend.vault.connectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.controllerRole=test' \
+      --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
+      --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       --set 'server.serverCert.secretName=pki_int/issue/test' \
       --set 'global.tls.caCert.secretName=pki_int/cert/ca' \
       . | tee /dev/stderr |
@@ -2163,6 +2159,9 @@ load _helpers
       --set 'global.secretsBackend.vault.connectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.controllerRole=test' \
+      --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
+      --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.volumes[] | select(.name == "certs")' | tee /dev/stderr)
   [ "${actual}" == "" ]
@@ -2182,6 +2181,9 @@ load _helpers
       --set 'global.secretsBackend.vault.connectInjectRole=inject-ca-role' \
       --set 'global.secretsBackend.vault.connectInject.tlsCert.secretName=pki/issue/connect-webhook-cert-dc1' \
       --set 'global.secretsBackend.vault.connectInject.caCert.secretName=pki/issue/connect-webhook-cert-dc1' \
+      --set 'global.secretsBackend.vault.controllerRole=test' \
+      --set 'global.secretsBackend.vault.controller.caCert.secretName=foo/ca' \
+      --set 'global.secretsBackend.vault.controller.tlsCert.secretName=foo/tls' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "certs")' | tee /dev/stderr)
   [ "${actual}" == "" ]
@@ -2220,12 +2222,7 @@ load _helpers
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject") |
-      del(."vault.hashicorp.com/agent-inject") |
-      del(."vault.hashicorp.com/role")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -2639,30 +2636,6 @@ reservedNameTest() {
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: validates that externalServers.hosts is not set with an HCP-managed cluster's address" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'global.enabled=false' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=abc.aws.hashicorp.cloud' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-     . > /dev/stderr
-
-  [ "$status" -eq 1 ]
-
-  [[ "$output" =~ "global.cloud.enabled cannot be used in combination with an HCP-managed cluster address in externalServers.hosts. global.cloud.enabled is for linked self-managed clusters." ]]
-}
-
 @test "connectInject/Deployment: can provide a TLS server name for the sidecar-injector when global.cloud.enabled is set" {
   cd `chart_dir`
   local env=$(helm template \
@@ -2683,59 +2656,4 @@ reservedNameTest() {
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_TLS_SERVER_NAME").value' | tee /dev/stderr)
   [ "${actual}" = "server.dc1.consul" ]
-}
-
-#--------------------------------------------------------------------
-# resource-apis
-
-@test "connectInject/Deployment: resource-apis is not set by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
-
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: -enable-resource-apis=true is set when global.experiments contains [\"resource-apis\"] " {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'ui.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-resource-apis=true"))' | tee /dev/stderr)
-
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# v2tenancy
-
-@test "connectInject/Deployment: v2tenancy is not set by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-v2tenancy=true"))' | tee /dev/stderr)
-
-  [ "${actual}" = "false" ]
-}
-
-@test "connectInject/Deployment: -enable-v2tenancy=true is set when global.experiments contains [\"resource-apis\", \"v2tenancy\"]" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'global.experiments[1]=v2tenancy' \
-      --set 'ui.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-v2tenancy=true"))' | tee /dev/stderr)
-
-  [ "${actual}" = "true" ]
 }

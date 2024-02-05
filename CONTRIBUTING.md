@@ -7,7 +7,7 @@
     1. [Running linters locally](#running-linters-locally)
     1. [Rebasing contributions against main](#rebasing-contributions-against-main)
 1. [Creating a new CRD](#creating-a-new-crd)
-    1. [The Structs](#the-structs)
+    1. [The Structs](#the-structs) 
     1. [Spec Methods](#spec-methods)
     1. [Spec Tests](#spec-tests)
     1. [Controller](#controller)
@@ -22,22 +22,21 @@
     1. [Running the tests](#running-the-tests)
     1. [Writing Unit tests](#writing-unit-tests)
     1. [Writing Acceptance tests](#writing-acceptance-tests)
-1. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
 1. [Helm Reference Docs](#helm-reference-docs)
-1. [Managing External CRD Dependencies](#managing-external-crd-dependencies)
 1. [Adding a Changelog Entry](#adding-a-changelog-entry)
+
 
 ## Contributing 101
 
 ### Building and running `consul-k8s-control-plane`
 
-To build and install the control plane binary `consul-k8s-control-plane` locally, Go version 1.17.0+ is required.
+To build and install the control plane binary `consul-k8s-control-plane` locally, Go version 1.17.0+ is required. 
 You will also need to install the Docker engine:
 
 - [Docker for Mac](https://docs.docker.com/engine/installation/mac/)
 - [Docker for Windows](https://docs.docker.com/engine/installation/windows/)
 - [Docker for Linux](https://docs.docker.com/engine/installation/linux/ubuntulinux/)
-
+ 
 Install [gox](https://github.com/mitchellh/gox) (v1.14+). For Mac and Linux:
   ```bash
   brew install gox
@@ -102,7 +101,7 @@ controller:
   enabled: true
 ```
 
-Run a `helm install` from the project root directory to target your dev version of the Helm chart.
+Run a `helm install` from the project root directory to target your dev version of the Helm chart. 
 
 ```shell
 helm install consul --create-namespace -n consul -f ./values.dev.yaml ./charts/consul
@@ -125,7 +124,7 @@ consul-k8s version
 
 ### Making changes to consul-k8s
 
-The first step to making changes is to fork Consul K8s. Afterwards, the easiest way
+The first step to making changes is to fork Consul K8s. Afterwards, the easiest way 
 to work on the fork is to set it as a remote of the Consul K8s project:
 
 1. Rename the existing remote's name: `git remote rename origin upstream`.
@@ -164,46 +163,46 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 ## Creating a new CRD
 
 ### The Structs
-1. Run the generate command from the `control-plane` directory: (installation instructions for `operator-sdk` found [here](https://sdk.operatorframework.io/docs/installation/):
+1. Run the generate command:
     ```bash
     operator-sdk create api --group consul --version v1alpha1 --kind IngressGateway --controller --namespaced=true --make=false --resource=true
     ```
-1. Re-order the generated ingressgateway_types.go file, so it looks like:
+1. Re-order the file so it looks like:
     ```go
     func init() {
     	SchemeBuilder.Register(&IngressGateway{}, &IngressGatewayList{})
     }
-
+    
     // +kubebuilder:object:root=true
     // +kubebuilder:subresource:status
-
+    
     // IngressGateway is the Schema for the ingressgateways API
     type IngressGateway struct {
     	metav1.TypeMeta   `json:",inline"`
     	metav1.ObjectMeta `json:"metadata,omitempty"`
-
+    
     	Spec   IngressGatewaySpec   `json:"spec,omitempty"`
     	Status IngressGatewayStatus `json:"status,omitempty"`
     }
-
+    
     // +kubebuilder:object:root=true
-
+    
     // IngressGatewayList contains a list of IngressGateway
     type IngressGatewayList struct {
     	metav1.TypeMeta `json:",inline"`
     	metav1.ListMeta `json:"metadata,omitempty"`
     	Items           []IngressGateway `json:"items"`
     }
-
+    
     // IngressGatewaySpec defines the desired state of IngressGateway
     type IngressGatewaySpec struct {
     	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
     	// Important: Run "make" to regenerate code after modifying this file
-
+    
     	// Foo is an example field of IngressGateway. Edit IngressGateway_types.go to remove/update
     	Foo string `json:"foo,omitempty"`
     }
-
+    
     // IngressGatewayStatus defines the observed state of IngressGateway
     type IngressGatewayStatus struct {
     	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
@@ -214,7 +213,6 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```go
     // ServiceRouter is the Schema for the servicerouters API
     // +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
-    // +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
     // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
     type ServiceRouter struct {
     ```
@@ -225,7 +223,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     type IngressGateway struct {
     	metav1.TypeMeta   `json:",inline"`
     	metav1.ObjectMeta `json:"metadata,omitempty"`
-
+    
     	Spec   IngressGatewaySpec   `json:"spec,omitempty"`
     -	Status IngressGatewayStatus `json:"status,omitempty"`
     +	Status `json:"status,omitempty"`
@@ -233,9 +231,9 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```
 1. Go to the Consul `api` package for the config entry, e.g. https://github.com/hashicorp/consul/blob/main/api/config_entry_gateways.go
 1. Copy the top-level fields over into the `Spec` struct except for
-   `Kind`, `Name`, `Namespace`, `Partition`, `Meta`, `CreateIndex` and `ModifyIndex`. In this
+   `Kind`, `Name`, `Namespace`, `Meta`, `CreateIndex` and `ModifyIndex`. In this
    example, the top-level fields remaining are `TLS` and `Listeners`:
-
+   
     ```go
     // IngressGatewaySpec defines the desired state of IngressGateway
     type IngressGatewaySpec struct {
@@ -261,8 +259,8 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
    automatically stub out all the methods by using Code -> Generate -> IngressGateway -> ConfigEntryResource.
 1. Use existing implementations of other types to implement the methods. We have to
    copy their code because we can't use a common struct that implements the methods
-   because that messes up the CRD code generation.
-
+   because that messes up the CRD code generation. 
+   
    You should be able to follow the other "normal" types. The non-normal types
    are `ServiceIntention` and `ProxyDefault` because they have special behaviour
    around being global or their spec not matching up with Consul's directly.
@@ -273,7 +271,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 1. For `Validate`, we again follow the pattern of implementing the method on
    each sub-struct. You'll need to read the Consul documentation to understand
    what validation needs to be done.
-
+   
    Things to keep in mind:
    1. Re-use the `sliceContains` and `notInSliceMessage` helper methods where applicable.
    1. If the invalid field is an entire struct, encode as json (look for `asJSON` for an example).
@@ -322,6 +320,8 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 
 ### Controller
 1. Delete the file `control-plane/controllers/suite_test.go`. We don't write suite tests, just unit tests.
+1. Move `control-plane/controllers/ingressgateway_controller.go` to `control-plane/controller` directory.
+1. Delete the `control-plane/controllers` directory.
 1. Rename `Reconciler` to `Controller`, e.g. `IngressGatewayReconciler` => `IngressGatewayController`
 1. Use the existing controller files as a guide and make this file match.
 1. Add your controller as a case in the tests in `configentry_controller_test.go`:
@@ -333,7 +333,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     1. `TestConfigEntryControllers_doesNotCreateUnownedConfigEntry`
     1. `TestConfigEntryControllers_doesNotDeleteUnownedConfig`
 1. Note: we don't add tests to `configentry_controller_ent_test.go` because we decided
-   it's too much duplication and the controllers are already properly exercised in the oss tests.
+   it's too much duplication and the controllers are already properly exercised in the oss tests. 
 
 ### Webhook
 1. Copy an existing webhook to `control-plane/api/v1alpha/ingressgateway_webhook.go`
@@ -376,7 +376,7 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 
 ### Generating YAML
 1. Run `make ctrl-manifests` to generate the CRD and webhook YAML.
-1. Uncomment your CRD in `control-plane/config/crd/kustomization` under `patches:`
+1. Uncomment your CRD in `control-plane/config/crd/kustomization` under `patchesStrategicMerge:`
 1. Update the sample, e.g. `control-plane/config/samples/consul_v1alpha1_ingressgateway.yaml` to a valid resource
    that can be used for testing:
     ```yaml
@@ -395,13 +395,13 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
     ```
 
 ### Updating Helm chart
-1. Update `charts/consul/templates/connect-inject-mutatingwebhookconfiguration` with the webhook for this resource
+1. Update `charts/consul/templates/controller-mutatingwebhookconfiguration` with the webhook for this resource
    using the updated `control-plane/config/webhook/manifests.v1beta1.yaml` and replacing `clientConfig.service.name/namespace`
    with the templated strings shown below to match the other webhooks.:
     ```yaml
     - clientConfig:
         service:
-          name: {{ template "consul.fullname" . }}-connect-injector
+          name: {{ template "consul.fullname" . }}-controller-webhook
           namespace: {{ .Release.Namespace }}
           path: /mutate-v1alpha1-ingressgateway
       failurePolicy: Fail
@@ -421,31 +421,24 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
             - ingressgateways
       sideEffects: None
     ```
-1. Update `charts/consul/templates/connect-inject-clusterrole.yaml` to allow the controller to
+1. Update `charts/consul/templates/controller-clusterrole.yaml` to allow the controller to
    manage your resource type.
 
 ### Testing A New CRD
-1. Build a Docker image for consul-k8s via `make control-plane-dev-docker` and push to a docker repository:
-    ```
-    docker tag consul-k8s-control-plane-dev <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev:<version>
-    docker push <DOCKER-HUB-USERNAME>/consul-k8s-control-plane-dev:<version>
-    ```
+1. Build a Docker image for consul-k8s via `make dev-docker` and tagging your image appropriately. Remember to CD into the `control-plane` directory!
 1. Install using the updated Helm repository, with a values like:
     ```yaml
     global:
-      imageK8S: lkysow/consul-k8s-control-plane-dev:nov26
+      imageK8S: ghcr.io/lkysow/consul-k8s-dev:nov26
       name: consul
     server:
       replicas: 1
       bootstrapExpect: 1
-    ui:
-      enabled: true
-    connectInject:
+    controller:
       enabled: true
     ```
-1. Create a sample CRD
-1. Run `kubectl apply -f <path-to-crd>` to apply your sample CRD.
-1. Check its synced status (for example CRD called ingressgateway):
+1. `kubectl apply` your sample CRD.
+1. Check its synced status:
     ```bash
     kubectl get ingressgateway
     NAME                    SYNCED   AGE
@@ -507,7 +500,7 @@ a token named `foo`.
       ```
     * Add `if` statement in `Run` to create your token (follow placement of other tokens).
       You'll need to decide if you need a local token (use `createLocalACL()`) or a global token (use `createGlobalACL()`).
-
+      
       ```go
       if c.flagCreateFooToken {
           err := c.createLocalACL("foo", fooRules, consulDC, isPrimary, consulClient)
@@ -588,7 +581,7 @@ The acceptance tests require a Kubernetes cluster with a configured `kubectl`.
   ```bash
   brew install python-yq
   ```
-* [Helm 3](https://helm.sh) (Currently, must use v3.8.0+.)
+* [Helm 3](https://helm.sh) (Currently, must use v3.8.0+.) 
   ```bash
   brew install kubernetes-helm
   ```
@@ -617,7 +610,7 @@ To run a specific test by name use the `--filter` flag:
     bats ./charts/consul/test/unit/<filename>.bats --filter "my test name"
 
 #### Acceptance Tests
-##### Pre-requisites
+##### Pre-requisites 
 * [gox](https://github.com/mitchellh/gox) (v1.14+)
   ```bash
   brew install gox
@@ -629,7 +622,7 @@ To run the acceptance tests:
 
     cd acceptance/tests
     go test ./... -p 1
-
+    
 The above command will run all tests that can run against a single Kubernetes cluster,
 using the current context set in your kubeconfig locally.
 
@@ -689,7 +682,7 @@ Changes to the Helm chart should be accompanied by appropriate unit tests.
 
 #### Formatting
 
-- Put tests in the test file in the same order as the variables appear in the `values.yaml`.
+- Put tests in the test file in the same order as the variables appear in the `values.yaml`. 
 - Start tests for a chart value with a header that says what is being tested, like this:
     ```
     #--------------------------------------------------------------------
@@ -710,8 +703,8 @@ In all of the tests in this repo, the base command being run is [helm template](
 In this way, we're able to test that the various conditionals in the templates render as we would expect.
 
 Each test defines the files that should be rendered using the `-x` flag, then it might adjust chart values by adding `--set` flags as well.
-The output from this `helm template` command is then piped to [yq](https://pypi.org/project/yq/).
-`yq` allows us to pull out just the information we're interested in, either by referencing its position in the yaml file directly or giving information about it (like its length).
+The output from this `helm template` command is then piped to [yq](https://pypi.org/project/yq/). 
+`yq` allows us to pull out just the information we're interested in, either by referencing its position in the yaml file directly or giving information about it (like its length). 
 The `-r` flag can be used with `yq` to return a raw string instead of a quoted one which is especially useful when looking for an exact match.
 
 The test passes or fails based on the conditional at the end that is in square brackets, which is a comparison of our expected value and the output of  `helm template` piped to `yq`.
@@ -786,11 +779,11 @@ Here are some examples of common test patterns:
       cd `chart_dir`
       assert_empty helm template \
           -s templates/sync-catalog-deployment.yaml \
-          .
+          . 
     }
     ```
     Here we are using the `assert_empty` helper command.
-
+    
 ### Writing Acceptance Tests
 
 If you are adding a feature that fits thematically with one of the existing test suites,
@@ -831,9 +824,9 @@ you need to handle that in the `TestMain` function.
 
 ```go
 func TestMain(m *testing.M) {
-    // First, create a new suite so that all flags are parsed.
+    // First, create a new suite so that all flags are parsed. 	
     suite = framework.NewSuite(m)
-
+    
     // Run the suite only if our example feature test flag is set.
     if suite.Config().EnableExampleFeature {
         os.Exit(suite.Run())
@@ -866,16 +859,16 @@ func TestExample(t *testing.T) {
   helmValues := map[string]string{
       "exampleFeature.enabled": "true",
   }
-
-  // Generate a random name for this test.
+  
+  // Generate a random name for this test. 
   releaseName := helpers.RandomName()
 
   // Create a new Consul cluster object.
   consulCluster := framework.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
-
+  
   // Create the Consul cluster with Helm.
   consulCluster.Create(t)
-
+    
   // Make test assertions.
 }
 ```
@@ -941,205 +934,13 @@ Here are some things to consider before adding a test:
 
 ---
 
-## Using Acceptance Test Framework to Debug
-### Acceptance Tests
-
-The [consul-k8s](https://github.com/hashicorp/consul-k8s) repository has an extensive list of [acceptance](https://github.com/hashicorp/consul-k8s/tree/main/acceptance/tests)
-tests that are used by CI to run per-PR and nightly acceptance tests.
-It is built on its own framework that uses Helm and the consul-k8s CLI to deploy consul (and other tools) in various
-configurations that provide test coverage for most features that exist and provides coverage for more advanced deployments
-than are typically covered in guides.
-Importantly, it is **automated**, so you are able to rapidly deploy known working
-configurations in known working environments.
-It can be very helpful for bootstrapping complex environments such as when using Vault as a CA for Consul or for federating test clusters.
-
-The tests are organized like this :
-```shell
-demo $ tree -L 1 -d acceptance/tests
-acceptance/tests
-├── basic
-├── cli
-├── config-entries
-├── connect
-├── consul-dns
-├── example
-├── fixtures
-├── ingress-gateway
-├── metrics
-├── partitions
-├── peering
-├── snapshot-agent
-├── sync
-├── terminating-gateway
-├── vault
-└── wan-federation
-```
-
-### Basic Running of Tests
-Any given test can be run either through GoLand or another IDE, or via command line using `go test -run`.
-
-To run all of the connect tests from command line:
-```shell
-$ cd acceptance/tests
-$ go test ./connect/... -v -p 1 -timeout 2h -failfast -use-kind -no-cleanup-on-failure -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-enterprise -enable-multi-cluster -debug-directory=/tmp/debug -consul-k8s-image=kyleschochenmaier/consul-k8s-acls
-```
-
-When running from command line a few things are important:
-* Some tests use Enterprise features, in which case you need:
-    * Set environment variables `CONSUL_ENT_LICENSE` and possibly `VAULT_LICENSE`.
-    * Use `-enable-enterprise` on command line when running the test.
-* Multi-cluster tests require `-enable-multi-cluster -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2`
-* Using `./<test-directory>/...` is required as part of the command-line to pick up necessary environmental config.
-
-### Using the framework to debug in an environment
-=> NOTE: It is helpful to tune the docker desktop resource settings so that docker has at least 4GB memory, plenty of cpu cores and 2GB of swap.
-
-* If using Kind, `-use-kind` should be added, and be sure you cluster is up and running:
-```shell
-$ kind create cluster --name=dc1 && kind create cluster --name=dc2
-```
-* Pick a test which replicates the environment you are wanting to work with.
-  Ex: pick a test from `partitions/` or `vault/` or `connect/`.
-* If you need the environment to persist, add a `time.Sleep(1*time.Hour)` to the end of the test in the test file.
-* Use the following flags if you need to use or test out a specific consul/k8s image:
-  `-consul-k8s-image=<your-custom-image>` && `-consul-image=<your-custom-image>`
-* You can set custom helm flags by modifying the test file directly in the respective directory.
-
-Finally, run the test like shown above:
-```shell
-$ cd acceptance/tests
-$ go test -run Vault_WANFederationViaGateways ./vault/... -p 1 -timeout 2h -failfast -use-kind -no-cleanup-on-failure -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-multi-cluster -debug-directory=/tmp/debug
-```
-You can interact with the running kubernetes clusters now using `kubectl [COMMAND] --context=<kind-dc1/kind-dc2>`
-
-* `kind delete clusters --all` is helpful for cleanup!
-
-### Example Debugging session using the acceptance test framework to bootstrap and debug a Vault backed federated Consul installation:
-This test utilizes the `consul-k8s` acceptance test framework, with a custom consul-k8s branch which:
-* Modifies the acceptance test to use custom consul+consul-k8s images and sleeps at the end of the test to allow analysis.
-* Modifies the helm chart to pass in `connect_ca.intermediate_cert_ttl` and `connect_ca.leaf_cert_ttl` in the `server-configmap`
-
-1. First clone the consul-k8s repo and then check out the branch locally: `git checkout origin/consul-vault-provider-wanfed-acceptance`.
-2. Start the kind clusters: `kind create cluster --name=dc1 && kind create cluster --name=dc2`
-3. run the `TestVault_WANFederationViaGateways` acceptance test in `acceptance/tests/vault/vault_wan_fed_test.go` - I use goland, but this command should get you most of the way:
-```shell
-$ cd acceptance/tests
-$ go test -run Vault_WANFederationViaGateways ./vault/... -p 1 -timeout 2h -failfast -use-kind -no-cleanup-on-failure -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-multi-cluster -debug-directory=/tmp/debug
-```
-NOTE: This specific acceptance test is considered FLAKY with Kind, if things don't come up it's best to run against GKE/AKS/etc, in which case you just modify the `kubecontext` command parameters to point to your clusters. It is worth noting that you will need to setup any necessary networking for non-Kind clusters manually.
-
-NOTE: This test requires a VAULT_LICENSE set as an environment variable in the shell where you run `go test`
-
-4. Wait 10-20 minutes to allow the first intermediate ca renewal, this test is particularly resource intensive so it can take time for everything to come online on a laptop, use `kubectl get pods` to validate that `static-server` and `static-client` have been deployed and are online.
-
-You can validate the ICA rotation by doing:
-```shell
-# Fetch the vault root token:
-$ kubectl get secrets <vault-release-name>-root-token -o json //----> b64 decode the `data.token` field.
-$ kubectl exec -it <vault-server> -- sh
-$ export VAULT_TOKEN=<from above>
-$ export VAULT_ADDR=https://<vault-release-name>-vault:8200
-
-# Fetch the consul bootstrap token
-$ vault kv get consul/secret/bootstrap
-
-# Examine the vault issuers, there should be 2 by now if ICA renewal has occured:
-# NOTE: for a federated setup the issuers url for dc2 is `vault list dc2/connect_inter/issuers`!
-$ vault list dc1/connect_inter/issuers
-
-Keys
-----
-29bdffbd-87ec-cfe0-fd05-b78f99eba243
-344eea3c-f085-943a-c3ff-66721ef408f4
-
-# Now login to the consul-server
-$ kubectl exec -it <consul-server> -- sh
-$ export CONSUL_HTTP_TOKEN=<bootstrap token from above>
-$ export CONSUL_HTTP_ADDR=https://localhost:8501
-$ export CONSUL_HTTP_SSL_VERIFY=false
-
-# Read the `connect/ca/roots` endpoint:
-# It should change + rotate with the expiration of the ICA (defined by `intermediate_cert_ttl` which is `15m` in the branch for this gist.
-
-$ curl -k --header "X-Consul-Token: 1428da53-5e88-db1a-6ad5-e50212b011da" https://127.0.0.1:8501/v1/agent/connect/ca/roots | jq
- .
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-100  3113  100  3113    0     0   6222      0 --:--:-- --:--:-- --:--:--  7705
-{
-  "ActiveRootID": "36:be:19:0e:56:d1:c2:1a:d8:54:22:97:88:3c:91:17:1d:d2:d3:e0",
-  "TrustDomain": "34a76791-b9b2-b93e-b0e4-1989ed11a28e.consul",
-  "Roots": [
-    {
-      "ID": "36:be:19:0e:56:d1:c2:1a:d8:54:22:97:88:3c:91:17:1d:d2:d3:e0",
-      "Name": "Vault CA Primary Cert",
-      "SerialNumber": 15998414315735550000,
-      "SigningKeyID": "fe:b9:d6:0b:c6:ce:2c:25:4f:d8:59:cb:11:ea:a5:42:5f:8e:41:4b",
-      "ExternalTrustDomain": "34a76791-b9b2-b93e-b0e4-1989ed11a28e",
-      "NotBefore": "2022-11-16T20:16:15Z",
-      "NotAfter": "2032-11-13T20:16:45Z",
-      "RootCert": "-----BEGIN CERTIFICATE-----\nMIICLDCCAdKgAwIBAgIUKQ9BPHF9mtC7yFPC3gXJDpLxCHIwCgYIKoZIzj0EAwIw\nLzEtMCsGA1UEAxMkcHJpLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3Vs\nMB4XDTIyMTExNjIwMTYxNVoXDTMyMTExMzIwMTY0NVowLzEtMCsGA1UEAxMkcHJp\nLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3VsMFkwEwYHKoZIzj0CAQYI\nKoZIzj0DAQcDQgAETnpGixC1kW8ep2JcGjRR2jbdESvjlEm9nSIWVAcilemUGFwi\nJ0YW0XUmJeEzRyfwLXnOw6voPzXRf1zXKjdTD6OByzCByDAOBgNVHQ8BAf8EBAMC\nAQYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUtb6EjDxyI+myIjDc+7KbiN8u\n8XowHwYDVR0jBBgwFoAUtb6EjDxyI+myIjDc+7KbiN8u8XowZQYDVR0RBF4wXIIk\ncHJpLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3VshjRzcGlmZmU6Ly8z\nNGE3Njc5MS1iOWIyLWI5M2UtYjBlNC0xOTg5ZWQxMWEyOGUuY29uc3VsMAoGCCqG\nSM49BAMCA0gAMEUCIHBezFSQAK5Nolf0rs3ErvlDcA8Z9esldh6gHupuGsNkAiEA\n9qL+P9PJAW4CrbTL0iF2yZUyJC2nwSSa2K0nYG8bXWQ=\n-----END CERTIFICATE-----\n",
-      "IntermediateCerts": [
-        "-----BEGIN CERTIFICATE-----\nMIICLzCCAdSgAwIBAgIUbILCP3ODM4ScNBOm0jw59Fxju0swCgYIKoZIzj0EAwIw\nLzEtMCsGA1UEAxMkcHJpLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3Vs\nMB4XDTIyMTExNjIwMzIxNloXDTIyMTExNjIwNDc0NlowMDEuMCwGA1UEAxMlcHJp\nLTE4MThxNWlnLnZhdWx0LmNhLjM0YTc2NzkxLmNvbnN1bDBZMBMGByqGSM49AgEG\nCCqGSM49AwEHA0IABI30ikgrwTjbPaGgfNYkushvrEUUpxLzxMMEBlE82ilog1RW\nqwuEU29Qsa+N4SrfOf37xNv/Ey8SXPs5l2HmXJWjgcwwgckwDgYDVR0PAQH/BAQD\nAgEGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFCZpC/BTdaggL2kj6Dfyk3+a\nNqBvMB8GA1UdIwQYMBaAFLW+hIw8ciPpsiIw3Puym4jfLvF6MGYGA1UdEQRfMF2C\nJXByaS0xODE4cTVpZy52YXVsdC5jYS4zNGE3Njc5MS5jb25zdWyGNHNwaWZmZTov\nLzM0YTc2NzkxLWI5YjItYjkzZS1iMGU0LTE5ODllZDExYTI4ZS5jb25zdWwwCgYI\nKoZIzj0EAwIDSQAwRgIhAJ8RHgR5qkyW2q866vGYJy+7BJ4zUXs3OJ76QLmxxU3K\nAiEA70S7wBEm1ZduTAk1ZfZPJEUGxvAXAcgy7EWeO/6MJ5o=\n-----END CERTIFICATE-----\n",
-        "-----BEGIN CERTIFICATE-----\nMIICLTCCAdKgAwIBAgIUU3qwESuhh4PgW3/tnHDn3qnBMrAwCgYIKoZIzj0EAwIw\nLzEtMCsGA1UEAxMkcHJpLTEwOTJudTEudmF1bHQuY2EuMzRhNzY3OTEuY29uc3Vs\nMB4XDTIyMTExNjIwNDAxNloXDTIyMTExNjIwNTU0NlowLzEtMCsGA1UEAxMkcHJp\nLTFkY2hkbGkudmF1bHQuY2EuMzRhNzY3OTEuY29uc3VsMFkwEwYHKoZIzj0CAQYI\nKoZIzj0DAQcDQgAEpj0BWPkcH82su9XGOo9rN5Zr5+Jyp68LiHy+qlIgH3L+OAir\nYgmXmJfuNwI8S2BB8cu0Gk3w5cTF7O0p/qAghaOByzCByDAOBgNVHQ8BAf8EBAMC\nAQYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQU/rnWC8bOLCVP2FnLEeqlQl+O\nQUswHwYDVR0jBBgwFoAUtb6EjDxyI+myIjDc+7KbiN8u8XowZQYDVR0RBF4wXIIk\ncHJpLTFkY2hkbGkudmF1bHQuY2EuMzRhNzY3OTEuY29uc3VshjRzcGlmZmU6Ly8z\nNGE3Njc5MS1iOWIyLWI5M2UtYjBlNC0xOTg5ZWQxMWEyOGUuY29uc3VsMAoGCCqG\nSM49BAMCA0kAMEYCIQCtq4LiZzkiIKUES9MrzUEflg7wcwQf7Km+8RcOGQbz9QIh\nANWHWt1fe8Hl1wQ55qxsV5lSfOpGAox5WHpgnsBC7cwU\n-----END CERTIFICATE-----\n"
-      ],
-      "Active": true,
-      "PrivateKeyType": "ec",
-      "PrivateKeyBits": 256,
-      "CreateIndex": 11,
-      "ModifyIndex": 797
-    }
-  ]
-}
-
-# You can x509 decode the ICA certs to verify they have been updated and have correct expiry:
-$ openssl x509 -in cert.crt -text -noout
-Certificate:
-    Data:
-        Version: 3 (0x2)
-        Serial Number:
-            53:7a:b0:11:2b:a1:87:83:e0:5b:7f:ed:9c:70:e7:de:a9:c1:32:b0
-    Signature Algorithm: ecdsa-with-SHA256
-        Issuer: CN=pri-1092nu1.vault.ca.34a76791.consul
-        Validity
-            Not Before: Nov 16 20:40:16 2022 GMT
-            Not After : Nov 16 20:55:46 2022 GMT
-        Subject: CN=pri-1dchdli.vault.ca.34a76791.consul
-        Subject Public Key Info:
-            Public Key Algorithm: id-ecPublicKey
-                Public-Key: (256 bit)
-                pub:
-                    04:a6:3d:01:58:f9:1c:1f:cd:ac:bb:d5:c6:3a:8f:
-                    6b:37:96:6b:e7:e2:72:a7:af:0b:88:7c:be:aa:52:
-                    20:1f:72:fe:38:08:ab:62:09:97:98:97:ee:37:02:
-                    3c:4b:60:41:f1:cb:b4:1a:4d:f0:e5:c4:c5:ec:ed:
-                    29:fe:a0:20:85
-                ASN1 OID: prime256v1
-                NIST CURVE: P-256
-        X509v3 extensions:
-            X509v3 Key Usage: critical
-                Certificate Sign, CRL Sign
-            X509v3 Basic Constraints: critical
-                CA:TRUE
-            X509v3 Subject Key Identifier:
-                FE:B9:D6:0B:C6:CE:2C:25:4F:D8:59:CB:11:EA:A5:42:5F:8E:41:4B
-            X509v3 Authority Key Identifier:
-                keyid:B5:BE:84:8C:3C:72:23:E9:B2:22:30:DC:FB:B2:9B:88:DF:2E:F1:7A
-
-            X509v3 Subject Alternative Name:
-                DNS:pri-1dchdli.vault.ca.34a76791.consul, URI:spiffe://34a76791-b9b2-b93e-b0e4-1989ed11a28e.consul
-<snip>
-```
-
----
-
 ## Helm Reference Docs
-
+ 
 The Helm reference docs (https://www.consul.io/docs/k8s/helm) are automatically
 generated from our `values.yaml` file.
 
 ### Generating Helm Reference Docs
-
+ 
 To generate the docs and update the `helm.mdx` file:
 
 1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub.
@@ -1147,7 +948,7 @@ To generate the docs and update the `helm.mdx` file:
    ```shell-session
    git clone https://github.com/<your-username>/consul.git
    ```
-1. Change directory into your `consul-k8s` repo:
+1. Change directory into your `consul-k8s` repo: 
    ```shell-session
    cd /path/to/consul-k8s
    ```
@@ -1209,26 +1010,6 @@ So that the documentation can look like:
 - `ports` ((#v-ingressgateways-defaults-service-ports)) (`array<map>: [{port: 8080, port: 8443}]`) - Port docs
 ```
 
-## Managing External CRD Dependencies
-
-Some of the features of Consul on Kubernetes make use of CustomResourceDefinitions (CRDs) that we don't directly
-manage. One such example is the Gateway API CRDs which we use to configure API Gateways, but are managed by SIG
-Networking.
-
-To pull external CRDs into our Helm chart and make sure they get installed, we generate their configuration using
-[Kustomize](https://kustomize.io/) which can pull in Kubernetes config from external sources. We split these
-generated CRDs into individual files and store them in the `charts/consul/templates` directory.
-
-If you need to update the external CRDs we depend on, or add to them, you can do this by editing the
-[control-plane/config/crd/external/kustomization.yaml](/control-plane/config/crd/external/kustomization.yaml) file.
-Once modified, running
-
-```bash
-make generate-external-crds
-```
-
-will update the CRDs in the `/templates` directory.
-
 ## Adding a Changelog Entry
 
 Any change that a Consul-K8s user might need to know about should have a changelog entry.
@@ -1261,7 +1042,7 @@ Some common values are:
 - `control-plane`: related to control-plane functionality
 - `helm`: related to the charts module and any files, yaml, go, etc. therein
 
-There may be cases where a `code area` doesn't make sense (i.e. addressing a Go CVE). In these
+There may be cases where a `code area` doesn't make sense (i.e. addressing a Go CVE). In these 
 cases it is okay not to provide a `code area`.
 
 For more examples, look in the [`.changelog/`](../.changelog) folder for existing changelog entries.

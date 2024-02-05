@@ -1,3 +1,0 @@
-```release-note:improvement
-cli: Add -o json (-output-format json) to `consul-k8s proxy list` command that returns the result in json format.
-```

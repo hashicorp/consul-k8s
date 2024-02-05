@@ -58,7 +58,9 @@ load _helpers
   cd `chart_dir`
   assert_empty helm template \
       -s templates/partition-init-job.yaml  \
-      --set 'global.adminPartitions.enabled=false' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'server.enabled=true' \
       .
 }
 
@@ -107,27 +109,6 @@ load _helpers
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_API_TIMEOUT").value' | tee /dev/stderr)
   [ "${actual}" = "5s" ]
-}
-
-#--------------------------------------------------------------------
-# v2tenancy experiment
-
-@test "partitionInit/Job: -enable-v2tenancy=true is set when global.experiments contains [\"resource-apis\", \"v2tenancy\"]" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/partition-init-job.yaml  \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'server.enabled=false' \
-      --set 'global.adminPartitions.name=bar' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'global.experiments[1]=v2tenancy' \
-      --set 'ui.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-v2tenancy=true"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -654,15 +635,7 @@ reservedNameTest() {
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations |
-      del(."consul.hashicorp.com/connect-inject") |
-      del(."consul.hashicorp.com/mesh-inject") |
-      del(."vault.hashicorp.com/agent-inject") |
-      del(."vault.hashicorp.com/agent-pre-populate-only") |
-      del(."vault.hashicorp.com/role") |
-      del(."vault.hashicorp.com/agent-inject-secret-serverca.crt") |
-      del(."vault.hashicorp.com/agent-inject-template-serverca.crt")' |
-      tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/agent-pre-populate-only") | del(."vault.hashicorp.com/role") | del(."vault.hashicorp.com/agent-inject-secret-serverca.crt") | del(."vault.hashicorp.com/agent-inject-template-serverca.crt")' | tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 

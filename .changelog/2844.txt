@@ -1,3 +1,0 @@
-```release-note:feature
-helm: (Consul Enterprise) Adds rate limiting config to serviceDefaults CRD
-```

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package terminatinggateway
 
 import (
@@ -12,6 +9,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 )
@@ -72,25 +70,25 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service.
 			logger.Log(t, "creating static-server deployment")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-https")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server-https")
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
 			// so that it can request Connect certificates for it.
 			if c.secure {
-				UpdateTerminatingGatewayRole(t, consulClient, terminatingGatewayRules)
+				updateTerminatingGatewayRole(t, consulClient, terminatingGatewayRules)
 			}
 
 			// Since we are using the transparent kube DNS, disable the ability
 			// of the service to dial the server directly through the sidecar
-			CreateMeshConfigEntry(t, consulClient, "")
+			createMeshConfigEntry(t, consulClient, "")
 
 			// Create the config entry for the terminating gateway.
-			CreateTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerHostnameID, staticServerIPID)
+			createTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerHostnameID, staticServerIPID)
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 
 			staticServerIP, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "po", "-l", "app=static-server", `-o=jsonpath={.items[0].status.podIP}`)
 			require.NoError(t, err)
@@ -101,8 +99,8 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 			// Create the service default declaring the external service (aka Destination)
 			logger.Log(t, "creating tcp-based service defaults")
-			CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerServiceName)
-			CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "", 80, staticServerIP)
+			createServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerServiceName)
+			createServiceDefaultDestination(t, consulClient, "", staticServerIPID, "", 80, staticServerIP)
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -114,8 +112,8 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
 
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerHostnameID)
-				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerIPID)
+				addIntention(t, consulClient, "", staticClientName, "", staticServerHostnameID)
+				addIntention(t, consulClient, "", staticClientName, "", staticServerIPID)
 			}
 
 			// Test that we can make a call to the terminating gateway.
@@ -131,12 +129,54 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			logger.Log(t, "updating service defaults to try other scenarios")
 
 			// You can't use TLS w/ protocol set to anything L7; Envoy can't snoop the traffic when the client encrypts it
-			CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "http", 80, staticServerServiceName)
-			CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "http", 80, staticServerIP)
+			createServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "http", 80, staticServerServiceName)
+			createServiceDefaultDestination(t, consulClient, "", staticServerIPID, "http", 80, staticServerIP)
 
 			logger.Log(t, "trying calls to terminating gateway")
 			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
 			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerHostnameURL)
 		})
 	}
+}
+func createServiceDefaultDestination(t *testing.T, consulClient *api.Client, serviceNamespace string, name string, protocol string, port int, addresses ...string) {
+	t.Helper()
+
+	logger.Log(t, "creating config entry")
+
+	if serviceNamespace != "" {
+		logger.Logf(t, "creating the %s namespace in Consul", serviceNamespace)
+		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
+			Name: serviceNamespace,
+		}, nil)
+		require.NoError(t, err)
+	}
+
+	configEntry := &api.ServiceConfigEntry{
+		Kind:      api.ServiceDefaults,
+		Name:      name,
+		Namespace: serviceNamespace,
+		Protocol:  protocol,
+		Destination: &api.DestinationConfig{
+			Addresses: addresses,
+			Port:      port,
+		},
+	}
+
+	created, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+	require.NoError(t, err)
+	require.True(t, created, "failed to create config entry")
+}
+
+func createMeshConfigEntry(t *testing.T, consulClient *api.Client, namespace string) {
+	t.Helper()
+
+	logger.Log(t, "creating mesh config entry to enable MeshDestinationOnly")
+	created, _, err := consulClient.ConfigEntries().Set(&api.MeshConfigEntry{
+		Namespace: namespace,
+		TransparentProxy: api.TransparentProxyMeshConfig{
+			MeshDestinationsOnly: true,
+		},
+	}, nil)
+	require.NoError(t, err)
+	require.True(t, created, "failed to create config entry")
 }

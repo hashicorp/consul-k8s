@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package connectinject
 
 import (
@@ -131,15 +128,6 @@ func TestRun_FlagValidation(t *testing.T) {
 				"-default-envoy-proxy-concurrency=-42",
 			},
 			expErr: "-default-envoy-proxy-concurrency must be >= 0 if set",
-		},
-		{
-			flags: []string{
-				"-consul-k8s-image", "hashicorp/consul-k8s",
-				"-consul-image", "hashicorp/consul",
-				"-consul-dataplane-image", "hashicorp/consul-dataplane",
-				"-enable-v2tenancy", "true",
-			},
-			expErr: "-enable-resource-apis must be set to 'true' if -enable-v2tenancy is set",
 		},
 	}
 

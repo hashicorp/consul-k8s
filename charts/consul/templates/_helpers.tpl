@@ -15,8 +15,23 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+
 {{- define "consul.restrictedSecurityContext" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
+{{/*
+To be compatible with the 'restricted' Pod Security Standards profile, we
+should set this securityContext on containers whenever possible.
+
+In OpenShift < 4.11 the restricted SCC disallows setting most of these fields,
+so we do not set any for simplicity (and because that's how it was configured
+prior to adding restricted PSA support here). In OpenShift >= 4.11, the new
+restricted-v2 SCC allows setting these in the securityContext, and by setting
+them we avoid PSA warnings that are enabled by default.
+
+We use the K8s version as a proxy for the OpenShift version because there is a
+1:1 mapping of versions. OpenShift 4.11 corresponds to K8s 1.24.x.
+*/}}
+{{- if (or (not .Values.global.openshift.enabled) (and (ge .Capabilities.KubeVersion.Major "1") (ge .Capabilities.KubeVersion.Minor "24"))) -}}
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
@@ -27,11 +42,12 @@ securityContext:
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
+{{- end -}}
 {{- if not .Values.global.openshift.enabled -}}
 {{/*
 We must set runAsUser or else the root user will be used in some cases and
 containers will fail to start due to runAsNonRoot above (e.g.
-tls-init-cleanup). On OpenShift, runAsUser is automatically. We pick user 100
+tls-init-cleanup). On OpenShift, runAsUser is set automatically. We pick user 100
 because it is a non-root user id that exists in the consul, consul-dataplane,
 and consul-k8s-control-plane images.
 */}}
@@ -98,6 +114,22 @@ and consul-k8s-control-plane images.
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}
 
+{{- define "consul.controllerWebhookTLSCertTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-controller-webhook" $name }}"
+            "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.certificate -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
+{{- define "consul.controllerWebhookTLSKeyTemplate" -}}
+ |
+            {{ "{{" }}- with secret "{{ .Values.global.secretsBackend.vault.controller.tlsCert.secretName }}" "{{- $name := include "consul.fullname" . -}}{{ printf "common_name=%s-controller-webhook" $name }}"
+            "alt_names={{ include "consul.controllerWebhookTLSAltNames" . }}" -{{ "}}" }}
+            {{ "{{" }}- .Data.private_key -{{ "}}" }}
+            {{ "{{" }}- end -{{ "}}" }}
+{{- end -}}
+
 {{- define "consul.serverTLSAltNames" -}}
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
@@ -116,6 +148,12 @@ and consul-k8s-control-plane images.
 {{- $name := include "consul.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
 {{ printf "%s-connect-injector,%s-connect-injector.%s,%s-connect-injector.%s.svc,%s-connect-injector.%s.svc.cluster.local" $name $name $ns $name $ns $name $ns}}
+{{- end -}}
+
+{{- define "consul.controllerWebhookTLSAltNames" -}}
+{{- $name := include "consul.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{ printf "%s-controller-webhook,%s-controller-webhook.%s,%s-controller-webhook.%s.svc,%s-controller-webhook.%s.svc.cluster.local" $name $name $ns $name $ns $name $ns}}
 {{- end -}}
 
 {{- define "consul.vaultReplicationTokenTemplate" -}}
@@ -145,7 +183,7 @@ substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The out
 is passed to consul as a -config-file param on command line.
 */}}
 {{- define "consul.extraconfig" -}}
-              cp /consul/tmp/extra-config/extra-from-values.json /consul/extra-config/extra-from-values.json
+              cp /consul/config/extra-from-values.json /consul/extra-config/extra-from-values.json
               [ -n "${HOST_IP}" ] && sed -Ei "s|HOST_IP|${HOST_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${POD_IP}" ] && sed -Ei "s|POD_IP|${POD_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
@@ -166,27 +204,24 @@ Expand the name of the chart.
 {{- end -}}
 
 {{/*
-Calculate max number of server pods that are allowed to be voluntarily disrupted.
-When there's 1 server, this is set to 0 because this pod should not be disrupted. This is an edge
-case and I'm not sure it makes a difference when there's only one server but that's what the previous config was and
-I don't want to change it for this edge case.
-Otherwise we've changed this to always be 1 as part of the move to set leave_on_terminate
-to true. With leave_on_terminate set to true, whenever a server pod is stopped, the number of peers in raft
-is reduced. If the number of servers is odd and the count is reduced by 1, the quorum size doesn't change,
-but if it's reduced by more than 1, the quorum size can change so that's why this is now always hardcoded to 1.
+Compute the maximum number of unavailable replicas for the PodDisruptionBudget.
+This defaults to (n/2)-1 where n is the number of members of the server cluster.
+Special case of replica equaling 3 and allowing a minor disruption of 1 otherwise
+use the integer value
+Add a special case for replicas=1, where it should default to 0 as well.
 */}}
-{{- define "consul.server.pdb.maxUnavailable" -}}
+{{- define "consul.pdb.maxUnavailable" -}}
 {{- if eq (int .Values.server.replicas) 1 -}}
 {{ 0 }}
 {{- else if .Values.server.disruptionBudget.maxUnavailable -}}
 {{ .Values.server.disruptionBudget.maxUnavailable -}}
 {{- else -}}
-{{ 1 }}
+{{- if eq (int .Values.server.replicas) 3 -}}
+{{- 1 -}}
+{{- else -}}
+{{- sub (div (int .Values.server.replicas) 2) 1 -}}
 {{- end -}}
 {{- end -}}
-
-{{- define "consul.server.autopilotMinQuorum" -}}
-{{- add (div (int .Values.server.replicas) 2) 1 -}}
 {{- end -}}
 
 {{- define "consul.pdb.connectInject.maxUnavailable" -}}
@@ -291,17 +326,20 @@ Fails when at least one but not all of the following have been set:
 - global.secretsBackend.vault.connectInjectRole
 - global.secretsBackend.vault.connectInject.tlsCert.secretName
 - global.secretsBackend.vault.connectInject.caCert.secretName
+- global.secretsBackend.vault.controllerRole
+- global.secretsBackend.vault.controller.tlsCert.secretName
+- global.secretsBackend.vault.controller.caCert.secretName
 
 The above values are needed in full to turn off web cert manager and allow
-connect inject to manage its own webhook certs.
+connect inject and controller to manage its own webhook certs.
 
 Usage: {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 
 */}}
 {{- define "consul.validateVaultWebhookCertConfiguration" -}}
-{{- if or .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName}}
-{{- if or (not .Values.global.secretsBackend.vault.connectInjectRole) (not .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) (not .Values.global.secretsBackend.vault.connectInject.caCert.secretName) }}
-{{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName"}}
+{{- if or .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName .Values.global.secretsBackend.vault.controllerRole .Values.global.secretsBackend.vault.controller.tlsCert.secretName .Values.global.secretsBackend.vault.controller.caCert.secretName}}
+{{- if or (not .Values.global.secretsBackend.vault.connectInjectRole) (not .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) (not .Values.global.secretsBackend.vault.connectInject.caCert.secretName) (not .Values.global.secretsBackend.vault.controllerRole) (not .Values.global.secretsBackend.vault.controller.tlsCert.secretName) (not .Values.global.secretsBackend.vault.controller.caCert.secretName) }}
+{{fail "When one of the following has been set, all must be set:  global.secretsBackend.vault.connectInjectRole, global.secretsBackend.vault.connectInject.tlsCert.secretName, global.secretsBackend.vault.connectInject.caCert.secretName, global.secretsBackend.vault.controllerRole, global.secretsBackend.vault.controller.tlsCert.secretName, and global.secretsBackend.vault.controller.caCert.secretName."}}
 {{ end }}
 {{ end }}
 {{- end -}}
@@ -363,7 +401,7 @@ Consul server environment variables for consul-k8s commands.
 {{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
 - name: CONSUL_SKIP_SERVER_WATCH
-  value: "true"
+  value: "true" 
 {{- end }}
 {{- end -}}
 
@@ -394,7 +432,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 */}}
 {{- define "consul.validateCloudSecretKeys" -}}
-{{- if and .Values.global.cloud.enabled }}
+{{- if and .Values.global.cloud.enabled }} 
 {{- if or (and .Values.global.cloud.resourceId.secretName (not .Values.global.cloud.resourceId.secretKey)) (and .Values.global.cloud.resourceId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
 {{fail "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set."}}
 {{- end }}
@@ -416,106 +454,3 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 {{- end }}
 {{- end -}}
 
-
-{{/*
-Fails if telemetryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
-- telemetryCollector.cloud.clientId.secretName
-- telemetryCollector.cloud.clientSecret.secretName
-- global.cloud.resourceId.secretName
-
-Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
-
-*/}}
-{{- define "consul.validateTelemetryCollectorCloud" -}}
-{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (and (not .Values.global.cloud.clientSecret.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
-{{- end }}
-{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (and (not .Values.global.cloud.clientId.secretName) (not .Values.telemetryCollector.cloud.clientId.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set."}}
-{{- end }}
-{{- end }}
-
-{{/**/}}
-
-{{- define "consul.validateTelemetryCollectorCloudSecretKeys" -}}
-{{- if or (and .Values.telemetryCollector.cloud.clientId.secretName (not .Values.telemetryCollector.cloud.clientId.secretKey)) (and .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.telemetryCollector.cloud.clientId.secretName)) }}
-{{fail "When either telemetryCollector.cloud.clientId.secretName or telemetryCollector.cloud.clientId.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName (not .Values.telemetryCollector.cloud.clientSecret.secretKey)) (and .Values.telemetryCollector.cloud.clientSecret.secretKey (not .Values.telemetryCollector.cloud.clientSecret.secretName)) }}
-{{fail "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName))) }}
-{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretName or global.cloud.resourceId.secretName must be set"}}
-{{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey))) }}
-{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretKey or global.cloud.resourceId.secretKey must be set"}}
-{{- end }}
-{{- end -}}
-
-{{/*
-Fails if telemetryCollector.cloud.resourceId is set but differs from global.cloud.resourceId. This should never happen. Either one or both are set, but they should never differ.
-If they differ, that implies we're configuring servers for one HCP Consul cluster but pushing envoy metrics for a different HCP Consul cluster. A user could set the same value
-in two secrets (it's questionable whether resourceId should be a secret at all) but we won't know at this point, so we just check secret name+key.
-
-Usage: {{ template "consul.validateTelemetryCollectorResourceId" . }}
-
-*/}}
-{{- define "consul.validateTelemetryCollectorResourceId" -}}
-{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName) (not (eq .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName)) }}
-{{fail "When both global.cloud.resourceId.secretName and telemetryCollector.cloud.resourceId.secretName are set, they should be the same."}}
-{{- end }}
-{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey) (not (eq .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey)) }}
-{{fail "When both global.cloud.resourceId.secretKey and telemetryCollector.cloud.resourceId.secretKey are set, they should be the same."}}
-{{- end }}
-{{- end }}
-
-{{/**/}}
-
-{{/*
-Fails if global.experiments.resourceAPIs is set along with any of these unsupported features.
-- global.peering.enabled
-- global.federation.enabled
-- global.cloud.enabled
-- client.enabled
-- ui.enabled
-- syncCatalog.enabled
-- meshGateway.enabled
-- ingressGateways.enabled
-- terminatingGateways.enabled
-- apiGateway.enabled
-
-Usage: {{ template "consul.validateResourceAPIs" . }}
-
-*/}}
-{{- define "consul.validateResourceAPIs" -}}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.peering.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.peering.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) (not (mustHas "v2tenancy" .Values.global.experiments)) .Values.global.adminPartitions.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.experiments.v2tenancy must also be set to support global.adminPartitions.enabled."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.federation.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.federation.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.cloud.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.cloud.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.client.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, client.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ui.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, ui.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.syncCatalog.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, syncCatalog.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ingressGateways.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, ingressGateways.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.terminatingGateways.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.apiGateway.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, apiGateway.enabled is currently unsupported."}}
-{{- end }}
-{{- end }}

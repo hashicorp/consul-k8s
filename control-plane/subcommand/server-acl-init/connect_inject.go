@@ -1,17 +1,12 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package serveraclinit
 
 import (
 	"fmt"
 
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 // We use the default Kubernetes service as the default host
@@ -22,7 +17,7 @@ const defaultKubernetesHost = "https://kubernetes.default.svc"
 
 // configureConnectInject sets up auth methods so that connect injection will
 // work.
-func (c *Command) configureConnectInjectAuthMethod(client *consul.DynamicClient, authMethodName string) error {
+func (c *Command) configureConnectInjectAuthMethod(consulClient *api.Client, authMethodName string) error {
 
 	// Create the auth method template. This requires calls to the
 	// kubernetes environment.
@@ -48,11 +43,7 @@ func (c *Command) configureConnectInjectAuthMethod(client *consul.DynamicClient,
 			err = c.untilSucceeds(fmt.Sprintf("checking or creating namespace %s",
 				c.flagConsulInjectDestinationNamespace),
 				func() error {
-					err = client.RefreshClient()
-					if err != nil {
-						c.log.Error("could not refresh client", err)
-					}
-					_, err := namespaces.EnsureExists(client.ConsulClient, c.flagConsulInjectDestinationNamespace, "cross-namespace-policy")
+					_, err := namespaces.EnsureExists(consulClient, c.flagConsulInjectDestinationNamespace, "cross-namespace-policy")
 					return err
 				})
 			if err != nil {
@@ -64,44 +55,26 @@ func (c *Command) configureConnectInjectAuthMethod(client *consul.DynamicClient,
 	err = c.untilSucceeds(fmt.Sprintf("creating auth method %s", authMethodTmpl.Name),
 		func() error {
 			var err error
-			err = client.RefreshClient()
-			if err != nil {
-				c.log.Error("could not refresh client", err)
-			}
 			// `AuthMethodCreate` will also be able to update an existing
 			// AuthMethod based on the name provided. This means that any
 			// configuration changes will correctly update the AuthMethod.
-			_, _, err = client.ConsulClient.ACL().AuthMethodCreate(&authMethodTmpl, &writeOptions)
+			_, _, err = consulClient.ACL().AuthMethodCreate(&authMethodTmpl, &writeOptions)
 			return err
 		})
 	if err != nil {
 		return err
 	}
 
-	var abr api.ACLBindingRule
-	if c.flagResourceAPIs {
-		c.log.Info("creating consul binding rule for WorkloadIdentityName")
-		abr = api.ACLBindingRule{
-			Description: "Kubernetes binding rule",
-			AuthMethod:  authMethodName,
-			BindType:    api.BindingRuleBindTypeTemplatedPolicy,
-			BindName:    api.ACLTemplatedPolicyWorkloadIdentityName,
-			BindVars: &api.ACLTemplatedPolicyVariables{
-				Name: "${serviceaccount.name}",
-			},
-			Selector: c.flagBindingRuleSelector,
-		}
-	} else {
-		abr = api.ACLBindingRule{
-			Description: "Kubernetes binding rule",
-			AuthMethod:  authMethodName,
-			BindType:    api.BindingRuleBindTypeService,
-			BindName:    "${serviceaccount.name}",
-			Selector:    c.flagBindingRuleSelector,
-		}
+	c.log.Info("creating inject binding rule")
+	// Create the binding rule.
+	abr := api.ACLBindingRule{
+		Description: "Kubernetes binding rule",
+		AuthMethod:  authMethodName,
+		BindType:    api.BindingRuleBindTypeService,
+		BindName:    "${serviceaccount.name}",
+		Selector:    c.flagBindingRuleSelector,
 	}
-
-	return c.createConnectBindingRule(client, authMethodName, &abr)
+	return c.createConnectBindingRule(consulClient, authMethodName, &abr)
 }
 
 // createAuthMethodTmpl sets up the auth method template based on the connect-injector's service account

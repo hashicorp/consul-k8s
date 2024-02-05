@@ -1,20 +1,15 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestServiceDefaults_ToConsul(t *testing.T) {
@@ -70,7 +65,6 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
-					MutualTLSMode: MutualTLSModePermissive,
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
 							Name:              "upstream-default",
@@ -159,36 +153,6 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							},
 						},
 					},
-					BalanceInboundConnections: "exact_balance",
-					RateLimits: &RateLimits{
-						InstanceLevel: InstanceLevelRateLimits{
-							RequestsPerSecond: 1234,
-							RequestsMaxBurst:  2345,
-							Routes: []InstanceLevelRouteRateLimits{
-								{
-									PathExact:         "/foo",
-									RequestsPerSecond: 111,
-									RequestsMaxBurst:  222,
-								},
-								{
-									PathPrefix:        "/admin",
-									RequestsPerSecond: 333,
-								},
-							},
-						},
-					},
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
-							Required:  true,
-						},
-					},
 					Destination: &ServiceDefaultsDestination{
 						Addresses: []string{"api.google.com"},
 						Port:      443,
@@ -227,7 +191,6 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
-				MutualTLSMode: capi.MutualTLSModePermissive,
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
@@ -302,43 +265,6 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 								Mode: "remote",
 							},
 						},
-					},
-				},
-				BalanceInboundConnections: "exact_balance",
-				RateLimits: &capi.RateLimits{
-					InstanceLevel: capi.InstanceLevelRateLimits{
-						RequestsPerSecond: 1234,
-						RequestsMaxBurst:  2345,
-						Routes: []capi.InstanceLevelRouteRateLimits{
-							{
-								PathExact:         "/foo",
-								RequestsPerSecond: 111,
-								RequestsMaxBurst:  222,
-							},
-							{
-								PathPrefix:        "/admin",
-								RequestsPerSecond: 333,
-							},
-						},
-					},
-				},
-				EnvoyExtensions: []capi.EnvoyExtension{
-					{
-						Name: "aws_request_signing",
-						Arguments: map[string]interface{}{
-							"AWSServiceName": "s3",
-							"Region":         "us-west-2",
-						},
-						Required: false,
-					},
-					{
-						Name: "zipkin",
-						Arguments: map[string]interface{}{
-							"ClusterName":       "zipkin_cluster",
-							"Port":              "9411",
-							"CollectorEndpoint": "/api/v2/spans",
-						},
-						Required: true,
 					},
 				},
 				Destination: &capi.DestinationConfig{
@@ -506,7 +432,6 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
-					MutualTLSMode: MutualTLSModeStrict,
 					UpstreamConfig: &Upstreams{
 						Defaults: &Upstream{
 							Name:              "upstream-default",
@@ -565,6 +490,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							},
 							{
 								Name:              "upstream-default",
+								Namespace:         "ns",
 								EnvoyListenerJSON: `{"key": "value"}`,
 								EnvoyClusterJSON:  `{"key": "value"}`,
 								Protocol:          "http2",
@@ -589,36 +515,6 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									Mode: "remote",
 								},
 							},
-						},
-					},
-					BalanceInboundConnections: "exact_balance",
-					RateLimits: &RateLimits{
-						InstanceLevel: InstanceLevelRateLimits{
-							RequestsPerSecond: 1234,
-							RequestsMaxBurst:  2345,
-							Routes: []InstanceLevelRouteRateLimits{
-								{
-									PathExact:         "/foo",
-									RequestsPerSecond: 111,
-									RequestsMaxBurst:  222,
-								},
-								{
-									PathPrefix:        "/admin",
-									RequestsPerSecond: 333,
-								},
-							},
-						},
-					},
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
-							Required:  true,
 						},
 					},
 					Destination: &ServiceDefaultsDestination{
@@ -655,7 +551,6 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
-				MutualTLSMode: capi.MutualTLSModeStrict,
 				UpstreamConfig: &capi.UpstreamConfiguration{
 					Defaults: &capi.UpstreamConfig{
 						Name:              "upstream-default",
@@ -706,8 +601,7 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						},
 						{
 							Name:              "upstream-default",
-							Namespace:         "default",
-							Partition:         "default",
+							Namespace:         "ns",
 							EnvoyListenerJSON: `{"key": "value"}`,
 							EnvoyClusterJSON:  `{"key": "value"}`,
 							Protocol:          "http2",
@@ -728,43 +622,6 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 								Mode: "remote",
 							},
 						},
-					},
-				},
-				BalanceInboundConnections: "exact_balance",
-				RateLimits: &capi.RateLimits{
-					InstanceLevel: capi.InstanceLevelRateLimits{
-						RequestsPerSecond: 1234,
-						RequestsMaxBurst:  2345,
-						Routes: []capi.InstanceLevelRouteRateLimits{
-							{
-								PathExact:         "/foo",
-								RequestsPerSecond: 111,
-								RequestsMaxBurst:  222,
-							},
-							{
-								PathPrefix:        "/admin",
-								RequestsPerSecond: 333,
-							},
-						},
-					},
-				},
-				EnvoyExtensions: []capi.EnvoyExtension{
-					{
-						Name: "aws_request_signing",
-						Arguments: map[string]interface{}{
-							"AWSServiceName": "s3",
-							"Region":         "us-west-2",
-						},
-						Required: false,
-					},
-					{
-						Name: "zipkin",
-						Arguments: map[string]interface{}{
-							"ClusterName":       "zipkin_cluster",
-							"Port":              "9411",
-							"CollectorEndpoint": "/api/v2/spans",
-						},
-						Required: true,
 					},
 				},
 				Destination: &capi.DestinationConfig{
@@ -873,7 +730,6 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
-					MutualTLSMode: MutualTLSModePermissive,
 					Expose: Expose{
 						Checks: false,
 						Paths: []ExposePath{
@@ -898,39 +754,6 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					Destination: &ServiceDefaultsDestination{
 						Addresses: []string{"www.google.com"},
 						Port:      443,
-					},
-				},
-			},
-			expectedErrMsg: "",
-		},
-		"valid - balanceInboundConnections": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					BalanceInboundConnections: "exact_balance",
-				},
-			},
-			expectedErrMsg: "",
-		},
-		"valid - envoyExtension": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
-							Required:  true,
-						},
 					},
 				},
 			},
@@ -1009,17 +832,6 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			expectedErrMsg: "servicedefaults.consul.hashicorp.com \"my-service\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
 		},
-		"mutualTLSMode": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					MutualTLSMode: MutualTLSMode("asdf"),
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.mutualTLSMode: Invalid value: "asdf": Must be one of "", "strict", or "permissive".`,
-		},
 		"mode": {
 			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1063,21 +875,6 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.name: Invalid value: "foobar": upstream.name for a default upstream must be ""`,
 		},
-		"upstreamConfig.defaults.namespace": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					UpstreamConfig: &Upstreams{
-						Defaults: &Upstream{
-							Namespace: "foobar",
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.namespace: Invalid value: "foobar": upstream.namespace for a default upstream must be ""`,
-		},
 		"upstreamConfig.defaults.partition": {
 			input: &ServiceDefaults{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1092,22 +889,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			partitionsEnabled: false,
-			expectedErrMsg:    `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.upstreamConfig.defaults.partition: Invalid value: "upstream": upstream.partition for a default upstream must be "", spec.upstreamConfig.defaults.partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition]`,
-		},
-		"upstreamConfig.defaults.peer": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					UpstreamConfig: &Upstreams{
-						Defaults: &Upstream{
-							Peer: "foobar",
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.peer: Invalid value: "foobar": upstream.peer for a default upstream must be ""`,
+			expectedErrMsg:    `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.defaults.partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition`,
 		},
 		"upstreamConfig.overrides.meshGateway": {
 			input: &ServiceDefaults{
@@ -1163,44 +945,6 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0].partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition`,
-		},
-		"upstreamConfig.overrides.partition and namespace": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					UpstreamConfig: &Upstreams{
-						Overrides: []*Upstream{
-							{
-								Name:      "service",
-								Namespace: "namespace",
-								Peer:      "peer",
-							},
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0]: Invalid value: v1alpha1.Upstream{Name:"service", Namespace:"namespace", Partition:"", Peer:"peer", EnvoyListenerJSON:"", EnvoyClusterJSON:"", Protocol:"", ConnectTimeoutMs:0, Limits:(*v1alpha1.UpstreamLimits)(nil), PassiveHealthCheck:(*v1alpha1.PassiveHealthCheck)(nil), MeshGateway:v1alpha1.MeshGateway{Mode:""}}: both namespace and peer cannot be specified.`,
-		},
-		"upstreamConfig.overrides.partition and peer": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					UpstreamConfig: &Upstreams{
-						Overrides: []*Upstream{
-							{
-								Name:      "service",
-								Partition: "upstream",
-								Peer:      "peer",
-							},
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.upstreamConfig.overrides[0]: Invalid value: v1alpha1.Upstream{Name:"service", Namespace:"", Partition:"upstream", Peer:"peer", EnvoyListenerJSON:"", EnvoyClusterJSON:"", Protocol:"", ConnectTimeoutMs:0, Limits:(*v1alpha1.UpstreamLimits)(nil), PassiveHealthCheck:(*v1alpha1.PassiveHealthCheck)(nil), MeshGateway:v1alpha1.MeshGateway{Mode:""}}: both partition and peer cannot be specified., spec.upstreamConfig.overrides[0].partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition]`,
 		},
 		"multi-error": {
 			input: &ServiceDefaults{
@@ -1291,257 +1035,6 @@ func TestServiceDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.destination.port: Invalid value: 0x0: invalid port number`,
-		},
-		"MaxInboundConnections (invalid value)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					MaxInboundConnections: -1,
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.maxinboundconnections: Invalid value: -1: MaxInboundConnections must be > 0`,
-		},
-		"LocalConnectTimeoutMs (invalid value)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					LocalConnectTimeoutMs: -1,
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.localConnectTimeoutMs: Invalid value: -1: LocalConnectTimeoutMs must be > 0`,
-		},
-		"LocalRequestTimeoutMs (invalid value)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					LocalRequestTimeoutMs: -1,
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.localRequestTimeoutMs: Invalid value: -1: LocalRequestTimeoutMs must be > 0`,
-		},
-		"balanceInboundConnections (invalid value)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					BalanceInboundConnections: "not_exact_balance",
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.balanceInboundConnections: Invalid value: "not_exact_balance": BalanceInboundConnections must be an empty string or exact_balance`,
-		},
-		"envoyExtension.arguments (single empty)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "zipkin",
-							Arguments: nil,
-							Required:  true,
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.envoyExtensions.envoyExtension[1].arguments: Required value: arguments must be defined`,
-		},
-		"envoyExtension.arguments (multi empty)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: nil,
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: nil,
-							Required:  false,
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.envoyExtensions.envoyExtension[0].arguments: Required value: arguments must be defined, spec.envoyExtensions.envoyExtension[1].arguments: Required value: arguments must be defined]`,
-		},
-		"envoyExtension.arguments (invalid json)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"SOME_INVALID_JSON"}`),
-							Required:  false,
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.envoyExtensions.envoyExtension[0].arguments: Invalid value: "{\"SOME_INVALID_JSON\"}": must be valid map value: invalid character '}' after object key`,
-		},
-		"rateLimits.instanceLevel.requestsPerSecond (negative value)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					RateLimits: &RateLimits{
-						InstanceLevel: InstanceLevelRateLimits{
-							RequestsPerSecond: -1,
-							RequestsMaxBurst:  0,
-							Routes: []InstanceLevelRouteRateLimits{
-								{
-									PathPrefix:        "/admin",
-									RequestsPerSecond: 222,
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.requestsPerSecond: Invalid value: -1: RequestsPerSecond must be positive`,
-		},
-		"rateLimits.instanceLevel.requestsPerSecond (invalid value)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					RateLimits: &RateLimits{
-						InstanceLevel: InstanceLevelRateLimits{
-							RequestsMaxBurst: 1000,
-							Routes: []InstanceLevelRouteRateLimits{
-								{
-									PathPrefix:        "/admin",
-									RequestsPerSecond: 222,
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.requestsPerSecond: Invalid value: 0: RequestsPerSecond must be greater than 0 if RequestsMaxBurst is set`,
-		},
-		"rateLimits.instanceLevel.requestsMaxBurst (negative value)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					RateLimits: &RateLimits{
-						InstanceLevel: InstanceLevelRateLimits{
-							RequestsMaxBurst: -1,
-							Routes: []InstanceLevelRouteRateLimits{
-								{
-									PathPrefix:        "/admin",
-									RequestsPerSecond: 222,
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.requestsMaxBurst: Invalid value: -1: RequestsMaxBurst must be positive`,
-		},
-		"rateLimits.instanceLevel.routes (invalid path)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					RateLimits: &RateLimits{
-						InstanceLevel: InstanceLevelRateLimits{
-							RequestsPerSecond: 1234,
-							RequestsMaxBurst:  2345,
-							Routes: []InstanceLevelRouteRateLimits{
-								{
-									RequestsPerSecond: 222,
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.routes[0]: Required value: Route must define exactly one of PathExact, PathPrefix, or PathRegex`,
-		},
-		"rateLimits.instanceLevel.routes.requestsPerSecond (zero value)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					RateLimits: &RateLimits{
-						InstanceLevel: InstanceLevelRateLimits{
-							RequestsPerSecond: 1234,
-							Routes: []InstanceLevelRouteRateLimits{
-								{
-									PathExact: "/",
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.routes[0].requestsPerSecond: Invalid value: 0: RequestsPerSecond must be greater than 0`,
-		},
-		"rateLimits.instanceLevel.routes.requestsMaxBurst (negative value)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					RateLimits: &RateLimits{
-						InstanceLevel: InstanceLevelRateLimits{
-							RequestsPerSecond: 1234,
-							Routes: []InstanceLevelRouteRateLimits{
-								{
-									PathExact:         "/",
-									RequestsPerSecond: 222,
-									RequestsMaxBurst:  -1,
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.rateLimits.instanceLevel.routes[0].requestsMaxBurst: Invalid value: -1: RequestsMaxBurst must be positive`,
-		},
-		"rateLimits.requestsMaxBurst (top-level and route-level unset)": {
-			input: &ServiceDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-service",
-				},
-				Spec: ServiceDefaultsSpec{
-					RateLimits: &RateLimits{
-						InstanceLevel: InstanceLevelRateLimits{
-							Routes: []InstanceLevelRouteRateLimits{
-								{
-									PathExact: "/",
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.rateLimits.instanceLevel.routes[0].requestsPerSecond: Invalid value: 0: RequestsPerSecond must be greater than 0, spec.rateLimits.instanceLevel.requestsPerSecond: Invalid value: 0: At least one of top-level or route-level RequestsPerSecond must be set]`,
 		},
 	}
 
@@ -1647,7 +1140,7 @@ func TestServiceDefaults_ConsulName(t *testing.T) {
 }
 
 func TestServiceDefaults_KubernetesName(t *testing.T) {
-	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).KubernetesName())
+	require.Equal(t, "foo", (&ServiceDefaults{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}).ConsulName())
 }
 
 func TestServiceDefaults_ConsulNamespace(t *testing.T) {

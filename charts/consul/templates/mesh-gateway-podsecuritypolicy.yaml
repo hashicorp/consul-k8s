@@ -1,5 +1,4 @@
 {{- if and .Values.global.enablePodSecurityPolicies .Values.meshGateway.enabled }}
-{{- if not (mustHas "resource-apis" .Values.global.experiments) }}
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -52,5 +51,4 @@ spec:
   fsGroup:
     rule: 'RunAsAny'
   readOnlyRootFilesystem: false
-{{- end }}
 {{- end }}

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 //go:build enterprise
 
 package endpoints
@@ -11,9 +8,12 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -23,10 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 // TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
@@ -172,40 +168,40 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 					CheckID:     fmt.Sprintf("%s/pod1-service-created", testCase.SourceKubeNS),
 					ServiceName: "service-created",
 					ServiceID:   "pod1-service-created",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 					Namespace:   testCase.ExpConsulNS,
 				},
 				{
 					CheckID:     fmt.Sprintf("%s/pod1-service-created-sidecar-proxy", testCase.SourceKubeNS),
 					ServiceName: "service-created-sidecar-proxy",
 					ServiceID:   "pod1-service-created-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 					Namespace:   testCase.ExpConsulNS,
 				},
 				{
 					CheckID:     fmt.Sprintf("%s/pod2-service-created", testCase.SourceKubeNS),
 					ServiceName: "service-created",
 					ServiceID:   "pod2-service-created",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 					Namespace:   testCase.ExpConsulNS,
 				},
 				{
 					CheckID:     fmt.Sprintf("%s/pod2-service-created-sidecar-proxy", testCase.SourceKubeNS),
 					ServiceName: "service-created-sidecar-proxy",
 					ServiceID:   "pod2-service-created-sidecar-proxy",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 					Namespace:   testCase.ExpConsulNS,
 				},
 			},
@@ -227,7 +223,7 @@ func TestReconcileCreateEndpointWithNamespaces(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                     fakeClient,
-				Log:                        logrtest.NewTestLogger(t),
+				Log:                        logrtest.New(t),
 				ConsulClientConfig:         testClient.Cfg,
 				ConsulServerConnMgr:        testClient.Watcher,
 				AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
@@ -446,30 +442,30 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 					CheckID:     "default/mesh-gateway",
 					ServiceName: "mesh-gateway",
 					ServiceID:   "mesh-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 					Namespace:   "default",
 				},
 				{
 					CheckID:     "default/terminating-gateway",
 					ServiceName: "terminating-gateway",
 					ServiceID:   "terminating-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 					Namespace:   testCase.ConsulNS,
 				},
 				{
 					CheckID:     "default/ingress-gateway",
 					ServiceName: "ingress-gateway",
 					ServiceID:   "ingress-gateway",
-					Name:        constants.ConsulKubernetesCheckName,
+					Name:        consulKubernetesCheckName,
 					Status:      api.HealthPassing,
-					Output:      constants.KubernetesSuccessReasonMsg,
-					Type:        constants.ConsulKubernetesCheckType,
+					Output:      kubernetesSuccessReasonMsg,
+					Type:        consulKubernetesCheckType,
 					Namespace:   testCase.ConsulNS,
 				},
 			},
@@ -488,7 +484,7 @@ func TestReconcileCreateGatewayWithNamespaces(t *testing.T) {
 			// Create the endpoints controller.
 			ep := &Controller{
 				Client:                 fakeClient,
-				Log:                    logrtest.NewTestLogger(t),
+				Log:                    logrtest.New(t),
 				ConsulClientConfig:     testClient.Cfg,
 				ConsulServerConnMgr:    testClient.Watcher,
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
@@ -1550,7 +1546,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 							} else {
 								writeOpts.Namespace = ts.ExpConsulNS
 							}
-							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service.Service, svc.Service.Meta[constants.MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix, false)
+							test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service.Service, svc.Service.Meta[constants.MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix)
 							token, _, err := consulClient.ACL().Login(&api.ACLLoginParams{
 								AuthMethod:  test.AuthMethod,
 								BearerToken: test.ServiceAccountJWTToken,
@@ -1586,7 +1582,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 				// Create the endpoints controller.
 				ep := &Controller{
 					Client:                     fakeClient,
-					Log:                        logrtest.NewTestLogger(t),
+					Log:                        logrtest.New(t),
 					ConsulClientConfig:         testClient.Cfg,
 					ConsulServerConnMgr:        testClient.Watcher,
 					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
@@ -1656,7 +1652,7 @@ func TestReconcileUpdateEndpointWithNamespaces(t *testing.T) {
 						// Read the token from Consul.
 						token, _, err := consulClient.ACL().TokenRead(tokenID, nil)
 						if deregisteredServices.Contains(serviceID) {
-							require.Contains(t, err.Error(), "ACL not found")
+							require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
 						} else {
 							require.NoError(t, err, "token should exist for service instance: "+serviceID)
 							require.NotNil(t, token)
@@ -1861,7 +1857,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 						} else {
 							writeOpts.Namespace = ts.ExpConsulNS
 						}
-						test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[constants.MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix, false)
+						test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[constants.MetaKeyKubeNS], ts.ExpConsulNS, ts.Mirror, ts.MirrorPrefix)
 						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
 							AuthMethod:  test.AuthMethod,
 							BearerToken: test.ServiceAccountJWTToken,
@@ -1877,7 +1873,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 				// Create the endpoints controller.
 				ep := &Controller{
 					Client:                     fakeClient,
-					Log:                        logrtest.NewTestLogger(t),
+					Log:                        logrtest.New(t),
 					ConsulClientConfig:         testClient.Cfg,
 					ConsulServerConnMgr:        testClient.Watcher,
 					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
@@ -1919,7 +1915,7 @@ func TestReconcileDeleteEndpointWithNamespaces(t *testing.T) {
 
 				if tt.enableACLs {
 					_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
-					require.Contains(t, err.Error(), "ACL not found")
+					require.EqualError(t, err, "Unexpected response code: 403 (ACL not found)")
 				}
 			})
 		}
@@ -1954,7 +1950,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "mesh-gateway",
 						Kind:    api.ServiceKindMeshGateway,
-						Service: consulSvcName,
+						Service: "mesh-gateway",
 						Port:    80,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -1985,7 +1981,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "mesh-gateway",
 						Kind:    api.ServiceKindMeshGateway,
-						Service: consulSvcName,
+						Service: "mesh-gateway",
 						Port:    80,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -2016,7 +2012,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "terminating-gateway",
 						Kind:    api.ServiceKindTerminatingGateway,
-						Service: consulSvcName,
+						Service: "terminating-gateway",
 						Port:    8443,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -2037,7 +2033,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "terminating-gateway",
 						Kind:    api.ServiceKindTerminatingGateway,
-						Service: consulSvcName,
+						Service: "terminating-gateway",
 						Port:    8443,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -2089,7 +2085,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					{
 						ID:      "ingress-gateway",
 						Kind:    api.ServiceKindIngressGateway,
-						Service: consulSvcName,
+						Service: "ingress-gateway",
 						Port:    80,
 						Address: "1.2.3.4",
 						Meta: map[string]string{
@@ -2159,7 +2155,7 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 							writeOpts.Namespace = ts.ConsulNS
 						}
 
-						test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[constants.MetaKeyKubeNS], writeOpts.Namespace, false, "", false)
+						test.SetupK8sAuthMethodWithNamespaces(t, consulClient, svc.Service, svc.Meta[constants.MetaKeyKubeNS], writeOpts.Namespace, false, "")
 						token, _, err = consulClient.ACL().Login(&api.ACLLoginParams{
 							AuthMethod:  test.AuthMethod,
 							BearerToken: test.ServiceAccountJWTToken,
@@ -2175,16 +2171,15 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 
 				// Create the endpoints controller.
 				ep := &Controller{
-					Client:                     fakeClient,
-					Log:                        logrtest.NewTestLogger(t),
-					ConsulClientConfig:         testClient.Cfg,
-					ConsulServerConnMgr:        testClient.Watcher,
-					AllowK8sNamespacesSet:      mapset.NewSetWith("*"),
-					DenyK8sNamespacesSet:       mapset.NewSetWith(),
-					ReleaseName:                "consul",
-					ReleaseNamespace:           "default",
-					EnableConsulNamespaces:     true,
-					ConsulDestinationNamespace: ts.ConsulNS,
+					Client:                 fakeClient,
+					Log:                    logrtest.New(t),
+					ConsulClientConfig:     testClient.Cfg,
+					ConsulServerConnMgr:    testClient.Watcher,
+					AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
+					DenyK8sNamespacesSet:   mapset.NewSetWith(),
+					ReleaseName:            "consul",
+					ReleaseNamespace:       "default",
+					EnableConsulNamespaces: true,
 				}
 				if tt.enableACLs {
 					ep.AuthMethod = test.AuthMethod
@@ -2217,7 +2212,6 @@ func TestReconcileDeleteGatewayWithNamespaces(t *testing.T) {
 					}
 
 					token, _, err = consulClient.ACL().TokenRead(token.AccessorID, queryOpts)
-					require.Error(t, err)
 					require.Contains(t, err.Error(), "ACL not found", token)
 				}
 			})
@@ -2232,7 +2226,7 @@ func createPodWithNamespace(name, namespace, ip string, inject bool, managedByEn
 			Namespace: namespace,
 			Labels:    map[string]string{},
 			Annotations: map[string]string{
-				constants.LegacyAnnotationConsulK8sVersion: "1.0.0",
+				constants.AnnotationConsulK8sVersion: "1.0.0",
 			},
 		},
 		Status: corev1.PodStatus{

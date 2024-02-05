@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package webhook
 
 import (
@@ -10,13 +7,12 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
-
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -51,11 +47,11 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		containerName = fmt.Sprintf("%s-%s", sidecarContainer, mpi.serviceName)
 	}
 
-	var readinessProbe *corev1.Probe
+	var probe *corev1.Probe
 	if useProxyHealthCheck(pod) {
 		// If using the proxy health check for a service, configure an HTTP handler
 		// that queries the '/ready' endpoint of the proxy.
-		readinessProbe = &corev1.Probe{
+		probe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(constants.ProxyDefaultHealthPort + mpi.serviceIndex),
@@ -65,34 +61,13 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			InitialDelaySeconds: 1,
 		}
 	} else {
-		readinessProbe = &corev1.Probe{
+		probe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
 					Port: intstr.FromInt(constants.ProxyDefaultInboundPort + mpi.serviceIndex),
 				},
 			},
 			InitialDelaySeconds: 1,
-		}
-	}
-
-	// Configure optional probes on the proxy to force restart it in failure scenarios.
-	var startupProbe, livenessProbe *corev1.Probe
-	startupSeconds := w.getStartupFailureSeconds(pod)
-	livenessSeconds := w.getLivenessFailureSeconds(pod)
-	if startupSeconds > 0 {
-		startupProbe = &corev1.Probe{
-			// Use the same handler as the readiness probe.
-			ProbeHandler:     readinessProbe.ProbeHandler,
-			PeriodSeconds:    1,
-			FailureThreshold: startupSeconds,
-		}
-	}
-	if livenessSeconds > 0 {
-		livenessProbe = &corev1.Probe{
-			// Use the same handler as the readiness probe.
-			ProbeHandler:     readinessProbe.ProbeHandler,
-			PeriodSeconds:    1,
-			FailureThreshold: livenessSeconds,
 		}
 	}
 
@@ -161,9 +136,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			},
 		},
 		Args:           args,
-		ReadinessProbe: readinessProbe,
-		StartupProbe:   startupProbe,
-		LivenessProbe:  livenessProbe,
+		ReadinessProbe: probe,
 	}
 
 	if w.AuthMethod != "" {
@@ -195,15 +168,6 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
 	}
 
-	// Container Ports
-	metricsPorts, err := w.getMetricsPorts(pod)
-	if err != nil {
-		return corev1.Container{}, err
-	}
-	if metricsPorts != nil {
-		container.Ports = append(container.Ports, metricsPorts...)
-	}
-
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
@@ -229,11 +193,10 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			}
 		}
 		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-			RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-			RunAsNonRoot:             pointer.Bool(true),
-			AllowPrivilegeEscalation: pointer.Bool(false),
-			ReadOnlyRootFilesystem:   pointer.Bool(true),
+			RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
+			RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
+			RunAsNonRoot:           pointer.Bool(true),
+			ReadOnlyRootFilesystem: pointer.Bool(true),
 		}
 	}
 
@@ -299,7 +262,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 			args = append(args, "-tls-server-name="+w.ConsulTLSServerName)
 		}
 		if w.ConsulCACert != "" {
-			args = append(args, "-ca-certs="+constants.LegacyConsulCAFile)
+			args = append(args, "-ca-certs="+constants.ConsulCAFile)
 		}
 	} else {
 		args = append(args, "-tls-disabled")
@@ -542,64 +505,4 @@ func useProxyHealthCheck(pod corev1.Pod) bool {
 		return useProxyHealthCheck
 	}
 	return false
-}
-
-// getStartupFailureSeconds returns number of seconds configured by the annotation 'consul.hashicorp.com/sidecar-proxy-startup-failure-seconds'
-// and indicates how long we should wait for the sidecar proxy to initialize before considering the pod unhealthy.
-func (w *MeshWebhook) getStartupFailureSeconds(pod corev1.Pod) int32 {
-	seconds := w.DefaultSidecarProxyStartupFailureSeconds
-	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyStartupFailureSeconds]; ok {
-		seconds, _ = strconv.Atoi(v)
-	}
-	if seconds > 0 {
-		return int32(seconds)
-	}
-	return 0
-}
-
-// getLivenessFailureSeconds returns number of seconds configured by the annotation 'consul.hashicorp.com/sidecar-proxy-liveness-failure-seconds'
-// and indicates how long we should wait for the sidecar proxy to initialize before considering the pod unhealthy.
-func (w *MeshWebhook) getLivenessFailureSeconds(pod corev1.Pod) int32 {
-	seconds := w.DefaultSidecarProxyLivenessFailureSeconds
-	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyLivenessFailureSeconds]; ok {
-		seconds, _ = strconv.Atoi(v)
-	}
-	if seconds > 0 {
-		return int32(seconds)
-	}
-	return 0
-}
-
-// getMetricsPorts creates container ports for exposing services such as prometheus.
-// Prometheus in particular needs a named port for use with the operator.
-// https://github.com/hashicorp/consul-k8s/pull/1440
-func (w *MeshWebhook) getMetricsPorts(pod corev1.Pod) ([]corev1.ContainerPort, error) {
-	enableMetrics, err := w.MetricsConfig.EnableMetrics(pod)
-	if err != nil {
-		return nil, fmt.Errorf("error determining if metrics are enabled: %w", err)
-	}
-	if !enableMetrics {
-		return nil, nil
-	}
-
-	prometheusScrapePort, err := w.MetricsConfig.PrometheusScrapePort(pod)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
-	}
-	if prometheusScrapePort == "" {
-		return nil, nil
-	}
-
-	port, err := strconv.Atoi(prometheusScrapePort)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
-	}
-
-	return []corev1.ContainerPort{
-		{
-			Name:          "prometheus",
-			ContainerPort: int32(port),
-			Protocol:      corev1.ProtocolTCP,
-		},
-	}, nil
 }

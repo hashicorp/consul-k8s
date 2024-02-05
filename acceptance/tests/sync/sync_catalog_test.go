@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package sync
 
 import (
@@ -50,7 +47,7 @@ func TestSyncCatalog(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating a static-server with a service")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
@@ -118,19 +115,19 @@ func TestSyncCatalogWithIngress(t *testing.T) {
 				// Retry the kubectl apply because we've seen sporadic
 				// "connection refused" errors where the mutating webhook
 				// endpoint fails initially.
-				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", "../fixtures/bases/ingress")
+				out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/ingress")
 				require.NoError(r, err, out)
-				helpers.Cleanup(r, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 					// Ignore errors here because if the test ran as expected
 					// the custom resources will have been deleted.
-					k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "delete", "-k", "../fixtures/bases/ingress")
+					k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/ingress")
 				})
 			})
 
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating a static-server with a service")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), suite.Config().NoCleanupOnFailure, suite.Config().DebugDirectory, "../fixtures/bases/static-server")
 
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 

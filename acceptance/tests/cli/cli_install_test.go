@@ -1,10 +1,6 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package cli
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -16,7 +12,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const ipv4RegEx = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
@@ -52,8 +47,8 @@ func TestInstall(t *testing.T) {
 			connHelper.Install(t)
 			connHelper.DeployClientAndServer(t)
 			if c.secure {
-				connHelper.TestConnectionFailureWithoutIntention(t, connhelper.ConnHelperOpts{})
-				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
+				connHelper.TestConnectionFailureWithoutIntention(t)
+				connHelper.CreateIntention(t)
 			}
 
 			// Run proxy list and get the two results.
@@ -70,11 +65,11 @@ func TestInstall(t *testing.T) {
 			retrier := &retry.Timer{Timeout: 160 * time.Second, Wait: 2 * time.Second}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
-					out, err := cli.Run(r, ctx.KubectlOptions(r), "proxy", "read", podName)
+					out, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "read", podName)
 					require.NoError(r, err)
 
 					output := string(out)
-					r.Log(output)
+					logger.Log(t, output)
 
 					// Both proxies must see their own local agent and app as clusters.
 					require.Regexp(r, "consul-dataplane.*STATIC", output)
@@ -88,40 +83,7 @@ func TestInstall(t *testing.T) {
 				}
 			})
 
-			// Troubleshoot: Get the client pod so we can portForward to it and get the 'troubleshoot upstreams' output
-			clientPod, err := connHelper.Ctx.KubernetesClient(t).CoreV1().Pods(connHelper.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "app=static-client",
-			})
-			require.NoError(t, err)
-
-			clientPodName := clientPod.Items[0].Name
-			upstreamsOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "upstreams", "-pod", clientPodName)
-			logger.Log(t, string(upstreamsOut))
-			require.NoError(t, err)
-
-			if cfg.EnableTransparentProxy {
-				// If tproxy is enabled we are looking for the upstream ip which is the ClusterIP of the Kubernetes Service
-				serverService, err := connHelper.Ctx.KubernetesClient(t).CoreV1().Services(connHelper.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
-					FieldSelector: "metadata.name=static-server",
-				})
-				require.NoError(t, err)
-				serverIP := serverService.Items[0].Spec.ClusterIP
-
-				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
-				require.NoError(t, err)
-				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
-				logger.Log(t, string(proxyOut))
-			} else {
-				// With tproxy disabled and explicit upstreams we need the envoy-id of the server
-				require.Regexp(t, "static-server", string(upstreamsOut))
-
-				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-envoy-id", "static-server")
-				require.NoError(t, err)
-				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
-				logger.Log(t, string(proxyOut))
-			}
-
-			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+			connHelper.TestConnectionSuccess(t)
 			connHelper.TestConnectionFailureWhenUnhealthy(t)
 		})
 	}

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package consul
 
 import (
@@ -45,7 +42,6 @@ type CLICluster struct {
 	kubeConfig         string
 	kubeContext        string
 	noCleanupOnFailure bool
-	noCleanup          bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 	cli                cli.CLI
@@ -110,7 +106,6 @@ func NewCLICluster(
 		kubeConfig:         cfg.GetPrimaryKubeEnv().KubeConfig,
 		kubeContext:        cfg.GetPrimaryKubeEnv().KubeContext,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
-		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		cli:                *cli,
@@ -124,7 +119,7 @@ func (c *CLICluster) Create(t *testing.T) {
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
-	helpers.Cleanup(t, c.noCleanupOnFailure, c.noCleanup, func() {
+	helpers.Cleanup(t, c.noCleanupOnFailure, func() {
 		c.Destroy(t)
 	})
 
@@ -203,13 +198,8 @@ func (c *CLICluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...string) (*api.Client, string) {
+func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool) (*api.Client, string) {
 	t.Helper()
-
-	releaseName := c.releaseName
-	if len(release) > 0 {
-		releaseName = release[0]
-	}
 
 	namespace := c.kubectlOptions.Namespace
 	config := api.DefaultConfig()
@@ -230,13 +220,13 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...str
 		// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
 		// Instead, we provide a replication token that serves the role of the bootstrap token.
 
-		aclSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", releaseName)
+		aclSecretName := fmt.Sprintf("%s-consul-bootstrap-acl-token", c.releaseName)
 		if c.releaseName == CLIReleaseName {
 			aclSecretName = "consul-bootstrap-acl-token"
 		}
 		aclSecret, err := c.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), aclSecretName, metav1.GetOptions{})
 		if err != nil && errors.IsNotFound(err) {
-			federationSecret := fmt.Sprintf("%s-consul-federation", releaseName)
+			federationSecret := fmt.Sprintf("%s-consul-federation", c.releaseName)
 			if c.releaseName == CLIReleaseName {
 				federationSecret = "consul-federation"
 			}
@@ -250,8 +240,8 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...str
 		}
 	}
 
-	serverPod := fmt.Sprintf("%s-consul-server-0", releaseName)
-	if releaseName == CLIReleaseName {
+	serverPod := fmt.Sprintf("%s-consul-server-0", c.releaseName)
+	if c.releaseName == CLIReleaseName {
 		serverPod = "consul-server-0"
 	}
 	tunnel := terratestk8s.NewTunnelWithLogger(
@@ -264,7 +254,10 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...str
 
 	// Retry creating the port forward since it can fail occasionally.
 	retry.RunWith(&retry.Counter{Wait: 3 * time.Second, Count: 60}, t, func(r *retry.R) {
-		require.NoError(r, tunnel.ForwardPortE(r))
+		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
+		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
+		// get used to fail the test, just for logging.
+		require.NoError(r, tunnel.ForwardPortE(t))
 	})
 
 	t.Cleanup(func() {

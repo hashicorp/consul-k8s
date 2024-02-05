@@ -1,10 +1,6 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package test
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,37 +10,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/consul/sdk/testutil"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/testing/protocmp"
-
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/stretchr/testify/require"
 )
 
 const (
 	componentAuthMethod = "consul-k8s-component-auth-method"
-	eventuallyWaitFor   = 5 * time.Second
-	eventuallyTickEvery = 100 * time.Millisecond
 )
 
 type TestServerClient struct {
-	TestServer     *testutil.TestServer
-	APIClient      *api.Client
-	Cfg            *consul.Config
-	Watcher        consul.ServerConnectionManager
-	ResourceClient pbresource.ResourceServiceClient
+	TestServer *testutil.TestServer
+	APIClient  *api.Client
+	Cfg        *consul.Config
+	Watcher    consul.ServerConnectionManager
 }
 
 func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConfigCallback) *TestServerClient {
@@ -61,7 +43,7 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	t.Cleanup(func() {
 		_ = consulServer.Stop()
 	})
-	consulServer.WaitForLeader(t)
+	consulServer.WaitForSerfCheck(t)
 
 	consulConfig := &consul.Config{
 		APIClientConfig: &api.Config{Address: consulServer.HTTPAddr},
@@ -73,50 +55,24 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	client, err := api.NewClient(consulConfig.APIClientConfig)
 	require.NoError(t, err)
 
-	requireACLBootstrapped(t, cfg, client)
-	watcher := MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true)
-
-	// Create a gRPC resource service client when the resource-apis experiment is enabled.
-	var resourceClient pbresource.ResourceServiceClient
-	if slices.Contains(cfg.Experiments, "resource-apis") {
-		resourceClient, err = consul.NewResourceServiceClient(watcher)
-		require.NoError(t, err)
-	}
-
-	requireTenancyBuiltins(t, cfg, client, resourceClient)
-
 	return &TestServerClient{
-		TestServer:     consulServer,
-		APIClient:      client,
-		Cfg:            consulConfig,
-		Watcher:        watcher,
-		ResourceClient: resourceClient,
+		TestServer: consulServer,
+		APIClient:  client,
+		Cfg:        consulConfig,
+		Watcher:    MockConnMgrForIPAndPort("127.0.0.1", cfg.Ports.GRPC),
 	}
 }
 
-func MockConnMgrForIPAndPort(t *testing.T, ip string, port int, enableGRPCConn bool) *consul.MockServerConnectionManager {
+func MockConnMgrForIPAndPort(ip string, port int) *consul.MockServerConnectionManager {
 	parsedIP := net.ParseIP(ip)
 	connMgr := &consul.MockServerConnectionManager{}
-
 	mockState := discovery.State{
 		Address: discovery.Addr{
 			TCPAddr: net.TCPAddr{
 				IP:   parsedIP,
 				Port: port,
 			},
-		},
-	}
-
-	// If the connection is enabled, some tests will receive extra HTTP API calls where
-	// the server is being dialed.
-	if enableGRPCConn {
-		conn, err := grpc.DialContext(
-			context.Background(),
-			fmt.Sprintf("%s:%d", parsedIP, port),
-			grpc.WithTransportCredentials(insecure.NewCredentials()))
-		require.NoError(t, err)
-		mockState.GRPCConn = conn
-	}
+		}}
 	connMgr.On("State").Return(mockState, nil)
 	connMgr.On("Run").Return(nil)
 	connMgr.On("Stop").Return(nil)
@@ -239,19 +195,13 @@ func SetupK8sComponentAuthMethod(t *testing.T, consulClient *api.Client, service
 // SetupK8sAuthMethod create a k8s auth method and a binding rule in Consul for the
 // given k8s service and namespace.
 func SetupK8sAuthMethod(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS string) {
-	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "", false)
-}
-
-// SetupK8sAuthMethodV2 create a k8s auth method and a binding rule in Consul for the
-// given k8s service and namespace.
-func SetupK8sAuthMethodV2(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS string) {
-	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "", true)
+	SetupK8sAuthMethodWithNamespaces(t, consulClient, serviceName, k8sServiceNS, "", false, "")
 }
 
 // SetupK8sAuthMethodWithNamespaces creates a k8s auth method and binding rule
 // in Consul for the k8s service name and namespace. It sets up the auth method and the binding
 // rule so that it works with consul namespaces.
-func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS, consulNS string, mirrorNS bool, nsPrefix string, useV2 bool) {
+func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, serviceName, k8sServiceNS, consulNS string, mirrorNS bool, nsPrefix string) {
 	t.Helper()
 	// Start the mock k8s server.
 	k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -288,57 +238,20 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	require.NoError(t, err)
 
 	// Create the binding rule.
-	var aclBindingRule api.ACLBindingRule
-	if useV2 {
-		aclBindingRule = api.ACLBindingRule{
-			Description: "Kubernetes binding rule",
-			AuthMethod:  AuthMethod,
-			BindType:    api.BindingRuleBindTypeTemplatedPolicy,
-			BindName:    api.ACLTemplatedPolicyWorkloadIdentityName,
-			BindVars: &api.ACLTemplatedPolicyVariables{
-				Name: "${serviceaccount.name}",
-			},
-			Selector:  "serviceaccount.name!=default",
-			Namespace: consulNS,
-		}
-	} else {
-		aclBindingRule = api.ACLBindingRule{
-			Description: "Kubernetes binding rule",
-			AuthMethod:  AuthMethod,
-			BindType:    api.BindingRuleBindTypeService,
-			BindName:    "${serviceaccount.name}",
-			Selector:    "serviceaccount.name!=default",
-			Namespace:   consulNS,
-		}
+	aclBindingRule := api.ACLBindingRule{
+		Description: "Kubernetes binding rule",
+		AuthMethod:  AuthMethod,
+		BindType:    api.BindingRuleBindTypeService,
+		BindName:    "${serviceaccount.name}",
+		Selector:    "serviceaccount.name!=default",
+		Namespace:   consulNS,
 	}
-
 	if mirrorNS {
 		aclBindingRule.Namespace = "default"
 	}
 	// This API call will idempotently create the binding rule (it won't fail if it already exists).
 	_, _, err = consulClient.ACL().BindingRuleCreate(&aclBindingRule, nil)
 	require.NoError(t, err)
-}
-
-// ResourceHasPersisted checks that a recently written resource exists in the Consul
-// state store with a valid version. This must be true before a resource is overwritten
-// or deleted.
-func ResourceHasPersisted(t *testing.T, ctx context.Context, client pbresource.ResourceServiceClient, id *pbresource.ID) {
-	req := &pbresource.ReadRequest{Id: id}
-
-	require.Eventually(t, func() bool {
-		res, err := client.Read(ctx, req)
-		if err != nil {
-			return false
-		}
-
-		if res.GetResource().GetVersion() == "" {
-			return false
-		}
-
-		return true
-	}, 5*time.Second,
-		time.Second)
 }
 
 func TokenReviewsResponse(name, ns string) string {
@@ -386,16 +299,6 @@ func ServiceAccountGetResponse(name, ns string) string {
 }`, name, ns, ns, name, name)
 }
 
-// CmpProtoIgnoreOrder returns a slice of cmp.Option useful for comparing proto messages independent of the order of
-// their repeated fields.
-func CmpProtoIgnoreOrder() []cmp.Option {
-	return []cmp.Option{
-		protocmp.Transform(),
-		// Stringify any type passed to the sorter so that we can reliably compare most values.
-		cmpopts.SortSlices(func(a, b any) bool { return fmt.Sprintf("%v", a) < fmt.Sprintf("%v", b) }),
-	}
-}
-
 const AuthMethod = "consul-k8s-auth-method"
 const ServiceAccountJWTToken = `eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImtoYWtpLWFyYWNobmlkLWNvbnN1bC1jb25uZWN0LWluamVjdG9yLWF1dGhtZXRob2Qtc3ZjLWFjY29obmRidiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJraGFraS1hcmFjaG5pZC1jb25zdWwtY29ubmVjdC1pbmplY3Rvci1hdXRobWV0aG9kLXN2Yy1hY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiN2U5NWUxMjktZTQ3My0xMWU5LThmYWEtNDIwMTBhODAwMTIyIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmRlZmF1bHQ6a2hha2ktYXJhY2huaWQtY29uc3VsLWNvbm5lY3QtaW5qZWN0b3ItYXV0aG1ldGhvZC1zdmMtYWNjb3VudCJ9.Yi63MMtzh5MBWKKd3a7dzCJjTITE15ikFy_Tnpdk_AwdwA9J4AMSGEeHN5vWtCuuFjo_lMJqBBPHkK2AqbnoFUj9m5CopWyqICJQlvEOP4fUQ-Rc0W1P_JjU1rZERHG39b5TMLgKPQguyhaiZEJ6CjVtm9wUTagrgiuqYV2iUqLuF6SYNm6SrKtkPS-lqIO-u7C06wVk5m5uqwIVQNpZSIC_5Ls5aLmyZU3nHvH-V7E3HmBhVyZAB76jgKB0TyVX1IOskt9PDFarNtU3suZyCjvqC-UJA6sYeySe4dBNKsKlSZ6YuxUUmn1Rgv32YMdImnsWg8khf-zJvqgWk7B5EA`
 const serviceAccountCACert = `-----BEGIN CERTIFICATE-----
@@ -417,69 +320,3 @@ w7/VeA7lzmj3TQRE/W0U0ZGeoAxn9b6JtT0iMucYvP0hXKTPBWlnzIijamU50r2Y
 Z23jGuk6rn9DUHC2xPj3wCTmd8SGEJoV31noJV5dVeQ90wusXz3vTG7ficKnvHFS
 xtr5PSwH1DusYfVaGH2O
 -----END CERTIFICATE-----`
-
-func requireTenancyBuiltins(t *testing.T, cfg *testutil.TestServerConfig, client *api.Client, resourceClient pbresource.ResourceServiceClient) {
-	t.Helper()
-
-	// There is a window of time post-leader election on startup where v2 tenancy builtins
-	// (default partition and namespace) have not yet been created.
-	// Wait for them to exist before considering the server "open for business".
-	// Only check for default namespace existence since it implies the default partition exists.
-	if slices.Contains(cfg.Experiments, "v2tenancy") {
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
-			_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{
-				Id: &pbresource.ID{
-					Name:    constants.DefaultConsulNS,
-					Type:    pbtenancy.NamespaceType,
-					Tenancy: &pbresource.Tenancy{Partition: constants.DefaultConsulPartition},
-				},
-			})
-			assert.NoError(c, err)
-		},
-			eventuallyWaitFor,
-			eventuallyTickEvery,
-			"failed to eventually read v2 builtin default namespace",
-		)
-	} else {
-		// Do the same for V1 counterparts in ent only to prevent known test flakes.
-		require.Eventually(t,
-			func() bool {
-				self, err := client.Agent().Self()
-				if err != nil {
-					return false
-				}
-				if self["DebugConfig"]["VersionMetadata"] != "ent" {
-					return true
-				}
-
-				// Check for the default partition instead of the default namespace since this is a thing:
-				// error="Namespaces are currently disabled until all servers in the datacenter supports the feature"
-				partition, _, err := client.Partitions().Read(
-					context.Background(),
-					constants.DefaultConsulPartition,
-					nil,
-				)
-				return err == nil && partition != nil
-			},
-			eventuallyWaitFor,
-			eventuallyTickEvery,
-			"failed to eventually read v1 builtin default partition")
-	}
-}
-
-func requireACLBootstrapped(t *testing.T, cfg *testutil.TestServerConfig, client *api.Client) {
-	t.Helper()
-
-	// Prevent test flakes due to "ACL system must be bootstrapped before ..." error
-	// by requiring successful retrieval of the initial mgmt token.
-	if cfg.ACL.Enabled && cfg.ACL.Tokens.InitialManagement != "" {
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
-			_, _, err := client.ACL().TokenReadSelf(nil)
-			assert.NoError(c, err)
-		},
-			eventuallyWaitFor,
-			eventuallyTickEvery,
-			"failed to eventually read self token as a proxy for the ACL system bootstrap completion",
-		)
-	}
-}

@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -8,12 +5,11 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // Test MatchesConsul.
@@ -53,10 +49,9 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 						{
 							Match: &ServiceRouteMatch{
 								HTTP: &ServiceRouteHTTPMatch{
-									CaseInsensitive: true,
-									PathExact:       "pathExact",
-									PathPrefix:      "pathPrefix",
-									PathRegex:       "pathRegex",
+									PathExact:  "pathExact",
+									PathPrefix: "pathPrefix",
+									PathRegex:  "pathRegex",
 									Header: []ServiceRouteHTTPMatchHeader{
 										{
 											Name:    "name",
@@ -88,7 +83,6 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
-								RetryOn:               []string{"gateway-error"},
 								RetryOnStatusCodes:    []uint32{500, 400},
 								RequestHeaders: &HTTPHeaderModifiers{
 									Add: map[string]string{
@@ -132,10 +126,9 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 					{
 						Match: &capi.ServiceRouteMatch{
 							HTTP: &capi.ServiceRouteHTTPMatch{
-								CaseInsensitive: true,
-								PathExact:       "pathExact",
-								PathPrefix:      "pathPrefix",
-								PathRegex:       "pathRegex",
+								PathExact:  "pathExact",
+								PathPrefix: "pathPrefix",
+								PathRegex:  "pathRegex",
 								Header: []capi.ServiceRouteHTTPMatchHeader{
 									{
 										Name:    "name",
@@ -162,13 +155,11 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 							Service:               "service",
 							ServiceSubset:         "serviceSubset",
 							Namespace:             "namespace",
-							Partition:             "default",
 							PrefixRewrite:         "prefixRewrite",
 							IdleTimeout:           1 * time.Second,
 							RequestTimeout:        1 * time.Second,
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
-							RetryOn:               []string{"gateway-error"},
 							RetryOnStatusCodes:    []uint32{500, 400},
 							RequestHeaders: &capi.HTTPHeaderModifiers{
 								Add: map[string]string{
@@ -261,10 +252,9 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 						{
 							Match: &ServiceRouteMatch{
 								HTTP: &ServiceRouteHTTPMatch{
-									CaseInsensitive: true,
-									PathExact:       "pathExact",
-									PathPrefix:      "pathPrefix",
-									PathRegex:       "pathRegex",
+									PathExact:  "pathExact",
+									PathPrefix: "pathPrefix",
+									PathRegex:  "pathRegex",
 									Header: []ServiceRouteHTTPMatchHeader{
 										{
 											Name:    "name",
@@ -296,7 +286,6 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
-								RetryOn:               []string{"gateway-error"},
 								RetryOnStatusCodes:    []uint32{500, 400},
 								RequestHeaders: &HTTPHeaderModifiers{
 									Add: map[string]string{
@@ -340,10 +329,9 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 					{
 						Match: &capi.ServiceRouteMatch{
 							HTTP: &capi.ServiceRouteHTTPMatch{
-								CaseInsensitive: true,
-								PathExact:       "pathExact",
-								PathPrefix:      "pathPrefix",
-								PathRegex:       "pathRegex",
+								PathExact:  "pathExact",
+								PathPrefix: "pathPrefix",
+								PathRegex:  "pathRegex",
 								Header: []capi.ServiceRouteHTTPMatchHeader{
 									{
 										Name:    "name",
@@ -375,7 +363,6 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 							RequestTimeout:        1 * time.Second,
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
-							RetryOn:               []string{"gateway-error"},
 							RetryOnStatusCodes:    []uint32{500, 400},
 							RequestHeaders: &capi.HTTPHeaderModifiers{
 								Add: map[string]string{

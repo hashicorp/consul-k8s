@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package webhook
 
 import (
@@ -15,6 +12,13 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/version"
 	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -23,14 +27,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/version"
 )
 
 const (
@@ -152,9 +148,6 @@ type MeshWebhook struct {
 	DefaultProxyCPULimit      resource.Quantity
 	DefaultProxyMemoryRequest resource.Quantity
 	DefaultProxyMemoryLimit   resource.Quantity
-
-	DefaultSidecarProxyStartupFailureSeconds  int
-	DefaultSidecarProxyLivenessFailureSeconds int
 
 	// LifecycleConfig contains proxy lifecycle management configuration from the inject-connect command and has methods to determine whether
 	// configuration should come from the default flags or annotations. The meshWebhook uses this to configure container sidecar proxy args.
@@ -298,10 +291,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// port.
 	annotatedSvcNames := w.annotatedServiceNames(pod)
 	multiPort := len(annotatedSvcNames) > 1
-	lifecycleEnabled, ok := w.LifecycleConfig.EnableProxyLifecycle(pod)
-	if ok != nil {
-		w.Log.Error(err, "unable to get lifecycle enabled status")
-	}
+
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
@@ -318,14 +308,8 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
-		//Append the Envoy sidecar before the application container only if lifecycle enabled.
-
-		if lifecycleEnabled && ok == nil {
-			pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
-		} else {
-			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
-		}
-
+		// TODO: invert to start the Envoy sidecar before the application container
+		pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 	} else {
 		// For multi port pods, check for unsupported cases, mount all relevant service account tokens, and mount an init
 		// container and envoy sidecar per port. Tproxy, metrics, and metrics merging are not supported for multi port pods.
@@ -340,10 +324,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Error(err, "checking unsupported cases for multi port pods")
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
-
-		//List of sidecar containers for each service. Build as a list to preserve correct ordering in relation
-		//to services.
-		sidecarContainers := []corev1.Container{}
 		for i, svc := range annotatedSvcNames {
 			w.Log.Info(fmt.Sprintf("service: %s", svc))
 			if w.AuthMethod != "" {
@@ -399,20 +379,9 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 			}
-			// If Lifecycle is enabled, add to the list of sidecar containers to be added
-			// to pod containers at the end in order to preserve relative ordering.
-			if lifecycleEnabled {
-				sidecarContainers = append(sidecarContainers, envoySidecar)
-			} else {
-				pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
-
-			}
-
-		}
-
-		//Add sidecar containers first if lifecycle enabled.
-		if lifecycleEnabled {
-			pod.Spec.Containers = append(sidecarContainers, pod.Spec.Containers...)
+			// TODO: invert to start the Envoy sidecar container before the
+			// application container
+			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 		}
 	}
 
@@ -537,24 +506,20 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 	}
 
 	if tproxyEnabled && overwriteProbes {
-		// We don't use the loop index because this needs to line up w.withiptablesConfigJSON,
-		// which is performed before the sidecar is injected.
-		idx := 0
-		for _, container := range pod.Spec.Containers {
+		for i, container := range pod.Spec.Containers {
 			// skip the "envoy-sidecar" container from having it's probes overridden
 			if container.Name == sidecarContainer {
 				continue
 			}
 			if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
-				container.LivenessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsLivenessPortsRangeStart + idx)
+				container.LivenessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsLivenessPortsRangeStart + i)
 			}
 			if container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil {
-				container.ReadinessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsReadinessPortsRangeStart + idx)
+				container.ReadinessProbe.HTTPGet.Port = intstr.FromInt(exposedPathsReadinessPortsRangeStart + i)
 			}
 			if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
-				container.StartupProbe.HTTPGet.Port = intstr.FromInt(exposedPathsStartupPortsRangeStart + idx)
+				container.StartupProbe.HTTPGet.Port = intstr.FromInt(exposedPathsStartupPortsRangeStart + i)
 			}
-			idx++
 		}
 	}
 	return nil
@@ -623,7 +588,6 @@ func (w *MeshWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error 
 		}
 	}
 	pod.Annotations[constants.AnnotationOriginalPod] = podJson
-	pod.Annotations[constants.LegacyAnnotationConsulK8sVersion] = version.GetHumanVersion()
 	pod.Annotations[constants.AnnotationConsulK8sVersion] = version.GetHumanVersion()
 
 	return nil

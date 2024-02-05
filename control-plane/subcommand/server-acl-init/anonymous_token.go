@@ -1,10 +1,6 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package serveraclinit
 
 import (
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -15,8 +11,8 @@ const (
 
 // configureAnonymousPolicy sets up policies and tokens so that Consul DNS and
 // cross-datacenter Consul connect calls will work.
-func (c *Command) configureAnonymousPolicy(client *consul.DynamicClient) error {
-	exists, err := checkIfAnonymousTokenPolicyExists(client)
+func (c *Command) configureAnonymousPolicy(consulClient *api.Client) error {
+	exists, err := checkIfAnonymousTokenPolicyExists(consulClient)
 	if err != nil {
 		c.log.Error("Error checking if anonymous token policy exists", "err", err)
 		return err
@@ -41,7 +37,7 @@ func (c *Command) configureAnonymousPolicy(client *consul.DynamicClient) error {
 
 	err = c.untilSucceeds("creating anonymous token policy - PUT /v1/acl/policy",
 		func() error {
-			return c.createOrUpdateACLPolicy(anonPolicy, client)
+			return c.createOrUpdateACLPolicy(anonPolicy, consulClient)
 		})
 	if err != nil {
 		return err
@@ -56,17 +52,13 @@ func (c *Command) configureAnonymousPolicy(client *consul.DynamicClient) error {
 	// Update anonymous token to include this policy
 	return c.untilSucceeds("updating anonymous token with policy",
 		func() error {
-			err := client.RefreshClient()
-			if err != nil {
-				c.log.Error("could not refresh client", err)
-			}
-			_, _, err = client.ConsulClient.ACL().TokenUpdate(&aToken, &api.WriteOptions{})
+			_, _, err := consulClient.ACL().TokenUpdate(&aToken, &api.WriteOptions{})
 			return err
 		})
 }
 
-func checkIfAnonymousTokenPolicyExists(client *consul.DynamicClient) (bool, error) {
-	token, _, err := client.ConsulClient.ACL().TokenRead(anonymousTokenAccessorID, nil)
+func checkIfAnonymousTokenPolicyExists(consulClient *api.Client) (bool, error) {
+	token, _, err := consulClient.ACL().TokenRead(anonymousTokenAccessorID, nil)
 	if err != nil {
 		return false, err
 	}

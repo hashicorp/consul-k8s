@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -8,15 +5,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 func init() {
@@ -75,8 +71,6 @@ type ServiceRouteMatch struct {
 }
 
 type ServiceRouteHTTPMatch struct {
-	// CaseInsensitive configures PathExact and PathPrefix matches to ignore upper/lower casing.
-	CaseInsensitive bool `json:"caseInsensitive,omitempty"`
 	// PathExact is an exact path to match on the HTTP request path.
 	PathExact string `json:"pathExact,omitempty"`
 	// PathPrefix is a path prefix to match on the HTTP request path.
@@ -153,9 +147,6 @@ type ServiceRouteDestination struct {
 	NumRetries uint32 `json:"numRetries,omitempty"`
 	// RetryOnConnectFailure allows for connection failure errors to trigger a retry.
 	RetryOnConnectFailure bool `json:"retryOnConnectFailure,omitempty"`
-	// RetryOn is a flat list of conditions for Consul to retry requests based on the response from an upstream service.
-	// Refer to the valid conditions here: https://developer.hashicorp.com/consul/docs/connect/config-entries/service-router#routes-destination-retryon
-	RetryOn []string `json:"retryOn,omitempty"`
 	// RetryOnStatusCodes is a flat list of http response status codes that are eligible for retry.
 	RetryOnStatusCodes []uint32 `json:"retryOnStatusCodes,omitempty"`
 	// Allow HTTP header manipulation to be configured.
@@ -259,18 +250,8 @@ func (in *ServiceRouter) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-
-	specialEquality := cmp.Options{
-		cmp.FilterPath(func(path cmp.Path) bool {
-			return path.String() == "Routes.Destination.Namespace"
-		}, cmp.Transformer("NormalizeNamespace", normalizeEmptyToDefault)),
-		cmp.FilterPath(func(path cmp.Path) bool {
-			return path.String() == "Routes.Destination.Partition"
-		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
-	}
-
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(), specialEquality)
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceRouterConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
 func (in *ServiceRouter) Validate(consulMeta common.ConsulMeta) error {
@@ -360,7 +341,6 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 		RequestTimeout:        in.RequestTimeout.Duration,
 		NumRetries:            in.NumRetries,
 		RetryOnConnectFailure: in.RetryOnConnectFailure,
-		RetryOn:               in.RetryOn,
 		RetryOnStatusCodes:    in.RetryOnStatusCodes,
 		RequestHeaders:        in.RequestHeaders.toConsul(),
 		ResponseHeaders:       in.ResponseHeaders.toConsul(),
@@ -424,13 +404,12 @@ func (in *ServiceRouteHTTPMatch) toConsul() *capi.ServiceRouteHTTPMatch {
 		query = append(query, q.toConsul())
 	}
 	return &capi.ServiceRouteHTTPMatch{
-		CaseInsensitive: in.CaseInsensitive,
-		PathExact:       in.PathExact,
-		PathPrefix:      in.PathPrefix,
-		PathRegex:       in.PathRegex,
-		Header:          header,
-		QueryParam:      query,
-		Methods:         in.Methods,
+		PathExact:  in.PathExact,
+		PathPrefix: in.PathPrefix,
+		PathRegex:  in.PathRegex,
+		Header:     header,
+		QueryParam: query,
+		Methods:    in.Methods,
 	}
 }
 

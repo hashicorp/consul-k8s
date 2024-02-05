@@ -1,3 +1,0 @@
-```release-note:improvement
-api-gateway: reduce log output when disconnecting from consul server 
-```

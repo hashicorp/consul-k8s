@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package terminatinggateway
 
 import (
@@ -62,7 +59,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
 
@@ -74,24 +71,24 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service.
 			logger.Log(t, "creating static-server deployment")
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			// Register the external service.
-			helpers.RegisterExternalService(t, consulClient, testNamespace, staticServerName, staticServerName, 80)
+			registerExternalService(t, consulClient, testNamespace)
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
 			// so that it can request Connect certificates for it.
 			if c.secure {
-				UpdateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
+				updateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
 			}
 
 			// Create the config entry for the terminating gateway.
-			CreateTerminatingGatewayConfigEntry(t, consulClient, testNamespace, testNamespace, staticServerName)
+			createTerminatingGatewayConfigEntry(t, consulClient, testNamespace, testNamespace, staticServerName)
 
 			// Deploy the static client.
 			logger.Log(t, "deploying static client")
-			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -102,7 +99,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, nsK8SOptions, staticClientName, staticServerLocalAddress)
 
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				AddIntention(t, consulClient, "", testNamespace, staticClientName, testNamespace, staticServerName)
+				addIntention(t, consulClient, testNamespace, staticClientName, testNamespace, staticServerName)
 			}
 
 			// Test that we can make a call to the terminating gateway.
@@ -159,14 +156,14 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 			logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 			})
 
 			StaticClientNamespace := "ns2"
 			logger.Logf(t, "creating Kubernetes namespace %s", StaticClientNamespace)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", StaticClientNamespace)
 			})
 
@@ -183,24 +180,24 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service.
 			logger.Log(t, "creating static-server deployment")
-			k8s.DeployKustomize(t, ns1K8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, ns1K8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			// Register the external service
-			helpers.RegisterExternalService(t, consulClient, testNamespace, staticServerName, staticServerName, 80)
+			registerExternalService(t, consulClient, testNamespace)
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
 			// so that it can request Connect certificates for it.
 			if c.secure {
-				UpdateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
+				updateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
 			}
 
 			// Create the config entry for the terminating gateway
-			CreateTerminatingGatewayConfigEntry(t, consulClient, "", testNamespace, staticServerName)
+			createTerminatingGatewayConfigEntry(t, consulClient, "", testNamespace, staticServerName)
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
-			k8s.DeployKustomize(t, ns2K8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+			k8s.DeployKustomize(t, ns2K8SOptions, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -211,7 +208,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, ns2K8SOptions, staticClientName, staticServerLocalAddress)
 
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				AddIntention(t, consulClient, "", StaticClientNamespace, staticClientName, testNamespace, staticServerName)
+				addIntention(t, consulClient, StaticClientNamespace, staticClientName, testNamespace, staticServerName)
 			}
 
 			// Test that we can make a call to the terminating gateway

@@ -44,9 +44,6 @@ spec:
     rollingUpdate:
       partition: {{ .Values.server.updatePartition }}
   {{- end }}
-  {{- if and (semverCompare ">= 1.23-0" .Capabilities.KubeVersion.Version) (.Values.server.persistentVolumeClaimRetentionPolicy) }}
-  persistentVolumeClaimRetentionPolicy: {{ toYaml .Values.server.persistentVolumeClaimRetentionPolicy | nindent 4 }}
-  {{- end }}
   selector:
     matchLabels:
       app: {{ template "consul.name" . }}
@@ -118,8 +115,7 @@ spec:
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/mesh-inject": "false"
-        "consul.hashicorp.com/config-checksum": {{ print (include (print $.Template.BasePath "/server-config-configmap.yaml") .) (include (print $.Template.BasePath "/server-tmp-extra-config-configmap.yaml") .) | sha256sum }}
+        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/server-config-configmap.yaml") . | sha256sum }}
         {{- if .Values.server.annotations }}
           {{- tpl .Values.server.annotations . | nindent 8 }}
         {{- end }}
@@ -159,9 +155,6 @@ spec:
             name: {{ template "consul.fullname" . }}-server-config
         - name: extra-config
           emptyDir: {}
-        - name: tmp-extra-config
-          configMap:
-            name: {{ template "consul.fullname" . }}-server-tmp-extra-config
         {{- if (and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled)) }}
         - name: consul-ca-cert
           secret:
@@ -214,11 +207,6 @@ spec:
             medium: "Memory"
         {{- end }}
         {{- end }}
-        {{- if .Values.global.trustedCAs }}
-        - name: trusted-cas
-          emptyDir:
-            medium: "Memory"
-        {{- end }}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -238,27 +226,9 @@ spec:
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
       {{- end }}
-      initContainers:
-      - name: locality-init
-        image: {{ .Values.global.imageK8S }}
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        command:
-          - "/bin/sh"
-          - "-ec"
-          - |
-            consul-k8s-control-plane fetch-server-region -node-name "$NODE_NAME" -output-file /consul/extra-config/locality.json
-        volumeMounts:
-          - name: extra-config
-            mountPath: /consul/extra-config
-        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image }}"
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
@@ -330,9 +300,9 @@ spec:
             {{- end }}
             {{- if .Values.global.cloud.enabled}}
             # These are mounted as secrets so that the consul server agent can use them.
-            # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL,
+            # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, 
             #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
-            # - HCP_RESOURCE_ID is created for use in the
+            # - HCP_RESOURCE_ID is created for use in the 
             #   `-hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"` logic in the command below.
             {{- if .Values.global.cloud.clientId.secretName }}
             - name: HCP_CLIENT_ID
@@ -367,7 +337,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.global.cloud.apiHost.secretName }}
-                  key: {{ .Values.global.cloud.apiHost.secretKey }}
+                  key: {{ .Values.global.cloud.apiHost.secretKey }}            
             {{- end}}
             {{- if .Values.global.cloud.scadaAddress.secretName }}
             - name: HCP_SCADA_ADDRESS
@@ -375,25 +345,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.global.cloud.scadaAddress.secretName }}
                   key: {{ .Values.global.cloud.scadaAddress.secretKey }}
-            {{- end}}
-            {{- end }}
-            {{- if .Values.global.trustedCAs }}
-            - name: SSL_CERT_DIR
-              value: "/etc/ssl/certs:/trusted-cas"
+            {{- end}}          
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
             - "/bin/sh"
             - "-ec"
             - |
-              {{- if .Values.global.trustedCAs }}
-              {{- range $i, $cert := .Values.global.trustedCAs }}
-              cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
-              {{- $cert | nindent 14 }}
-              EOF
-              {{- end }}
-              {{- end }}
-
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
@@ -426,21 +384,9 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
-                -config-dir=/consul/extra-config \
+                -config-file=/consul/extra-config/extra-from-values.json
                 {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
                 -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
-                {{- end }}
-                
-                {{- if .Values.global.experiments }}
-                {{- $commaSeparatedValues := "" }}
-                {{- range $index, $value := .Values.global.experiments }}
-                  {{- if ne $index 0 }}
-                    {{- $commaSeparatedValues = printf "%s,\\\"%s\\\"" $commaSeparatedValues $value }}
-                  {{- else }}
-                    {{- $commaSeparatedValues = printf "\\\"%s\\\"" $value }}
-                  {{- end }}
-                {{- end }}
-                -hcl="experiments=[{{ $commaSeparatedValues }}]"
                 {{- end }}
           volumeMounts:
             - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
@@ -449,8 +395,6 @@ spec:
               mountPath: /consul/config
             - name: extra-config
               mountPath: /consul/extra-config
-            - name: tmp-extra-config
-              mountPath: /consul/tmp/extra-config
             {{- if (and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca/
@@ -473,11 +417,6 @@ spec:
             - name: vault-ca
               mountPath: /consul/vault-ca/
               readOnly: true
-            {{- end }}
-            {{- if .Values.global.trustedCAs }}
-            - name: trusted-cas
-              mountPath: /trusted-cas
-              readOnly: false
             {{- end }}
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}

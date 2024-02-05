@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -74,33 +71,6 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
-					MutualTLSMode: MutualTLSModePermissive,
-					AccessLogs: &AccessLogs{
-						Enabled:             true,
-						DisableListenerLogs: true,
-						Type:                FileLogSinkType,
-						Path:                "/var/log/envoy.logs",
-						TextFormat:          "ITS WORKING %START_TIME%",
-					},
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
-							Required:  true,
-						},
-					},
-					FailoverPolicy: &FailoverPolicy{
-						Mode:    "sequential",
-						Regions: []string{"us-west-1"},
-					},
-					PrioritizeByLocality: &PrioritizeByLocality{
-						Mode: "failover",
-					},
 				},
 			},
 			Theirs: &capi.ProxyConfigEntry{
@@ -132,40 +102,6 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				TransparentProxy: &capi.TransparentProxyConfig{
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
-				},
-				MutualTLSMode: capi.MutualTLSModePermissive,
-				AccessLogs: &capi.AccessLogsConfig{
-					Enabled:             true,
-					DisableListenerLogs: true,
-					Type:                capi.FileLogSinkType,
-					Path:                "/var/log/envoy.logs",
-					TextFormat:          "ITS WORKING %START_TIME%",
-				},
-				EnvoyExtensions: []capi.EnvoyExtension{
-					{
-						Name: "aws_request_signing",
-						Arguments: map[string]interface{}{
-							"AWSServiceName": "s3",
-							"Region":         "us-west-2",
-						},
-						Required: false,
-					},
-					{
-						Name: "zipkin",
-						Arguments: map[string]interface{}{
-							"ClusterName":       "zipkin_cluster",
-							"Port":              "9411",
-							"CollectorEndpoint": "/api/v2/spans",
-						},
-						Required: true,
-					},
-				},
-				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
-					Mode:    "sequential",
-					Regions: []string{"us-west-1"},
-				},
-				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
-					Mode: "failover",
 				},
 			},
 			Matches: true,
@@ -300,33 +236,6 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						OutboundListenerPort: 1000,
 						DialedDirectly:       true,
 					},
-					MutualTLSMode: MutualTLSModeStrict,
-					AccessLogs: &AccessLogs{
-						Enabled:             true,
-						DisableListenerLogs: true,
-						Type:                FileLogSinkType,
-						Path:                "/var/log/envoy.logs",
-						TextFormat:          "ITS WORKING %START_TIME%",
-					},
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
-							Required:  true,
-						},
-					},
-					FailoverPolicy: &FailoverPolicy{
-						Mode:    "sequential",
-						Regions: []string{"us-west-1"},
-					},
-					PrioritizeByLocality: &PrioritizeByLocality{
-						Mode: "none",
-					},
 				},
 			},
 			Exp: &capi.ProxyConfigEntry{
@@ -360,40 +269,6 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 					OutboundListenerPort: 1000,
 					DialedDirectly:       true,
 				},
-				MutualTLSMode: capi.MutualTLSModeStrict,
-				AccessLogs: &capi.AccessLogsConfig{
-					Enabled:             true,
-					DisableListenerLogs: true,
-					Type:                capi.FileLogSinkType,
-					Path:                "/var/log/envoy.logs",
-					TextFormat:          "ITS WORKING %START_TIME%",
-				},
-				EnvoyExtensions: []capi.EnvoyExtension{
-					{
-						Name: "aws_request_signing",
-						Arguments: map[string]interface{}{
-							"AWSServiceName": "s3",
-							"Region":         "us-west-2",
-						},
-						Required: false,
-					},
-					{
-						Name: "zipkin",
-						Arguments: map[string]interface{}{
-							"ClusterName":       "zipkin_cluster",
-							"Port":              "9411",
-							"CollectorEndpoint": "/api/v2/spans",
-						},
-						Required: true,
-					},
-				},
-				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
-					Mode:    "sequential",
-					Regions: []string{"us-west-1"},
-				},
-				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
-					Mode: "none",
-				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
 					common.DatacenterKey: "datacenter",
@@ -418,30 +293,8 @@ func TestProxyDefaults_Validate(t *testing.T) {
 		input          *ProxyDefaults
 		expectedErrMsg string
 	}{
-		"valid envoyExtension": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
-							Required:  true,
-						},
-					},
-				},
-			},
-			expectedErrMsg: "",
-		},
 		"meshgateway.mode": {
-			input: &ProxyDefaults{
+			&ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "global",
 				},
@@ -451,10 +304,10 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be one of "remote", "local", "none", ""`,
+			`proxydefaults.consul.hashicorp.com "global" is invalid: spec.meshGateway.mode: Invalid value: "foobar": must be one of "remote", "local", "none", ""`,
 		},
 		"expose.paths[].protocol": {
-			input: &ProxyDefaults{
+			&ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "global",
 				},
@@ -469,10 +322,10 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http", "http2"`,
+			`proxydefaults.consul.hashicorp.com "global" is invalid: spec.expose.paths[0].protocol: Invalid value: "invalid-protocol": must be one of "http", "http2"`,
 		},
 		"expose.paths[].path": {
-			input: &ProxyDefaults{
+			&ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "global",
 				},
@@ -487,10 +340,10 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
+			`proxydefaults.consul.hashicorp.com "global" is invalid: spec.expose.paths[0].path: Invalid value: "invalid-path": must begin with a '/'`,
 		},
 		"transparentProxy.outboundListenerPort": {
-			input: &ProxyDefaults{
+			&ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "global",
 				},
@@ -500,10 +353,10 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port",
 		},
 		"mode": {
-			input: &ProxyDefaults{
+			&ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "global",
 				},
@@ -511,174 +364,10 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					Mode: proxyModeRef("transparent"),
 				},
 			},
-			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
-		},
-		"mutualTLSMode": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					MutualTLSMode: MutualTLSMode("asdf"),
-				},
-			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.mutualTLSMode: Invalid value: "asdf": Must be one of "", "strict", or "permissive".`,
-		},
-		"accessLogs.type": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					AccessLogs: &AccessLogs{
-						Type: "foo",
-					},
-				},
-			},
-			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.type: Invalid value: \"foo\": invalid access log type (must be one of \"stdout\", \"stderr\", \"file\"",
-		},
-		"accessLogs.path missing": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					AccessLogs: &AccessLogs{
-						Type: "file",
-					},
-				},
-			},
-			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.path: Invalid value: \"\": path must be specified when using file type access logs",
-		},
-		"accessLogs.path for wrong type": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					AccessLogs: &AccessLogs{
-						Path: "/var/log/envoy.logs",
-					},
-				},
-			},
-			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.path: Invalid value: \"/var/log/envoy.logs\": path is only valid for file type access logs",
-		},
-		"accessLogs.jsonFormat": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					AccessLogs: &AccessLogs{
-						JSONFormat: "{ \"start_time\": \"%START_TIME\"", // intentionally missing the closing brace
-					},
-				},
-			},
-			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.jsonFormat: Invalid value: \"{ \\\"start_time\\\": \\\"%START_TIME\\\"\": invalid access log json",
-		},
-		"accessLogs.textFormat": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					AccessLogs: &AccessLogs{
-						JSONFormat: "{ \"start_time\": \"%START_TIME\" }",
-						TextFormat: "MY START TIME %START_TIME",
-					},
-				},
-			},
-			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.accessLogs.textFormat: Invalid value: \"MY START TIME %START_TIME\": cannot specify both access log jsonFormat and textFormat",
-		},
-		"envoyExtension.arguments single empty": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "zipkin",
-							Arguments: nil,
-							Required:  true,
-						},
-					},
-				},
-			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.envoyExtensions.envoyExtension[1].arguments: Required value: arguments must be defined`,
-		},
-		"envoyExtension.arguments multi empty": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: nil,
-							Required:  false,
-						},
-						EnvoyExtension{
-							Name:      "zipkin",
-							Arguments: nil,
-							Required:  true,
-						},
-					},
-				},
-			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: [spec.envoyExtensions.envoyExtension[0].arguments: Required value: arguments must be defined, spec.envoyExtensions.envoyExtension[1].arguments: Required value: arguments must be defined]`,
-		},
-		"envoyExtension.arguments invalid json": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					EnvoyExtensions: EnvoyExtensions{
-						EnvoyExtension{
-							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"SOME_INVALID_JSON"}`),
-							Required:  false,
-						},
-					},
-				},
-			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.envoyExtensions.envoyExtension[0].arguments: Invalid value: "{\"SOME_INVALID_JSON\"}": must be valid map value: invalid character '}' after object key`,
-		},
-		"failoverPolicy.mode invalid": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					FailoverPolicy: &FailoverPolicy{
-						Mode: "wrong-mode",
-					},
-				},
-			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.failoverPolicy.mode: Invalid value: "wrong-mode": must be one of "", "sequential", "order-by-locality"`,
-		},
-		"prioritize by locality invalid": {
-			input: &ProxyDefaults{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: ProxyDefaultsSpec{
-					PrioritizeByLocality: &PrioritizeByLocality{
-						Mode: "wrong-mode",
-					},
-				},
-			},
-			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.prioritizeByLocality.mode: Invalid value: "wrong-mode": must be one of "", "none", "failover"`,
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode",
 		},
 		"multi-error": {
-			input: &ProxyDefaults{
+			&ProxyDefaults{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "global",
 				},
@@ -697,14 +386,10 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					TransparentProxy: &TransparentProxy{
 						OutboundListenerPort: 1000,
 					},
-					AccessLogs: &AccessLogs{
-						JSONFormat: "{ \"start_time\": \"%START_TIME\" }",
-						TextFormat: "MY START TIME %START_TIME",
-					},
 					Mode: proxyModeRef("transparent"),
 				},
 			},
-			expectedErrMsg: "proxydefaults.consul.hashicorp.com \"global\" is invalid: [spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.accessLogs.textFormat: Invalid value: \"MY START TIME %START_TIME\": cannot specify both access log jsonFormat and textFormat, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
+			"proxydefaults.consul.hashicorp.com \"global\" is invalid: [spec.meshGateway.mode: Invalid value: \"invalid-mode\": must be one of \"remote\", \"local\", \"none\", \"\", spec.transparentProxy.outboundListenerPort: Invalid value: 1000: use the annotation `consul.hashicorp.com/transparent-proxy-outbound-listener-port` to configure the Outbound Listener Port, spec.mode: Invalid value: \"transparent\": use the annotation `consul.hashicorp.com/transparent-proxy` to configure the Transparent Proxy Mode, spec.expose.paths[0].path: Invalid value: \"invalid-path\": must begin with a '/', spec.expose.paths[0].protocol: Invalid value: \"invalid-protocol\": must be one of \"http\", \"http2\"]",
 		},
 	}
 	for name, testCase := range cases {

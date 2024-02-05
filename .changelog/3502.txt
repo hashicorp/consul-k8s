@@ -1,3 +1,0 @@
-```release-note:improvement
-control-plane: Add `CaseInsensitive` flag to service-routers that allows paths and path prefixes to ignore URL upper and lower casing.
-```

@@ -31,6 +31,17 @@ load _helpers
       .
 }
 
+@test "client/ConfigMap: extraConfig is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-config-configmap.yaml  \
+      --set 'client.enabled=true' \
+      --set 'client.extraConfig="{\"hello\": \"world\"}"' \
+      . | tee /dev/stderr |
+      yq '.data["extra-from-values.json"] | match("world") | length > 1' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 #--------------------------------------------------------------------
 # connectInject.centralConfig [DEPRECATED]
 

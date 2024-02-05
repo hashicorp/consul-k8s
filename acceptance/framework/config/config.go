@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package config
 
 import (
@@ -88,22 +85,14 @@ type TestConfig struct {
 	ConsulVersion          *version.Version
 	ConsulDataplaneVersion *version.Version
 	EnvoyImage             string
-	ConsulCollectorImage   string
-
-	HCPResourceID string
-
-	VaultHelmChartVersion string
-	VaultServerVersion    string
 
 	NoCleanupOnFailure bool
-	NoCleanup          bool
 	DebugDirectory     string
 
-	UseAKS          bool
-	UseEKS          bool
-	UseGKE          bool
-	UseGKEAutopilot bool
-	UseKind         bool
+	UseAKS  bool
+	UseEKS  bool
+	UseGKE  bool
+	UseKind bool
 
 	helmChartPath string
 }
@@ -154,15 +143,6 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 			// namespace it must be run in a different privileged namespace.
 			setIfNotEmpty(helmValues, "connectInject.cni.namespace", "kube-system")
 		}
-	}
-
-	// UseGKEAutopilot is a temporary hack that we need in place as GKE Autopilot is already installing
-	// Gateway CRDs in the clusters. There are still other CRDs we need to install though (see helm cluster install)
-	if t.UseGKEAutopilot {
-		setIfNotEmpty(helmValues, "global.server.resources.requests.cpu", "500m")
-		setIfNotEmpty(helmValues, "global.server.resources.limits.cpu", "500m")
-		setIfNotEmpty(helmValues, "connectInject.apiGateway.manageExternalCRDs", "false")
-		setIfNotEmpty(helmValues, "connectInject.apiGateway.manageNonStandardCRDs", "true")
 	}
 
 	setIfNotEmpty(helmValues, "connectInject.transparentProxy.defaultEnabled", strconv.FormatBool(t.EnableTransparentProxy))
@@ -242,12 +222,6 @@ func (t *TestConfig) entImage() (string, error) {
 func (c *TestConfig) SkipWhenOpenshiftAndCNI(t *testing.T) {
 	if c.EnableOpenshift && c.EnableCNI {
 		t.Skip("skipping because -enable-cni and -enable-openshift are set and this test doesn't deploy apps correctly")
-	}
-}
-
-func (c *TestConfig) SkipWhenCNI(t *testing.T) {
-	if c.EnableCNI {
-		t.Skip("skipping because -enable-cni is set and doesn't apply to this accepatance test")
 	}
 }
 

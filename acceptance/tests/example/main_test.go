@@ -1,8 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 // Rename package to your test package.
-// NOTE: Remember to add your test package to acceptance/ci-inputs so it gets run in CI.
 package example
 
 import (

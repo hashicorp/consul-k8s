@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package flags
 
 import (
@@ -9,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
@@ -30,10 +26,10 @@ func TestConsulFlags_Flags(t *testing.T) {
 				DatacenterEnvVar: "test-dc",
 				APITimeoutEnvVar: "10s",
 
-				constants.UseTLSEnvVar:        "true",
-				constants.CACertFileEnvVar:    "path/to/ca.pem",
-				constants.CACertPEMEnvVar:     "test-ca-pem",
-				constants.TLSServerNameEnvVar: "server.consul",
+				UseTLSEnvVar:        "true",
+				CACertFileEnvVar:    "path/to/ca.pem",
+				CACertPEMEnvVar:     "test-ca-pem",
+				TLSServerNameEnvVar: "server.consul",
 
 				ACLTokenEnvVar:             "test-token",
 				ACLTokenFileEnvVar:         "/path/to/token",
@@ -90,7 +86,7 @@ func TestConsulFlags_Flags(t *testing.T) {
 				HTTPPortEnvVar:   "not-int-http-port",
 				APITimeoutEnvVar: "10sec",
 
-				constants.UseTLSEnvVar: "not-a-bool",
+				UseTLSEnvVar: "not-a-bool",
 
 				LoginMetaEnvVar: "key1:value1;key2:value2",
 			},

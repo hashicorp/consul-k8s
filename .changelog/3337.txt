@@ -1,3 +1,0 @@
-```release-note:bug-fix
-mesh:  prevent extra-config from being loaded twice (and erroring for segment config) on clients and servers.
-```

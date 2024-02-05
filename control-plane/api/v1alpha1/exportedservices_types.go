@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package v1alpha1
 
 import (
@@ -8,6 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -15,12 +13,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 const ExportedServicesKubeKind = "exportedservices"
-const WildcardSpecifier = "*"
 
 func init() {
 	SchemeBuilder.Register(&ExportedServices{}, &ExportedServicesList{})
@@ -73,10 +68,8 @@ type ExportedService struct {
 type ServiceConsumer struct {
 	// Partition is the admin partition to export the service to.
 	Partition string `json:"partition,omitempty"`
-	// Peer is the name of the peer to export the service to.
+	// [Experimental] Peer is the name of the peer to export the service to.
 	Peer string `json:"peer,omitempty"`
-	// SamenessGroup is the name of the sameness group to export the service to.
-	SamenessGroup string `json:"samenessGroup,omitempty"`
 }
 
 func (in *ExportedServices) GetObjectMeta() metav1.ObjectMeta {
@@ -173,9 +166,8 @@ func (in *ExportedService) toConsul() capi.ExportedService {
 	var consumers []capi.ServiceConsumer
 	for _, consumer := range in.Consumers {
 		consumers = append(consumers, capi.ServiceConsumer{
-			Partition:     consumer.Partition,
-			Peer:          consumer.Peer,
-			SamenessGroup: consumer.SamenessGroup,
+			Partition: consumer.Partition,
+			Peer:      consumer.Peer,
 		})
 	}
 	return capi.ExportedService{
@@ -190,15 +182,8 @@ func (in *ExportedServices) MatchesConsul(candidate api.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-
-	specialEquality := cmp.Options{
-		cmp.FilterPath(func(path cmp.Path) bool {
-			return path.String() == "Services.Consumers.Partition"
-		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
-	}
-
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ExportedServicesConfigEntry{}, "Partition", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(), specialEquality)
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ExportedServicesConfigEntry{}, "Partition", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 
 }
 
@@ -242,34 +227,14 @@ func (in *ExportedService) validate(path *field.Path, consulMeta common.ConsulMe
 }
 
 func (in *ServiceConsumer) validate(path *field.Path, consulMeta common.ConsulMeta) *field.Error {
-	count := 0
-
-	if in.Partition != "" {
-		count++
+	if in.Partition != "" && in.Peer != "" {
+		return field.Invalid(path, *in, "both partition and peer cannot be specified.")
 	}
-	if in.Peer != "" {
-		count++
-	}
-	if in.SamenessGroup != "" {
-		count++
-	}
-	if count > 1 {
-		return field.Invalid(path, *in, "service consumer must define at most one of Peer, Partition, or SamenessGroup")
-	}
-	if count == 0 {
-		return field.Invalid(path, *in, "service consumer must define at least one of Peer, Partition, or SamenessGroup")
+	if in.Partition == "" && in.Peer == "" {
+		return field.Invalid(path, *in, "either partition or peer must be specified.")
 	}
 	if !consulMeta.PartitionsEnabled && in.Partition != "" {
-		return field.Invalid(path.Child("partition"), in.Partition, "Consul Admin Partitions need to be enabled to specify partition.")
-	}
-	if in.Partition == WildcardSpecifier {
-		return field.Invalid(path.Child("partition"), "", "exporting to all partitions (wildcard) is not supported")
-	}
-	if in.Peer == WildcardSpecifier {
-		return field.Invalid(path.Child("peer"), "", "exporting to all peers (wildcard) is not supported")
-	}
-	if in.SamenessGroup == WildcardSpecifier {
-		return field.Invalid(path.Child("samenessgroup"), "", "exporting to all sameness groups (wildcard) is not supported")
+		return field.Invalid(path.Child("partitions"), in.Partition, "Consul Admin Partitions need to be enabled to specify partition.")
 	}
 	return nil
 }

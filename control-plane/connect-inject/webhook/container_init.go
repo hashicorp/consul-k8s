@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package webhook
 
 import (
@@ -155,15 +152,15 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if w.TLSEnabled {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
-				Name:  constants.UseTLSEnvVar,
+				Name:  "CONSUL_USE_TLS",
 				Value: "true",
 			},
 			corev1.EnvVar{
-				Name:  constants.CACertPEMEnvVar,
+				Name:  "CONSUL_CACERT_PEM",
 				Value: w.ConsulCACert,
 			},
 			corev1.EnvVar{
-				Name:  constants.TLSServerNameEnvVar,
+				Name:  "CONSUL_TLS_SERVER_NAME",
 				Value: w.ConsulTLSServerName,
 			})
 	}
@@ -263,8 +260,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
 				},
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
 			}
 		}
 	}

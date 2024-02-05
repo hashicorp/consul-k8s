@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package portforward
 
 import (
@@ -16,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// CreateTunnelToResourcePort returns a local address:port that is tunneled to the given resource's port.
 func CreateTunnelToResourcePort(t *testing.T, resourceName string, remotePort int, options *terratestk8s.KubectlOptions, logger terratestLogger.TestLogger) string {
 	localPort := terratestk8s.GetAvailablePort(t)
 	tunnel := terratestk8s.NewTunnelWithLogger(
@@ -28,11 +24,11 @@ func CreateTunnelToResourcePort(t *testing.T, resourceName string, remotePort in
 		logger)
 
 	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 3 * time.Second, Count: 60}, t, func(r *retry.R) {
 		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
 		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
 		// get used to fail the test, just for logging.
-		require.NoError(r, tunnel.ForwardPortE(r))
+		require.NoError(r, tunnel.ForwardPortE(t))
 	})
 
 	doneChan := make(chan bool)
