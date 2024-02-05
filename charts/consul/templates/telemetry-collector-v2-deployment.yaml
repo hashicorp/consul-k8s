@@ -122,7 +122,7 @@ spec:
           - /bin/sh
           - -ec
           - |-
-            consul-k8s-control-plane mesh-init -proxy-name=${POD_NAME} \
+            exec consul-k8s-control-plane mesh-init -proxy-name=${POD_NAME} \
               -log-level={{ default .Values.global.logLevel .Values.telemetryCollector.logLevel }} \
               -log-json={{ .Values.global.logJSON }} 
 
@@ -245,7 +245,7 @@ spec:
           {{- end }}
           {{- end }}
 
-          consul-telemetry-collector agent \
+          exec consul-telemetry-collector agent \
           {{- if .Values.telemetryCollector.customExporterConfig }}
           -config-file-path /consul/config/config.json \
           {{ end }}

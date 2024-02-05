@@ -143,7 +143,7 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-api-gateway server \
+          exec consul-api-gateway server \
             -sds-server-host {{ template "consul.fullname" . }}-api-gateway-controller.{{ .Release.Namespace }}.svc \
             -k8s-namespace {{ .Release.Namespace }} \
             {{- if .Values.global.enableConsulNamespaces }}
@@ -189,7 +189,7 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: [ "/bin/sh", "-ec", "/consul-bin/consul logout" ]
+              command: ["/consul-bin/consul", "logout" ]
         {{- end }}
       volumes:
       {{- if .Values.global.acls.manageSystemACLs }}
@@ -275,7 +275,7 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane acl-init \
+          exec consul-k8s-control-plane acl-init \
             {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
             -auth-method-name={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }} \
             {{- else }}
