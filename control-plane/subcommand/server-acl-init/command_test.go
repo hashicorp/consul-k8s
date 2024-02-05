@@ -180,7 +180,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			TestName:    "Datadog Agent Token",
 			TokenFlags:  []string{"-create-dd-agent-token"},
 			PolicyNames: []string{"datadog-agent-metrics-token"},
-			PolicyDCs:   nil,
+			PolicyDCs:   []string{"dc1"},
 			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
 			LocalToken:  true,
 		},
