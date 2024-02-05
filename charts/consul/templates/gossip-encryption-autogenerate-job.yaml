@@ -54,7 +54,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              consul-k8s-control-plane gossip-encryption-autogenerate \
+              exec consul-k8s-control-plane gossip-encryption-autogenerate \
                 -namespace={{ .Release.Namespace }} \
                 -secret-name={{ template "consul.fullname" . }}-gossip-encryption-key \
                 -secret-key="key" \
