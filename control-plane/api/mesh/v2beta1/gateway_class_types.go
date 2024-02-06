@@ -38,22 +38,28 @@ type GatewayClassList struct {
 }
 
 type GatewayClassSpec struct {
+	// ControllerName is the name of the Kubernetes controller
+	// that manages Gateways of this class
 	ControllerName string               `json:"controllerName"`
+
+	// ParametersRef refers to a resource responsible for configuring
+	// the behavior of the GatewayClass.
 	ParametersRef  *ParametersReference `json:"parametersRef"`
-	Description    string               `json:"description"`
+
+	// Description of GatewayClass
+	Description    string               `json:"description,omitempty"`
 }
 
 type ParametersReference struct {
-	// Group is the Kubernetes group that the referenced resource belongs to.
-	Group string `json:"group"`
+	// The Kubernetes Group that the referred object belongs to
+	Group string `json:"group,omitempty"`
 
-	// Kind is the Kubernetes kind of the referenced resource.
-	Kind string `json:"kind"`
+	// The Kubernetes Kind that the referred object is
+	Kind string `json:"kind,omitempty"`
 
-	// Name is the name of the referenced resource.
+	// The Name of the referred object
 	Name string `json:"name"`
 
-	// Namespace is the namespace of the referenced resource. If empty, the referenced
-	// resource is assumed to be in the same namespace as the GatewayClass.
+	// The kubernetes namespace that the referred object is in
 	Namespace *string `json:"namespace,omitempty"`
 }
