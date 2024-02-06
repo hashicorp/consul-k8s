@@ -180,8 +180,8 @@ func (in *APIGateway) Validate(tenancy common.ConsulTenancyConfig) error {
 // DefaultNamespaceFields is required as part of the common.MeshConfig interface.
 func (in *APIGateway) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
 
-// ListenersToPorts converts the APIGateway listeners to ServicePorts.
-func (in *APIGateway) ListenersToPorts(portModifier int32) []corev1.ServicePort {
+// ListenersToServicePorts converts the APIGateway listeners to ServicePorts.
+func (in *APIGateway) ListenersToServicePorts(portModifier int32) []corev1.ServicePort {
 	ports := []corev1.ServicePort{}
 
 	for _, listener := range in.Spec.Listeners {
@@ -196,5 +196,19 @@ func (in *APIGateway) ListenersToPorts(portModifier int32) []corev1.ServicePort 
 		})
 	}
 
+	return ports
+}
+
+func (in *APIGateway) ListenersToContainerPorts(portModifier int32) []corev1.ContainerPort {
+	ports := []corev1.ContainerPort{}
+
+	for _, listener := range in.Spec.Listeners {
+		port := int32(listener.Port)
+		ports = append(ports, corev1.ContainerPort{
+			Name:          listener.Name,
+			ContainerPort: port + portModifier,
+			Protocol:      corev1.Protocol(listener.Protocol),
+		})
+	}
 	return ports
 }

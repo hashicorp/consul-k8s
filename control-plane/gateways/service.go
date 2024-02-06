@@ -33,16 +33,9 @@ func (b *gatewayBuilder[T]) Service() *corev1.Service {
 		Spec: corev1.ServiceSpec{
 			Selector: b.labelsForDeployment(),
 			Type:     serviceType,
-			Ports:    b.Ports(portModifier),
+			Ports:    b.gateway.ListenersToServicePorts(portModifier),
 		},
 	}
-}
-
-// Ports build a list of ports from the listener objects. In theory there should only ever be a WAN port on
-// mesh gateway but building the ports from a list of listeners will allow for easier compatability with other
-// gateway patterns in the future.
-func (b *gatewayBuilder[T]) Ports(portModifier int32) []corev1.ServicePort {
-	return b.gateway.ListenersToPorts(portModifier)
 }
 
 // MergeService is used to update a corev1.Service without overwriting any
