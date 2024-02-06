@@ -128,6 +128,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			ConsulTLSServerName:        c.consul.TLSServerName,
 			ConsulPartition:            c.consul.Partition,
 			ConsulCACert:               string(c.caCertPem),
+			InitContainerResources:     &c.initContainerResources,
 		},
 		AllowK8sNamespacesSet:   allowK8sNamespaces,
 		DenyK8sNamespacesSet:    denyK8sNamespaces,
