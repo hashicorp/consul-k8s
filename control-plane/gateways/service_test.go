@@ -154,3 +154,65 @@ func Test_meshGatewayBuilder_Service(t *testing.T) {
 		})
 	}
 }
+
+func Test_MergeService(t *testing.T) {
+	testCases := []struct {
+		name     string
+		a, b     *corev1.Service
+		assertFn func(*testing.T, *corev1.Service)
+	}{
+		{
+			name: "new service gets desired annotations + labels",
+			a:    &corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "service"}},
+			b: &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+				Namespace:   "default",
+				Name:        "service",
+				Annotations: map[string]string{"b": "b"},
+				Labels:      map[string]string{"b": "b"},
+			}},
+			assertFn: func(t *testing.T, result *corev1.Service) {
+				assert.Equal(t, map[string]string{"b": "b"}, result.Annotations)
+				assert.Equal(t, map[string]string{"b": "b"}, result.Labels)
+			},
+		},
+		{
+			name: "existing service keeps existing annotations + labels and gains desired annotations + labels + type",
+			a: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         "default",
+					Name:              "service",
+					CreationTimestamp: metav1.Now(),
+					Annotations:       map[string]string{"a": "a"},
+					Labels:            map[string]string{"a": "a"},
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+				},
+			},
+			b: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   "default",
+					Name:        "service",
+					Annotations: map[string]string{"b": "b"},
+					Labels:      map[string]string{"b": "b"},
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+				},
+			},
+			assertFn: func(t *testing.T, result *corev1.Service) {
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Annotations)
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Labels)
+
+				assert.Equal(t, corev1.ServiceTypeLoadBalancer, result.Spec.Type)
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			MergeService(testCase.a, testCase.b)
+			testCase.assertFn(t, testCase.a)
+		})
+	}
+}
