@@ -21,7 +21,7 @@ data:
   resources.json: |
     {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
   {{- end }}
-  {{- if and (mustHas "resource-apis" .Values.global.experiments) (.Values.meshGateway.enabled or .Values.connectInject.apiGateway.managedGatewayClass }}
+  {{- if and (mustHas "resource-apis" .Values.global.experiments) (or .Values.meshGateway.enabled .Values.connectInject.apiGateway.managedGatewayClass) }}
   config.yaml: |
     gatewayClassConfigs:
       {{- if .Values.meshGateway.enabled  }}
@@ -105,7 +105,7 @@ data:
     {{- if .Values.connectInject.apiGateway.managedGatewayClass  }}
     - apiVersion: mesh.consul.hashicorp.com/v2beta1
       metadata:
-        name: consul-api-gateway
+        name: consul-api-gateway22222
       kind: GatewayClassConfig
       spec:
         labels:
@@ -115,27 +115,30 @@ data:
             heritage: {{ .Release.Service }}
             release: {{ .Release.Name }}
             component: api-gateway
+        {{- if .Values.connectInject.apiGateway.managedGatewayClass.service }}
         annotations:
           service: {{ .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
+        {{- end}}
         deployment:
           replicas:
-            default: {{ .Values.connectInject.apiGateway.managedGatewayClass.defaultInstances }}
-            min: {{ .Values.connectInject.apiGateway.managedGatewayClass.minInstances }}
-            max: {{ .Values.connectInject.apiGateway.managedGatewayClass.maxInstances }}
+            default: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+            min: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
+            max: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
           {{- if .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
           tolerations: {{ fromYamlArray .Values.connectInject.apiGateway.managedGatewayClass.tolerations | toJson }}
           {{- end }}
+        {{- if .Values.connectInject.apiGateway.managedGatewayClass.service }}
         service:
-          {{- if .Values.connectInject.apiGateway.managedGatewayClass.service.annotations }}
           annotations:
             set: {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.service.annotations }}
           {{- end }}
           type: {{ .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
-        {{- if .Values.connectInject.apiGateway.managedGatewayClass.serviceAccount.annotations }}
+        {{- if .Values.connectInject.apiGateway.managedGatewayClass.serviceAccount }}
         serviceAccount:
           annotations:
             set: {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.serviceAccount.annotations }}
-    {{- end  }}
+        {{- end  }}
+    {{- end }}
     {{- if .Values.meshGateway.enabled  }}
     meshGateways:
       - apiVersion: mesh.consul.hashicorp.com/v2beta1
