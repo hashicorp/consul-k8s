@@ -3,22 +3,7 @@
 package v2beta1
 
 import (
-	"fmt"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"google.golang.org/protobuf/testing/protocmp"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-)
-
-const (
-	gatewayClassKubeKind = "gatewayclass"
 )
 
 func init() {
@@ -37,7 +22,7 @@ type GatewayClass struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   pbmesh.GatewayClass `json:"spec,omitempty"`
+	Spec   GatewayClassSpec `json:"spec,omitempty"`
 	Status `json:"status,omitempty"`
 }
 
@@ -50,97 +35,23 @@ type GatewayClassList struct {
 	Items           []*GatewayClass `json:"items"`
 }
 
-func (in *GatewayClass) ResourceID(namespace, partition string) *pbresource.ID {
-	return &pbresource.ID{
-		Name: in.Name,
-		Type: pbmesh.GatewayClassType,
-		Tenancy: &pbresource.Tenancy{
-			Partition: partition,
-			Namespace: namespace,
-		},
-	}
+type GatewayClassSpec struct {
+	ControllerName string               `json:"controllerName"`
+	ParametersRef  *ParametersReference `json:"parametersRef"`
+	Description    string               `json:"description"`
 }
 
-func (in *GatewayClass) Resource(namespace, partition string) *pbresource.Resource {
-	return &pbresource.Resource{
-		Id:       in.ResourceID(namespace, partition),
-		Data:     inject.ToProtoAny(&in.Spec),
-		Metadata: meshConfigMeta(),
-	}
-}
+type ParametersReference struct {
+	// Group is the Kubernetes group that the referenced resource belongs to.
+	Group string `json:"group"`
 
-func (in *GatewayClass) AddFinalizer(f string) {
-	in.ObjectMeta.Finalizers = append(in.Finalizers(), f)
-}
+	// Kind is the Kubernetes kind of the referenced resource.
+	Kind string `json:"kind"`
 
-func (in *GatewayClass) RemoveFinalizer(f string) {
-	var newFinalizers []string
-	for _, oldF := range in.Finalizers() {
-		if oldF != f {
-			newFinalizers = append(newFinalizers, oldF)
-		}
-	}
-	in.ObjectMeta.Finalizers = newFinalizers
-}
+	// Name is the name of the referenced resource.
+	Name string `json:"name"`
 
-func (in *GatewayClass) Finalizers() []string {
-	return in.ObjectMeta.Finalizers
+	// Namespace is the namespace of the referenced resource. If empty, the referenced
+	// resource is assumed to be in the same namespace as the GatewayClass.
+	Namespace *string `json:"namespace,omitempty"`
 }
-
-func (in *GatewayClass) MatchesConsul(candidate *pbresource.Resource, namespace, partition string) bool {
-	return cmp.Equal(
-		in.Resource(namespace, partition),
-		candidate,
-		protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
-		protocmp.IgnoreFields(&pbresource.ID{}, "uid"),
-		protocmp.Transform(),
-		cmpopts.SortSlices(func(a, b any) bool { return fmt.Sprintf("%v", a) < fmt.Sprintf("%v", b) }),
-	)
-}
-
-func (in *GatewayClass) KubeKind() string {
-	return gatewayClassKubeKind
-}
-
-func (in *GatewayClass) KubernetesName() string {
-	return in.ObjectMeta.Name
-}
-
-func (in *GatewayClass) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
-	in.Status.Conditions = Conditions{
-		{
-			Type:               ConditionSynced,
-			Status:             status,
-			LastTransitionTime: metav1.Now(),
-			Reason:             reason,
-			Message:            message,
-		},
-	}
-}
-
-func (in *GatewayClass) SetLastSyncedTime(time *metav1.Time) {
-	in.Status.LastSyncedTime = time
-}
-
-func (in *GatewayClass) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
-	cond := in.Status.GetCondition(ConditionSynced)
-	if cond == nil {
-		return corev1.ConditionUnknown, "", ""
-	}
-	return cond.Status, cond.Reason, cond.Message
-}
-
-func (in *GatewayClass) SyncedConditionStatus() corev1.ConditionStatus {
-	condition := in.Status.GetCondition(ConditionSynced)
-	if condition == nil {
-		return corev1.ConditionUnknown
-	}
-	return condition.Status
-}
-
-func (in *GatewayClass) Validate(tenancy common.ConsulTenancyConfig) error {
-	return nil
-}
-
-// DefaultNamespaceFields is required as part of the common.MeshConfig interface.
-func (in *GatewayClass) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
