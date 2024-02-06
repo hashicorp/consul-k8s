@@ -6,6 +6,8 @@ package common
 import (
 	"strings"
 	"time"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 const componentAuthMethod = "k8s-component-auth-method"
@@ -40,6 +42,8 @@ type HelmConfig struct {
 	// MapPrivilegedServicePorts is the value which Consul will add to privileged container port values (ports < 1024)
 	// defined on a Gateway.
 	MapPrivilegedServicePorts int
+
+	InitContainerResources *v1.ResourceRequirements
 }
 
 type ConsulConfig struct {
