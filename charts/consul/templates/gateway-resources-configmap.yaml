@@ -105,7 +105,7 @@ data:
     {{- if .Values.connectInject.apiGateway.managedGatewayClass  }}
     - apiVersion: mesh.consul.hashicorp.com/v2beta1
       metadata:
-        name: consul-api-gateway22222
+        name: consul-api-gateway
       kind: GatewayClassConfig
       spec:
         labels:
