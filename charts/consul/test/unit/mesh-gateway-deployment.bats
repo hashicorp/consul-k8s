@@ -1784,3 +1784,20 @@ key2: value2' \
     yq 'any(contains("-log-level=warn"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# security context
+
+@test "meshGateway/Deployment: security context is set on Consul Dataplane" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.capabilities.drop[0]') = "ALL" ]
+  [ $(echo "${actual}" | yq -r '.capabilities.add[0]') = "NET_BIND_SERVICE" ]
+
+}
