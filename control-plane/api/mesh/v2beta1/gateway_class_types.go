@@ -16,8 +16,6 @@ func init() {
 // +kubebuilder:subresource:status
 
 // GatewayClass is the Schema for the Gateway Class API
-// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
-// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 // +kubebuilder:resource:scope=Cluster
 type GatewayClass struct {
@@ -40,14 +38,14 @@ type GatewayClassList struct {
 type GatewayClassSpec struct {
 	// ControllerName is the name of the Kubernetes controller
 	// that manages Gateways of this class
-	ControllerName string               `json:"controllerName"`
+	ControllerName string `json:"controllerName"`
 
 	// ParametersRef refers to a resource responsible for configuring
 	// the behavior of the GatewayClass.
-	ParametersRef  *ParametersReference `json:"parametersRef"`
+	ParametersRef *ParametersReference `json:"parametersRef"`
 
 	// Description of GatewayClass
-	Description    string               `json:"description,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 type ParametersReference struct {
