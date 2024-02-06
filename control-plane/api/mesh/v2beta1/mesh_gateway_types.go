@@ -147,25 +147,15 @@ func (in *MeshGateway) Validate(tenancy common.ConsulTenancyConfig) error {
 // DefaultNamespaceFields is required as part of the common.MeshConfig interface.
 func (in *MeshGateway) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
 
-// ListenersToPorts converts the MeshGateway listeners to ServicePorts.
-func (in *MeshGateway) ListenersToPorts(portModifier int32) []corev1.ServicePort {
+// ListenersToServicePorts converts the MeshGateway listeners to ServicePorts.
+func (in *MeshGateway) ListenersToServicePorts(portModifier int32) []corev1.ServicePort {
 	ports := []corev1.ServicePort{}
 
-	if len(in.Spec.Listeners) == 0 {
-		// If empty use the default value. This should always be set, but in case it's not, this check
-		// will prevent a panic.
-		return []corev1.ServicePort{
-			{
-				Name: "wan",
-				Port: constants.DefaultWANPort,
-				TargetPort: intstr.IntOrString{
-					IntVal: constants.DefaultWANPort + portModifier,
-				},
-			},
-		}
-	}
 	for _, listener := range in.Spec.Listeners {
 		port := int32(listener.Port)
+		if listener.Name == "wan" {
+			port = constants.DefaultWANPort
+		}
 		ports = append(ports, corev1.ServicePort{
 			Name: listener.Name,
 			Port: port,
@@ -173,6 +163,20 @@ func (in *MeshGateway) ListenersToPorts(portModifier int32) []corev1.ServicePort
 				IntVal: port + portModifier,
 			},
 			Protocol: corev1.Protocol(listener.Protocol),
+		})
+	}
+	return ports
+}
+
+func (in *MeshGateway) ListenersToContainerPorts(portModifier int32) []corev1.ContainerPort {
+	ports := []corev1.ContainerPort{}
+
+	for _, listener := range in.Spec.Listeners {
+		port := int32(listener.Port)
+		ports = append(ports, corev1.ContainerPort{
+			Name:          listener.Name,
+			ContainerPort: port + portModifier,
+			Protocol:      corev1.Protocol(listener.Protocol),
 		})
 	}
 	return ports

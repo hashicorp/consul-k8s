@@ -117,16 +117,7 @@ func (b *gatewayBuilder[T]) consulDataplaneContainer(containerConfig v2beta1.Gat
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
 
-	// Configure the wan port.
-	wanPort := corev1.ContainerPort{
-		Name:          "wan",
-		ContainerPort: int32(constants.DefaultWANPort),
-		HostPort:      containerConfig.HostPort,
-	}
-
-	wanPort.ContainerPort = 443 + containerConfig.PortModifier
-
-	container.Ports = append(container.Ports, wanPort)
+	container.Ports = append(container.Ports, b.gateway.ListenersToContainerPorts(containerConfig.PortModifier)...)
 
 	// Configure the resource requests and limits for the proxy if they are set.
 	if resources != nil {
