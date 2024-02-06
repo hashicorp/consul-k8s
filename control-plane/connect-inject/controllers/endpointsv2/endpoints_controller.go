@@ -375,7 +375,6 @@ func getServiceID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-			PeerName:  constants.DefaultConsulPeer,
 		},
 	}
 }

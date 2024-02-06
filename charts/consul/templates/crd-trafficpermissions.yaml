@@ -101,23 +101,25 @@ spec:
                               when evaluating rules for the incoming connection.
                             items:
                               properties:
-                                header:
-                                  properties:
-                                    exact:
-                                      type: string
-                                    invert:
-                                      type: boolean
-                                    name:
-                                      type: string
-                                    prefix:
-                                      type: string
-                                    present:
-                                      type: boolean
-                                    regex:
-                                      type: string
-                                    suffix:
-                                      type: string
-                                  type: object
+                                headers:
+                                  items:
+                                    properties:
+                                      exact:
+                                        type: string
+                                      invert:
+                                        type: boolean
+                                      name:
+                                        type: string
+                                      prefix:
+                                        type: string
+                                      present:
+                                        type: boolean
+                                      regex:
+                                        type: string
+                                      suffix:
+                                        type: string
+                                    type: object
+                                  type: array
                                 methods:
                                   description: Methods is the list of HTTP methods.
                                   items:
@@ -138,23 +140,25 @@ spec:
                                   type: array
                               type: object
                             type: array
-                          header:
-                            properties:
-                              exact:
-                                type: string
-                              invert:
-                                type: boolean
-                              name:
-                                type: string
-                              prefix:
-                                type: string
-                              present:
-                                type: boolean
-                              regex:
-                                type: string
-                              suffix:
-                                type: string
-                            type: object
+                          headers:
+                            items:
+                              properties:
+                                exact:
+                                  type: string
+                                invert:
+                                  type: boolean
+                                name:
+                                  type: string
+                                prefix:
+                                  type: string
+                                present:
+                                  type: boolean
+                                regex:
+                                  type: string
+                                suffix:
+                                  type: string
+                              type: object
+                            type: array
                           methods:
                             description: Methods is the list of HTTP methods. If no
                               methods are specified, this rule will apply to all methods.

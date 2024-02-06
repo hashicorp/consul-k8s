@@ -18,7 +18,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -61,10 +60,6 @@ func (in *TCPRoute) ResourceID(namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }
