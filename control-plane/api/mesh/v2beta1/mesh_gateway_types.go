@@ -153,9 +153,7 @@ func (in *MeshGateway) ListenersToServicePorts(portModifier int32) []corev1.Serv
 
 	for _, listener := range in.Spec.Listeners {
 		port := int32(listener.Port)
-		if listener.Name == "wan" {
-			port = constants.DefaultWANPort
-		}
+
 		ports = append(ports, corev1.ServicePort{
 			Name: listener.Name,
 			Port: port,
@@ -173,6 +171,7 @@ func (in *MeshGateway) ListenersToContainerPorts(portModifier int32) []corev1.Co
 
 	for _, listener := range in.Spec.Listeners {
 		port := int32(listener.Port)
+
 		ports = append(ports, corev1.ContainerPort{
 			Name:          listener.Name,
 			ContainerPort: port + portModifier,
