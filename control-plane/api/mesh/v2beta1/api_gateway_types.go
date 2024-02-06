@@ -12,7 +12,9 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -67,6 +69,20 @@ type APIGatewayList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []*APIGateway `json:"items"`
+}
+
+func (in *APIGatewayList) ReconcileRequests() []reconcile.Request {
+	requests := make([]reconcile.Request, 0, len(in.Items))
+
+	for _, item := range in.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.Name,
+				Namespace: item.Namespace,
+			},
+		})
+	}
+	return requests
 }
 
 func (in *APIGateway) ResourceID(namespace, partition string) *pbresource.ID {

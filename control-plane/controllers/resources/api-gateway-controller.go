@@ -40,5 +40,5 @@ func (r *APIGatewayController) UpdateStatus(ctx context.Context, obj client.Obje
 }
 
 func (r *APIGatewayController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &meshv2beta1.APIGateway{}, r)
+	return setupGatewayControllerWithManager[*meshv2beta1.APIGatewayList](mgr, &meshv2beta1.APIGateway{}, r.Client, r)
 }
