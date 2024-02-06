@@ -128,7 +128,7 @@ spec:
           - "/bin/sh"
           - "-ec"
           - |
-            consul-k8s-control-plane acl-init \
+            exec consul-k8s-control-plane acl-init \
               -secret-name="{{ template "consul.fullname" . }}-enterprise-license-acl-token" \
               -k8s-namespace={{ .Release.Namespace }} \
               -consul-api-timeout={{ .Values.global.consulAPITimeout }}

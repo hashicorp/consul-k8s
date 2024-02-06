@@ -133,7 +133,7 @@ spec:
           - /bin/sh
           - -ec
           - |-
-            consul-k8s-control-plane connect-init \
+            exec consul-k8s-control-plane connect-init \
               -log-json={{ .Values.global.logJSON }} \
               -log-level={{ default .Values.global.logLevel .Values.telemetryCollector.logLevel }} \
               -pod-name=${POD_NAME} \
@@ -261,7 +261,7 @@ spec:
           {{- end }}
           {{- end }}
 
-          consul-telemetry-collector agent \
+          exec consul-telemetry-collector agent \
           {{- if .Values.telemetryCollector.customExporterConfig }}
             -config-file-path /consul/config/config.json \
           {{ end }}
