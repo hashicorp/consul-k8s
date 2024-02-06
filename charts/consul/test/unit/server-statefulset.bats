@@ -1103,6 +1103,83 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# server extraConfig validation
+
+@test "server/Statefulset: Validate enable_debug extraConfig for Consul Helm chart" {
+    cd `chart_dir`
+    run helm template \
+      -s templates/server-statefulset.yaml \
+      --set global.metrics.enabled=true \
+      --set global.metrics.enableAgentMetrics=true \
+      --set server.extraConfig=enable_debug=true \
+      .
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "The enable_debug key is present in extra-from-values.json. Use server.enableAgentDebug to set this value." ]]
+}
+
+@test "server/Statefulset: Validate disable_hostname extraConfig for Consul Helm chart" {
+    cd `chart_dir`
+    run helm template \
+      -s templates/server-statefulset.yaml \
+      --set global.metrics.enabled=true \
+      --set global.metrics.enableAgentMetrics=true \
+      --set server.extraConfig=telemetry.disable_hostname=true \
+      .
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "The disable_hostname key is present in extra-from-values.json. Use global.metrics.disableAgentHostName to set this value." ]]
+}
+
+@test "server/Statefulset: Validate enable_host_metrics extraConfig for Consul Helm chart" {
+    cd `chart_dir`
+    run helm template \
+      -s templates/server-statefulset.yaml \
+      --set global.metrics.enabled=true \
+      --set global.metrics.enableAgentMetrics=true \
+      --set server.extraConfig=telemetry.enable_host_metrics=true \
+      .
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "The enable_host_metrics key is present in extra-from-values.json. Use global.metrics.enableHostMetrics to set this value." ]]
+}
+
+@test "server/Statefulset: Validate prefix_filter extraConfig for Consul Helm chart" {
+    cd `chart_dir`
+    run helm template \
+      -s templates/server-statefulset.yaml \
+      --set global.metrics.enabled=true \
+      --set global.metrics.enableAgentMetrics=true \
+      --set server.extraConfig=telemetry.prefix_filter=["+consul.rpc.server.call"] \
+      .
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "The prefix_filter key is present in extra-from-values.json. Use global.metrics.prefix_filter to set this value." ]]
+}
+
+@test "server/Statefulset: Validate dogstatsd_tags extraConfig for Consul Helm chart" {
+    cd `chart_dir`
+    run helm template \
+      -s templates/server-statefulset.yaml \
+      --set global.metrics.enabled=true \
+      --set global.metrics.enableAgentMetrics=true \
+      --set global.metrics.datadog.dogstatsd.enabled=true \
+      --set server.extraConfig=telemetry.dogstatsd_tags='[\"source:consul-server\"\,\"consul_service:consul\"]' \
+      .
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "The dogstatsd_tags key is present in extra-from-values.json. Use global.metrics.datadog.dogstatsd.dogstatsdTags to set this value." ]]
+}
+
+@test "server/Statefulset: Validate dogstatsd_addr extraConfig for Consul Helm chart" {
+    cd `chart_dir`
+    run helm template \
+      -s templates/server-statefulset.yaml \
+      --set global.metrics.enabled=true \
+      --set global.metrics.enableAgentMetrics=true \
+      --set global.metrics.datadog.dogstatsd.enabled=true \
+      --set server.extraConfig=telemetry.dogstatsd_addr="localhost:8125" \
+      .
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "The dogstatsd_addr key is present in extra-from-values.json. Use global.metrics.datadog.dogstatsd.dogstatsd_addr to set this value." ]]
+}
+
+#--------------------------------------------------------------------
 # tolerations
 
 @test "server/StatefulSet: tolerations not set by default" {

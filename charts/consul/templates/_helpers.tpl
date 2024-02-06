@@ -167,30 +167,11 @@ Cleanup server.extraConfig entries to avoid conflicting entries:
 Usage: {{ template "consul.validateExtraConfig" . }}
 */}}
 {{- define "consul.validateExtraConfig" -}}
-{{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
-{{- if (contains "enable_debug" .Values.server.extraConfig) }}
-{{ fail "The 'enable_debug' key is present in extra-from-values.json. Use 'server.enableAgentDebug' to set this value." }}
-{{- end }}
-{{- if (contains "disable_hostname" .Values.server.extraConfig) }}
-{{ fail "The 'disable_hostname' key is present in extra-from-values.json. Use 'global.metrics.disableAgentHostName' to set this value." }}
-{{- end }}
-{{- if (contains "enable_host_metrics" .Values.server.extraConfig) }}
-{{ fail "The 'enable_host_metrics' key is present in extra-from-values.json. Use 'global.metrics.enableHostMetrics' to set this value." }}
-{{- end }}
-{{- if (contains "prefix_filter" .Values.server.extraConfig) }}
-{{ fail "The 'prefix_filter' key is present in extra-from-values.json. Use 'global.metrics.prefix_filter' to set this value." }}
-{{- end }}
-{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}
-{{- if (contains "dogstatsd_tags" .Values.server.extraConfig) }}
-{{ fail "The 'dogstatsd_tags' key is present in extra-from-values.json. Use 'global.metrics.datadog.dogstatsd.dogstatsdTags' to set this value." }}
-{{- end }}
-{{- end }}
-{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}
-{{- if (contains "dogstatsd_addr" .Values.server.extraConfig) }}
-{{ fail "The 'dogstatsd_addr' key is present in extra-from-values.json. Use 'global.metrics.datadog.dogstatsd.dogstatsd_addr' to set this value." }}
-{{- end }}
-{{- end }}
-{{- end }}
+{{- if (contains "enable_debug" .Values.server.extraConfig) }}{{ fail "The enable_debug key is present in extra-from-values.json. Use server.enableAgentDebug to set this value." }}{{- end }}
+{{- if (contains "disable_hostname" .Values.server.extraConfig) }}{{ fail "The disable_hostname key is present in extra-from-values.json. Use global.metrics.disableAgentHostName to set this value." }}{{- end }}
+{{- if (contains "enable_host_metrics" .Values.server.extraConfig) }}{{ fail "The enable_host_metrics key is present in extra-from-values.json. Use global.metrics.enableHostMetrics to set this value." }}{{- end }}
+{{- if (contains "prefix_filter" .Values.server.extraConfig) }}{{ fail "The prefix_filter key is present in extra-from-values.json. Use global.metrics.prefix_filter to set this value." }}{{- end }}
+{{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}{{- if (contains "dogstatsd_tags" .Values.server.extraConfig) }}{{ fail "The dogstatsd_tags key is present in extra-from-values.json. Use global.metrics.datadog.dogstatsd.dogstatsdTags to set this value." }}{{- end }}{{- end }}{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}{{- if (contains "dogstatsd_addr" .Values.server.extraConfig) }}{{ fail "The dogstatsd_addr key is present in extra-from-values.json. Use global.metrics.datadog.dogstatsd.dogstatsd_addr to set this value." }}{{- end }}{{- end }}{{- end }}
 {{- end -}}
 
 {{/*
