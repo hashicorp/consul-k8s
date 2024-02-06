@@ -13,7 +13,7 @@ type Gateway interface {
 	GetName() string
 	GetNamespace() string
 	ListenersToServicePorts(int32) []corev1.ServicePort
-	ListenersToContainerPorts(int32) []corev1.ContainerPort
+	ListenersToContainerPorts(int32, int32) []corev1.ContainerPort
 	GetAnnotations() map[string]string
 	GetLabels() map[string]string
 }

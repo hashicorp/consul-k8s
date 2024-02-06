@@ -166,7 +166,7 @@ func (in *MeshGateway) ListenersToServicePorts(portModifier int32) []corev1.Serv
 	return ports
 }
 
-func (in *MeshGateway) ListenersToContainerPorts(portModifier int32) []corev1.ContainerPort {
+func (in *MeshGateway) ListenersToContainerPorts(portModifier int32, hostPort int32) []corev1.ContainerPort {
 	ports := []corev1.ContainerPort{}
 
 	for _, listener := range in.Spec.Listeners {
@@ -175,6 +175,7 @@ func (in *MeshGateway) ListenersToContainerPorts(portModifier int32) []corev1.Co
 		ports = append(ports, corev1.ContainerPort{
 			Name:          listener.Name,
 			ContainerPort: port + portModifier,
+			HostPort:      hostPort,
 			Protocol:      corev1.Protocol(listener.Protocol),
 		})
 	}

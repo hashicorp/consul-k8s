@@ -117,7 +117,7 @@ func (b *gatewayBuilder[T]) consulDataplaneContainer(containerConfig v2beta1.Gat
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
 
-	container.Ports = append(container.Ports, b.gateway.ListenersToContainerPorts(containerConfig.PortModifier)...)
+	container.Ports = append(container.Ports, b.gateway.ListenersToContainerPorts(containerConfig.PortModifier, containerConfig.HostPort)...)
 
 	// Configure the resource requests and limits for the proxy if they are set.
 	if resources != nil {

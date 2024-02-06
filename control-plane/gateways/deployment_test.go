@@ -67,6 +67,13 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 					},
 					Spec: pbmesh.MeshGateway{
 						GatewayClassName: "test-gateway-class",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				config: GatewayConfig{},
@@ -327,6 +334,7 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 											Name:          "wan",
 											ContainerPort: 8443,
 											HostPort:      8080,
+											Protocol:      "tcp",
 										},
 									},
 									Env: []corev1.EnvVar{
@@ -475,6 +483,13 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 					},
 					Spec: pbmesh.MeshGateway{
 						GatewayClassName: "test-gateway-class",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				config: GatewayConfig{
@@ -728,6 +743,7 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 											Name:          "wan",
 											ContainerPort: 8443,
 											HostPort:      8080,
+											Protocol:      "tcp",
 										},
 									},
 									Env: []corev1.EnvVar{
@@ -876,6 +892,13 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 					},
 					Spec: pbmesh.MeshGateway{
 						GatewayClassName: "test-gateway-class",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				config: GatewayConfig{},
@@ -1009,6 +1032,7 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 										{
 											Name:          "wan",
 											ContainerPort: 443,
+											Protocol:      "tcp",
 										},
 									},
 									Env: []corev1.EnvVar{
