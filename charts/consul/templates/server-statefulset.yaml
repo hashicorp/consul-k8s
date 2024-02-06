@@ -249,7 +249,7 @@ spec:
           - "/bin/sh"
           - "-ec"
           - |
-            consul-k8s-control-plane fetch-server-region -node-name "$NODE_NAME" -output-file /consul/extra-config/locality.json
+            exec consul-k8s-control-plane fetch-server-region -node-name "$NODE_NAME" -output-file /consul/extra-config/locality.json
         volumeMounts:
           - name: extra-config
             mountPath: /consul/extra-config

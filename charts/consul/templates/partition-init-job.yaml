@@ -111,7 +111,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              consul-k8s-control-plane partition-init \
+              exec consul-k8s-control-plane partition-init \
                 -log-level={{ .Values.global.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 {{- if .Values.global.cloud.enabled }}
