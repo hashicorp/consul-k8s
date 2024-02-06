@@ -68,7 +68,10 @@ func (r *MeshGatewayController) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, err
 		}
 
-		if err := r.onCreateUpdate(ctx, req, gcc, resource); err != nil {
+		if err := onCreateUpdate(ctx, r.Client, configs{
+			gcc:           gcc,
+			gatewayConfig: gateways.GatewayConfig{},
+		}, resource); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -88,6 +91,15 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 	return setupGatewayControllerWithManager[*meshv2beta1.MeshGatewayList](mgr, &meshv2beta1.MeshGateway{}, r.Client, r)
 }
 
+type gateway interface {
+	*meshv2beta1.MeshGateway | *meshv2beta1.APIGateway
+}
+
+type configs struct {
+	gcc           *meshv2beta1.GatewayClassConfig
+	gatewayConfig gateways.GatewayConfig
+}
+
 // onCreateUpdate is responsible for creating/updating all K8s resources that
 // are required in order to run a meshv2beta1.MeshGateway. These are created/updated
 // in dependency order.
@@ -96,26 +108,19 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 //  3. Service
 //  4. Role
 //  5. RoleBinding
-func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, gcc *meshv2beta1.GatewayClassConfig, resource *meshv2beta1.MeshGateway) error {
-	// Fetch GatewayClassConfig for the gateway
-	gcc, err := getGatewayClassConfigForGateway(ctx, r.Client, resource.Spec.GatewayClassName)
-	if err != nil {
-		r.Log.Error(err, "unable to get gatewayclassconfig for gateway: %s gatewayclass: %s", resource.Name, resource.Spec.GatewayClassName)
-		return err
-	}
-
-	builder := gateways.NewGatewayBuilder[*meshv2beta1.MeshGateway](resource, r.GatewayConfig, gcc)
+func onCreateUpdate[T gateways.Gateway](ctx context.Context, k8sClient client.Client, cfg configs, resource T) error {
+	builder := gateways.NewGatewayBuilder[T](resource, cfg.gatewayConfig, cfg.gcc)
 
 	// Create ServiceAccount
 	desiredAccount := builder.ServiceAccount()
 	existingAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: desiredAccount.Namespace, Name: desiredAccount.Name}}
 
 	upsertOp := func(ctx context.Context, _, object client.Object) error {
-		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, object, func() error { return nil })
+		_, err := controllerutil.CreateOrUpdate(ctx, k8sClient, object, func() error { return nil })
 		return err
 	}
 
-	err = r.opIfNewOrOwned(ctx, resource, existingAccount, desiredAccount, upsertOp)
+	err := opIfNewOrOwned(ctx, resource, k8sClient, existingAccount, desiredAccount, upsertOp)
 	if err != nil {
 		return fmt.Errorf("unable to create service account: %w", err)
 	}
@@ -124,7 +129,7 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 	desiredRole := builder.Role()
 	existingRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Namespace: desiredRole.Namespace, Name: desiredRole.Name}}
 
-	err = r.opIfNewOrOwned(ctx, resource, existingRole, desiredRole, upsertOp)
+	err = opIfNewOrOwned(ctx, resource, k8sClient, existingRole, desiredRole, upsertOp)
 	if err != nil {
 		return fmt.Errorf("unable to create role: %w", err)
 	}
@@ -133,7 +138,7 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 	desiredBinding := builder.RoleBinding()
 	existingBinding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Namespace: desiredBinding.Namespace, Name: desiredBinding.Name}}
 
-	err = r.opIfNewOrOwned(ctx, resource, existingBinding, desiredBinding, upsertOp)
+	err = opIfNewOrOwned(ctx, resource, k8sClient, existingBinding, desiredBinding, upsertOp)
 	if err != nil {
 		return fmt.Errorf("unable to create role binding: %w", err)
 	}
@@ -146,14 +151,14 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		existing := existingObj.(*corev1.Service)
 		desired := desiredObj.(*corev1.Service)
 
-		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, existing, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, k8sClient, existing, func() error {
 			gateways.MergeService(existing, desired)
 			return nil
 		})
 		return err
 	}
 
-	err = r.opIfNewOrOwned(ctx, resource, existingService, desiredService, mergeServiceOp)
+	err = opIfNewOrOwned(ctx, resource, k8sClient, existingService, desiredService, mergeServiceOp)
 	if err != nil {
 		return fmt.Errorf("unable to create service: %w", err)
 	}
@@ -169,14 +174,14 @@ func (r *MeshGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Req
 		existing := existingObj.(*appsv1.Deployment)
 		desired := desiredObj.(*appsv1.Deployment)
 
-		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, existing, func() error {
+		_, err = controllerutil.CreateOrUpdate(ctx, k8sClient, existing, func() error {
 			gateways.MergeDeployment(existing, desired)
 			return nil
 		})
 		return err
 	}
 
-	err = r.opIfNewOrOwned(ctx, resource, existingDeployment, desiredDeployment, mergeDeploymentOp)
+	err = opIfNewOrOwned(ctx, resource, k8sClient, existingDeployment, desiredDeployment, mergeDeploymentOp)
 	if err != nil {
 		return fmt.Errorf("unable to create deployment: %w", err)
 	}
@@ -205,9 +210,9 @@ type ownedObjectOp func(ctx context.Context, existing, desired client.Object) er
 // opIfNewOrOwned runs a given ownedObjectOp to create, update, or delete a resource.
 // The purpose of opIfNewOrOwned is to ensure that we aren't updating or deleting a
 // resource that was not created by us. If this scenario is encountered, we error.
-func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *meshv2beta1.MeshGateway, existing, desired client.Object, op ownedObjectOp) error {
+func opIfNewOrOwned(ctx context.Context, gateway client.Object, k8sClient client.Client, existing, desired client.Object, op ownedObjectOp) error {
 	// Ensure owner reference is always set on objects that we write
-	if err := ctrl.SetControllerReference(gateway, desired, r.Client.Scheme()); err != nil {
+	if err := ctrl.SetControllerReference(gateway, desired, k8sClient.Scheme()); err != nil {
 		return err
 	}
 
@@ -217,7 +222,7 @@ func (r *MeshGatewayController) opIfNewOrOwned(ctx context.Context, gateway *mes
 	}
 
 	exists := false
-	if err := r.Get(ctx, key, existing); err != nil {
+	if err := k8sClient.Get(ctx, key, existing); err != nil {
 		// We failed to fetch the object in a way that doesn't tell us about its existence
 		if !k8serr.IsNotFound(err) {
 			return err
