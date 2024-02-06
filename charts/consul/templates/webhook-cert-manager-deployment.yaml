@@ -43,7 +43,7 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane webhook-cert-manager \
+          exec consul-k8s-control-plane webhook-cert-manager \
             -log-level={{ .Values.global.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
             -config-file=/bootstrap/config/webhook-config.json \
