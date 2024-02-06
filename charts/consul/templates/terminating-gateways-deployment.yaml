@@ -197,7 +197,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-                consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
+              exec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
                   -gateway-kind="terminating-gateway" \
                   -proxy-id-file=/consul/service/proxy-id \
                   -service-name={{ .name }} \

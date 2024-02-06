@@ -123,7 +123,7 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane sync-catalog \
+          exec consul-k8s-control-plane sync-catalog \
             -log-level={{ default .Values.global.logLevel .Values.syncCatalog.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
             -k8s-default-sync={{ .Values.syncCatalog.default }} \
