@@ -1798,6 +1798,7 @@ key2: value2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
 
+  [ $(echo "${actual}" | yq -r '.capabilities.drop | length') -eq 0 ]
   [ $(echo "${actual}" | yq -r '.capabilities.add[0]') = "NET_BIND_SERVICE" ]
 
 }
