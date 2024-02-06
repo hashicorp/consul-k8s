@@ -199,16 +199,7 @@ func (in *APIGateway) ListenersToServicePorts(portModifier int32) []corev1.Servi
 	return ports
 }
 
-func (in *APIGateway) ListenersToContainerPorts(portModifier int32) []corev1.ContainerPort {
-	ports := []corev1.ContainerPort{}
-
-	for _, listener := range in.Spec.Listeners {
-		port := int32(listener.Port)
-		ports = append(ports, corev1.ContainerPort{
-			Name:          listener.Name,
-			ContainerPort: port + portModifier,
-			Protocol:      corev1.Protocol(listener.Protocol),
-		})
-	}
-	return ports
+func (in *APIGateway) ListenersToContainerPorts(_ int32, _ int32) []corev1.ContainerPort {
+	// TODO: check if this is actually needed: we don't map any container ports in v1
+	return []corev1.ContainerPort{}
 }
