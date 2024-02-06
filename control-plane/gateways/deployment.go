@@ -180,8 +180,9 @@ func deploymentReplicaCount(replicas *meshv2beta1.GatewayClassReplicasConfig, cu
 //
 // based on https://github.com/kubernetes-sigs/controller-runtime/blob/4000e996a202917ad7d40f02ed8a2079a9ce25e9/pkg/controller/controllerutil/example_test.go
 func MergeDeployment(existing, desired *appsv1.Deployment) {
-	// Only overwrite the annotations and labels if the Deployment doesn't exist yet
+	// Only overwrite fields if the Deployment doesn't exist yet
 	if existing.ObjectMeta.CreationTimestamp.IsZero() {
+		existing.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
 		existing.Spec = desired.Spec
 		existing.Annotations = desired.Annotations
 		existing.Labels = desired.Labels

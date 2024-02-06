@@ -81,8 +81,9 @@ func (b *meshGatewayBuilder) Ports(portModifier int32) []corev1.ServicePort {
 func MergeService(existing, desired *corev1.Service) {
 	existing.Spec = desired.Spec
 
-	// Only overwrite the annotations and labels if the Service doesn't exist yet
+	// Only overwrite fields if the Service doesn't exist yet
 	if existing.ObjectMeta.CreationTimestamp.IsZero() {
+		existing.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
 		existing.Annotations = desired.Annotations
 		existing.Labels = desired.Labels
 		return

@@ -45,7 +45,6 @@ type MeshGatewayController struct {
 
 func (r *MeshGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Logger(req.NamespacedName)
-	logger.Info("reconciling MeshGateway")
 
 	// Fetch the resource being reconciled
 	resource := &meshv2beta1.MeshGateway{}
