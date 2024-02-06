@@ -211,12 +211,12 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
-          -gateway-kind="ingress-gateway" \
-          -proxy-id-file=/consul/service/proxy-id \
-          -service-name={{ template "consul.fullname" $root }}-{{ .name }} \
-          -log-level={{ default $root.Values.global.logLevel $root.Values.ingressGateways.logLevel }} \
-          -log-json={{ $root.Values.global.logJSON }}
+          exec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
+            -gateway-kind="ingress-gateway" \
+            -proxy-id-file=/consul/service/proxy-id \
+            -service-name={{ template "consul.fullname" $root }}-{{ .name }} \
+            -log-level={{ default $root.Values.global.logLevel $root.Values.ingressGateways.logLevel }} \
+            -log-json={{ $root.Values.global.logJSON }}
         volumeMounts:
         - name: consul-service
           mountPath: /consul/service
