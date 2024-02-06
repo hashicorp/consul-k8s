@@ -537,6 +537,7 @@ func (c *Command) Run(args []string) int {
 			ConsulTLSServerName:        c.consul.TLSServerName,
 			ConsulPartition:            c.consul.Partition,
 			ConsulCACert:               string(caCertPem),
+			InitContainerResources:     &initResources,
 		},
 		AllowK8sNamespacesSet:   allowK8sNamespaces,
 		DenyK8sNamespacesSet:    denyK8sNamespaces,
