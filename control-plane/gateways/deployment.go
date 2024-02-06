@@ -109,19 +109,10 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	}, nil
 }
 
-func (b *meshGatewayBuilder) MergeDeployments(gcc *meshv2beta1.GatewayClassConfig, old, new *appsv1.Deployment) *appsv1.Deployment {
-	if old == nil {
-		return new
-	}
-	if !compareDeployments(old, new) {
-		old.Spec.Template = new.Spec.Template
-		new.Spec.Replicas = deploymentReplicaCount(nil, old.Spec.Replicas)
-	}
-
-	return new
-}
-
-func compareDeployments(a, b *appsv1.Deployment) bool {
+// areDeploymentsEqual determines whether two Deployments are the same in
+// the ways that we care about. This specifically ignores valid out-of-band
+// changes such as initContainer injection.
+func areDeploymentsEqual(a, b *appsv1.Deployment) bool {
 	// since K8s adds a bunch of defaults when we create a deployment, check that
 	// they don't differ by the things that we may actually change, namely container
 	// ports
@@ -182,4 +173,35 @@ func deploymentReplicaCount(replicas *meshv2beta1.GatewayClassReplicasConfig, cu
 
 	// otherwise use the global default
 	return pointer.Int32(globalDefaultInstances)
+}
+
+// MergeDeployment is used to update an appsv1.Deployment without overwriting any
+// existing annotations or labels that were placed there by other vendors.
+//
+// based on https://github.com/kubernetes-sigs/controller-runtime/blob/4000e996a202917ad7d40f02ed8a2079a9ce25e9/pkg/controller/controllerutil/example_test.go
+func MergeDeployment(existing, desired *appsv1.Deployment) {
+	// Only overwrite fields if the Deployment doesn't exist yet
+	if existing.ObjectMeta.CreationTimestamp.IsZero() {
+		existing.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
+		existing.Spec = desired.Spec
+		existing.Annotations = desired.Annotations
+		existing.Labels = desired.Labels
+		return
+	}
+
+	// Make sure we don't reconcile forever by overwriting valid out-of-band
+	// changes such as init container injection. If the deployments are
+	// sufficiently equal, we only update the annotations.
+	if !areDeploymentsEqual(existing, desired) {
+		desired.Spec.Replicas = deploymentReplicaCount(nil, existing.Spec.Replicas)
+		existing.Spec = desired.Spec
+	}
+
+	// If the Deployment already exists, add any desired annotations + labels to existing set
+	for k, v := range desired.ObjectMeta.Annotations {
+		existing.ObjectMeta.Annotations[k] = v
+	}
+	for k, v := range desired.ObjectMeta.Labels {
+		existing.ObjectMeta.Labels[k] = v
+	}
 }

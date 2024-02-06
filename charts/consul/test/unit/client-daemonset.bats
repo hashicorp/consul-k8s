@@ -1445,7 +1445,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul logout"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[1]] | any(contains("logout"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

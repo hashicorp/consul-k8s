@@ -140,7 +140,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              consul-k8s-control-plane inject-connect \
+              exec consul-k8s-control-plane inject-connect \
                 {{- if .Values.global.federation.enabled }}
                 -enable-federation \
                 {{- end }}
