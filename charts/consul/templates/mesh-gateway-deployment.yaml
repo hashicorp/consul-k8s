@@ -186,8 +186,10 @@ spec:
         image: {{ .Values.global.imageConsulDataplane | quote }}
         securityContext:
           capabilities:
+            {{ if not .Values.meshGateway.hostNetwork}}
             drop:
               - ALL
+            {{- end }}
             add:
               - NET_BIND_SERVICE
         {{- if .Values.meshGateway.resources }}
