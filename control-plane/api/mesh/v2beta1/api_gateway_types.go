@@ -15,7 +15,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -38,8 +37,26 @@ type APIGateway struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   pbmesh.APIGateway `json:"spec,omitempty"`
-	Status `json:"status,omitempty"`
+	Spec             pbmesh.APIGateway `json:"spec,omitempty"`
+	APIGatewayStatus `json:"status,omitempty"`
+}
+
+type APIGatewayStatus struct {
+	Status    `json:"status,omitempty"`
+	Addresses []GatewayAddress `json:"addresses"`
+	Listeners []ListenerStatus `json:"listeners"`
+}
+
+type ListenerStatus struct {
+	Status         `json:"status,omitempty"`
+	Name           string `json:"name"`
+	AttachedRoutes int32  `json:"attachedRoutes"`
+}
+
+type GatewayAddress struct {
+	// +kubebuilder:default=IPAddress
+	Type  string `json:"type"`
+	Value string `json:"value"`
 }
 
 // +kubebuilder:object:root=true
@@ -58,10 +75,6 @@ func (in *APIGateway) ResourceID(namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }

@@ -116,7 +116,6 @@ func createWorkload(t *testing.T, watcher ServerConnectionManager, name string) 
 		Tenancy: &pbresource.Tenancy{
 			Partition: "default",
 			Namespace: "default",
-			PeerName:  "local",
 		},
 	}
 
@@ -157,7 +156,6 @@ func createProxyConfiguration(t *testing.T, watcher ServerConnectionManager, nam
 		Tenancy: &pbresource.Tenancy{
 			Partition: "default",
 			Namespace: "default",
-			PeerName:  "local",
 		},
 	}
 
