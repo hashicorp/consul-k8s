@@ -91,7 +91,7 @@ func Test_compareDeployments(t *testing.T) {
 			shouldBeEqual: false,
 		},
 		{
-			name: "different init container resources",
+			name: "same init container resources",
 			a: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
 					Template: corev1.PodTemplateSpec{
