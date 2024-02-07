@@ -203,10 +203,8 @@ spec:
             preStop:
               exec:
                 command:
-                  - "/bin/sh"
-                  - "-ec"
-                  - |
-                    consul logout
+                  - "/bin/consul"
+                  - "logout"
           {{- end }}
           env:
             {{- if .Values.global.acls.manageSystemACLs }}
@@ -524,7 +522,7 @@ spec:
           - "/bin/sh"
           - "-ec"
           - |
-            consul-k8s-control-plane acl-init \
+            exec consul-k8s-control-plane acl-init \
               -log-level={{ default .Values.global.logLevel .Values.client.logLevel }} \
               -log-json={{ .Values.global.logJSON }} \
               -init-type="client"
