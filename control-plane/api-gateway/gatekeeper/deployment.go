@@ -6,18 +6,19 @@ package gatekeeper
 import (
 	"context"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/types"
-
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 const (
@@ -168,6 +169,14 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	if len(b.Spec.Template.Spec.Containers) != len(a.Spec.Template.Spec.Containers) {
 		return false
 	}
+
+	for i, containerA := range a.Spec.Template.Spec.InitContainers {
+		containerB := b.Spec.Template.Spec.InitContainers[i]
+		if !cmp.Equal(containerA, containerB) {
+			return false
+		}
+	}
+
 	for i, container := range a.Spec.Template.Spec.Containers {
 		otherPorts := b.Spec.Template.Spec.Containers[i].Ports
 		if len(container.Ports) != len(otherPorts) {
