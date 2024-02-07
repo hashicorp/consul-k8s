@@ -27,8 +27,6 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	k8syaml "sigs.k8s.io/yaml"
 
-	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
-
 	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -432,15 +430,14 @@ func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, compo
 			return err
 		}
 
-		// TODO: NET-6934 remove hardcoded values
 		class := &v2beta1.GatewayClass{
 			ObjectMeta: metav1.ObjectMeta{Name: cfg.Name, Labels: labels},
-			TypeMeta:   metav1.TypeMeta{Kind: "GatewayClass"},
-			Spec: meshv2beta1.GatewayClass{
+			TypeMeta:   metav1.TypeMeta{Kind: v2beta1.KindGatewayClass},
+			Spec: v2beta1.GatewayClassSpec{
 				ControllerName: controllerName,
-				ParametersRef: &meshv2beta1.ParametersReference{
+				ParametersRef: &v2beta1.ParametersReference{
 					Group:     v2beta1.MeshGroup,
-					Kind:      "GatewayClassConfig",
+					Kind:      v2beta1.KindGatewayClassConfig,
 					Namespace: &cfg.Namespace,
 					Name:      cfg.Name,
 				},

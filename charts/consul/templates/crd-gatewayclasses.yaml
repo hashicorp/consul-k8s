@@ -21,14 +21,6 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - description: The sync status of the resource with Consul
-      jsonPath: .status.conditions[?(@.type=="Synced")].status
-      name: Synced
-      type: string
-    - description: The last successful synced time of the resource with Consul
-      jsonPath: .status.lastSyncedTime
-      name: Last Synced
-      type: date
     - description: The age of the resource
       jsonPath: .metadata.creationTimestamp
       name: Age
@@ -51,9 +43,6 @@ spec:
           metadata:
             type: object
           spec:
-            description: "NOTE: this should align to the GAMMA/gateway-api version,
-              or at least be easily translatable. \n https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.GatewayClass
-              \n This is a Resource type."
             properties:
               controllerName:
                 description: ControllerName is the name of the Kubernetes controller
@@ -74,13 +63,18 @@ spec:
                     description: The Kubernetes Kind that the referred object is
                     type: string
                   name:
-                    description: The name of the referred object
+                    description: The Name of the referred object
                     type: string
                   namespace:
                     description: The kubernetes namespace that the referred object
                       is in
                     type: string
+                required:
+                - name
                 type: object
+            required:
+            - controllerName
+            - parametersRef
             type: object
           status:
             properties:
