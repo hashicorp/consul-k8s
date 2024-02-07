@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -107,6 +108,16 @@ func TestUpsert(t *testing.T) {
 			},
 			helmConfig: common.HelmConfig{
 				ImageDataplane: dataplaneImage,
+				InitContainerResources: &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    requireQuantity(t, "100m"),
+						corev1.ResourceMemory: requireQuantity(t, "2Gi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    requireQuantity(t, "100m"),
+						corev1.ResourceMemory: requireQuantity(t, "2Gi"),
+					},
+				},
 			},
 			initialResources: resources{},
 			finalResources: resources{
@@ -762,7 +773,7 @@ func TestUpsert(t *testing.T) {
 
 			err := gatekeeper.Upsert(context.Background(), tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 			require.NoError(t, err)
-			require.NoError(t, validateResourcesExist(t, client, tc.finalResources))
+			require.NoError(t, validateResourcesExist(t, client, tc.helmConfig, tc.finalResources))
 		})
 	}
 }
@@ -951,7 +962,7 @@ func TestDelete(t *testing.T) {
 				Name:      tc.gateway.Name,
 			})
 			require.NoError(t, err)
-			require.NoError(t, validateResourcesExist(t, client, tc.finalResources))
+			require.NoError(t, validateResourcesExist(t, client, tc.helmConfig, tc.finalResources))
 			require.NoError(t, validateResourcesAreDeleted(t, client, tc.initialResources))
 		})
 	}
@@ -981,7 +992,7 @@ func joinResources(resources resources) (objs []client.Object) {
 	return objs
 }
 
-func validateResourcesExist(t *testing.T, client client.Client, resources resources) error {
+func validateResourcesExist(t *testing.T, client client.Client, helmConfig common.HelmConfig, resources resources) error {
 	t.Helper()
 
 	for _, expected := range resources.deployments {
@@ -1007,6 +1018,21 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 			require.NotNil(t, actual.Spec.Replicas)
 			require.EqualValues(t, *expected.Spec.Replicas, *actual.Spec.Replicas)
 		}
+
+		// Ensure there is an init container
+		hasInitContainer := false
+		for _, container := range actual.Spec.Template.Spec.InitContainers {
+			if container.Name == injectInitContainerName {
+				hasInitContainer = true
+
+				// If the Helm config specifies init container resources, verify they are set
+				if helmConfig.InitContainerResources != nil {
+					assert.Equal(t, helmConfig.InitContainerResources.Limits, container.Resources.Limits)
+					assert.Equal(t, helmConfig.InitContainerResources.Requests, container.Resources.Requests)
+				}
+			}
+		}
+		assert.True(t, hasInitContainer)
 
 		// Ensure there is a consul-dataplane container dropping ALL capabilities, adding
 		// back the NET_BIND_SERVICE capability, and establishing a read-only root filesystem
@@ -1342,4 +1368,10 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 			},
 		},
 	}
+}
+
+func requireQuantity(t *testing.T, v string) resource.Quantity {
+	quantity, err := resource.ParseQuantity(v)
+	require.NoError(t, err)
+	return quantity
 }
