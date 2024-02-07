@@ -6,16 +6,14 @@ package gateways
 import (
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Gateway interface {
 	*meshv2beta1.MeshGateway | *meshv2beta1.APIGateway
-	GetName() string
-	GetNamespace() string
+	client.Object
 	ListenersToServicePorts(int32) []corev1.ServicePort
 	ListenersToContainerPorts(int32, int32) []corev1.ContainerPort
-	GetAnnotations() map[string]string
-	GetLabels() map[string]string
 }
 
 // gatewayBuilder is a helper struct for building the Kubernetes resources for a mesh gateway.
