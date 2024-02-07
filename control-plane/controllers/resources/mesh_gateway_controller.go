@@ -313,7 +313,7 @@ func (r *MeshGatewayController) getGatewayClassConfigForGatewayClass(ctx context
 
 	config := &meshv2beta1.GatewayClassConfig{}
 	if ref := gatewayClass.Spec.ParametersRef; ref != nil {
-		if ref.Group != meshv2beta1.MeshGroup || ref.Kind != "GatewayClassConfig" {
+		if ref.Group != meshv2beta1.MeshGroup || ref.Kind != meshv2beta1.KindGatewayClassConfig {
 			// TODO @Gateway-Management additionally check for controller name when available
 			return nil, nil
 		}
