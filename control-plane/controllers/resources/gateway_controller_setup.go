@@ -124,7 +124,7 @@ func getGatewayClassesReferencingGatewayClassConfig(ctx context.Context, k8sClie
 }
 
 // getGatewaysReferencingGatewayClass queries all xGateway resources in the cluster
-// and returns any that reference the given GatewayClass.
+// and returns any that reference the given GatewayClass by name.
 func getGatewaysReferencingGatewayClass[T gatewayList](ctx context.Context, k8sClient client.Client, className string, index indexName) (T, error) {
 	var allGateways T
 	if err := k8sClient.List(ctx, allGateways, &client.ListOptions{
