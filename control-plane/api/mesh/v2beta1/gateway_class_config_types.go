@@ -8,6 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const KindGatewayClassConfig = "GatewayClassConfig"
+
 func init() {
 	MeshSchemeBuilder.Register(&GatewayClassConfig{}, &GatewayClassConfigList{})
 }
