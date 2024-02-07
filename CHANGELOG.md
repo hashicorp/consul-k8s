@@ -1,3 +1,51 @@
+## 1.4.0-rc1 (February 8, 2024)
+
+_Note: Consul K8s 1.4 is compatible with Consul 1.18 and Consul Dataplane 1.4. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info._
+BREAKING CHANGES:
+
+* server: set `autopilot.min_quorum` to the correct quorum value to ensure autopilot doesn't prune servers needed for quorum. Also set `autopilot. disable_upgrade_migration` to `true` as that setting is meant for blue/green deploys, not rolling deploys.
+
+This setting makes sense for most use-cases, however if you had a specific reason to use the old settings you can use the following config to keep them:
+
+    server:
+      extraConfig: |
+        {"autopilot": {"min_quorum": 0, "disable_upgrade_migration": false}} [[GH-3000](https://github.com/hashicorp/consul-k8s/issues/3000)]
+* server: set `leave_on_terminate` to `true` and set the server pod disruption budget `maxUnavailable` to `1`.
+
+This change makes server rollouts faster and more reliable. However, there is now a potential for reduced reliability if users accidentally
+scale the statefulset down. Now servers will leave the raft pool when they are stopped gracefully which reduces the fault
+tolerance. For example, with 5 servers, you can tolerate a loss of 2 servers' data as raft guarantees data is replicated to
+a majority of nodes (3). However, if you accidentally scale the statefulset down to 3, then the raft quorum will now be 2, and
+if you lose 2 servers, you may lose data. Before this change, the quorum would have remained at 3.
+
+During a regular rollout, the number of servers will be reduced by 1 at a time, which doesn't affect quorum when running
+an odd number of servers, e.g. quorum for 5 servers is 3, and quorum for 4 servers is also 3. That's why the pod disruption
+budget is being set to 1 now.
+
+If a server is stopped ungracefully, e.g. due to a node loss, it will not leave the raft pool, and so fault tolerance won't be affected.
+
+For the vast majority of users, this change will be beneficial, however if you wish to remain with the old settings you
+can set:
+
+    server:
+      extraConfig: |
+        {"leave_on_terminate": false}
+      disruptionBudget:
+        maxUnavailable: <previous setting> [[GH-3000](https://github.com/hashicorp/consul-k8s/issues/3000)]
+
+SECURITY:
+
+* Update Envoy version to 1.25.11 to address [CVE-2023-44487](https://github.com/envoyproxy/envoy/security/advisories/GHSA-jhv4-f7mr-xx76) [[GH-3116](https://github.com/hashicorp/consul-k8s/issues/3116)]
+
+IMPROVEMENTS:
+
+* cni: When CNI is enabled, set ReadOnlyRootFilesystem=true and AllowPrivilegeEscalation=false for mesh pod init containers and AllowPrivilegeEscalation=false for consul-dataplane containers (ReadOnlyRootFilesystem was already true for consul-dataplane containers). [[GH-3498](https://github.com/hashicorp/consul-k8s/issues/3498)]
+* control-plane: Add `CaseInsensitive` flag to service-routers that allows paths and path prefixes to ignore URL upper and lower casing. [[GH-3502](https://github.com/hashicorp/consul-k8s/issues/3502)]
+
+BUG FIXES:
+
+* consul-telemetry-collector: fix args to consul-dataplane when global.acls.manageSystemACLs [[GH-3184](https://github.com/hashicorp/consul-k8s/issues/3184)]
+
 ## 1.3.1 (December 19, 2023)
 
 SECURITY:
