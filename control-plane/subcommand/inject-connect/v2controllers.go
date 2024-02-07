@@ -200,7 +200,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := resourceControllers.RegisterFieldIndexes(ctx, mgr); err != nil {
+	if err := resourceControllers.RegisterGatewayFieldIndexes(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to register field indexes")
 		return err
 	}

@@ -52,7 +52,7 @@ func setupGatewayControllerWithManager[L gatewayList](mgr ctrl.Manager, obj clie
 					return nil
 				}
 
-				classes, err := getGatewayClassesByGatewayClassConfigName(context.Background(), k8sClient, gcc.Name)
+				classes, err := getGatewayClassesReferencingGatewayClassConfig(context.Background(), k8sClient, gcc.Name)
 				if err != nil {
 					return nil
 				}
