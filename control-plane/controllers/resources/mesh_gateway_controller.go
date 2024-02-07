@@ -77,7 +77,7 @@ func (r *MeshGatewayController) UpdateStatus(ctx context.Context, obj client.Obj
 }
 
 func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupGatewayControllerWithManager[*meshv2beta1.MeshGatewayList](mgr, &meshv2beta1.MeshGateway{}, r.Client, r)
+	return setupGatewayControllerWithManager[*meshv2beta1.MeshGatewayList](mgr, &meshv2beta1.MeshGateway{}, r.Client, r, MeshGateway_GatewayClassIndex)
 }
 
 // onCreateUpdate is responsible for creating/updating all K8s resources that
@@ -279,46 +279,4 @@ func (r *MeshGatewayController) getGatewayClassForGateway(ctx context.Context, g
 		return nil, client.IgnoreNotFound(err)
 	}
 	return &gatewayClass, nil
-}
-
-// getGatewayClassesReferencingGatewayClassConfig queries all GatewayClass resources in the
-// cluster and returns any that reference the given GatewayClassConfig.
-func (r *MeshGatewayController) getGatewayClassesReferencingGatewayClassConfig(ctx context.Context, config *meshv2beta1.GatewayClassConfig) (*meshv2beta1.GatewayClassList, error) {
-	if config == nil {
-		return nil, nil
-	}
-
-	allClasses := &meshv2beta1.GatewayClassList{}
-	if err := r.Client.List(ctx, allClasses); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-
-	matchingClasses := &meshv2beta1.GatewayClassList{}
-	for _, class := range allClasses.Items {
-		if class.Spec.ParametersRef != nil && class.Spec.ParametersRef.Name == config.Name {
-			matchingClasses.Items = append(matchingClasses.Items, class)
-		}
-	}
-	return matchingClasses, nil
-}
-
-// getGatewaysReferencingGatewayClass queries all MeshGateway resources in the cluster
-// and returns any that reference the given GatewayClass.
-func (r *MeshGatewayController) getGatewaysReferencingGatewayClass(ctx context.Context, class *meshv2beta1.GatewayClass) (*meshv2beta1.MeshGatewayList, error) {
-	if class == nil {
-		return nil, nil
-	}
-
-	allGateways := &meshv2beta1.MeshGatewayList{}
-	if err := r.Client.List(ctx, allGateways); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-
-	matchingGateways := &meshv2beta1.MeshGatewayList{}
-	for _, gateway := range allGateways.Items {
-		if gateway.Spec.GatewayClassName == class.Name {
-			matchingGateways.Items = append(matchingGateways.Items, gateway)
-		}
-	}
-	return matchingGateways, nil
 }
