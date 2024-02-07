@@ -23,10 +23,10 @@ const (
 	MeshGateway_GatewayClassIndex indexName = "__v2_mesh_gateway_referencing_gatewayclass"
 )
 
-// RegisterFieldIndexes registers all of the field indexes for the API gateway controllers.
+// RegisterGatewayFieldIndexes registers all of the field indexes for the xGateway controllers.
 // These indexes are similar to indexes used in databases to speed up queries.
 // They allow us to quickly find objects based on a field value.
-func RegisterFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
+func RegisterGatewayFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
 	for _, index := range indexes {
 		if err := mgr.GetFieldIndexer().IndexField(ctx, index.target, string(index.name), index.indexerFunc); err != nil {
 			return err
