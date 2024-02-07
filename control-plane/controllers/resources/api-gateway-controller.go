@@ -14,14 +14,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 )
 
 // APIGatewayController reconciles a APIGateway object.
 type APIGatewayController struct {
 	client.Client
-	Log        logr.Logger
-	Scheme     *runtime.Scheme
-	Controller *ConsulResourceController
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	Controller    *ConsulResourceController
+	GatewayConfig gateways.GatewayConfig
 }
 
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=tcproute,verbs=get;list;watch;create;update;patch;delete
@@ -40,14 +42,28 @@ func (r *APIGatewayController) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Call hooks
-	if !resource.DeletionTimestamp.IsZero() {
+	if !resource.GetDeletionTimestamp().IsZero() {
 		logger.Info("deletion event")
 
-		if err := r.onDelete(ctx, req, resource); err != nil {
+		if err := onDelete(ctx, req, r.Client, resource); err != nil {
 			return ctrl.Result{}, err
 		}
 	} else {
-		if err := r.onCreateUpdate(ctx, req, resource); err != nil {
+		// Fetch GatewayClassConfig for the gateway
+		if resource.Namespace == "" {
+			resource.Namespace = "default"
+		}
+
+		gcc, err := getGatewayClassConfigByGatewayClassName(ctx, r.Client, resource.Spec.GatewayClassName)
+		if err != nil {
+			r.Log.Error(err, "unable to get gatewayclassconfig for gateway: %s gatewayclass: %s", resource.Name, resource.Spec.GatewayClassName)
+			return ctrl.Result{}, err
+		}
+
+		if err := onCreateUpdate(ctx, r.Client, gatewayConfigs{
+			gcc:           gcc,
+			gatewayConfig: r.GatewayConfig,
+		}, resource); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
