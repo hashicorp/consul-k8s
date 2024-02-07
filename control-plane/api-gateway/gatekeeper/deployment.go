@@ -188,6 +188,7 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	if len(b.Spec.Template.Spec.Containers) != len(a.Spec.Template.Spec.Containers) {
 		return false
 	}
+
 	for i, container := range a.Spec.Template.Spec.Containers {
 		otherPorts := b.Spec.Template.Spec.Containers[i].Ports
 		if len(container.Ports) != len(otherPorts) {
