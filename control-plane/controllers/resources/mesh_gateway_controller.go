@@ -70,7 +70,7 @@ func (r *MeshGatewayController) Reconcile(ctx context.Context, req ctrl.Request)
 
 		if err := onCreateUpdate(ctx, r.Client, configs{
 			gcc:           gcc,
-			gatewayConfig: gateways.GatewayConfig{},
+			gatewayConfig: r.GatewayConfig,
 		}, resource); err != nil {
 			return ctrl.Result{}, err
 		}
