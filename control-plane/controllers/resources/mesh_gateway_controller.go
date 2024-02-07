@@ -91,10 +91,6 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 	return setupGatewayControllerWithManager[*meshv2beta1.MeshGatewayList](mgr, &meshv2beta1.MeshGateway{}, r.Client, r)
 }
 
-type gateway interface {
-	*meshv2beta1.MeshGateway | *meshv2beta1.APIGateway
-}
-
 type configs struct {
 	gcc           *meshv2beta1.GatewayClassConfig
 	gatewayConfig gateways.GatewayConfig
