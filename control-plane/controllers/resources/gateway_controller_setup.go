@@ -76,40 +76,6 @@ func setupGatewayControllerWithManager[L gatewayList](mgr ctrl.Manager, obj clie
 		Complete(gwc)
 }
 
-// TODO: uncomment when moving the CRUD hooks from mesh gateway controller
-//func getGatewayClassConfigByGatewayClassName(ctx context.Context, k8sClient client.Client, className string) (*meshv2beta1.GatewayClassConfig, error) {
-//	gatewayClass, err := getGatewayClassByName(ctx, k8sClient, className)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	if gatewayClass == nil {
-//		return nil, nil
-//	}
-//
-//	gatewayClassConfig := &meshv2beta1.GatewayClassConfig{}
-//	if ref := gatewayClass.Spec.ParametersRef; ref != nil {
-//		if ref.Group != meshv2beta1.MeshGroup || ref.Kind != v2beta1.KindGatewayClassConfig {
-//			// TODO @Gateway-Management additionally check for controller name when available
-//			return nil, nil
-//		}
-//
-//		if err := k8sClient.Get(ctx, types.NamespacedName{Name: ref.Name}, gatewayClassConfig); err != nil {
-//			return nil, client.IgnoreNotFound(err)
-//		}
-//	}
-//	return gatewayClassConfig, nil
-//}
-//
-//func getGatewayClassByName(ctx context.Context, k8sClient client.Client, className string) (*meshv2beta1.GatewayClass, error) {
-//var gatewayClass meshv2beta1.GatewayClass
-//
-//	if err := k8sClient.Get(ctx, types.NamespacedName{Name: className}, &gatewayClass); err != nil {
-//		return nil, client.IgnoreNotFound(err)
-//	}
-//	return &gatewayClass, nil
-//}
-
 // getGatewayClassesReferencingGatewayClassConfig queries all GatewayClass resources in the
 // cluster and returns any that reference the given GatewayClassConfig by name.
 func getGatewayClassesReferencingGatewayClassConfig(ctx context.Context, k8sClient client.Client, configName string) (*meshv2beta1.GatewayClassList, error) {
