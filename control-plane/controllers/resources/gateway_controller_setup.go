@@ -110,9 +110,9 @@ func setupGatewayControllerWithManager[L gatewayList](mgr ctrl.Manager, obj clie
 //	return &gatewayClass, nil
 //}
 
-// getGatewayClassesByGatewayClassConfigName queries all GatewayClass resources in the
-// cluster and returns any that reference the given GatewayClassConfig.
-func getGatewayClassesByGatewayClassConfigName(ctx context.Context, k8sClient client.Client, configName string) (*meshv2beta1.GatewayClassList, error) {
+// getGatewayClassesReferencingGatewayClassConfig queries all GatewayClass resources in the
+// cluster and returns any that reference the given GatewayClassConfig by name.
+func getGatewayClassesReferencingGatewayClassConfig(ctx context.Context, k8sClient client.Client, configName string) (*meshv2beta1.GatewayClassList, error) {
 	allClasses := &meshv2beta1.GatewayClassList{}
 	if err := k8sClient.List(ctx, allClasses, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(string(GatewayClass_GatewayClassConfigIndex), configName),
