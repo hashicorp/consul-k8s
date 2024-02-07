@@ -12,6 +12,8 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -45,6 +47,20 @@ type APIGatewayStatus struct {
 	Status    `json:"status,omitempty"`
 	Addresses []GatewayAddress `json:"addresses"`
 	Listeners []ListenerStatus `json:"listeners"`
+}
+
+func (in *APIGatewayList) ReconcileRequests() []reconcile.Request {
+	requests := make([]reconcile.Request, 0, len(in.Items))
+
+	for _, item := range in.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.Name,
+				Namespace: item.Namespace,
+			},
+		})
+	}
+	return requests
 }
 
 type ListenerStatus struct {

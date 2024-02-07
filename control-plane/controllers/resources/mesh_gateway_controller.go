@@ -19,9 +19,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/gateways"
@@ -80,57 +77,7 @@ func (r *MeshGatewayController) UpdateStatus(ctx context.Context, obj client.Obj
 }
 
 func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&meshv2beta1.MeshGateway{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&rbacv1.Role{}).
-		Owns(&rbacv1.RoleBinding{}).
-		Owns(&corev1.Service{}).
-		Owns(&corev1.ServiceAccount{}).
-		Watches(
-			source.NewKindWithCache(&meshv2beta1.GatewayClass{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				gateways, err := r.getGatewaysReferencingGatewayClass(context.Background(), o.(*meshv2beta1.GatewayClass))
-				if err != nil {
-					return nil
-				}
-
-				requests := make([]reconcile.Request, 0, len(gateways.Items))
-				for _, gateway := range gateways.Items {
-					requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{
-						Namespace: gateway.Namespace,
-						Name:      gateway.Name,
-					}})
-				}
-
-				return requests
-			})).
-		Watches(
-			source.NewKindWithCache(&meshv2beta1.GatewayClassConfig{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				classes, err := r.getGatewayClassesReferencingGatewayClassConfig(context.Background(), o.(*meshv2beta1.GatewayClassConfig))
-				if err != nil {
-					return nil
-				}
-
-				var requests []reconcile.Request
-				for _, class := range classes.Items {
-					gateways, err := r.getGatewaysReferencingGatewayClass(context.Background(), class)
-					if err != nil {
-						continue
-					}
-
-					for _, gateway := range gateways.Items {
-						requests = append(requests, reconcile.Request{NamespacedName: types.NamespacedName{
-							Namespace: gateway.Namespace,
-							Name:      gateway.Name,
-						}})
-					}
-				}
-
-				return requests
-			})).
-		Complete(r)
+	return setupGatewayControllerWithManager[*meshv2beta1.MeshGatewayList](mgr, &meshv2beta1.MeshGateway{}, r.Client, r)
 }
 
 // onCreateUpdate is responsible for creating/updating all K8s resources that
