@@ -5,13 +5,11 @@ package gatekeeper
 
 import (
 	"context"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,12 +30,12 @@ func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gatewa
 		return g.deleteService(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
-	service := g.service(gateway, gcc)
+	desiredService := g.service(gateway, gcc)
 
-	mutated := service.DeepCopy()
-	mutator := newServiceMutator(service, mutated, gateway, g.Client.Scheme())
+	existingService := desiredService.DeepCopy()
+	mutator := newServiceMutator(existingService, desiredService, gateway, g.Client.Scheme())
 
-	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
+	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, existingService, mutator)
 	if err != nil {
 		return err
 	}
@@ -112,43 +110,33 @@ func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClas
 	}
 }
 
-// mergeService is used to keep annotations and ports from the `from` Service
-// to the `to` service. This prevents an infinite reconciliation loop when
+// mergeService is used to keep annotations and ports from the `existing` Service
+// to the `desired` service. This prevents an infinite reconciliation loop when
 // Kubernetes adds this configuration back in.
-func mergeService(from, to *corev1.Service) *corev1.Service {
-	if areServicesEqual(from, to) {
-		return to
+func mergeService(existing, desired *corev1.Service) {
+
+	existing.Spec = desired.Spec
+
+	// Only overwrite fields if the Service doesn't exist yet
+	if existing.ObjectMeta.CreationTimestamp.IsZero() {
+		existing.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
+		existing.Annotations = desired.Annotations
+		existing.Labels = desired.Labels
+		return
 	}
 
-	to.Annotations = from.Annotations
-	to.Spec.Ports = from.Spec.Ports
-
-	return to
+	// If the Service already exists, add any desired annotations + labels to existing set
+	for k, v := range desired.ObjectMeta.Annotations {
+		existing.ObjectMeta.Annotations[k] = v
+	}
+	for k, v := range desired.ObjectMeta.Labels {
+		existing.ObjectMeta.Labels[k] = v
+	}
 }
 
-func areServicesEqual(a, b *corev1.Service) bool {
-	if !equality.Semantic.DeepEqual(a.Annotations, b.Annotations) {
-		return false
-	}
-	if len(b.Spec.Ports) != len(a.Spec.Ports) {
-		return false
-	}
-
-	for i, port := range a.Spec.Ports {
-		otherPort := b.Spec.Ports[i]
-		if port.Port != otherPort.Port {
-			return false
-		}
-		if port.Protocol != otherPort.Protocol {
-			return false
-		}
-	}
-	return true
-}
-
-func newServiceMutator(service, mutated *corev1.Service, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
+func newServiceMutator(existing, desired *corev1.Service, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
 	return func() error {
-		mutated = mergeService(service, mutated)
-		return ctrl.SetControllerReference(&gateway, mutated, scheme)
+		mergeService(existing, desired)
+		return ctrl.SetControllerReference(&gateway, existing, scheme)
 	}
 }
