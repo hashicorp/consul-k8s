@@ -64,6 +64,7 @@ func (r *APIGatewayController) Reconcile(ctx context.Context, req ctrl.Request) 
 			gcc:           gcc,
 			gatewayConfig: r.GatewayConfig,
 		}, resource); err != nil {
+			logger.Error(err, "unable to create/update gateway")
 			return ctrl.Result{}, err
 		}
 	}

@@ -46,22 +46,8 @@ type APIGateway struct {
 
 type APIGatewayStatus struct {
 	Status    `json:"status,omitempty"`
-	Addresses []GatewayAddress `json:"addresses"`
-	Listeners []ListenerStatus `json:"listeners"`
-}
-
-func (in *APIGatewayList) ReconcileRequests() []reconcile.Request {
-	requests := make([]reconcile.Request, 0, len(in.Items))
-
-	for _, item := range in.Items {
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      item.Name,
-				Namespace: item.Namespace,
-			},
-		})
-	}
-	return requests
+	Addresses []GatewayAddress `json:"addresses,omitempty"`
+	Listeners []ListenerStatus `json:"listeners,omitempty"`
 }
 
 type ListenerStatus struct {
@@ -83,6 +69,20 @@ type APIGatewayList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []*APIGateway `json:"items"`
+}
+
+func (in *APIGatewayList) ReconcileRequests() []reconcile.Request {
+	requests := make([]reconcile.Request, 0, len(in.Items))
+
+	for _, item := range in.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.Name,
+				Namespace: item.Namespace,
+			},
+		})
+	}
+	return requests
 }
 
 func (in *APIGateway) ResourceID(namespace, partition string) *pbresource.ID {
