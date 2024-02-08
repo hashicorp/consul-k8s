@@ -102,8 +102,8 @@ spec:
             {{- end }}
             - -map-privileged-container-ports={{ .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
             {{- end}}
-            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled }}
-            - -enable-metrics={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled }}
+            {{- if (ne (.Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled | toString) "-") }}
+            - -enable-metrics={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled | toString }}
             {{- end }}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}
             - -metrics-path={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}

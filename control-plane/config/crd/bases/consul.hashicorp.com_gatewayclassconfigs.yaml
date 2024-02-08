@@ -135,11 +135,9 @@ spec:
                       will inherit behavior from the global Helm configuration.
                     type: boolean
                   path:
-                    default: /metrics
                     description: The path used for metrics.
                     type: string
                   port:
-                    default: 20200
                     description: The port used for metrics.
                     format: int32
                     maximum: 65535

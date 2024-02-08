@@ -2248,7 +2248,7 @@ connectInject:
       metrics:
         # This value enables or disables metrics collection on a gateway, overriding the global gateway metrics collection settings.
         # @type: boolean
-        enabled: null
+        enabled: "-"
         # This value sets the port to use for scraping gateway metrics via prometheus, defaults to 20200 if not set. Must be in the port
         # range of 1024-65535.
         # @type: int

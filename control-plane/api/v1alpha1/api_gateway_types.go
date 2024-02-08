@@ -96,13 +96,11 @@ type DeploymentSpec struct {
 // +k8s:deepcopy-gen=true
 
 type MetricsSpec struct {
-	// +kubebuilder:default:=20200
 	// +kubebuilder:validation:Maximum=65535
 	// +kubebuilder:validation:Minimum=1024
 	// The port used for metrics.
 	Port *int32 `json:"port,omitempty"`
 
-	// +kubebuilder:default:=/metrics
 	// The path used for metrics.
 	Path *string `json:"path,omitempty"`
 
