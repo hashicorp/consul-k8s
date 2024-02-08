@@ -37,18 +37,18 @@ func NewResourceTester(resourceClient pbresource.ResourceServiceClient) *Resourc
 	}
 }
 
-func (r *ResourceTester) retry(t testutil.TestingTB, fn func(r *retry.R)) {
+func (rt *ResourceTester) retry(t testutil.TestingTB, fn func(r *retry.R)) {
 	t.Helper()
-	retryer := &retry.Timer{Timeout: r.timeout, Wait: r.wait}
+	retryer := &retry.Timer{Timeout: rt.timeout, Wait: rt.wait}
 	retry.RunWith(retryer, t, fn)
 }
 
-func (rh *ResourceTester) Context(t testutil.TestingTB) context.Context {
+func (rt *ResourceTester) Context(t testutil.TestingTB) context.Context {
 	ctx := testutil.TestContext(t)
 
-	if rh.token != "" {
+	if rt.token != "" {
 		md := metadata.New(map[string]string{
-			"x-consul-token": rh.token,
+			"x-consul-token": rt.token,
 		})
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
@@ -56,39 +56,39 @@ func (rh *ResourceTester) Context(t testutil.TestingTB) context.Context {
 	return ctx
 }
 
-func (rh *ResourceTester) RequireResourceExists(t testutil.TestingTB, id *pbresource.ID) *pbresource.Resource {
+func (rt *ResourceTester) RequireResourceExists(t testutil.TestingTB, id *pbresource.ID) *pbresource.Resource {
 	t.Helper()
 
-	rsp, err := rh.resourceClient.Read(rh.Context(t), &pbresource.ReadRequest{Id: id})
+	rsp, err := rt.resourceClient.Read(rt.Context(t), &pbresource.ReadRequest{Id: id})
 	require.NoError(t, err, "error reading %s with type %v", id.Name, id.Type)
 	require.NotNil(t, rsp)
 	return rsp.Resource
 }
 
-func (rh *ResourceTester) RequireResourceNotFound(t testutil.TestingTB, id *pbresource.ID) {
+func (rt *ResourceTester) RequireResourceNotFound(t testutil.TestingTB, id *pbresource.ID) {
 	t.Helper()
 
-	rsp, err := rh.resourceClient.Read(rh.Context(t), &pbresource.ReadRequest{Id: id})
+	rsp, err := rt.resourceClient.Read(rt.Context(t), &pbresource.ReadRequest{Id: id})
 	require.Error(t, err)
 	require.Equal(t, codes.NotFound, status.Code(err))
 	require.Nil(t, rsp)
 }
 
-func (rh *ResourceTester) WaitForResourceExists(t testutil.TestingTB, id *pbresource.ID) *pbresource.Resource {
+func (rt *ResourceTester) WaitForResourceExists(t testutil.TestingTB, id *pbresource.ID) *pbresource.Resource {
 	t.Helper()
 
 	var res *pbresource.Resource
-	rh.retry(t, func(r *retry.R) {
-		res = rh.RequireResourceExists(r, id)
+	rt.retry(t, func(r *retry.R) {
+		res = rt.RequireResourceExists(r, id)
 	})
 
 	return res
 }
 
-func (rh *ResourceTester) WaitForResourceNotFound(t testutil.TestingTB, id *pbresource.ID) {
+func (rt *ResourceTester) WaitForResourceNotFound(t testutil.TestingTB, id *pbresource.ID) {
 	t.Helper()
 
-	rh.retry(t, func(r *retry.R) {
-		rh.RequireResourceNotFound(r, id)
+	rt.retry(t, func(r *retry.R) {
+		rt.RequireResourceNotFound(r, id)
 	})
 }
