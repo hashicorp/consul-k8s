@@ -21,9 +21,9 @@ import (
 type ResourceTester struct {
 	// resourceClient is the client to use for resource operations.
 	resourceClient pbresource.ResourceServiceClient
-	// timeout is the timeout to use for the retryer.
+	// timeout is the total time across which to apply retries.
 	timeout time.Duration
-	// wait is the total wait time to use for the retryer.
+	// wait is the wait time between retries.
 	wait time.Duration
 	// token is the token to use for requests when ACLs are enabled.
 	token string
