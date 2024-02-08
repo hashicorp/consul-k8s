@@ -275,6 +275,17 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
+	if metricsEnabled, isSet := getMetricsEnabled(c.flagEnableMetrics); isSet {
+		classConfig.Spec.Metrics.Enabled = &metricsEnabled
+		if port, isValid := getScrapePort(c.flagMetricsPort); isValid {
+			port32 := int32(port)
+			classConfig.Spec.Metrics.Port = &port32
+		}
+		if path, isSet := getScrapePath(c.flagMetricsPath); isSet {
+			classConfig.Spec.Metrics.Path = &path
+		}
+	}
+
 	class := &gwv1beta1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{Name: c.flagGatewayClassName, Labels: labels},
 		Spec: gwv1beta1.GatewayClassSpec{
@@ -285,16 +296,6 @@ func (c *Command) Run(args []string) int {
 				Name:  c.flagGatewayClassConfigName,
 			},
 		},
-	}
-
-	if metricsEnabled, isSet := getMetricsEnabled(c.flagEnableMetrics); isSet {
-		class.Spec.MetricsConfig.Enabled = metricsEnabled
-		if port, isValid := getScrapePort(c.flagMetricsPort); isValid {
-			class.Spec.MetricsConfig.Port = port
-		}
-		if path, isSet := getScrapePath(c.flagMetricsPath); isSet {
-			class.Spec.MetricsConfig.Path = path
-		}
 	}
 
 	if err := forceV1ClassConfig(context.Background(), c.k8sClient, classConfig); err != nil {

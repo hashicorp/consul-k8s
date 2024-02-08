@@ -98,10 +98,10 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 
 	metrics := common.GatewayMetricsConfig(gateway, gcc, config)
 
-	if metrics.enabled {
+	if metrics.Enabled {
 		annotations[constants.AnnotationPrometheusScrape] = "true"
-		annotations[constants.AnnotationPrometheusPath] = metrics.path
-		annotations[constants.AnnotationPrometheusPort] = strconv.Itoa(metrics.port)
+		annotations[constants.AnnotationPrometheusPath] = metrics.Path
+		annotations[constants.AnnotationPrometheusPort] = strconv.Itoa(metrics.Port)
 	}
 
 	container, err := consulDataplaneContainer(metrics, config, gcc, gateway.Name, gateway.Namespace)

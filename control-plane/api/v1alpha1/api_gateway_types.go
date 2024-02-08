@@ -67,7 +67,7 @@ type GatewayClassConfigSpec struct {
 	MapPrivilegedContainerPorts int32 `json:"mapPrivilegedContainerPorts,omitempty"`
 
 	// Metrics defines how to configure the metrics for a gateway.
-	MetricsSpec MetricsSpec `json:"metrics,omitempty"`
+	Metrics MetricsSpec `json:"metrics,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true

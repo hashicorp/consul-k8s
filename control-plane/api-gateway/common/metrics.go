@@ -30,8 +30,8 @@ func gatewayMetricsEnabled(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassC
 	}
 
 	// if it's not set on the annotation, then we check to see if it's set on the GatewayClassConfig
-	if gcc.Spec.MetricsSpec.Enabled != nil {
-		return *gcc.Spec.MetricsSpec.Enabled
+	if gcc.Spec.Metrics.Enabled != nil {
+		return *gcc.Spec.Metrics.Enabled
 	}
 
 	// otherwise, fallback to the global helm setting
@@ -46,8 +46,8 @@ func fetchPortString(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig,
 	}
 
 	// if it's not set on the annotation, then we check to see if it's set on the GatewayClassConfig
-	if gcc.Spec.MetricsSpec.Port != nil {
-		return strconv.Itoa(int(*gcc.Spec.MetricsSpec.Port))
+	if gcc.Spec.Metrics.Port != nil {
+		return strconv.Itoa(int(*gcc.Spec.Metrics.Port))
 	}
 
 	// otherwise, fallback to the global helm setting
@@ -81,15 +81,15 @@ func gatewayMetricsPath(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConf
 	}
 
 	// if it's not set on the annotation, then we check to see if it's set on the GatewayClassConfig
-	if gcc.Spec.MetricsSpec.Path != nil {
-		return *gcc.Spec.MetricsSpec.Path
+	if gcc.Spec.Metrics.Path != nil {
+		return *gcc.Spec.Metrics.Path
 	}
 
 	// otherwise, fallback to the global helm setting
 	return config.DefaultPrometheusScrapePath
 }
 
-func GatewayMetricsConfig(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) metricsConfig {
+func GatewayMetricsConfig(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) MetricsConfig {
 	return MetricsConfig{
 		Enabled: gatewayMetricsEnabled(gateway, gcc, config),
 		Path:    gatewayMetricsPath(gateway, gcc, config),
