@@ -42,9 +42,17 @@ var (
 		"gateway.consul.hashicorp.com/managed":   "true",
 		//"my-label":                               "keep-me-please",
 	}
-	annotations = map[string]string{
+
+	// TODO: This could probably be handled better
+	externalAnnotations = map[string]string{
 		"my-annotation": "keep-me-please",
 	}
+	copyAnnotations            = []string{"copy-this-annotation"}
+	externalAndCopyAnnotations = map[string]string{
+		"my-annotation":        "keep-me-please",
+		"copy-this-annotation": "copy-this-annotation-value",
+	}
+
 	listeners = []gwv1beta1.Listener{
 		{
 			Name:     "Listener 1",
@@ -599,8 +607,9 @@ func TestUpsert(t *testing.T) {
 		"updating a gateway deployment respects the labels and annotations a user has set": {
 			gateway: gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: namespace,
+					Name:        name,
+					Namespace:   namespace,
+					Annotations: map[string]string{copyAnnotations[0]: "copy-this-annotation-value"},
 				},
 				Spec: gwv1beta1.GatewaySpec{
 					Listeners: listeners,
@@ -616,7 +625,7 @@ func TestUpsert(t *testing.T) {
 						MaxInstances:     common.PointerTo(int32(7)),
 						MinInstances:     common.PointerTo(int32(1)),
 					},
-					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{Service: copyAnnotations},
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
@@ -625,7 +634,7 @@ func TestUpsert(t *testing.T) {
 			},
 			initialResources: resources{
 				services: []*corev1.Service{
-					configureService(name, namespace, labels, annotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+					configureService(name, namespace, labels, externalAnnotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
 							Name:       "Listener 1",
 							Protocol:   "TCP",
@@ -645,7 +654,7 @@ func TestUpsert(t *testing.T) {
 				deployments: []*appsv1.Deployment{},
 				roles:       []*rbac.Role{},
 				services: []*corev1.Service{
-					configureService(name, namespace, labels, annotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+					configureService(name, namespace, labels, externalAndCopyAnnotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
 							Name:       "Listener 1",
 							Protocol:   "TCP",
