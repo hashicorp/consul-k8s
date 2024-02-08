@@ -793,7 +793,6 @@ func TestDestinationsWrite(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -820,7 +819,7 @@ func TestDestinationsWrite(t *testing.T) {
 			},
 			expErr: "error processing destination annotations: destination currently does not support peers: destination.port.upstream1.svc.ns1.ns.peer1.peer:1234",
 			// TODO: uncomment this and remove expErr when peers is supported
-			//expected: &pbmesh.Destinations{
+			// expected: &pbmesh.Destinations{
 			//	Workloads: &pbcatalog.WorkloadSelector{
 			//		Names: []string{podName},
 			//	},
@@ -845,7 +844,7 @@ func TestDestinationsWrite(t *testing.T) {
 			//			},
 			//		},
 			//	},
-			//},
+			// },
 			consulNamespacesEnabled: true,
 			consulPartitionsEnabled: false,
 		},
@@ -867,7 +866,6 @@ func TestDestinationsWrite(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "part1",
 								Namespace: "ns1",
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -914,7 +912,6 @@ func TestDestinationsWrite(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -950,7 +947,6 @@ func TestDestinationsWrite(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "bar",
 								Namespace: "foo",
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream",
 						},
@@ -1033,7 +1029,6 @@ func TestDestinationsDelete(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: constants.GetNormalizedConsulPartition(""),
 								Namespace: constants.GetNormalizedConsulNamespace(""),
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "upstream1",
 						},
@@ -1577,7 +1572,6 @@ func TestReconcileUpdatePod(t *testing.T) {
 							Tenancy: &pbresource.Tenancy{
 								Partition: "ap1",
 								Namespace: "ns1",
-								PeerName:  constants.GetNormalizedConsulPeer(""),
 							},
 							Name: "mySVC3",
 						},
@@ -1699,7 +1693,7 @@ func TestReconcileDeletePod(t *testing.T) {
 		var token *api.ACLToken
 		var err error
 		if tc.aclsEnabled {
-			test.SetupK8sAuthMethodV2(t, testClient.APIClient, tc.podName, metav1.NamespaceDefault) //podName is a standin for the service name
+			test.SetupK8sAuthMethodV2(t, testClient.APIClient, tc.podName, metav1.NamespaceDefault) // podName is a standin for the service name
 			token, _, err = testClient.APIClient.ACL().Login(&api.ACLLoginParams{
 				AuthMethod:  test.AuthMethod,
 				BearerToken: test.ServiceAccountJWTToken,
@@ -1980,7 +1974,6 @@ func createDestinations() *pbmesh.Destinations {
 					Tenancy: &pbresource.Tenancy{
 						Partition: constants.GetNormalizedConsulPartition(""),
 						Namespace: constants.GetNormalizedConsulNamespace(""),
-						PeerName:  constants.GetNormalizedConsulPeer(""),
 					},
 					Name: "mySVC",
 				},

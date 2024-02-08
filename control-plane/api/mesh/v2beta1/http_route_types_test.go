@@ -435,10 +435,6 @@ func TestHTTPRoute_MatchesConsul(t *testing.T) {
 					Tenancy: &pbresource.Tenancy{
 						Partition: constants.DefaultConsulNS,
 						Namespace: constants.DefaultConsulPartition,
-
-						// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-						// At a future point, this will move out of the Tenancy block.
-						PeerName: constants.DefaultConsulPeer,
 					},
 				},
 				Data:     inject.ToProtoAny(&pbmesh.ProxyConfiguration{}),
@@ -807,7 +803,7 @@ func TestHTTPRoute_ObjectMeta(t *testing.T) {
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 // TODO: add when implemented
-//func TestHTTPRoute_DefaultNamespaceFields(t *testing.T)
+// func TestHTTPRoute_DefaultNamespaceFields(t *testing.T)
 
 func TestHTTPRoute_Validate(t *testing.T) {
 	cases := []struct {
@@ -1311,10 +1307,6 @@ func constructHTTPRouteResource(tp *pbmesh.HTTPRoute, name, namespace, partition
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 		Uid: "ABCD", // We add this to show it does not factor into the comparison
 	}
