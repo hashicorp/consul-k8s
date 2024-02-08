@@ -329,8 +329,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 	srvCAAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
-	// // Move Vault CA secret from primary to secondary so that we can mount it to pods in the
-	// // secondary cluster.
+	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
+	// secondary cluster.
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
 	logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
 	vaultCASecret, err := primaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})

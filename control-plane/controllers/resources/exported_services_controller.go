@@ -12,7 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	multiclusterv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/multicluster/v2beta1"
+	multiclusterv2 "github.com/hashicorp/consul-k8s/control-plane/api/multicluster/v2"
 	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 )
 
@@ -29,7 +29,7 @@ type ExportedServicesController struct {
 // +kubebuilder:rbac:groups=multicluster.consul.hashicorp.com,resources=exportedservices/status,verbs=get;update;patch
 
 func (r *ExportedServicesController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	return r.Controller.ReconcileResource(ctx, r, req, &multiclusterv2beta1.ExportedServices{})
+	return r.Controller.ReconcileResource(ctx, r, req, &multiclusterv2.ExportedServices{})
 }
 
 func (r *ExportedServicesController) Logger(name types.NamespacedName) logr.Logger {
@@ -41,5 +41,5 @@ func (r *ExportedServicesController) UpdateStatus(ctx context.Context, obj clien
 }
 
 func (r *ExportedServicesController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &multiclusterv2beta1.ExportedServices{}, r)
+	return setupWithManager(mgr, &multiclusterv2.ExportedServices{}, r)
 }
