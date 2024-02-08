@@ -1,5 +1,5 @@
-// // Copyright (c) HashiCorp, Inc.
-// // SPDX-License-Identifier: MPL-2.0
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
 package v2beta1
 
 import (
@@ -7,14 +7,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 )
 
 const (
@@ -57,10 +57,6 @@ func (in *MeshConfiguration) ResourceID(_, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			// we don't pass a namespace here because MeshConfiguration is partition-scoped
 			Partition: partition,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }

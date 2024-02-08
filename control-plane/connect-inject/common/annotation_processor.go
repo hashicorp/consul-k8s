@@ -99,7 +99,7 @@ func processPodLabeledDestination(pod corev1.Pod, rawUpstream string, enablePart
 	service := parts[0]
 	pieces := strings.Split(service, ".")
 
-	var portName, datacenter, svcName, namespace, partition, peer string
+	var portName, datacenter, svcName, namespace, partition string
 	if enablePartitions || enableNamespaces {
 		switch len(pieces) {
 		case 8:
@@ -107,13 +107,13 @@ func processPodLabeledDestination(pod corev1.Pod, rawUpstream string, enablePart
 			switch end {
 			case "peer":
 				// TODO: uncomment and remove error when peers supported
-				//peer = strings.TrimSpace(pieces[6])
+				// peer = strings.TrimSpace(pieces[6])
 				return nil, fmt.Errorf("destination currently does not support peers: %s", rawUpstream)
 			case "ap":
 				partition = strings.TrimSpace(pieces[6])
 			case "dc":
 				// TODO: uncomment and remove error when datacenters are supported
-				//datacenter = strings.TrimSpace(pieces[6])
+				// datacenter = strings.TrimSpace(pieces[6])
 				return nil, fmt.Errorf("destination currently does not support datacenters: %s", rawUpstream)
 			default:
 				return nil, fmt.Errorf("destination structured incorrectly: %s", rawUpstream)
@@ -147,17 +147,17 @@ func processPodLabeledDestination(pod corev1.Pod, rawUpstream string, enablePart
 			switch end {
 			case "peer":
 				// TODO: uncomment and remove error when peers supported
-				//peer = strings.TrimSpace(pieces[4])
+				// peer = strings.TrimSpace(pieces[4])
 				return nil, fmt.Errorf("destination currently does not support peers: %s", rawUpstream)
 			case "dc":
 				// TODO: uncomment and remove error when datacenter supported
-				//datacenter = strings.TrimSpace(pieces[4])
+				// datacenter = strings.TrimSpace(pieces[4])
 				return nil, fmt.Errorf("destination currently does not support datacenters: %s", rawUpstream)
 			default:
 				return nil, fmt.Errorf("destination structured incorrectly: %s", rawUpstream)
 			}
 			// TODO: uncomment and remove error when datacenter and/or peers supported
-			//fallthrough
+			// fallthrough
 		case 4:
 			if strings.TrimSpace(pieces[3]) == "svc" {
 				svcName = strings.TrimSpace(pieces[2])
@@ -180,7 +180,6 @@ func processPodLabeledDestination(pod corev1.Pod, rawUpstream string, enablePart
 			Tenancy: &pbresource.Tenancy{
 				Partition: constants.GetNormalizedConsulPartition(partition),
 				Namespace: constants.GetNormalizedConsulNamespace(namespace),
-				PeerName:  constants.GetNormalizedConsulPeer(peer),
 			},
 			Name: svcName,
 		},
@@ -239,7 +238,7 @@ func processPodUnlabeledDestination(pod corev1.Pod, rawUpstream string, enablePa
 	// parse the optional datacenter
 	if len(parts) > 2 {
 		// TODO: uncomment and remove error when datacenters supported
-		//datacenter = strings.TrimSpace(parts[2])
+		// datacenter = strings.TrimSpace(parts[2])
 		return nil, fmt.Errorf("destination currently does not support datacenters: %s", rawUpstream)
 	}
 
@@ -250,7 +249,6 @@ func processPodUnlabeledDestination(pod corev1.Pod, rawUpstream string, enablePa
 				Tenancy: &pbresource.Tenancy{
 					Partition: constants.GetNormalizedConsulPartition(partition),
 					Namespace: constants.GetNormalizedConsulNamespace(namespace),
-					PeerName:  constants.GetNormalizedConsulPeer(""),
 				},
 				Name: svcName,
 			},

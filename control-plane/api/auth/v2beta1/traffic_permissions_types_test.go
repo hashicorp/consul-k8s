@@ -317,10 +317,6 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 					Tenancy: &pbresource.Tenancy{
 						Partition: constants.DefaultConsulNS,
 						Namespace: constants.DefaultConsulPartition,
-
-						// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-						// At a future point, this will move out of the Tenancy block.
-						PeerName: constants.DefaultConsulPeer,
 					},
 				},
 				Data:     inject.ToProtoAny(&pbmesh.ProxyConfiguration{}),
@@ -608,7 +604,7 @@ func TestTrafficPermissions_ObjectMeta(t *testing.T) {
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 // TODO: add when implemented
-//func TestTrafficPermissions_DefaultNamespaceFields(t *testing.T)
+// func TestTrafficPermissions_DefaultNamespaceFields(t *testing.T)
 
 func TestTrafficPermissions_Validate(t *testing.T) {
 	cases := []struct {
@@ -1021,10 +1017,6 @@ func constructTrafficPermissionResource(tp *pbauth.TrafficPermissions, name, nam
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 		Uid: "ABCD", // We add this to show it does not factor into the comparison
 	}
