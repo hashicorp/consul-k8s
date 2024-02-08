@@ -1,9 +1,5 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-// TODO: Remove this when the next version of the submodule is released.
-// We need to use a replace directive instead of directly pinning because `api` requires version `0.5.1` and will clobber the pin, but not the replace directive.
-replace github.com/hashicorp/consul/sdk v0.15.0 => github.com/hashicorp/consul/sdk v0.4.1-0.20240202162830-f0b4ef0d7fd7
-
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.1
@@ -15,9 +11,9 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240201210635-25708a18e4aa
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
-	github.com/hashicorp/consul/api v1.10.1-0.20240129223144-3b9bb8d6f9f5
-	github.com/hashicorp/consul/proto-public v0.1.2-0.20240131194705-383d92e9ab27
-	github.com/hashicorp/consul/sdk v0.15.0
+	github.com/hashicorp/consul/api v1.28.0-rc1
+	github.com/hashicorp/consul/proto-public v0.6.0-rc1
+	github.com/hashicorp/consul/sdk v0.16.0-rc1
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
 	github.com/hashicorp/go-hclog v1.5.0
