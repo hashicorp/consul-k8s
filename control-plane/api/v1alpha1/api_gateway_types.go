@@ -65,6 +65,9 @@ type GatewayClassConfigSpec struct {
 
 	// The value to add to privileged ports ( ports < 1024) for gateway containers
 	MapPrivilegedContainerPorts int32 `json:"mapPrivilegedContainerPorts,omitempty"`
+
+	// Metrics defines how to configure the metrics for a gateway.
+	MetricsSpec MetricsSpec `json:"metrics,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -88,6 +91,24 @@ type DeploymentSpec struct {
 
 	// Resources defines the resource requirements for the gateway.
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+type MetricsSpec struct {
+	// +kubebuilder:default:=20200
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:Minimum=1024
+	// The port used for metrics.
+	Port *int32 `json:"port,omitempty"`
+
+	// +kubebuilder:default:=/metrics
+	// The path used for metrics.
+	Path *string `json:"path,omitempty"`
+
+	// Enable metrics for this class of gateways. If unspecified, will inherit
+	// behavior from the global Helm configuration.
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 //+kubebuilder:object:generate=true

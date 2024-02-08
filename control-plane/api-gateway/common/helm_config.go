@@ -40,6 +40,16 @@ type HelmConfig struct {
 	// MapPrivilegedServicePorts is the value which Consul will add to privileged container port values (ports < 1024)
 	// defined on a Gateway.
 	MapPrivilegedServicePorts int
+
+	// EnableGatewayMetrics indicates whether or not gateway metrics should be enabled
+	// by default on a deployed gateway, passed from the helm chart via command-line flags to our controller.
+	EnableGatewayMetrics bool
+
+	// The default path to use for scraping prometheus metrics, passed from the helm chart via command-line flags to our controller.
+	DefaultPrometheusScrapePath string
+
+	// The default port to use for scraping prometheus metrics, passed from the helm chart via command-line flags to our controller.
+	DefaultPrometheusScrapePort string
 }
 
 type ConsulConfig struct {

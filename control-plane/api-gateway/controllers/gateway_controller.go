@@ -204,6 +204,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		ConsulGateway:         consulGateway,
 		ConsulGatewayServices: consulServices,
 		Policies:              policies,
+		HelmConfig:            r.HelmConfig,
 	})
 
 	updates := binder.Snapshot()

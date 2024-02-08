@@ -5,9 +5,11 @@ package gatekeeper
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -90,7 +92,19 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 		return nil, err
 	}
 
-	container, err := consulDataplaneContainer(config, gcc, gateway.Name, gateway.Namespace)
+	annotations := map[string]string{
+		"consul.hashicorp.com/connect-inject": "false",
+	}
+
+	metrics := common.GatewayMetricsConfig(gateway, gcc, config)
+
+	if metrics.enabled {
+		annotations[constants.AnnotationPrometheusScrape] = "true"
+		annotations[constants.AnnotationPrometheusPath] = metrics.path
+		annotations[constants.AnnotationPrometheusPort] = strconv.Itoa(metrics.port)
+	}
+
+	container, err := consulDataplaneContainer(metrics, config, gcc, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -108,10 +122,8 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: common.LabelsForGateway(&gateway),
-					Annotations: map[string]string{
-						"consul.hashicorp.com/connect-inject": "false",
-					},
+					Labels:      common.LabelsForGateway(&gateway),
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					Volumes: []corev1.Volume{

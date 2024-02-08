@@ -102,6 +102,15 @@ spec:
             {{- end }}
             - -map-privileged-container-ports={{ .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
             {{- end}}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled }}
+            - -enable-metrics={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled }}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}
+            - -metrics-path={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
+            - -metrics-port={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
+            {{- end }}
           resources:
             requests:
               memory: "50Mi"
