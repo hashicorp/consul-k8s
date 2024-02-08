@@ -12,7 +12,7 @@ import (
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
 
-func TestMeshGatewayBuilder_Annotations(t *testing.T) {
+func TestGatewayBuilder_Annotations(t *testing.T) {
 	gateway := &meshv2beta1.MeshGateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
@@ -77,7 +77,7 @@ func TestMeshGatewayBuilder_Annotations(t *testing.T) {
 		},
 	}
 
-	b := NewMeshGatewayBuilder(gateway, GatewayConfig{}, gatewayClassConfig)
+	b := NewGatewayBuilder[*meshv2beta1.MeshGateway](gateway, GatewayConfig{}, gatewayClassConfig)
 
 	for _, testCase := range []struct {
 		Actual   map[string]string
@@ -133,7 +133,7 @@ func TestMeshGatewayBuilder_Annotations(t *testing.T) {
 	}
 }
 
-func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
+func TestGatewayBuilder_Labels(t *testing.T) {
 	gateway := &meshv2beta1.MeshGateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -198,7 +198,7 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 		},
 	}
 
-	b := NewMeshGatewayBuilder(gateway, GatewayConfig{}, gatewayClassConfig)
+	b := NewGatewayBuilder[*meshv2beta1.MeshGateway](gateway, GatewayConfig{}, gatewayClassConfig)
 
 	for _, testCase := range []struct {
 		Actual   map[string]string
@@ -261,7 +261,7 @@ func TestNewMeshGatewayBuilder_Labels(t *testing.T) {
 
 // The LogLevel for deployment containers may be set on the Gateway Class Config or the Gateway Config.
 // If it is set on both, the Gateway Config takes precedence.
-func TestMeshGatewayBuilder_LogLevel(t *testing.T) {
+func TestGatewayBuilder_LogLevel(t *testing.T) {
 	debug := "debug"
 	info := "info"
 
@@ -285,7 +285,6 @@ func TestMeshGatewayBuilder_LogLevel(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-
 			gcc := &meshv2beta1.GatewayClassConfig{
 				Spec: meshv2beta1.GatewayClassConfigSpec{
 					Deployment: meshv2beta1.GatewayClassDeploymentConfig{
@@ -299,7 +298,7 @@ func TestMeshGatewayBuilder_LogLevel(t *testing.T) {
 					},
 				},
 			}
-			b := NewMeshGatewayBuilder(&meshv2beta1.MeshGateway{}, GatewayConfig{LogLevel: testCase.GatewayLogLevel}, gcc)
+			b := NewGatewayBuilder(&meshv2beta1.MeshGateway{}, GatewayConfig{LogLevel: testCase.GatewayLogLevel}, gcc)
 
 			assert.Equal(t, debug, b.logLevelForDataplaneContainer())
 		})

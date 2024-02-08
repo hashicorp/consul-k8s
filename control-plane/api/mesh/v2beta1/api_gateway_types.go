@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -178,3 +179,27 @@ func (in *APIGateway) Validate(tenancy common.ConsulTenancyConfig) error {
 
 // DefaultNamespaceFields is required as part of the common.MeshConfig interface.
 func (in *APIGateway) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
+
+// ListenersToServicePorts converts the APIGateway listeners to ServicePorts.
+func (in *APIGateway) ListenersToServicePorts(portModifier int32) []corev1.ServicePort {
+	ports := []corev1.ServicePort{}
+
+	for _, listener := range in.Spec.Listeners {
+		port := int32(listener.Port)
+		ports = append(ports, corev1.ServicePort{
+			Name: listener.Name,
+			Port: port,
+			TargetPort: intstr.IntOrString{
+				IntVal: port + portModifier,
+			},
+			Protocol: corev1.Protocol(listener.Protocol),
+		})
+	}
+
+	return ports
+}
+
+func (in *APIGateway) ListenersToContainerPorts(_ int32, _ int32) []corev1.ContainerPort {
+	// TODO: check if this is actually needed: we don't map any container ports in v1
+	return []corev1.ContainerPort{}
+}

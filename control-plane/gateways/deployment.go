@@ -18,12 +18,12 @@ const (
 	meshGatewayAnnotationKind       = "mesh-gateway"
 )
 
-func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
+func (b *gatewayBuilder[T]) Deployment() (*appsv1.Deployment, error) {
 	spec, err := b.deploymentSpec()
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        b.gateway.Name,
-			Namespace:   b.gateway.Namespace,
+			Name:        b.gateway.GetName(),
+			Namespace:   b.gateway.GetNamespace(),
 			Labels:      b.labelsForDeployment(),
 			Annotations: b.annotationsForDeployment(),
 		},
@@ -31,7 +31,7 @@ func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
 	}, err
 }
 
-func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
+func (b *gatewayBuilder[T]) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	var (
 		deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
 		containerConfig  meshv2beta1.GatewayClassContainerConfig
@@ -74,11 +74,11 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 					constants.AnnotationTransparentProxyOverwriteProbes: "false",
 					// This annotation determines which source to use to set the
 					// WAN address and WAN port for the Mesh Gateway service registration.
-					constants.AnnotationGatewayWANSource: b.gateway.Annotations[constants.AnnotationGatewayWANSource],
+					constants.AnnotationGatewayWANSource: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANSource],
 					// This annotation determines the WAN port for the Mesh Gateway service registration.
-					constants.AnnotationGatewayWANPort: b.gateway.Annotations[constants.AnnotationGatewayWANPort],
+					constants.AnnotationGatewayWANPort: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANPort],
 					// This annotation determines the address for the gateway when the source annotation is "Static".
-					constants.AnnotationGatewayWANAddress: b.gateway.Annotations[constants.AnnotationGatewayWANAddress],
+					constants.AnnotationGatewayWANAddress: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANAddress],
 				},
 			},
 			Spec: corev1.PodSpec{

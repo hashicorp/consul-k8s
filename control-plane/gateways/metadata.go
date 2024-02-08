@@ -13,54 +13,54 @@ const labelManagedBy = "mesh.consul.hashicorp.com/managed-by"
 
 var defaultLabels = map[string]string{labelManagedBy: "consul-k8s"}
 
-func (b *meshGatewayBuilder) annotationsForDeployment() map[string]string {
+func (b *gatewayBuilder[T]) annotationsForDeployment() map[string]string {
 	if b.gcc == nil {
 		return map[string]string{}
 	}
-	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.Deployment.Annotations, b.gcc.Spec.Annotations)
+	return computeAnnotationsOrLabels(b.gateway.GetAnnotations(), b.gcc.Spec.Deployment.Annotations, b.gcc.Spec.Annotations)
 }
 
-func (b *meshGatewayBuilder) annotationsForRole() map[string]string {
+func (b *gatewayBuilder[T]) annotationsForRole() map[string]string {
 	if b.gcc == nil {
 		return map[string]string{}
 	}
-	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.Role.Annotations, b.gcc.Spec.Annotations)
+	return computeAnnotationsOrLabels(b.gateway.GetAnnotations(), b.gcc.Spec.Role.Annotations, b.gcc.Spec.Annotations)
 }
 
-func (b *meshGatewayBuilder) annotationsForRoleBinding() map[string]string {
+func (b *gatewayBuilder[T]) annotationsForRoleBinding() map[string]string {
 	if b.gcc == nil {
 		return map[string]string{}
 	}
-	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.RoleBinding.Annotations, b.gcc.Spec.Annotations)
+	return computeAnnotationsOrLabels(b.gateway.GetAnnotations(), b.gcc.Spec.RoleBinding.Annotations, b.gcc.Spec.Annotations)
 }
 
-func (b *meshGatewayBuilder) annotationsForService() map[string]string {
+func (b *gatewayBuilder[T]) annotationsForService() map[string]string {
 	if b.gcc == nil {
 		return map[string]string{}
 	}
-	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.Service.Annotations, b.gcc.Spec.Annotations)
+	return computeAnnotationsOrLabels(b.gateway.GetAnnotations(), b.gcc.Spec.Service.Annotations, b.gcc.Spec.Annotations)
 }
 
-func (b *meshGatewayBuilder) annotationsForServiceAccount() map[string]string {
+func (b *gatewayBuilder[T]) annotationsForServiceAccount() map[string]string {
 	if b.gcc == nil {
 		return map[string]string{}
 	}
-	return computeAnnotationsOrLabels(b.gateway.Annotations, b.gcc.Spec.ServiceAccount.Annotations, b.gcc.Spec.Annotations)
+	return computeAnnotationsOrLabels(b.gateway.GetAnnotations(), b.gcc.Spec.ServiceAccount.Annotations, b.gcc.Spec.Annotations)
 }
 
-func (b *meshGatewayBuilder) labelsForDeployment() map[string]string {
+func (b *gatewayBuilder[T]) labelsForDeployment() map[string]string {
 	if b.gcc == nil {
 		return defaultLabels
 	}
 
-	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.Deployment.Labels, b.gcc.Spec.Labels)
+	labels := computeAnnotationsOrLabels(b.gateway.GetLabels(), b.gcc.Spec.Deployment.Labels, b.gcc.Spec.Labels)
 	for k, v := range defaultLabels {
 		labels[k] = v
 	}
 	return labels
 }
 
-func (b *meshGatewayBuilder) logLevelForDataplaneContainer() string {
+func (b *gatewayBuilder[T]) logLevelForDataplaneContainer() string {
 	if b.config.LogLevel != "" {
 		return b.config.LogLevel
 	}
@@ -72,7 +72,7 @@ func (b *meshGatewayBuilder) logLevelForDataplaneContainer() string {
 	return b.gcc.Spec.Deployment.Container.Consul.Logging.Level
 }
 
-func (b *meshGatewayBuilder) logLevelForInitContainer() string {
+func (b *gatewayBuilder[T]) logLevelForInitContainer() string {
 	if b.config.LogLevel != "" {
 		return b.config.LogLevel
 	}
@@ -84,48 +84,48 @@ func (b *meshGatewayBuilder) logLevelForInitContainer() string {
 	return b.gcc.Spec.Deployment.InitContainer.Consul.Logging.Level
 }
 
-func (b *meshGatewayBuilder) labelsForRole() map[string]string {
+func (b *gatewayBuilder[T]) labelsForRole() map[string]string {
 	if b.gcc == nil {
 		return defaultLabels
 	}
 
-	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.Role.Labels, b.gcc.Spec.Labels)
+	labels := computeAnnotationsOrLabels(b.gateway.GetLabels(), b.gcc.Spec.Role.Labels, b.gcc.Spec.Labels)
 	for k, v := range defaultLabels {
 		labels[k] = v
 	}
 	return labels
 }
 
-func (b *meshGatewayBuilder) labelsForRoleBinding() map[string]string {
+func (b *gatewayBuilder[T]) labelsForRoleBinding() map[string]string {
 	if b.gcc == nil {
 		return defaultLabels
 	}
 
-	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.RoleBinding.Labels, b.gcc.Spec.Labels)
+	labels := computeAnnotationsOrLabels(b.gateway.GetLabels(), b.gcc.Spec.RoleBinding.Labels, b.gcc.Spec.Labels)
 	for k, v := range defaultLabels {
 		labels[k] = v
 	}
 	return labels
 }
 
-func (b *meshGatewayBuilder) labelsForService() map[string]string {
+func (b *gatewayBuilder[T]) labelsForService() map[string]string {
 	if b.gcc == nil {
 		return defaultLabels
 	}
 
-	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.Service.Labels, b.gcc.Spec.Labels)
+	labels := computeAnnotationsOrLabels(b.gateway.GetLabels(), b.gcc.Spec.Service.Labels, b.gcc.Spec.Labels)
 	for k, v := range defaultLabels {
 		labels[k] = v
 	}
 	return labels
 }
 
-func (b *meshGatewayBuilder) labelsForServiceAccount() map[string]string {
+func (b *gatewayBuilder[T]) labelsForServiceAccount() map[string]string {
 	if b.gcc == nil {
 		return defaultLabels
 	}
 
-	labels := computeAnnotationsOrLabels(b.gateway.Labels, b.gcc.Spec.ServiceAccount.Labels, b.gcc.Spec.Labels)
+	labels := computeAnnotationsOrLabels(b.gateway.GetLabels(), b.gcc.Spec.ServiceAccount.Labels, b.gcc.Spec.Labels)
 	for k, v := range defaultLabels {
 		labels[k] = v
 	}

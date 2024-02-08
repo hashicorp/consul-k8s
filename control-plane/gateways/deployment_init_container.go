@@ -21,9 +21,7 @@ const (
 	initContainersUserAndGroupID = 5996
 )
 
-var (
-	tpl = template.Must(template.New("root").Parse(strings.TrimSpace(initContainerCommandTpl)))
-)
+var tpl = template.Must(template.New("root").Parse(strings.TrimSpace(initContainerCommandTpl)))
 
 type initContainerCommandData struct {
 	ServiceName        string
@@ -37,12 +35,12 @@ type initContainerCommandData struct {
 
 // initContainer returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
+func (b *gatewayBuilder[T]) initContainer() (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         b.config.AuthMethod,
 		LogLevel:           b.logLevelForInitContainer(),
 		LogJSON:            b.config.LogJSON,
-		ServiceName:        b.gateway.Name,
+		ServiceName:        b.gateway.GetName(),
 		ServiceAccountName: b.serviceAccountName(),
 	}
 	// Render the command
@@ -64,7 +62,7 @@ func (b *meshGatewayBuilder) initContainer() (corev1.Container, error) {
 		bearerTokenFile = defaultBearerTokenFile
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(b.gateway.Namespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(b.gateway.GetNamespace(), b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
 
 	initContainerName := injectInitContainerName
 	container := corev1.Container{
