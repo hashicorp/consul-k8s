@@ -304,6 +304,14 @@ eks-test-packages: ## eks test packages
 aks-test-packages: ## aks test packages
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
 
+.PHONY: go-mod-tidy
+go-mod-tidy: ## Recursively run go mod tidy on all subdirectories
+	@./control-plane/build-support/scripts/mod_tidy.sh
+
+.PHONY: check-mod-tidy
+check-mod-tidy: ## Recursively run go mod tidy on all subdirectories and check if there are any changes
+	@./control-plane/build-support/scripts/mod_tidy.sh --check
+
 ##@ Release Targets
 
 .PHONY: check-env
