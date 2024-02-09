@@ -6,6 +6,8 @@ package gatekeeper
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-	"testing"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
