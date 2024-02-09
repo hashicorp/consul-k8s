@@ -34,22 +34,23 @@ var (
 	dataplaneImage      = "hashicorp/consul-dataplane"
 	name                = "test"
 	namespace           = "default"
-	labels              = map[string]string{
+
+	labels = map[string]string{
 		"component":                              "api-gateway",
 		"gateway.consul.hashicorp.com/name":      name,
 		"gateway.consul.hashicorp.com/namespace": namespace,
 		createdAtLabelKey:                        createdAtLabelValue,
 		"gateway.consul.hashicorp.com/managed":   "true",
-		//"my-label":                               "keep-me-please",
 	}
 
 	// TODO: This could probably be handled better
+	// These annotations are used for testing that annotations stay on the service after reconcile
 	externalAnnotations = map[string]string{
-		"my-annotation": "keep-me-please",
+		"external-annotation": "external-annotation-value",
 	}
 	copyAnnotations            = []string{"copy-this-annotation"}
 	externalAndCopyAnnotations = map[string]string{
-		"my-annotation":        "keep-me-please",
+		"external-annotation":  "external-annotation-value",
 		"copy-this-annotation": "copy-this-annotation-value",
 	}
 
@@ -205,7 +206,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8080,
 							TargetPort: intstr.FromInt(8080),
 						},
-					}, "1", false),
+					}, "1", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -257,7 +258,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
-					}, "1", false),
+					}, "1", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -315,7 +316,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
-					}, "1", false),
+					}, "1", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -441,7 +442,7 @@ func TestUpsert(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8080,
 						},
-					}, "1", true),
+					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -471,7 +472,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
-					}, "2", false),
+					}, "2", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -531,7 +532,7 @@ func TestUpsert(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8081,
 						},
-					}, "1", true),
+					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -555,7 +556,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8080,
 							TargetPort: intstr.FromInt(8080),
 						},
-					}, "2", false),
+					}, "2", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -647,7 +648,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
-					}, "1", true),
+					}, "1", true, false),
 				},
 			},
 			finalResources: resources{
@@ -667,7 +668,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
-					}, "2", false),
+					}, "2", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -953,7 +954,7 @@ func TestDelete(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8081,
 						},
-					}, "1", true),
+					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -1014,7 +1015,7 @@ func TestDelete(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8081,
 						},
-					}, "1", true),
+					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -1412,7 +1413,14 @@ func configureRoleBinding(name, namespace string, labels map[string]string, reso
 	}
 }
 
-func configureService(name, namespace string, labels, annotations map[string]string, serviceType corev1.ServiceType, ports []corev1.ServicePort, resourceVersion string, isInitialResource bool) *corev1.Service {
+func configureService(name, namespace string, labels, annotations map[string]string, serviceType corev1.ServiceType, ports []corev1.ServicePort, resourceVersion string, isInitialResource, addExternalLabel bool) *corev1.Service {
+
+	// This is used only to test that any external labels added to the service
+	// are not removed on reconcile
+	combinedLabels := labels
+	if addExternalLabel {
+		combinedLabels["extra-label"] = "extra-label-value"
+	}
 
 	service := corev1.Service{
 		TypeMeta: metav1.TypeMeta{
@@ -1422,7 +1430,7 @@ func configureService(name, namespace string, labels, annotations map[string]str
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			Namespace:       namespace,
-			Labels:          labels,
+			Labels:          combinedLabels,
 			Annotations:     annotations,
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
