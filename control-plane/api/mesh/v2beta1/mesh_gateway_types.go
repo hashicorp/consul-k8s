@@ -1,5 +1,5 @@
-// // Copyright (c) HashiCorp, Inc.
-// // SPDX-License-Identifier: MPL-2.0
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
 package v2beta1
 
 import (
@@ -12,6 +12,9 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -48,6 +51,20 @@ type MeshGatewayList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []*MeshGateway `json:"items"`
+}
+
+func (in *MeshGatewayList) ReconcileRequests() []reconcile.Request {
+	requests := make([]reconcile.Request, 0, len(in.Items))
+
+	for _, item := range in.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      item.Name,
+				Namespace: item.Namespace,
+			},
+		})
+	}
+	return requests
 }
 
 func (in *MeshGateway) ResourceID(_, partition string) *pbresource.ID {
@@ -145,3 +162,38 @@ func (in *MeshGateway) Validate(tenancy common.ConsulTenancyConfig) error {
 
 // DefaultNamespaceFields is required as part of the common.MeshConfig interface.
 func (in *MeshGateway) DefaultNamespaceFields(tenancy common.ConsulTenancyConfig) {}
+
+// ListenersToServicePorts converts the MeshGateway listeners to ServicePorts.
+func (in *MeshGateway) ListenersToServicePorts(portModifier int32) []corev1.ServicePort {
+	ports := []corev1.ServicePort{}
+
+	for _, listener := range in.Spec.Listeners {
+		port := int32(listener.Port)
+
+		ports = append(ports, corev1.ServicePort{
+			Name: listener.Name,
+			Port: port,
+			TargetPort: intstr.IntOrString{
+				IntVal: port + portModifier,
+			},
+			Protocol: corev1.Protocol(listener.Protocol),
+		})
+	}
+	return ports
+}
+
+func (in *MeshGateway) ListenersToContainerPorts(portModifier int32, hostPort int32) []corev1.ContainerPort {
+	ports := []corev1.ContainerPort{}
+
+	for _, listener := range in.Spec.Listeners {
+		port := int32(listener.Port)
+
+		ports = append(ports, corev1.ContainerPort{
+			Name:          listener.Name,
+			ContainerPort: port + portModifier,
+			HostPort:      hostPort,
+			Protocol:      corev1.Protocol(listener.Protocol),
+		})
+	}
+	return ports
+}

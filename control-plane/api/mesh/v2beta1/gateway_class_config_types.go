@@ -1,5 +1,5 @@
-// // Copyright (c) HashiCorp, Inc.
-// // SPDX-License-Identifier: MPL-2.0
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
 
 package v2beta1
 
@@ -7,6 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const KindGatewayClassConfig = "GatewayClassConfig"
 
 func init() {
 	MeshSchemeBuilder.Register(&GatewayClassConfig{}, &GatewayClassConfigList{})

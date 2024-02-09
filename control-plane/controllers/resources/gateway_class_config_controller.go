@@ -26,7 +26,7 @@ type GatewayClassConfigController struct {
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=gatewayclassconfig,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=mesh.consul.hashicorp.com,resources=gatewayclassconfig/status,verbs=get;update;patch
 
-func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *GatewayClassConfigController) Reconcile(_ context.Context, _ ctrl.Request) (ctrl.Result, error) {
 	// GatewayClassConfig is not synced into Consul because Consul has no use for it.
 	// Consul is only aware of the resource for the sake of Kubernetes CRD generation.
 	return ctrl.Result{}, nil
