@@ -86,6 +86,9 @@ type Command struct {
 	flagDefaultSidecarProxyLifecycleGracefulPort                 string
 	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
 
+	flagDefaultSidecarProxyStartupFailureSeconds  int
+	flagDefaultSidecarProxyLivenessFailureSeconds int
+
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
 	flagEnableGatewayMetrics        bool
@@ -224,6 +227,9 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds, "default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds", 0, "Default sidecar proxy shutdown grace period in seconds.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulPort, "default-sidecar-proxy-lifecycle-graceful-port", strconv.Itoa(constants.DefaultGracefulPort), "Default port for sidecar proxy lifecycle management HTTP endpoints.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath, "default-sidecar-proxy-lifecycle-graceful-shutdown-path", "/graceful_shutdown", "Default sidecar proxy lifecycle management graceful shutdown path.")
+
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyStartupFailureSeconds, "default-sidecar-proxy-startup-failure-seconds", 0, "Default number of seconds for the k8s startup probe to fail before the proxy container is restarted. Zero disables the probe.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLivenessFailureSeconds, "default-sidecar-proxy-liveness-failure-seconds", 0, "Default number of seconds for the k8s liveness probe to fail before the proxy container is restarted. Zero disables the probe.")
 
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
@@ -631,45 +637,47 @@ func (c *Command) Run(args []string) int {
 
 	mgr.GetWebhookServer().Register("/mutate",
 		&ctrlRuntimeWebhook.Admission{Handler: &webhook.MeshWebhook{
-			Clientset:                    c.clientset,
-			ReleaseNamespace:             c.flagReleaseNamespace,
-			ConsulConfig:                 consulConfig,
-			ConsulServerConnMgr:          watcher,
-			ImageConsul:                  c.flagConsulImage,
-			ImageConsulDataplane:         c.flagConsulDataplaneImage,
-			EnvoyExtraArgs:               c.flagEnvoyExtraArgs,
-			ImageConsulK8S:               c.flagConsulK8sImage,
-			RequireAnnotation:            !c.flagDefaultInject,
-			AuthMethod:                   c.flagACLAuthMethod,
-			ConsulCACert:                 string(caCertPem),
-			TLSEnabled:                   c.consul.UseTLS,
-			ConsulAddress:                c.consul.Addresses,
-			SkipServerWatch:              c.consul.SkipServerWatch,
-			ConsulTLSServerName:          c.consul.TLSServerName,
-			DefaultProxyCPURequest:       sidecarProxyCPURequest,
-			DefaultProxyCPULimit:         sidecarProxyCPULimit,
-			DefaultProxyMemoryRequest:    sidecarProxyMemoryRequest,
-			DefaultProxyMemoryLimit:      sidecarProxyMemoryLimit,
-			DefaultEnvoyProxyConcurrency: c.flagDefaultEnvoyProxyConcurrency,
-			LifecycleConfig:              lifecycleConfig,
-			MetricsConfig:                metricsConfig,
-			InitContainerResources:       initResources,
-			ConsulPartition:              c.consul.Partition,
-			AllowK8sNamespacesSet:        allowK8sNamespaces,
-			DenyK8sNamespacesSet:         denyK8sNamespaces,
-			EnableNamespaces:             c.flagEnableNamespaces,
-			ConsulDestinationNamespace:   c.flagConsulDestinationNamespace,
-			EnableK8SNSMirroring:         c.flagEnableK8SNSMirroring,
-			K8SNSMirroringPrefix:         c.flagK8SNSMirroringPrefix,
-			CrossNamespaceACLPolicy:      c.flagCrossNamespaceACLPolicy,
-			EnableTransparentProxy:       c.flagDefaultEnableTransparentProxy,
-			EnableCNI:                    c.flagEnableCNI,
-			TProxyOverwriteProbes:        c.flagTransparentProxyDefaultOverwriteProbes,
-			EnableConsulDNS:              c.flagEnableConsulDNS,
-			EnableOpenShift:              c.flagEnableOpenShift,
-			Log:                          ctrl.Log.WithName("handler").WithName("connect"),
-			LogLevel:                     c.flagLogLevel,
-			LogJSON:                      c.flagLogJSON,
+			Clientset:                                c.clientset,
+			ReleaseNamespace:                         c.flagReleaseNamespace,
+			ConsulConfig:                             consulConfig,
+			ConsulServerConnMgr:                      watcher,
+			ImageConsul:                              c.flagConsulImage,
+			ImageConsulDataplane:                     c.flagConsulDataplaneImage,
+			EnvoyExtraArgs:                           c.flagEnvoyExtraArgs,
+			ImageConsulK8S:                           c.flagConsulK8sImage,
+			RequireAnnotation:                        !c.flagDefaultInject,
+			AuthMethod:                               c.flagACLAuthMethod,
+			ConsulCACert:                             string(caCertPem),
+			TLSEnabled:                               c.consul.UseTLS,
+			ConsulAddress:                            c.consul.Addresses,
+			SkipServerWatch:                          c.consul.SkipServerWatch,
+			ConsulTLSServerName:                      c.consul.TLSServerName,
+			DefaultProxyCPURequest:                   sidecarProxyCPURequest,
+			DefaultProxyCPULimit:                     sidecarProxyCPULimit,
+			DefaultProxyMemoryRequest:                sidecarProxyMemoryRequest,
+			DefaultProxyMemoryLimit:                  sidecarProxyMemoryLimit,
+			DefaultEnvoyProxyConcurrency:             c.flagDefaultEnvoyProxyConcurrency,
+			DefaultSidecarProxyStartupFailureSeconds: c.flagDefaultSidecarProxyStartupFailureSeconds,
+			DefaultSidecarProxyLivenessFailureSeconds: c.flagDefaultSidecarProxyLivenessFailureSeconds,
+			LifecycleConfig:            lifecycleConfig,
+			MetricsConfig:              metricsConfig,
+			InitContainerResources:     initResources,
+			ConsulPartition:            c.consul.Partition,
+			AllowK8sNamespacesSet:      allowK8sNamespaces,
+			DenyK8sNamespacesSet:       denyK8sNamespaces,
+			EnableNamespaces:           c.flagEnableNamespaces,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
+			K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+			EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
+			EnableCNI:                  c.flagEnableCNI,
+			TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
+			EnableConsulDNS:            c.flagEnableConsulDNS,
+			EnableOpenShift:            c.flagEnableOpenShift,
+			Log:                        ctrl.Log.WithName("handler").WithName("connect"),
+			LogLevel:                   c.flagLogLevel,
+			LogJSON:                    c.flagLogJSON,
 		}})
 
 	// Note: The path here should be identical to the one on the kubebuilder
