@@ -117,13 +117,16 @@ data:
               release: {{ .Release.Name }}
               component: api-gateway
           {{- if .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations }}
+          {{- if .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
           annotations:
-            service: {{ .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
+            service:
+             {{ fromYamlArray .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations | toYaml }}
+          {{- end}}
           {{- end}}
           deployment:
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
             nodeSelector:
-              {{ fromYamlArray .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector | toJson }}
+              {{ fromYamlArray .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector | toYaml }}
             {{- end }}
             initContainer:
               {{- if .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
@@ -145,18 +148,18 @@ data:
               max: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
             tolerations:
-              {{ fromYamlArray .Values.connectInject.apiGateway.managedGatewayClass.tolerations | toJson }}
+              {{ fromYamlArray .Values.connectInject.apiGateway.managedGatewayClass.tolerations | toYaml }}
             {{- end }}
           {{- if .Values.connectInject.apiGateway.managedGatewayClass.service }}
           service:
             annotations:
-              set: {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.service.annotations }}
+              set: {{ toYaml .Values.connectInject.apiGateway.managedGatewayClass.service.annotations }}
             {{- end }}
             type: {{ .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
           {{- if .Values.connectInject.apiGateway.managedGatewayClass.serviceAccount }}
           serviceAccount:
             annotations:
-              set: {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.serviceAccount.annotations }}
+              set: {{ toYaml .Values.connectInject.apiGateway.managedGatewayClass.serviceAccount.annotations }}
           {{- end  }}
       {{- end }}
     {{- if .Values.meshGateway.enabled  }}

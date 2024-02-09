@@ -378,21 +378,15 @@ target=templates/gateway-resources-configmap.yaml
         --set 'global.experiments[0]=resource-apis' \
         --set 'ui.enabled=false' \
         --set 'global.logLevel=error' \
-        --set 'connectInject.apiGateway.managedGatewayClass.deployment.nodeSelector=2' \
+        --set 'connectInject.apiGateway.managedGatewayClass.nodeSelector=- key: value' \
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | yq -r '.replicas.default')
-    [ "${actual}" = '2' ]
-
-    local actual=$(echo "$config" | yq -r '.replicas.min')
-    [ "${actual}" = '1' ]
-
-    local actual=$(echo "$config" | yq -r '.replicas.max')
-    [ "${actual}" = '3' ]
+    local actual=$(echo "$config" | yq -r '.nodeSelector')
+    [ "${actual}" = '- key: value' ]
 }
 
-@test "gateway-resources/ConfigMap: API Gateway deploymentConfig default {
+@test "gateway-resources/ConfigMap: API Gateway nodeSelector default {
     cd `chart_dir`
     local config=$(helm template \
         -s $target \
@@ -402,17 +396,76 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | yq -r '.replicas.default')
-    [ "${actual}" = '1' ]
+    local actual=$(echo "$config" | yq -r '.nodeSelector')
+    [ "${actual}" = 'null' ]
+}
 
-    local actual=$(echo "$config" | yq -r '.replicas.min')
-    [ "${actual}" = '1' ]
+#--------------------------------------------------------------------
+# API Gateway Tests tolerations
 
-    local actual=$(echo "$config" | yq -r '.replicas.max')
-    [ "${actual}" = '1' ]
+@test "gateway-resources/ConfigMap: API Gateway tolerations overrides default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        --set 'connectInject.apiGateway.managedGatewayClass.tolerations=- key: value' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.tolerations')
+    [ "${actual}" = '- key: value' ]
+}
+
+@test "gateway-resources/ConfigMap: API Gateway tolerations default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.nodeSelector')
+    [ "${actual}" = 'null' ]
 }
 
 
+#--------------------------------------------------------------------
+# API Gateway Tests copyAnnotations
+
+@test "gateway-resources/ConfigMap: API Gateway copyAnnotations overrides default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        --set 'connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations=- annotation.name' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.annotations' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.service')
+    echo "${actual}"
+    [ "${actual}" = '- annotation.name' ]
+}
+
+@test "gateway-resources/ConfigMap: API Gateway copyAnnotations default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.annotations' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.service')
+    [ "${actual}" = 'null' ]
+}
+
 
 #--------------------------------------------------------------------
-# TODO openShiftSSCName, tolerations, nodeSelector
+# TODO openShiftSSCName
