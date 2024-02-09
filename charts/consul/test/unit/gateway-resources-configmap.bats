@@ -94,6 +94,28 @@ target=templates/gateway-resources-configmap.yaml
 }
 
 
+#--------------------------------------------------------------------
+# API Gateway logLevel configuration
+
+@test "gateway-resources/ConfigMap: API Gateway logLevel default configuration" {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'meshGateway.enabled=false' \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.container.consul.logging.level')
+    [ "${actual}" = 'info' ]
+
+    local actual=$(echo "$config" | yq -r '.initContainer.consul.logging.level')
+    [ "${actual}" = 'info' ]
+}
+
+
+
 @test "gateway-resources/ConfigMap: Mesh Gateway logLevel custom global configuration" {
     cd `chart_dir`
     local config=$(helm template \
@@ -199,15 +221,16 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
 
-    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-source"]')
+    local actual=$(echo "$annotations" | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]')
     [ "${actual}" = 'Service' ]
 
-    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-port"]')
+    local actual=$(echo "$annotations" | yq -r '.["consul.hashicorp.com/gateway-wan-port"]')
     [ "${actual}" = '443' ]
 
-    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-static"]')
+    local actual=$(echo "$annotations" | yq -r '.["consul.hashicorp.com/gateway-wan-address-static"]')
     [ "${actual}" = '' ]
 }
+
 
 @test "gateway-resources/ConfigMap: Mesh Gateway WAN Address NodePort annotations" {
     cd `chart_dir`
@@ -223,13 +246,13 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
 
-    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-source"]')
+    local actual=$(echo "$annotations" | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]')
     [ "${actual}" = 'Service' ]
 
-    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-port"]')
+    local actual=$(echo "$annotations" | yq -r '.["consul.hashicorp.com/gateway-wan-port"]')
     [ "${actual}" = '30000' ]
 
-    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-static"]')
+    local actual=$(echo "$annotations" | yq -r '.["consul.hashicorp.com/gateway-wan-address-static"]')
     [ "${actual}" = '' ]
 }
 
@@ -246,13 +269,150 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.meshGateways[0].metadata.annotations' | tee /dev/stderr)
 
-    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-source"]')
+    local actual=$(echo "$annotations" | yq -r '.["consul.hashicorp.com/gateway-wan-address-source"]')
     [ "${actual}" = 'Static' ]
 
-    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-port"]')
+    local actual=$(echo "$annotations" | yq -r '.["consul.hashicorp.com/gateway-wan-port"]')
     [ "${actual}" = '443' ]
 
-    local actual=$(echo "$annotations" | jq -r '.["consul.hashicorp.com/gateway-wan-address-static"]')
+    local actual=$(echo "$annotations" | yq -r '.["consul.hashicorp.com/gateway-wan-address-static"]')
     [ "${actual}" = '127.0.0.1' ]
 }
 
+#--------------------------------------------------------------------
+# API Gateway Tests mapPrivilageContainerPorts
+
+@test "gateway-resources/ConfigMap: API Gateway mapPrivilageContainerPorts empty by default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.container.portModifier')
+
+    [ "${actual}" = 'null' ]
+
+    local actual=$(echo "$config" | yq -r '.initContainer.portModifier')
+
+    [ "${actual}" = 'null' ]
+}
+
+
+@test "gateway-resources/ConfigMap: API Gateway mapPrivilageContainerPorts overrides default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        --set 'connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts=80' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.container.portModifier')
+
+    [ "${actual}" = '80' ]
+
+    local actual=$(echo "$config" | yq -r '.initContainer.portModifier')
+
+    [ "${actual}" = '80' ]
+}
+
+#--------------------------------------------------------------------
+# API Gateway Tests deployment replicas
+
+@test "gateway-resources/ConfigMap: API Gateway deploymentConfig overrides default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        --set 'connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances=2' \
+        --set 'connectInject.apiGateway.managedGatewayClass.deployment.maxInstances=3' \
+        --set 'connectInject.apiGateway.managedGatewayClass.deployment.minInstances=1' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.replicas.default')
+    [ "${actual}" = '2' ]
+
+    local actual=$(echo "$config" | yq -r '.replicas.min')
+    [ "${actual}" = '1' ]
+
+    local actual=$(echo "$config" | yq -r '.replicas.max')
+    [ "${actual}" = '3' ]
+}
+
+@test "gateway-resources/ConfigMap: API Gateway deploymentConfig default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.replicas.default')
+    [ "${actual}" = '1' ]
+
+    local actual=$(echo "$config" | yq -r '.replicas.min')
+    [ "${actual}" = '1' ]
+
+    local actual=$(echo "$config" | yq -r '.replicas.max')
+    [ "${actual}" = '1' ]
+}
+
+#--------------------------------------------------------------------
+# API Gateway Tests nodeSelector
+
+@test "gateway-resources/ConfigMap: API Gateway nodeSelector overrides default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        --set 'connectInject.apiGateway.managedGatewayClass.deployment.nodeSelector=2' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.replicas.default')
+    [ "${actual}" = '2' ]
+
+    local actual=$(echo "$config" | yq -r '.replicas.min')
+    [ "${actual}" = '1' ]
+
+    local actual=$(echo "$config" | yq -r '.replicas.max')
+    [ "${actual}" = '3' ]
+}
+
+@test "gateway-resources/ConfigMap: API Gateway deploymentConfig default {
+    cd `chart_dir`
+    local config=$(helm template \
+        -s $target \
+        --set 'global.experiments[0]=resource-apis' \
+        --set 'ui.enabled=false' \
+        --set 'global.logLevel=error' \
+        . | tee /dev/stderr |
+        yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
+
+    local actual=$(echo "$config" | yq -r '.replicas.default')
+    [ "${actual}" = '1' ]
+
+    local actual=$(echo "$config" | yq -r '.replicas.min')
+    [ "${actual}" = '1' ]
+
+    local actual=$(echo "$config" | yq -r '.replicas.max')
+    [ "${actual}" = '1' ]
+}
+
+
+
+#--------------------------------------------------------------------
+# TODO openShiftSSCName, tolerations, nodeSelector
