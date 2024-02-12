@@ -448,7 +448,6 @@ target=templates/gateway-resources-configmap.yaml
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.annotations' | tee /dev/stderr)
 
     local actual=$(echo "$config" | yq -r '.service')
-    echo "${actual}"
     [ "${actual}" = '- annotation.name' ]
 }
 
