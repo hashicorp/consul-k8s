@@ -17,7 +17,7 @@ annotations:
     - name: consul-k8s-control-plane
       image: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.1.9-dev
     - name: consul-dataplane
-      image: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.1-dev
+      image: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.1-dev-ec80631908d436f26f275418f563885691128e64
     - name: envoy
       image: envoyproxy/envoy:v1.25.11
   artifacthub.io/license: MPL-2.0
