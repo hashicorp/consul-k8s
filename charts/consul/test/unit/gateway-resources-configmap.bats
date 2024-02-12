@@ -383,12 +383,9 @@ target=templates/gateway-resources-configmap.yaml
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
     local actual=$(echo "$config" | yq -r '.nodeSelector[0].key')
-    echo "actual"
-    echo "${actual}"
-    echo "expected"
-    echo '[\n  {\n    "key": "value"\n  }\n]'
+    echo ${actual}
 
-    [ "${actual}" = 'value']
+    [ "${actual}" = 'value' ]
 }
 
 @test "gateway-resources/ConfigMap: API Gateway nodeSelector default {
@@ -456,7 +453,7 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.annotations' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | yq -r '.service.service[0]')
+    local actual=$(echo "$config" | yq -r '.service[0]')
     echo "${actual}"
     [ "${actual}" = 'annotation.name' ]
 }
