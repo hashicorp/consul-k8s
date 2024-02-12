@@ -383,7 +383,10 @@ target=templates/gateway-resources-configmap.yaml
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
     local actual=$(echo "$config" | yq -r '.nodeSelector')
+    echo "actual"
     echo "${actual}"
+    echo "expected"
+    echo '[\n  {\n    "key": "value"\n  }\n]'
 
     [ "${actual}" = '[\n  {\n    "key": "value"\n  }\n]' ]
 }
