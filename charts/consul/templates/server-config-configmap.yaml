@@ -192,7 +192,8 @@ data:
   telemetry-config.json: |-
     {
       "telemetry": {
-        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}"
+        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}",
+        "disable_hostname": "{{ .Values.global.metrics.agentDisableHostname }}"
       }
     }
   {{- end }}

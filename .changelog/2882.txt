@@ -1,0 +1,3 @@
+```release-note:feature
+helm: support 'telemetry.disable_hostname' which is needed to make gauge metrics correctly collected by Prometheus.
+```

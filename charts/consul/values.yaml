@@ -625,6 +625,10 @@ global:
     # @type: string
     agentMetricsRetentionTime: 1m
 
+    # If true, the gauge metric names will be like consul_server_isLeader
+    # If false, the gauge metric names will have the hostname, like consul_<hostname>_server_isLeader
+    agentDisableHostname: false
+
     # If true, mesh, terminating, and ingress gateways will expose their
     # Envoy metrics on port `20200` at the `/metrics` path and all gateway pods
     # will have Prometheus scrape annotations. Only applicable if `global.metrics.enabled` is true.
