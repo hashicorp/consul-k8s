@@ -44,8 +44,7 @@ var (
 		"gateway.consul.hashicorp.com/managed":   "true",
 	}
 
-	// TODO: This could probably be handled better
-	// These annotations are used for testing that annotations stay on the service after reconcile
+	// These annotations are used for testing that annotations stay on the service after reconcile.
 	externalAnnotations = map[string]string{
 		"external-annotation": "external-annotation-value",
 	}
