@@ -115,8 +115,6 @@ func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClas
 // Kubernetes adds this configuration back in.
 func mergeService(existing, desired *corev1.Service) {
 
-	existing.Spec = desired.Spec
-
 	// Only overwrite fields if the Service doesn't exist yet
 	if existing.ObjectMeta.CreationTimestamp.IsZero() {
 		existing.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
@@ -124,6 +122,8 @@ func mergeService(existing, desired *corev1.Service) {
 		existing.Labels = desired.Labels
 		return
 	}
+
+	existing.Spec.Ports = desired.Spec.Ports
 
 	// If the Service already exists, add any desired annotations + labels to existing set
 	for k, v := range desired.ObjectMeta.Annotations {
