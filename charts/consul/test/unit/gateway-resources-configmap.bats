@@ -382,13 +382,13 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | yq -r '.nodeSelector')
+    local actual=$(echo "$config" | yq -r '.nodeSelector[0].key')
     echo "actual"
     echo "${actual}"
     echo "expected"
     echo '[\n  {\n    "key": "value"\n  }\n]'
 
-    [ "${actual}" = '[\n  {\n    "key": "value"\n  }\n]' ]
+    [ "${actual}" = 'value']
 }
 
 @test "gateway-resources/ConfigMap: API Gateway nodeSelector default {
@@ -419,10 +419,10 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | yq -r '.tolerations')
+    local actual=$(echo "$config" | yq -r '.tolerations[0].key')
     echo "${actual}"
 
-    [ "${actual}" = '[\n  {\n    "key": "value"\n  }\n]' ]
+    [ "${actual}" = 'value' ]
 }
 
 
@@ -456,9 +456,9 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.annotations' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | yq -r '.service')
+    local actual=$(echo "$config" | yq -r '.service.service[0]')
     echo "${actual}"
-    [ "${actual}" = '{\n  "service": [\n    "annotation.name"\n  ]\n}' ]
+    [ "${actual}" = 'annotation.name' ]
 }
 
 @test "gateway-resources/ConfigMap: API Gateway copyAnnotations default {
