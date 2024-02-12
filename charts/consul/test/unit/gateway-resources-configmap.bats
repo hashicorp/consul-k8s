@@ -385,7 +385,7 @@ target=templates/gateway-resources-configmap.yaml
     local actual=$(echo "$config" | yq -r '.nodeSelector')
     echo "${actual}"
 
-    [ "${actual}" = '- key: value' ]
+    [ "${actual}" = '{\n  [\n   \"annotation.name\"\n  ]\n}' ]
 }
 
 @test "gateway-resources/ConfigMap: API Gateway nodeSelector default {
@@ -416,10 +416,10 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | jq -r '.tolerations')
+    local actual=$(echo "$config" | yq -r '.tolerations')
     echo "${actual}"
 
-    [ "${actual}" = '- key: value' ]
+    [ "${actual}" = '{\n  [\n   \"annotation.name\"\n  ]\n}' ]
 }
 
 @test "gateway-resources/ConfigMap: API Gateway tolerations default {
@@ -453,7 +453,7 @@ target=templates/gateway-resources-configmap.yaml
 
     local actual=$(echo "$config" | yq -r '.service')
     echo "${actual}"
-    [ "${actual}" = '[\n \"annotation.name\"\n]'
+    [ "${actual}" = '{\n  [\n   \"annotation.name\"\n  ]\n}' ]
 }
 
 @test "gateway-resources/ConfigMap: API Gateway copyAnnotations default {
