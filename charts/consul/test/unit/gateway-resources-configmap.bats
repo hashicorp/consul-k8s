@@ -416,7 +416,7 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | yq -r '.tolerations')
+    local actual=$(echo "$config" | jq -r '.tolerations')
     echo "${actual}"
 
     [ "${actual}" = '- key: value' ]
@@ -453,7 +453,7 @@ target=templates/gateway-resources-configmap.yaml
 
     local actual=$(echo "$config" | yq -r '.service')
     echo "${actual}"
-    [ "${actual}" = '- annotation.name' ]
+    [ "${actual}" = '[\n \"annotation.name\"\n]'
 }
 
 @test "gateway-resources/ConfigMap: API Gateway copyAnnotations default {
