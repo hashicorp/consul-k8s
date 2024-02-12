@@ -396,6 +396,32 @@ partition "default" {
 	return c.renderRules(aclReplicationRulesTpl)
 }
 
+func (c *Command) datadogAgentRules() (string, error) {
+	ddAgentRulesTpl := `{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+{{- end }}
+  agent_prefix "" {
+    policy = "read"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+{{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+    service_prefix "" {
+      policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
+}
+{{- end }}
+`
+	return c.renderRules(ddAgentRulesTpl)
+}
+
 func (c *Command) rulesData() rulesData {
 	return rulesData{
 		EnablePartitions:        c.consulFlags.Partition != "",
