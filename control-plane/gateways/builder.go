@@ -20,17 +20,19 @@ type Gateway interface {
 // This includes Deployment, Role, Service, and ServiceAccount resources.
 // Configuration is combined from the MeshGateway, GatewayConfig, and GatewayClassConfig.
 type gatewayBuilder[T Gateway] struct {
-	gateway T
-	gcc     *meshv2beta1.GatewayClassConfig
-	config  GatewayConfig
+	gateway     T
+	gcc         *meshv2beta1.GatewayClassConfig
+	config      GatewayConfig
+	gatewayKind string
 }
 
 // NewGatewayBuilder returns a new meshGatewayBuilder for the given MeshGateway,
 // GatewayConfig, and GatewayClassConfig.
-func NewGatewayBuilder[T Gateway](gateway T, gatewayConfig GatewayConfig, gatewayClassConfig *meshv2beta1.GatewayClassConfig) *gatewayBuilder[T] {
+func NewGatewayBuilder[T Gateway](gateway T, gatewayConfig GatewayConfig, gatewayClassConfig *meshv2beta1.GatewayClassConfig, gatewayKind string) *gatewayBuilder[T] {
 	return &gatewayBuilder[T]{
-		gateway: gateway,
-		config:  gatewayConfig,
-		gcc:     gatewayClassConfig,
+		gateway:     gateway,
+		config:      gatewayConfig,
+		gcc:         gatewayClassConfig,
+		gatewayKind: gatewayKind,
 	}
 }
