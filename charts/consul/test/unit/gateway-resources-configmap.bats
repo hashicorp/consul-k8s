@@ -383,6 +383,8 @@ target=templates/gateway-resources-configmap.yaml
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
     local actual=$(echo "$config" | yq -r '.nodeSelector')
+    echo "${actual}"
+
     [ "${actual}" = '- key: value' ]
 }
 
@@ -415,6 +417,8 @@ target=templates/gateway-resources-configmap.yaml
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
     local actual=$(echo "$config" | yq -r '.tolerations')
+    echo "${actual}"
+
     [ "${actual}" = '- key: value' ]
 }
 
@@ -428,7 +432,7 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.deployment' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | yq -r '.nodeSelector')
+    local actual=$(echo "$config" | yq -r '.tolerations')
     [ "${actual}" = 'null' ]
 }
 
@@ -448,6 +452,7 @@ target=templates/gateway-resources-configmap.yaml
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.annotations' | tee /dev/stderr)
 
     local actual=$(echo "$config" | yq -r '.service')
+    echo "${actual}"
     [ "${actual}" = '- annotation.name' ]
 }
 
@@ -461,7 +466,7 @@ target=templates/gateway-resources-configmap.yaml
         . | tee /dev/stderr |
         yq -r '.data["config.yaml"]' | yq -r '.gatewayClassConfigs[0].spec.annotations' | tee /dev/stderr)
 
-    local actual=$(echo "$config" | yq -r '.service')
+    local actual=$(echo "$config" | jq -r '.service')
     [ "${actual}" = 'null' ]
 }
 
