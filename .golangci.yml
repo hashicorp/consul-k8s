@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 linters:
   # enables all defaults + the below, `golangci-lint linters` to see the list of active linters.
   enable:

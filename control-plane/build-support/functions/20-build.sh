@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 function refresh_docker_images {
    # Arguments:
    #   $1 - Path to top level Consul source
