@@ -5,13 +5,11 @@ package gatekeeper
 
 import (
 	"context"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,12 +30,12 @@ func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gatewa
 		return g.deleteService(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
-	service := g.service(gateway, gcc)
+	desiredService := g.service(gateway, gcc)
 
-	mutated := service.DeepCopy()
-	mutator := newServiceMutator(service, mutated, gateway, g.Client.Scheme())
+	existingService := desiredService.DeepCopy()
+	mutator := newServiceMutator(existingService, desiredService, gateway, g.Client.Scheme())
 
-	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
+	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, existingService, mutator)
 	if err != nil {
 		return err
 	}
@@ -112,24 +110,48 @@ func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClas
 	}
 }
 
-// mergeService is used to keep annotations and ports from the `from` Service
-// to the `to` service. This prevents an infinite reconciliation loop when
+// mergeService is used to keep annotations and ports from the `existing` Service
+// to the `desired` service. This prevents an infinite reconciliation loop when
 // Kubernetes adds this configuration back in.
-func mergeService(from, to *corev1.Service) *corev1.Service {
-	if areServicesEqual(from, to) {
-		return to
+func mergeServiceInto(existing, desired *corev1.Service) {
+	duplicate := existing.DeepCopy()
+
+	// Reset the existing object in kubernetes to have the same base spec as
+	// our generated service.
+	existing.Spec = desired.Spec
+
+	// For NodePort services, kubernetes will internally set the ports[*].NodePort
+	// we don't want to override that, so reset it to what exists in the store.
+	if hasEqualPorts(duplicate, desired) {
+		existing.Spec.Ports = duplicate.Spec.Ports
 	}
 
-	to.Annotations = from.Annotations
-	to.Spec.Ports = from.Spec.Ports
+	// If the Service already exists, add any desired annotations + labels to existing set
 
-	return to
+	// Note: the annotations could be empty if an external controller decided to remove them all
+	// do not want to panic in that case.
+	if existing.ObjectMeta.Annotations == nil {
+		existing.Annotations = desired.Annotations
+	} else {
+		for k, v := range desired.ObjectMeta.Annotations {
+			existing.ObjectMeta.Annotations[k] = v
+		}
+	}
+
+	// Note: the labels could be empty if an external controller decided to remove them all
+	// do not want to panic in that case.
+	if existing.ObjectMeta.Labels == nil {
+		existing.Labels = desired.Labels
+	} else {
+		for k, v := range desired.ObjectMeta.Labels {
+			existing.ObjectMeta.Labels[k] = v
+		}
+	}
 }
 
-func areServicesEqual(a, b *corev1.Service) bool {
-	if !equality.Semantic.DeepEqual(a.Annotations, b.Annotations) {
-		return false
-	}
+// hasEqualPorts does a fuzzy comparison of the ports on a service spec
+// ignoring any fields set internally by Kubernetes.
+func hasEqualPorts(a, b *corev1.Service) bool {
 	if len(b.Spec.Ports) != len(a.Spec.Ports) {
 		return false
 	}
@@ -146,9 +168,9 @@ func areServicesEqual(a, b *corev1.Service) bool {
 	return true
 }
 
-func newServiceMutator(service, mutated *corev1.Service, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
+func newServiceMutator(existing, desired *corev1.Service, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
 	return func() error {
-		mutated = mergeService(service, mutated)
-		return ctrl.SetControllerReference(&gateway, mutated, scheme)
+		mergeServiceInto(existing, desired)
+		return ctrl.SetControllerReference(&gateway, existing, scheme)
 	}
 }
