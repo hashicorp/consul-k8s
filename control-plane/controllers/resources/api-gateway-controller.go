@@ -83,13 +83,3 @@ func (r *APIGatewayController) UpdateStatus(ctx context.Context, obj client.Obje
 func (r *APIGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 	return setupGatewayControllerWithManager[*meshv2beta1.APIGatewayList](mgr, &meshv2beta1.APIGateway{}, r.Client, r, APIGateway_GatewayClassIndex)
 }
-
-func (r *APIGatewayController) onCreateUpdate(ctx context.Context, req ctrl.Request, resource *meshv2beta1.APIGateway) error {
-	// TODO: NET-7449, NET-7450, and NET-7451
-	return nil
-}
-
-func (r *APIGatewayController) onDelete(ctx context.Context, req ctrl.Request, resource *meshv2beta1.APIGateway) error {
-	// TODO: NET-7449, NET-7450, and NET-7451
-	return nil
-}

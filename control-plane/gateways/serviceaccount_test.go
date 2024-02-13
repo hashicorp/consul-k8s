@@ -19,7 +19,7 @@ func TestNewMeshGatewayBuilder_ServiceAccount(t *testing.T) {
 			Namespace: "default",
 			Name:      "mesh-gateway",
 		},
-	}, GatewayConfig{}, nil)
+	}, GatewayConfig{}, nil, MeshGatewayAnnotationKind)
 
 	expected := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
