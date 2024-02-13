@@ -97,7 +97,7 @@ load _helpers
       --set 'server.replicas=6' \
       . | tee /dev/stderr |
       yq '.spec.maxUnavailable' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+  [ "${actual}" = "2" ]
 }
 
 @test "server/DisruptionBudget: correct maxUnavailable with replicas=7" {
@@ -107,7 +107,7 @@ load _helpers
       --set 'server.replicas=7' \
       . | tee /dev/stderr |
       yq '.spec.maxUnavailable' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+  [ "${actual}" = "2" ]
 }
 
 @test "server/DisruptionBudget: correct maxUnavailable with replicas=8" {
@@ -117,7 +117,7 @@ load _helpers
       --set 'server.replicas=8' \
       . | tee /dev/stderr |
       yq '.spec.maxUnavailable' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+  [ "${actual}" = "3" ]
 }
 
 #--------------------------------------------------------------------
