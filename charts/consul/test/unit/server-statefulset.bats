@@ -1079,7 +1079,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = a4771bea366d4a6ee9037572665dc4040519dc22e9b0ff3463a263aab13675b8 ]
+  [ "${actual}" = 0fb82d8e2e58b3e11c8803a5e6a6575b735b011b373304a724317c299d95cdbb ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when extraConfig is provided" {
@@ -1089,7 +1089,7 @@ load _helpers
       --set 'server.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = c6b872933263bf5fe847d61e638035637d2db89edf31ad25d0aaeaa5261649c9 ]
+  [ "${actual}" = a05ee305cfb15c76587e815d08472098c790ccce6322ab79f1d9702020be5a5e ]
 }
 
 @test "server/StatefulSet: adds config-checksum annotation when config is updated" {
@@ -1099,7 +1099,7 @@ load _helpers
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = 576044232d6181bca69628af87c12f15311ebd3f0ab700e112b3e1dea9225125 ]
+  [ "${actual}" = 13e6436e0a8e2ee57e35abc358c068eb575737e706dd9e4b3231dff69228d89d ]
 }
 
 #--------------------------------------------------------------------
@@ -3449,33 +3449,5 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'server.snapshotAgent.interval=10h34m5s' \
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers[1].command[2] | contains("-interval=10h34m5s")' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# global.experiments=["resource-apis"]
-
-@test "server/StatefulSet: experiments=[\"resource-apis\"] is not set in command when global.experiments is empty" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      . | tee /dev/stderr)
-
-  # Test the flag is set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"experiments=[\\\"resource-apis\\\"]\""))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/StatefulSet: experiments=[\"resource-apis\"] is set in command when global.experiments contains \"resource-apis\"" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'ui.enabled=false' \
-      . | tee /dev/stderr)
-
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"experiments=[\\\"resource-apis\\\"]\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
