@@ -147,8 +147,6 @@ func mergeServiceInto(existing, desired *corev1.Service) {
 			existing.ObjectMeta.Labels[k] = v
 		}
 	}
-
-	return
 }
 
 // hasEqualPorts does a fuzzy comparison of the ports on a service spec
