@@ -57,7 +57,12 @@ data:
         "enabled": true
       },
       {{- end }}
-      "server": true
+      "server": true,
+      "leave_on_terminate": true,
+      "autopilot": {
+        "min_quorum": {{ template "consul.server.autopilotMinQuorum" . }},
+        "disable_upgrade_migration": true
+      }
     }
   {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}
   {{- if and .Values.global.secretsBackend.vault.enabled $vaultConnectCAEnabled }}
