@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/sdk/iptables"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 // addRedirectTrafficConfigAnnotation creates an iptables.Config in JSON format based on proxy configuration.
@@ -62,20 +63,24 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	}
 
 	if overwriteProbes {
-		for i, container := range pod.Spec.Containers {
-			// skip the "envoy-sidecar" container from having its probes overridden
+		// We don't use the loop index because this needs to line up w.overwriteProbes(),
+		// which is performed after the sidecar is injected.
+		idx := 0
+		for _, container := range pod.Spec.Containers {
+			// skip the "consul-dataplane" container from having its probes overridden
 			if container.Name == sidecarContainer {
 				continue
 			}
 			if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
-				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsLivenessPortsRangeStart+i))
+				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsLivenessPortsRangeStart+idx))
 			}
 			if container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil {
-				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsReadinessPortsRangeStart+i))
+				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsReadinessPortsRangeStart+idx))
 			}
 			if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
-				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsStartupPortsRangeStart+i))
+				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsStartupPortsRangeStart+idx))
 			}
+			idx++
 		}
 	}
 
