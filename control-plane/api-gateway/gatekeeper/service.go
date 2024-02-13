@@ -113,30 +113,66 @@ func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClas
 // mergeService is used to keep annotations and ports from the `existing` Service
 // to the `desired` service. This prevents an infinite reconciliation loop when
 // Kubernetes adds this configuration back in.
-func mergeService(existing, desired *corev1.Service) {
+func mergeServiceInto(existing, desired *corev1.Service) {
+	duplicate := existing.DeepCopy()
 
-	// Only overwrite fields if the Service doesn't exist yet
-	if existing.ObjectMeta.CreationTimestamp.IsZero() {
-		existing.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
-		existing.Annotations = desired.Annotations
-		existing.Labels = desired.Labels
-		return
+	// Reset the existing object in kubernetes to have the same base spec as
+	// our generated service.
+	existing.Spec = desired.Spec
+
+	// For NodePort services, kubernetes will internally set the ports[*].NodePort
+	// we don't want to override that, so reset it to what exists in the store.
+	if hasEqualPorts(duplicate, desired) {
+		existing.Spec.Ports = duplicate.Spec.Ports
 	}
-
-	existing.Spec.Ports = desired.Spec.Ports
 
 	// If the Service already exists, add any desired annotations + labels to existing set
-	for k, v := range desired.ObjectMeta.Annotations {
-		existing.ObjectMeta.Annotations[k] = v
+
+	// Note: the annotations could be empty if an external controller decided to remove them all
+	// do not want to panic in that case.
+	if existing.ObjectMeta.Annotations == nil {
+		existing.Annotations = desired.Annotations
+	} else {
+		for k, v := range desired.ObjectMeta.Annotations {
+			existing.ObjectMeta.Annotations[k] = v
+		}
 	}
-	for k, v := range desired.ObjectMeta.Labels {
-		existing.ObjectMeta.Labels[k] = v
+
+	// Note: the labels could be empty if an external controller decided to remove them all
+	// do not want to panic in that case.
+	if existing.ObjectMeta.Labels == nil {
+		existing.Labels = desired.Labels
+	} else {
+		for k, v := range desired.ObjectMeta.Labels {
+			existing.ObjectMeta.Labels[k] = v
+		}
 	}
+
+	return
+}
+
+// hasEqualPorts does a fuzzy comparison of the ports on a service spec
+// ignoring any fields set internally by Kubernetes.
+func hasEqualPorts(a, b *corev1.Service) bool {
+	if len(b.Spec.Ports) != len(a.Spec.Ports) {
+		return false
+	}
+
+	for i, port := range a.Spec.Ports {
+		otherPort := b.Spec.Ports[i]
+		if port.Port != otherPort.Port {
+			return false
+		}
+		if port.Protocol != otherPort.Protocol {
+			return false
+		}
+	}
+	return true
 }
 
 func newServiceMutator(existing, desired *corev1.Service, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
 	return func() error {
-		mergeService(existing, desired)
+		mergeServiceInto(existing, desired)
 		return ctrl.SetControllerReference(&gateway, existing, scheme)
 	}
 }

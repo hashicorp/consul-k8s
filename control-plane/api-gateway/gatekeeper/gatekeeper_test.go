@@ -45,13 +45,16 @@ var (
 	}
 
 	// These annotations are used for testing that annotations stay on the service after reconcile.
+	copyAnnotationKey = "copy-this-annotation"
+	copyAnnotations   = map[string]string{
+		copyAnnotationKey: "copy-this-annotation-value",
+	}
 	externalAnnotations = map[string]string{
 		"external-annotation": "external-annotation-value",
 	}
-	copyAnnotations            = []string{"copy-this-annotation"}
 	externalAndCopyAnnotations = map[string]string{
-		"external-annotation":  "external-annotation-value",
-		"copy-this-annotation": "copy-this-annotation-value",
+		"external-annotation": "external-annotation-value",
+		copyAnnotationKey:     "copy-this-annotation-value",
 	}
 
 	listeners = []gwv1beta1.Listener{
@@ -610,7 +613,7 @@ func TestUpsert(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        name,
 					Namespace:   namespace,
-					Annotations: map[string]string{copyAnnotations[0]: "copy-this-annotation-value"},
+					Annotations: copyAnnotations,
 				},
 				Spec: gwv1beta1.GatewaySpec{
 					Listeners: listeners,
@@ -626,7 +629,7 @@ func TestUpsert(t *testing.T) {
 						MaxInstances:     common.PointerTo(int32(7)),
 						MinInstances:     common.PointerTo(int32(1)),
 					},
-					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{Service: copyAnnotations},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{Service: []string{copyAnnotationKey}},
 					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
 				},
 			},
@@ -656,6 +659,75 @@ func TestUpsert(t *testing.T) {
 				roles:       []*rbac.Role{},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, externalAndCopyAnnotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+						{
+							Name:       "Listener 1",
+							Protocol:   "TCP",
+							Port:       8080,
+							TargetPort: intstr.FromInt(8080),
+						},
+						{
+							Name:       "Listener 2",
+							Protocol:   "TCP",
+							Port:       8081,
+							TargetPort: intstr.FromInt(8081),
+						},
+					}, "2", false, false),
+				},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+			ignoreTimestampOnService: true,
+		},
+		"updating a gateway that has copy-annotations doesn't panic if another controller has removed them all": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        name,
+					Namespace:   namespace,
+					Annotations: copyAnnotations,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(5)),
+						MaxInstances:     common.PointerTo(int32(7)),
+						MinInstances:     common.PointerTo(int32(1)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{Service: []string{copyAnnotationKey}},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
+			initialResources: resources{
+				services: []*corev1.Service{
+					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+						{
+							Name:       "Listener 1",
+							Protocol:   "TCP",
+							Port:       8080,
+							TargetPort: intstr.FromInt(8080),
+						},
+						{
+							Name:       "Listener 2",
+							Protocol:   "TCP",
+							Port:       8081,
+							TargetPort: intstr.FromInt(8081),
+						},
+					}, "1", true, false),
+				},
+			},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{},
+				roles:       []*rbac.Role{},
+				services: []*corev1.Service{
+					configureService(name, namespace, labels, copyAnnotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
 							Name:       "Listener 1",
 							Protocol:   "TCP",
