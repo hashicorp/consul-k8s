@@ -677,7 +677,7 @@ func TestUpsert(t *testing.T) {
 			},
 			ignoreTimestampOnService: true,
 		},
-		"updating a gateway that has copy-annotations doesn't panic if another controller has removed them all": {
+		"updating a gateway that has copy-annotations and labels doesn't panic if another controller has removed them all": {
 			gateway: gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        name,
@@ -707,7 +707,7 @@ func TestUpsert(t *testing.T) {
 			},
 			initialResources: resources{
 				services: []*corev1.Service{
-					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+					configureService(name, namespace, nil, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
 							Name:       "Listener 1",
 							Protocol:   "TCP",
