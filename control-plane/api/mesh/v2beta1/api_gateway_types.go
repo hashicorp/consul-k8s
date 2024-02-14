@@ -25,7 +25,7 @@ const (
 )
 
 func init() {
-	MeshSchemeBuilder.Register(&GatewayClass{}, &GatewayClassList{}, &APIGateway{}, &APIGatewayList{})
+	MeshSchemeBuilder.Register(&APIGateway{}, &APIGatewayList{})
 }
 
 // +kubebuilder:object:root=true

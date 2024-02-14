@@ -18,6 +18,9 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	logrtest "github.com/go-logr/logr/testr"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,10 +34,19 @@ func TestAPIGatewayController_ReconcileResourceExists(t *testing.T) {
 	ctx := context.Background()
 
 	s := runtime.NewScheme()
-	s.AddKnownTypes(schema.GroupVersion{
-		Group:   "mesh.consul.hashicorp.com",
-		Version: pbmesh.Version,
-	}, &v2beta1.APIGateway{}, &v2beta1.APIGatewayList{})
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, appsv1.AddToScheme(s))
+	require.NoError(t, rbacv1.AddToScheme(s))
+	require.NoError(t, v2beta1.AddMeshToScheme(s))
+	s.AddKnownTypes(
+		schema.GroupVersion{
+			Group:   "mesh.consul.hashicorp.com",
+			Version: pbmesh.Version,
+		},
+		&v2beta1.APIGateway{},
+		&v2beta1.GatewayClass{},
+		&v2beta1.GatewayClassConfig{},
+	)
 
 	apiGW := &v2beta1.APIGateway{
 		ObjectMeta: metav1.ObjectMeta{
