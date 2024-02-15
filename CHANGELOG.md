@@ -1,3 +1,34 @@
+## 1.3.3- (February 15, 2024)
+
+FEATURES:
+
+* helm: introduces `global.metrics.datadog` overrides to streamline consul-k8s datadog integration.
+helm: introduces `server.enableAgentDebug` to expose agent [`enable_debug`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#enable_debug) configuration.
+helm: introduces `global.metrics.disableAgentHostName` to expose agent [`telemetry.disable_hostname`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-disable_hostname) configuration.
+helm: introduces `global.metrics.enableHostMetrics` to expose agent [`telemetry.enable_host_metrics`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-enable_host_metrics) configuration.
+helm: introduces `global.metrics.prefixFilter` to expose agent [`telemetry.prefix_filter`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-prefix_filter) configuration.
+helm: introduces `global.metrics.datadog.dogstatsd.dogstatsdAddr` to expose agent [`telemetry.dogstatsd_addr`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-dogstatsd_addr) configuration.
+helm: introduces `global.metrics.datadog.dogstatsd.dogstatsdTags` to expose agent [`telemetry.dogstatsd_tags`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-dogstatsd_tags) configuration.
+helm: introduces required `ad.datadoghq.com/` annotations and `tags.datadoghq.com/` labels for integration with [Datadog Autodiscovery](https://docs.datadoghq.com/integrations/consul/?tab=containerized) and [Datadog Unified Service Tagging](https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging/?tab=kubernetes#serverless-environment) for Consul.
+helm: introduces automated unix domain socket hostPath mounting for containerized integration with datadog within consul-server statefulset.
+helm: introduces `global.metrics.datadog.otlp` override options to allow OTLP metrics forwarding to Datadog Agent.
+control-plane: adds `server-acl-init` datadog agent token creation for datadog integration. [[GH-3407](https://github.com/hashicorp/consul-k8s/issues/3407)]
+
+IMPROVEMENTS:
+
+* Upgrade to use Go 1.21.7. [[GH-3591](https://github.com/hashicorp/consul-k8s/issues/3591)]
+* api-gateway: Apply `connectInject.initContainer.resources` to the init container for API gateway Pods. [[GH-3531](https://github.com/hashicorp/consul-k8s/issues/3531)]
+* cni: When CNI is enabled, set ReadOnlyRootFilesystem=true and AllowPrivilegeEscalation=false for mesh pod init containers and AllowPrivilegeEscalation=false for consul-dataplane containers (ReadOnlyRootFilesystem was already true for consul-dataplane containers). [[GH-3498](https://github.com/hashicorp/consul-k8s/issues/3498)]
+* control-plane: Add `CaseInsensitive` flag to service-routers that allows paths and path prefixes to ignore URL upper and lower casing. [[GH-3502](https://github.com/hashicorp/consul-k8s/issues/3502)]
+* helm: Change `/bin/sh -ec "<command>"` to `/bin/sh -ec "exec <command>"` in helm deployments [[GH-3548](https://github.com/hashicorp/consul-k8s/issues/3548)]
+
+BUG FIXES:
+
+* api-gateway: fix issue where external annotations and labels are being incorrectly deleted on services controlled by the API Gateway [[GH-3597](https://github.com/hashicorp/consul-k8s/issues/3597)]
+* mesh-gw: update capabilities on the security context needed for the dataplane container.
+Adds NET_BIND_SERVICE to capabilities.add
+Adds ALL to capabilities.drop unless .Values.meshGateway.hostNetwork is true [[GH-3549](https://github.com/hashicorp/consul-k8s/issues/3549)]
+
 ## 1.3.1 (December 19, 2023)
 
 SECURITY:
