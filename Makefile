@@ -175,6 +175,7 @@ lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance di
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	make copy-crds-to-chart
+	make add-copyright-header
 
 .PHONY: get-controller-gen
 get-controller-gen: ## Download controller-gen program needed for operator SDK.
@@ -191,6 +192,14 @@ CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
+
+.PHONY: add-copyright-header
+add-copyright-header: ## Add copyright header to all files in the project
+ifeq (, $(shell which copywrite))
+	@echo "Installing copywrite"
+	@go install github.com/hashicorp/copywrite@latest
+endif
+	@copywrite headers --spdx "MPL-2.0"
 
 ##@ CI Targets
 
