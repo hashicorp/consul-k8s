@@ -291,7 +291,7 @@ spec:
         {{- if and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled (eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" ) }}
         - name: dsdsocket
           hostPath:
-            path: /var/run/datadog
+            path: {{ dir .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}
             type: DirectoryOrCreate
         {{- end }}
         {{- range .Values.server.extraVolumes }}
@@ -528,7 +528,7 @@ spec:
             {{- end }}
             {{- if and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled (eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" ) }}
             - name: dsdsocket
-              mountPath: /var/run/datadog
+              mountPath: {{ dir .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}
               readOnly: true
             {{- end }}
             {{- range .Values.server.extraVolumes }}
