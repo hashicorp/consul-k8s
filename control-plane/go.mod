@@ -42,7 +42,7 @@ require (
 	k8s.io/apimachinery v0.26.3
 	k8s.io/client-go v0.26.3
 	k8s.io/klog/v2 v2.100.1
-	k8s.io/utils v0.0.0-20230209194617-a36077c30491
+	k8s.io/utils v0.0.0-20230220204549-a5ecb0141aa5
 	sigs.k8s.io/controller-runtime v0.14.6
 	sigs.k8s.io/gateway-api v0.7.1
 )
@@ -73,7 +73,7 @@ require (
 	github.com/denverdino/aliyungo v0.0.0-20170926055100-d3308649c661 // indirect
 	github.com/digitalocean/godo v1.7.5 // indirect
 	github.com/dimchansky/utfbom v1.1.0 // indirect
-	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
@@ -87,7 +87,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/go-querystring v0.0.0-20170111101155-53e6ce116135 // indirect
-	github.com/google/gofuzz v1.1.0 // indirect
+	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/googleapis/gax-go/v2 v2.7.1 // indirect
@@ -107,7 +107,7 @@ require (
 	github.com/hashicorp/vault/sdk v0.7.0 // indirect
 	github.com/hashicorp/vic v1.5.1-0.20190403131502-bbfe86ec9443 // indirect
 	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
-	github.com/imdario/mergo v0.3.12 // indirect
+	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/joyent/triton-go v0.0.0-20180628001255-830d2b111e62 // indirect
@@ -116,11 +116,11 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
-	github.com/mitchellh/copystructure v1.0.0 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.0.0 // indirect
 	github.com/mitchellh/pointerstructure v1.2.1 // indirect
-	github.com/mitchellh/reflectwalk v1.0.0 // indirect
+	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
@@ -137,7 +137,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/renier/xmlrpc v0.0.0-20170708154548-ce4a1a486c03 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/softlayer/softlayer-go v0.0.0-20180806151055-260589d94c7d // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
