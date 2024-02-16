@@ -92,6 +92,8 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/onsi/ginkgo/v2 v2.6.0 // indirect
+	github.com/onsi/gomega v1.24.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
