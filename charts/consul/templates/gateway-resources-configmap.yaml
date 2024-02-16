@@ -21,9 +21,10 @@ data:
   resources.json: |
     {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
   {{- end }}
-  {{- if and (mustHas "resource-apis" .Values.global.experiments) .Values.meshGateway.enabled }}
+  {{- if and (mustHas "resource-apis" .Values.global.experiments) (or .Values.meshGateway.enabled .Values.connectInject.apiGateway.managedGatewayClass) }}
   config.yaml: |
     gatewayClassConfigs:
+      {{- if .Values.meshGateway.enabled  }}
       - apiVersion: mesh.consul.hashicorp.com/v2beta1
         metadata:
           name: consul-mesh-gateway
@@ -87,7 +88,8 @@ data:
               min: {{ .Values.meshGateway.replicas }}
               max: {{ .Values.meshGateway.replicas }}
             {{- if .Values.meshGateway.tolerations }}
-            tolerations: {{ fromYamlArray .Values.meshGateway.tolerations | toJson }}
+            tolerations:
+              {{ fromYamlArray .Values.meshGateway.tolerations | toJson }}
             {{- end }}
           service:
             {{- if .Values.meshGateway.service.annotations }}
@@ -100,6 +102,67 @@ data:
             annotations:
               set: {{ toJson .Values.meshGateway.serviceAccount.annotations }}
           {{- end }}
+    {{- end }}
+    {{- if .Values.connectInject.apiGateway.managedGatewayClass  }}
+      - apiVersion: mesh.consul.hashicorp.com/v2beta1
+        metadata:
+          name: consul-api-gateway
+        kind: GatewayClassConfig
+        spec:
+          labels:
+            set:
+              app: {{ template "consul.name" . }}
+              chart: {{ template "consul.chart" . }}
+              heritage: {{ .Release.Service }}
+              release: {{ .Release.Name }}
+              component: api-gateway
+          {{- if .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations }}
+          {{- if .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
+          annotations:
+            service:
+             {{ fromYamlArray .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations | toYaml }}
+          {{- end}}
+          {{- end}}
+          deployment:
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
+            nodeSelector:
+              {{ fromYamlArray .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector | toYaml }}
+            {{- end }}
+            initContainer:
+              {{- if .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
+              portModifier: {{ .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
+              {{- end }}
+              consul:
+                logging:
+                  level: {{ .Values.global.logLevel }}
+            container:
+              {{- if .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
+              portModifier: {{ .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
+              {{- end }}
+              consul:
+                logging:
+                  level: {{ .Values.global.logLevel }}
+            replicas:
+              default: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+              min: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
+              max: {{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
+            tolerations:
+              {{ fromYamlArray .Values.connectInject.apiGateway.managedGatewayClass.tolerations | toYaml }}
+            {{- end }}
+          {{- if .Values.connectInject.apiGateway.managedGatewayClass.service }}
+          service:
+            annotations:
+              set: {{ toYaml .Values.connectInject.apiGateway.managedGatewayClass.service.annotations }}
+            {{- end }}
+            type: {{ .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
+          {{- if .Values.connectInject.apiGateway.managedGatewayClass.serviceAccount }}
+          serviceAccount:
+            annotations:
+              set: {{ toYaml .Values.connectInject.apiGateway.managedGatewayClass.serviceAccount.annotations }}
+          {{- end  }}
+      {{- end }}
+    {{- if .Values.meshGateway.enabled  }}
     meshGateways:
       - apiVersion: mesh.consul.hashicorp.com/v2beta1
         kind: MeshGateway
@@ -107,7 +170,6 @@ data:
           name: mesh-gateway
           namespace: {{ .Release.Namespace }}
           annotations: 
-            # TODO are these annotations even necessary?
             "consul.hashicorp.com/gateway-wan-address-source": {{ .Values.meshGateway.wanAddress.source | quote }}
             "consul.hashicorp.com/gateway-wan-address-static": {{ .Values.meshGateway.wanAddress.static | quote }}
             {{- if eq .Values.meshGateway.wanAddress.source "Service" }}
@@ -128,5 +190,6 @@ data:
           workloads:
             prefixes: 
               - "mesh-gateway"
+    {{- end  }}
   {{- end }}
 {{- end }}

@@ -58,7 +58,6 @@ type reconcileCase struct {
 }
 
 // TODO(NET-5716): Allow/deny namespaces for reconcile tests
-// TODO(NET-5932): Add tests for consistently sorting repeated output fields (getConsulService, getServicePorts)
 
 func TestReconcile_CreateService(t *testing.T) {
 	t.Parallel()
