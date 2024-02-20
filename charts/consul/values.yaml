@@ -1533,7 +1533,7 @@ externalServers:
   # The GRPC port of the Consul servers.
   grpcPort: 8502
 
-  # The server name to use as the SNI host header when connecting with HTTPS. This is also the hostname to expect in the server certificate's subject.
+  # The server name to use as the SNI host header when connecting with HTTPS. This name also appears as the hostname in the server certificate's subject field.
   # @type: string
   tlsServerName: null
 
