@@ -210,7 +210,7 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 								"release":      "consul",
 							},
 							Annotations: map[string]string{
-								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     MeshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
 								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 								constants.AnnotationGatewayWANSource:                "Service",
@@ -607,7 +607,7 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 								"release":      "consul",
 							},
 							Annotations: map[string]string{
-								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     MeshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
 								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 								constants.AnnotationGatewayWANSource:                "Service",
@@ -918,7 +918,7 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: defaultLabels,
 							Annotations: map[string]string{
-								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     MeshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
 								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 								constants.AnnotationGatewayWANSource:                "Service",
@@ -1140,9 +1140,10 @@ func Test_gatewayBuilder_Deployment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &gatewayBuilder[*meshv2beta1.MeshGateway]{
-				gateway: tt.fields.gateway,
-				config:  tt.fields.config,
-				gcc:     tt.fields.gcc,
+				gateway:     tt.fields.gateway,
+				config:      tt.fields.config,
+				gcc:         tt.fields.gcc,
+				gatewayKind: MeshGatewayAnnotationKind,
 			}
 			got, err := b.Deployment()
 			if !tt.wantErr && (err != nil) {

@@ -77,7 +77,7 @@ func TestGatewayBuilder_Annotations(t *testing.T) {
 		},
 	}
 
-	b := NewGatewayBuilder[*meshv2beta1.MeshGateway](gateway, GatewayConfig{}, gatewayClassConfig)
+	b := NewGatewayBuilder[*meshv2beta1.MeshGateway](gateway, GatewayConfig{}, gatewayClassConfig, MeshGatewayAnnotationKind)
 
 	for _, testCase := range []struct {
 		Actual   map[string]string
@@ -198,7 +198,7 @@ func TestGatewayBuilder_Labels(t *testing.T) {
 		},
 	}
 
-	b := NewGatewayBuilder[*meshv2beta1.MeshGateway](gateway, GatewayConfig{}, gatewayClassConfig)
+	b := NewGatewayBuilder[*meshv2beta1.MeshGateway](gateway, GatewayConfig{}, gatewayClassConfig, MeshGatewayAnnotationKind)
 
 	for _, testCase := range []struct {
 		Actual   map[string]string
@@ -298,7 +298,7 @@ func TestGatewayBuilder_LogLevel(t *testing.T) {
 					},
 				},
 			}
-			b := NewGatewayBuilder(&meshv2beta1.MeshGateway{}, GatewayConfig{LogLevel: testCase.GatewayLogLevel}, gcc)
+			b := NewGatewayBuilder(&meshv2beta1.MeshGateway{}, GatewayConfig{LogLevel: testCase.GatewayLogLevel}, gcc, MeshGatewayAnnotationKind)
 
 			assert.Equal(t, debug, b.logLevelForDataplaneContainer())
 		})
