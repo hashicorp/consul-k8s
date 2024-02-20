@@ -13,19 +13,28 @@
 # See `security-scanner` docs or run with `--help` for scan target syntax.
 
 container {
-	dependencies = true
-	alpine_secdb = true
+  dependencies = true
+  alpine_secdb = true
 
-	secrets {
-		all = true
-	}
+  secrets {
+    all = true
+  }
 }
 
 binary {
-	go_modules   = true
-	osv          = true
+  go_modules   = true
+  osv          = true
 
-	secrets {
-		all = true
-	}
+  secrets {
+    all = true
+  }
+
+  triage {
+    suppress {
+      vulnerabilites = [
+        # NET-8174 (2024-02-20): Chart YAML path traversal (not impacted)
+        "GHSA-v53g-5gjp-272r", # alias CVE-2024-25620
+      ]
+    }
+  }
 }
