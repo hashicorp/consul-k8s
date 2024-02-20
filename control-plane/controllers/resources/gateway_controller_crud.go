@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package resources
 
 import (
@@ -31,8 +34,8 @@ type gatewayConfigs struct {
 //  3. Service
 //  4. Role
 //  5. RoleBinding
-func onCreateUpdate[T gateways.Gateway](ctx context.Context, k8sClient client.Client, cfg gatewayConfigs, resource T) error {
-	builder := gateways.NewGatewayBuilder[T](resource, cfg.gatewayConfig, cfg.gcc)
+func onCreateUpdate[T gateways.Gateway](ctx context.Context, k8sClient client.Client, cfg gatewayConfigs, resource T, gatewayKind string) error {
+	builder := gateways.NewGatewayBuilder[T](resource, cfg.gatewayConfig, cfg.gcc, gatewayKind)
 
 	// Create ServiceAccount
 	desiredAccount := builder.ServiceAccount()

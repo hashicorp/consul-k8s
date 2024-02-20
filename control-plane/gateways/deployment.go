@@ -15,7 +15,8 @@ import (
 
 const (
 	globalDefaultInstances    int32 = 1
-	meshGatewayAnnotationKind       = "mesh-gateway"
+	MeshGatewayAnnotationKind       = "mesh-gateway"
+	APIGatewayAnnotationKind        = "api-gateway"
 )
 
 func (b *gatewayBuilder[T]) Deployment() (*appsv1.Deployment, error) {
@@ -67,7 +68,7 @@ func (b *gatewayBuilder[T]) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 				Annotations: map[string]string{
 					// Indicate that this pod is a mesh gateway pod so that the Pod controller,
 					// consul-k8s CLI, etc. can key off of it
-					constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
+					constants.AnnotationGatewayKind: b.gatewayKind,
 					// It's not logical to add a proxy sidecar since our workload is itself a proxy
 					constants.AnnotationMeshInject: "false",
 					// This functionality only applies when proxy sidecars are used

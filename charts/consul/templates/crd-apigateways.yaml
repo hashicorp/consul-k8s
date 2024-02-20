@@ -293,9 +293,6 @@ spec:
                     format: date-time
                     type: string
                 type: object
-            required:
-            - addresses
-            - listeners
             type: object
         type: object
     served: true
