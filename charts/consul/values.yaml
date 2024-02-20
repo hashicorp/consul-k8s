@@ -1540,7 +1540,7 @@ externalServers:
   # Note: If enabling clients, `client.join` must also be set to the hosts that should be
   # used to join the cluster. In most cases, the `client.join` values
   # should be the same, however, they may be different if you
-  # wish to use separate hosts for the HTTPS connections.
+  # wish to use separate hosts for the HTTPS connections. `tlsServerName` is required if TLS is enabled and 'hosts' is not a DNS name.
   # @type: array<string>
   hosts: []
 
@@ -1550,7 +1550,7 @@ externalServers:
   # The GRPC port of the Consul servers.
   grpcPort: 8502
 
-  # The server name to use as the SNI host header when connecting with HTTPS.
+  # The server name to use as the SNI host header when connecting with HTTPS. This name also appears as the hostname in the server certificate's subject field.
   # @type: string
   tlsServerName: null
 
