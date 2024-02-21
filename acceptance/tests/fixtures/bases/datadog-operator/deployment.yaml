@@ -1,0 +1,72 @@
+---
+# Source: datadog-operator/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datadog-operator
+  namespace: datadog
+  labels:
+    app.kubernetes.io/name: datadog-operator
+    helm.sh/chart: datadog-operator-1.5.0
+    app.kubernetes.io/instance: datadog-operator
+    app.kubernetes.io/version: "1.4.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: datadog-operator
+      app.kubernetes.io/instance: datadog-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: datadog-operator
+        app.kubernetes.io/instance: datadog-operator
+      annotations:
+        ad.datadoghq.com/datadog-operator.check_names: '["openmetrics"]'
+        ad.datadoghq.com/datadog-operator.init_configs: '[{}]'
+        ad.datadoghq.com/datadog-operator.instances: |
+          [{
+            "prometheus_url": "http://%%host%%:8383/metrics",
+            "namespace": "datadog.operator",
+            "metrics": ["*"]
+          }]
+        consul.hashicorp.com/connect-inject: "false"
+    spec:
+      serviceAccountName: datadog-operator
+      containers:
+        - name: datadog-operator
+          image: "gcr.io/datadoghq/operator:1.4.0"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          args:
+            - "-supportExtendedDaemonset=false"
+            - "-logEncoder=json"
+            - "-metrics-addr=:8383"
+            - "-loglevel=info"
+            - "-operatorMetricsEnabled=true"
+            - "-webhookEnabled=false"
+            - "-datadogMonitorEnabled=false"
+            - "-datadogAgentEnabled=true"
+            - "-datadogSLOEnabled=false"
+          ports:
+            - name: metrics
+              containerPort: 8383
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz/
+              port: 8081
+            periodSeconds: 10
+          resources:
+            {}
+          volumeMounts:
+      volumes:
