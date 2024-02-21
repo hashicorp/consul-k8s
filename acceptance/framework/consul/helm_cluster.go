@@ -94,6 +94,15 @@ func NewHelmCluster(
 	valuesFromConfig, err := cfg.HelmValuesFromConfig()
 	require.NoError(t, err)
 
+	if cfg.EnableDatadog {
+		datadogNamespace := helmValues["global.metrics.datadog.namespace"]
+		configureNamespace(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
+
+		if cfg.DatadogAPIKey != "" || cfg.DatadogAppKey != "" {
+			createOrUpdateDatadogSecret(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
+		}
+	}
+
 	// Merge all helm values
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
@@ -159,6 +168,15 @@ func (h *HelmCluster) Create(t *testing.T) {
 		chartName = h.ChartPath
 	}
 
+	if strings.Contains(t.Name(), "Datadog") {
+		helm.AddRepo(t, h.helmOptions, "datadog", "https://helm.datadoghq.com")
+		// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
+		// asserting a chart version on Install which would fail in an obvious way should this not succeed.
+		_, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
+		if err != nil {
+			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
+		}
+	}
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
@@ -672,6 +690,14 @@ func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg 
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
 }
 
+func createOrUpdateDatadogSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	secretMap := map[string]string{
+		config.DatadogAPIKey: cfg.DatadogAPIKey,
+		config.DatadogAppKey: cfg.DatadogAppKey,
+	}
+	CreateMultiKeyK8sSecret(t, client, cfg, namespace, config.DatadogSecretName, secretMap)
+}
+
 func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	ctx := context.Background()
 
@@ -772,6 +798,28 @@ func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.Test
 					secretKey: secret,
 				},
 				Type: corev1.SecretTypeOpaque,
+			}, metav1.CreateOptions{})
+			require.NoError(r, err)
+		} else {
+			require.NoError(r, err)
+		}
+	})
+
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
+	})
+}
+
+func CreateMultiKeyK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName string, secretMap map[string]string) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
+		_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: secretName,
+				},
+				StringData: secretMap,
+				Type:       corev1.SecretTypeOpaque,
 			}, metav1.CreateOptions{})
 			require.NoError(r, err)
 		} else {
