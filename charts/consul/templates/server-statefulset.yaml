@@ -132,7 +132,7 @@ spec:
           {{- tpl .Values.server.annotations . | nindent 8 }}
         {{- end }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
-        {{- if not .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
+        {{- if (or (not .Values.global.metrics.datadog.enabled) (and .Values.global.metrics.datadog.enabled (.Values.global.metrics.datadog.dogstatsd.enabled))) }}
         "prometheus.io/scrape": "true"
         {{- if not (hasKey (default "" .Values.server.annotations | fromYaml) "prometheus.io/path")}}
         "prometheus.io/path": "/v1/agent/metrics"
