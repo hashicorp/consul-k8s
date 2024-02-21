@@ -1,19 +1,16 @@
 package datadog
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV1"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/datadog"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	"testing"
-	"time"
-)
-
-const (
-	StaticClientName = "static-client"
 )
 
 // Test that prometheus metrics, when enabled, are accessible from the
@@ -36,7 +33,14 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 		"global.metrics.datadog.dogstatsd.socketTransportType": "UDS",
 	}
 
+	datadogOperatorHelmValues := map[string]string{
+		"replicaCount":     "1",
+		"image.tag":        datadog.DefaultHelmChartVersion,
+		"image.repository": "gcr.io/datadoghq/operator",
+	}
+
 	releaseName := helpers.RandomName()
+	datadogOperatorRelease := datadog.DatadogOperatorReleaseName
 
 	// Install the consul cluster in the default kubernetes ctx.
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
@@ -44,27 +48,29 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 
 	// Deploy Datadog Agent via Datadog Operator and apply dogstatsd overlay
 	datadogNamespace := helmValues["global.metrics.datadog.namespace"]
-	logger.Log(t, fmt.Sprintf("deploying datadog-agent using operator | namespace: %s", datadogNamespace))
-	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/datadog-operator")
-	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "app.kubernetes.io/name=datadog-operator")
+	logger.Log(t, fmt.Sprintf("deploying datadog-operator via helm | namespace: %s | release-name: %s", datadogNamespace, datadogOperatorRelease))
+	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
+	datadogCluster.Create(t)
+	//k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/datadog-operator")
+	//k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "app.kubernetes.io/name=datadog-operator")
 
+	logger.Log(t, fmt.Sprintf("deploying datadog-agent | namespace: %s", datadogNamespace))
 	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/datadog")
 	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
 
+	logger.Log(t, fmt.Sprintf("applying dogstatd over unix domain sockets patch to datadog-agent | namespace: %s", datadogNamespace))
 	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/datadog-dogstatsd-uds")
 	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
 
-	// Create the static-client deployment so we can use it for in-cluster calls to metrics endpoints.
-	// This simulates queries that would be made by a prometheus server that runs externally to the consul
-	// components in the cluster.
-	logger.Log(t, "creating static-client")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
-	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace, "app=static-client")
-	// Server Metrics
-	searchQuery := "?q=consul.acl"
-	retry.RunWith(&retry.Counter{Count: 30, Wait: 10 * time.Second}, t, func(r *retry.R) {
-		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("--header \"DD-API-KEY: %s\"", cfg.DatadogAPIKey), fmt.Sprintf("--header \"DD-APP-KEY: %s\"", cfg.DatadogAppKey), fmt.Sprintf("https://api.datadoghq.com/api/v1/search%s", searchQuery))
-		require.NoError(t, err)
-		require.Contains(t, metricsOutput, `consul.acl.ResolveToken.50percentile`)
-	})
+	datadogAPIClient := datadogCluster.DatadogClient(t)
+	api := datadogV1.NewMetricsApi(datadogAPIClient.ApiClient)
+
+	response, fullResponse, err := api.ListMetrics(datadogAPIClient.Ctx, "consul.acl")
+	if err != nil {
+		logger.Logf(t, "Error when calling MetricsApi.ListMetris: %v", err)
+		logger.Logf(t, "Full Response: %v", fullResponse)
+	}
+	content, _ := json.MarshalIndent(response, "", " ")
+	logger.Logf(t, "Full Response: %v", string(content))
+	require.Contains(t, string(content), `consul.acl.ResolveToken.50percentile`)
 }
