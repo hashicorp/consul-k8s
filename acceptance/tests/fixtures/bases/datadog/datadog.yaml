@@ -139,16 +139,6 @@ spec:
 #          http:
 #            enabled: true
 #            endpoint: "0.0.0.0:4318"
-  override:
-   nodeAgent:
-     containers:
-       resources:
-         requests:
-           cpu: 2
-           memory: 1Gi
-         limits:
-           cpu: 2
-           memory: 1Gi
 #  override:
 #    nodeAgent:
 #      annotations:

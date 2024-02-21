@@ -1,8 +1,0 @@
-resources:
-  - clusterrole.yaml
-  - clusterrole_binding.yaml
-  - datadoghq.com_datadogagents_v1.yaml
-  - datadoghq.com_datadogmetrics_v1.yaml
-  - datadoghq.com_datadogmonitors_v1.yaml
-  - deployment.yaml
-  - serviceaccount.yaml

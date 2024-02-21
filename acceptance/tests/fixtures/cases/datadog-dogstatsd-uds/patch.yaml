@@ -32,10 +32,6 @@ spec:
                   peer_id: "$1"
   override:
     nodeAgent:
-      resources:
-        limits:
-          cpu: "2"
-          memory: "1Gi"
       annotations:
         'consul.hashicorp.com/connect-inject': 'false'
         'consul.hashicorp.com/transparent-proxy': 'false'
