@@ -1,0 +1,14 @@
+---
+# Source: datadog-operator/templates/clusterrole_binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: datadog-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: datadog-operator
+subjects:
+  - kind: ServiceAccount
+    name: datadog-operator
+    namespace: datadog
