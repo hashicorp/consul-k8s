@@ -14,6 +14,7 @@ import (
 
 const (
 	maxDatadogAPIRetryAttempts = 20
+	consulDogstatsDMetricQuery = "consul.memberlist"
 )
 
 // Test that prometheus metrics, when enabled, are accessible from the
@@ -64,14 +65,14 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
 
 	datadogAPIClient := datadogCluster.DatadogClient(t)
-	response, fullResponse, err := datadog.SearchMetricsAPIWithRetry(datadogAPIClient, "consul.acl", maxDatadogAPIRetryAttempts, t)
+	response, fullResponse, err := datadog.SearchMetricsAPIWithRetry(datadogAPIClient, consulDogstatsDMetricQuery, maxDatadogAPIRetryAttempts, t)
 	if err != nil {
 		content, _ := json.MarshalIndent(response, "", "   ")
 		fullContent, _ := json.MarshalIndent(fullResponse, "", "    ")
-		logger.Logf(t, "Error when calling MetricsApi.ListMetris: %v", err)
+		logger.Logf(t, "Error when calling MetricsApi.ListMetris for %s: %v", consulDogstatsDMetricQuery, err)
 		logger.Logf(t, "Response: %v", string(content))
 		logger.Logf(t, "Full Response: %v", string(fullContent))
 	}
 	content, _ := json.Marshal(response.Results)
-	require.Contains(t, string(content), `consul.acl.ResolveToken.50percentile`)
+	require.Contains(t, string(content), `consul.memberlist.gossip.50percentile`)
 }
