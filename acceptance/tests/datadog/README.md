@@ -18,3 +18,21 @@ global:
         dogstatsdAddr: "/var/run/datadog/dsd.socket"
         dogstatsdTags: [ "source:consul","consul_service:consul-server" ]
 ```
+
+
+* DogStatsD with UDP
+```yaml
+  metrics:
+    enabled: true
+    enableAgentMetrics: true
+    datadog:
+      enabled: true
+      namespace: "datadog"
+      openMetricsPrometheus:
+        enabled: false
+      dogstatsd:
+        enabled: true
+        socketTransportType: "UDP"
+        dogstatsdAddr: "datadog.datadog.svc.cluster.local"
+        dogstatsdTags: [ "source:consul","consul_service:consul-server" ]
+```

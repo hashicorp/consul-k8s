@@ -35,10 +35,6 @@ spec:
       annotations:
         'consul.hashicorp.com/connect-inject': 'false'
         'consul.hashicorp.com/transparent-proxy': 'false'
-      volumes:
-        - hostPath:
-            path: /var/run/datadog/
-          name: dsdsocket
       tolerations:
         - operator: Exists
       env:
@@ -55,6 +51,3 @@ spec:
               value: "true"
             - name: DD_USE_V2_API_SERIES
               value: "true"
-          volumeMounts:
-            - name: dsdsocket
-              mountPath: /var/run/datadog
