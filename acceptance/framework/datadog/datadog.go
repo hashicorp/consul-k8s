@@ -20,6 +20,8 @@ import (
 )
 
 const (
+	MetricsListQuery           = "search"
+	MetricTimeSeriesQuery      = "time-series"
 	releaseLabel               = "app.kubernetes.io/name"
 	DatadogOperatorReleaseName = "datadog-operator"
 	DefaultHelmChartVersion    = "1.4.0"
@@ -159,7 +161,7 @@ func (d *DatadogCluster) Destroy(t *testing.T) {
 
 	k8s.WritePodsDebugInfoIfFailed(t, d.kubectlOptions, d.debugDirectory, d.releaseLabelSelector())
 	// Ignore the error returned by the helm delete here so that we can
-	// always idempotently clean up resources in the cluster.
+	// always idempotent clean up resources in the cluster.
 	_ = helm.DeleteE(t, d.helmOptions, d.releaseName, true)
 }
 
