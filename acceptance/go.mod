@@ -7,7 +7,8 @@ replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.
 replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20240129174413-a2d50af1bdfb
 
 require (
-	github.com/google/uuid v1.3.0
+	github.com/DataDog/datadog-api-client-go/v2 v2.22.0
+	github.com/google/uuid v1.5.0
 	github.com/gruntwork-io/terratest v0.31.2
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240201210635-25708a18e4aa
 	github.com/hashicorp/consul/api v1.10.1-0.20240122152324-758ddf84e9c9
@@ -33,6 +34,7 @@ require (
 )
 
 require (
+	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
@@ -65,6 +67,7 @@ require (
 	github.com/go-openapi/validate v0.22.1 // indirect
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
+	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect

@@ -8,7 +8,7 @@ spec:
       unixDomainSocketConfig:
         enabled: false
       hostPortConfig:
-        enabled: false
+        enabled: true
         hostPort: 8125
       mapperProfiles:
         configData: |-
