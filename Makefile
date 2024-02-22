@@ -7,6 +7,8 @@ KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh 
 KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
 KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
 
+GO_MODULES := $(shell find . -name go.mod -exec dirname {} \; | sort)
+
 ##@ Helm Targets
 
 .PHONY: gen-helm-docs
@@ -316,6 +318,19 @@ go-mod-tidy: ## Recursively run go mod tidy on all subdirectories
 .PHONY: check-mod-tidy
 check-mod-tidy: ## Recursively run go mod tidy on all subdirectories and check if there are any changes
 	@./control-plane/build-support/scripts/mod_tidy.sh --check
+
+.PHONY: go-mod-get
+go-mod-get: $(foreach mod,$(GO_MODULES),go-mod-get/$(mod)) ## Run go get and go mod tidy in every module for the given dependency
+
+.PHONY: go-mod-get/%
+go-mod-get/%:
+ifndef DEP_VERSION
+	$(error DEP_VERSION is undefined: set this to <dependency>@<version>, e.g. github.com/hashicorp/go-hclog@v1.5.0)
+endif
+	@echo "--> Running go get ${DEP_VERSION} ($*)"
+	@cd $* && go get $(DEP_VERSION)
+	@echo "--> Running go mod tidy ($*)"
+	@cd $* && go mod tidy
 
 ##@ Release Targets
 
