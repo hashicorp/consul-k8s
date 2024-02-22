@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"testing"
 	"time"
 )
@@ -23,10 +24,8 @@ func SearchMetricsAPIWithRetry(apiClient *DatadogClient, metricName string, maxR
 
 		// Log the error and response details
 		content, _ := json.MarshalIndent(response, "", "    ")
-		fullContent, _ := json.MarshalIndent(fullResponse, "", "    ")
 		logger.Logf(t, "Attempt %d: Error when calling MetricsApi.ListMetrics: %v", attempt+1, err)
 		logger.Logf(t, "Attempt %d: Response: %v", attempt+1, string(content))
-		logger.Logf(t, "Attempt %d: Full Response: %v", attempt+1, string(fullContent))
 
 		// Exponential backoff with jitter
 		waitTime := getBackoffDuration(attempt)
@@ -49,8 +48,9 @@ func getBackoffDuration(attempt int) time.Duration {
 func responseContainsMetric(response datadogV1.MetricSearchResponse, metricName string) bool {
 	// Implement logic to check if `metricName` is present in `response`.
 	// This is a placeholder implementation. You'll need to adjust it based on how the response structure is defined and how the metrics are listed in it.
+	reg := regexp.MustCompile(".*" + metricName)
 	for _, metric := range response.Results.Metrics {
-		if metric == metricName {
+		if reg.MatchString(metric) {
 			return true
 		}
 	}
