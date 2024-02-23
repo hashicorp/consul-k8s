@@ -26,83 +26,17 @@ spec:
     kubelet:
       tlsVerify: false
   features:
-    # This enables the cluster check setup in the Cluster Agent and allows it to process
-    # configurations from the Kubernetes service annotations (kube_services).
+    dogstatsd:
+      unixDomainSocketConfig:
+        enabled: false
+      hostPortConfig:
+        enabled: false
     clusterChecks:
-      # Once this is enabled, configurations are passed to the Cluster Agent through
-      #  - mounted configuration files
-      #  - through Kubernetes service annotations
       enabled: false
-      # When you use Cluster Check Runners, a small, dedicated set of Agents runs the
-      # cluster checks, leaving the endpoint checks to the normal Agent.
-      # This strategy can be beneficial to control the dispatching of cluster checks,
-      # especially when the scale of your cluster checks increases.
       useClusterChecksRunners: false
-    # admission controller: datadog operator default enables this.
-    # it auto-injects:
-    #  - environment variables (DD_AGENT_HOST, DD_TRACE_AGENT_URL and DD_ENTITY_ID) to
-    #    configure DogStatsD and APM tracer libraries into the user’s application containers.
-    #  - Datadog standard tags (env, service, version) from application labels into the container
-    #    environment variables. These comply with DD unified service tagging (https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging/?tab=kubernetes)
-    #      - Identify deployment impact with trace and container metrics filtered by version
-    #      - Navigate seamlessly across traces, metrics, and logs with consistent tags
-    #      - View service data based on environment or version in a unified fashion
     admissionController:
       enabled: false
       mutateUnlabelled: false
-#    dogstatsd:
-#      # Sets DD_DOGSTATSD_ORIGIN_DETECTION=true on NodeAgent 'agent' container
-#      originDetectionEnabled: false
-#
-#      # TagCardinality configures tag cardinality for the metrics collected using origin detection (low, orchestrator or high).
-#      # See also: https://docs.datadoghq.com/getting_started/tagging/assigning_tags/?tab=containerizedenvironments#environment-variables
-#      # Cardinality default: low
-#      tagCardinality: low
-
-      # | Testing Consul to Datadog Unix Socket Connection                                                  |
-      # | Ref: https://docs.datadoghq.com/developers/dogstatsd/unix_socket/?tab=kubernetes#test-with-netcat |
-      # ----------------------------------------------------
-      # Requires: netcat-openbsd (-U unix domain socket)
-      #   - privileged consul container: apk add netcat-openbsd
-      #   - privileged datadog agent container: apt-get update && apt-get install -y netcat-openbsd
-      #
-      # $ echo -n "custom.metric.name:1|c" | nc -U -u -v -w1 /var/run/datadog/dsd.socket
-      # Bound on /tmp/nc-IjJkoG/recv.sock
-      #
-      # # Check UDS Connection Established: netstat -x (-x: Unix Sockets)
-      # # Looking for CONNECTED state to the I-Node
-      #
-      # $ netstat -x
-      #  Active UNIX domain sockets (w/o servers)
-      #  Proto RefCnt Flags       Type       State         I-Node Path
-      #  unix  2      [ ]         DGRAM      CONNECTED     15952473
-      #  unix  2      [ ]         DGRAM                    15652537 @9d10c
-#      unixDomainSocketConfig:
-#        enabled: false
-#        path: "/var/run/datadog/dsd.socket"
-#      hostPortConfig:
-#        enabled: false
-#        hostPort: 8125
-#      mapperProfiles:
-#        configData: |-
-#            - name: consul
-#              prefix: "consul."
-#              mappings:
-#                - match: 'consul\.raft\.replication\.appendEntries\.logs\.([0-9a-f-]+)'
-#                  match_type: "regex"
-#                  name: "consul.raft.replication.appendEntries.logs"
-#                  tags:
-#                    peer_id: "$1"
-#                - match: 'consul\.raft\.replication\.appendEntries\.rpc\.([0-9a-f-]+)'
-#                  match_type: "regex"
-#                  name: "consul.raft.replication.appendEntries.rpc"
-#                  tags:
-#                    peer_id: "$1"
-#                - match: 'consul\.raft\.replication\.heartbeat\.([0-9a-f-]+)'
-#                  match_type: "regex"
-#                  name: "consul.raft.replication.heartbeat"
-#                  tags:
-#                    peer_id: "$1"
     apm:
       enabled: false
     # features.npm.enabled: false
@@ -130,109 +64,6 @@ spec:
     prometheusScrape:
       enabled: false
       enableServiceEndpoints: false
-#    otlp:
-#      receiver:
-#        protocols:
-#          grpc:
-#            enabled: true
-#            endpoint: "0.0.0.0:4317"
-#          http:
-#            enabled: true
-#            endpoint: "0.0.0.0:4318"
-#  override:
-#    nodeAgent:
-#      annotations:
-#        'consul.hashicorp.com/connect-inject': 'false'
-#        'consul.hashicorp.com/transparent-proxy': 'false'
-#      volumes:
-#        - hostPath:
-#            path: /var/run/datadog/
-#          name: dsdsocket
-#        - name: consul-ca-cert
-#          secret:
-#            secretName: consul-ca-cert
-#        - name: consul-server-cert
-#          secret:
-#            secretName: consul-server-cert
-#
-#      tolerations:
-#        - operator: Exists
-#      env:
-#        - name: DD_HISTOGRAM_PERCENTILES
-#          value: '0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90 0.95 0.99'
-#        - name: DD_SECRET_BACKEND_COMMAND
-#          value: /readsecret_multiple_providers.sh
-#        - name: DD_CLC_RUNNER_ENABLED
-#          value: "true"
-#        - name: DD_CLC_RUNNER_HOST
-#          valueFrom:
-#            fieldRef:
-#              fieldPath: status.podIP
-#      containers:
-#        agent:
-#          env:
-#            - name: DD_OTLP_CONFIG_LOGS_ENABLED
-#              value: "true"
-#            - name: DD_DOGSTATSD_NON_LOCAL_TRAFFIC
-#              value: "true"
-#            - name: DD_USE_V2_API_SERIES
-#              value: "true"
-#          volumeMounts:
-#            - name: dsdsocket
-#              mountPath: /var/run/datadog
-#            - name: consul-ca-cert
-#              mountPath: /etc/datadog-agent/conf.d/consul.d/ca
-#            - name: consul-server-cert
-#              mountPath: /etc/datadog-agent/conf.d/consul.d/certs
-#
-#      extraConfd:
-#        configDataMap:
-#          # ACL Token API Endpoints Scraped: Overall permissions required -> agent:read, service:read, node:read
-#          #  - /v1/agent/metrics | /v1/agent/self ->                agent:read
-#          #  - /v1/status/leader | /v1/status/peers ->              none (not blocked by ACLs)
-#          #  - /v1/catalog/services ->                              service:read
-#          #  - /v1/health/service | /v1/health/state/any ->         node:read,service:read
-#          #  - /v1/coordinate/datacenters | /v1/coordinate/nodes -> node:read
-#          consul.yaml: |-
-#            advanced_ad_identifiers:
-#              - kube_service:
-#                  name: "consul-server"
-#                  namespace: "consul"
-#            init_config:
-#            instances:
-#              - url: "https://consul-server.consul.svc:8501"
-#                tls_cert: "ENC[k8s_secret@consul/consul-server-cert/tls.crt"
-#                tls_private_key: "ENC[k8s_secret@consul/consul-server-cert/tls.key"
-#                tls_ca_cert: "ENC[k8s_secret@consul/consul-ca-cert/tls.crt"
-#                acl_token: "ENC[k8s_secret@consul/datadog-agent-metrics-acl-token/token]"
-#                new_leader_checks: true
-#                network_latency_checks: true
-#                catalog_checks: true
-#                auth_type: "basic"
-#          envoy.yaml: |-
-#            ad_identifiers:
-#              - consul-dataplane
-#            init_config: {}
-#            instances:
-#              - openmetrics_endpoint: http://%%host%%:20200/metrics
-#                stats_url: "http://%%host%%:21200/stats"
-#                metrics: [ "*" ]
-#
-#    clusterChecksRunner:
-#      annotations:
-#        'consul.hashicorp.com/connect-inject': 'false'
-#        'consul.hashicorp.com/transparent-proxy': 'false'
-#    clusterAgent:
-#      annotations:
-#        'consul.hashicorp.com/connect-inject': 'false'
-#        'consul.hashicorp.com/transparent-proxy': 'false'
-#      replicas: 1
-#      env:
-#          # The Cluster Agent can use an advanced dispatching logic for cluster checks,
-#          # which takes into account the execution time and metric samples from check instances.
-#          # This logic enables the Cluster Agent to optimize dispatching and distribution
-#          # between cluster check runners.
-#        - name: DD_CLUSTER_CHECKS_ADVANCED_DISPATCHING_ENABLED
-#          value: 'true'
-#        - name: DD_DOGSTATSD_NON_LOCAL_TRAFFIC
-#          value: 'true'
+  override:
+      clusterAgent:
+        replicas: 0
