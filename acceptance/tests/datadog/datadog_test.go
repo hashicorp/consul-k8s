@@ -203,3 +203,64 @@ func TestDatadogConsulChecks(t *testing.T) {
 	logger.Logf(t, "Response: %v", string(content))
 	require.Contains(t, string(content), consulIntegrationMetricQuery)
 }
+
+// TestDatadogOpenmetrics
+// Acceptance test to verify e2e metrics configuration works as expected
+// with live datadog API using histogram formatted metric
+//
+// Method: Datadog Openmetrics Prometheus Metrics Collection
+func TestDatadogOpenmetrics(t *testing.T) {
+	env := suite.Environment()
+	cfg := suite.Config()
+	ctx := env.DefaultContext(t)
+	ns := ctx.KubectlOptions(t).Namespace
+	consulOpenmetricsQuery := fmt.Sprintf("%s.consul_memberlist_gossip.quantile", ns)
+
+	helmValues := map[string]string{
+		"global.datacenter":                                    "dc1",
+		"global.metrics.enabled":                               "true",
+		"global.metrics.enableAgentMetrics":                    "true",
+		"global.metrics.disableAgentHostName":                  "true",
+		"global.metrics.enableHostMetrics":                     "true",
+		"global.metrics.datadog.enabled":                       "true",
+		"global.metrics.datadog.namespace":                     "datadog",
+		"global.metrics.datadog.openMetricsPrometheus.enabled": "true",
+	}
+
+	datadogOperatorHelmValues := map[string]string{
+		"replicaCount":     "1",
+		"image.tag":        datadog.DefaultHelmChartVersion,
+		"image.repository": "gcr.io/datadoghq/operator",
+	}
+
+	releaseName := helpers.RandomName()
+	datadogOperatorRelease := datadog.DatadogOperatorReleaseName
+
+	acceptanceTestingTags := fmt.Sprintf("kube_stateful_set:%s-consul-server", releaseName)
+	// Install the consul cluster in the default kubernetes ctx.
+	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	consulCluster.Create(t)
+
+	// Deploy Datadog Agent via Datadog Operator and apply dogstatsd overlay
+	datadogNamespace := helmValues["global.metrics.datadog.namespace"]
+	logger.Log(t, fmt.Sprintf("deploying datadog-operator via helm | namespace: %s | release-name: %s", datadogNamespace, datadogOperatorRelease))
+	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
+	datadogCluster.Create(t)
+
+	logger.Log(t, fmt.Sprintf("applying datadog openmetrics patch to datadog-agent | namespace: %s", datadogNamespace))
+	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/datadog-openmetrics")
+	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
+
+	datadogAPIClient := datadogCluster.DatadogClient(t)
+	response, fullResponse, err := datadog.ApiWithRetry(t, datadogAPIClient, datadog.MetricTimeSeriesQuery, acceptanceTestingTags, consulOpenmetricsQuery, maxDatadogAPIRetryAttempts)
+	if err != nil {
+		content, _ := json.MarshalIndent(response.QueryResponse, "", "   ")
+		fullContent, _ := json.MarshalIndent(fullResponse, "", "    ")
+		logger.Logf(t, "Error when querying /v1/query endpoint for %s: %v", consulOpenmetricsQuery, err)
+		logger.Logf(t, "Response: %v", string(content))
+		logger.Logf(t, "Full Response: %v", string(fullContent))
+	}
+	content, _ := json.MarshalIndent(response.QueryResponse, "", "   ")
+	logger.Logf(t, "Response: %v", string(content))
+	require.Contains(t, string(content), consulOpenmetricsQuery)
+}
