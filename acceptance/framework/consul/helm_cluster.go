@@ -26,16 +26,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 )
 
 // HelmCluster implements Cluster and uses Helm
@@ -751,6 +752,8 @@ func defaultValues() map[string]string {
 		// which could result in tests passing due to that token having privileges to read services
 		// (false positive).
 		"dns.enabled": "false",
+
+		"global.image": "dstoughhashicorp/consul:default-dnsv2-01",
 
 		// Enable trace logs for servers and clients.
 		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
