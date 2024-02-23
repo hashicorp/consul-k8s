@@ -156,12 +156,12 @@ spec:
               "instances": [
                 {
         {{- if .Values.global.tls.enabled }}
-                  "openmetrics_endpoint": "https://{{ .Release.Name }}-consul-server.{{ .Release.Namespace }}.svc:8501/v1/agent/metrics?format=prometheus",
+                  "openmetrics_endpoint": "https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501/v1/agent/metrics?format=prometheus",
                   "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
                   "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
                   "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
         {{- else }}
-                  "openmetrics_endpoint": "http://{{ .Release.Name }}-consul-server.{{ .Release.Namespace }}.svc:8500/v1/agent/metrics?format=prometheus",
+                  "openmetrics_endpoint": "http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500/v1/agent/metrics?format=prometheus",
         {{- end }}
         {{- if ( .Values.global.acls.manageSystemACLs) }}
                   "headers": {
@@ -182,12 +182,12 @@ spec:
               "instances": [
                 {
         {{- if .Values.global.tls.enabled }}
-                  "url": "https://{{ .Release.Name }}-consul-server.{{ .Release.Namespace }}.svc:8501",
+                  "url": "https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501",
                   "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
                   "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
                   "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
         {{- else }}
-                  "url": "http://{{ .Release.Name }}-consul-server.{{ .Release.Namespace }}.svc:8500",
+                  "url": "http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500",
         {{- end }}
                   "use_prometheus_endpoint": true,
         {{- if ( .Values.global.acls.manageSystemACLs) }}
