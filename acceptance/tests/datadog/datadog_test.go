@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	maxDatadogAPIRetryAttempts = 20
-	consulDogstatsDMetricQuery = "consul.memberlist.gossip.50percentile"
+	maxDatadogAPIRetryAttempts   = 20
+	consulDogstatsDMetricQuery   = "consul.memberlist.gossip.50percentile"
+	consulIntegrationMetricQuery = "consul.memberlist.gossip.quantile"
 )
 
 // TestDatadogDogstatsDUnixDomainSocket
@@ -62,9 +63,7 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
 	datadogCluster.Create(t)
 
-	logger.Log(t, fmt.Sprintf("deploying datadog-agent | namespace: %s", datadogNamespace))
-	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/datadog")
-	logger.Log(t, fmt.Sprintf("applying dogstatd over unix domain sockets patch to datadog-agent | namespace: %s", datadogNamespace))
+	logger.Log(t, fmt.Sprintf("applying dogstatd over unix domain sockets kustomization patch to datadog-agent | namespace: %s", datadogNamespace))
 	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/datadog-dogstatsd-uds")
 	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
 
@@ -127,9 +126,7 @@ func TestDatadogDogstatsDUDP(t *testing.T) {
 	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
 	datadogCluster.Create(t)
 
-	logger.Log(t, fmt.Sprintf("deploying datadog-agent | namespace: %s", datadogNamespace))
-	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/datadog")
-	logger.Log(t, fmt.Sprintf("applying dogstatd over unix domain sockets patch to datadog-agent | namespace: %s", datadogNamespace))
+	logger.Log(t, fmt.Sprintf("applying dogstatd over UDP kustomization patch to datadog-agent | namespace: %s", datadogNamespace))
 	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/datadog-dogstatsd-udp")
 	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
 
@@ -145,4 +142,64 @@ func TestDatadogDogstatsDUDP(t *testing.T) {
 	content, _ := json.MarshalIndent(response.QueryResponse, "", "   ")
 	logger.Logf(t, "Response: %v", string(content))
 	require.Contains(t, string(content), consulDogstatsDMetricQuery)
+}
+
+// TestDatadogConsulChecks
+// Acceptance test to verify e2e metrics configuration works as expected
+// with live datadog API using histogram formatted metric
+//
+// Method: Consul Integrated Datadog Checks
+func TestDatadogConsulChecks(t *testing.T) {
+	env := suite.Environment()
+	cfg := suite.Config()
+	ctx := env.DefaultContext(t)
+
+	helmValues := map[string]string{
+		"global.datacenter":                   "dc1",
+		"global.metrics.enabled":              "true",
+		"global.metrics.enableAgentMetrics":   "true",
+		"global.metrics.disableAgentHostName": "true",
+		"global.metrics.enableHostMetrics":    "true",
+		"server.replicas":                     "3", // Network Latency Checks need > 1 node
+		"server.affinity":                     "null",
+		"global.metrics.datadog.enabled":      "true",
+		"global.metrics.datadog.namespace":    "datadog",
+	}
+
+	datadogOperatorHelmValues := map[string]string{
+		"replicaCount":     "1",
+		"image.tag":        datadog.DefaultHelmChartVersion,
+		"image.repository": "gcr.io/datadoghq/operator",
+	}
+
+	releaseName := helpers.RandomName()
+	datadogOperatorRelease := datadog.DatadogOperatorReleaseName
+
+	acceptanceTestingTags := fmt.Sprintf("kube_stateful_set:%s-consul-server", releaseName)
+	// Install the consul cluster in the default kubernetes ctx.
+	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	consulCluster.Create(t)
+
+	// Deploy Datadog Agent via Datadog Operator and apply dogstatsd overlay
+	datadogNamespace := helmValues["global.metrics.datadog.namespace"]
+	logger.Log(t, fmt.Sprintf("deploying datadog-operator via helm | namespace: %s | release-name: %s", datadogNamespace, datadogOperatorRelease))
+	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
+	datadogCluster.Create(t)
+
+	logger.Log(t, fmt.Sprintf("applying datadog consul integration patch to datadog-agent | namespace: %s", datadogNamespace))
+	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/datadog")
+	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
+
+	datadogAPIClient := datadogCluster.DatadogClient(t)
+	response, fullResponse, err := datadog.ApiWithRetry(t, datadogAPIClient, datadog.MetricTimeSeriesQuery, acceptanceTestingTags, consulIntegrationMetricQuery, maxDatadogAPIRetryAttempts)
+	if err != nil {
+		content, _ := json.MarshalIndent(response.QueryResponse, "", "   ")
+		fullContent, _ := json.MarshalIndent(fullResponse, "", "    ")
+		logger.Logf(t, "Error when querying /v1/query endpoint for %s: %v", consulIntegrationMetricQuery, err)
+		logger.Logf(t, "Response: %v", string(content))
+		logger.Logf(t, "Full Response: %v", string(fullContent))
+	}
+	content, _ := json.MarshalIndent(response.QueryResponse, "", "   ")
+	logger.Logf(t, "Response: %v", string(content))
+	require.Contains(t, string(content), consulIntegrationMetricQuery)
 }
