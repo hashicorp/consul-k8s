@@ -6,4 +6,4 @@ spec:
   features:
     prometheusScrape:
       enabled: true
-      enableServiceEndpoints: false
+      enableServiceEndpoints: true
