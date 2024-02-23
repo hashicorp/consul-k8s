@@ -810,7 +810,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .consul.instances | jq -r .[0].url | tee /dev/stderr)"
-  [ "${actual}" = "http://consul-server.consul.svc:8500" ]
+  [ "${actual}" = http://release-name-consul-server.default.svc:8500 ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .consul.instances | jq -r .[0].new_leader_checks | tee /dev/stderr)"
@@ -853,7 +853,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .consul.instances | jq -r .[0].url | tee /dev/stderr)"
-  [ "${actual}" = "https://consul-server.default.svc:8501" ]
+  [ "${actual}" = "https://release-name-consul-server.default.svc:8501" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .consul.instances | jq -r .[0].tls_cert | tee /dev/stderr)"
@@ -920,7 +920,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
-  [ "${actual}" = "http://consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
+  [ "${actual}" = "http://release-name-consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].headers | tee /dev/stderr)"
@@ -958,7 +958,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
-  [ "${actual}" = "https://consul-server.default.svc:8501/v1/agent/metrics?format=prometheus" ]
+  [ "${actual}" = "https://release-name-consul-server.default.svc:8501/v1/agent/metrics?format=prometheus" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].headers | tee /dev/stderr)"
@@ -1007,7 +1007,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
-  [ "${actual}" = "http://consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
+  [ "${actual}" = "http://release-name-consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r '.[0].headers["X-Consul-Token"]' | tee /dev/stderr)"
