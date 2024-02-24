@@ -35,6 +35,11 @@ func ApiWithRetry(t *testing.T, apiClient *DatadogClient, endpoint, testTags, qu
 			fullQueryString := fmt.Sprintf("avg:%s{%s}", query, testTags)
 			queryResponse, fullResponse, err = api.QueryMetrics(apiClient.Ctx, time.Now().Add(-1*time.Minute).Unix(), time.Now().Unix(), fullQueryString)
 			response.QueryResponse = &queryResponse
+		case MetricTimeSeriesOTLPQuery:
+			var queryResponse datadogV1.MetricsQueryResponse
+			fullQueryString := fmt.Sprintf("sum:%s{%s}", query, testTags)
+			queryResponse, fullResponse, err = api.QueryMetrics(apiClient.Ctx, time.Now().Add(-1*time.Minute).Unix(), time.Now().Unix(), fullQueryString)
+			response.QueryResponse = &queryResponse
 		default:
 			var searchResponse datadogV1.MetricSearchResponse
 			searchResponse, fullResponse, err = api.ListMetrics(apiClient.Ctx, query)
@@ -46,13 +51,15 @@ func ApiWithRetry(t *testing.T, apiClient *DatadogClient, endpoint, testTags, qu
 
 		// Log the error and response details
 		content, _ := json.MarshalIndent(response.SearchResponse, "", "    ")
-		if endpoint == "time-series" {
+		sentQuery := query
+		if endpoint == MetricTimeSeriesQuery || endpoint == MetricTimeSeriesOTLPQuery {
 			content, _ = json.MarshalIndent(response.QueryResponse, "", "    ")
+			sentQuery = response.QueryResponse.GetQuery()
 		}
 		if err != nil {
-			logger.Logf(t, "Attempt %d of %d: Error received when calling Datadog API MetricsApi.ListMetrics (/v1/search) | query=%s | error=%v", attempt+1, maxRetries, query, err)
+			logger.Logf(t, "Attempt %d of %d: Error received when calling Datadog API | query=%s | error=%v", attempt+1, maxRetries, sentQuery, err)
 		} else {
-			logger.Logf(t, "Attempt %d of %d: No match received when calling Datadog API MetricsApi.ListMetrics (/v1/search) | query=%s", attempt+1, maxRetries, query)
+			logger.Logf(t, "Attempt %d of %d: No match received when calling Datadog API | query=%s", attempt+1, maxRetries, sentQuery)
 		}
 		logger.Logf(t, "Response: %v", string(content))
 
@@ -65,10 +72,10 @@ func ApiWithRetry(t *testing.T, apiClient *DatadogClient, endpoint, testTags, qu
 	return response, fullResponse, err
 }
 
-// getBackoffDuration calculates the time to wait before the next retry attempt with an exponential backoff and jitter
+// getBackoffDuration calculates the time to wait before the next retry attempt with an exponential backoff and jitter.
 func getBackoffDuration(attempt int) time.Duration {
 	// Exponential backoff factor
-	backoff := math.Pow(7, float64(attempt)) * 100 // Base delay in milliseconds
+	backoff := math.Pow(5, float64(attempt)) * 100 // Base delay in milliseconds
 	jitter := rand.Float64() * 100                 // Add jitter up to 100ms
 	return time.Duration(backoff+jitter) * time.Millisecond
 }

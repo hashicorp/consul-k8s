@@ -22,6 +22,7 @@ import (
 const (
 	MetricsListQuery           = "search"
 	MetricTimeSeriesQuery      = "time-series"
+	MetricTimeSeriesOTLPQuery  = "time-series-otlp"
 	releaseLabel               = "app.kubernetes.io/name"
 	DatadogOperatorReleaseName = "datadog-operator"
 	DefaultHelmChartVersion    = "1.4.0"
@@ -55,7 +56,7 @@ func (d *DatadogCluster) releaseLabelSelector() string {
 	return fmt.Sprintf("%s=%s", releaseLabel, d.releaseName)
 }
 
-// DatadogClient returns datadog client
+// DatadogClient returns datadog client.
 func (d *DatadogCluster) DatadogClient(*testing.T) *DatadogClient { return d.datadogClient }
 
 // NewDatadogClient initializes and returns a DataDog client using the API key and Application key from environment variables.
