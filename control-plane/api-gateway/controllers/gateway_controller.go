@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -73,7 +74,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	consulKey := r.Translator.ConfigEntryReference(api.APIGateway, req.NamespacedName)
 	nonNormalizedConsulKey := r.Translator.NonNormalizedConfigEntryReference(api.APIGateway, req.NamespacedName)
 
-	var gateway gwv1beta1.Gateway
+	var gateway gwv1.Gateway
 
 	log := r.Log.V(1).WithValues("gateway", req.NamespacedName)
 	log.Info("Reconciling Gateway")
@@ -356,7 +357,7 @@ func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 	return es
 }
 
-func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) error {
+func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1.Gateway) error {
 	gk := gatekeeper.New(log, r.Client)
 	err := gk.Delete(ctx, types.NamespacedName{
 		Namespace: gw.Namespace,
@@ -369,7 +370,7 @@ func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log l
 	return nil
 }
 
-func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
+func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
 	gk := gatekeeper.New(log, r.Client)
 	err := gk.Upsert(ctx, *gw, *gwcc, r.HelmConfig)
 	if err != nil {
@@ -417,20 +418,20 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	}
 
 	return c, ctrl.NewControllerManagedBy(mgr).
-		For(&gwv1beta1.Gateway{}).
+		For(&gwv1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
 		Watches(
-			source.NewKindWithCache(&gwv1beta1.ReferenceGrant{}, mgr.GetCache()),
+			source.NewKindWithCache(&gwv1.ReferenceGrant{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant(ctx)),
 		).
 		Watches(
-			source.NewKindWithCache(&gwv1beta1.GatewayClass{}, mgr.GetCache()),
+			source.NewKindWithCache(&gwv1.GatewayClass{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass(ctx)),
 		).
 		Watches(
-			source.NewKindWithCache(&gwv1beta1.HTTPRoute{}, mgr.GetCache()),
+			source.NewKindWithCache(&gwv1.HTTPRoute{}, mgr.GetCache()),
 			handler.EnqueueRequestsFromMapFunc(r.transformHTTPRoute(ctx)),
 		).
 		Watches(
@@ -871,7 +872,7 @@ func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gatew
 	return service, nil
 }
 
-func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1beta1.Gateway) ([]corev1.Pod, error) {
+func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1.Gateway) ([]corev1.Pod, error) {
 	labels := common.LabelsForGateway(&gateway)
 
 	var list corev1.PodList
@@ -883,8 +884,8 @@ func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway 
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1beta1.HTTPRoute, error) {
-	var list gwv1beta1.HTTPRouteList
+func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1.HTTPRoute, error) {
+	var list gwv1.HTTPRouteList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, gateway.String()),
@@ -1018,7 +1019,7 @@ func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway typ
 	return list.Items, nil
 }
 
-func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1beta1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
+func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
 	if gatewayClassConfig == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
 		return nil, nil
@@ -1040,8 +1041,8 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 	return config, nil
 }
 
-func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1beta1.Gateway) (*gwv1beta1.GatewayClass, error) {
-	var gatewayClass gwv1beta1.GatewayClass
+func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1.Gateway) (*gwv1.GatewayClass, error) {
+	var gatewayClass gwv1.GatewayClass
 	if err := c.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
@@ -1063,7 +1064,7 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 		set.Add(gatewayClass.Name)
 	}
 
-	gateways := &gwv1beta1.GatewayList{}
+	gateways := &gwv1.GatewayList{}
 	if err := c.Client.List(ctx, gateways); err != nil {
 		return err
 	}
@@ -1076,7 +1077,7 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 	return nil
 }
 
-func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *common.ResourceMap, gateway gwv1beta1.Gateway) error {
+func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *common.ResourceMap, gateway gwv1.Gateway) error {
 	certificates := mapset.NewSet()
 
 	for _, listener := range gateway.Spec.Listeners {
@@ -1109,7 +1110,7 @@ func (c *GatewayController) fetchSecret(ctx context.Context, resources *common.R
 	return nil
 }
 
-func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *common.ResourceMap, tcpRoutes []gwv1alpha2.TCPRoute, httpRoutes []gwv1beta1.HTTPRoute) error {
+func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *common.ResourceMap, tcpRoutes []gwv1alpha2.TCPRoute, httpRoutes []gwv1.HTTPRoute) error {
 	serviceBackends := mapset.NewSet()
 	meshServiceBackends := mapset.NewSet()
 

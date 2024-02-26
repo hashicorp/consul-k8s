@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -42,11 +43,11 @@ type BinderConfig struct {
 	// state that we may have set on the Gateway, its corresponding Routes or in
 	// Consul, because we should no longer be managing the Gateway (its association
 	// to our controller is through a parameter on the GatewayClass).
-	GatewayClass *gwv1beta1.GatewayClass
+	GatewayClass *gwv1.GatewayClass
 	// Gateway is the Gateway being reconciled that we want to bind routes to.
-	Gateway gwv1beta1.Gateway
+	Gateway gwv1.Gateway
 	// HTTPRoutes is a list of HTTPRoute objects that ought to be bound to the Gateway.
-	HTTPRoutes []gwv1beta1.HTTPRoute
+	HTTPRoutes []gwv1.HTTPRoute
 	// TCPRoutes is a list of TCPRoute objects that ought to be bound to the Gateway.
 	TCPRoutes []gwv1alpha2.TCPRoute
 	// Pods are any pods that are part of the Gateway deployment.

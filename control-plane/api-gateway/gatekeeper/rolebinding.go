@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"k8s.io/apimachinery/pkg/types"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -18,7 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (g *Gatekeeper) upsertRoleBinding(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
+func (g *Gatekeeper) upsertRoleBinding(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	if config.AuthMethod == "" && !config.EnableOpenShift {
 		return g.deleteRole(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
@@ -63,7 +63,7 @@ func (g *Gatekeeper) deleteRoleBinding(ctx context.Context, gwName types.Namespa
 	return nil
 }
 
-func (g *Gatekeeper) roleBinding(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) *rbac.RoleBinding {
+func (g *Gatekeeper) roleBinding(gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) *rbac.RoleBinding {
 	// Create resources for reference. This avoids bugs if naming patterns change.
 	serviceAccount := g.serviceAccount(gateway)
 	role := g.role(gateway, gcc, config)

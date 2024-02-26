@@ -8,6 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -235,7 +236,7 @@ func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.GatewayJWT
 	return &verifyClaim
 }
 
-func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
+func (t ResourceTranslator) ToHTTPRoute(route gwv1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
 	namespace := t.Namespace(route.Namespace)
 
 	// We don't translate parent refs.
@@ -263,7 +264,7 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 	return &configEntry
 }
 
-func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
+func (t ResourceTranslator) translateHTTPRouteRule(route gwv1.HTTPRoute, rule gwv1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
 	services := ConvertSliceFuncIf(
 		rule.BackendRefs,
 		func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
@@ -285,7 +286,7 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 	}, true
 }
 
-func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, ref gwv1beta1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
+func (t ResourceTranslator) translateHTTPBackendRef(route gwv1.HTTPRoute, ref gwv1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
 	id := types.NamespacedName{
 		Name:      string(ref.Name),
 		Namespace: DerefStringOr(ref.Namespace, route.Namespace),
@@ -325,19 +326,19 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 }
 
 var headerMatchTypeTranslation = map[gwv1beta1.HeaderMatchType]api.HTTPHeaderMatchType{
-	gwv1beta1.HeaderMatchExact:             api.HTTPHeaderMatchExact,
-	gwv1beta1.HeaderMatchRegularExpression: api.HTTPHeaderMatchRegularExpression,
+	gwv1.HeaderMatchExact:             api.HTTPHeaderMatchExact,
+	gwv1.HeaderMatchRegularExpression: api.HTTPHeaderMatchRegularExpression,
 }
 
 var headerPathMatchTypeTranslation = map[gwv1beta1.PathMatchType]api.HTTPPathMatchType{
-	gwv1beta1.PathMatchExact:             api.HTTPPathMatchExact,
-	gwv1beta1.PathMatchPathPrefix:        api.HTTPPathMatchPrefix,
-	gwv1beta1.PathMatchRegularExpression: api.HTTPPathMatchRegularExpression,
+	gwv1.PathMatchExact:             api.HTTPPathMatchExact,
+	gwv1.PathMatchPathPrefix:        api.HTTPPathMatchPrefix,
+	gwv1.PathMatchRegularExpression: api.HTTPPathMatchRegularExpression,
 }
 
 var queryMatchTypeTranslation = map[gwv1beta1.QueryParamMatchType]api.HTTPQueryMatchType{
-	gwv1beta1.QueryParamMatchExact:             api.HTTPQueryMatchExact,
-	gwv1beta1.QueryParamMatchRegularExpression: api.HTTPQueryMatchRegularExpression,
+	gwv1.QueryParamMatchExact:             api.HTTPQueryMatchExact,
+	gwv1.QueryParamMatchRegularExpression: api.HTTPQueryMatchRegularExpression,
 }
 
 func (t ResourceTranslator) translateHTTPMatch(match gwv1beta1.HTTPRouteMatch) api.HTTPMatch {
