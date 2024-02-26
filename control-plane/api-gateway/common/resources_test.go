@@ -44,11 +44,11 @@ func TestResourceMap_JWTProvider(t *testing.T) {
 
 type mockReferenceValidator struct{}
 
-func (m mockReferenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
+func (m mockReferenceValidator) GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
 	return true
 }
 
-func (m mockReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
+func (m mockReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
 	return true
 }
 

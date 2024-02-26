@@ -6,7 +6,6 @@ package resources
 import (
 	"context"
 
-	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -15,7 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 )
 
 type gatewayList interface {
@@ -33,14 +33,14 @@ func setupGatewayControllerWithManager[L gatewayList](mgr ctrl.Manager, obj clie
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ServiceAccount{}).
 		Watches(
-			source.NewKindWithCache(&meshv2beta1.GatewayClass{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+			&meshv2beta1.GatewayClass{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 				gc := o.(*meshv2beta1.GatewayClass)
 				if gc == nil {
 					return nil
 				}
 
-				gateways, err := getGatewaysReferencingGatewayClass[L](context.Background(), k8sClient, gc.Name, index)
+				gateways, err := getGatewaysReferencingGatewayClass[L](ctx, k8sClient, gc.Name, index)
 				if err != nil {
 					return nil
 				}
@@ -48,14 +48,14 @@ func setupGatewayControllerWithManager[L gatewayList](mgr ctrl.Manager, obj clie
 				return gateways.ReconcileRequests()
 			})).
 		Watches(
-			source.NewKindWithCache(&meshv2beta1.GatewayClassConfig{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+			&meshv2beta1.GatewayClassConfig{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 				gcc := o.(*meshv2beta1.GatewayClassConfig)
 				if gcc == nil {
 					return nil
 				}
 
-				classes, err := getGatewayClassesReferencingGatewayClassConfig(context.Background(), k8sClient, gcc.Name)
+				classes, err := getGatewayClassesReferencingGatewayClassConfig(ctx, k8sClient, gcc.Name)
 				if err != nil {
 					return nil
 				}
@@ -66,7 +66,7 @@ func setupGatewayControllerWithManager[L gatewayList](mgr ctrl.Manager, obj clie
 						continue
 					}
 
-					gateways, err := getGatewaysReferencingGatewayClass[L](context.Background(), k8sClient, class.Name, index)
+					gateways, err := getGatewaysReferencingGatewayClass[L](ctx, k8sClient, class.Name, index)
 					if err != nil {
 						continue
 					}

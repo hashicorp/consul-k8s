@@ -183,9 +183,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Forcibly delete all gateway classes and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
 
-	var gatewayClassList gwv1beta1.GatewayClassList
+	var gatewayClassList gwv1.GatewayClassList
 	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
 	}) == nil {

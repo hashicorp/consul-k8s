@@ -64,7 +64,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 		canReference       bool
 		err                error
 		ctx                context.Context
-		gateway            gwv1beta1.Gateway
+		gateway            gwv1.Gateway
 		secret             gwv1beta1.SecretObjectReference
 		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
@@ -72,7 +72,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 			canReference: true,
 			err:          nil,
 			ctx:          context.TODO(),
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       GatewayKind,
 					APIVersion: Group + V1Beta1,
@@ -80,8 +80,8 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: FromNamespace,
 				},
-				Spec:   gwv1beta1.GatewaySpec{},
-				Status: gwv1beta1.GatewayStatus{},
+				Spec:   gwv1.GatewaySpec{},
+				Status: gwv1.GatewayStatus{},
 			},
 			secret: gwv1beta1.SecretObjectReference{
 				Group:     &secretRefGroup,
@@ -141,7 +141,7 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 		canReference       bool
 		err                error
 		ctx                context.Context
-		httpRoute          gwv1beta1.HTTPRoute
+		httpRoute          gwv1.HTTPRoute
 		backendRef         gwv1beta1.BackendRef
 		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
@@ -149,7 +149,7 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 			canReference: true,
 			err:          nil,
 			ctx:          context.TODO(),
-			httpRoute: gwv1beta1.HTTPRoute{
+			httpRoute: gwv1.HTTPRoute{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       HTTPRouteKind,
 					APIVersion: Group + V1Beta1,
@@ -157,8 +157,8 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: FromNamespace,
 				},
-				Spec:   gwv1beta1.HTTPRouteSpec{},
-				Status: gwv1beta1.HTTPRouteStatus{},
+				Spec:   gwv1.HTTPRouteSpec{},
+				Status: gwv1.HTTPRouteStatus{},
 			},
 			backendRef: gwv1beta1.BackendRef{
 				BackendObjectReference: gwv1beta1.BackendObjectReference{

@@ -97,7 +97,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	// the reconcile loop to run (hence a ~1m timeout here).
 	var gatewayAddress string
 	retryCheck(t, 60, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
 		require.NoError(r, err)
 

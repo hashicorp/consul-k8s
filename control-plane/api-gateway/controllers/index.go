@@ -10,6 +10,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -61,37 +62,37 @@ type index struct {
 var indexes = []index{
 	{
 		name:        GatewayClass_GatewayClassConfigIndex,
-		target:      &gwv1beta1.GatewayClass{},
+		target:      &gwv1.GatewayClass{},
 		indexerFunc: gatewayClassConfigForGatewayClass,
 	},
 	{
 		name:        GatewayClass_ControllerNameIndex,
-		target:      &gwv1beta1.GatewayClass{},
+		target:      &gwv1.GatewayClass{},
 		indexerFunc: gatewayClassControllerName,
 	},
 	{
 		name:        Gateway_GatewayClassIndex,
-		target:      &gwv1beta1.Gateway{},
+		target:      &gwv1.Gateway{},
 		indexerFunc: gatewayClassForGateway,
 	},
 	{
 		name:        Secret_GatewayIndex,
-		target:      &gwv1beta1.Gateway{},
+		target:      &gwv1.Gateway{},
 		indexerFunc: gatewayForSecret,
 	},
 	{
 		name:        HTTPRoute_GatewayIndex,
-		target:      &gwv1beta1.HTTPRoute{},
+		target:      &gwv1.HTTPRoute{},
 		indexerFunc: gatewaysForHTTPRoute,
 	},
 	{
 		name:        HTTPRoute_ServiceIndex,
-		target:      &gwv1beta1.HTTPRoute{},
+		target:      &gwv1.HTTPRoute{},
 		indexerFunc: servicesForHTTPRoute,
 	},
 	{
 		name:        HTTPRoute_MeshServiceIndex,
-		target:      &gwv1beta1.HTTPRoute{},
+		target:      &gwv1.HTTPRoute{},
 		indexerFunc: meshServicesForHTTPRoute,
 	},
 	{
@@ -116,17 +117,17 @@ var indexes = []index{
 	},
 	{
 		name:        HTTPRoute_RouteRetryFilterIndex,
-		target:      &gwv1beta1.HTTPRoute{},
+		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
 	{
 		name:        HTTPRoute_RouteTimeoutFilterIndex,
-		target:      &gwv1beta1.HTTPRoute{},
+		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
 	{
 		name:        HTTPRoute_RouteAuthFilterIndex,
-		target:      &gwv1beta1.HTTPRoute{},
+		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
 	{
@@ -138,7 +139,7 @@ var indexes = []index{
 
 // gatewayClassConfigForGatewayClass creates an index of every GatewayClassConfig referenced by a GatewayClass.
 func gatewayClassConfigForGatewayClass(o client.Object) []string {
-	gc := o.(*gwv1beta1.GatewayClass)
+	gc := o.(*gwv1.GatewayClass)
 
 	pr := gc.Spec.ParametersRef
 	if pr != nil && pr.Kind == v1alpha1.GatewayClassConfigKind {
@@ -149,7 +150,7 @@ func gatewayClassConfigForGatewayClass(o client.Object) []string {
 }
 
 func gatewayClassControllerName(o client.Object) []string {
-	gc := o.(*gwv1beta1.GatewayClass)
+	gc := o.(*gwv1.GatewayClass)
 
 	if gc.Spec.ControllerName != "" {
 		return []string{string(gc.Spec.ControllerName)}
@@ -160,7 +161,7 @@ func gatewayClassControllerName(o client.Object) []string {
 
 // gatewayClassForGateway creates an index of every GatewayClass referenced by a Gateway.
 func gatewayClassForGateway(o client.Object) []string {
-	g := o.(*gwv1beta1.Gateway)
+	g := o.(*gwv1.Gateway)
 	return []string{string(g.Spec.GatewayClassName)}
 }
 
@@ -173,10 +174,10 @@ func peersForMeshService(o client.Object) []string {
 }
 
 func gatewayForSecret(o client.Object) []string {
-	gateway := o.(*gwv1beta1.Gateway)
+	gateway := o.(*gwv1.Gateway)
 	var secretReferences []string
 	for _, listener := range gateway.Spec.Listeners {
-		if listener.TLS == nil || *listener.TLS.Mode != gwv1beta1.TLSModeTerminate {
+		if listener.TLS == nil || *listener.TLS.Mode != gwv1.TLSModeTerminate {
 			continue
 		}
 		for _, cert := range listener.TLS.CertificateRefs {
@@ -190,7 +191,7 @@ func gatewayForSecret(o client.Object) []string {
 }
 
 func gatewaysForHTTPRoute(o client.Object) []string {
-	route := o.(*gwv1beta1.HTTPRoute)
+	route := o.(*gwv1.HTTPRoute)
 	statusRefs := common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
 		return parentStatus.ParentRef
 	})
@@ -206,7 +207,7 @@ func gatewaysForTCPRoute(o client.Object) []string {
 }
 
 func servicesForHTTPRoute(o client.Object) []string {
-	route := o.(*gwv1beta1.HTTPRoute)
+	route := o.(*gwv1.HTTPRoute)
 	refs := []string{}
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
@@ -226,7 +227,7 @@ func servicesForHTTPRoute(o client.Object) []string {
 }
 
 func meshServicesForHTTPRoute(o client.Object) []string {
-	route := o.(*gwv1beta1.HTTPRoute)
+	route := o.(*gwv1.HTTPRoute)
 	refs := []string{}
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:
@@ -303,7 +304,7 @@ func gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference, status
 }
 
 func filtersForHTTPRoute(o client.Object) []string {
-	route := o.(*gwv1beta1.HTTPRoute)
+	route := o.(*gwv1.HTTPRoute)
 	filters := []string{}
 	var nilString *string
 

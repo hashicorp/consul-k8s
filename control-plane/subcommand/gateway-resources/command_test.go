@@ -224,7 +224,7 @@ func TestRun(t *testing.T) {
 			existingGatewayClassConfig := &v1alpha1.GatewayClassConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			}
-			existingGatewayClass := &gwv1beta1.GatewayClass{
+			existingGatewayClass := &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			}
 

@@ -57,7 +57,7 @@ func (t ResourceTranslator) Namespace(namespace string) string {
 }
 
 // ToAPIGateway translates a kuberenetes API gateway into a Consul APIGateway Config Entry.
-func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) *api.APIGatewayConfigEntry {
+func (t ResourceTranslator) ToAPIGateway(gateway gwv1.Gateway, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) *api.APIGatewayConfigEntry {
 	namespace := t.Namespace(gateway.Namespace)
 
 	listeners := ConvertSliceFuncIf(gateway.Spec.Listeners, func(listener gwv1beta1.Listener) (api.APIGatewayListener, bool) {
@@ -83,7 +83,7 @@ var listenerProtocolMap = map[string]string{
 	"tcp":   "tcp",
 }
 
-func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) (api.APIGatewayListener, bool) {
+func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1.Gateway, listener gwv1beta1.Listener, resources *ResourceMap, gwcc *v1alpha1.GatewayClassConfig) (api.APIGatewayListener, bool) {
 	namespace := gateway.Namespace
 
 	var certificates []api.ResourceReference
@@ -244,7 +244,7 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1.HTTPRoute, resources *Resourc
 	hostnames := StringLikeSlice(route.Spec.Hostnames)
 	rules := ConvertSliceFuncIf(
 		route.Spec.Rules,
-		func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
+		func(rule gwv1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
 			return t.translateHTTPRouteRule(route, rule, resources)
 		})
 
@@ -341,7 +341,7 @@ var queryMatchTypeTranslation = map[gwv1beta1.QueryParamMatchType]api.HTTPQueryM
 	gwv1.QueryParamMatchRegularExpression: api.HTTPQueryMatchRegularExpression,
 }
 
-func (t ResourceTranslator) translateHTTPMatch(match gwv1beta1.HTTPRouteMatch) api.HTTPMatch {
+func (t ResourceTranslator) translateHTTPMatch(match gwv1.HTTPRouteMatch) api.HTTPMatch {
 	headers := ConvertSliceFunc(match.Headers, t.translateHTTPHeaderMatch)
 	queries := ConvertSliceFunc(match.QueryParams, t.translateHTTPQueryMatch)
 
@@ -376,7 +376,7 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 	}
 }
 
-func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters) {
+func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters) {
 	var (
 		urlRewrite            *api.URLRewrite
 		retryFilter           *api.RetryFilter
@@ -437,7 +437,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		// we drop any path rewrites that are not prefix matches as we don't support those
 		if filter.URLRewrite != nil &&
 			filter.URLRewrite.Path != nil &&
-			filter.URLRewrite.Path.Type == gwv1beta1.PrefixMatchHTTPPathModifier {
+			filter.URLRewrite.Path.Type == gwv1.PrefixMatchHTTPPathModifier {
 			urlRewrite = &api.URLRewrite{Path: DerefStringOr(filter.URLRewrite.Path.ReplacePrefixMatch, "")}
 		}
 

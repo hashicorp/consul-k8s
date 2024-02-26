@@ -213,15 +213,15 @@ func TestValidateGateway(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		object   gwv1beta1.Gateway
+		object   gwv1.Gateway
 		expected error
 	}{
 		"valid": {
-			object:   gwv1beta1.Gateway{},
+			object:   gwv1.Gateway{},
 			expected: nil,
 		},
 		"invalid": {
-			object: gwv1beta1.Gateway{Spec: gwv1beta1.GatewaySpec{Addresses: []gwv1beta1.GatewayAddress{
+			object: gwv1.Gateway{Spec: gwv1.GatewaySpec{Addresses: []gwv1.GatewayAddress{
 				{Value: "1"},
 			}}},
 			expected: errGatewayUnsupportedAddress,
@@ -342,23 +342,23 @@ func TestValidateTLS(t *testing.T) {
 	_, secret := generateTestCertificate(t, "", "")
 
 	for name, tt := range map[string]struct {
-		gateway                 gwv1beta1.Gateway
+		gateway                 gwv1.Gateway
 		grants                  []gwv1beta1.ReferenceGrant
-		tls                     *gwv1beta1.GatewayTLSConfig
+		tls                     *gwv1.GatewayTLSConfig
 		certificates            []corev1.Secret
 		expectedResolvedRefsErr error
 		expectedAcceptedErr     error
 	}{
 		"no tls": {
-			gateway:                 gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:                 gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			tls:                     nil,
 			certificates:            nil,
 			expectedResolvedRefsErr: nil,
 			expectedAcceptedErr:     nil,
 		},
 		"not supported certificate": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{
 					{Name: "foo", Namespace: common.PointerTo[gwv1beta1.Namespace]("other"), Group: common.PointerTo[gwv1beta1.Group]("test")},
 				},
@@ -372,8 +372,8 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"not allowed certificate": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{
 					{Name: "foo", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
 				},
@@ -397,8 +397,8 @@ func TestValidateTLS(t *testing.T) {
 					},
 				}},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{
 					{Name: "zoiks", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
 				},
@@ -422,8 +422,8 @@ func TestValidateTLS(t *testing.T) {
 					},
 				}},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{
 					{Name: "foo", Namespace: common.PointerTo[gwv1beta1.Namespace]("foo")},
 				},
@@ -437,8 +437,8 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"passthrough mode": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				Mode: common.PointerTo(gwv1beta1.TLSModePassthrough),
 			},
 			certificates:            nil,
@@ -472,8 +472,8 @@ func TestValidateTLS(t *testing.T) {
 					},
 				}},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{
 					{Name: "foo", Namespace: common.PointerTo[gwv1beta1.Namespace]("1")},
 					{Name: "bar", Namespace: common.PointerTo[gwv1beta1.Namespace]("2")},
@@ -489,8 +489,8 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"valid same namespace": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{
 					{Name: "foo"},
 					{Name: "bar"},
@@ -506,15 +506,15 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"valid empty certs": {
-			gateway:                 gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls:                     &gwv1beta1.GatewayTLSConfig{},
+			gateway:                 gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls:                     &gwv1.GatewayTLSConfig{},
 			certificates:            nil,
 			expectedResolvedRefsErr: nil,
 			expectedAcceptedErr:     nil,
 		},
 		"invalid cipher suite": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
 					common.TLSCipherSuitesAnnotationKey: "invalid",
 				},
@@ -523,8 +523,8 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr: errListenerUnsupportedTLSCipherSuite,
 		},
 		"cipher suite not configurable": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
 					common.TLSMinVersionAnnotationKey:   "TLSv1_3",
 					common.TLSCipherSuitesAnnotationKey: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
@@ -534,8 +534,8 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr: errListenerTLSCipherSuiteNotConfigurable,
 		},
 		"invalid max version": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
 					common.TLSMaxVersionAnnotationKey: "invalid",
 				},
@@ -544,8 +544,8 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr: errListenerUnsupportedTLSMaxVersion,
 		},
 		"invalid min version": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.GatewayTLSConfig{
 				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
 					common.TLSMinVersionAnnotationKey: "invalid",
 				},
@@ -577,14 +577,14 @@ func TestValidateListeners(t *testing.T) {
 		expectedAcceptedErr         error
 		listenerIndexToTest         int
 		mapPrivilegedContainerPorts int32
-		gateway                     gwv1beta1.Gateway
+		gateway                     gwv1.Gateway
 		resources                   resourceMapResources
 	}{
 		"valid protocol HTTP": {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.HTTPProtocolType},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: nil,
 		},
@@ -592,7 +592,7 @@ func TestValidateListeners(t *testing.T) {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.HTTPSProtocolType},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: nil,
 		},
@@ -600,7 +600,7 @@ func TestValidateListeners(t *testing.T) {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.TCPProtocolType},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: nil,
 		},
@@ -608,7 +608,7 @@ func TestValidateListeners(t *testing.T) {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.UDPProtocolType},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: errListenerUnsupportedProtocol,
 		},
@@ -616,7 +616,7 @@ func TestValidateListeners(t *testing.T) {
 			listeners: []gwv1beta1.Listener{
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 20000},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: errListenerPortUnavailable,
 		},
@@ -625,7 +625,7 @@ func TestValidateListeners(t *testing.T) {
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: errListenerPortUnavailable,
 			listenerIndexToTest: 1,
@@ -635,7 +635,7 @@ func TestValidateListeners(t *testing.T) {
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
 				{Protocol: gwv1beta1.TCPProtocolType, Port: 2080},
 			},
-			gateway:                     gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:                     gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			expectedAcceptedErr:         errListenerMappedToPrivilegedPortMapping,
 			resources:                   resourceMapResources{},
 			listenerIndexToTest:         1,
@@ -645,7 +645,7 @@ func TestValidateListeners(t *testing.T) {
 			listeners: []gwv1beta1.Listener{
 				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources: resourceMapResources{
 				jwtProviders: []*v1alpha1.JWTProvider{
 					{
@@ -687,7 +687,7 @@ func TestValidateListeners(t *testing.T) {
 			listeners: []gwv1beta1.Listener{
 				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources: resourceMapResources{
 				jwtProviders: []*v1alpha1.JWTProvider{
 					{
@@ -729,7 +729,7 @@ func TestValidateListeners(t *testing.T) {
 			listeners: []gwv1beta1.Listener{
 				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources: resourceMapResources{
 				jwtProviders: []*v1alpha1.JWTProvider{
 					{
@@ -771,7 +771,7 @@ func TestValidateListeners(t *testing.T) {
 			listeners: []gwv1beta1.Listener{
 				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources: resourceMapResources{
 				jwtProviders: []*v1alpha1.JWTProvider{
 					{
@@ -1049,17 +1049,17 @@ func TestRouteKindIsAllowedForListener(t *testing.T) {
 
 func TestValidateGatewayPolicies(t *testing.T) {
 	for name, tc := range map[string]struct {
-		gateway   gwv1beta1.Gateway
+		gateway   gwv1.Gateway
 		policies  []v1alpha1.GatewayPolicy
 		resources *common.ResourceMap
 		expected  gatewayPolicyValidationResults
 	}{
 		"happy path, everything exists": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "l1",
@@ -1130,11 +1130,11 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references a gateway that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "l1",
@@ -1185,11 +1185,11 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references a JWT provider in the override section that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "l1",
@@ -1240,11 +1240,11 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references a JWT provider in the default section that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "l1",
@@ -1295,11 +1295,11 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references the same JWT provider in the both override and default section that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "l1",
@@ -1359,11 +1359,11 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references different JWT providers in the both override and default section that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "l1",
@@ -1423,11 +1423,11 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"everything is wrong: listener does not exist and override and default both reference different missing jwt providers": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "l1",

@@ -63,7 +63,7 @@ func (k *KubernetesUpdates) Operations() []client.Object {
 }
 
 type ReferenceValidator interface {
-	GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool
+	GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool
 	HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool
 	TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool
 }
@@ -462,7 +462,7 @@ func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.Gat
 	return value, exists
 }
 
-func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
+func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
 	key := api.ResourceReference{
 		Name:        gateway.Name,
 		Kind:        gateway.Kind,
@@ -708,7 +708,7 @@ func (s *ResourceMap) toConsulReference(kind string, key types.NamespacedName) a
 	}
 }
 
-func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, ref gwv1beta1.SecretObjectReference) bool {
+func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1.Gateway, ref gwv1beta1.SecretObjectReference) bool {
 	return s.referenceValidator.GatewayCanReferenceSecret(gateway, ref)
 }
 

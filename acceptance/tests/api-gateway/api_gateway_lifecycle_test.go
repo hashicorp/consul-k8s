@@ -74,7 +74,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all gateway classes")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{})
+		k8sClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{})
 	})
 
 	controlledGatewayClassTwoName := "controlled-gateway-class-two"
@@ -116,7 +116,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all gateways")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.Gateway{}, client.InNamespace(defaultNamespace))
+		k8sClient.DeleteAllOf(context.Background(), &gwv1.Gateway{}, client.InNamespace(defaultNamespace))
 	})
 
 	controlledGatewayTwoName := "controlled-gateway-two"
@@ -134,7 +134,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all http routes")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.HTTPRoute{}, client.InNamespace(defaultNamespace))
+		k8sClient.DeleteAllOf(context.Background(), &gwv1.HTTPRoute{}, client.InNamespace(defaultNamespace))
 	})
 
 	routeTwoName := "route-two"
@@ -152,7 +152,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// update the route to point to the other controlled gateway
 	logger.Log(t, "updating route one to be bound to gateway two")
-	updateKubernetes(t, k8sClient, routeOne, func(r *gwv1beta1.HTTPRoute) {
+	updateKubernetes(t, k8sClient, routeOne, func(r *gwv1.HTTPRoute) {
 		r.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(controlledGatewayTwoName)
 	})
 
@@ -175,7 +175,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// update the route to point to the uncontrolled gateway
 	logger.Log(t, "updating route two to be bound to an uncontrolled gateway")
-	updateKubernetes(t, k8sClient, routeTwo, func(r *gwv1beta1.HTTPRoute) {
+	updateKubernetes(t, k8sClient, routeTwo, func(r *gwv1.HTTPRoute) {
 		r.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(uncontrolledGatewayName)
 	})
 
@@ -190,14 +190,14 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// swap the gateway's protocol and see the route unbind
 	logger.Log(t, "marking gateway two as using TCP")
-	updateKubernetes(t, k8sClient, controlledGatewayTwo, func(g *gwv1beta1.Gateway) {
+	updateKubernetes(t, k8sClient, controlledGatewayTwo, func(g *gwv1.Gateway) {
 		g.Spec.Listeners[0].Protocol = gwv1beta1.TCPProtocolType
 	})
 
 	// check that the route is unbound and all Consul objects and Kubernetes statuses are cleaned up
 	logger.Log(t, "checking that http route one is not bound to gateway two")
 	retryCheck(t, 60, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
+		var route gwv1.HTTPRoute
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeOneName, Namespace: defaultNamespace}, &route)
 		require.NoError(r, err)
 
@@ -228,7 +228,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// reset route one to point to our first gateway and check that it's bound properly
 	logger.Log(t, "remarking route one as bound to gateway one")
-	updateKubernetes(t, k8sClient, routeOne, func(r *gwv1beta1.HTTPRoute) {
+	updateKubernetes(t, k8sClient, routeOne, func(r *gwv1.HTTPRoute) {
 		r.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(controlledGatewayOneName)
 	})
 
@@ -240,14 +240,14 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// make the gateway uncontrolled by pointing to a non-existent gateway class
 	logger.Log(t, "marking gateway one as not controlled by our controller")
-	updateKubernetes(t, k8sClient, controlledGatewayOne, func(g *gwv1beta1.Gateway) {
+	updateKubernetes(t, k8sClient, controlledGatewayOne, func(g *gwv1.Gateway) {
 		g.Spec.GatewayClassName = "non-existent"
 	})
 
 	// check that the Kubernetes gateway is cleaned up
 	logger.Log(t, "checking that gateway one is cleaned up in Kubernetes")
 	retryCheck(t, 60, func(r *retry.R) {
-		var route gwv1beta1.Gateway
+		var route gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &route)
 		require.NoError(r, err)
 
@@ -269,7 +269,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// reset the gateway
 	logger.Log(t, "remarking gateway one as controlled by our controller")
-	updateKubernetes(t, k8sClient, controlledGatewayOne, func(g *gwv1beta1.Gateway) {
+	updateKubernetes(t, k8sClient, controlledGatewayOne, func(g *gwv1.Gateway) {
 		g.Spec.GatewayClassName = gwv1beta1.ObjectName(controlledGatewayClassOneName)
 	})
 
@@ -332,7 +332,7 @@ func checkEmptyRoute(t *testing.T, client client.Client, name, namespace string)
 	t.Helper()
 
 	retryCheck(t, 60, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
+		var route gwv1.HTTPRoute
 		err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &route)
 		require.NoError(r, err)
 
@@ -345,7 +345,7 @@ func checkRouteBound(t *testing.T, client client.Client, name, namespace, parent
 	t.Helper()
 
 	retryCheck(t, 60, func(r *retry.R) {
-		var route gwv1beta1.HTTPRoute
+		var route gwv1.HTTPRoute
 		err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &route)
 		require.NoError(r, err)
 
@@ -368,21 +368,21 @@ func updateKubernetes[T client.Object](t *testing.T, k8sClient client.Client, o 
 	require.NoError(t, err)
 }
 
-func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1beta1.HTTPRoute {
+func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1.HTTPRoute {
 	t.Helper()
 
-	route := &gwv1beta1.HTTPRoute{
+	route := &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: gwv1beta1.HTTPRouteSpec{
+		Spec: gwv1.HTTPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 				ParentRefs: []gwv1beta1.ParentReference{
 					{Name: gwv1beta1.ObjectName(parent)},
 				},
 			},
-			Rules: []gwv1beta1.HTTPRouteRule{
+			Rules: []gwv1.HTTPRouteRule{
 				{BackendRefs: []gwv1beta1.HTTPBackendRef{
 					{BackendRef: gwv1beta1.BackendRef{
 						BackendObjectReference: gwv1beta1.BackendObjectReference{Name: gwv1beta1.ObjectName(target)},
@@ -397,21 +397,21 @@ func createRoute(t *testing.T, client client.Client, name, namespace, parent, ta
 	return route
 }
 
-func createGateway(t *testing.T, client client.Client, name, namespace, gatewayClass, certificate string) *gwv1beta1.Gateway {
+func createGateway(t *testing.T, client client.Client, name, namespace, gatewayClass, certificate string) *gwv1.Gateway {
 	t.Helper()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: gwv1beta1.GatewaySpec{
+		Spec: gwv1.GatewaySpec{
 			GatewayClassName: gwv1beta1.ObjectName(gatewayClass),
 			Listeners: []gwv1beta1.Listener{{
 				Name:     gwv1beta1.SectionName("listener"),
 				Protocol: gwv1beta1.HTTPSProtocolType,
 				Port:     8443,
-				TLS: &gwv1beta1.GatewayTLSConfig{
+				TLS: &gwv1.GatewayTLSConfig{
 					CertificateRefs: []gwv1beta1.SecretObjectReference{{
 						Name: gwv1beta1.ObjectName(certificate),
 					}},
@@ -429,12 +429,12 @@ func createGateway(t *testing.T, client client.Client, name, namespace, gatewayC
 func createGatewayClass(t *testing.T, client client.Client, name, controllerName string, parameters *gwv1beta1.ParametersReference) {
 	t.Helper()
 
-	gatewayClass := &gwv1beta1.GatewayClass{
+	gatewayClass := &gwv1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: gwv1beta1.GatewayController(controllerName),
+		Spec: gwv1.GatewayClassSpec{
+			ControllerName: gwv1.GatewayController(controllerName),
 			ParametersRef:  parameters,
 		},
 	}

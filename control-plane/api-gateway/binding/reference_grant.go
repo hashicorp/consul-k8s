@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -32,7 +33,7 @@ func NewReferenceValidator(grants []gwv1beta1.ReferenceGrant) common.ReferenceVa
 	}
 }
 
-func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
+func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
 	fromNS := gateway.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: gateway.GroupVersionKind().Group,
@@ -46,7 +47,7 @@ func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gatewa
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(secretRef.Name))
 }
 
-func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
+func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
 	fromNS := httproute.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: httproute.GroupVersionKind().Group,

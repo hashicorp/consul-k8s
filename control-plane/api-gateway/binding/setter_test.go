@@ -25,8 +25,8 @@ func TestSetter(t *testing.T) {
 		Reason:  "Accepted",
 		Message: "route accepted",
 	}
-	route := &gwv1beta1.HTTPRoute{
-		Spec: gwv1beta1.HTTPRouteSpec{
+	route := &gwv1.HTTPRoute{
+		Spec: gwv1.HTTPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 				ParentRefs: []gwv1beta1.ParentReference{parentRef},
 			},

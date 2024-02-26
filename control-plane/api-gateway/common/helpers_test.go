@@ -116,17 +116,17 @@ func TestEnsureFinalizer(t *testing.T) {
 		finalizers []string
 	}{
 		"gateway no finalizer": {
-			object:     &gwv1beta1.Gateway{},
+			object:     &gwv1.Gateway{},
 			expected:   true,
 			finalizers: []string{GatewayFinalizer},
 		},
 		"gateway other finalizer": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other"}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other"}}},
 			expected:   true,
 			finalizers: []string{"other", GatewayFinalizer},
 		},
 		"gateway already has finalizer": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{GatewayFinalizer}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{GatewayFinalizer}}},
 			expected:   false,
 			finalizers: []string{GatewayFinalizer},
 		},
@@ -147,22 +147,22 @@ func TestRemoveFinalizer(t *testing.T) {
 		finalizers []string
 	}{
 		"gateway no finalizer": {
-			object:     &gwv1beta1.Gateway{},
+			object:     &gwv1.Gateway{},
 			expected:   false,
 			finalizers: []string{},
 		},
 		"gateway other finalizer": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other"}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other"}}},
 			expected:   false,
 			finalizers: []string{"other"},
 		},
 		"gateway multiple finalizers": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{GatewayFinalizer, GatewayFinalizer}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{GatewayFinalizer, GatewayFinalizer}}},
 			expected:   true,
 			finalizers: []string{},
 		},
 		"gateway mixed finalizers": {
-			object:     &gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other", GatewayFinalizer}}},
+			object:     &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"other", GatewayFinalizer}}},
 			expected:   true,
 			finalizers: []string{"other"},
 		},

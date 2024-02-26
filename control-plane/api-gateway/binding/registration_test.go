@@ -17,19 +17,19 @@ func TestRegistrationsForPods_Health(t *testing.T) {
 
 	for name, tt := range map[string]struct {
 		consulNamespace string
-		gateway         gwv1beta1.Gateway
+		gateway         gwv1.Gateway
 		pods            []corev1.Pod
 		expected        []string
 	}{
 		"empty": {
 			consulNamespace: "",
-			gateway:         gwv1beta1.Gateway{},
+			gateway:         gwv1.Gateway{},
 			pods:            []corev1.Pod{},
 			expected:        []string{},
 		},
 		"mix": {
 			consulNamespace: "",
-			gateway:         gwv1beta1.Gateway{},
+			gateway:         gwv1.Gateway{},
 			pods: []corev1.Pod{
 				// Pods without a running status
 				{Status: corev1.PodStatus{Phase: corev1.PodFailed}},

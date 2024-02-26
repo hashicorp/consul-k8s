@@ -6,11 +6,12 @@ package binding
 import (
 	"fmt"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -24,7 +25,7 @@ const (
 	consulKubernetesCheckName = "Kubernetes Readiness Check"
 )
 
-func registrationsForPods(namespace string, gateway gwv1beta1.Gateway, pods []corev1.Pod) []api.CatalogRegistration {
+func registrationsForPods(namespace string, gateway gwv1.Gateway, pods []corev1.Pod) []api.CatalogRegistration {
 	registrations := []api.CatalogRegistration{}
 	for _, pod := range pods {
 		registrations = append(registrations, registrationForPod(namespace, gateway, pod))
@@ -32,7 +33,7 @@ func registrationsForPods(namespace string, gateway gwv1beta1.Gateway, pods []co
 	return registrations
 }
 
-func registrationForPod(namespace string, gateway gwv1beta1.Gateway, pod corev1.Pod) api.CatalogRegistration {
+func registrationForPod(namespace string, gateway gwv1.Gateway, pod corev1.Pod) api.CatalogRegistration {
 	healthStatus := api.HealthCritical
 	if isPodReady(pod) {
 		healthStatus = api.HealthPassing

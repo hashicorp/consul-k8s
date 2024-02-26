@@ -37,11 +37,11 @@ import (
 
 type fakeReferenceValidator struct{}
 
-func (v fakeReferenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
+func (v fakeReferenceValidator) GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
 	return true
 }
 
-func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
+func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
 	return true
 }
 
@@ -208,7 +208,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			input := gwv1beta1.Gateway{
+			input := gwv1.Gateway{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "Gateway",
 				},
@@ -217,14 +217,14 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 					Namespace:   k8sNamespace,
 					Annotations: tc.annotations,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     gwv1beta1.SectionName(listenerOneName),
 							Hostname: PointerTo(gwv1beta1.Hostname(listenerOneHostname)),
 							Port:     gwv1beta1.PortNumber(listenerOnePort),
 							Protocol: gwv1beta1.ProtocolType(listenerOneProtocol),
-							TLS: &gwv1beta1.GatewayTLSConfig{
+							TLS: &gwv1.GatewayTLSConfig{
 								CertificateRefs: tc.listenerOneK8sCertRefs,
 								Options:         tc.listenerOneTLSOptions,
 							},
@@ -234,7 +234,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 							Hostname: PointerTo(gwv1beta1.Hostname(listenerTwoHostname)),
 							Port:     gwv1beta1.PortNumber(listenerTwoPort),
 							Protocol: gwv1beta1.ProtocolType(listenerTwoProtocol),
-							TLS: &gwv1beta1.GatewayTLSConfig{
+							TLS: &gwv1.GatewayTLSConfig{
 								CertificateRefs: []gwv1beta1.SecretObjectReference{
 									{
 										Name:      gwv1beta1.ObjectName(listenerTwoCertName),
@@ -245,13 +245,13 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 						},
 					},
 				},
-				Status: gwv1beta1.GatewayStatus{
+				Status: gwv1.GatewayStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:               string(gwv1beta1.GatewayConditionAccepted),
+							Type:               string(gwv1.GatewayConditionAccepted),
 							Status:             metav1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: gwLastTransmissionTime},
-							Reason:             string(gwv1beta1.GatewayReasonAccepted),
+							Reason:             string(gwv1.GatewayReasonAccepted),
 							Message:            "I'm accepted",
 						},
 					},
@@ -261,10 +261,10 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 							AttachedRoutes: 5,
 							Conditions: []metav1.Condition{
 								{
-									Type:               string(gwv1beta1.GatewayConditionReady),
+									Type:               string(gwv1.GatewayConditionReady),
 									Status:             metav1.ConditionTrue,
 									LastTransitionTime: metav1.Time{Time: listenerOneLastTransmissionTime},
-									Reason:             string(gwv1beta1.GatewayConditionReady),
+									Reason:             string(gwv1.GatewayConditionReady),
 									Message:            "I'm ready",
 								},
 							},
@@ -275,10 +275,10 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 							AttachedRoutes: 3,
 							Conditions: []metav1.Condition{
 								{
-									Type:               string(gwv1beta1.GatewayConditionReady),
+									Type:               string(gwv1.GatewayConditionReady),
 									Status:             metav1.ConditionTrue,
 									LastTransitionTime: metav1.Time{Time: listenerTwoLastTransmissionTime},
-									Reason:             string(gwv1beta1.GatewayConditionReady),
+									Reason:             string(gwv1.GatewayConditionReady),
 									Message:            "I'm also ready",
 								},
 							},
@@ -358,7 +358,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 func TestTranslator_ToHTTPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		k8sHTTPRoute    gwv1beta1.HTTPRoute
+		k8sHTTPRoute    gwv1.HTTPRoute
 		services        []types.NamespacedName
 		meshServices    []v1alpha1.MeshService
 		externalFilters []client.Object
@@ -370,13 +370,13 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 	}{
 		"base test": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "k8s-http-route",
 						Namespace:   "k8s-ns",
 						Annotations: map[string]string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{
 								{
@@ -391,9 +391,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
 											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
@@ -416,7 +416,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Method: PointerTo(gwv1beta1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
 										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 											Set: []gwv1beta1.HTTPHeader{
@@ -454,7 +454,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
 												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 													Set: []gwv1beta1.HTTPHeader{
@@ -577,12 +577,12 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 		},
 		"dropping path rewrites that are not prefix match": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "k8s-http-route",
 						Namespace: "k8s-ns",
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{
 								{
@@ -597,9 +597,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
 											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
@@ -622,7 +622,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Method: PointerTo(gwv1beta1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
 										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 											Set: []gwv1beta1.HTTPHeader{
@@ -661,7 +661,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
 												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 													Set: []gwv1beta1.HTTPHeader{
@@ -787,13 +787,13 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 		},
 		"parent ref that is not registered with consul is dropped": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "k8s-http-route",
 						Namespace:   "k8s-ns",
 						Annotations: map[string]string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{
 								{
@@ -815,9 +815,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
 											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
@@ -840,7 +840,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Method: PointerTo(gwv1beta1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
 										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 											Set: []gwv1beta1.HTTPHeader{
@@ -878,7 +878,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
 												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 													Set: []gwv1beta1.HTTPHeader{
@@ -1005,13 +1005,13 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 		},
 		"when section name on apigw is not supplied": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "k8s-http-route",
 						Namespace:   "k8s-ns",
 						Annotations: map[string]string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{
 								{
@@ -1025,9 +1025,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
 											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
@@ -1050,7 +1050,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Method: PointerTo(gwv1beta1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
 										RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 											Set: []gwv1beta1.HTTPHeader{
@@ -1107,7 +1107,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
 												RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 													Set: []gwv1beta1.HTTPHeader{
@@ -1246,13 +1246,13 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 		},
 		"test with external filters": {
 			args: args{
-				k8sHTTPRoute: gwv1beta1.HTTPRoute{
+				k8sHTTPRoute: gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "k8s-http-route",
 						Namespace:   "k8s-ns",
 						Annotations: map[string]string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{
 								{
@@ -1267,9 +1267,9 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							"host-name.example.com",
 							"consul.io",
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Matches: []gwv1beta1.HTTPRouteMatch{
+								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
 											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
@@ -1292,7 +1292,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										Method: PointerTo(gwv1beta1.HTTPMethodGet),
 									},
 								},
-								Filters: []gwv1beta1.HTTPRouteFilter{
+								Filters: []gwv1.HTTPRouteFilter{
 									{
 										ExtensionRef: &gwv1beta1.LocalObjectReference{
 											Name:  "test",
@@ -1324,7 +1324,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 											},
 											Weight: PointerTo(int32(45)),
 										},
-										Filters: []gwv1beta1.HTTPRouteFilter{
+										Filters: []gwv1.HTTPRouteFilter{
 											{
 												ExtensionRef: &gwv1beta1.LocalObjectReference{
 													Name:  "test",
@@ -1708,7 +1708,7 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 		Datacenter             string
 	}
 	type args struct {
-		filters []gwv1beta1.HTTPRouteFilter
+		filters []gwv1.HTTPRouteFilter
 	}
 	tests := []struct {
 		name                string
@@ -1721,7 +1721,7 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 			name:   "no httproutemodifier set",
 			fields: fields{},
 			args: args{
-				filters: []gwv1beta1.HTTPRouteFilter{
+				filters: []gwv1.HTTPRouteFilter{
 					{
 						URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{},
 					},
@@ -1760,7 +1760,7 @@ func newSectionNamePtr(s string) *gwv1beta1.SectionName {
 
 func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 	type args struct {
-		gateway  gwv1beta1.Gateway
+		gateway  gwv1.Gateway
 		listener gwv1beta1.Listener
 		gwcc     *v1alpha1.GatewayClassConfig
 	}
@@ -1814,7 +1814,7 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 				},
 			},
 			args: args{
-				gateway: gwv1beta1.Gateway{
+				gateway: gwv1.Gateway{
 					TypeMeta: metav1.TypeMeta{
 						Kind: KindGateway,
 					},
@@ -1822,7 +1822,7 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 						Name:      "test",
 						Namespace: "test",
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						Listeners: []gwv1beta1.Listener{
 							{
 								Name:     "test-listener",

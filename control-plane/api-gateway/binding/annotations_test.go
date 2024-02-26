@@ -22,7 +22,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		gw   *gwv1beta1.Gateway
+		gw   *gwv1.Gateway
 		gwcc *v1alpha1.GatewayClassConfig
 	}
 	tests := []struct {
@@ -33,12 +33,12 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 		{
 			name: "when gateway has not been annotated yet and annotations are nil",
 			args: args{
-				gw: &gwv1beta1.Gateway{
+				gw: &gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-gw",
 					},
-					Spec:   gwv1beta1.GatewaySpec{},
-					Status: gwv1beta1.GatewayStatus{},
+					Spec:   gwv1.GatewaySpec{},
+					Status: gwv1.GatewayStatus{},
 				},
 				gwcc: &v1alpha1.GatewayClassConfig{
 					TypeMeta: metav1.TypeMeta{},
@@ -70,13 +70,13 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 		{
 			name: "when gateway has not been annotated yet but annotations are empty",
 			args: args{
-				gw: &gwv1beta1.Gateway{
+				gw: &gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "my-gw",
 						Annotations: make(map[string]string),
 					},
-					Spec:   gwv1beta1.GatewaySpec{},
-					Status: gwv1beta1.GatewayStatus{},
+					Spec:   gwv1.GatewaySpec{},
+					Status: gwv1.GatewayStatus{},
 				},
 				gwcc: &v1alpha1.GatewayClassConfig{
 					TypeMeta: metav1.TypeMeta{},
@@ -108,15 +108,15 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 		{
 			name: "when gateway has been annotated",
 			args: args{
-				gw: &gwv1beta1.Gateway{
+				gw: &gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-gw",
 						Annotations: map[string]string{
 							common.AnnotationGatewayClassConfig: `{"serviceType":"serviceType","nodeSelector":{"selector":"of node"},"tolerations":[{"key":"key","operator":"op","value":"120","effect":"to the moon","tolerationSeconds":0}],"copyAnnotations":{"service":["service"]}}`,
 						},
 					},
-					Spec:   gwv1beta1.GatewaySpec{},
-					Status: gwv1beta1.GatewayStatus{},
+					Spec:   gwv1.GatewaySpec{},
+					Status: gwv1.GatewayStatus{},
 				},
 				gwcc: &v1alpha1.GatewayClassConfig{
 					TypeMeta: metav1.TypeMeta{},
@@ -148,7 +148,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 		{
 			name: "when gateway has been annotated but the serialization was invalid",
 			args: args{
-				gw: &gwv1beta1.Gateway{
+				gw: &gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-gw",
 						Annotations: map[string]string{
@@ -156,8 +156,8 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 							common.AnnotationGatewayClassConfig: `"serviceType":"serviceType","nodeSelector":{"selector":"of node"},"tolerations":[{"key":"key","operator":"op","value":"120","effect":"to the moon","tolerationSeconds":0}],"copyAnnotations":{"service":["service"]}}`,
 						},
 					},
-					Spec:   gwv1beta1.GatewaySpec{},
-					Status: gwv1beta1.GatewayStatus{},
+					Spec:   gwv1.GatewaySpec{},
+					Status: gwv1.GatewayStatus{},
 				},
 				gwcc: &v1alpha1.GatewayClassConfig{
 					TypeMeta: metav1.TypeMeta{},

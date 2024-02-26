@@ -30,12 +30,12 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 	}{
 		"valid - no other policy targets listener": {
 			existingResources: []runtime.Object{
-				&gwv1beta1.Gateway{
+				&gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-gateway",
 						Namespace: "default",
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						Listeners: []gwv1beta1.Listener{
 							{
 								Name: "l1",
@@ -62,12 +62,12 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 		},
 		"valid - existing policy targets different gateway": {
 			existingResources: []runtime.Object{
-				&gwv1beta1.Gateway{
+				&gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-gateway",
 						Namespace: "default",
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: "",
 						Listeners: []gwv1beta1.Listener{
 							{
@@ -110,12 +110,12 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 
 		"valid - existing policy targets different listener on the same gateway": {
 			existingResources: []runtime.Object{
-				&gwv1beta1.Gateway{
+				&gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "my-gateway",
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: "",
 						Listeners: []gwv1beta1.Listener{
 							{
@@ -160,12 +160,12 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 		},
 		"invalid - existing policy targets same listener on same gateway": {
 			existingResources: []runtime.Object{
-				&gwv1beta1.Gateway{
+				&gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-gateway",
 						Namespace: "default",
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: "",
 						Listeners: []gwv1beta1.Listener{
 							{
@@ -220,7 +220,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &GatewayPolicy{}, &GatewayPolicyList{})
-			s.AddKnownTypes(gwv1beta1.SchemeGroupVersion, &gwv1beta1.Gateway{})
+			s.AddKnownTypes(gwv1beta1.SchemeGroupVersion, &gwv1.Gateway{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.existingResources...).WithIndex(&GatewayPolicy{}, Gatewaypolicy_GatewayIndex, gatewayForGatewayPolicy).Build()
 
 			var list GatewayPolicyList

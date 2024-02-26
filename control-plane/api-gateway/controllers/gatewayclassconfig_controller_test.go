@@ -70,12 +70,12 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 						DeletionTimestamp: &deletionTimestamp,
 					},
 				}
-				gatewayClass := gwv1beta1.GatewayClass{
+				gatewayClass := gwv1.GatewayClass{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "consul-api-gateway-class",
 					},
-					Spec: gwv1beta1.GatewayClassSpec{
+					Spec: gwv1.GatewayClassSpec{
 						ParametersRef: &gwv1beta1.ParametersReference{
 							Group:     gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
 							Kind:      v1alpha1.GatewayClassConfigKind,
@@ -83,7 +83,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 							Namespace: nil,
 						},
 					},
-					Status: gwv1beta1.GatewayClassStatus{},
+					Status: gwv1.GatewayClassStatus{},
 				}
 				return []runtime.Object{&gatewayClassConfig, &gatewayClass}
 			},

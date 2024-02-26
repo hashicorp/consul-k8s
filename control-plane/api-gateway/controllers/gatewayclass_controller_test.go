@@ -42,7 +42,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 	deletionTimestamp := metav1.Now()
 
 	cases := map[string]struct {
-		gatewayClass       *gwv1beta1.GatewayClass
+		gatewayClass       *gwv1.GatewayClass
 		k8sObjects         []runtime.Object
 		expectedResult     ctrl.Result
 		expectedError      error
@@ -51,13 +51,13 @@ func TestGatewayClassReconciler(t *testing.T) {
 		expectedConditions []metav1.Condition
 	}{
 		"successful reconcile with no change": {
-			gatewayClass: &gwv1beta1.GatewayClass{
+			gatewayClass: &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  namespace,
 					Name:       name,
 					Finalizers: []string{gatewayClassFinalizer},
 				},
-				Spec: gwv1beta1.GatewayClassSpec{
+				Spec: gwv1.GatewayClassSpec{
 					ControllerName: common.GatewayClassControllerName,
 				},
 			},
@@ -75,13 +75,13 @@ func TestGatewayClassReconciler(t *testing.T) {
 			},
 		},
 		"successful reconcile that adds finalizer": {
-			gatewayClass: &gwv1beta1.GatewayClass{
+			gatewayClass: &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  namespace,
 					Name:       name,
 					Finalizers: []string{},
 				},
-				Spec: gwv1beta1.GatewayClassSpec{
+				Spec: gwv1.GatewayClassSpec{
 					ControllerName: common.GatewayClassControllerName,
 				},
 			},
@@ -91,13 +91,13 @@ func TestGatewayClassReconciler(t *testing.T) {
 			expectedConditions: []metav1.Condition{},
 		},
 		"attempt to reconcile a GatewayClass with a different controller name": {
-			gatewayClass: &gwv1beta1.GatewayClass{
+			gatewayClass: &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  namespace,
 					Name:       name,
 					Finalizers: []string{},
 				},
-				Spec: gwv1beta1.GatewayClassSpec{
+				Spec: gwv1.GatewayClassSpec{
 					ControllerName: "foo",
 				},
 			},
@@ -106,13 +106,13 @@ func TestGatewayClassReconciler(t *testing.T) {
 			expectedConditions: []metav1.Condition{},
 		},
 		"attempt to reconcile a GatewayClass with a different controller name removing our finalizer": {
-			gatewayClass: &gwv1beta1.GatewayClass{
+			gatewayClass: &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  namespace,
 					Name:       name,
 					Finalizers: []string{gatewayClassFinalizer},
 				},
-				Spec: gwv1beta1.GatewayClassSpec{
+				Spec: gwv1.GatewayClassSpec{
 					ControllerName: "foo",
 				},
 			},
@@ -121,13 +121,13 @@ func TestGatewayClassReconciler(t *testing.T) {
 			expectedConditions: []metav1.Condition{},
 		},
 		"attempt to reconcile a GatewayClass with an incorrect parametersRef type": {
-			gatewayClass: &gwv1beta1.GatewayClass{
+			gatewayClass: &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  namespace,
 					Name:       name,
 					Finalizers: []string{gatewayClassFinalizer},
 				},
-				Spec: gwv1beta1.GatewayClassSpec{
+				Spec: gwv1.GatewayClassSpec{
 					ControllerName: common.GatewayClassControllerName,
 					ParametersRef: &gwv1beta1.ParametersReference{
 						Kind: "some-nonsense",
@@ -147,13 +147,13 @@ func TestGatewayClassReconciler(t *testing.T) {
 			},
 		},
 		"attempt to reconcile a GatewayClass with a GatewayClassConfig that does not exist": {
-			gatewayClass: &gwv1beta1.GatewayClass{
+			gatewayClass: &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  namespace,
 					Name:       name,
 					Finalizers: []string{gatewayClassFinalizer},
 				},
-				Spec: gwv1beta1.GatewayClassSpec{
+				Spec: gwv1.GatewayClassSpec{
 					ControllerName: common.GatewayClassControllerName,
 					ParametersRef: &gwv1beta1.ParametersReference{
 						Kind: v1alpha1.GatewayClassConfigKind,
@@ -180,7 +180,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 			expectedConditions: []metav1.Condition{},
 		},
 		"attempt to remove a GatewayClass that is not in use": {
-			gatewayClass: &gwv1beta1.GatewayClass{
+			gatewayClass: &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
 					Name:      name,
@@ -189,7 +189,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 					},
 					DeletionTimestamp: &deletionTimestamp,
 				},
-				Spec: gwv1beta1.GatewayClassSpec{
+				Spec: gwv1.GatewayClassSpec{
 					ControllerName: common.GatewayClassControllerName,
 				},
 			},
@@ -199,7 +199,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 			expectedIsDeleted:  true,
 		},
 		"attempt to remove a GatewayClass that is in use": {
-			gatewayClass: &gwv1beta1.GatewayClass{
+			gatewayClass: &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
 					Name:      name,
@@ -208,17 +208,17 @@ func TestGatewayClassReconciler(t *testing.T) {
 					},
 					DeletionTimestamp: &deletionTimestamp,
 				},
-				Spec: gwv1beta1.GatewayClassSpec{
+				Spec: gwv1.GatewayClassSpec{
 					ControllerName: common.GatewayClassControllerName,
 				},
 			},
 			k8sObjects: []runtime.Object{
-				&gwv1beta1.Gateway{
+				&gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "test-gateway",
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: v1beta1.ObjectName(name),
 					},
 				},
@@ -256,7 +256,7 @@ func TestGatewayClassReconciler(t *testing.T) {
 			require.Equal(t, tc.expectedError, err)
 
 			// Check the GatewayClass after reconciliation.
-			gc := &gwv1beta1.GatewayClass{}
+			gc := &gwv1.GatewayClass{}
 			err = r.Client.Get(context.Background(), req.NamespacedName, gc)
 
 			if tc.gatewayClass == nil || tc.expectedIsDeleted {

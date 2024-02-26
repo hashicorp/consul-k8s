@@ -132,7 +132,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			retryCheck(t, 120, func(r *retry.R) {
-				var gateway gwv1beta1.Gateway
+				var gateway gwv1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
 
@@ -154,7 +154,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// route failure
 			retryCheck(t, 60, func(r *retry.R) {
-				var httproute gwv1beta1.HTTPRoute
+				var httproute gwv1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
 
@@ -176,7 +176,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// gateway updated with references allowed
 			retryCheck(t, 60, func(r *retry.R) {
-				var gateway gwv1beta1.Gateway
+				var gateway gwv1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
 
@@ -208,7 +208,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// route updated with gateway and services allowed
 			retryCheck(t, 30, func(r *retry.R) {
-				var httproute gwv1beta1.HTTPRoute
+				var httproute gwv1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
 
