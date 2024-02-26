@@ -34,6 +34,8 @@ binary {
       vulnerabilites = [
         # NET-8174 (2024-02-20): Chart YAML path traversal (not impacted)
         "GHSA-v53g-5gjp-272r", # alias CVE-2024-25620
+        # NET-8174 (2024-02-26): Missing YAML Content Leads To Panic (requires malicious plugin)
+        "GHSA-r53h-jv2g-vpx6", # alias CVE-2024-26147
       ]
     }
   }
