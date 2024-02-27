@@ -27,6 +27,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -386,14 +388,18 @@ func (c *Command) Run(args []string) int {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		LeaderElection:         true,
-		LeaderElectionID:       "consul-controller-lock",
-		Host:                   listenSplits[0],
-		Port:                   port,
-		Logger:                 zapLogger,
-		MetricsBindAddress:     "0.0.0.0:9444",
+		Scheme:           scheme,
+		LeaderElection:   true,
+		LeaderElectionID: "consul-controller-lock",
+		Logger:           zapLogger,
+		Metrics: metricsserver.Options{
+			BindAddress: "0.0.0.0:9444",
+		},
 		HealthProbeBindAddress: "0.0.0.0:9445",
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Host: listenSplits[0],
+			Port: port,
+		}),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
