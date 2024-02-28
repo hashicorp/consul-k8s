@@ -652,9 +652,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							r.Service = &rs
 							r.Service.ID = serviceID(r.Service.Service, endpointAddr)
 							r.Service.Address = address.Address
-							if region := node.Labels[corev1.LabelTopologyRegion]; region != "" {
-								r.Service.Meta[ConsulK8STopologyRegion] = region
-							}
 
 							t.consulMap[key] = append(t.consulMap[key], &r)
 							// Only consider the first address that matches. In some cases
@@ -739,6 +736,13 @@ func (t *ServiceResource) registerServiceInstance(
 			}
 		}
 		for _, endpoint := range endpointSlice.Endpoints {
+			// Used for adding node region label to an endpoint but only needs to called once
+			node, err := t.Client.CoreV1().Nodes().Get(t.Ctx, *endpoint.NodeName, metav1.GetOptions{})
+			if err != nil {
+				t.Log.Warn("error getting node info", "error", err)
+				continue
+			}
+
 			for _, endpointAddr := range endpoint.Addresses {
 
 				var addr string
@@ -787,6 +791,9 @@ func (t *ServiceResource) registerServiceInstance(
 				}
 				if endpoint.Zone != nil {
 					r.Service.Meta[ConsulK8STopologyZone] = *endpoint.Zone
+				}
+				if region := node.Labels[corev1.LabelTopologyRegion]; region != "" {
+					r.Service.Meta[ConsulK8STopologyRegion] = region
 				}
 
 				r.Check = &consulapi.AgentCheck{
