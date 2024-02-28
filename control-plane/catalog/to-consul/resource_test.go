@@ -761,7 +761,7 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 
 	node1, _ := createNodes(t, client)
 
-	// Insert the endpoint slices
+	// Insert the endpoint slice
 	_, err := client.DiscoveryV1().EndpointSlices(metav1.NamespaceDefault).Create(
 		context.Background(),
 		&discoveryv1.EndpointSlice{
@@ -794,8 +794,7 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 				},
 			},
 		},
-		metav1.CreateOptions{},
-	)
+		metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	// Insert an LB service
@@ -911,7 +910,6 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	node1, _ := createNodes(t, client)
 
 	// Insert the endpoint slice
-
 	_, err := client.DiscoveryV1().EndpointSlices(metav1.NamespaceDefault).Create(
 		context.Background(),
 		&discoveryv1.EndpointSlice{
@@ -944,9 +942,7 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 				},
 			},
 		},
-		metav1.CreateOptions{},
-	)
-
+		metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	// Insert the service
@@ -1156,7 +1152,7 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
@@ -1194,7 +1190,7 @@ func TestServiceResource_clusterIP_healthCheck(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
@@ -1232,7 +1228,7 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
@@ -1270,7 +1266,7 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
@@ -1308,7 +1304,7 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
@@ -1348,7 +1344,7 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
@@ -1385,7 +1381,7 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
@@ -1415,7 +1411,7 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	_, err := client.CoreV1().Services(testNamespace).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", testNamespace)
 
 	// Verify what we got
@@ -1456,7 +1452,7 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
@@ -1492,7 +1488,7 @@ func TestServiceResource_targetRefInMeta(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
+	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
@@ -2148,8 +2144,7 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 				},
 			},
 		},
-		metav1.CreateOptions{},
-	)
+		metav1.CreateOptions{})
 	require.NoError(t, err)
 }
 
