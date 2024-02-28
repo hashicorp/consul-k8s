@@ -1,0 +1,3 @@
+```release-note:improvement
+catalog: Topology Zone information is now read from the Kubernetes endpoints and added to registered consul services under Meta.
+```
