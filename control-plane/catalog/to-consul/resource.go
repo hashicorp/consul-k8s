@@ -845,7 +845,6 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-
 				return t.Service.Client.DiscoveryV1().
 					EndpointSlices(metav1.NamespaceAll).
 					List(t.Ctx, options)
@@ -857,7 +856,7 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 					Watch(t.Ctx, options)
 			},
 		},
-		&discoveryv1.EndpointSliceList{},
+		&discoveryv1.EndpointSlice{},
 		0,
 		cache.Indexers{},
 	)
