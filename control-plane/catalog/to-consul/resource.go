@@ -34,11 +34,12 @@ const (
 
 	// ConsulK8SNS is the key used in the meta to record the namespace
 	// of the service/node registration.
-	ConsulK8SNS           = "external-k8s-ns"
-	ConsulK8SRefKind      = "external-k8s-ref-kind"
-	ConsulK8SRefValue     = "external-k8s-ref-name"
-	ConsulK8SNodeName     = "external-k8s-node-name"
-	ConsulK8STopologyZone = "external-k8s-topology-zone"
+	ConsulK8SNS             = "external-k8s-ns"
+	ConsulK8SRefKind        = "external-k8s-ref-kind"
+	ConsulK8SRefValue       = "external-k8s-ref-name"
+	ConsulK8SNodeName       = "external-k8s-node-name"
+	ConsulK8STopologyRegion = "external-k8s-topology-region"
+	ConsulK8STopologyZone   = "external-k8s-topology-zone"
 
 	// consulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckType = "kubernetes-readiness"
@@ -651,6 +652,9 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							r.Service = &rs
 							r.Service.ID = serviceID(r.Service.Service, endpointAddr)
 							r.Service.Address = address.Address
+							if region := node.Labels[corev1.LabelTopologyRegion]; region != "" {
+								r.Service.Meta[ConsulK8STopologyRegion] = region
+							}
 
 							t.consulMap[key] = append(t.consulMap[key], &r)
 							// Only consider the first address that matches. In some cases
