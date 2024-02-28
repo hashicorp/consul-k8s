@@ -17,6 +17,7 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,10 +34,11 @@ const (
 
 	// ConsulK8SNS is the key used in the meta to record the namespace
 	// of the service/node registration.
-	ConsulK8SNS       = "external-k8s-ns"
-	ConsulK8SRefKind  = "external-k8s-ref-kind"
-	ConsulK8SRefValue = "external-k8s-ref-name"
-	ConsulK8SNodeName = "external-k8s-node-name"
+	ConsulK8SNS           = "external-k8s-ns"
+	ConsulK8SRefKind      = "external-k8s-ref-kind"
+	ConsulK8SRefValue     = "external-k8s-ref-name"
+	ConsulK8SNodeName     = "external-k8s-node-name"
+	ConsulK8STopologyZone = "external-k8s-topology-zone"
 
 	// consulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckType = "kubernetes-readiness"
@@ -143,9 +145,9 @@ type ServiceResource struct {
 	// in the form <kube namespace>/<kube svc name>.
 	serviceMap map[string]*corev1.Service
 
-	// endpointsMap uses the same keys as serviceMap but maps to the endpoints
+	// endpointSliceListMap uses the same keys as serviceMap but maps to the EndpointSliceList
 	// of each service.
-	endpointsMap map[string]*corev1.Endpoints
+	endpointSliceListMap map[string]*discoveryv1.EndpointSliceList
 
 	// EnableIngress enables syncing of the hostname from an Ingress resource
 	// to the service registration if an Ingress rule matches the service.
@@ -227,19 +229,23 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 
 	// If we care about endpoints, we should do the initial endpoints load.
 	if t.shouldTrackEndpoints(key) {
-		endpoints, err := t.Client.CoreV1().
-			Endpoints(service.Namespace).
-			Get(t.Ctx, service.Name, metav1.GetOptions{})
+
+		// account for continue
+		endpointSliceList, err := t.Client.DiscoveryV1().
+			EndpointSlices(service.Namespace).
+			List(t.Ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, service.Name)})
+
 		if err != nil {
-			t.Log.Warn("error loading initial endpoints",
+			t.Log.Warn("error loading initial endpoint slices list",
 				"key", key,
 				"err", err)
+			return err // Ensure to handle or return the error appropriately
 		} else {
-			if t.endpointsMap == nil {
-				t.endpointsMap = make(map[string]*corev1.Endpoints)
+			if t.endpointSliceListMap == nil {
+				t.endpointSliceListMap = make(map[string]*discoveryv1.EndpointSliceList)
 			}
-			t.endpointsMap[key] = endpoints
-			t.Log.Debug("[ServiceResource.Upsert] adding service's endpoints to endpointsMap", "key", key, "service", service, "endpoints", endpoints)
+			t.endpointSliceListMap[key] = endpointSliceList
+			t.Log.Debug("[ServiceResource.Upsert] adding service's endpoint slices to endpointSliceListMap", "key", key, "service", service, "endpointSliceList", endpointSliceList)
 		}
 	}
 
@@ -265,8 +271,8 @@ func (t *ServiceResource) Delete(key string, _ interface{}) error {
 func (t *ServiceResource) doDelete(key string) {
 	delete(t.serviceMap, key)
 	t.Log.Debug("[doDelete] deleting service from serviceMap", "key", key)
-	delete(t.endpointsMap, key)
-	t.Log.Debug("[doDelete] deleting endpoints from endpointsMap", "key", key)
+	delete(t.endpointSliceListMap, key)
+	t.Log.Debug("[doDelete] deleting endpoints from endpointSliceListMap", "key", key)
 	// If there were registrations related to this service, then
 	// delete them and sync.
 	if _, ok := t.consulMap[key]; ok {
@@ -582,25 +588,24 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// pods are running on. This way we don't register _every_ K8S
 	// node as part of the service.
 	case corev1.ServiceTypeNodePort:
-		if t.endpointsMap == nil {
+		if t.endpointSliceListMap == nil {
 			return
 		}
 
-		endpoints := t.endpointsMap[key]
-		if endpoints == nil {
+		endpointsList := t.endpointSliceListMap[key]
+		if endpointsList == nil {
 			return
 		}
 
-		for _, subset := range endpoints.Subsets {
-			for _, subsetAddr := range subset.Addresses {
+		for _, endpointSlice := range endpointsList.Items {
+			for _, endpoint := range endpointSlice.Endpoints {
 				// Check that the node name exists
 				// subsetAddr.NodeName is of type *string
-				if subsetAddr.NodeName == nil {
+				if endpoint.NodeName == nil {
 					continue
 				}
-
 				// Look up the node's ip address by getting node info
-				node, err := t.Client.CoreV1().Nodes().Get(t.Ctx, *subsetAddr.NodeName, metav1.GetOptions{})
+				node, err := t.Client.CoreV1().Nodes().Get(t.Ctx, *endpoint.NodeName, metav1.GetOptions{})
 				if err != nil {
 					t.Log.Warn("error getting node info", "error", err)
 					continue
@@ -614,37 +619,18 @@ func (t *ServiceResource) generateRegistrations(key string) {
 					expectedType = corev1.NodeExternalIP
 				}
 
-				// Find the ip address for the node and
-				// create the Consul service using it
-				var found bool
-				for _, address := range node.Status.Addresses {
-					if address.Type == expectedType {
-						found = true
-						r := baseNode
-						rs := baseService
-						r.Service = &rs
-						r.Service.ID = serviceID(r.Service.Service, subsetAddr.IP)
-						r.Service.Address = address.Address
+				for _, endpointAddr := range endpoint.Addresses {
 
-						t.consulMap[key] = append(t.consulMap[key], &r)
-						// Only consider the first address that matches. In some cases
-						// there will be multiple addresses like when using AWS CNI.
-						// In those cases, Kubernetes will ensure eth0 is always the first
-						// address in the list.
-						// See https://github.com/kubernetes/kubernetes/blob/b559434c02f903dbcd46ee7d6c78b216d3f0aca0/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L1462-L1464
-						break
-					}
-				}
-
-				// If an ExternalIP wasn't found, and ExternalFirst is set,
-				// use an InternalIP
-				if t.NodePortSync == ExternalFirst && !found {
+					// Find the ip address for the node and
+					// create the Consul service using it
+					var found bool
 					for _, address := range node.Status.Addresses {
-						if address.Type == corev1.NodeInternalIP {
+						if address.Type == expectedType {
+							found = true
 							r := baseNode
 							rs := baseService
 							r.Service = &rs
-							r.Service.ID = serviceID(r.Service.Service, subsetAddr.IP)
+							r.Service.ID = serviceID(r.Service.Service, endpointAddr)
 							r.Service.Address = address.Address
 
 							t.consulMap[key] = append(t.consulMap[key], &r)
@@ -656,6 +642,29 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							break
 						}
 					}
+
+					// If an ExternalIP wasn't found, and ExternalFirst is set,
+					// use an InternalIP
+					if t.NodePortSync == ExternalFirst && !found {
+						for _, address := range node.Status.Addresses {
+							if address.Type == corev1.NodeInternalIP {
+								r := baseNode
+								rs := baseService
+								r.Service = &rs
+								r.Service.ID = serviceID(r.Service.Service, endpointAddr)
+								r.Service.Address = address.Address
+
+								t.consulMap[key] = append(t.consulMap[key], &r)
+								// Only consider the first address that matches. In some cases
+								// there will be multiple addresses like when using AWS CNI.
+								// In those cases, Kubernetes will ensure eth0 is always the first
+								// address in the list.
+								// See https://github.com/kubernetes/kubernetes/blob/b559434c02f903dbcd46ee7d6c78b216d3f0aca0/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L1462-L1464
+								break
+							}
+						}
+					}
+
 				}
 			}
 		}
@@ -675,94 +684,100 @@ func (t *ServiceResource) registerServiceInstance(
 	overridePortNumber int,
 	useHostname bool) {
 
-	if t.endpointsMap == nil {
+	if t.endpointSliceListMap == nil {
 		return
 	}
 
-	endpoints := t.endpointsMap[key]
-	if endpoints == nil {
+	endpointSliceList := t.endpointSliceListMap[key]
+	if endpointSliceList == nil {
 		return
 	}
 
 	seen := map[string]struct{}{}
-	for _, subset := range endpoints.Subsets {
+	for _, endpointSlices := range endpointSliceList.Items {
 		// For ClusterIP services and if LoadBalancerEndpointsSync is true, we use the endpoint port instead
 		// of the service port because we're registering each endpoint
 		// as a separate service instance.
 		epPort := baseService.Port
 		if overridePortName != "" {
 			// If we're supposed to use a specific named port, find it.
-			for _, p := range subset.Ports {
-				if overridePortName == p.Name {
-					epPort = int(p.Port)
+			for _, p := range endpointSlices.Ports {
+				if overridePortName == *p.Name {
+					epPort = int(*p.Port)
 					break
 				}
 			}
 		} else if overridePortNumber == 0 {
 			// Otherwise we'll just use the first port in the list
 			// (unless the port number was overridden by an annotation).
-			for _, p := range subset.Ports {
-				epPort = int(p.Port)
+			for _, p := range endpointSlices.Ports {
+				epPort = int(*p.Port)
 				break
 			}
 		}
-		for _, subsetAddr := range subset.Addresses {
-			var addr string
-			// Use the address and port from the Ingress resource if
-			// ingress-sync is enabled and the service has an ingress
-			// resource that references it.
-			if t.EnableIngress && t.isIngressService(key) {
-				addr = t.serviceHostnameMap[key].hostName
-				epPort = int(t.serviceHostnameMap[key].port)
-			} else {
-				addr = subsetAddr.IP
-				if addr == "" && useHostname {
-					addr = subsetAddr.Hostname
+		for _, endpoint := range endpointSlices.Endpoints {
+			for _, endpointAddr := range endpoint.Addresses {
+
+				var addr string
+				// Use the address and port from the Ingress resource if
+				// ingress-sync is enabled and the service has an ingress
+				// resource that references it.
+				if t.EnableIngress && t.isIngressService(key) {
+					addr = t.serviceHostnameMap[key].hostName
+					epPort = int(t.serviceHostnameMap[key].port)
+				} else {
+					addr = endpointAddr
+					if addr == "" && useHostname {
+						addr = *endpoint.Hostname
+					}
+					if addr == "" {
+						continue
+					}
 				}
-				if addr == "" {
+
+				// Its not clear whether K8S guarantees ready addresses to
+				// be unique so we maintain a set to prevent duplicates just
+				// in case.
+				if _, ok := seen[addr]; ok {
 					continue
 				}
-			}
+				seen[addr] = struct{}{}
 
-			// Its not clear whether K8S guarantees ready addresses to
-			// be unique so we maintain a set to prevent duplicates just
-			// in case.
-			if _, ok := seen[addr]; ok {
-				continue
-			}
-			seen[addr] = struct{}{}
+				r := baseNode
+				rs := baseService
+				r.Service = &rs
+				r.Service.ID = serviceID(r.Service.Service, addr)
+				r.Service.Address = addr
+				r.Service.Port = epPort
+				r.Service.Meta = make(map[string]string)
+				// Deepcopy baseService.Meta into r.Service.Meta as baseService is shared
+				// between all nodes of a service
+				for k, v := range baseService.Meta {
+					r.Service.Meta[k] = v
+				}
+				if endpoint.TargetRef != nil {
+					r.Service.Meta[ConsulK8SRefValue] = endpoint.TargetRef.Name
+					r.Service.Meta[ConsulK8SRefKind] = endpoint.TargetRef.Kind
+				}
+				if endpoint.NodeName != nil {
+					r.Service.Meta[ConsulK8SNodeName] = *endpoint.NodeName
+				}
+				if endpoint.Zone != nil {
+					r.Service.Meta[ConsulK8STopologyZone] = *endpoint.Zone
+				}
 
-			r := baseNode
-			rs := baseService
-			r.Service = &rs
-			r.Service.ID = serviceID(r.Service.Service, addr)
-			r.Service.Address = addr
-			r.Service.Port = epPort
-			r.Service.Meta = make(map[string]string)
-			// Deepcopy baseService.Meta into r.Service.Meta as baseService is shared
-			// between all nodes of a service
-			for k, v := range baseService.Meta {
-				r.Service.Meta[k] = v
-			}
-			if subsetAddr.TargetRef != nil {
-				r.Service.Meta[ConsulK8SRefValue] = subsetAddr.TargetRef.Name
-				r.Service.Meta[ConsulK8SRefKind] = subsetAddr.TargetRef.Kind
-			}
-			if subsetAddr.NodeName != nil {
-				r.Service.Meta[ConsulK8SNodeName] = *subsetAddr.NodeName
-			}
+				r.Check = &consulapi.AgentCheck{
+					CheckID:   consulHealthCheckID(endpointSlices.Namespace, serviceID(r.Service.Service, addr)),
+					Name:      consulKubernetesCheckName,
+					Namespace: baseService.Namespace,
+					Type:      consulKubernetesCheckType,
+					Status:    consulapi.HealthPassing,
+					ServiceID: serviceID(r.Service.Service, addr),
+					Output:    kubernetesSuccessReasonMsg,
+				}
 
-			r.Check = &consulapi.AgentCheck{
-				CheckID:   consulHealthCheckID(endpoints.Namespace, serviceID(r.Service.Service, addr)),
-				Name:      consulKubernetesCheckName,
-				Namespace: baseService.Namespace,
-				Type:      consulKubernetesCheckType,
-				Status:    consulapi.HealthPassing,
-				ServiceID: serviceID(r.Service.Service, addr),
-				Output:    kubernetesSuccessReasonMsg,
+				t.consulMap[key] = append(t.consulMap[key], &r)
 			}
-
-			t.consulMap[key] = append(t.consulMap[key], &r)
 		}
 	}
 }
@@ -811,18 +826,19 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return t.Service.Client.CoreV1().
-					Endpoints(metav1.NamespaceAll).
+
+				return t.Service.Client.DiscoveryV1().
+					EndpointSlices(metav1.NamespaceAll).
 					List(t.Ctx, options)
 			},
 
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return t.Service.Client.CoreV1().
-					Endpoints(metav1.NamespaceAll).
+				return t.Service.Client.DiscoveryV1().
+					EndpointSlices(metav1.NamespaceAll).
 					Watch(t.Ctx, options)
 			},
 		},
-		&corev1.Endpoints{},
+		&discoveryv1.EndpointSliceList{},
 		0,
 		cache.Indexers{},
 	)
@@ -830,10 +846,10 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 
 func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
 	svc := t.Service
-	endpoints, ok := raw.(*corev1.Endpoints)
+
+	endpointSliceList, ok := raw.(*discoveryv1.EndpointSliceList)
 	if !ok {
 		svc.Log.Warn("upsert got invalid type", "raw", raw)
-		return nil
 	}
 
 	svc.serviceLock.Lock()
@@ -845,10 +861,10 @@ func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
 	}
 
 	// We are tracking this service so let's keep track of the endpoints
-	if svc.endpointsMap == nil {
-		svc.endpointsMap = make(map[string]*corev1.Endpoints)
+	if svc.endpointSliceListMap == nil {
+		svc.endpointSliceListMap = make(map[string]*discoveryv1.EndpointSliceList)
 	}
-	svc.endpointsMap[key] = endpoints
+	svc.endpointSliceListMap[key] = endpointSliceList
 
 	// Update the registration and trigger a sync
 	svc.generateRegistrations(key)
@@ -864,8 +880,8 @@ func (t *serviceEndpointsResource) Delete(key string, _ interface{}) error {
 	// This is a bit of an optimization. We only want to force a resync
 	// if we were tracking this endpoint to begin with and that endpoint
 	// had associated registrations.
-	if _, ok := t.Service.endpointsMap[key]; ok {
-		delete(t.Service.endpointsMap, key)
+	if _, ok := t.Service.endpointSliceListMap[key]; ok {
+		delete(t.Service.endpointSliceListMap, key)
 		if _, ok := t.Service.consulMap[key]; ok {
 			delete(t.Service.consulMap, key)
 			t.Service.sync()
