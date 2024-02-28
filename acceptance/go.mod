@@ -2,17 +2,13 @@ module github.com/hashicorp/consul-k8s/acceptance
 
 go 1.20
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f
-
-replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20231212195019-69e3f93ee8a3
-
 require (
 	github.com/google/uuid v1.3.0
 	github.com/gruntwork-io/terratest v0.31.2
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20230609143603-198c4433d892
-	github.com/hashicorp/consul/api v1.10.1-0.20230906155245-56917eb4c968
-	github.com/hashicorp/consul/proto-public v0.5.1
-	github.com/hashicorp/consul/sdk v0.15.0
+	github.com/hashicorp/consul/api v1.28.0
+	github.com/hashicorp/consul/proto-public v0.6.0
+	github.com/hashicorp/consul/sdk v0.16.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/go-version v1.6.0
@@ -116,7 +112,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/pquerna/otp v1.2.0 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
+	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
