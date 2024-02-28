@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Kubernetes v1.29 is now supported. Minimum tested version of Kubernetes is now v1.26.
+```
