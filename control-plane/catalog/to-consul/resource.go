@@ -147,7 +147,7 @@ type ServiceResource struct {
 
 	// endpointSliceListMap uses the same keys as serviceMap but maps to the EndpointSliceList
 	// of each service.
-	endpointSliceListMap map[string]*discoveryv1.EndpointSliceList
+	endpointSliceListMap map[string][]discoveryv1.EndpointSlice
 
 	// EnableIngress enables syncing of the hostname from an Ingress resource
 	// to the service registration if an Ingress rule matches the service.
@@ -201,7 +201,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	// We expect a Service. If it isn't a service then just ignore it.
 	service, ok := raw.(*corev1.Service)
 	if !ok {
-		t.Log.Warn("upsert got invalid type", "raw", raw)
+		t.Log.Warn("upsert got invalid type svc", "raw", raw)
 		return nil
 	}
 
@@ -242,9 +242,9 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 			return err // Ensure to handle or return the error appropriately
 		} else {
 			if t.endpointSliceListMap == nil {
-				t.endpointSliceListMap = make(map[string]*discoveryv1.EndpointSliceList)
+				t.endpointSliceListMap = make(map[string][]discoveryv1.EndpointSlice)
 			}
-			t.endpointSliceListMap[key] = endpointSliceList
+			t.endpointSliceListMap[key] = endpointSliceList.Items
 			t.Log.Debug("[ServiceResource.Upsert] adding service's endpoint slices to endpointSliceListMap", "key", key, "service", service, "endpointSliceList", endpointSliceList)
 		}
 	}
@@ -592,12 +592,12 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			return
 		}
 
-		endpointsList := t.endpointSliceListMap[key]
-		if endpointsList == nil {
+		endpointSliceList := t.endpointSliceListMap[key]
+		if endpointSliceList == nil {
 			return
 		}
 
-		for _, endpointSlice := range endpointsList.Items {
+		for _, endpointSlice := range endpointSliceList {
 			for _, endpoint := range endpointSlice.Endpoints {
 				// Check that the node name exists
 				// subsetAddr.NodeName is of type *string
@@ -694,14 +694,14 @@ func (t *ServiceResource) registerServiceInstance(
 	}
 
 	seen := map[string]struct{}{}
-	for _, endpointSlices := range endpointSliceList.Items {
+	for _, endpointSlice := range endpointSliceList {
 		// For ClusterIP services and if LoadBalancerEndpointsSync is true, we use the endpoint port instead
 		// of the service port because we're registering each endpoint
 		// as a separate service instance.
 		epPort := baseService.Port
 		if overridePortName != "" {
 			// If we're supposed to use a specific named port, find it.
-			for _, p := range endpointSlices.Ports {
+			for _, p := range endpointSlice.Ports {
 				if overridePortName == *p.Name {
 					epPort = int(*p.Port)
 					break
@@ -710,12 +710,12 @@ func (t *ServiceResource) registerServiceInstance(
 		} else if overridePortNumber == 0 {
 			// Otherwise we'll just use the first port in the list
 			// (unless the port number was overridden by an annotation).
-			for _, p := range endpointSlices.Ports {
+			for _, p := range endpointSlice.Ports {
 				epPort = int(*p.Port)
 				break
 			}
 		}
-		for _, endpoint := range endpointSlices.Endpoints {
+		for _, endpoint := range endpointSlice.Endpoints {
 			for _, endpointAddr := range endpoint.Addresses {
 
 				var addr string
@@ -767,7 +767,7 @@ func (t *ServiceResource) registerServiceInstance(
 				}
 
 				r.Check = &consulapi.AgentCheck{
-					CheckID:   consulHealthCheckID(endpointSlices.Namespace, serviceID(r.Service.Service, addr)),
+					CheckID:   consulHealthCheckID(endpointSlice.Namespace, serviceID(r.Service.Service, addr)),
 					Name:      consulKubernetesCheckName,
 					Namespace: baseService.Namespace,
 					Type:      consulKubernetesCheckType,
@@ -847,9 +847,9 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
 	svc := t.Service
 
-	endpointSliceList, ok := raw.(*discoveryv1.EndpointSliceList)
+	endpointSlice, ok := raw.(*discoveryv1.EndpointSlice)
 	if !ok {
-		svc.Log.Warn("upsert got invalid type", "raw", raw)
+		svc.Log.Warn("upsert got invalid type for ep", "raw", raw)
 	}
 
 	svc.serviceLock.Lock()
@@ -862,9 +862,10 @@ func (t *serviceEndpointsResource) Upsert(key string, raw interface{}) error {
 
 	// We are tracking this service so let's keep track of the endpoints
 	if svc.endpointSliceListMap == nil {
-		svc.endpointSliceListMap = make(map[string]*discoveryv1.EndpointSliceList)
+		svc.endpointSliceListMap = make(map[string][]discoveryv1.EndpointSlice)
 	}
-	svc.endpointSliceListMap[key] = endpointSliceList
+	//svc.endpointSliceListMap[key] = &discoveryv1.EndpointSliceList{Items: []discoveryv1.EndpointSlice{*endpointSliceList}}
+	svc.endpointSliceListMap[key] = []discoveryv1.EndpointSlice{*endpointSlice}
 
 	// Update the registration and trigger a sync
 	svc.generateRegistrations(key)
@@ -931,7 +932,7 @@ func (t *serviceIngressResource) Upsert(key string, raw interface{}) error {
 	svc := t.Service
 	ingress, ok := raw.(*networkingv1.Ingress)
 	if !ok {
-		svc.Log.Warn("upsert got invalid type", "raw", raw)
+		svc.Log.Warn("upsert got invalid type ing", "raw", raw)
 		return nil
 	}
 

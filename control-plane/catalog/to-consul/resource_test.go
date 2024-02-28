@@ -766,7 +766,8 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 		context.Background(),
 		&discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+				GenerateName: "foo-",
+				Labels:       map[string]string{discoveryv1.LabelServiceName: "foo"},
 			},
 			AddressType: discoveryv1.AddressTypeIPv4,
 			Endpoints: []discoveryv1.Endpoint{
@@ -909,27 +910,43 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 
 	node1, _ := createNodes(t, client)
 
-	// Insert the endpoints
-	_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(
-		context.Background(),
-		&corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
-			},
+	// Insert the endpoint slice
 
-			Subsets: []corev1.EndpointSubset{
+	_, err := client.DiscoveryV1().EndpointSlices(metav1.NamespaceDefault).Create(
+		context.Background(),
+		&discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "foo-",
+				Labels:       map[string]string{discoveryv1.LabelServiceName: "foo"},
+			},
+			AddressType: discoveryv1.AddressTypeIPv4,
+			Endpoints: []discoveryv1.Endpoint{
 				{
-					Addresses: []corev1.EndpointAddress{
-						{NodeName: &node1.Name, IP: "1.2.3.4"},
+					Addresses: []string{"1.2.3.4"},
+					Conditions: discoveryv1.EndpointConditions{
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
-					Ports: []corev1.EndpointPort{
-						{Name: "http", Port: 8080},
-						{Name: "rpc", Port: 2000},
-					},
+					TargetRef: &corev1.ObjectReference{Kind: "pod", Name: "foo", Namespace: metav1.NamespaceDefault},
+					NodeName:  &node1.Name,
+					Zone:      pointer.String("us-west-2a"),
+				},
+			},
+			Ports: []discoveryv1.EndpointPort{
+				{
+					Name: pointer.String("http"),
+					Port: pointer.Int32(8080),
+				},
+				{
+					Name: pointer.String("rpc"),
+					Port: pointer.Int32(2000),
 				},
 			},
 		},
-		metav1.CreateOptions{})
+		metav1.CreateOptions{},
+	)
+
 	require.NoError(t, err)
 
 	// Insert the service
@@ -2081,18 +2098,18 @@ func createNodes(t *testing.T, client *fake.Clientset) (*corev1.Node, *corev1.No
 	return node1, node2
 }
 
-// createEndpoints calls the fake k8s client to create two endpoint slices across two nodes.
+// createEndpointSlices calls the fake k8s client to create an endpoint slices with two endpoints on different nodes.
 func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName string, namespace string) {
 	node1 := nodeName1
 	node2 := nodeName2
 	targetRef := corev1.ObjectReference{Kind: "pod", Name: "foobar"}
 
-	_, err := client.DiscoveryV1().EndpointSlices(metav1.NamespaceDefault).Create(
+	_, err := client.DiscoveryV1().EndpointSlices(namespace).Create(
 		context.Background(),
 		&discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: serviceName + "-",
-				Namespace:    namespace,
+				Labels:       map[string]string{discoveryv1.LabelServiceName: serviceName},
 			},
 			AddressType: discoveryv1.AddressTypeIPv4,
 			Endpoints: []discoveryv1.Endpoint{
