@@ -273,8 +273,8 @@ github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41
 github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b/go.mod h1:9NKJHOcgmz/6P2y6MegNIOXhIKE/0ils/mHWd5sZgoU=
 github.com/hashicorp/consul-server-connection-manager v0.1.6 h1:ktj8Fi+dRXn9hhM+FXsfEJayhzzgTqfH08Ne5M6Fmug=
 github.com/hashicorp/consul-server-connection-manager v0.1.6/go.mod h1:HngMIv57MT+pqCVeRQMa1eTB5dqnyMm8uxjyv+Hn8cs=
-github.com/hashicorp/consul/api v1.28.0 h1:QWfM1UXnQaECMh7bwP5jt+/uJsCE09qWuYq3GWbBZA8=
-github.com/hashicorp/consul/api v1.28.0/go.mod h1:MyriVXDqGlf2ZeV6NW2NGdyl26W1mwF5nKLlg8xlNak=
+github.com/hashicorp/consul/api v1.28.2 h1:mXfkRHrpHN4YY3RqL09nXU1eHKLNiuAN4kHvDQ16k/8=
+github.com/hashicorp/consul/api v1.28.2/go.mod h1:KyzqzgMEya+IZPcD65YFoOVAgPpbfERu4I/tzG6/ueE=
 github.com/hashicorp/consul/proto-public v0.6.0 h1:9qrBujmoTB5gQQ84kQO+YWvhjgYoYBNrOoHdo4cpHHM=
 github.com/hashicorp/consul/proto-public v0.6.0/go.mod h1:JF6983XNCzvw4wDNOLEwLqOq2IPw7iyT+pkswHSz08U=
 github.com/hashicorp/consul/sdk v0.16.0 h1:SE9m0W6DEfgIVCJX7xU+iv/hUl4m/nxqMTnCdMxDpJ8=
