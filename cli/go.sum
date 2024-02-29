@@ -391,13 +391,12 @@ github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgf
 github.com/grpc-ecosystem/grpc-gateway v1.9.0/go.mod h1:vNeuVxBJEsws4ogUvrchl83t/GYV9WGTSLVdBhOQFDY=
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/hashicorp/consul/api v1.1.0/go.mod h1:VmuI/Lkw1nC05EYQWNKwWGbkg+FbDBtguAZLlVdkD9Q=
-github.com/hashicorp/consul/api v1.28.0 h1:QWfM1UXnQaECMh7bwP5jt+/uJsCE09qWuYq3GWbBZA8=
-github.com/hashicorp/consul/api v1.28.0/go.mod h1:MyriVXDqGlf2ZeV6NW2NGdyl26W1mwF5nKLlg8xlNak=
+github.com/hashicorp/consul/api v1.28.2 h1:mXfkRHrpHN4YY3RqL09nXU1eHKLNiuAN4kHvDQ16k/8=
+github.com/hashicorp/consul/api v1.28.2/go.mod h1:KyzqzgMEya+IZPcD65YFoOVAgPpbfERu4I/tzG6/ueE=
 github.com/hashicorp/consul/envoyextensions v0.5.2 h1:L5mYp/caTRHJyfTanIRk2J8phzqLfK2BCnrLxCIiPCA=
 github.com/hashicorp/consul/envoyextensions v0.5.2/go.mod h1:Y8PTEDOAEs/785atx6iAnmxfpTaXgZjnlXCDJMw+T64=
 github.com/hashicorp/consul/sdk v0.1.1/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/consul/sdk v0.16.0 h1:SE9m0W6DEfgIVCJX7xU+iv/hUl4m/nxqMTnCdMxDpJ8=
-github.com/hashicorp/consul/sdk v0.16.0/go.mod h1:7pxqqhqoaPqnBnzXD1StKed62LqJeClzVsUEy85Zr0A=
 github.com/hashicorp/consul/troubleshoot v0.5.2 h1:gtRPoQIcIMJtdicRs0RvjRhfwkDD38iglSvNQAwlazY=
 github.com/hashicorp/consul/troubleshoot v0.5.2/go.mod h1:8UMoKivWLo2fQMSWGLqKOA97MS5lPZhwin6r9CPRlTc=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
@@ -690,6 +689,7 @@ github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTE
 github.com/rogpeppe/go-internal v1.8.0/go.mod h1:WmiCO8CzOY8rg0OYDC4/i/2WRWAB6poM+XZ2dLUbcbE=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
+github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
 github.com/rubenv/sql-migrate v1.3.1 h1:Vx+n4Du8X8VTYuXbhNxdEUoh6wiJERA0GlWocR5FrbA=
 github.com/rubenv/sql-migrate v1.3.1/go.mod h1:YzG/Vh82CwyhTFXy+Mf5ahAiiEOpAlHurg+23VEzcsk=
 github.com/russross/blackfriday/v2 v2.0.1/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
