@@ -6,7 +6,7 @@ Upgrade `helm/v3` to 3.11.3. This resolves the following security vulnerabilitie
 [CVE-2022-23525](https://osv.dev/vulnerability/CVE-2022-23525)
 ```
 ```release-note:security
-security: upgrade containerd to 1.7.13 (latest) to resolve [GHSA-7ww5-4wqc-m92c](https://osv.dev/vulnerability/GO-2023-2412).
+Upgrade containerd to 1.7.13 (latest) to resolve [GHSA-7ww5-4wqc-m92c](https://osv.dev/vulnerability/GO-2023-2412).
 ```
 ```release-note:security
 Upgrade docker/docker to 25.0.3+incompatible (latest) to resolve [GHSA-jq35-85cj-fj4p](https://osv.dev/vulnerability/GHSA-jq35-85cj-fj4p).
