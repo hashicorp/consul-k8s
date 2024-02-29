@@ -1,6 +1,7 @@
 ## 1.4.0 (February 29, 2024)
 
 > NOTE: Consul K8s 1.4.x is compatible with Consul 1.18.x and Consul Dataplane 1.4.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
 BREAKING CHANGES:
 
 * server: set `autopilot.min_quorum` to the correct quorum value to ensure autopilot doesn't prune servers needed for quorum. Also set `autopilot. disable_upgrade_migration` to `true` as that setting is meant for blue/green deploys, not rolling deploys.
@@ -50,6 +51,8 @@ IMPROVEMENTS:
 
 * control-plane: publish `consul-k8s-control-plane` and `consul-k8s-control-plane-fips` images to official HashiCorp AWS ECR. [[GH-3668](https://github.com/hashicorp/consul-k8s/issues/3668)]
 * helm: Kubernetes v1.29 is now supported. Minimum tested version of Kubernetes is now v1.26. [[GH-3675](https://github.com/hashicorp/consul-k8s/issues/3675)]
+* cni: When CNI is enabled, set ReadOnlyRootFilesystem=true and AllowPrivilegeEscalation=false for mesh pod init containers and AllowPrivilegeEscalation=false for consul-dataplane containers (ReadOnlyRootFilesystem was already true for consul-dataplane containers). [[GH-3498](https://github.com/hashicorp/consul-k8s/issues/3498)]
+* control-plane: Add `CaseInsensitive` flag to service-routers that allows paths and path prefixes to ignore URL upper and lower casing. [[GH-3502](https://github.com/hashicorp/consul-k8s/issues/3502)]
 
 BUG FIXES:
 
