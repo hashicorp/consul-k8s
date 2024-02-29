@@ -1,11 +1,5 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-// TODO: Remove this when the next version of the submodule is released.
-// We need to use a replace directive instead of directly pinning because `api` requires version `0.5.1` and will clobber the pin, but not the replace directive.
-replace github.com/hashicorp/consul/proto-public => github.com/hashicorp/consul/proto-public v0.1.2-0.20240207215339-2456fe5148bd
-
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20231213150639-123bc95e1a3f
-
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.2
@@ -15,11 +9,11 @@ require (
 	github.com/go-logr/logr v1.2.4
 	github.com/google/go-cmp v0.5.9
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230825213844-4ea04860c5ed
+	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
-	github.com/hashicorp/consul/api v1.10.1-0.20240122152324-758ddf84e9c9
-	github.com/hashicorp/consul/proto-public v0.5.1
-	github.com/hashicorp/consul/sdk v0.15.0
+	github.com/hashicorp/consul/api v1.28.0
+	github.com/hashicorp/consul/proto-public v0.6.0
+	github.com/hashicorp/consul/sdk v0.16.0
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
 	github.com/hashicorp/go-hclog v1.5.0
@@ -134,13 +128,14 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nicolai86/scaleway-sdk v1.10.2-0.20180628010248-798f60e20bb2 // indirect
 	github.com/oklog/run v1.0.0 // indirect
+	github.com/onsi/gomega v1.24.2 // indirect
 	github.com/packethost/packngo v0.1.1-0.20180711074735-b9cb5096f54c // indirect
 	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
+	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/renier/xmlrpc v0.0.0-20170708154548-ce4a1a486c03 // indirect

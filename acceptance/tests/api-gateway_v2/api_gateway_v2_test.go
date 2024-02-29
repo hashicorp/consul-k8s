@@ -159,7 +159,7 @@ func TestAPIGateway_V2_Basic(t *testing.T) {
 
 			// check our finalizers
 			require.Len(t, gatewayClass.Finalizers, 1)
-			require.EqualValues(t, gatewayClassFinalizer, gatewayClass.Finalizers()[0])
+			require.EqualValues(t, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
 			// tcp route checks
 			var tcpRoute meshv2beta1.TCPRoute
