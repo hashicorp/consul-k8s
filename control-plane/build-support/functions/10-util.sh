@@ -761,7 +761,8 @@ function set_changelog {
         fi
         compatibility_note="
 
-> NOTE: Consul K8s ${version_short}.x is compatible with Consul ${consul_version_short}.x and Consul Dataplane ${consul_dataplane_version_short}.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info. \n"
+> NOTE: Consul K8s ${version_short}.x is compatible with Consul ${consul_version_short}.x and Consul Dataplane ${consul_dataplane_version_short}.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+"
     fi
 
 	cat <<EOT | cat - "${curdir}"/CHANGELOG.MD >tmp && mv tmp "${curdir}"/CHANGELOG.MD
