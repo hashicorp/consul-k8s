@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	"context"
 	"encoding/json"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
@@ -230,11 +231,9 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				FieldSelector: fields.OneTermEqualSelector(Gatewaypolicy_GatewayIndex, gwNamespaceName.String()),
 			})
 
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
 			v := &GatewayPolicyWebhook{
 				Logger:  logrtest.New(t),
-				decoder: decoder,
+				decoder: admission.NewDecoder(s),
 				Client:  fakeClient,
 			}
 
