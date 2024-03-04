@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -197,12 +198,12 @@ func TestBinder_Lifecycle(t *testing.T) {
 			config: controlledBinder(BinderConfig{
 				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{{
-						Protocol: gwv1beta1.HTTPSProtocolType,
+						Protocol: gwv1.HTTPSProtocolType,
 						TLS: &gwv1.GatewayTLSConfig{
 							CertificateRefs: []gwv1beta1.SecretObjectReference{
 								{Name: "secret-one"},
 							},
-							Mode: common.PointerTo(gwv1beta1.TLSModeTerminate),
+							Mode: common.PointerTo(gwv1.TLSModeTerminate),
 						},
 					}},
 				}),
@@ -216,9 +217,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 				addClassConfig(gatewayWithFinalizerStatus(
 					gwv1.GatewaySpec{
 						Listeners: []gwv1beta1.Listener{{
-							Protocol: gwv1beta1.HTTPSProtocolType,
+							Protocol: gwv1.HTTPSProtocolType,
 							TLS: &gwv1.GatewayTLSConfig{
-								Mode: common.PointerTo(gwv1beta1.TLSModeTerminate),
+								Mode: common.PointerTo(gwv1.TLSModeTerminate),
 								CertificateRefs: []gwv1beta1.SecretObjectReference{
 									{Name: "secret-one"},
 								},
@@ -226,7 +227,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 						}},
 					},
 					gwv1.GatewayStatus{
-						Addresses: []gwv1.GatewayAddress{},
+						Addresses: []gwv1.GatewayStatusAddress{},
 						Conditions: []metav1.Condition{
 							{
 								Type:    "Accepted",
@@ -241,7 +242,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 							},
 						},
 						Listeners: []gwv1beta1.ListenerStatus{{
-							SupportedKinds: supportedKindsForProtocol[gwv1beta1.HTTPSProtocolType],
+							SupportedKinds: supportedKindsForProtocol[gwv1.HTTPSProtocolType],
 							Conditions: []metav1.Condition{
 								{
 									Type:    "Accepted",
@@ -317,7 +318,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 			},
 			expectedStatusUpdates: []client.Object{
 				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
-					Addresses: []gwv1.GatewayAddress{},
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -388,7 +389,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 			},
 			expectedStatusUpdates: []client.Object{
 				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
-					Addresses: []gwv1.GatewayAddress{},
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -444,7 +445,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 			},
 			expectedStatusUpdates: []client.Object{
 				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
-					Addresses: []gwv1.GatewayAddress{},
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -515,7 +516,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 			},
 			expectedStatusUpdates: []client.Object{
 				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
-					Addresses: []gwv1.GatewayAddress{},
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -957,7 +958,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
 				}),
@@ -1063,11 +1064,11 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
 				}, gwv1.GatewayStatus{
-					Addresses: []gwv1.GatewayAddress{},
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -1171,7 +1172,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
 				}),
@@ -1279,11 +1280,11 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
 				}, gwv1.GatewayStatus{
-					Addresses: []gwv1.GatewayAddress{},
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -1394,7 +1395,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
 				}),
@@ -1502,11 +1503,11 @@ func TestBinder_Lifecycle(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
 				}, gwv1.GatewayStatus{
-					Addresses: []gwv1.GatewayAddress{},
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -1713,14 +1714,14 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 	gateway := gatewayWithFinalizer(gwv1.GatewaySpec{
 		Listeners: []gwv1beta1.Listener{{
 			Name:     "http-listener-default-same",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 		}, {
 			Name:     "http-listener-hostname",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			Hostname: common.PointerTo[gwv1beta1.Hostname]("host.name"),
 		}, {
 			Name:     "http-listener-mismatched-kind-allowed",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Kinds: []gwv1beta1.RouteGroupKind{{
 					Kind: "Foo",
@@ -1728,26 +1729,26 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		}, {
 			Name:     "http-listener-explicit-all-allowed",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromAll),
+					From: common.PointerTo(gwv1.NamespacesFromAll),
 				},
 			},
 		}, {
 			Name:     "http-listener-explicit-allowed-same",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromSame),
+					From: common.PointerTo(gwv1.NamespacesFromSame),
 				},
 			},
 		}, {
 			Name:     "http-listener-allowed-selector",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
+					From: common.PointerTo(gwv1.NamespacesFromSelector),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"test": "foo",
@@ -1757,7 +1758,7 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		}, {
 			Name:     "http-listener-tls",
-			Protocol: gwv1beta1.HTTPSProtocolType,
+			Protocol: gwv1.HTTPSProtocolType,
 			TLS: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{{
 					Name: "secret-one",
@@ -1765,10 +1766,10 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		}, {
 			Name:     "tcp-listener-default-same",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 		}, {
 			Name:     "tcp-listener-mismatched-kind-allowed",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Kinds: []gwv1beta1.RouteGroupKind{{
 					Kind: "Foo",
@@ -1776,26 +1777,26 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		}, {
 			Name:     "tcp-listener-explicit-all-allowed",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromAll),
+					From: common.PointerTo(gwv1.NamespacesFromAll),
 				},
 			},
 		}, {
 			Name:     "tcp-listener-explicit-allowed-same",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromSame),
+					From: common.PointerTo(gwv1.NamespacesFromSame),
 				},
 			},
 		}, {
 			Name:     "tcp-listener-allowed-selector",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
+					From: common.PointerTo(gwv1.NamespacesFromSelector),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"test": "foo",
@@ -1805,7 +1806,7 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		}, {
 			Name:     "tcp-listener-tls",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 			TLS: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{{
 					Name: "secret-one",

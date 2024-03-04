@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -396,24 +397,24 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
 										Headers: []gwv1beta1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
 										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
 								Filters: []gwv1.HTTPRouteFilter{
@@ -439,7 +440,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										},
 										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 											Path: &gwv1beta1.HTTPPathModifier{
-												Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												Type:               gwv1.PrefixMatchHTTPPathModifier,
 												ReplacePrefixMatch: PointerTo("v1"),
 											},
 										},
@@ -477,7 +478,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 												},
 												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 													Path: &gwv1beta1.HTTPPathModifier{
-														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+														Type:               gwv1.PrefixMatchHTTPPathModifier,
 														ReplacePrefixMatch: PointerTo("path"),
 													},
 												},
@@ -602,24 +603,24 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
 										Headers: []gwv1beta1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
 										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
 								Filters: []gwv1.HTTPRouteFilter{
@@ -646,7 +647,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										// THIS IS THE CHANGE
 										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 											Path: &gwv1beta1.HTTPPathModifier{
-												Type:            gwv1beta1.FullPathHTTPPathModifier,
+												Type:            gwv1.FullPathHTTPPathModifier,
 												ReplaceFullPath: PointerTo("v1"),
 											},
 										},
@@ -684,7 +685,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 												},
 												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 													Path: &gwv1beta1.HTTPPathModifier{
-														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+														Type:               gwv1.PrefixMatchHTTPPathModifier,
 														ReplacePrefixMatch: PointerTo("path"),
 													},
 												},
@@ -820,24 +821,24 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
 										Headers: []gwv1beta1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
 										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
 								Filters: []gwv1.HTTPRouteFilter{
@@ -863,7 +864,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										},
 										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 											Path: &gwv1beta1.HTTPPathModifier{
-												Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												Type:               gwv1.PrefixMatchHTTPPathModifier,
 												ReplacePrefixMatch: PointerTo("v1"),
 											},
 										},
@@ -901,7 +902,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 												},
 												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 													Path: &gwv1beta1.HTTPPathModifier{
-														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+														Type:               gwv1.PrefixMatchHTTPPathModifier,
 														ReplacePrefixMatch: PointerTo("path"),
 													},
 												},
@@ -1030,24 +1031,24 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
 										Headers: []gwv1beta1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
 										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
 								Filters: []gwv1.HTTPRouteFilter{
@@ -1073,7 +1074,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 										},
 										URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 											Path: &gwv1beta1.HTTPPathModifier{
-												Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+												Type:               gwv1.PrefixMatchHTTPPathModifier,
 												ReplacePrefixMatch: PointerTo("v1"),
 											},
 										},
@@ -1130,7 +1131,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 												},
 												URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 													Path: &gwv1beta1.HTTPPathModifier{
-														Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+														Type:               gwv1.PrefixMatchHTTPPathModifier,
 														ReplacePrefixMatch: PointerTo("path"),
 													},
 												},
@@ -1272,24 +1273,24 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 								Matches: []gwv1.HTTPRouteMatch{
 									{
 										Path: &gwv1beta1.HTTPPathMatch{
-											Type:  PointerTo(gwv1beta1.PathMatchPathPrefix),
+											Type:  PointerTo(gwv1.PathMatchPathPrefix),
 											Value: PointerTo("/v1"),
 										},
 										Headers: []gwv1beta1.HTTPHeaderMatch{
 											{
-												Type:  PointerTo(gwv1beta1.HeaderMatchExact),
+												Type:  PointerTo(gwv1.HeaderMatchExact),
 												Name:  "my header match",
 												Value: "the value",
 											},
 										},
 										QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 											{
-												Type:  PointerTo(gwv1beta1.QueryParamMatchExact),
+												Type:  PointerTo(gwv1.QueryParamMatchExact),
 												Name:  "search",
 												Value: "term",
 											},
 										},
-										Method: PointerTo(gwv1beta1.HTTPMethodGet),
+										Method: PointerTo(gwv1.HTTPMethodGet),
 									},
 								},
 								Filters: []gwv1.HTTPRouteFilter{

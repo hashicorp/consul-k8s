@@ -8,11 +8,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -20,7 +15,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func TestAPIGateway_Lifecycle(t *testing.T) {
@@ -191,7 +193,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	// swap the gateway's protocol and see the route unbind
 	logger.Log(t, "marking gateway two as using TCP")
 	updateKubernetes(t, k8sClient, controlledGatewayTwo, func(g *gwv1.Gateway) {
-		g.Spec.Listeners[0].Protocol = gwv1beta1.TCPProtocolType
+		g.Spec.Listeners[0].Protocol = gwv1.TCPProtocolType
 	})
 
 	// check that the route is unbound and all Consul objects and Kubernetes statuses are cleaned up
@@ -409,7 +411,7 @@ func createGateway(t *testing.T, client client.Client, name, namespace, gatewayC
 			GatewayClassName: gwv1beta1.ObjectName(gatewayClass),
 			Listeners: []gwv1beta1.Listener{{
 				Name:     gwv1beta1.SectionName("listener"),
-				Protocol: gwv1beta1.HTTPSProtocolType,
+				Protocol: gwv1.HTTPSProtocolType,
 				Port:     8443,
 				TLS: &gwv1.GatewayTLSConfig{
 					CertificateRefs: []gwv1beta1.SecretObjectReference{{

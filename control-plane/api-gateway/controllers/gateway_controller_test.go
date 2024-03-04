@@ -8,10 +8,6 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,8 +16,13 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 func TestTransformEndpoints(t *testing.T) {
@@ -269,8 +270,8 @@ func TestTransformEndpoints(t *testing.T) {
 				allowK8sNamespacesSet: allowSet,
 			}
 
-			fn := controller.transformEndpoints(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.endpoints))
+			fn := controller.transformEndpoints
+			require.ElementsMatch(t, tt.expected, fn(context.Background(), tt.endpoints))
 		})
 	}
 }
@@ -409,8 +410,8 @@ func TestTransformHTTPRoute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			controller := GatewayController{}
 
-			fn := controller.transformHTTPRoute(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.route))
+			fn := controller.transformHTTPRoute
+			require.ElementsMatch(t, tt.expected, fn(context.Background(), tt.route))
 		})
 	}
 }
@@ -549,8 +550,8 @@ func TestTransformTCPRoute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			controller := GatewayController{}
 
-			fn := controller.transformTCPRoute(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.route))
+			fn := controller.transformTCPRoute
+			require.ElementsMatch(t, tt.expected, fn(context.Background(), tt.route))
 		})
 	}
 }
@@ -566,14 +567,14 @@ func TestTransformSecret(t *testing.T) {
 		Spec: gwv1.GatewaySpec{
 			Listeners: []gwv1beta1.Listener{
 				{Name: "terminate", TLS: &gwv1.GatewayTLSConfig{
-					Mode: common.PointerTo(gwv1beta1.TLSModeTerminate),
+					Mode: common.PointerTo(gwv1.TLSModeTerminate),
 					CertificateRefs: []gwv1beta1.SecretObjectReference{
 						{Name: "secret-no-namespace"},
 						{Name: "secret-namespace", Namespace: common.PointerTo(gwv1beta1.Namespace("other"))},
 					},
 				}},
 				{Name: "passthrough", TLS: &gwv1.GatewayTLSConfig{
-					Mode: common.PointerTo(gwv1beta1.TLSModePassthrough),
+					Mode: common.PointerTo(gwv1.TLSModePassthrough),
 					CertificateRefs: []gwv1beta1.SecretObjectReference{
 						{Name: "passthrough", Namespace: common.PointerTo(gwv1beta1.Namespace("other"))},
 					},
@@ -635,8 +636,8 @@ func TestTransformSecret(t *testing.T) {
 				Client: fakeClient,
 			}
 
-			fn := controller.transformSecret(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.secret))
+			fn := controller.transformSecret
+			require.ElementsMatch(t, tt.expected, fn(context.Background(), tt.secret))
 		})
 	}
 }

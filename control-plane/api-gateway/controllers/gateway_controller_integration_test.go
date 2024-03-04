@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -566,14 +567,14 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 							},
 							Headers: []gwv1beta1.HTTPHeaderMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.HeaderMatchExact),
+									Type:  common.PointerTo(gwv1.HeaderMatchExact),
 									Name:  "version",
 									Value: "version",
 								},
 							},
 							QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.QueryParamMatchExact),
+									Type:  common.PointerTo(gwv1.QueryParamMatchExact),
 									Name:  "search",
 									Value: "q",
 								},
@@ -605,7 +606,7 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:            gwv1beta1.FullPathHTTPPathModifier,
+									Type:            gwv1.FullPathHTTPPathModifier,
 									ReplaceFullPath: common.PointerTo("/foobar"),
 								},
 							},
@@ -616,7 +617,7 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+									Type:               gwv1.PrefixMatchHTTPPathModifier,
 									ReplacePrefixMatch: common.PointerTo("/foo"),
 								},
 							},
@@ -1244,18 +1245,18 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 					Matches: []gwv1.HTTPRouteMatch{
 						{
 							Path: &gwv1beta1.HTTPPathMatch{
-								Type: common.PointerTo(gwv1beta1.PathMatchPathPrefix),
+								Type: common.PointerTo(gwv1.PathMatchPathPrefix),
 							},
 							Headers: []gwv1beta1.HTTPHeaderMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.HeaderMatchExact),
+									Type:  common.PointerTo(gwv1.HeaderMatchExact),
 									Name:  "version",
 									Value: "version",
 								},
 							},
 							QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.QueryParamMatchExact),
+									Type:  common.PointerTo(gwv1.QueryParamMatchExact),
 									Name:  "search",
 									Value: "q",
 								},
@@ -1287,7 +1288,7 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:            gwv1beta1.FullPathHTTPPathModifier,
+									Type:            gwv1.FullPathHTTPPathModifier,
 									ReplaceFullPath: common.PointerTo("/foobar"),
 								},
 							},
@@ -1298,7 +1299,7 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+									Type:               gwv1.PrefixMatchHTTPPathModifier,
 									ReplacePrefixMatch: common.PointerTo("/foo"),
 								},
 							},
@@ -1473,14 +1474,14 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 							},
 							Headers: []gwv1beta1.HTTPHeaderMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.HeaderMatchExact),
+									Type:  common.PointerTo(gwv1.HeaderMatchExact),
 									Name:  "version",
 									Value: "version",
 								},
 							},
 							QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.QueryParamMatchExact),
+									Type:  common.PointerTo(gwv1.QueryParamMatchExact),
 									Name:  "search",
 									Value: "q",
 								},
@@ -1512,7 +1513,7 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:            gwv1beta1.FullPathHTTPPathModifier,
+									Type:            gwv1.FullPathHTTPPathModifier,
 									ReplaceFullPath: common.PointerTo("/foobar"),
 								},
 							},
@@ -1523,7 +1524,7 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+									Type:               gwv1.PrefixMatchHTTPPathModifier,
 									ReplacePrefixMatch: common.PointerTo("/foo"),
 								},
 							},

@@ -47,8 +47,8 @@ func TestHandlerHandle(t *testing.T) {
 		Group:   "",
 		Version: "v1",
 	}, &corev1.Pod{})
-	decoder, err := admission.NewDecoder(s)
-	require.NoError(t, err)
+
+	decoder := admission.NewDecoder(s)
 
 	cases := []struct {
 		Name    string
@@ -1189,8 +1189,8 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 		Group:   "",
 		Version: "v1",
 	}, &corev1.Pod{})
-	decoder, err := admission.NewDecoder(s)
-	require.NoError(t, err)
+
+	decoder := admission.NewDecoder(s)
 
 	cases := []struct {
 		Name    string
