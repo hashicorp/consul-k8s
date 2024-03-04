@@ -397,8 +397,9 @@ func (c *Command) Run(args []string) int {
 		},
 		HealthProbeBindAddress: "0.0.0.0:9445",
 		WebhookServer: webhook.NewServer(webhook.Options{
-			Host: listenSplits[0],
-			Port: port,
+			CertDir: c.flagCertDir,
+			Host:    listenSplits[0],
+			Port:    port,
 		}),
 	})
 	if err != nil {
