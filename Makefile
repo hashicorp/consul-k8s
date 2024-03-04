@@ -1,10 +1,13 @@
 VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
+GOLANG_VERSION?=$(shell head -n 1 .go-version)
 CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
 CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
 CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-dataplane-version.sh charts/consul/values.yaml)
 KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindVersion)
 KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
 KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
+
+GO_MODULES := $(shell find . -name go.mod -exec dirname {} \; | sort)
 
 ##@ Helm Targets
 
@@ -33,7 +36,7 @@ bats-tests: ## Run Helm chart bats tests.
 
 .PHONY: control-plane-dev
 control-plane-dev: ## Build consul-k8s-control-plane binary.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a amd64
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch amd64
 
 .PHONY: dev-docker
 dev-docker: control-plane-dev-docker ## build dev local dev docker image
@@ -41,9 +44,10 @@ dev-docker: control-plane-dev-docker ## build dev local dev docker image
 
 .PHONY: control-plane-dev-docker
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
 	@docker build -t '$(DEV_IMAGE)' \
        --target=dev \
+       --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
@@ -53,8 +57,9 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 .PHONY: control-plane-dev-skaffold
 # DANGER: this target is experimental and could be modified/removed at any time.
 control-plane-dev-skaffold: ## Build consul-k8s-control-plane dev Docker image for use with skaffold or local development.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
 	@docker build -t '$(DEV_IMAGE)' \
+       --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
        -f $(CURDIR)/control-plane/Dockerfile.dev $(CURDIR)/control-plane
 
@@ -66,10 +71,11 @@ endif
 
 .PHONY: control-plane-dev-docker-multi-arch
 control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-k8s-control-plane dev multi-arch Docker image.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a "arm64 amd64"
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch "arm64 amd64"
 	@docker buildx create --use && docker buildx build -t '$(REMOTE_DEV_IMAGE)' \
        --platform linux/amd64,linux/arm64 \
        --target=dev \
+       --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
@@ -78,9 +84,10 @@ control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-
 
 .PHONY: control-plane-fips-dev-docker
 control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker image.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH) --fips
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH) --fips
 	@docker build -t '$(DEV_IMAGE)' \
        --target=dev \
+       --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
@@ -303,6 +310,27 @@ eks-test-packages: ## eks test packages
 .PHONY: aks-test-packages
 aks-test-packages: ## aks test packages
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
+
+.PHONY: go-mod-tidy
+go-mod-tidy: ## Recursively run go mod tidy on all subdirectories
+	@./control-plane/build-support/scripts/mod_tidy.sh
+
+.PHONY: check-mod-tidy
+check-mod-tidy: ## Recursively run go mod tidy on all subdirectories and check if there are any changes
+	@./control-plane/build-support/scripts/mod_tidy.sh --check
+
+.PHONY: go-mod-get
+go-mod-get: $(foreach mod,$(GO_MODULES),go-mod-get/$(mod)) ## Run go get and go mod tidy in every module for the given dependency
+
+.PHONY: go-mod-get/%
+go-mod-get/%:
+ifndef DEP_VERSION
+	$(error DEP_VERSION is undefined: set this to <dependency>@<version>, e.g. github.com/hashicorp/go-hclog@v1.5.0)
+endif
+	@echo "--> Running go get ${DEP_VERSION} ($*)"
+	@cd $* && go get $(DEP_VERSION)
+	@echo "--> Running go mod tidy ($*)"
+	@cd $* && go mod tidy
 
 ##@ Release Targets
 

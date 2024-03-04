@@ -11,6 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
@@ -19,6 +20,8 @@ const (
 	injectInitContainerName      = "consul-mesh-init"
 	initContainersUserAndGroupID = 5996
 )
+
+var tpl = template.Must(template.New("root").Parse(strings.TrimSpace(initContainerCommandTpl)))
 
 type initContainerCommandData struct {
 	ServiceName        string
@@ -30,15 +33,20 @@ type initContainerCommandData struct {
 	LogJSON  bool
 }
 
-// containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
+// initContainer returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func initContainer(config GatewayConfig, name, namespace string) (corev1.Container, error) {
+func (b *gatewayBuilder[T]) initContainer() (corev1.Container, error) {
 	data := initContainerCommandData{
-		AuthMethod:         config.AuthMethod,
-		LogLevel:           config.LogLevel,
-		LogJSON:            config.LogJSON,
-		ServiceName:        name,
-		ServiceAccountName: name,
+		AuthMethod:         b.config.AuthMethod,
+		LogLevel:           b.logLevelForInitContainer(),
+		LogJSON:            b.config.LogJSON,
+		ServiceName:        b.gateway.GetName(),
+		ServiceAccountName: b.serviceAccountName(),
+	}
+	// Render the command
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, &data); err != nil {
+		return corev1.Container{}, err
 	}
 
 	// Create expected volume mounts
@@ -50,40 +58,32 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 	}
 
 	var bearerTokenFile string
-	if config.AuthMethod != "" {
-		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	if b.config.AuthMethod != "" {
+		bearerTokenFile = defaultBearerTokenFile
 	}
 
-	// Render the command
-	var buf bytes.Buffer
-	tpl := template.Must(template.New("root").Parse(strings.TrimSpace(initContainerCommandTpl)))
-
-	if err := tpl.Execute(&buf, &data); err != nil {
-		return corev1.Container{}, err
-	}
-
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.ConsulDestinationNamespace, config.ConsulTenancyConfig.EnableConsulNamespaces, config.ConsulTenancyConfig.NSMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(b.gateway.GetNamespace(), b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
 
 	initContainerName := injectInitContainerName
 	container := corev1.Container{
 		Name:  initContainerName,
-		Image: config.ImageConsulK8S,
+		Image: b.config.ImageConsulK8S,
 
 		Env: []corev1.EnvVar{
 			{
-				Name: "POD_NAME",
+				Name: envPodName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
 				},
 			},
 			{
-				Name: "POD_NAMESPACE",
+				Name: envPodNamespace,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
 				},
 			},
 			{
-				Name: "NODE_NAME",
+				Name: envNodeName,
 				ValueFrom: &corev1.EnvVarSource{
 					FieldRef: &corev1.ObjectFieldSelector{
 						FieldPath: "spec.nodeName",
@@ -91,59 +91,60 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 				},
 			},
 			{
-				Name:  "CONSUL_ADDRESSES",
-				Value: config.ConsulConfig.Address,
+				Name:  envConsulAddresses,
+				Value: b.config.ConsulConfig.Address,
 			},
 			{
-				Name:  "CONSUL_GRPC_PORT",
-				Value: strconv.Itoa(config.ConsulConfig.GRPCPort),
+				Name:  envConsulGRPCPort,
+				Value: strconv.Itoa(b.config.ConsulConfig.GRPCPort),
 			},
 			{
-				Name:  "CONSUL_HTTP_PORT",
-				Value: strconv.Itoa(config.ConsulConfig.HTTPPort),
+				Name:  envConsulHTTPPort,
+				Value: strconv.Itoa(b.config.ConsulConfig.HTTPPort),
 			},
 			{
-				Name:  "CONSUL_API_TIMEOUT",
-				Value: config.ConsulConfig.APITimeout.String(),
+				Name:  envConsulAPITimeout,
+				Value: b.config.ConsulConfig.APITimeout.String(),
 			},
 			{
-				Name:  "CONSUL_NODE_NAME",
+				Name:  envConsulNodeName,
 				Value: "$(NODE_NAME)-virtual",
 			},
 		},
 		VolumeMounts: volMounts,
 		Command:      []string{"/bin/sh", "-ec", buf.String()},
+		Resources:    initContainerResourcesOrDefault(b.gcc),
 	}
 
-	if config.AuthMethod != "" {
+	if b.config.AuthMethod != "" {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
-				Name:  "CONSUL_LOGIN_AUTH_METHOD",
-				Value: config.AuthMethod,
+				Name:  envConsulLoginAuthMethod,
+				Value: b.config.AuthMethod,
 			},
 			corev1.EnvVar{
-				Name:  "CONSUL_LOGIN_BEARER_TOKEN_FILE",
+				Name:  envConsulLoginBearerTokenFile,
 				Value: bearerTokenFile,
 			},
 			corev1.EnvVar{
-				Name:  "CONSUL_LOGIN_META",
+				Name:  envConsulLoginMeta,
 				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 			})
 
-		if config.ConsulTenancyConfig.ConsulPartition != "" {
+		if b.config.ConsulTenancyConfig.ConsulPartition != "" {
 			container.Env = append(container.Env, corev1.EnvVar{
-				Name:  "CONSUL_LOGIN_PARTITION",
-				Value: config.ConsulTenancyConfig.ConsulPartition,
+				Name:  envConsulLoginPartition,
+				Value: b.config.ConsulTenancyConfig.ConsulPartition,
 			})
 		}
 	}
 	container.Env = append(container.Env,
 		corev1.EnvVar{
-			Name:  "CONSUL_NAMESPACE",
+			Name:  envConsulNamespace,
 			Value: consulNamespace,
 		})
 
-	if config.TLSEnabled {
+	if b.config.TLSEnabled {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
 				Name:  constants.UseTLSEnvVar,
@@ -151,23 +152,31 @@ func initContainer(config GatewayConfig, name, namespace string) (corev1.Contain
 			},
 			corev1.EnvVar{
 				Name:  constants.CACertPEMEnvVar,
-				Value: config.ConsulCACert,
+				Value: b.config.ConsulCACert,
 			},
 			corev1.EnvVar{
 				Name:  constants.TLSServerNameEnvVar,
-				Value: config.ConsulTLSServerName,
+				Value: b.config.ConsulTLSServerName,
 			})
 	}
 
-	if config.ConsulTenancyConfig.ConsulPartition != "" {
+	if b.config.ConsulTenancyConfig.ConsulPartition != "" {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
-				Name:  "CONSUL_PARTITION",
-				Value: config.ConsulTenancyConfig.ConsulPartition,
+				Name:  envConsulPartition,
+				Value: b.config.ConsulTenancyConfig.ConsulPartition,
 			})
 	}
 
 	return container, nil
+}
+
+func initContainerResourcesOrDefault(gcc *meshv2beta1.GatewayClassConfig) corev1.ResourceRequirements {
+	if gcc != nil && gcc.Spec.Deployment.InitContainer != nil && gcc.Spec.Deployment.InitContainer.Resources != nil {
+		return *gcc.Spec.Deployment.InitContainer.Resources
+	}
+
+	return corev1.ResourceRequirements{}
 }
 
 // initContainerCommandTpl is the template for the command executed by

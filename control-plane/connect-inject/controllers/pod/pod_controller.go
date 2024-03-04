@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -619,10 +618,7 @@ func getWorkloadPorts(pod corev1.Pod) ([]string, map[string]*pbcatalog.WorkloadP
 
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
-			name := port.Name
-			if name == "" {
-				name = strconv.Itoa(int(port.ContainerPort))
-			}
+			name := inject.WorkloadPortName(&port)
 
 			// TODO: error check reserved "mesh" keyword and 20000
 
@@ -712,10 +708,6 @@ func getWorkloadID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }
@@ -727,10 +719,6 @@ func getProxyConfigurationID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }
@@ -742,10 +730,6 @@ func getHealthStatusID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }
@@ -757,10 +741,6 @@ func getDestinationsID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }

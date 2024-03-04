@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.18-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.19-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -86,7 +86,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.4-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.5-dev
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -654,6 +654,16 @@ global:
     # @type: boolean
     enableAgentMetrics: false
 
+    # Set to true to stop prepending the machine's hostname to gauge-type metrics. Default is false.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
+    # @type: boolean
+    disableAgentHostName: false
+
+    # Configures consul agent underlying host metrics. Only applicable if
+    # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
+    # @type: boolean
+    enableHostMetrics: false
+
     # Configures the retention time for metrics in Consul clients and
     # servers. This must be greater than 0 for Consul clients and servers
     # to expose any metrics at all.
@@ -672,10 +682,152 @@ global:
     # @type: boolean
     enableTelemetryCollector: false
 
+    # This configures the list of filter rules to apply for allowing/blocking
+    # metrics by prefix in the following format:
+    #
+    # A leading "+" will enable any metrics with the given prefix, and a leading "-" will block them.
+    # If there is overlap between two rules, the more specific rule will take precedence.
+    # Blocking will take priority if the same prefix is listed multiple times.
+    #
+    # - allowList:
+    prefixFilter:
+      # @type: array<string>
+      allowList: []
+      # @type: array<string>
+      blockList: []
+
+    # Configures consul integration configurations for datadog on kubernetes.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
+    datadog:
+      # Enables datadog [Consul Autodiscovery Integration](https://docs.datadoghq.com/integrations/consul/?tab=containerized#metric-collection)
+      # by configuring the required `ad.datadoghq.com/consul.checks` annotation. The following _Consul_ agent metrics/health statuses
+      # are monitored by Datadog unless monitoring via OpenMetrics (Prometheus) or DogStatsD:
+      #   - Serf events and member flaps
+      #   - The Raft protocol
+      #   - DNS performance
+      #   - API Endpoints scraped:
+      #     - `/v1/agent/metrics?format=prometheus`
+      #     - `/v1/agent/self`
+      #     - `/v1/status/leader`
+      #     - `/v1/status/peers`
+      #     - `/v1/catalog/services`
+      #     - `/v1/health/service`
+      #     - `/v1/health/state/any`
+      #     - `/v1/coordinate/datacenters`
+      #     - `/v1/coordinate/nodes`
+      #
+      # Setting either `global.metrics.datadog.otlp.enabled=true` or `global.metrics.datadog.dogstatsd.enabled=true` disables the above checks
+      # in lieu of metrics data collection via DogStatsD or by a customer OpenMetrics (Prometheus) collection endpoint.
+      #
+      # ~> **Note:** If you have a [dogstatsd_mapper_profile](https://docs.datadoghq.com/integrations/consul/?tab=host#dogstatsd) configured for Consul
+      # residing on either your Datadog NodeAgent or ClusterAgent the default Consul agent metrics/health status checks will fail. If you do not desire
+      # to utilize DogStatsD metrics emission from Consul, remove this configuration file, and restart your Datadog agent to permit the checks to run.
+      #
+      # @default: false
+      # @type: boolean
+      enabled: false
+
+      # Configures Kubernetes Prometheus/OpenMetrics auto-discovery annotations for use with Datadog.
+      # This configuration is less common and more for advanced usage with custom metrics monitoring
+      # configurations. See https://docs.datadoghq.com/containers/kubernetes/prometheus/?tab=kubernetesadv2 for more details
+      # surround further configuration.
+      openMetricsPrometheus:
+        # @default: false
+        # @type: boolean
+        enabled: false
+
+      otlp:
+        # Enables forwarding of Consul's Telemetry Collector OTLP metrics for
+        # ingestion by Datadog Agent.
+        # @default: false
+        # @type: boolean
+        enabled: false
+        # Protocol used for DataDog Endpoint OTLP ingestion.
+        #
+        # Valid protocol options are one of either:
+        #
+        #   - "http": will forward to DataDog HTTP OTLP Node Agent Endpoint default - "0.0.0.0:4318"
+        #   - "grpc": will forward to DataDog gRPC OTLP Node Agent Endpoint default - "0.0.0.0:4317"
+        #
+        # @default: "http"
+        # @type: string
+        protocol: "http"
+
+      # Configuration settings for DogStatsD metrics aggregation service
+      # that is bundled with the Datadog Agent.
+      # DogStatsD implements the StatsD protocol and adds a few Datadog-specific extensions:
+      # - Histogram metric type
+      # - Service checks
+      # - Events
+      # - Tagging
+      dogstatsd:
+        enabled: false
+        # Sets the socket transport type for dogstatsd:
+        #  - "UDS" (Unix Domain Socket): prefixes `unix://` to URL and appends path to socket (i.e., "unix:///var/run/datadog/dsd.socket")
+        #    If set, this will create the required [hostPath](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath) mount for
+        #    managing [DogStatsD with Unix Domain Socket on Kubernetes](https://docs.datadoghq.com/developers/dogstatsd/unix_socket/?tab=kubernetes).
+        #    The volume is mounted using the `DirectoryOrCreate` type, thereby setting `0755` permissions with the same kubelet group ownership.
+        #
+        #  Applies the following `volumes` and `volumeMounts` to the consul-server stateful set consul containers:
+        #
+        # ```yaml
+        # volumes:
+        #   - name: dsdsocket
+        #     hostPath:
+        #       path: /var/run/datadog
+        #       type: DirectoryOrCreate
+        # volumeMounts:
+        #   - name: dsdsocket
+        #     mountPath: /var/run/datadog
+        #     readOnly: true
+        # ```
+        #  - "UDP" (User Datagram Protocol): assigns address to use `hostname/IP:Port` formatted URL for UDP transport to hostIP based
+        #     dogstatsd sink (i.e., 127.0.0.1:8125). HostIP of Datadog agent must be reachable and known to Consul server emitting metrics.
+        #
+        # @default: "UDS"
+        # @type: string
+        socketTransportType: "UDS"
+        # Sets URL path for dogstatsd:
+        #
+        # Can be either a path to unix domain socket or an IP Address or Hostname that's reachable from the
+        # consul-server service, server containers. When using "UDS" the path will be appended. When using "UDP"
+        # the path will be prepended to the specified `dogstatsdPort`.
+        #
+        # @default: "/var/run/datadog/dsd.socket"
+        # @type: string
+        dogstatsdAddr: "/var/run/datadog/dsd.socket"
+        # Configures IP based dogstatsd designated port that will be appended to "UDP" based transport socket IP/Hostname URL.
+        #
+        # If using a kubernetes service based address (i.e., datadog.default.svc.cluster.local), set this to 0 to
+        # mitigate appending a port value to the dogstatsd address field. Resultant address would be "datadog.default.svc.cluster.local" with
+        # default port setting, while appending a non-zero port would result in "172.10.23.6:8125" with a dogstatsdAddr value
+        # of "172.10.23.6".
+        #
+        # @default: 0
+        # @type: integer
+        dogstatsdPort: 0
+        # Configures datadog [autodiscovery](https://docs.datadoghq.com/containers/kubernetes/log/?tab=operator#autodiscovery)
+        # style [log integration](https://docs.datadoghq.com/integrations/consul/?tab=containerized#log-collection)
+        # configuration for Consul.
+        #
+        # The default settings should handle most Consul Kubernetes deployment schemes. The resultant annotation
+        # will reside on the consul-server statefulset as autodiscovery annotations.
+        # (i.e., ad.datadoghq.com/consul.logs: ["source:consul","consul_service:consul-server", ""])
+        #
+        # @default: ["source:consul","consul_service:consul-server"]
+        # @type: array<string>
+        dogstatsdTags: ["source:consul","consul_service:consul-server"]
+      # Namespace
+      #
+      # @default: "default"
+      # @type: string
+      namespace: "default"
+
+
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.4-dev
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.5-dev
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -951,6 +1103,12 @@ server:
   # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries).
   connect: true
 
+  # When set to true, enables Consul to report additional debugging information, including runtime profiling (pprof) data.
+  # This setting is only required for clusters without ACL enabled. Sets `enable_debug` in server agent config to `true`.
+  # If you change this setting, you must restart the agent for the change to take effect. Default is false.
+  # @type: boolean
+  enableAgentDebug: false
+
   serviceAccount:
     # This value defines additional annotations for the server service account. This should be formatted as a multi-line
     # string.
@@ -1041,8 +1199,14 @@ server:
     # the server cluster is enabled. To disable, set to `false`.
     enabled: true
 
-    # The maximum number of unavailable pods. By default, this will be
-    # automatically computed based on the `server.replicas` value to be `(n/2)-1`.
+    # The maximum number of unavailable pods. In most cases you should not change this as it is automatically set to
+    # the correct number when left as null. This setting has been kept to not break backwards compatibility.
+    #
+    # By default, this is set to 1 internally in the chart. When server pods are stopped gracefully, they leave the Raft
+    # consensus pool. When running an odd number of servers, one server leaving the pool does not change the quorum
+    # size, and so fault tolerance is not affected. However, if more than one server were to leave the pool, the quorum
+    # size would change. That's why this is set to 1 internally and should not be changed in most cases.
+    #
     # If you need to set this to `0`, you will need to add a
     # --set 'server.disruptionBudget.maxUnavailable=0'` flag to the helm chart installation
     # command because of a limitation in the Helm templating language.
@@ -1426,7 +1590,7 @@ externalServers:
   # Note: If enabling clients, `client.join` must also be set to the hosts that should be
   # used to join the cluster. In most cases, the `client.join` values
   # should be the same, however, they may be different if you
-  # wish to use separate hosts for the HTTPS connections.
+  # wish to use separate hosts for the HTTPS connections. `tlsServerName` is required if TLS is enabled and 'hosts' is not a DNS name.
   # @type: array<string>
   hosts: []
 
@@ -1436,7 +1600,7 @@ externalServers:
   # The GRPC port of the Consul servers.
   grpcPort: 8502
 
-  # The server name to use as the SNI host header when connecting with HTTPS.
+  # The server name to use as the SNI host header when connecting with HTTPS. This name also appears as the hostname in the server certificate's subject field.
   # @type: string
   tlsServerName: null
 
@@ -2744,6 +2908,13 @@ connectInject:
       defaultGracefulPort: 20600
       # @type: string
       defaultGracefulShutdownPath: "/graceful_shutdown"
+
+    # Configures how long the k8s startup probe will wait before the proxy is considered to be unhealthy and the container is restarted.
+    # A value of zero disables the probe.
+    defaultStartupFailureSeconds: 0
+    # Configures how long the k8s liveness probe will wait before the proxy is considered to be unhealthy and the container is restarted.
+    # A value of zero disables the probe.
+    defaultLivenessFailureSeconds: 0
 
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of

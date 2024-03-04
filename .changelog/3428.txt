@@ -1,0 +1,4 @@
+```release-note:note
+build: Releases will now also be available as Debian and RPM packages for the arm64 architecture, refer to the
+[Official Packaging Guide](https://www.hashicorp.com/official-packaging-guide) for more information.
+```

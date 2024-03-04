@@ -550,7 +550,7 @@ func TestRun_loadGatewayConfigs(t *testing.T) {
 			expectedClassConfig := v2beta1.GatewayClassConfig{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v2beta1.MeshGroupVersion.String(),
-					Kind:       "GatewayClassConfig",
+					Kind:       v2beta1.KindGatewayClassConfig,
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "consul-mesh-gateway",

@@ -32,6 +32,7 @@ import (
 
 	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	multiclusterv2 "github.com/hashicorp/consul-k8s/control-plane/api/multicluster/v2"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -57,6 +58,7 @@ type Command struct {
 	flagLogLevel              string
 	flagLogJSON               bool
 	flagResourceAPIs          bool // Use V2 APIs
+	flagV2Tenancy             bool // Use V2 partitions (ent only) and namespaces instead of V1 counterparts
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -87,6 +89,9 @@ type Command struct {
 	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
 	flagDefaultSidecarProxyLifecycleGracefulPort                 string
 	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
+
+	flagDefaultSidecarProxyStartupFailureSeconds  int
+	flagDefaultSidecarProxyLivenessFailureSeconds int
 
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
@@ -166,8 +171,9 @@ func init() {
 	// V2 resources
 	utilruntime.Must(authv2beta1.AddAuthToScheme(scheme))
 	utilruntime.Must(meshv2beta1.AddMeshToScheme(scheme))
+	utilruntime.Must(multiclusterv2.AddMultiClusterToScheme(scheme))
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 }
 
 func (c *Command) init() {
@@ -235,6 +241,8 @@ func (c *Command) init() {
 		"Enable or disable JSON output format for logging.")
 	c.flagSet.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
 		"Enable or disable Consul V2 Resource APIs.")
+	c.flagSet.BoolVar(&c.flagV2Tenancy, "enable-v2tenancy", false,
+		"Enable or disable Consul V2 tenancy.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -248,6 +256,9 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds, "default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds", 0, "Default sidecar proxy shutdown grace period in seconds.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulPort, "default-sidecar-proxy-lifecycle-graceful-port", strconv.Itoa(constants.DefaultGracefulPort), "Default port for sidecar proxy lifecycle management HTTP endpoints.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath, "default-sidecar-proxy-lifecycle-graceful-shutdown-path", "/graceful_shutdown", "Default sidecar proxy lifecycle management graceful shutdown path.")
+
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyStartupFailureSeconds, "default-sidecar-proxy-startup-failure-seconds", 0, "Default number of seconds for the k8s startup probe to fail before the proxy container is restarted. Zero disables the probe.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLivenessFailureSeconds, "default-sidecar-proxy-liveness-failure-seconds", 0, "Default number of seconds for the k8s liveness probe to fail before the proxy container is restarted. Zero disables the probe.")
 
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
@@ -418,6 +429,19 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagConsulDataplaneImage == "" {
 		return errors.New("-consul-dataplane-image must be set")
+	}
+
+	// In Consul 1.17, multiport beta shipped with v2 catalog + mesh resources backed by v1 tenancy
+	// and acls (experiments=[resource-apis]).
+	//
+	// With Consul 1.18, we built out v2 tenancy with no support for acls, hence need to be explicit
+	// about which combination of v1 + v2 features are enabled.
+	//
+	// To summarize:
+	// - experiments=[resource-apis] => v2 catalog and mesh + v1 tenancy and acls
+	// - experiments=[resource-apis, v2tenancy] => v2 catalog and mesh + v2 tenancy + acls disabled
+	if c.flagV2Tenancy && !c.flagResourceAPIs {
+		return errors.New("-enable-resource-apis must be set to 'true' if -enable-v2tenancy is set")
 	}
 
 	if c.flagEnablePartitions && c.consul.Partition == "" {

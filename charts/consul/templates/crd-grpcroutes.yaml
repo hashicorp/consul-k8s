@@ -72,9 +72,10 @@ spec:
                   description: 'NOTE: roughly equivalent to structs.ResourceReference'
                   properties:
                     port:
-                      description: For east/west this is the name of the Consul Service
+                      description: "For east/west this is the name of the Consul Service
                         port to direct traffic to or empty to imply all. For north/south
-                        this is TBD.
+                        this is TBD. \n For more details on potential values of this
+                        field, see documentation for Service.ServicePort."
                       type: string
                     ref:
                       description: For east/west configuration, this should point
@@ -105,13 +106,6 @@ spec:
                                 \n When using the List and WatchList endpoints, provide
                                 the wildcard value \"*\" to list resources across
                                 all partitions."
-                              type: string
-                            peerName:
-                              description: "PeerName identifies which peer the resource
-                                is imported from. https://developer.hashicorp.com/consul/docs/connect/cluster-peering
-                                \n When using the List and WatchList endpoints, provide
-                                the wildcard value \"*\" to list resources across
-                                all peers."
                               type: string
                           type: object
                         type:
@@ -166,7 +160,9 @@ spec:
                                 description: "For east/west this is the name of the
                                   Consul Service port to direct traffic to or empty
                                   to imply using the same value as the parent ref.
-                                  \n For north/south this is TBD."
+                                  For north/south this is TBD. \n For more details
+                                  on potential values of this field, see documentation
+                                  for Service.ServicePort."
                                 type: string
                               ref:
                                 description: For east/west configuration, this should
@@ -198,13 +194,6 @@ spec:
                                           \n When using the List and WatchList endpoints,
                                           provide the wildcard value \"*\" to list
                                           resources across all partitions."
-                                        type: string
-                                      peerName:
-                                        description: "PeerName identifies which peer
-                                          the resource is imported from. https://developer.hashicorp.com/consul/docs/connect/cluster-peering
-                                          \n When using the List and WatchList endpoints,
-                                          provide the wildcard value \"*\" to list
-                                          resources across all peers."
                                         type: string
                                     type: object
                                   type:

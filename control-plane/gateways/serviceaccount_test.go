@@ -14,12 +14,12 @@ import (
 )
 
 func TestNewMeshGatewayBuilder_ServiceAccount(t *testing.T) {
-	b := NewMeshGatewayBuilder(&meshv2beta1.MeshGateway{
+	b := NewGatewayBuilder(&meshv2beta1.MeshGateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "mesh-gateway",
 		},
-	}, GatewayConfig{}, nil)
+	}, GatewayConfig{}, nil, MeshGatewayAnnotationKind)
 
 	expected := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{

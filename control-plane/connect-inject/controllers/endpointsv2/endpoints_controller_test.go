@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
@@ -33,7 +32,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
@@ -60,7 +58,6 @@ type reconcileCase struct {
 }
 
 // TODO(NET-5716): Allow/deny namespaces for reconcile tests
-// TODO(NET-5932): Add tests for consistently sorting repeated output fields (getConsulService, getServicePorts)
 
 func TestReconcile_CreateService(t *testing.T) {
 	t.Parallel()
@@ -231,7 +228,7 @@ func TestReconcile_CreateService(t *testing.T) {
 								Name:       "other",
 								Port:       10001,
 								Protocol:   "TCP",
-								TargetPort: intstr.FromString("10001"),
+								TargetPort: intstr.FromString("cslport-10001"),
 								// no app protocol specified
 							},
 						},
@@ -262,7 +259,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 10001,
-							TargetPort:  "10001",
+							TargetPort:  "cslport-10001",
 							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
 						},
 						{
@@ -556,12 +553,12 @@ func TestReconcile_CreateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 9090,
-							TargetPort:  "6789", // Matches service target number
+							TargetPort:  "cslport-6789", // Matches service target number
 							Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
 						},
 						{
 							VirtualPort: 10010,
-							TargetPort:  "10010", // Matches service target number (unmatched by container ports)
+							TargetPort:  "cslport-10010", // Matches service target number (unmatched by container ports)
 							Protocol:    pbcatalog.Protocol_PROTOCOL_HTTP,
 						},
 						{
@@ -715,7 +712,7 @@ func TestReconcile_CreateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 9090,
-							TargetPort:  "6789", // Matches service target number due to unnamed being most common
+							TargetPort:  "cslport-6789", // Matches service target number due to unnamed being most common
 							Protocol:    pbcatalog.Protocol_PROTOCOL_GRPC,
 						},
 						{
@@ -1271,7 +1268,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 10001,
-							TargetPort:  "10001",
+							TargetPort:  "unspec-port", //this might need to be changed to "my_unspecified_port"
 							Protocol:    pbcatalog.Protocol_PROTOCOL_UNSPECIFIED,
 						},
 						{
@@ -1392,7 +1389,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 								Name:       "other",
 								Port:       10001,
 								Protocol:   "TCP",
-								TargetPort: intstr.FromString("10001"),
+								TargetPort: intstr.FromString("cslport-10001"),
 								// no app protocol specified
 							},
 						},
@@ -1423,7 +1420,7 @@ func TestReconcile_UpdateService(t *testing.T) {
 						},
 						{
 							VirtualPort: 10001,
-							TargetPort:  "10001",
+							TargetPort:  "cslport-10001",
 							Protocol:    pbcatalog.Protocol_PROTOCOL_TCP,
 						},
 						{
@@ -1755,9 +1752,6 @@ func TestEnsureService(t *testing.T) {
 		c.Experiments = []string{"resource-apis"}
 	})
 
-	resourceClient, err := consul.NewResourceServiceClient(testClient.Watcher)
-	require.NoError(t, err)
-
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create the Endpoints controller.
@@ -1774,7 +1768,7 @@ func TestEnsureService(t *testing.T) {
 
 			// Set up test resourceReadWriter
 			rw := struct{ testReadWriter }{}
-			defaultRw := defaultResourceReadWriter{resourceClient}
+			defaultRw := defaultResourceReadWriter{testClient.ResourceClient}
 			rw.readFn = defaultRw.Read
 			rw.writeFn = defaultRw.Write
 			if tc.readFn != nil {
@@ -1798,7 +1792,7 @@ func TestEnsureService(t *testing.T) {
 			require.NoError(t, err)
 
 			// Get written resource before additional calls
-			beforeResource := getAndValidateResource(t, resourceClient, id)
+			beforeResource := getAndValidateResource(t, testClient.ResourceClient, id)
 
 			// Call a second time
 			err = ep.ensureService(context.Background(), &rw, tc.afterArgs.k8sUid, id, tc.afterArgs.meta, tc.afterArgs.consulSvc)
@@ -1806,26 +1800,26 @@ func TestEnsureService(t *testing.T) {
 
 			// Check for change on second call to ensureService
 			if tc.expectWrite {
-				require.NotEqual(t, beforeResource.GetGeneration(), getAndValidateResource(t, resourceClient, id).GetGeneration(),
+				require.NotEqual(t, beforeResource.GetGeneration(), getAndValidateResource(t, testClient.ResourceClient, id).GetGeneration(),
 					"wanted different version for before and after resources following modification and reconcile")
 			} else {
-				require.Equal(t, beforeResource.GetGeneration(), getAndValidateResource(t, resourceClient, id).GetGeneration(),
+				require.Equal(t, beforeResource.GetGeneration(), getAndValidateResource(t, testClient.ResourceClient, id).GetGeneration(),
 					"wanted same version for before and after resources following repeat reconcile")
 			}
 
 			// Call several additional times
 			for i := 0; i < 5; i++ {
 				// Get written resource before each additional call
-				beforeResource = getAndValidateResource(t, resourceClient, id)
+				beforeResource = getAndValidateResource(t, testClient.ResourceClient, id)
 
 				err := ep.ensureService(context.Background(), &rw, tc.afterArgs.k8sUid, id, tc.afterArgs.meta, tc.afterArgs.consulSvc)
 				require.NoError(t, err)
 
 				if tc.expectAlwaysWrite {
-					require.NotEqual(t, beforeResource.GetGeneration(), getAndValidateResource(t, resourceClient, id).GetGeneration(),
+					require.NotEqual(t, beforeResource.GetGeneration(), getAndValidateResource(t, testClient.ResourceClient, id).GetGeneration(),
 						"wanted different version for before and after resources following modification and reconcile")
 				} else {
-					require.Equal(t, beforeResource.GetGeneration(), getAndValidateResource(t, resourceClient, id).GetGeneration(),
+					require.Equal(t, beforeResource.GetGeneration(), getAndValidateResource(t, testClient.ResourceClient, id).GetGeneration(),
 						"wanted same version for before and after resources following repeat reconcile")
 				}
 			}
@@ -2196,11 +2190,6 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 		c.Experiments = []string{"resource-apis"}
 	})
 
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
-
 	// Create the Endpoints controller.
 	ep := &Controller{
 		Client:              fakeClient,
@@ -2212,8 +2201,6 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 			DenyK8sNamespacesSet:  mapset.NewSetWith(),
 		},
 	}
-	resourceClient, err := consul.NewResourceServiceClient(ep.ConsulServerConnMgr)
-	require.NoError(t, err)
 
 	// Default ns and partition if not specified in test.
 	if tc.targetConsulNs == "" {
@@ -2226,9 +2213,9 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	// If existing resource specified, create it and ensure it exists.
 	if tc.existingResource != nil {
 		writeReq := &pbresource.WriteRequest{Resource: tc.existingResource}
-		_, err = resourceClient.Write(context.Background(), writeReq)
+		_, err := testClient.ResourceClient.Write(context.Background(), writeReq)
 		require.NoError(t, err)
-		test.ResourceHasPersisted(t, context.Background(), resourceClient, tc.existingResource.Id)
+		test.ResourceHasPersisted(t, context.Background(), testClient.ResourceClient, tc.existingResource.Id)
 	}
 
 	// Run actual reconcile and verify results.
@@ -2245,10 +2232,10 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	}
 	require.False(t, resp.Requeue)
 
-	expectedServiceMatches(t, resourceClient, tc.svcName, tc.targetConsulNs, tc.targetConsulPartition, tc.expectedResource)
+	expectedServiceMatches(t, testClient.ResourceClient, tc.svcName, tc.targetConsulNs, tc.targetConsulPartition, tc.expectedResource)
 
 	if tc.caseFn != nil {
-		tc.caseFn(t, &tc, ep, resourceClient)
+		tc.caseFn(t, &tc, ep, testClient.ResourceClient)
 	}
 }
 

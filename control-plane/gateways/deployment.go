@@ -15,15 +15,16 @@ import (
 
 const (
 	globalDefaultInstances    int32 = 1
-	meshGatewayAnnotationKind       = "mesh-gateway"
+	MeshGatewayAnnotationKind       = "mesh-gateway"
+	APIGatewayAnnotationKind        = "api-gateway"
 )
 
-func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
+func (b *gatewayBuilder[T]) Deployment() (*appsv1.Deployment, error) {
 	spec, err := b.deploymentSpec()
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        b.gateway.Name,
-			Namespace:   b.gateway.Namespace,
+			Name:        b.gateway.GetName(),
+			Namespace:   b.gateway.GetNamespace(),
 			Labels:      b.labelsForDeployment(),
 			Annotations: b.annotationsForDeployment(),
 		},
@@ -31,17 +32,14 @@ func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
 	}, err
 }
 
-func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
-	initContainer, err := initContainer(b.config, b.gateway.Name, b.gateway.Namespace)
-	if err != nil {
-		return nil, err
-	}
-
+func (b *gatewayBuilder[T]) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	var (
-		containerConfig  meshv2beta1.GatewayClassContainerConfig
 		deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
+		containerConfig  meshv2beta1.GatewayClassContainerConfig
 	)
 
+	// If GatewayClassConfig is not nil, use it to override the defaults for
+	// the deployment and container configs.
 	if b.gcc != nil {
 		deploymentConfig = b.gcc.Spec.Deployment
 		if deploymentConfig.Container != nil {
@@ -49,7 +47,12 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 		}
 	}
 
-	container, err := consulDataplaneContainer(b.config, containerConfig, b.gateway.Name, b.gateway.Namespace)
+	initContainer, err := b.initContainer()
+	if err != nil {
+		return nil, err
+	}
+
+	container, err := b.consulDataplaneContainer(containerConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -65,18 +68,18 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 				Annotations: map[string]string{
 					// Indicate that this pod is a mesh gateway pod so that the Pod controller,
 					// consul-k8s CLI, etc. can key off of it
-					constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
+					constants.AnnotationGatewayKind: b.gatewayKind,
 					// It's not logical to add a proxy sidecar since our workload is itself a proxy
 					constants.AnnotationMeshInject: "false",
 					// This functionality only applies when proxy sidecars are used
 					constants.AnnotationTransparentProxyOverwriteProbes: "false",
 					// This annotation determines which source to use to set the
 					// WAN address and WAN port for the Mesh Gateway service registration.
-					constants.AnnotationGatewayWANSource: b.gateway.Annotations[constants.AnnotationGatewayWANSource],
+					constants.AnnotationGatewayWANSource: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANSource],
 					// This annotation determines the WAN port for the Mesh Gateway service registration.
-					constants.AnnotationGatewayWANPort: b.gateway.Annotations[constants.AnnotationGatewayWANPort],
+					constants.AnnotationGatewayWANPort: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANPort],
 					// This annotation determines the address for the gateway when the source annotation is "Static".
-					constants.AnnotationGatewayWANAddress: b.gateway.Annotations[constants.AnnotationGatewayWANAddress],
+					constants.AnnotationGatewayWANAddress: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANAddress],
 				},
 			},
 			Spec: corev1.PodSpec{
@@ -107,19 +110,10 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	}, nil
 }
 
-func (b *meshGatewayBuilder) MergeDeployments(gcc *meshv2beta1.GatewayClassConfig, old, new *appsv1.Deployment) *appsv1.Deployment {
-	if old == nil {
-		return new
-	}
-	if !compareDeployments(old, new) {
-		old.Spec.Template = new.Spec.Template
-		new.Spec.Replicas = deploymentReplicaCount(nil, old.Spec.Replicas)
-	}
-
-	return new
-}
-
-func compareDeployments(a, b *appsv1.Deployment) bool {
+// areDeploymentsEqual determines whether two Deployments are the same in
+// the ways that we care about. This specifically ignores valid out-of-band
+// changes such as initContainer injection.
+func areDeploymentsEqual(a, b *appsv1.Deployment) bool {
 	// since K8s adds a bunch of defaults when we create a deployment, check that
 	// they don't differ by the things that we may actually change, namely container
 	// ports
@@ -180,4 +174,35 @@ func deploymentReplicaCount(replicas *meshv2beta1.GatewayClassReplicasConfig, cu
 
 	// otherwise use the global default
 	return pointer.Int32(globalDefaultInstances)
+}
+
+// MergeDeployment is used to update an appsv1.Deployment without overwriting any
+// existing annotations or labels that were placed there by other vendors.
+//
+// based on https://github.com/kubernetes-sigs/controller-runtime/blob/4000e996a202917ad7d40f02ed8a2079a9ce25e9/pkg/controller/controllerutil/example_test.go
+func MergeDeployment(existing, desired *appsv1.Deployment) {
+	// Only overwrite fields if the Deployment doesn't exist yet
+	if existing.ObjectMeta.CreationTimestamp.IsZero() {
+		existing.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
+		existing.Spec = desired.Spec
+		existing.Annotations = desired.Annotations
+		existing.Labels = desired.Labels
+		return
+	}
+
+	// Make sure we don't reconcile forever by overwriting valid out-of-band
+	// changes such as init container injection. If the deployments are
+	// sufficiently equal, we only update the annotations.
+	if !areDeploymentsEqual(existing, desired) {
+		desired.Spec.Replicas = deploymentReplicaCount(nil, existing.Spec.Replicas)
+		existing.Spec = desired.Spec
+	}
+
+	// If the Deployment already exists, add any desired annotations + labels to existing set
+	for k, v := range desired.ObjectMeta.Annotations {
+		existing.ObjectMeta.Annotations[k] = v
+	}
+	for k, v := range desired.ObjectMeta.Labels {
+		existing.ObjectMeta.Labels[k] = v
+	}
 }

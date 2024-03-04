@@ -1,0 +1,3 @@
+```release-note:improvement
+api-gateway: Apply `connectInject.initContainer.resources` to the init container for API gateway Pods.
+```

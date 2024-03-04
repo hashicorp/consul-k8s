@@ -162,12 +162,12 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
-           -gateway-kind="mesh-gateway" \
-           -proxy-id-file=/consul/service/proxy-id \
-           -service-name={{ .Values.meshGateway.consulServiceName }} \
-           -log-level={{ default .Values.global.logLevel .Values.meshGateway.logLevel }} \
-           -log-json={{ .Values.global.logJSON }}
+          exec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
+            -gateway-kind="mesh-gateway" \
+            -proxy-id-file=/consul/service/proxy-id \
+            -service-name={{ .Values.meshGateway.consulServiceName }} \
+            -log-level={{ default .Values.global.logLevel .Values.meshGateway.logLevel }} \
+            -log-json={{ .Values.global.logJSON }}
         volumeMounts:
         - name: consul-service
           mountPath: /consul/service
@@ -184,6 +184,14 @@ spec:
       containers:
       - name: mesh-gateway
         image: {{ .Values.global.imageConsulDataplane | quote }}
+        securityContext:
+          capabilities:
+            {{ if not .Values.meshGateway.hostNetwork}}
+            drop:
+              - ALL
+            {{- end }}
+            add:
+              - NET_BIND_SERVICE
         {{- if .Values.meshGateway.resources }}
         resources:
             {{- if eq (typeOf .Values.meshGateway.resources) "string" }}

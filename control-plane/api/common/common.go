@@ -29,13 +29,14 @@ const (
 	RouteAuthFilter          string = "routeauthfilter"
 	GatewayPolicy            string = "gatewaypolicy"
 
-	// V2 config entries.
+	// V2 resources.
 	TrafficPermissions string = "trafficpermissions"
 	GRPCRoute          string = "grpcroute"
 	HTTPRoute          string = "httproute"
 	TCPRoute           string = "tcproute"
 	ProxyConfiguration string = "proxyconfiguration"
 	MeshGateway        string = "meshgateway"
+	APIGateway         string = "apigateway"
 	GatewayClass       string = "gatewayclass"
 	GatewayClassConfig string = "gatewayclassconfig"
 	MeshConfiguration  string = "meshconfiguration"

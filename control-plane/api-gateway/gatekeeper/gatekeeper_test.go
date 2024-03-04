@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 var (
@@ -33,12 +35,28 @@ var (
 	dataplaneImage      = "hashicorp/consul-dataplane"
 	name                = "test"
 	namespace           = "default"
-	labels              = map[string]string{
+
+	labels = map[string]string{
+		"component":                              "api-gateway",
 		"gateway.consul.hashicorp.com/name":      name,
 		"gateway.consul.hashicorp.com/namespace": namespace,
 		createdAtLabelKey:                        createdAtLabelValue,
 		"gateway.consul.hashicorp.com/managed":   "true",
 	}
+
+	// These annotations are used for testing that annotations stay on the service after reconcile.
+	copyAnnotationKey = "copy-this-annotation"
+	copyAnnotations   = map[string]string{
+		copyAnnotationKey: "copy-this-annotation-value",
+	}
+	externalAnnotations = map[string]string{
+		"external-annotation": "external-annotation-value",
+	}
+	externalAndCopyAnnotations = map[string]string{
+		"external-annotation": "external-annotation-value",
+		copyAnnotationKey:     "copy-this-annotation-value",
+	}
+
 	listeners = []gwv1beta1.Listener{
 		{
 			Name:     "Listener 1",
@@ -67,6 +85,10 @@ type testCase struct {
 
 	initialResources resources
 	finalResources   resources
+
+	// This is used to ignore the timestamp on the service when comparing the final resources
+	// This is useful for testing an update on a service
+	ignoreTimestampOnService bool
 }
 
 type resources struct {
@@ -107,6 +129,16 @@ func TestUpsert(t *testing.T) {
 			},
 			helmConfig: common.HelmConfig{
 				ImageDataplane: dataplaneImage,
+				InitContainerResources: &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    requireQuantity(t, "100m"),
+						corev1.ResourceMemory: requireQuantity(t, "2Gi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    requireQuantity(t, "100m"),
+						corev1.ResourceMemory: requireQuantity(t, "2Gi"),
+					},
+				},
 			},
 			initialResources: resources{},
 			finalResources: resources{
@@ -177,7 +209,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8080,
 							TargetPort: intstr.FromInt(8080),
 						},
-					}, "1"),
+					}, "1", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -229,7 +261,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
-					}, "1"),
+					}, "1", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -287,7 +319,7 @@ func TestUpsert(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
-					}, "1"),
+					}, "1", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -413,7 +445,7 @@ func TestUpsert(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8080,
 						},
-					}, "1"),
+					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -443,12 +475,13 @@ func TestUpsert(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
-					}, "2"),
+					}, "2", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
 				},
 			},
+			ignoreTimestampOnService: true,
 		},
 		"update a gateway, removing a listener from a service": {
 			gateway: gwv1beta1.Gateway{
@@ -502,7 +535,7 @@ func TestUpsert(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8081,
 						},
-					}, "1"),
+					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -526,12 +559,13 @@ func TestUpsert(t *testing.T) {
 							Port:       8080,
 							TargetPort: intstr.FromInt(8080),
 						},
-					}, "2"),
+					}, "2", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
 				},
 			},
+			ignoreTimestampOnService: true,
 		},
 		"updating a gateway deployment respects the number of replicas a user has set": {
 			gateway: gwv1beta1.Gateway{
@@ -573,6 +607,144 @@ func TestUpsert(t *testing.T) {
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
+		},
+		"updating a gateway deployment respects the labels and annotations a user has set": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        name,
+					Namespace:   namespace,
+					Annotations: copyAnnotations,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(5)),
+						MaxInstances:     common.PointerTo(int32(7)),
+						MinInstances:     common.PointerTo(int32(1)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{Service: []string{copyAnnotationKey}},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
+			initialResources: resources{
+				services: []*corev1.Service{
+					configureService(name, namespace, labels, externalAnnotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+						{
+							Name:       "Listener 1",
+							Protocol:   "TCP",
+							Port:       8080,
+							TargetPort: intstr.FromInt(8080),
+						},
+						{
+							Name:       "Listener 2",
+							Protocol:   "TCP",
+							Port:       8081,
+							TargetPort: intstr.FromInt(8081),
+						},
+					}, "1", true, false),
+				},
+			},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{},
+				roles:       []*rbac.Role{},
+				services: []*corev1.Service{
+					configureService(name, namespace, labels, externalAndCopyAnnotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+						{
+							Name:       "Listener 1",
+							Protocol:   "TCP",
+							Port:       8080,
+							TargetPort: intstr.FromInt(8080),
+						},
+						{
+							Name:       "Listener 2",
+							Protocol:   "TCP",
+							Port:       8081,
+							TargetPort: intstr.FromInt(8081),
+						},
+					}, "2", false, false),
+				},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+			ignoreTimestampOnService: true,
+		},
+		"updating a gateway that has copy-annotations and labels doesn't panic if another controller has removed them all": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        name,
+					Namespace:   namespace,
+					Annotations: copyAnnotations,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(5)),
+						MaxInstances:     common.PointerTo(int32(7)),
+						MinInstances:     common.PointerTo(int32(1)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{Service: []string{copyAnnotationKey}},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{
+				ImageDataplane: dataplaneImage,
+			},
+			initialResources: resources{
+				services: []*corev1.Service{
+					configureService(name, namespace, nil, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+						{
+							Name:       "Listener 1",
+							Protocol:   "TCP",
+							Port:       8080,
+							TargetPort: intstr.FromInt(8080),
+						},
+						{
+							Name:       "Listener 2",
+							Protocol:   "TCP",
+							Port:       8081,
+							TargetPort: intstr.FromInt(8081),
+						},
+					}, "1", true, false),
+				},
+			},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{},
+				roles:       []*rbac.Role{},
+				services: []*corev1.Service{
+					configureService(name, namespace, labels, copyAnnotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+						{
+							Name:       "Listener 1",
+							Protocol:   "TCP",
+							Port:       8080,
+							TargetPort: intstr.FromInt(8080),
+						},
+						{
+							Name:       "Listener 2",
+							Protocol:   "TCP",
+							Port:       8081,
+							TargetPort: intstr.FromInt(8081),
+						},
+					}, "2", false, false),
+				},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+			ignoreTimestampOnService: true,
 		},
 		"update a gateway deployment by scaling it when no min or max number of instances is defined on the GatewayClassConfig": {
 			gateway: gwv1beta1.Gateway{
@@ -762,7 +934,7 @@ func TestUpsert(t *testing.T) {
 
 			err := gatekeeper.Upsert(context.Background(), tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 			require.NoError(t, err)
-			require.NoError(t, validateResourcesExist(t, client, tc.finalResources))
+			require.NoError(t, validateResourcesExist(t, client, tc.helmConfig, tc.finalResources, tc.ignoreTimestampOnService))
 		})
 	}
 }
@@ -854,7 +1026,7 @@ func TestDelete(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8081,
 						},
-					}, "1"),
+					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -915,7 +1087,7 @@ func TestDelete(t *testing.T) {
 							Protocol: "TCP",
 							Port:     8081,
 						},
-					}, "1"),
+					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
@@ -951,7 +1123,7 @@ func TestDelete(t *testing.T) {
 				Name:      tc.gateway.Name,
 			})
 			require.NoError(t, err)
-			require.NoError(t, validateResourcesExist(t, client, tc.finalResources))
+			require.NoError(t, validateResourcesExist(t, client, tc.helmConfig, tc.finalResources, false))
 			require.NoError(t, validateResourcesAreDeleted(t, client, tc.initialResources))
 		})
 	}
@@ -981,7 +1153,7 @@ func joinResources(resources resources) (objs []client.Object) {
 	return objs
 }
 
-func validateResourcesExist(t *testing.T, client client.Client, resources resources) error {
+func validateResourcesExist(t *testing.T, client client.Client, helmConfig common.HelmConfig, resources resources, ignoreTimestampOnService bool) error {
 	t.Helper()
 
 	for _, expected := range resources.deployments {
@@ -1007,6 +1179,23 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 			require.NotNil(t, actual.Spec.Replicas)
 			require.EqualValues(t, *expected.Spec.Replicas, *actual.Spec.Replicas)
 		}
+		require.Equal(t, expected.Spec.Template.ObjectMeta.Annotations, actual.Spec.Template.ObjectMeta.Annotations)
+		require.Equal(t, expected.Spec.Template.ObjectMeta.Labels, actual.Spec.Template.Labels)
+
+		// Ensure there is an init container
+		hasInitContainer := false
+		for _, container := range actual.Spec.Template.Spec.InitContainers {
+			if container.Name == injectInitContainerName {
+				hasInitContainer = true
+
+				// If the Helm config specifies init container resources, verify they are set
+				if helmConfig.InitContainerResources != nil {
+					assert.Equal(t, helmConfig.InitContainerResources.Limits, container.Resources.Limits)
+					assert.Equal(t, helmConfig.InitContainerResources.Requests, container.Resources.Requests)
+				}
+			}
+		}
+		assert.True(t, hasInitContainer)
 
 		// Ensure there is a consul-dataplane container dropping ALL capabilities, adding
 		// back the NET_BIND_SERVICE capability, and establishing a read-only root filesystem
@@ -1070,6 +1259,10 @@ func validateResourcesExist(t *testing.T, client client.Client, resources resour
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 		actual.Spec.Selector[createdAtLabelKey] = createdAtLabelValue
+
+		if ignoreTimestampOnService {
+			expected.CreationTimestamp = actual.CreationTimestamp
+		}
 
 		require.Equal(t, expected, actual)
 	}
@@ -1189,7 +1382,9 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 					Annotations: map[string]string{
-						"consul.hashicorp.com/connect-inject": "false",
+						constants.AnnotationInject:                   "false",
+						constants.AnnotationGatewayConsulServiceName: name,
+						constants.AnnotationGatewayKind:              "api-gateway",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -1290,8 +1485,16 @@ func configureRoleBinding(name, namespace string, labels map[string]string, reso
 	}
 }
 
-func configureService(name, namespace string, labels, annotations map[string]string, serviceType corev1.ServiceType, ports []corev1.ServicePort, resourceVersion string) *corev1.Service {
-	return &corev1.Service{
+func configureService(name, namespace string, labels, annotations map[string]string, serviceType corev1.ServiceType, ports []corev1.ServicePort, resourceVersion string, isInitialResource, addExternalLabel bool) *corev1.Service {
+
+	// This is used only to test that any external labels added to the service
+	// are not removed on reconcile
+	combinedLabels := labels
+	if addExternalLabel {
+		combinedLabels["extra-label"] = "extra-label-value"
+	}
+
+	service := corev1.Service{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Service",
@@ -1299,7 +1502,7 @@ func configureService(name, namespace string, labels, annotations map[string]str
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			Namespace:       namespace,
-			Labels:          labels,
+			Labels:          combinedLabels,
 			Annotations:     annotations,
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
@@ -1318,6 +1521,12 @@ func configureService(name, namespace string, labels, annotations map[string]str
 			Ports:    ports,
 		},
 	}
+
+	if isInitialResource {
+		service.ObjectMeta.CreationTimestamp = metav1.Now()
+	}
+
+	return &service
 }
 
 func configureServiceAccount(name, namespace string, labels map[string]string, resourceVersion string) *corev1.ServiceAccount {
@@ -1342,4 +1551,10 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 			},
 		},
 	}
+}
+
+func requireQuantity(t *testing.T, v string) resource.Quantity {
+	quantity, err := resource.ParseQuantity(v)
+	require.NoError(t, err)
+	return quantity
 }

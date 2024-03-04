@@ -1,0 +1,16 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: mesh.consul.hashicorp.com/v2beta1
+kind: APIGateway
+metadata:
+  name: gateway
+spec:
+  gatewayClassName: gateway-class
+  listeners:
+  - protocol: TCP
+    port: 81
+    name: tcp
+    allowedRoutes:
+      namespaces:
+        from: "All"

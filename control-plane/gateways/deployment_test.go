@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
@@ -40,7 +42,7 @@ RQIgXg8YtejEgGNxswtyXsvqzhLpt7k44L7TJMUhfIw0lUECIQCIxKNowmv0/XVz                
 nRnYLmGy79EZ2Y+CZS9nSm9Es6QNwg==                                                                                                                         │
 -----END CERTIFICATE-----`
 
-func Test_meshGatewayBuilder_Deployment(t *testing.T) {
+func Test_gatewayBuilder_Deployment(t *testing.T) {
 	type fields struct {
 		gateway *meshv2beta1.MeshGateway
 		config  GatewayConfig
@@ -65,6 +67,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 					},
 					Spec: pbmesh.MeshGateway{
 						GatewayClassName: "test-gateway-class",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				config: GatewayConfig{},
@@ -77,6 +86,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									"chart":    "consul-helm",
 									"heritage": "Helm",
 									"release":  "consul",
+								},
+							},
+							Annotations: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+								Set: map[string]string{
+									"a": "b",
 								},
 							},
 						},
@@ -102,9 +116,26 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									},
 								},
 							},
+							GatewayClassAnnotationsAndLabels: meshv2beta1.GatewayClassAnnotationsAndLabels{
+								Labels: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+									Set: map[string]string{
+										"foo": "bar",
+									},
+								},
+								Annotations: meshv2beta1.GatewayClassAnnotationsLabelsConfig{
+									Set: map[string]string{
+										"baz": "qux",
+									},
+								},
+							},
 							Container: &meshv2beta1.GatewayClassContainerConfig{
 								HostPort:     8080,
 								PortModifier: 8000,
+								Consul: meshv2beta1.GatewayClassConsulConfig{
+									Logging: meshv2beta1.GatewayClassConsulLoggingConfig{
+										Level: "debug",
+									},
+								},
 							},
 							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
@@ -120,6 +151,23 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									WhenUnsatisfiable: "DoNotSchedule",
 								},
 							},
+							InitContainer: &meshv2beta1.GatewayClassInitContainerConfig{
+								Resources: &corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										"cpu":    resource.MustParse("100m"),
+										"memory": resource.MustParse("128Mi"),
+									},
+									Limits: corev1.ResourceList{
+										"cpu":    resource.MustParse("200m"),
+										"memory": resource.MustParse("228Mi"),
+									},
+								},
+								Consul: meshv2beta1.GatewayClassConsulConfig{
+									Logging: meshv2beta1.GatewayClassConsulLoggingConfig{
+										Level: "debug",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -132,9 +180,12 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						"chart":        "consul-helm",
 						"heritage":     "Helm",
 						"release":      "consul",
+						"foo":          "bar",
 					},
-
-					Annotations: map[string]string{},
+					Annotations: map[string]string{
+						"a":   "b",
+						"baz": "qux",
+					},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: pointer.Int32(1),
@@ -145,6 +196,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							"chart":        "consul-helm",
 							"heritage":     "Helm",
 							"release":      "consul",
+							"foo":          "bar",
 						},
 					},
 					Template: corev1.PodTemplateSpec{
@@ -154,11 +206,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"app":          "consul",
 								"chart":        "consul-helm",
 								"heritage":     "Helm",
+								"foo":          "bar",
 								"release":      "consul",
 							},
-
 							Annotations: map[string]string{
-								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     MeshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
 								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 								constants.AnnotationGatewayWANSource:                "Service",
@@ -183,7 +235,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Command: []string{
 										"/bin/sh",
 										"-ec",
-										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-json=false",
+										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-level=debug \\\n  -log-json=false",
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -241,7 +293,16 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Value: "",
 										},
 									},
-									Resources: corev1.ResourceRequirements{},
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											"cpu":    resource.MustParse("100m"),
+											"memory": resource.MustParse("128Mi"),
+										},
+										Limits: corev1.ResourceList{
+											"cpu":    resource.MustParse("200m"),
+											"memory": resource.MustParse("228Mi"),
+										},
+									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
 											Name:      "consul-mesh-inject-data",
@@ -257,7 +318,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										"-addresses",
 										"",
 										"-grpc-port=0",
-										"-log-level=",
+										"-log-level=debug",
 										"-log-json=false",
 										"-envoy-concurrency=1",
 										"-tls-disabled",
@@ -273,6 +334,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Name:          "wan",
 											ContainerPort: 8443,
 											HostPort:      8080,
+											Protocol:      "tcp",
 										},
 									},
 									Env: []corev1.EnvVar{
@@ -313,14 +375,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										{
 											Name:  "DP_CREDENTIAL_LOGIN_META",
 											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
-										},
-										{
-											Name:  "DP_CREDENTIAL_LOGIN_META1",
-											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
-										},
-										{
-											Name:  "DP_SERVICE_NODE_NAME",
-											Value: "$(NODE_NAME)-virtual",
 										},
 										{
 											Name:  "DP_ENVOY_READY_BIND_ADDRESS",
@@ -429,6 +483,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 					},
 					Spec: pbmesh.MeshGateway{
 						GatewayClassName: "test-gateway-class",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				config: GatewayConfig{
@@ -472,6 +533,11 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							Container: &meshv2beta1.GatewayClassContainerConfig{
 								HostPort:     8080,
 								PortModifier: 8000,
+								Consul: meshv2beta1.GatewayClassConsulConfig{
+									Logging: meshv2beta1.GatewayClassConsulLoggingConfig{
+										Level: "debug",
+									},
+								},
 							},
 							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
@@ -485,6 +551,23 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									MaxSkew:           1,
 									TopologyKey:       "key",
 									WhenUnsatisfiable: "DoNotSchedule",
+								},
+							},
+							InitContainer: &meshv2beta1.GatewayClassInitContainerConfig{
+								Resources: &corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										"cpu":    resource.MustParse("100m"),
+										"memory": resource.MustParse("128Mi"),
+									},
+									Limits: corev1.ResourceList{
+										"cpu":    resource.MustParse("200m"),
+										"memory": resource.MustParse("228Mi"),
+									},
+								},
+								Consul: meshv2beta1.GatewayClassConsulConfig{
+									Logging: meshv2beta1.GatewayClassConsulLoggingConfig{
+										Level: "debug",
+									},
 								},
 							},
 						},
@@ -524,7 +607,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 								"release":      "consul",
 							},
 							Annotations: map[string]string{
-								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     MeshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
 								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 								constants.AnnotationGatewayWANSource:                "Service",
@@ -549,7 +632,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 									Command: []string{
 										"/bin/sh",
 										"-ec",
-										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-json=false",
+										"consul-k8s-control-plane mesh-init \\\n  -proxy-name=${POD_NAME} \\\n  -namespace=${POD_NAMESPACE} \\\n  -log-level=debug \\\n  -log-json=false",
 									},
 									Env: []corev1.EnvVar{
 										{
@@ -619,7 +702,16 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Value: "",
 										},
 									},
-									Resources: corev1.ResourceRequirements{},
+									Resources: corev1.ResourceRequirements{
+										Requests: corev1.ResourceList{
+											"cpu":    resource.MustParse("100m"),
+											"memory": resource.MustParse("128Mi"),
+										},
+										Limits: corev1.ResourceList{
+											"cpu":    resource.MustParse("200m"),
+											"memory": resource.MustParse("228Mi"),
+										},
+									},
 									VolumeMounts: []corev1.VolumeMount{
 										{
 											Name:      "consul-mesh-inject-data",
@@ -635,7 +727,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										"-addresses",
 										"",
 										"-grpc-port=0",
-										"-log-level=",
+										"-log-level=debug",
 										"-log-json=false",
 										"-envoy-concurrency=1",
 										"-ca-certs=/consul/mesh-inject/consul-ca.pem",
@@ -651,6 +743,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 											Name:          "wan",
 											ContainerPort: 8443,
 											HostPort:      8080,
+											Protocol:      "tcp",
 										},
 									},
 									Env: []corev1.EnvVar{
@@ -691,14 +784,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										{
 											Name:  "DP_CREDENTIAL_LOGIN_META",
 											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
-										},
-										{
-											Name:  "DP_CREDENTIAL_LOGIN_META1",
-											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
-										},
-										{
-											Name:  "DP_SERVICE_NODE_NAME",
-											Value: "$(NODE_NAME)-virtual",
 										},
 										{
 											Name:  "DP_ENVOY_READY_BIND_ADDRESS",
@@ -807,6 +892,13 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 					},
 					Spec: pbmesh.MeshGateway{
 						GatewayClassName: "test-gateway-class",
+						Listeners: []*pbmesh.MeshGatewayListener{
+							{
+								Name:     "wan",
+								Port:     443,
+								Protocol: "tcp",
+							},
+						},
 					},
 				},
 				config: GatewayConfig{},
@@ -826,7 +918,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: defaultLabels,
 							Annotations: map[string]string{
-								constants.AnnotationGatewayKind:                     meshGatewayAnnotationKind,
+								constants.AnnotationGatewayKind:                     MeshGatewayAnnotationKind,
 								constants.AnnotationMeshInject:                      "false",
 								constants.AnnotationTransparentProxyOverwriteProbes: "false",
 								constants.AnnotationGatewayWANSource:                "Service",
@@ -940,6 +1032,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										{
 											Name:          "wan",
 											ContainerPort: 443,
+											Protocol:      "tcp",
 										},
 									},
 									Env: []corev1.EnvVar{
@@ -980,14 +1073,6 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 										{
 											Name:  "DP_CREDENTIAL_LOGIN_META",
 											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
-										},
-										{
-											Name:  "DP_CREDENTIAL_LOGIN_META1",
-											Value: "pod=$(POD_NAMESPACE)/$(DP_PROXY_ID)",
-										},
-										{
-											Name:  "DP_SERVICE_NODE_NAME",
-											Value: "$(NODE_NAME)-virtual",
 										},
 										{
 											Name:  "DP_ENVOY_READY_BIND_ADDRESS",
@@ -1054,16 +1139,124 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &meshGatewayBuilder{
-				gateway: tt.fields.gateway,
-				config:  tt.fields.config,
-				gcc:     tt.fields.gcc,
+			b := &gatewayBuilder[*meshv2beta1.MeshGateway]{
+				gateway:     tt.fields.gateway,
+				config:      tt.fields.config,
+				gcc:         tt.fields.gcc,
+				gatewayKind: MeshGatewayAnnotationKind,
 			}
 			got, err := b.Deployment()
 			if !tt.wantErr && (err != nil) {
 				assert.Errorf(t, err, "Error")
 			}
 			assert.Equalf(t, tt.want, got, "Deployment()")
+		})
+	}
+}
+
+func Test_MergeDeployment(t *testing.T) {
+	testCases := []struct {
+		name     string
+		a, b     *appsv1.Deployment
+		assertFn func(*testing.T, *appsv1.Deployment)
+	}{
+		{
+			name: "new deployment gets desired annotations + labels + containers",
+			a:    &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "deployment"}},
+			b: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+				Namespace:   "default",
+				Name:        "deployment",
+				Annotations: map[string]string{"b": "b"},
+				Labels:      map[string]string{"b": "b"},
+			}},
+			assertFn: func(t *testing.T, result *appsv1.Deployment) {
+				assert.Equal(t, map[string]string{"b": "b"}, result.Annotations)
+				assert.Equal(t, map[string]string{"b": "b"}, result.Labels)
+			},
+		},
+		{
+			name: "existing deployment keeps existing annotations + labels and gains desired annotations + labels + containers",
+			a: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+				Namespace:         "default",
+				Name:              "deployment",
+				CreationTimestamp: metav1.Now(),
+				Annotations:       map[string]string{"a": "a"},
+				Labels:            map[string]string{"a": "a"},
+			}},
+			b: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   "default",
+					Name:        "deployment",
+					Annotations: map[string]string{"b": "b"},
+					Labels:      map[string]string{"b": "b"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{Name: "b"}},
+						},
+					},
+				},
+			},
+			assertFn: func(t *testing.T, result *appsv1.Deployment) {
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Annotations)
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Labels)
+
+				require.Len(t, result.Spec.Template.Spec.Containers, 1)
+				assert.Equal(t, "b", result.Spec.Template.Spec.Containers[0].Name)
+			},
+		},
+		{
+			name: "existing deployment with injected initContainer retains it",
+			a: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         "default",
+					Name:              "deployment",
+					CreationTimestamp: metav1.Now(),
+					Annotations:       map[string]string{"a": "a"},
+					Labels:            map[string]string{"a": "a"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							InitContainers: []corev1.Container{{Name: "b"}},
+							Containers:     []corev1.Container{{Name: "b"}},
+						},
+					},
+				},
+			},
+			b: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   "default",
+					Name:        "deployment",
+					Annotations: map[string]string{"b": "b"},
+					Labels:      map[string]string{"b": "b"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{Name: "b"}},
+						},
+					},
+				},
+			},
+			assertFn: func(t *testing.T, result *appsv1.Deployment) {
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Annotations)
+				assert.Equal(t, map[string]string{"a": "a", "b": "b"}, result.Labels)
+
+				require.Len(t, result.Spec.Template.Spec.InitContainers, 1)
+				assert.Equal(t, "b", result.Spec.Template.Spec.InitContainers[0].Name)
+
+				require.Len(t, result.Spec.Template.Spec.Containers, 1)
+				assert.Equal(t, "b", result.Spec.Template.Spec.Containers[0].Name)
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			MergeDeployment(testCase.a, testCase.b)
+			testCase.assertFn(t, testCase.a)
 		})
 	}
 }

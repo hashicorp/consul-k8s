@@ -186,14 +186,16 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 									PathExact:  "/hello",
 									PathPrefix: "/world",
 									PathRegex:  "/.*/foo",
-									Header: &pbauth.DestinationRuleHeader{
-										Name:    "x-consul-test",
-										Present: true,
-										Exact:   "true",
-										Prefix:  "prefix",
-										Suffix:  "suffix",
-										Regex:   "reg.*ex",
-										Invert:  true,
+									Headers: []*pbauth.DestinationRuleHeader{
+										{
+											Name:    "x-consul-test",
+											Present: true,
+											Exact:   "true",
+											Prefix:  "prefix",
+											Suffix:  "suffix",
+											Regex:   "reg.*ex",
+											Invert:  true,
+										},
 									},
 									Methods: []string{"GET", "POST"},
 									Exclude: []*pbauth.ExcludePermissionRule{
@@ -201,14 +203,16 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 											PathExact:  "/hello",
 											PathPrefix: "/world",
 											PathRegex:  "/.*/foo",
-											Header: &pbauth.DestinationRuleHeader{
-												Name:    "x-consul-not-test",
-												Present: true,
-												Exact:   "false",
-												Prefix:  "~prefix",
-												Suffix:  "~suffix",
-												Regex:   "~reg.*ex",
-												Invert:  true,
+											Headers: []*pbauth.DestinationRuleHeader{
+												{
+													Name:    "x-consul-not-test",
+													Present: true,
+													Exact:   "false",
+													Prefix:  "~prefix",
+													Suffix:  "~suffix",
+													Regex:   "~reg.*ex",
+													Invert:  true,
+												},
 											},
 											Methods:   []string{"DELETE"},
 											PortNames: []string{"log"},
@@ -257,14 +261,16 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 								PathExact:  "/hello",
 								PathPrefix: "/world",
 								PathRegex:  "/.*/foo",
-								Header: &pbauth.DestinationRuleHeader{
-									Name:    "x-consul-test",
-									Present: true,
-									Exact:   "true",
-									Prefix:  "prefix",
-									Suffix:  "suffix",
-									Regex:   "reg.*ex",
-									Invert:  true,
+								Headers: []*pbauth.DestinationRuleHeader{
+									{
+										Name:    "x-consul-test",
+										Present: true,
+										Exact:   "true",
+										Prefix:  "prefix",
+										Suffix:  "suffix",
+										Regex:   "reg.*ex",
+										Invert:  true,
+									},
 								},
 								Methods: []string{"GET", "POST"},
 								Exclude: []*pbauth.ExcludePermissionRule{
@@ -272,14 +278,16 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 										PathExact:  "/hello",
 										PathPrefix: "/world",
 										PathRegex:  "/.*/foo",
-										Header: &pbauth.DestinationRuleHeader{
-											Name:    "x-consul-not-test",
-											Present: true,
-											Exact:   "false",
-											Prefix:  "~prefix",
-											Suffix:  "~suffix",
-											Regex:   "~reg.*ex",
-											Invert:  true,
+										Headers: []*pbauth.DestinationRuleHeader{
+											{
+												Name:    "x-consul-not-test",
+												Present: true,
+												Exact:   "false",
+												Prefix:  "~prefix",
+												Suffix:  "~suffix",
+												Regex:   "~reg.*ex",
+												Invert:  true,
+											},
 										},
 										Methods:   []string{"DELETE"},
 										PortNames: []string{"log"},
@@ -309,10 +317,6 @@ func TestTrafficPermissions_MatchesConsul(t *testing.T) {
 					Tenancy: &pbresource.Tenancy{
 						Partition: constants.DefaultConsulNS,
 						Namespace: constants.DefaultConsulPartition,
-
-						// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-						// At a future point, this will move out of the Tenancy block.
-						PeerName: constants.DefaultConsulPeer,
 					},
 				},
 				Data:     inject.ToProtoAny(&pbmesh.ProxyConfiguration{}),
@@ -391,7 +395,7 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 									PathExact:  "/hello",
 									PathPrefix: "/world",
 									PathRegex:  "/.*/foo",
-									Header: &pbauth.DestinationRuleHeader{
+									Headers: []*pbauth.DestinationRuleHeader{{
 										Name:    "x-consul-test",
 										Present: true,
 										Exact:   "true",
@@ -399,14 +403,14 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 										Suffix:  "suffix",
 										Regex:   "reg.*ex",
 										Invert:  true,
-									},
+									}},
 									Methods: []string{"GET", "POST"},
 									Exclude: []*pbauth.ExcludePermissionRule{
 										{
 											PathExact:  "/hello",
 											PathPrefix: "/world",
 											PathRegex:  "/.*/foo",
-											Header: &pbauth.DestinationRuleHeader{
+											Headers: []*pbauth.DestinationRuleHeader{{
 												Name:    "x-consul-not-test",
 												Present: true,
 												Exact:   "false",
@@ -414,7 +418,7 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 												Suffix:  "~suffix",
 												Regex:   "~reg.*ex",
 												Invert:  true,
-											},
+											}},
 											Methods:   []string{"DELETE"},
 											PortNames: []string{"log"},
 										},
@@ -462,7 +466,7 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 								PathExact:  "/hello",
 								PathPrefix: "/world",
 								PathRegex:  "/.*/foo",
-								Header: &pbauth.DestinationRuleHeader{
+								Headers: []*pbauth.DestinationRuleHeader{{
 									Name:    "x-consul-test",
 									Present: true,
 									Exact:   "true",
@@ -470,14 +474,14 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 									Suffix:  "suffix",
 									Regex:   "reg.*ex",
 									Invert:  true,
-								},
+								}},
 								Methods: []string{"GET", "POST"},
 								Exclude: []*pbauth.ExcludePermissionRule{
 									{
 										PathExact:  "/hello",
 										PathPrefix: "/world",
 										PathRegex:  "/.*/foo",
-										Header: &pbauth.DestinationRuleHeader{
+										Headers: []*pbauth.DestinationRuleHeader{{
 											Name:    "x-consul-not-test",
 											Present: true,
 											Exact:   "false",
@@ -485,7 +489,7 @@ func TestTrafficPermissions_Resource(t *testing.T) {
 											Suffix:  "~suffix",
 											Regex:   "~reg.*ex",
 											Invert:  true,
-										},
+										}},
 										Methods:   []string{"DELETE"},
 										PortNames: []string{"log"},
 									},
@@ -642,27 +646,31 @@ func TestTrafficPermissions_Validate(t *testing.T) {
 							DestinationRules: []*pbauth.DestinationRule{
 								{
 									PathExact: "/hello",
-									Header: &pbauth.DestinationRuleHeader{
-										Name:    "x-consul-test",
-										Present: true,
-										Exact:   "true",
-										Prefix:  "prefix",
-										Suffix:  "suffix",
-										Regex:   "reg.*ex",
-										Invert:  true,
+									Headers: []*pbauth.DestinationRuleHeader{
+										{
+											Name:    "x-consul-test",
+											Present: true,
+											Exact:   "true",
+											Prefix:  "prefix",
+											Suffix:  "suffix",
+											Regex:   "reg.*ex",
+											Invert:  true,
+										},
 									},
 									Methods: []string{"GET", "POST"},
 									Exclude: []*pbauth.ExcludePermissionRule{
 										{
 											PathPrefix: "/world",
-											Header: &pbauth.DestinationRuleHeader{
-												Name:    "x-consul-not-test",
-												Present: true,
-												Exact:   "false",
-												Prefix:  "~prefix",
-												Suffix:  "~suffix",
-												Regex:   "~reg.*ex",
-												Invert:  true,
+											Headers: []*pbauth.DestinationRuleHeader{
+												{
+													Name:    "x-consul-not-test",
+													Present: true,
+													Exact:   "false",
+													Prefix:  "~prefix",
+													Suffix:  "~suffix",
+													Regex:   "~reg.*ex",
+													Invert:  true,
+												},
 											},
 											Methods:   []string{"DELETE"},
 											PortNames: []string{"log"},
@@ -937,9 +945,9 @@ func TestTrafficPermissions_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsgs: []string{
-				`spec.permissions[0].destinationRules[0]: Invalid value: authv2beta1.DestinationRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"foobar", PathRegex:"", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil), Exclude:[]*authv2beta1.ExcludePermissionRule(nil)}: prefix values, regex values, and explicit names must not combined`,
-				`spec.permissions[0].destinationRules[1]: Invalid value: authv2beta1.DestinationRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"", PathRegex:"path-regex", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil), Exclude:[]*authv2beta1.ExcludePermissionRule(nil)}: prefix values, regex values, and explicit names must not combined`,
-				`spec.permissions[0].destinationRules[2]: Invalid value: authv2beta1.DestinationRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"", PathPrefix:"foobar", PathRegex:"path-regex", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil), Exclude:[]*authv2beta1.ExcludePermissionRule(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[0]: Invalid value: authv2beta1.DestinationRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"foobar", PathRegex:"", Methods:[]string(nil), Headers:[]*authv2beta1.DestinationRuleHeader(nil), PortNames:[]string(nil), Exclude:[]*authv2beta1.ExcludePermissionRule(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[1]: Invalid value: authv2beta1.DestinationRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"", PathRegex:"path-regex", Methods:[]string(nil), Headers:[]*authv2beta1.DestinationRuleHeader(nil), PortNames:[]string(nil), Exclude:[]*authv2beta1.ExcludePermissionRule(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[2]: Invalid value: authv2beta1.DestinationRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"", PathPrefix:"foobar", PathRegex:"path-regex", Methods:[]string(nil), Headers:[]*authv2beta1.DestinationRuleHeader(nil), PortNames:[]string(nil), Exclude:[]*authv2beta1.ExcludePermissionRule(nil)}: prefix values, regex values, and explicit names must not combined`,
 			},
 		},
 		{
@@ -979,9 +987,9 @@ func TestTrafficPermissions_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsgs: []string{
-				`spec.permissions[0].destinationRules[0].exclude[0]: Invalid value: authv2beta1.ExcludePermissionRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"foobar", PathRegex:"", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil)}: prefix values, regex values, and explicit names must not combined`,
-				`spec.permissions[0].destinationRules[0].exclude[1]: Invalid value: authv2beta1.ExcludePermissionRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"", PathRegex:"path-regex", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil)}: prefix values, regex values, and explicit names must not combined`,
-				`spec.permissions[0].destinationRules[0].exclude[2]: Invalid value: authv2beta1.ExcludePermissionRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"", PathPrefix:"foobar", PathRegex:"path-regex", Methods:[]string(nil), Header:(*authv2beta1.DestinationRuleHeader)(nil), PortNames:[]string(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[0].exclude[0]: Invalid value: authv2beta1.ExcludePermissionRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"foobar", PathRegex:"", Methods:[]string(nil), Headers:[]*authv2beta1.DestinationRuleHeader(nil), PortNames:[]string(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[0].exclude[1]: Invalid value: authv2beta1.ExcludePermissionRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"/hello", PathPrefix:"", PathRegex:"path-regex", Methods:[]string(nil), Headers:[]*authv2beta1.DestinationRuleHeader(nil), PortNames:[]string(nil)}: prefix values, regex values, and explicit names must not combined`,
+				`spec.permissions[0].destinationRules[0].exclude[2]: Invalid value: authv2beta1.ExcludePermissionRule{state:impl.MessageState{NoUnkeyedLiterals:pragma.NoUnkeyedLiterals{}, DoNotCompare:pragma.DoNotCompare{}, DoNotCopy:pragma.DoNotCopy{}, atomicMessageInfo:(*impl.MessageInfo)(nil)}, sizeCache:0, unknownFields:[]uint8(nil), PathExact:"", PathPrefix:"foobar", PathRegex:"path-regex", Methods:[]string(nil), Headers:[]*authv2beta1.DestinationRuleHeader(nil), PortNames:[]string(nil)}: prefix values, regex values, and explicit names must not combined`,
 			},
 		},
 	}
@@ -1009,10 +1017,6 @@ func constructTrafficPermissionResource(tp *pbauth.TrafficPermissions, name, nam
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 		Uid: "ABCD", // We add this to show it does not factor into the comparison
 	}

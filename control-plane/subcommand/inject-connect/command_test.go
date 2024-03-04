@@ -132,6 +132,15 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "-default-envoy-proxy-concurrency must be >= 0 if set",
 		},
+		{
+			flags: []string{
+				"-consul-k8s-image", "hashicorp/consul-k8s",
+				"-consul-image", "hashicorp/consul",
+				"-consul-dataplane-image", "hashicorp/consul-dataplane",
+				"-enable-v2tenancy", "true",
+			},
+			expErr: "-enable-resource-apis must be set to 'true' if -enable-v2tenancy is set",
+		},
 	}
 
 	for _, c := range cases {
