@@ -151,7 +151,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			gwSub := resourceCache.Subscribe(ctx, api.APIGateway, gwCtrl.transformConsulGateway)
 			httpRouteSub := resourceCache.Subscribe(ctx, api.HTTPRoute, gwCtrl.transformConsulHTTPRoute(ctx))
 			tcpRouteSub := resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
-			inlineCertSub := resourceCache.Subscribe(ctx, api.InlineCertificate, gwCtrl.transformConsulInlineCertificate(ctx))
+			inlineCertSub := resourceCache.Subscribe(ctx, api.InlineCertificate, gwCtrl.transformConsulFileSystemCertificate(ctx))
 
 			cert := tc.certFn(t, ctx, k8sClient, tc.namespace)
 			k8sGWObj := tc.gwFn(t, ctx, k8sClient, tc.namespace)
