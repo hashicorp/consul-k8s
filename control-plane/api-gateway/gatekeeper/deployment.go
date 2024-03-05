@@ -5,7 +5,6 @@ package gatekeeper
 
 import (
 	"context"
-
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -92,7 +91,9 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 		return nil, err
 	}
 
-	container, err := consulDataplaneContainer(config, gcc, gateway.Name, gateway.Namespace)
+	volumes, mounts := volumesAndMounts(gateway)
+
+	container, err := consulDataplaneContainer(config, gcc, gateway.Name, gateway.Namespace, mounts)
 	if err != nil {
 		return nil, err
 	}
@@ -118,14 +119,7 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 					},
 				},
 				Spec: corev1.PodSpec{
-					Volumes: []corev1.Volume{
-						{
-							Name: volumeName,
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
-							},
-						},
-					},
+					Volumes: volumes,
 					InitContainers: []corev1.Container{
 						initContainer,
 					},

@@ -47,7 +47,7 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 	// Create expected volume mounts
 	volMounts := []corev1.VolumeMount{
 		{
-			Name:      volumeName,
+			Name:      volumeNameForConnectInject,
 			MountPath: "/consul/connect-inject",
 		},
 	}

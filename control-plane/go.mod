@@ -173,3 +173,5 @@ require (
 )
 
 go 1.20
+
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.10.1-0.20240305213446-e5825b62e7ee

@@ -70,8 +70,8 @@ func EntriesEqual(a, b api.ConfigEntry) bool {
 		if bCast, ok := b.(*api.TCPRouteConfigEntry); ok {
 			return tcpRoutesEqual(aCast, bCast)
 		}
-	case *api.InlineCertificateConfigEntry:
-		if bCast, ok := b.(*api.InlineCertificateConfigEntry); ok {
+	case *api.FileSystemCertificateConfigEntry:
+		if bCast, ok := b.(*api.FileSystemCertificateConfigEntry); ok {
 			return certificatesEqual(aCast, bCast)
 		}
 	}
@@ -323,7 +323,7 @@ func (e entryComparator) tcpRouteServicesEqual(a, b api.TCPService) bool {
 		orDefault(a.Partition, e.partitionA) == orDefault(b.Partition, e.partitionB)
 }
 
-func certificatesEqual(a, b *api.InlineCertificateConfigEntry) bool {
+func certificatesEqual(a, b *api.FileSystemCertificateConfigEntry) bool {
 	if a == nil || b == nil {
 		return false
 	}
@@ -336,7 +336,7 @@ func certificatesEqual(a, b *api.InlineCertificateConfigEntry) bool {
 	}).certificatesEqual(*a, *b)
 }
 
-func (e entryComparator) certificatesEqual(a, b api.InlineCertificateConfigEntry) bool {
+func (e entryComparator) certificatesEqual(a, b api.FileSystemCertificateConfigEntry) bool {
 	return a.Kind == b.Kind &&
 		a.Name == b.Name &&
 		e.namespaceA == e.namespaceB &&
