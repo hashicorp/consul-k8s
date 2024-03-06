@@ -319,8 +319,9 @@ spec:
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
       {{- end }}
       initContainers:
-      - name: fix-consul-data-owner
-        image: busybox
+      {{- if .Values.server.enableConsulDataDirectoryOwnership }}
+      - name: fix-consul-data-directory-ownership
+        image: {{ .Values.global.imageSideScript }}
         securityContext:
           runAsNonRoot: false
           runAsUser: 0
@@ -331,6 +332,7 @@ spec:
         volumeMounts:
           - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
             mountPath: /consul/data
+      {{- endif }}
       - name: locality-init
         image: {{ .Values.global.imageK8S }}
         {{ template "consul.imagePullPolicy" . }}
