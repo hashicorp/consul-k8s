@@ -1,0 +1,4 @@
+```release-note:deprecation
+api-gateway: The api-gateway stanza located under .Values.api-gateway is deprecated and being removed in favor of
+connectInject.apiGateway.
+```
