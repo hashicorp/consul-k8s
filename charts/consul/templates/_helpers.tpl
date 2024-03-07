@@ -538,9 +538,6 @@ Usage: {{ template "consul.validateResourceAPIs" . }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.terminatingGateways.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported."}}
 {{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.apiGateway.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, apiGateway.enabled is currently unsupported."}}
-{{- end }}
 {{- end }}
 
 {{/*
