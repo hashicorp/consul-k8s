@@ -93,6 +93,15 @@ func NewHelmCluster(
 	valuesFromConfig, err := cfg.HelmValuesFromConfig()
 	require.NoError(t, err)
 
+	if cfg.EnableDatadog {
+		datadogNamespace := helmValues["global.metrics.datadog.namespace"]
+		configureNamespace(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
+
+		if cfg.DatadogAPIKey != "" || cfg.DatadogAppKey != "" {
+			CreateOrUpdateDatadogSecret(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
+		}
+	}
+
 	// Merge all helm values
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
@@ -154,7 +163,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
-
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
@@ -668,6 +676,14 @@ func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg 
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
 }
 
+func CreateOrUpdateDatadogSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	secretMap := map[string]string{
+		config.DatadogAPIKey: cfg.DatadogAPIKey,
+		config.DatadogAppKey: cfg.DatadogAppKey,
+	}
+	CreateMultiKeyK8sSecret(t, client, cfg, namespace, config.DatadogSecretName, secretMap)
+}
+
 func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	ctx := context.Background()
 
@@ -772,6 +788,28 @@ func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.Test
 					secretKey: secret,
 				},
 				Type: corev1.SecretTypeOpaque,
+			}, metav1.CreateOptions{})
+			require.NoError(r, err)
+		} else {
+			require.NoError(r, err)
+		}
+	})
+
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		_ = client.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
+	})
+}
+
+func CreateMultiKeyK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName string, secretMap map[string]string) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
+		_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: secretName,
+				},
+				StringData: secretMap,
+				Type:       corev1.SecretTypeOpaque,
 			}, metav1.CreateOptions{})
 			require.NoError(r, err)
 		} else {
