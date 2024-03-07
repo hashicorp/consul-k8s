@@ -56,7 +56,7 @@ load _helpers
       --set 'syncCatalog.enabled=true' \
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[2].resources[0]' | tee /dev/stderr)
+      yq -r '.rules[3].resources[0]' | tee /dev/stderr)
   [ "${actual}" = "podsecuritypolicies" ]
 }
 
@@ -77,6 +77,14 @@ load _helpers
 @test "syncCatalog/ClusterRole: has full permissions if toK8s=true" {
   cd `chart_dir`
   local actual=$(helm template \
+      -s templates/sync-catalog-clusterrole.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.toK8S=true' \
+      . | tee /dev/stderr |
+      yq -c '.rules[0].verbs' | tee /dev/stderr)
+  [ "${actual}" = '["get","list","watch","update","patch","delete","create"]' ]
+
+  actual=$(helm template \
       -s templates/sync-catalog-clusterrole.yaml  \
       --set 'syncCatalog.enabled=true' \
       --set 'syncCatalog.toK8S=true' \
