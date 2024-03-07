@@ -18,6 +18,15 @@ rules:
   - get
   - list
   - watch
+<<<<<<< Updated upstream
+=======
+{{- if .Values.syncCatalog.toK8S }}
+  - update
+  - patch
+  - delete
+  - create
+{{- end }}
+>>>>>>> Stashed changes
 - apiGroups: ["discovery.k8s.io"]
   resources:
   - endpointslices
