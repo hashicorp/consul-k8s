@@ -2,8 +2,6 @@ module github.com/hashicorp/consul-k8s/acceptance
 
 go 1.21.1
 
-toolchain go1.22.0
-
 replace (
 	k8s.io/api => k8s.io/api v0.26.4
 	k8s.io/apimachinery => k8s.io/apimachinery v0.26.4
