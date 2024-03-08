@@ -279,7 +279,7 @@ func realMain(ctx context.Context) error {
 		vpcName, _ := vpcNameAndBuildURL(vpc)
 		cluster, ok := toDeleteClusters[vpcName]
 		if !ok {
-			fmt.Printf("Found no associated EKS cluster for VPC: %s\n", *vpc.VpcId)
+			fmt.Printf("Found no associated EKS cluster for VPC: %s\n", vpcName)
 		} else {
 			// Delete node groups.
 			nodeGroups, err := eksClient.ListNodegroupsWithContext(ctx, &eks.ListNodegroupsInput{
@@ -382,7 +382,7 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
-		
+
 		if err != nil {
 			return err
 		}
@@ -495,7 +495,7 @@ func realMain(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		
+
 		for _, igw := range igws.InternetGateways {
 			fmt.Printf("Internet gateway: Detaching from VPC... [id=%s]\n", *igw.InternetGatewayId)
 			if err := destroyBackoff(ctx, "Internet Gateway", *igw.InternetGatewayId, func() error {

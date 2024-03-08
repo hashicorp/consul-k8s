@@ -1,14 +1,10 @@
 # Dispatch to the consul-k8s-workflows with a nightly cron
 name: nightly-cleanup
 on:
-  push:
-    branches:
-      # REMOVE MEEEEE - Testing only
-      - "NET-8391_fix_eks_cleanup"
-  # schedule:
-  #   # * is a special character in YAML so you have to quote this string
-  #   # Run nightly at 12PM UTC/8AM EST/5AM PST
-  #   - cron: '0 12 * * *'
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    # Run nightly at 12PM UTC/8AM EST/5AM PST
+    - cron: '0 12 * * *'
 
 # these should be the only settings that you will ever need to change
 env:
