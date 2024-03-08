@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -62,8 +63,8 @@ func (k *KubernetesUpdates) Operations() []client.Object {
 }
 
 type ReferenceValidator interface {
-	GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool
-	HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool
+	GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool
+	HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool
 	TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool
 }
 
@@ -73,7 +74,7 @@ type certificate struct {
 }
 
 type httpRoute struct {
-	route    gwv1beta1.HTTPRoute
+	route    gwv1.HTTPRoute
 	gateways mapset.Set
 }
 
@@ -210,7 +211,7 @@ func (s *ResourceMap) ReferenceCountCertificate(secret corev1.Secret) {
 	}
 }
 
-func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
+func (s *ResourceMap) ReferenceCountGateway(gateway gwv1.Gateway) {
 	key := client.ObjectKeyFromObject(&gateway)
 	consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
 
@@ -222,7 +223,7 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 	}
 
 	for _, listener := range gateway.Spec.Listeners {
-		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
+		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1.TLSModeTerminate) {
 			continue
 		}
 		for _, cert := range listener.TLS.CertificateRefs {
@@ -351,7 +352,7 @@ func (s *ResourceMap) consulGatewaysForRoute(namespace string, refs []api.Resour
 	return gateways
 }
 
-func (s *ResourceMap) ReferenceCountHTTPRoute(route gwv1beta1.HTTPRoute) {
+func (s *ResourceMap) ReferenceCountHTTPRoute(route gwv1.HTTPRoute) {
 	key := client.ObjectKeyFromObject(&route)
 	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
 
@@ -461,7 +462,7 @@ func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.Gat
 	return value, exists
 }
 
-func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
+func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
 	key := api.ResourceReference{
 		Name:        gateway.Name,
 		Kind:        gateway.Kind,
@@ -707,11 +708,11 @@ func (s *ResourceMap) toConsulReference(kind string, key types.NamespacedName) a
 	}
 }
 
-func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, ref gwv1beta1.SecretObjectReference) bool {
+func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1.Gateway, ref gwv1beta1.SecretObjectReference) bool {
 	return s.referenceValidator.GatewayCanReferenceSecret(gateway, ref)
 }
 
-func (s *ResourceMap) HTTPRouteCanReferenceBackend(route gwv1beta1.HTTPRoute, ref gwv1beta1.BackendRef) bool {
+func (s *ResourceMap) HTTPRouteCanReferenceBackend(route gwv1.HTTPRoute, ref gwv1beta1.BackendRef) bool {
 	return s.referenceValidator.HTTPRouteCanReferenceBackend(route, ref)
 }
 

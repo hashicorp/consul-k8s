@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	k8syaml "sigs.k8s.io/yaml"
 
@@ -262,10 +263,10 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
-	class := &gwv1beta1.GatewayClass{
+	class := &gwv1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{Name: c.flagGatewayClassName, Labels: labels},
-		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: gwv1beta1.GatewayController(c.flagControllerName),
+		Spec: gwv1.GatewayClassSpec{
+			ControllerName: gwv1.GatewayController(c.flagControllerName),
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
 				Kind:  gwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
@@ -520,9 +521,9 @@ func forceV1ClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha
 	}, exponentialBackoffWithMaxIntervalAndTime())
 }
 
-func forceV1Class(ctx context.Context, k8sClient client.Client, o *gwv1beta1.GatewayClass) error {
+func forceV1Class(ctx context.Context, k8sClient client.Client, o *gwv1.GatewayClass) error {
 	return backoff.Retry(func() error {
-		var existing gwv1beta1.GatewayClass
+		var existing gwv1.GatewayClass
 		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(o), &existing)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			return err

@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -44,12 +45,12 @@ var (
 	testGatewayClassObjectName = gwv1beta1.ObjectName(testGatewayClassName)
 	deletionTimestamp          = common.PointerTo(metav1.Now())
 
-	testGatewayClass = &gwv1beta1.GatewayClass{
+	testGatewayClass = &gwv1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testGatewayClassName,
 		},
-		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: gwv1beta1.GatewayController(testControllerName),
+		Spec: gwv1.GatewayClassSpec{
+			ControllerName: gwv1.GatewayController(testControllerName),
 		},
 	}
 )
@@ -57,8 +58,8 @@ var (
 type resourceMapResources struct {
 	grants                   []gwv1beta1.ReferenceGrant
 	secrets                  []corev1.Secret
-	gateways                 []gwv1beta1.Gateway
-	httpRoutes               []gwv1beta1.HTTPRoute
+	gateways                 []gwv1.Gateway
+	httpRoutes               []gwv1.HTTPRoute
 	tcpRoutes                []gwv1alpha2.TCPRoute
 	meshServices             []v1alpha1.MeshService
 	services                 []types.NamespacedName
@@ -127,7 +128,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 	}{
 		"no gateway class and empty routes": {
 			config: BinderConfig{
-				Gateway: gwv1beta1.Gateway{},
+				Gateway: gwv1.Gateway{},
 			},
 			expectedConsulDeletions: []api.ResourceReference{{
 				Kind: api.APIGateway,
@@ -135,14 +136,14 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"no gateway class and empty routes remove finalizer": {
 			config: BinderConfig{
-				Gateway: gwv1beta1.Gateway{
+				Gateway: gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Finalizers: []string{common.GatewayFinalizer},
 					},
 				},
 			},
 			expectedUpdates: []client.Object{
-				addClassConfig(gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{}}}),
+				addClassConfig(gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{}}}),
 			},
 			expectedConsulDeletions: []api.ResourceReference{
 				{Kind: api.APIGateway},
@@ -152,20 +153,20 @@ func TestBinder_Lifecycle(t *testing.T) {
 			config: BinderConfig{
 				ControllerName: testControllerName,
 				GatewayClass:   testGatewayClass,
-				Gateway: gwv1beta1.Gateway{
+				Gateway: gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						DeletionTimestamp: deletionTimestamp,
 						Finalizers:        []string{common.GatewayFinalizer},
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: testGatewayClassObjectName,
 					},
 				},
 			},
 			expectedUpdates: []client.Object{
-				addClassConfig(gwv1beta1.Gateway{
+				addClassConfig(gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: deletionTimestamp, Finalizers: []string{}},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: testGatewayClassObjectName,
 					},
 				}),
@@ -178,16 +179,16 @@ func TestBinder_Lifecycle(t *testing.T) {
 			config: BinderConfig{
 				ControllerName: testControllerName,
 				GatewayClass:   testGatewayClass,
-				Gateway: gwv1beta1.Gateway{
-					Spec: gwv1beta1.GatewaySpec{
+				Gateway: gwv1.Gateway{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: testGatewayClassObjectName,
 					},
 				},
 			},
 			expectedUpdates: []client.Object{
-				addClassConfig(gwv1beta1.Gateway{
+				addClassConfig(gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{Finalizers: []string{common.GatewayFinalizer}},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: testGatewayClassObjectName,
 					},
 				}),
@@ -195,14 +196,14 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"basic gateway": {
 			config: controlledBinder(BinderConfig{
-				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{{
-						Protocol: gwv1beta1.HTTPSProtocolType,
-						TLS: &gwv1beta1.GatewayTLSConfig{
+						Protocol: gwv1.HTTPSProtocolType,
+						TLS: &gwv1.GatewayTLSConfig{
 							CertificateRefs: []gwv1beta1.SecretObjectReference{
 								{Name: "secret-one"},
 							},
-							Mode: common.PointerTo(gwv1beta1.TLSModeTerminate),
+							Mode: common.PointerTo(gwv1.TLSModeTerminate),
 						},
 					}},
 				}),
@@ -214,19 +215,19 @@ func TestBinder_Lifecycle(t *testing.T) {
 			},
 			expectedStatusUpdates: []client.Object{
 				addClassConfig(gatewayWithFinalizerStatus(
-					gwv1beta1.GatewaySpec{
+					gwv1.GatewaySpec{
 						Listeners: []gwv1beta1.Listener{{
-							Protocol: gwv1beta1.HTTPSProtocolType,
-							TLS: &gwv1beta1.GatewayTLSConfig{
-								Mode: common.PointerTo(gwv1beta1.TLSModeTerminate),
+							Protocol: gwv1.HTTPSProtocolType,
+							TLS: &gwv1.GatewayTLSConfig{
+								Mode: common.PointerTo(gwv1.TLSModeTerminate),
 								CertificateRefs: []gwv1beta1.SecretObjectReference{
 									{Name: "secret-one"},
 								},
 							},
 						}},
 					},
-					gwv1beta1.GatewayStatus{
-						Addresses: []gwv1beta1.GatewayAddress{},
+					gwv1.GatewayStatus{
+						Addresses: []gwv1.GatewayStatusAddress{},
 						Conditions: []metav1.Condition{
 							{
 								Type:    "Accepted",
@@ -241,7 +242,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 							},
 						},
 						Listeners: []gwv1beta1.ListenerStatus{{
-							SupportedKinds: supportedKindsForProtocol[gwv1beta1.HTTPSProtocolType],
+							SupportedKinds: supportedKindsForProtocol[gwv1.HTTPSProtocolType],
 							Conditions: []metav1.Condition{
 								{
 									Type:    "Accepted",
@@ -292,8 +293,8 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"gateway http route no finalizer": {
 			config: controlledBinder(BinderConfig{
-				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-				HTTPRoutes: []gwv1beta1.HTTPRoute{
+				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+				HTTPRoutes: []gwv1.HTTPRoute{
 					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "HTTPRoute",
@@ -302,7 +303,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "route",
 						},
-						Spec: gwv1beta1.HTTPRouteSpec{
+						Spec: gwv1.HTTPRouteSpec{
 							CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 								ParentRefs: []gwv1beta1.ParentReference{{
 									Name: "gateway",
@@ -316,8 +317,8 @@ func TestBinder_Lifecycle(t *testing.T) {
 				common.PointerTo(testHTTPRoute("route", []string{"gateway"}, nil)),
 			},
 			expectedStatusUpdates: []client.Object{
-				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{}, gwv1beta1.GatewayStatus{
-					Addresses: []gwv1beta1.GatewayAddress{},
+				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -345,14 +346,14 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"gateway http route deleting": {
 			config: controlledBinder(BinderConfig{
-				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-				HTTPRoutes: []gwv1beta1.HTTPRoute{{
+				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+				HTTPRoutes: []gwv1.HTTPRoute{{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "route",
 						DeletionTimestamp: deletionTimestamp,
 						Finalizers:        []string{common.GatewayFinalizer},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{{
 								Name: "gateway",
@@ -371,13 +372,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 				}},
 			},
 			expectedUpdates: []client.Object{
-				&gwv1beta1.HTTPRoute{
+				&gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "route",
 						DeletionTimestamp: deletionTimestamp,
 						Finalizers:        []string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{{
 								Name: "gateway",
@@ -387,8 +388,8 @@ func TestBinder_Lifecycle(t *testing.T) {
 				},
 			},
 			expectedStatusUpdates: []client.Object{
-				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{}, gwv1beta1.GatewayStatus{
-					Addresses: []gwv1beta1.GatewayAddress{},
+				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -419,7 +420,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"gateway tcp route no finalizer": {
 			config: controlledBinder(BinderConfig{
-				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 				TCPRoutes: []gwv1alpha2.TCPRoute{
 					{
 						TypeMeta: metav1.TypeMeta{
@@ -443,8 +444,8 @@ func TestBinder_Lifecycle(t *testing.T) {
 				common.PointerTo(testTCPRoute("route", []string{"gateway"}, nil)),
 			},
 			expectedStatusUpdates: []client.Object{
-				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{}, gwv1beta1.GatewayStatus{
-					Addresses: []gwv1beta1.GatewayAddress{},
+				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -472,7 +473,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"gateway tcp route deleting": {
 			config: controlledBinder(BinderConfig{
-				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 				TCPRoutes: []gwv1alpha2.TCPRoute{{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "route",
@@ -514,8 +515,8 @@ func TestBinder_Lifecycle(t *testing.T) {
 				},
 			},
 			expectedStatusUpdates: []client.Object{
-				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{}, gwv1beta1.GatewayStatus{
-					Addresses: []gwv1beta1.GatewayAddress{},
+				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{}, gwv1.GatewayStatus{
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -546,16 +547,16 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"gateway deletion routes and secrets": {
 			config: controlledBinder(BinderConfig{
-				Gateway: gwv1beta1.Gateway{
+				Gateway: gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "gateway-deleted",
 						DeletionTimestamp: deletionTimestamp,
 						Finalizers:        []string{common.GatewayFinalizer},
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: testGatewayClassName,
 						Listeners: []gwv1beta1.Listener{{
-							TLS: &gwv1beta1.GatewayTLSConfig{
+							TLS: &gwv1.GatewayTLSConfig{
 								CertificateRefs: []gwv1beta1.SecretObjectReference{
 									{Name: "secret-one"},
 									{Name: "secret-two"},
@@ -564,7 +565,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 						}},
 					},
 				},
-				HTTPRoutes: []gwv1beta1.HTTPRoute{
+				HTTPRoutes: []gwv1.HTTPRoute{
 					testHTTPRoute("http-route-one", []string{"gateway-deleted"}, nil),
 					testHTTPRouteStatus("http-route-two", nil, []gwv1alpha2.RouteParentStatus{
 						{ParentRef: gwv1beta1.ParentReference{Name: "gateway-deleted"}, ControllerName: testControllerName, Conditions: []metav1.Condition{
@@ -652,10 +653,10 @@ func TestBinder_Lifecycle(t *testing.T) {
 					secretOne,
 					secretTwo,
 				},
-				gateways: []gwv1beta1.Gateway{
-					gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+				gateways: []gwv1.Gateway{
+					gatewayWithFinalizer(gwv1.GatewaySpec{
 						Listeners: []gwv1beta1.Listener{{
-							TLS: &gwv1beta1.GatewayTLSConfig{
+							TLS: &gwv1.GatewayTLSConfig{
 								CertificateRefs: []gwv1beta1.SecretObjectReference{
 									{Name: "secret-one"},
 									{Name: "secret-three"},
@@ -684,7 +685,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 				}, "gateway-deleted")),
 			},
 			expectedUpdates: []client.Object{
-				&gwv1beta1.HTTPRoute{
+				&gwv1.HTTPRoute{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "HTTPRoute",
 						APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -694,14 +695,14 @@ func TestBinder_Lifecycle(t *testing.T) {
 						// removing a finalizer
 						Finalizers: []string{},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{
 								{Name: "gateway-deleted"},
 							},
 						},
 					},
-					Status: gwv1beta1.HTTPRouteStatus{RouteStatus: gwv1beta1.RouteStatus{Parents: []gwv1alpha2.RouteParentStatus{}}},
+					Status: gwv1.HTTPRouteStatus{RouteStatus: gwv1beta1.RouteStatus{Parents: []gwv1alpha2.RouteParentStatus{}}},
 				},
 				&gwv1alpha2.TCPRoute{
 					TypeMeta: metav1.TypeMeta{
@@ -721,16 +722,16 @@ func TestBinder_Lifecycle(t *testing.T) {
 					},
 					Status: gwv1alpha2.TCPRouteStatus{RouteStatus: gwv1beta1.RouteStatus{Parents: []gwv1alpha2.RouteParentStatus{}}},
 				},
-				addClassConfig(gwv1beta1.Gateway{
+				addClassConfig(gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "gateway-deleted",
 						DeletionTimestamp: deletionTimestamp,
 						Finalizers:        []string{},
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: testGatewayClassName,
 						Listeners: []gwv1beta1.Listener{{
-							TLS: &gwv1beta1.GatewayTLSConfig{
+							TLS: &gwv1.GatewayTLSConfig{
 								CertificateRefs: []gwv1beta1.SecretObjectReference{
 									{Name: "secret-one"},
 									{Name: "secret-two"},
@@ -777,13 +778,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"gateway deletion policies": {
 			config: controlledBinder(BinderConfig{
-				Gateway: gwv1beta1.Gateway{
+				Gateway: gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "gateway-deleted",
 						DeletionTimestamp: deletionTimestamp,
 						Finalizers:        []string{common.GatewayFinalizer},
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: testGatewayClassName,
 						Listeners: []gwv1beta1.Listener{
 							{
@@ -859,8 +860,8 @@ func TestBinder_Lifecycle(t *testing.T) {
 				},
 			}),
 			resources: resourceMapResources{
-				gateways: []gwv1beta1.Gateway{
-					gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+				gateways: []gwv1.Gateway{
+					gatewayWithFinalizer(gwv1.GatewaySpec{
 						Listeners: []gwv1beta1.Listener{
 							{
 								Name: "l1",
@@ -899,13 +900,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 				},
 			},
 			expectedUpdates: []client.Object{
-				addClassConfig(gwv1beta1.Gateway{
+				addClassConfig(gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "gateway-deleted",
 						DeletionTimestamp: deletionTimestamp,
 						Finalizers:        []string{},
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: testGatewayClassName,
 						Listeners: []gwv1beta1.Listener{
 							{
@@ -925,13 +926,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"gateway http route references missing external ref": {
 			resources: resourceMapResources{
-				gateways: []gwv1beta1.Gateway{gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+				gateways: []gwv1.Gateway{gatewayWithFinalizer(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{{
 						Name:     "l1",
 						Protocol: "HTTP",
 					}},
 				})},
-				httpRoutes: []gwv1beta1.HTTPRoute{},
+				httpRoutes: []gwv1.HTTPRoute{},
 				jwtProviders: []*v1alpha1.JWTProvider{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -953,21 +954,21 @@ func TestBinder_Lifecycle(t *testing.T) {
 					},
 					Meta: map[string]string{"k8s-name": "gateway", "k8s-namespace": "default"},
 				},
-				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
 				}),
-				HTTPRoutes: []gwv1beta1.HTTPRoute{
+				HTTPRoutes: []gwv1.HTTPRoute{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:       "h1",
 							Finalizers: []string{common.GatewayFinalizer},
 						},
-						Spec: gwv1beta1.HTTPRouteSpec{
+						Spec: gwv1.HTTPRouteSpec{
 							CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 								ParentRefs: []gwv1beta1.ParentReference{
 									{
@@ -979,9 +980,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 									},
 								},
 							},
-							Rules: []gwv1beta1.HTTPRouteRule{
+							Rules: []gwv1.HTTPRouteRule{
 								{
-									Filters: []gwv1beta1.HTTPRouteFilter{{
+									Filters: []gwv1.HTTPRouteFilter{{
 										Type: "ExtensionRef",
 										ExtensionRef: &gwv1beta1.LocalObjectReference{
 											Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
@@ -997,12 +998,12 @@ func TestBinder_Lifecycle(t *testing.T) {
 				},
 			}),
 			expectedStatusUpdates: []client.Object{
-				&gwv1beta1.HTTPRoute{
+				&gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "h1",
 						Finalizers: []string{common.GatewayFinalizer},
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{
 								{
@@ -1014,9 +1015,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 								},
 							},
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Filters: []gwv1beta1.HTTPRouteFilter{{
+								Filters: []gwv1.HTTPRouteFilter{{
 									Type: "ExtensionRef",
 									ExtensionRef: &gwv1beta1.LocalObjectReference{
 										Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
@@ -1027,7 +1028,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 							},
 						},
 					},
-					Status: gwv1beta1.HTTPRouteStatus{
+					Status: gwv1.HTTPRouteStatus{
 						RouteStatus: gwv1beta1.RouteStatus{
 							Parents: []gwv1beta1.RouteParentStatus{
 								{
@@ -1059,15 +1060,15 @@ func TestBinder_Lifecycle(t *testing.T) {
 					},
 				},
 				common.PointerTo(testHTTPRoute("http-route-2", []string{"gateway"}, nil)),
-				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{
+				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
-				}, gwv1beta1.GatewayStatus{
-					Addresses: []gwv1beta1.GatewayAddress{},
+				}, gwv1.GatewayStatus{
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -1126,13 +1127,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"gateway http route route auth filter references missing jwt provider": {
 			resources: resourceMapResources{
-				gateways: []gwv1beta1.Gateway{gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+				gateways: []gwv1.Gateway{gatewayWithFinalizer(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{{
 						Name:     "l1",
 						Protocol: "HTTP",
 					}},
 				})},
-				httpRoutes:   []gwv1beta1.HTTPRoute{},
+				httpRoutes:   []gwv1.HTTPRoute{},
 				jwtProviders: []*v1alpha1.JWTProvider{},
 				externalAuthFilters: []*v1alpha1.RouteAuthFilter{
 					{
@@ -1167,22 +1168,22 @@ func TestBinder_Lifecycle(t *testing.T) {
 					},
 					Meta: map[string]string{"k8s-name": "gateway", "k8s-namespace": "default"},
 				},
-				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
 				}),
-				HTTPRoutes: []gwv1beta1.HTTPRoute{
+				HTTPRoutes: []gwv1.HTTPRoute{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:       "h1",
 							Finalizers: []string{common.GatewayFinalizer},
 							Namespace:  "default",
 						},
-						Spec: gwv1beta1.HTTPRouteSpec{
+						Spec: gwv1.HTTPRouteSpec{
 							CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 								ParentRefs: []gwv1beta1.ParentReference{
 									{
@@ -1194,9 +1195,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 									},
 								},
 							},
-							Rules: []gwv1beta1.HTTPRouteRule{
+							Rules: []gwv1.HTTPRouteRule{
 								{
-									Filters: []gwv1beta1.HTTPRouteFilter{{
+									Filters: []gwv1.HTTPRouteFilter{{
 										Type: "ExtensionRef",
 										ExtensionRef: &gwv1beta1.LocalObjectReference{
 											Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
@@ -1212,13 +1213,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 				},
 			}),
 			expectedStatusUpdates: []client.Object{
-				&gwv1beta1.HTTPRoute{
+				&gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "h1",
 						Finalizers: []string{common.GatewayFinalizer},
 						Namespace:  "default",
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{
 								{
@@ -1230,9 +1231,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 								},
 							},
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Filters: []gwv1beta1.HTTPRouteFilter{{
+								Filters: []gwv1.HTTPRouteFilter{{
 									Type: "ExtensionRef",
 									ExtensionRef: &gwv1beta1.LocalObjectReference{
 										Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
@@ -1243,7 +1244,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 							},
 						},
 					},
-					Status: gwv1beta1.HTTPRouteStatus{
+					Status: gwv1.HTTPRouteStatus{
 						RouteStatus: gwv1beta1.RouteStatus{
 							Parents: []gwv1beta1.RouteParentStatus{
 								{
@@ -1275,15 +1276,15 @@ func TestBinder_Lifecycle(t *testing.T) {
 					},
 				},
 				common.PointerTo(testHTTPRoute("http-route-2", []string{"gateway"}, nil)),
-				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{
+				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
-				}, gwv1beta1.GatewayStatus{
-					Addresses: []gwv1beta1.GatewayAddress{},
+				}, gwv1.GatewayStatus{
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -1371,7 +1372,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 		},
 		"gateway http route route references invalid external ref type": {
 			resources: resourceMapResources{
-				gateways: []gwv1beta1.Gateway{gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+				gateways: []gwv1.Gateway{gatewayWithFinalizer(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{{
 						Name:     "l1",
 						Protocol: "HTTP",
@@ -1390,22 +1391,22 @@ func TestBinder_Lifecycle(t *testing.T) {
 					},
 					Meta: map[string]string{"k8s-name": "gateway", "k8s-namespace": "default"},
 				},
-				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
 				}),
-				HTTPRoutes: []gwv1beta1.HTTPRoute{
+				HTTPRoutes: []gwv1.HTTPRoute{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:       "h1",
 							Finalizers: []string{common.GatewayFinalizer},
 							Namespace:  "default",
 						},
-						Spec: gwv1beta1.HTTPRouteSpec{
+						Spec: gwv1.HTTPRouteSpec{
 							CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 								ParentRefs: []gwv1beta1.ParentReference{
 									{
@@ -1417,9 +1418,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 									},
 								},
 							},
-							Rules: []gwv1beta1.HTTPRouteRule{
+							Rules: []gwv1.HTTPRouteRule{
 								{
-									Filters: []gwv1beta1.HTTPRouteFilter{{
+									Filters: []gwv1.HTTPRouteFilter{{
 										Type: "ExtensionRef",
 										ExtensionRef: &gwv1beta1.LocalObjectReference{
 											Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
@@ -1435,13 +1436,13 @@ func TestBinder_Lifecycle(t *testing.T) {
 				},
 			}),
 			expectedStatusUpdates: []client.Object{
-				&gwv1beta1.HTTPRoute{
+				&gwv1.HTTPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "h1",
 						Finalizers: []string{common.GatewayFinalizer},
 						Namespace:  "default",
 					},
-					Spec: gwv1beta1.HTTPRouteSpec{
+					Spec: gwv1.HTTPRouteSpec{
 						CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 							ParentRefs: []gwv1beta1.ParentReference{
 								{
@@ -1453,9 +1454,9 @@ func TestBinder_Lifecycle(t *testing.T) {
 								},
 							},
 						},
-						Rules: []gwv1beta1.HTTPRouteRule{
+						Rules: []gwv1.HTTPRouteRule{
 							{
-								Filters: []gwv1beta1.HTTPRouteFilter{{
+								Filters: []gwv1.HTTPRouteFilter{{
 									Type: "ExtensionRef",
 									ExtensionRef: &gwv1beta1.LocalObjectReference{
 										Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
@@ -1466,7 +1467,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 							},
 						},
 					},
-					Status: gwv1beta1.HTTPRouteStatus{
+					Status: gwv1.HTTPRouteStatus{
 						RouteStatus: gwv1beta1.RouteStatus{
 							Parents: []gwv1beta1.RouteParentStatus{
 								{
@@ -1498,15 +1499,15 @@ func TestBinder_Lifecycle(t *testing.T) {
 					},
 				},
 				common.PointerTo(testHTTPRoute("http-route-2", []string{"gateway"}, nil)),
-				addClassConfig(gatewayWithFinalizerStatus(gwv1beta1.GatewaySpec{
+				addClassConfig(gatewayWithFinalizerStatus(gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "l1",
-							Protocol: gwv1beta1.HTTPProtocolType,
+							Protocol: gwv1.HTTPProtocolType,
 						},
 					},
-				}, gwv1beta1.GatewayStatus{
-					Addresses: []gwv1beta1.GatewayAddress{},
+				}, gwv1.GatewayStatus{
+					Addresses: []gwv1.GatewayStatusAddress{},
 					Conditions: []metav1.Condition{{
 						Type:    "Accepted",
 						Status:  metav1.ConditionTrue,
@@ -1593,7 +1594,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 func TestBinder_Registrations(t *testing.T) {
 	t.Parallel()
 
-	setDeleted := func(gateway gwv1beta1.Gateway) gwv1beta1.Gateway {
+	setDeleted := func(gateway gwv1.Gateway) gwv1.Gateway {
 		gateway.DeletionTimestamp = deletionTimestamp
 		return gateway
 	}
@@ -1606,7 +1607,7 @@ func TestBinder_Registrations(t *testing.T) {
 	}{
 		"deleting gateway with consul services": {
 			config: controlledBinder(BinderConfig{
-				Gateway: setDeleted(gatewayWithFinalizer(gwv1beta1.GatewaySpec{})),
+				Gateway: setDeleted(gatewayWithFinalizer(gwv1.GatewaySpec{})),
 				ConsulGatewayServices: []api.CatalogService{
 					{Node: "test", ServiceID: "pod1", Namespace: "namespace1"},
 					{Node: "test", ServiceID: "pod2", Namespace: "namespace1"},
@@ -1644,7 +1645,7 @@ func TestBinder_Registrations(t *testing.T) {
 		},
 		"gateway with consul services and mixed pods": {
 			config: controlledBinder(BinderConfig{
-				Gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+				Gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 				Pods: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "namespace1"},
@@ -1710,17 +1711,17 @@ func TestBinder_Registrations(t *testing.T) {
 func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 	t.Parallel()
 
-	gateway := gatewayWithFinalizer(gwv1beta1.GatewaySpec{
+	gateway := gatewayWithFinalizer(gwv1.GatewaySpec{
 		Listeners: []gwv1beta1.Listener{{
 			Name:     "http-listener-default-same",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 		}, {
 			Name:     "http-listener-hostname",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			Hostname: common.PointerTo[gwv1beta1.Hostname]("host.name"),
 		}, {
 			Name:     "http-listener-mismatched-kind-allowed",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Kinds: []gwv1beta1.RouteGroupKind{{
 					Kind: "Foo",
@@ -1728,26 +1729,26 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		}, {
 			Name:     "http-listener-explicit-all-allowed",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromAll),
+					From: common.PointerTo(gwv1.NamespacesFromAll),
 				},
 			},
 		}, {
 			Name:     "http-listener-explicit-allowed-same",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromSame),
+					From: common.PointerTo(gwv1.NamespacesFromSame),
 				},
 			},
 		}, {
 			Name:     "http-listener-allowed-selector",
-			Protocol: gwv1beta1.HTTPProtocolType,
+			Protocol: gwv1.HTTPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
+					From: common.PointerTo(gwv1.NamespacesFromSelector),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"test": "foo",
@@ -1757,18 +1758,18 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		}, {
 			Name:     "http-listener-tls",
-			Protocol: gwv1beta1.HTTPSProtocolType,
-			TLS: &gwv1beta1.GatewayTLSConfig{
+			Protocol: gwv1.HTTPSProtocolType,
+			TLS: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{{
 					Name: "secret-one",
 				}},
 			},
 		}, {
 			Name:     "tcp-listener-default-same",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 		}, {
 			Name:     "tcp-listener-mismatched-kind-allowed",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Kinds: []gwv1beta1.RouteGroupKind{{
 					Kind: "Foo",
@@ -1776,26 +1777,26 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		}, {
 			Name:     "tcp-listener-explicit-all-allowed",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromAll),
+					From: common.PointerTo(gwv1.NamespacesFromAll),
 				},
 			},
 		}, {
 			Name:     "tcp-listener-explicit-allowed-same",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromSame),
+					From: common.PointerTo(gwv1.NamespacesFromSame),
 				},
 			},
 		}, {
 			Name:     "tcp-listener-allowed-selector",
-			Protocol: gwv1beta1.TCPProtocolType,
+			Protocol: gwv1.TCPProtocolType,
 			AllowedRoutes: &gwv1beta1.AllowedRoutes{
 				Namespaces: &gwv1beta1.RouteNamespaces{
-					From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
+					From: common.PointerTo(gwv1.NamespacesFromSelector),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"test": "foo",
@@ -1805,8 +1806,8 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		}, {
 			Name:     "tcp-listener-tls",
-			Protocol: gwv1beta1.TCPProtocolType,
-			TLS: &gwv1beta1.GatewayTLSConfig{
+			Protocol: gwv1.TCPProtocolType,
+			TLS: &gwv1.GatewayTLSConfig{
 				CertificateRefs: []gwv1beta1.SecretObjectReference{{
 					Name: "secret-one",
 				}},
@@ -1836,7 +1837,7 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 	defaultNamespacePointer := common.PointerTo[gwv1beta1.Namespace]("default")
 
 	for name, tt := range map[string]struct {
-		httpRoute             *gwv1beta1.HTTPRoute
+		httpRoute             *gwv1.HTTPRoute
 		tcpRoute              *gwv1alpha2.TCPRoute
 		referenceGrants       []gwv1beta1.ReferenceGrant
 		expectedStatusUpdates []client.Object
@@ -2876,7 +2877,7 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			g := *addClassConfig(gateway)
 
 			resources := resourceMapResources{
-				gateways: []gwv1beta1.Gateway{g},
+				gateways: []gwv1.Gateway{g},
 				secrets: []corev1.Secret{
 					secretOne,
 				},
@@ -2911,7 +2912,7 @@ func compareUpdates(t *testing.T, expected []client.Object, actual []client.Obje
 	t.Helper()
 
 	filtered := common.Filter(actual, func(o client.Object) bool {
-		if _, ok := o.(*gwv1beta1.HTTPRoute); ok {
+		if _, ok := o.(*gwv1.HTTPRoute); ok {
 			return false
 		}
 		if _, ok := o.(*gwv1alpha2.TCPRoute); ok {
@@ -2923,18 +2924,18 @@ func compareUpdates(t *testing.T, expected []client.Object, actual []client.Obje
 	require.ElementsMatch(t, expected, filtered, "statuses don't match", cmp.Diff(expected, filtered))
 }
 
-func addClassConfig(g gwv1beta1.Gateway) *gwv1beta1.Gateway {
+func addClassConfig(g gwv1.Gateway) *gwv1.Gateway {
 	serializeGatewayClassConfig(&g, &v1alpha1.GatewayClassConfig{})
 	return &g
 }
 
-func gatewayWithFinalizer(spec gwv1beta1.GatewaySpec) gwv1beta1.Gateway {
+func gatewayWithFinalizer(spec gwv1.GatewaySpec) gwv1.Gateway {
 	spec.GatewayClassName = testGatewayClassObjectName
 
 	typeMeta := metav1.TypeMeta{}
 	typeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("Gateway"))
 
-	return gwv1beta1.Gateway{
+	return gwv1.Gateway{
 		TypeMeta: typeMeta,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "gateway",
@@ -2945,22 +2946,22 @@ func gatewayWithFinalizer(spec gwv1beta1.GatewaySpec) gwv1beta1.Gateway {
 	}
 }
 
-func gatewayWithFinalizerStatus(spec gwv1beta1.GatewaySpec, status gwv1beta1.GatewayStatus) gwv1beta1.Gateway {
+func gatewayWithFinalizerStatus(spec gwv1.GatewaySpec, status gwv1.GatewayStatus) gwv1.Gateway {
 	g := gatewayWithFinalizer(spec)
 	g.Status = status
 	return g
 }
 
-func testHTTPRoute(name string, parents []string, services []string) gwv1beta1.HTTPRoute {
+func testHTTPRoute(name string, parents []string, services []string) gwv1.HTTPRoute {
 	var parentRefs []gwv1beta1.ParentReference
-	var rules []gwv1beta1.HTTPRouteRule
+	var rules []gwv1.HTTPRouteRule
 
 	for _, parent := range parents {
 		parentRefs = append(parentRefs, gwv1beta1.ParentReference{Name: gwv1beta1.ObjectName(parent)})
 	}
 
 	for _, service := range services {
-		rules = append(rules, gwv1beta1.HTTPRouteRule{
+		rules = append(rules, gwv1.HTTPRouteRule{
 			BackendRefs: []gwv1beta1.HTTPBackendRef{
 				{
 					BackendRef: gwv1beta1.BackendRef{
@@ -2976,10 +2977,10 @@ func testHTTPRoute(name string, parents []string, services []string) gwv1beta1.H
 	httpTypeMeta := metav1.TypeMeta{}
 	httpTypeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("HTTPRoute"))
 
-	return gwv1beta1.HTTPRoute{
+	return gwv1.HTTPRoute{
 		TypeMeta:   httpTypeMeta,
 		ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{common.GatewayFinalizer}},
-		Spec: gwv1beta1.HTTPRouteSpec{
+		Spec: gwv1.HTTPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 				ParentRefs: parentRefs,
 			},
@@ -2988,10 +2989,10 @@ func testHTTPRoute(name string, parents []string, services []string) gwv1beta1.H
 	}
 }
 
-func testHTTPRouteBackends(name, namespace string, services []gwv1beta1.BackendObjectReference, parents []gwv1beta1.ParentReference) *gwv1beta1.HTTPRoute {
-	var rules []gwv1beta1.HTTPRouteRule
+func testHTTPRouteBackends(name, namespace string, services []gwv1beta1.BackendObjectReference, parents []gwv1beta1.ParentReference) *gwv1.HTTPRoute {
+	var rules []gwv1.HTTPRouteRule
 	for _, service := range services {
-		rules = append(rules, gwv1beta1.HTTPRouteRule{
+		rules = append(rules, gwv1.HTTPRouteRule{
 			BackendRefs: []gwv1beta1.HTTPBackendRef{
 				{
 					BackendRef: gwv1beta1.BackendRef{
@@ -3005,10 +3006,10 @@ func testHTTPRouteBackends(name, namespace string, services []gwv1beta1.BackendO
 	httpTypeMeta := metav1.TypeMeta{}
 	httpTypeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("HTTPRoute"))
 
-	return &gwv1beta1.HTTPRoute{
+	return &gwv1.HTTPRoute{
 		TypeMeta:   httpTypeMeta,
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Finalizers: []string{common.GatewayFinalizer}},
-		Spec: gwv1beta1.HTTPRouteSpec{
+		Spec: gwv1.HTTPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 				ParentRefs: parents,
 			},
@@ -3017,7 +3018,7 @@ func testHTTPRouteBackends(name, namespace string, services []gwv1beta1.BackendO
 	}
 }
 
-func testHTTPRouteStatusBackends(name, namespace string, services []gwv1beta1.BackendObjectReference, parentStatuses []gwv1beta1.RouteParentStatus) *gwv1beta1.HTTPRoute {
+func testHTTPRouteStatusBackends(name, namespace string, services []gwv1beta1.BackendObjectReference, parentStatuses []gwv1beta1.RouteParentStatus) *gwv1.HTTPRoute {
 	var parentRefs []gwv1beta1.ParentReference
 
 	for _, parent := range parentStatuses {
@@ -3029,7 +3030,7 @@ func testHTTPRouteStatusBackends(name, namespace string, services []gwv1beta1.Ba
 	return route
 }
 
-func testHTTPRouteStatus(name string, services []string, parentStatuses []gwv1beta1.RouteParentStatus, extraParents ...string) gwv1beta1.HTTPRoute {
+func testHTTPRouteStatus(name string, services []string, parentStatuses []gwv1beta1.RouteParentStatus, extraParents ...string) gwv1.HTTPRoute {
 	parentRefs := extraParents
 
 	for _, parent := range parentStatuses {

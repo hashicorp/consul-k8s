@@ -1300,7 +1300,7 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 				Client: fakeClient,
 				Log:    logrtest.New(t),
 			}
-			result := controller.requestsForPeeringTokens(tt.secret)
+			result := controller.requestsForPeeringTokens(context.Background(), tt.secret)
 
 			require.Equal(t, tt.result, result)
 		})

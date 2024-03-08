@@ -133,13 +133,11 @@ func TestValidatePeeringDialer(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &PeeringDialer{}, &PeeringDialerList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
 
 			validator := &PeeringDialerWebhook{
 				Client:  client,
 				Logger:  logrtest.New(t),
-				decoder: decoder,
+				decoder: admission.NewDecoder(s),
 			}
 			response := validator.Handle(ctx, admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{

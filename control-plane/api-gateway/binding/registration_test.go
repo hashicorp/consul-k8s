@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func TestRegistrationsForPods_Health(t *testing.T) {
@@ -17,19 +17,19 @@ func TestRegistrationsForPods_Health(t *testing.T) {
 
 	for name, tt := range map[string]struct {
 		consulNamespace string
-		gateway         gwv1beta1.Gateway
+		gateway         gwv1.Gateway
 		pods            []corev1.Pod
 		expected        []string
 	}{
 		"empty": {
 			consulNamespace: "",
-			gateway:         gwv1beta1.Gateway{},
+			gateway:         gwv1.Gateway{},
 			pods:            []corev1.Pod{},
 			expected:        []string{},
 		},
 		"mix": {
 			consulNamespace: "",
-			gateway:         gwv1beta1.Gateway{},
+			gateway:         gwv1.Gateway{},
 			pods: []corev1.Pod{
 				// Pods without a running status
 				{Status: corev1.PodStatus{Phase: corev1.PodFailed}},

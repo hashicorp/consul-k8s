@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -42,11 +43,11 @@ type BinderConfig struct {
 	// state that we may have set on the Gateway, its corresponding Routes or in
 	// Consul, because we should no longer be managing the Gateway (its association
 	// to our controller is through a parameter on the GatewayClass).
-	GatewayClass *gwv1beta1.GatewayClass
+	GatewayClass *gwv1.GatewayClass
 	// Gateway is the Gateway being reconciled that we want to bind routes to.
-	Gateway gwv1beta1.Gateway
+	Gateway gwv1.Gateway
 	// HTTPRoutes is a list of HTTPRoute objects that ought to be bound to the Gateway.
-	HTTPRoutes []gwv1beta1.HTTPRoute
+	HTTPRoutes []gwv1.HTTPRoute
 	// TCPRoutes is a list of TCPRoute objects that ought to be bound to the Gateway.
 	TCPRoutes []gwv1alpha2.TCPRoute
 	// Pods are any pods that are part of the Gateway deployment.
@@ -222,7 +223,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		}
 
 		// calculate the status for the gateway
-		var status gwv1beta1.GatewayStatus
+		var status gwv1.GatewayStatus
 		for i, listener := range b.config.Gateway.Spec.Listeners {
 			status.Listeners = append(status.Listeners, gwv1beta1.ListenerStatus{
 				Name:           listener.Name,
@@ -301,7 +302,7 @@ func (b *Binder) Snapshot() *Snapshot {
 	return snapshot
 }
 
-func secretsForGateway(gateway gwv1beta1.Gateway, resources *common.ResourceMap) mapset.Set {
+func secretsForGateway(gateway gwv1.Gateway, resources *common.ResourceMap) mapset.Set {
 	set := mapset.NewSet()
 
 	for _, listener := range gateway.Spec.Listeners {
@@ -322,7 +323,7 @@ func secretsForGateway(gateway gwv1beta1.Gateway, resources *common.ResourceMap)
 	return set
 }
 
-func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1beta1.GatewayAddress {
+func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1.GatewayStatusAddress {
 	if service == nil {
 		return addressesFromPods(pods)
 	}
@@ -343,21 +344,21 @@ func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1beta1
 		return addressesFromPodHosts(pods)
 	}
 
-	return []gwv1beta1.GatewayAddress{}
+	return []gwv1.GatewayStatusAddress{}
 }
 
-func addressesFromLoadBalancer(service *corev1.Service) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromLoadBalancer(service *corev1.Service) []gwv1.GatewayStatusAddress {
+	addresses := []gwv1.GatewayStatusAddress{}
 
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
 		if ingress.IP != "" {
-			addresses = append(addresses, gwv1beta1.GatewayAddress{
+			addresses = append(addresses, gwv1.GatewayStatusAddress{
 				Type:  common.PointerTo(gwv1beta1.IPAddressType),
 				Value: ingress.IP,
 			})
 		}
 		if ingress.Hostname != "" {
-			addresses = append(addresses, gwv1beta1.GatewayAddress{
+			addresses = append(addresses, gwv1.GatewayStatusAddress{
 				Type:  common.PointerTo(gwv1beta1.HostnameAddressType),
 				Value: ingress.Hostname,
 			})
@@ -367,11 +368,11 @@ func addressesFromLoadBalancer(service *corev1.Service) []gwv1beta1.GatewayAddre
 	return addresses
 }
 
-func addressesFromClusterIP(service *corev1.Service) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromClusterIP(service *corev1.Service) []gwv1.GatewayStatusAddress {
+	addresses := []gwv1.GatewayStatusAddress{}
 
 	if service.Spec.ClusterIP != "" {
-		addresses = append(addresses, gwv1beta1.GatewayAddress{
+		addresses = append(addresses, gwv1.GatewayStatusAddress{
 			Type:  common.PointerTo(gwv1beta1.IPAddressType),
 			Value: service.Spec.ClusterIP,
 		})
@@ -380,14 +381,14 @@ func addressesFromClusterIP(service *corev1.Service) []gwv1beta1.GatewayAddress 
 	return addresses
 }
 
-func addressesFromPods(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromPods(pods []corev1.Pod) []gwv1.GatewayStatusAddress {
+	addresses := []gwv1.GatewayStatusAddress{}
 	seenIPs := make(map[string]struct{})
 
 	for _, pod := range pods {
 		if pod.Status.PodIP != "" {
 			if _, found := seenIPs[pod.Status.PodIP]; !found {
-				addresses = append(addresses, gwv1beta1.GatewayAddress{
+				addresses = append(addresses, gwv1.GatewayStatusAddress{
 					Type:  common.PointerTo(gwv1beta1.IPAddressType),
 					Value: pod.Status.PodIP,
 				})
@@ -399,14 +400,14 @@ func addressesFromPods(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
 	return addresses
 }
 
-func addressesFromPodHosts(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromPodHosts(pods []corev1.Pod) []gwv1.GatewayStatusAddress {
+	addresses := []gwv1.GatewayStatusAddress{}
 	seenIPs := make(map[string]struct{})
 
 	for _, pod := range pods {
 		if pod.Status.HostIP != "" {
 			if _, found := seenIPs[pod.Status.HostIP]; !found {
-				addresses = append(addresses, gwv1beta1.GatewayAddress{
+				addresses = append(addresses, gwv1.GatewayStatusAddress{
 					Type:  common.PointerTo(gwv1beta1.IPAddressType),
 					Value: pod.Status.HostIP,
 				})

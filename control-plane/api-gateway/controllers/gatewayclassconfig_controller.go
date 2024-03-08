@@ -14,8 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -88,7 +87,7 @@ func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.R
 // gatewayClassUsesConfig determines whether a given GatewayClass references a
 // given GatewayClassConfig. Since these resources are scoped to the cluster,
 // namespace is not considered.
-func gatewayClassUsesConfig(gc gwv1beta1.GatewayClass, gcc *v1alpha1.GatewayClassConfig) bool {
+func gatewayClassUsesConfig(gc gwv1.GatewayClass, gcc *v1alpha1.GatewayClassConfig) bool {
 	parameterRef := gc.Spec.ParametersRef
 	return parameterRef != nil &&
 		string(parameterRef.Group) == v1alpha1.ConsulHashicorpGroup &&
@@ -99,7 +98,7 @@ func gatewayClassUsesConfig(gc gwv1beta1.GatewayClass, gcc *v1alpha1.GatewayClas
 // GatewayClassConfigInUse determines whether any GatewayClass in the cluster
 // references the provided GatewayClassConfig.
 func gatewayClassConfigInUse(ctx context.Context, k8sClient client.Client, gcc *v1alpha1.GatewayClassConfig) (bool, error) {
-	list := &gwv1beta1.GatewayClassList{}
+	list := &gwv1.GatewayClassList{}
 	if err := k8sClient.List(ctx, list); err != nil {
 		return false, err
 	}
@@ -117,13 +116,13 @@ func (r *GatewayClassConfigController) SetupWithManager(ctx context.Context, mgr
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.GatewayClassConfig{}).
 		// Watch for changes to GatewayClass objects associated with this config for purposes of finalizer removal.
-		Watches(source.NewKindWithCache(&gwv1beta1.GatewayClass{}, mgr.GetCache()), r.transformGatewayClassToGatewayClassConfig(ctx)).
+		Watches(&gwv1.GatewayClass{}, r.transformGatewayClassToGatewayClassConfig(ctx)).
 		Complete(r)
 }
 
 func (r *GatewayClassConfigController) transformGatewayClassToGatewayClassConfig(ctx context.Context) handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-		gc := o.(*gwv1beta1.GatewayClass)
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+		gc := o.(*gwv1.GatewayClass)
 
 		pr := gc.Spec.ParametersRef
 		if pr != nil && pr.Kind == v1alpha1.GatewayClassConfigKind {

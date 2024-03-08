@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -79,7 +80,7 @@ var (
 )
 
 type testCase struct {
-	gateway            gwv1beta1.Gateway
+	gateway            gwv1.Gateway
 	gatewayClassConfig v1alpha1.GatewayClassConfig
 	helmConfig         common.HelmConfig
 
@@ -104,12 +105,12 @@ func TestUpsert(t *testing.T) {
 
 	cases := map[string]testCase{
 		"create a new gateway deployment with only Deployment": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -151,12 +152,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway with service and map privileged ports correctly": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name:     "Listener 1",
@@ -215,12 +216,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway deployment with managed Service": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -267,12 +268,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway deployment with managed Service and ACLs": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -327,12 +328,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway where the GatewayClassConfig has a default number of instances greater than the max on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -364,12 +365,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway where the GatewayClassConfig has a default number of instances lesser than the min on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -401,12 +402,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"update a gateway, adding a listener to a service": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -484,12 +485,12 @@ func TestUpsert(t *testing.T) {
 			ignoreTimestampOnService: true,
 		},
 		"update a gateway, removing a listener from a service": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: []gwv1beta1.Listener{
 						listeners[0],
 					},
@@ -568,12 +569,12 @@ func TestUpsert(t *testing.T) {
 			ignoreTimestampOnService: true,
 		},
 		"updating a gateway deployment respects the number of replicas a user has set": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -609,13 +610,13 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"updating a gateway deployment respects the labels and annotations a user has set": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        name,
 					Namespace:   namespace,
 					Annotations: copyAnnotations,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -678,13 +679,13 @@ func TestUpsert(t *testing.T) {
 			ignoreTimestampOnService: true,
 		},
 		"updating a gateway that has copy-annotations and labels doesn't panic if another controller has removed them all": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        name,
 					Namespace:   namespace,
 					Annotations: copyAnnotations,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -747,12 +748,12 @@ func TestUpsert(t *testing.T) {
 			ignoreTimestampOnService: true,
 		},
 		"update a gateway deployment by scaling it when no min or max number of instances is defined on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -788,12 +789,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"update a gateway deployment by scaling it lower than the min number of instances on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -829,12 +830,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"update a gateway deployment by scaling it higher than the max number of instances on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -870,12 +871,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway with openshift enabled": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -944,12 +945,12 @@ func TestDelete(t *testing.T) {
 
 	cases := map[string]testCase{
 		"delete a gateway deployment with only Deployment": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -983,12 +984,12 @@ func TestDelete(t *testing.T) {
 			},
 		},
 		"delete a gateway deployment with a managed Service": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -1038,12 +1039,12 @@ func TestDelete(t *testing.T) {
 			},
 		},
 		"delete a gateway deployment with managed Service and ACLs": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},

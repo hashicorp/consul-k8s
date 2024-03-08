@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -50,11 +51,11 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	testCases := map[string]struct {
 		namespace        string
 		certFn           func(*testing.T, context.Context, client.WithWatch, string) *corev1.Secret
-		gwFn             func(*testing.T, context.Context, client.WithWatch, string) *gwv1beta1.Gateway
-		httpRouteFn      func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway, *v1alpha1.RouteAuthFilter) *gwv1beta1.HTTPRoute
-		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway) *v1alpha2.TCPRoute
+		gwFn             func(*testing.T, context.Context, client.WithWatch, string) *gwv1.Gateway
+		httpRouteFn      func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway, *v1alpha1.RouteAuthFilter) *gwv1.HTTPRoute
+		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway) *v1alpha2.TCPRoute
 		externalFilterFn func(*testing.T, context.Context, client.WithWatch, string) *v1alpha1.RouteAuthFilter
-		policyFn         func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway, string)
+		policyFn         func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway, string)
 	}{
 		"all fields set": {
 			namespace:   "consul",
@@ -65,7 +66,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			externalFilterFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ string) *v1alpha1.RouteAuthFilter {
 				return nil
 			},
-			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1beta1.Gateway, _ string) {},
+			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1.Gateway, _ string) {},
 		},
 		"minimal fields set": {
 			namespace:   "",
@@ -76,7 +77,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			externalFilterFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ string) *v1alpha1.RouteAuthFilter {
 				return nil
 			},
-			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1beta1.Gateway, _ string) {},
+			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1.Gateway, _ string) {},
 		},
 		"funky casing to test normalization doesnt cause infinite reconciliation": {
 			namespace:   "",
@@ -87,7 +88,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			externalFilterFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ string) *v1alpha1.RouteAuthFilter {
 				return nil
 			},
-			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1beta1.Gateway, _ string) {},
+			policyFn: func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1.Gateway, _ string) {},
 		},
 		"http route with JWT auth": {
 			namespace:        "",
@@ -96,7 +97,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			httpRouteFn:      createJWTAuthHTTPRoute,
 			tcpRouteFn:       createFunkyCasingFieldsTCPRoute,
 			externalFilterFn: createRouteAuthFilter,
-			policyFn:         func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1beta1.Gateway, _ string) {},
+			policyFn:         func(_ *testing.T, _ context.Context, _ client.WithWatch, _ *gwv1.Gateway, _ string) {},
 		},
 		"policy attached to gateway": {
 			namespace:   "",
@@ -321,7 +322,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	}
 }
 
-func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.WithWatch, namespace string) *gwv1beta1.Gateway {
+func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.WithWatch, namespace string) *gwv1.Gateway {
 	// listener one configuration
 	listenerOneName := "listener-one"
 	listenerOneHostname := "*.consul.io"
@@ -356,7 +357,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 		},
 		Spec: v1alpha1.GatewayClassConfigSpec{},
 	}
-	gwClass := &gwv1beta1.GatewayClass{
+	gwClass := &gwv1.GatewayClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClass",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -364,7 +365,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gatewayclass",
 		},
-		Spec: gwv1beta1.GatewayClassSpec{
+		Spec: gwv1.GatewayClassSpec{
 			ControllerName: "consul.hashicorp.com/gateway-controller",
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: "consul.hashicorp.com",
@@ -374,7 +375,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 			Description: new(string),
 		},
 	}
-	gw := &gwv1beta1.Gateway{
+	gw := &gwv1.Gateway{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Gateway",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -384,7 +385,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 			Namespace:   namespace,
 			Annotations: make(map[string]string),
 		},
-		Spec: gwv1beta1.GatewaySpec{
+		Spec: gwv1.GatewaySpec{
 			GatewayClassName: gwv1beta1.ObjectName(gwClass.Name),
 			Listeners: []gwv1beta1.Listener{
 				{
@@ -392,7 +393,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 					Hostname: common.PointerTo(gwv1beta1.Hostname(listenerOneHostname)),
 					Port:     gwv1beta1.PortNumber(listenerOnePort),
 					Protocol: gwv1beta1.ProtocolType(listenerOneProtocol),
-					TLS: &gwv1beta1.GatewayTLSConfig{
+					TLS: &gwv1.GatewayTLSConfig{
 						CertificateRefs: []gwv1beta1.SecretObjectReference{
 							{
 								Kind:      common.PointerTo(gwv1beta1.Kind("Secret")),
@@ -461,7 +462,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 	return gw
 }
 
-func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway, authFilter *v1alpha1.RouteAuthFilter) *gwv1beta1.HTTPRoute {
+func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway, authFilter *v1alpha1.RouteAuthFilter) *gwv1.HTTPRoute {
 	svcDefault := &v1alpha1.ServiceDefaults{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ServiceDefaults",
@@ -535,7 +536,7 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 	err = k8sClient.Create(ctx, deployment)
 	require.NoError(t, err)
 
-	route := &gwv1beta1.HTTPRoute{
+	route := &gwv1.HTTPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "HTTPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -543,7 +544,7 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "http-route",
 		},
-		Spec: gwv1beta1.HTTPRouteSpec{
+		Spec: gwv1.HTTPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 				ParentRefs: []gwv1beta1.ParentReference{
 					{
@@ -556,9 +557,9 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 				},
 			},
 			Hostnames: []gwv1beta1.Hostname{"route.consul.io"},
-			Rules: []gwv1beta1.HTTPRouteRule{
+			Rules: []gwv1.HTTPRouteRule{
 				{
-					Matches: []gwv1beta1.HTTPRouteMatch{
+					Matches: []gwv1.HTTPRouteMatch{
 						{
 							Path: &gwv1beta1.HTTPPathMatch{
 								Type:  common.PointerTo(gwv1beta1.PathMatchType("PathPrefix")),
@@ -566,14 +567,14 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 							},
 							Headers: []gwv1beta1.HTTPHeaderMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.HeaderMatchExact),
+									Type:  common.PointerTo(gwv1.HeaderMatchExact),
 									Name:  "version",
 									Value: "version",
 								},
 							},
 							QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.QueryParamMatchExact),
+									Type:  common.PointerTo(gwv1.QueryParamMatchExact),
 									Name:  "search",
 									Value: "q",
 								},
@@ -581,9 +582,9 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 							Method: common.PointerTo(gwv1beta1.HTTPMethod("GET")),
 						},
 					},
-					Filters: []gwv1beta1.HTTPRouteFilter{
+					Filters: []gwv1.HTTPRouteFilter{
 						{
-							Type: gwv1beta1.HTTPRouteFilterRequestHeaderModifier,
+							Type: gwv1.HTTPRouteFilterRequestHeaderModifier,
 							RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 								Set: []gwv1beta1.HTTPHeader{
 									{
@@ -601,28 +602,28 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 							},
 						},
 						{
-							Type: gwv1beta1.HTTPRouteFilterURLRewrite,
+							Type: gwv1.HTTPRouteFilterURLRewrite,
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:            gwv1beta1.FullPathHTTPPathModifier,
+									Type:            gwv1.FullPathHTTPPathModifier,
 									ReplaceFullPath: common.PointerTo("/foobar"),
 								},
 							},
 						},
 
 						{
-							Type: gwv1beta1.HTTPRouteFilterURLRewrite,
+							Type: gwv1.HTTPRouteFilterURLRewrite,
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+									Type:               gwv1.PrefixMatchHTTPPathModifier,
 									ReplacePrefixMatch: common.PointerTo("/foo"),
 								},
 							},
 						},
 						{
-							Type: gwv1beta1.HTTPRouteFilterExtensionRef,
+							Type: gwv1.HTTPRouteFilterExtensionRef,
 							ExtensionRef: &gwv1beta1.LocalObjectReference{
 								Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
 								Kind:  v1alpha1.RouteAuthFilterKind,
@@ -652,7 +653,7 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 	return route
 }
 
-func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *v1alpha2.TCPRoute {
+func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *v1alpha2.TCPRoute {
 	route := &v1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
@@ -751,7 +752,7 @@ func createCert(t *testing.T, ctx context.Context, k8sClient client.WithWatch, c
 	return secret
 }
 
-func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.WithWatch, namespace string) *gwv1beta1.Gateway {
+func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.WithWatch, namespace string) *gwv1.Gateway {
 	// listener one configuration
 	listenerOneName := "listener-one"
 	listenerOneHostname := "*.consul.io"
@@ -774,7 +775,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 		},
 		Spec: v1alpha1.GatewayClassConfigSpec{},
 	}
-	gwClass := &gwv1beta1.GatewayClass{
+	gwClass := &gwv1.GatewayClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClass",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -782,7 +783,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gatewayclass",
 		},
-		Spec: gwv1beta1.GatewayClassSpec{
+		Spec: gwv1.GatewayClassSpec{
 			ControllerName: "consul.hashicorp.com/gateway-controller",
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: "consul.hashicorp.com",
@@ -792,7 +793,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 			Description: new(string),
 		},
 	}
-	gw := &gwv1beta1.Gateway{
+	gw := &gwv1.Gateway{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Gateway",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -801,7 +802,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 			Name:        "gw",
 			Annotations: make(map[string]string),
 		},
-		Spec: gwv1beta1.GatewaySpec{
+		Spec: gwv1.GatewaySpec{
 			GatewayClassName: gwv1beta1.ObjectName(gwClass.Name),
 			Listeners: []gwv1beta1.Listener{
 				{
@@ -809,7 +810,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 					Hostname: common.PointerTo(gwv1beta1.Hostname(listenerOneHostname)),
 					Port:     gwv1beta1.PortNumber(listenerOnePort),
 					Protocol: gwv1beta1.ProtocolType(listenerOneProtocol),
-					TLS: &gwv1beta1.GatewayTLSConfig{
+					TLS: &gwv1.GatewayTLSConfig{
 						CertificateRefs: []gwv1beta1.SecretObjectReference{
 							{
 								Kind:      common.PointerTo(gwv1beta1.Kind("Secret")),
@@ -845,7 +846,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 	return gw
 }
 
-func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway, _ *v1alpha1.RouteAuthFilter) *gwv1beta1.HTTPRoute {
+func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway, _ *v1alpha1.RouteAuthFilter) *gwv1.HTTPRoute {
 	svcDefault := &v1alpha1.ServiceDefaults{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ServiceDefaults",
@@ -919,7 +920,7 @@ func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient clie
 	err = k8sClient.Create(ctx, deployment)
 	require.NoError(t, err)
 
-	route := &gwv1beta1.HTTPRoute{
+	route := &gwv1.HTTPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "HTTPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -927,7 +928,7 @@ func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient clie
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "http-route",
 		},
-		Spec: gwv1beta1.HTTPRouteSpec{
+		Spec: gwv1.HTTPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 				ParentRefs: []gwv1beta1.ParentReference{
 					{
@@ -940,7 +941,7 @@ func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient clie
 				},
 			},
 			Hostnames: []gwv1beta1.Hostname{"route.consul.io"},
-			Rules: []gwv1beta1.HTTPRouteRule{
+			Rules: []gwv1.HTTPRouteRule{
 				{
 					BackendRefs: []gwv1beta1.HTTPBackendRef{
 						{
@@ -963,7 +964,7 @@ func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient clie
 	return route
 }
 
-func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *v1alpha2.TCPRoute {
+func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *v1alpha2.TCPRoute {
 	route := &v1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
@@ -1005,7 +1006,7 @@ func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient clien
 	return route
 }
 
-func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient client.WithWatch, namespace string) *gwv1beta1.Gateway {
+func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient client.WithWatch, namespace string) *gwv1.Gateway {
 	// listener one configuration
 	listenerOneName := "listener-one"
 	listenerOneHostname := "*.consul.io"
@@ -1040,7 +1041,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 		},
 		Spec: v1alpha1.GatewayClassConfigSpec{},
 	}
-	gwClass := &gwv1beta1.GatewayClass{
+	gwClass := &gwv1.GatewayClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClass",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -1048,7 +1049,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gatewayclass",
 		},
-		Spec: gwv1beta1.GatewayClassSpec{
+		Spec: gwv1.GatewayClassSpec{
 			ControllerName: "consul.hashicorp.com/gateway-controller",
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: "consul.hashicorp.com",
@@ -1058,7 +1059,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 			Description: new(string),
 		},
 	}
-	gw := &gwv1beta1.Gateway{
+	gw := &gwv1.Gateway{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Gateway",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -1068,7 +1069,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 			Namespace:   namespace,
 			Annotations: make(map[string]string),
 		},
-		Spec: gwv1beta1.GatewaySpec{
+		Spec: gwv1.GatewaySpec{
 			GatewayClassName: gwv1beta1.ObjectName(gwClass.Name),
 			Listeners: []gwv1beta1.Listener{
 				{
@@ -1076,7 +1077,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 					Hostname: common.PointerTo(gwv1beta1.Hostname(listenerOneHostname)),
 					Port:     gwv1beta1.PortNumber(listenerOnePort),
 					Protocol: gwv1beta1.ProtocolType(listenerOneProtocol),
-					TLS: &gwv1beta1.GatewayTLSConfig{
+					TLS: &gwv1.GatewayTLSConfig{
 						CertificateRefs: []gwv1beta1.SecretObjectReference{
 							{
 								Kind:      common.PointerTo(gwv1beta1.Kind("Secret")),
@@ -1145,7 +1146,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 	return gw
 }
 
-func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway, _ *v1alpha1.RouteAuthFilter) *gwv1beta1.HTTPRoute {
+func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway, _ *v1alpha1.RouteAuthFilter) *gwv1.HTTPRoute {
 	svcDefault := &v1alpha1.ServiceDefaults{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ServiceDefaults",
@@ -1219,7 +1220,7 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 	err = k8sClient.Create(ctx, deployment)
 	require.NoError(t, err)
 
-	route := &gwv1beta1.HTTPRoute{
+	route := &gwv1.HTTPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "HTTPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -1227,7 +1228,7 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "http-route",
 		},
-		Spec: gwv1beta1.HTTPRouteSpec{
+		Spec: gwv1.HTTPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 				ParentRefs: []gwv1beta1.ParentReference{
 					{
@@ -1239,23 +1240,23 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 				},
 			},
 			Hostnames: []gwv1beta1.Hostname{"route.consul.io"},
-			Rules: []gwv1beta1.HTTPRouteRule{
+			Rules: []gwv1.HTTPRouteRule{
 				{
-					Matches: []gwv1beta1.HTTPRouteMatch{
+					Matches: []gwv1.HTTPRouteMatch{
 						{
 							Path: &gwv1beta1.HTTPPathMatch{
-								Type: common.PointerTo(gwv1beta1.PathMatchPathPrefix),
+								Type: common.PointerTo(gwv1.PathMatchPathPrefix),
 							},
 							Headers: []gwv1beta1.HTTPHeaderMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.HeaderMatchExact),
+									Type:  common.PointerTo(gwv1.HeaderMatchExact),
 									Name:  "version",
 									Value: "version",
 								},
 							},
 							QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.QueryParamMatchExact),
+									Type:  common.PointerTo(gwv1.QueryParamMatchExact),
 									Name:  "search",
 									Value: "q",
 								},
@@ -1263,9 +1264,9 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 							Method: common.PointerTo(gwv1beta1.HTTPMethod("geT")),
 						},
 					},
-					Filters: []gwv1beta1.HTTPRouteFilter{
+					Filters: []gwv1.HTTPRouteFilter{
 						{
-							Type: gwv1beta1.HTTPRouteFilterRequestHeaderModifier,
+							Type: gwv1.HTTPRouteFilterRequestHeaderModifier,
 							RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 								Set: []gwv1beta1.HTTPHeader{
 									{
@@ -1283,22 +1284,22 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 							},
 						},
 						{
-							Type: gwv1beta1.HTTPRouteFilterURLRewrite,
+							Type: gwv1.HTTPRouteFilterURLRewrite,
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:            gwv1beta1.FullPathHTTPPathModifier,
+									Type:            gwv1.FullPathHTTPPathModifier,
 									ReplaceFullPath: common.PointerTo("/foobar"),
 								},
 							},
 						},
 
 						{
-							Type: gwv1beta1.HTTPRouteFilterURLRewrite,
+							Type: gwv1.HTTPRouteFilterURLRewrite,
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+									Type:               gwv1.PrefixMatchHTTPPathModifier,
 									ReplacePrefixMatch: common.PointerTo("/foo"),
 								},
 							},
@@ -1326,7 +1327,7 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 	return route
 }
 
-func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *v1alpha2.TCPRoute {
+func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *v1alpha2.TCPRoute {
 	route := &v1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
@@ -1368,7 +1369,7 @@ func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClien
 	return route
 }
 
-func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway, filter *v1alpha1.RouteAuthFilter) *gwv1beta1.HTTPRoute {
+func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway, filter *v1alpha1.RouteAuthFilter) *gwv1.HTTPRoute {
 	svcDefault := &v1alpha1.ServiceDefaults{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ServiceDefaults",
@@ -1442,7 +1443,7 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 	err = k8sClient.Create(ctx, deployment)
 	require.NoError(t, err)
 
-	route := &gwv1beta1.HTTPRoute{
+	route := &gwv1.HTTPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "HTTPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -1450,7 +1451,7 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "http-route",
 		},
-		Spec: gwv1beta1.HTTPRouteSpec{
+		Spec: gwv1.HTTPRouteSpec{
 			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
 				ParentRefs: []gwv1beta1.ParentReference{
 					{
@@ -1463,9 +1464,9 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 				},
 			},
 			Hostnames: []gwv1beta1.Hostname{"route.consul.io"},
-			Rules: []gwv1beta1.HTTPRouteRule{
+			Rules: []gwv1.HTTPRouteRule{
 				{
-					Matches: []gwv1beta1.HTTPRouteMatch{
+					Matches: []gwv1.HTTPRouteMatch{
 						{
 							Path: &gwv1beta1.HTTPPathMatch{
 								Type:  common.PointerTo(gwv1beta1.PathMatchType("PathPrefix")),
@@ -1473,14 +1474,14 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 							},
 							Headers: []gwv1beta1.HTTPHeaderMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.HeaderMatchExact),
+									Type:  common.PointerTo(gwv1.HeaderMatchExact),
 									Name:  "version",
 									Value: "version",
 								},
 							},
 							QueryParams: []gwv1beta1.HTTPQueryParamMatch{
 								{
-									Type:  common.PointerTo(gwv1beta1.QueryParamMatchExact),
+									Type:  common.PointerTo(gwv1.QueryParamMatchExact),
 									Name:  "search",
 									Value: "q",
 								},
@@ -1488,9 +1489,9 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 							Method: common.PointerTo(gwv1beta1.HTTPMethod("GET")),
 						},
 					},
-					Filters: []gwv1beta1.HTTPRouteFilter{
+					Filters: []gwv1.HTTPRouteFilter{
 						{
-							Type: gwv1beta1.HTTPRouteFilterRequestHeaderModifier,
+							Type: gwv1.HTTPRouteFilterRequestHeaderModifier,
 							RequestHeaderModifier: &gwv1beta1.HTTPHeaderFilter{
 								Set: []gwv1beta1.HTTPHeader{
 									{
@@ -1508,22 +1509,22 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 							},
 						},
 						{
-							Type: gwv1beta1.HTTPRouteFilterURLRewrite,
+							Type: gwv1.HTTPRouteFilterURLRewrite,
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:            gwv1beta1.FullPathHTTPPathModifier,
+									Type:            gwv1.FullPathHTTPPathModifier,
 									ReplaceFullPath: common.PointerTo("/foobar"),
 								},
 							},
 						},
 
 						{
-							Type: gwv1beta1.HTTPRouteFilterURLRewrite,
+							Type: gwv1.HTTPRouteFilterURLRewrite,
 							URLRewrite: &gwv1beta1.HTTPURLRewriteFilter{
 								Hostname: common.PointerTo(gwv1beta1.PreciseHostname("host.com")),
 								Path: &gwv1beta1.HTTPPathModifier{
-									Type:               gwv1beta1.PrefixMatchHTTPPathModifier,
+									Type:               gwv1.PrefixMatchHTTPPathModifier,
 									ReplacePrefixMatch: common.PointerTo("/foo"),
 								},
 							},
@@ -1595,7 +1596,7 @@ func createJWTProvider(t *testing.T, ctx context.Context, k8sClient client.WithW
 	return provider
 }
 
-func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway, providerName string) {
+func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway, providerName string) {
 	policy := &v1alpha1.GatewayPolicy{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "GatewayPolicy",

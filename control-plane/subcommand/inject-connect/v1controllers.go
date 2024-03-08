@@ -322,8 +322,6 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			}})
 	}
 
-	mgr.GetWebhookServer().CertDir = c.flagCertDir
-
 	mgr.GetWebhookServer().Register("/mutate",
 		&ctrlRuntimeWebhook.Admission{Handler: &webhook.MeshWebhook{
 			Clientset:                                c.clientset,

@@ -248,13 +248,11 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
 
 			validator := &ServiceIntentionsWebhook{
 				Client:  client,
 				Logger:  logrtest.New(t),
-				decoder: decoder,
+				decoder: admission.NewDecoder(s),
 				ConsulMeta: common.ConsulMeta{
 					NamespacesEnabled: true,
 					Mirroring:         c.mirror,
@@ -437,13 +435,11 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
 
 			validator := &ServiceIntentionsWebhook{
 				Client:  client,
 				Logger:  logrtest.New(t),
-				decoder: decoder,
+				decoder: admission.NewDecoder(s),
 				ConsulMeta: common.ConsulMeta{
 					NamespacesEnabled: true,
 					Mirroring:         c.mirror,
@@ -597,13 +593,11 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				s := runtime.NewScheme()
 				s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
 				client := fake.NewClientBuilder().WithScheme(s).Build()
-				decoder, err := admission.NewDecoder(s)
-				require.NoError(t, err)
 
 				validator := &ServiceIntentionsWebhook{
 					Client:  client,
 					Logger:  logrtest.New(t),
-					decoder: decoder,
+					decoder: admission.NewDecoder(s),
 					ConsulMeta: common.ConsulMeta{
 						NamespacesEnabled: namespacesEnabled,
 						Mirroring:         true,

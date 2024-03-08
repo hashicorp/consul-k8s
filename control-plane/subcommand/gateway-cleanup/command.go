@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	k8syaml "sigs.k8s.io/yaml"
 
@@ -178,7 +179,7 @@ func (c *Command) deleteV1GatewayClassAndGatewayClasConfig() error {
 
 	// find the gateway class
 
-	gatewayClass := &gwv1beta1.GatewayClass{}
+	gatewayClass := &gwv1.GatewayClass{}
 	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, gatewayClass)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {

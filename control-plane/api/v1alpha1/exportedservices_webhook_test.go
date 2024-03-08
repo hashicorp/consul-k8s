@@ -175,13 +175,11 @@ func TestValidateExportedServices(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ExportedServices{}, &ExportedServicesList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
 
 			validator := &ExportedServicesWebhook{
 				Client:     client,
 				Logger:     logrtest.New(t),
-				decoder:    decoder,
+				decoder:    admission.NewDecoder(s),
 				ConsulMeta: c.consulMeta,
 			}
 			response := validator.Handle(ctx, admission.Request{
