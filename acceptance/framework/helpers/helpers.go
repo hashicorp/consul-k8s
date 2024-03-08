@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
+	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
@@ -184,4 +186,18 @@ func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, 
 		Service:  service,
 	}, nil)
 	require.NoError(t, err)
+}
+
+type Command struct {
+	Command    string            // The command to run
+	Args       []string          // The args to pass to the command
+	WorkingDir string            // The working directory
+	Env        map[string]string // Additional environment variables to set
+	Logger     *terratestLogger.Logger
+}
+
+func RunCommand(r *retry.R, command Command) (string, error) {
+	r.Helper()
+	cmd, error := exec.Command(command.Command, command.Args...).CombinedOutput()
+	return string(cmd), error
 }
