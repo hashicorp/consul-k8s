@@ -11,7 +11,7 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
-	"github.com/gruntwork-io/terratest/modules/shell"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -54,7 +54,7 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
 	}
 	cmdArgs = append(cmdArgs, args...)
-	command := shell.Command{
+	command := helpers.Command{
 		Command: "kubectl",
 		Args:    cmdArgs,
 		Env:     options.Env,
@@ -68,7 +68,7 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 	var output string
 	var err error
 	retry.RunWith(counter, t, func(r *retry.R) {
-		output, err = shell.RunCommandAndGetOutputE(r, command)
+		output, err = helpers.RunCommand(r, command)
 		if err != nil {
 			// Want to retry on errors connecting to actual Kube API because
 			// these are intermittent.
