@@ -523,6 +523,37 @@ func realMain(ctx context.Context) error {
 			fmt.Printf("Internet gateway: Destroyed [id=%s]\n", *igw.InternetGatewayId)
 		}
 
+		// Delete network interfaces
+		networkInterfaces, err := ec2Client.DescribeNetworkInterfacesWithContext(ctx, &ec2.DescribeNetworkInterfacesInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{vpcID},
+				},
+			},
+		})
+
+		if err != nil {
+			return err
+		}
+
+		for _, networkInterface := range networkInterfaces.NetworkInterfaces {
+			fmt.Printf("Network Interface: Destroying... [id=%s]\n", *networkInterface.NetworkInterfaceId)
+			if err := destroyBackoff(ctx, "Network Interface", *networkInterface.NetworkInterfaceId, func() error {
+				_, err := ec2Client.DeleteNetworkInterfaceWithContext(ctx, &ec2.DeleteNetworkInterfaceInput{
+					NetworkInterfaceId: networkInterface.NetworkInterfaceId,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+
+			fmt.Printf("Network interface: Destroyed [id=%s]\n", *networkInterface.NetworkInterfaceId)
+		}
+
 		// Delete subnets.
 		subnets, err := ec2Client.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
 			Filters: []*ec2.Filter{
