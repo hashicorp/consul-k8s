@@ -3,7 +3,6 @@ package datadog
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/DataDog/datadog-api-client-go/v2/api/datadogV1"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/datadog"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -11,6 +10,10 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/stretchr/testify/require"
 	"testing"
+)
+
+const (
+	maxDatadogAPIRetryAttempts = 20
 )
 
 // Test that prometheus metrics, when enabled, are accessible from the
@@ -56,21 +59,19 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 
 	logger.Log(t, fmt.Sprintf("deploying datadog-agent | namespace: %s", datadogNamespace))
 	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/datadog")
-	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
-
 	logger.Log(t, fmt.Sprintf("applying dogstatd over unix domain sockets patch to datadog-agent | namespace: %s", datadogNamespace))
 	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/datadog-dogstatsd-uds")
 	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
 
 	datadogAPIClient := datadogCluster.DatadogClient(t)
-	api := datadogV1.NewMetricsApi(datadogAPIClient.ApiClient)
-
-	response, fullResponse, err := api.ListMetrics(datadogAPIClient.Ctx, "consul.acl")
+	response, fullResponse, err := datadog.SearchMetricsAPIWithRetry(datadogAPIClient, "consul.acl", maxDatadogAPIRetryAttempts, t)
 	if err != nil {
+		content, _ := json.MarshalIndent(response, "", "   ")
+		fullContent, _ := json.MarshalIndent(fullResponse, "", "    ")
 		logger.Logf(t, "Error when calling MetricsApi.ListMetris: %v", err)
-		logger.Logf(t, "Full Response: %v", fullResponse)
+		logger.Logf(t, "Response: %v", string(content))
+		logger.Logf(t, "Full Response: %v", string(fullContent))
 	}
-	content, _ := json.MarshalIndent(response, "", " ")
-	logger.Logf(t, "Full Response: %v", string(content))
+	content, _ := json.Marshal(response.Results)
 	require.Contains(t, string(content), `consul.acl.ResolveToken.50percentile`)
 }
