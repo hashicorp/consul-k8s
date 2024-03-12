@@ -73,9 +73,10 @@ type TestConfig struct {
 	EnableEnterprise  bool
 	EnterpriseLicense string
 
-	EnableDatadog bool
-	DatadogAPIKey string
-	DatadogAppKey string
+	EnableDatadog           bool
+	DatadogAPIKey           string
+	DatadogAppKey           string
+	DatadogHelmChartVersion string
 
 	EnableOpenshift bool
 

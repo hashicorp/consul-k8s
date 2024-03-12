@@ -99,7 +99,7 @@ func NewHelmCluster(
 		configureNamespace(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
 
 		if cfg.DatadogAPIKey != "" || cfg.DatadogAppKey != "" {
-			createOrUpdateDatadogSecret(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
+			CreateOrUpdateDatadogSecret(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
 		}
 	}
 
@@ -166,16 +166,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
-	}
-
-	if strings.Contains(t.Name(), "Datadog") {
-		helm.AddRepo(t, h.helmOptions, "datadog", "https://helm.datadoghq.com")
-		// Ignoring the error from `helm repo update` as it could fail due to stale cache or unreachable servers and we're
-		// asserting a chart version on Install which would fail in an obvious way should this not succeed.
-		_, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "repo", "update")
-		if err != nil {
-			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
-		}
 	}
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
@@ -690,7 +680,7 @@ func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg 
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
 }
 
-func createOrUpdateDatadogSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+func CreateOrUpdateDatadogSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	secretMap := map[string]string{
 		config.DatadogAPIKey: cfg.DatadogAPIKey,
 		config.DatadogAppKey: cfg.DatadogAppKey,

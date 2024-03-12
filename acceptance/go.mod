@@ -11,7 +11,8 @@ replace (
 )
 
 require (
-	github.com/google/uuid v1.3.0
+	github.com/DataDog/datadog-api-client-go/v2 v2.22.0
+	github.com/google/uuid v1.5.0
 	github.com/gruntwork-io/terratest v0.46.7
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240226161840-f3842c41cb2b
 	github.com/hashicorp/consul/api v1.28.2
@@ -37,6 +38,7 @@ require (
 )
 
 require (
+	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/aws/aws-sdk-go v1.44.262 // indirect
@@ -68,6 +70,7 @@ require (
 	github.com/go-openapi/validate v0.22.1 // indirect
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
+	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
