@@ -683,6 +683,10 @@ func defaultValues() map[string]string {
 		// (false positive).
 		"dns.enabled": "false",
 
+		// Adjust the default value from 30s to 1s since we have several tests that verify tokens are cleaned up,
+		// and many of them are using the default retryer (7s max).
+		"connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds": "1",
+
 		// Enable trace logs for servers and clients.
 		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
 		"client.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
