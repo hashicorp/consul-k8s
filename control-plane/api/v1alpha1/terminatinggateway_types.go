@@ -81,7 +81,7 @@ type LinkedService struct {
 	SNI string `json:"sni,omitempty"`
 
 	//DisableAutoHostRewrite disables terminating gateways auto host rewrite feature when set to true.
-	DisableAutoHostRewrite bool `json:",omitempty"`
+	DisableAutoHostRewrite bool `json:"disableAutoHostRewrite,omitempty"`
 }
 
 func (in *TerminatingGateway) GetObjectMeta() metav1.ObjectMeta {
