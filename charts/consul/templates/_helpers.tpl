@@ -683,3 +683,16 @@ Usage: {{ template "consul.versionInfo" }}
 {{- end -}}
 {{- printf "%s" $sanitizedVersion | quote }}
 {{- end -}}
+
+{{/*
+Validate that the depraced stanze for .Values.apiGateway is not set.
+Cleanup server.extraConfig entries to avoid conflicting entries:
+    - server.enableAgentDebug:
+      - `enable_debug` should not exist in extraConfig
+Usage: {{ template "consul.validateExtraConfig" . }}
+*/}}
+{{- define "consul.validate_deprecated_apigateway_not_set" -}}
+    {{- if .Values.apiGateway}}
+    {{fail "[DEPRECATED and REMOVED] .Values.apiGateway is no longer supported as of Consul 1.19.0. Use connectInject.apiGateway instead."}}
+    {{- end -}}
+{{- end -}}
