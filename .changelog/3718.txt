@@ -1,4 +1,4 @@
-```release-note:deprecation
-api-gateway: The api-gateway stanza located under .Values.api-gateway is deprecated and being removed in favor of
-connectInject.apiGateway.
+```release-note:breaking-change
+api-gateway: The api-gateway stanza located under .Values.api-gateway was deprecated in
+1.16.0 of Consul and is being removed as of 1.19.0 in favor of connectInject.apiGateway.
 ```
