@@ -253,7 +253,7 @@ func TestPeering_Gateway(t *testing.T) {
 	// leader election so we may need to wait a long time for
 	// the reconcile loop to run (hence the 1m timeout here).
 	var gatewayAddress string
-	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
+	counter := &retry.Counter{Count: 10, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: staticClientNamespace}, &gateway)
