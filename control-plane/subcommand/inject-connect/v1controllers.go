@@ -65,6 +65,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
 		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+		LifecycleConfig:            lifecycleConfig,
 		EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
 		EnableWANFederation:        c.flagEnableFederation,
 		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
