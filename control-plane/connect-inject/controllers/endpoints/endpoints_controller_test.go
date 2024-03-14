@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
@@ -3903,12 +3904,16 @@ func TestReconcileUpdateEndpoint_LegacyService(t *testing.T) {
 func TestReconcileDeleteEndpoint(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name                      string
-		consulSvcName             string
-		consulPodUid              string
-		expectServicesToBeDeleted bool
-		initialConsulSvcs         []*api.AgentService
-		enableACLs                bool
+		name                       string
+		consulSvcName              string
+		pod                        *corev1.Pod // If this is present, a pod will be created in the fake kube client
+		consulPodUid               string
+		expectServicesToBeDeleted  bool
+		expectServicesToBeCritical bool
+		initialConsulSvcs          []*api.AgentService
+		enableACLs                 bool
+		expectTokens               bool
+		requeueAfter               time.Duration
 	}{
 		{
 			name:                      "Legacy service: does not delete",
@@ -4029,6 +4034,66 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				},
 			},
 			enableACLs: true,
+		},
+		{
+			name:          "When graceful shutdown is enabled with ACLs, tokens should not be deleted",
+			consulSvcName: "service-deleted",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: "default",
+					UID:       "123",
+					Annotations: map[string]string{
+						constants.AnnotationEnableSidecarProxyLifecycle:                     "true",
+						constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds: "5",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: nodeName,
+					// We don't need any other fields for this test
+				},
+			},
+			consulPodUid:               "123",
+			expectServicesToBeDeleted:  false,
+			expectServicesToBeCritical: true,
+			initialConsulSvcs: []*api.AgentService{
+				{
+					ID:      "pod1-service-deleted",
+					Service: "service-deleted",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						metaKeyKubeServiceName:   "service-deleted",
+						constants.MetaKeyKubeNS:  "default",
+						metaKeyManagedBy:         constants.ManagedByValue,
+						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "123",
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-deleted-sidecar-proxy",
+					Service: "service-deleted-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-deleted",
+						DestinationServiceID:   "pod1-service-deleted",
+					},
+					Meta: map[string]string{
+						metaKeyKubeServiceName:   "service-deleted",
+						constants.MetaKeyKubeNS:  "default",
+						metaKeyManagedBy:         constants.ManagedByValue,
+						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "123",
+					},
+				},
+			},
+			requeueAfter: time.Duration(6) * time.Second,
+			expectTokens: true,
+			enableACLs:   true,
 		},
 		{
 			name:                      "Mesh Gateway",
@@ -4209,10 +4274,16 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			// Add the default namespace.
-			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
-			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+			objs := []runtime.Object{ns, node}
+
+			if tt.pod != nil {
+				objs = append(objs, tt.pod)
+			}
+
 			// Create fake k8s client.
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(&ns, &node).Build()
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(objs...).Build()
 
 			// Create test consulServer server
 			adminToken := "123e4567-e89b-12d3-a456-426614174000"
@@ -4285,6 +4356,7 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.False(t, resp.Requeue)
+			require.Equal(t, tt.requeueAfter, resp.RequeueAfter)
 
 			// After reconciliation, Consul should not have any instances of service-deleted
 			serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
@@ -4300,9 +4372,20 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 				require.NotEmpty(t, serviceInstances)
 			}
 
-			if tt.enableACLs {
+			if tt.expectServicesToBeCritical {
+				checks, _, err := consulClient.Health().Checks(tt.consulSvcName, nil)
+				require.NoError(t, err)
+				require.Equal(t, api.HealthCritical, checks.AggregatedStatus())
+			}
+
+			if tt.enableACLs && !tt.expectTokens {
 				_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
+				require.Error(t, err)
 				require.Contains(t, err.Error(), "ACL not found")
+			}
+			if tt.expectTokens {
+				_, _, err = consulClient.ACL().TokenRead(token.AccessorID, nil)
+				require.NoError(t, err)
 			}
 		})
 	}
