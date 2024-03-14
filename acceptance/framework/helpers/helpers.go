@@ -216,6 +216,7 @@ func RunCommand(t testutil.TestingTB, command Command) (string, error) {
 	return string(cmd), err
 }
 
+// getCRDRemoveFinalizers gets CRDs with finalizers and removes them.
 func getCRDRemoveFinalizers(t testutil.TestingTB) error {
 	t.Helper()
 	// Get CRD names with finalizers
@@ -233,7 +234,7 @@ func getCRDRemoveFinalizers(t testutil.TestingTB) error {
 	return nil
 }
 
-// CRD struct to parse CRD JSON output
+// CRD struct to parse CRD JSON output.
 type CRD struct {
 	Items []struct {
 		Metadata struct {
@@ -243,6 +244,7 @@ type CRD struct {
 	} `json:"items"`
 }
 
+// getCRDsWithFinalizers gets CRDs with finalizers.
 func getCRDsWithFinalizers() ([]string, error) {
 	cmd := exec.Command("kubectl", "get", "crd", "-o=json")
 
@@ -266,6 +268,7 @@ func getCRDsWithFinalizers() ([]string, error) {
 	return crdNames, nil
 }
 
+// removeFinalizers removes finalizers from CRDs.
 func removeFinalizers(crdNames []string) error {
 	for _, crd := range crdNames {
 		cmd := exec.Command("kubectl", "patch", "crd", crd, "--type=json", "-p=[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]")
