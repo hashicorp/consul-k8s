@@ -5,6 +5,7 @@ package endpoints
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -2262,6 +2263,242 @@ func TestParseLocality(t *testing.T) {
 		}
 		require.Equal(t, &api.Locality{Region: "us-west-1", Zone: "us-west-1a"}, parseLocality(n))
 	})
+}
+
+func TestReconcile_PodErrorPreservesToken(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name                       string
+		svcName                    string
+		consulSvcName              string
+		k8sObjects                 func() []runtime.Object
+		expectedConsulSvcInstances []*api.CatalogService
+		expectedProxySvcInstances  []*api.CatalogService
+		expectedHealthChecks       []*api.HealthCheck
+		metricsEnabled             bool
+		telemetryCollectorDisabled bool
+		nodeMeta                   map[string]string
+		pod1Err                    string
+	}{
+		{
+			name:          "Error when fetching pod results in not deregistering the service instances in consul",
+			svcName:       "service-created",
+			consulSvcName: "service-created",
+			nodeMeta: map[string]string{
+				"test-node": "true",
+			},
+			pod1Err: "some fake error while fetching pod",
+			k8sObjects: func() []runtime.Object {
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				endpoint := &corev1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service-created",
+						Namespace: "default",
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP: "1.2.3.4",
+									TargetRef: &corev1.ObjectReference{
+										Kind:      "Pod",
+										Name:      "pod1",
+										Namespace: "default",
+									},
+								},
+							},
+						},
+					},
+				}
+				return []runtime.Object{pod1, endpoint}
+			},
+			expectedConsulSvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-created",
+					ServiceName:    "service-created",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    0,
+					ServiceMeta:    map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
+					ServiceTags:    []string{},
+					ServiceProxy:   &api.AgentServiceConnectProxyConfig{},
+					NodeMeta: map[string]string{
+						"synthetic-node": "true",
+						"test-node":      "true",
+					},
+				},
+			},
+			expectedProxySvcInstances: []*api.CatalogService{
+				{
+					ServiceID:      "pod1-service-created-sidecar-proxy",
+					ServiceName:    "service-created-sidecar-proxy",
+					ServiceAddress: "1.2.3.4",
+					ServicePort:    20000,
+					ServiceProxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-created",
+						DestinationServiceID:   "pod1-service-created",
+						LocalServiceAddress:    "",
+						LocalServicePort:       0,
+						Config:                 map[string]any{"envoy_telemetry_collector_bind_socket_dir": string("/consul/connect-inject")},
+					},
+					ServiceMeta: map[string]string{constants.MetaKeyPodName: "pod1", metaKeyKubeServiceName: "service-created", constants.MetaKeyKubeNS: "default", metaKeyManagedBy: constants.ManagedByValue, metaKeySyntheticNode: "true", constants.MetaKeyPodUID: ""},
+					ServiceTags: []string{},
+					NodeMeta: map[string]string{
+						"synthetic-node": "true",
+						"test-node":      "true",
+					},
+				},
+			},
+			expectedHealthChecks: []*api.HealthCheck{
+				{
+					CheckID:     "default/pod1-service-created",
+					ServiceName: "service-created",
+					ServiceID:   "pod1-service-created",
+					Name:        constants.ConsulKubernetesCheckName,
+					Status:      api.HealthPassing,
+					Output:      constants.KubernetesSuccessReasonMsg,
+					Type:        constants.ConsulKubernetesCheckType,
+				},
+				{
+					CheckID:     "default/pod1-service-created-sidecar-proxy",
+					ServiceName: "service-created-sidecar-proxy",
+					ServiceID:   "pod1-service-created-sidecar-proxy",
+					Name:        constants.ConsulKubernetesCheckName,
+					Status:      api.HealthPassing,
+					Output:      constants.KubernetesSuccessReasonMsg,
+					Type:        constants.ConsulKubernetesCheckType,
+				},
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Add the default namespace.
+			ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+			node := corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+			// Create fake k8s client
+			k8sObjects := append(tt.k8sObjects(), &ns, &node)
+
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(k8sObjects...).Build()
+
+			customClient := fakeClientWithPodCustomization{fakeClient}
+
+			// Create test consulServer server.
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
+
+			// Create the endpoints controller.
+			ep := &Controller{
+				Client:                fakeClient,
+				Log:                   logrtest.New(t),
+				ConsulClientConfig:    testClient.Cfg,
+				ConsulServerConnMgr:   testClient.Watcher,
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSetWith(),
+				ReleaseName:           "consulServer",
+				ReleaseNamespace:      "default",
+				NodeMeta:              tt.nodeMeta,
+			}
+			if tt.metricsEnabled {
+				ep.MetricsConfig = metrics.Config{
+					DefaultEnableMetrics: true,
+					EnableGatewayMetrics: true,
+				}
+			}
+
+			ep.EnableTelemetryCollector = !tt.telemetryCollectorDisabled
+
+			namespacedName := types.NamespacedName{
+				Namespace: "default",
+				Name:      tt.svcName,
+			}
+
+			// Do a first reconcile to setup the state in Consul with the instances and tokens.
+			resp, err := ep.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+			require.NoError(t, err)
+			require.False(t, resp.Requeue)
+
+			// Do a second reconcile while stubbing the k8s client to return an error for the pod. Since it's not a "not
+			// found" error, we should expect that the service instance does not get deregistered and that the acl token
+			// is not deleted, so we will assert after this that the state in Consul still exists.
+			ep.Client = customClient
+			resp, err = ep.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: namespacedName,
+			})
+			require.Contains(t, err.Error(), tt.pod1Err)
+			require.False(t, resp.Requeue)
+
+			// These are the same assertions in the Reconcile-Create test cases, ensuring the state in Consul is correct.
+			// After reconciliation, Consul should have the service with the correct number of instances
+			serviceInstances, _, err := consulClient.Catalog().Service(tt.consulSvcName, "", nil)
+			require.NoError(t, err)
+			require.Len(t, serviceInstances, len(tt.expectedConsulSvcInstances))
+			for i, instance := range serviceInstances {
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceID, instance.ServiceID)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceName, instance.ServiceName)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceAddress, instance.ServiceAddress)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServicePort, instance.ServicePort)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceMeta, instance.ServiceMeta)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTags, instance.ServiceTags)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceTaggedAddresses, instance.ServiceTaggedAddresses)
+				require.Equal(t, tt.expectedConsulSvcInstances[i].ServiceProxy, instance.ServiceProxy)
+				if tt.nodeMeta != nil {
+					require.Equal(t, tt.expectedConsulSvcInstances[i].NodeMeta, instance.NodeMeta)
+				}
+			}
+			proxyServiceInstances, _, err := consulClient.Catalog().Service(fmt.Sprintf("%s-sidecar-proxy", tt.consulSvcName), "", nil)
+			require.NoError(t, err)
+			require.Len(t, proxyServiceInstances, len(tt.expectedProxySvcInstances))
+			for i, instance := range proxyServiceInstances {
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceID, instance.ServiceID)
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceName, instance.ServiceName)
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceAddress, instance.ServiceAddress)
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServicePort, instance.ServicePort)
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceMeta, instance.ServiceMeta)
+				require.Equal(t, tt.expectedProxySvcInstances[i].ServiceTags, instance.ServiceTags)
+				if tt.nodeMeta != nil {
+					require.Equal(t, tt.expectedProxySvcInstances[i].NodeMeta, instance.NodeMeta)
+				}
+				// When comparing the ServiceProxy field we ignore the DestinationNamespace
+				// field within that struct because on Consul OSS it's set to "" but on Consul Enterprise
+				// it's set to "default" and we want to re-use this test for both OSS and Ent.
+				// This does mean that we don't test that field but that's okay because
+				// it's not getting set specifically in this test.
+				// To do the comparison that ignores that field we use go-cmp instead
+				// of the regular require.Equal call since it supports ignoring certain
+				// fields.
+				diff := cmp.Diff(tt.expectedProxySvcInstances[i].ServiceProxy, instance.ServiceProxy,
+					cmpopts.IgnoreFields(api.Upstream{}, "DestinationNamespace", "DestinationPartition"))
+				require.Empty(t, diff, "expected objects to be equal")
+			}
+
+			// Check that the Consul health expectedCheck was created for the k8s pod.
+			for _, expectedCheck := range tt.expectedHealthChecks {
+				filter := fmt.Sprintf("ServiceID == %q", expectedCheck.ServiceID)
+				checks, _, err := consulClient.Health().Checks(expectedCheck.ServiceName, &api.QueryOptions{Filter: filter})
+				require.NoError(t, err)
+				require.Equal(t, len(checks), 1)
+				// Ignoring Namespace because the response from ENT includes it and OSS does not.
+				var ignoredFields = []string{"Node", "Definition", "Namespace", "Partition", "CreateIndex", "ModifyIndex", "ServiceTags"}
+				require.True(t, cmp.Equal(checks[0], expectedCheck, cmpopts.IgnoreFields(api.HealthCheck{}, ignoredFields...)))
+			}
+		})
+	}
+
+}
+
+type fakeClientWithPodCustomization struct {
+	client.WithWatch
+}
+
+func (c fakeClientWithPodCustomization) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if key.Name == "pod1" {
+		return errors.New("some fake error while fetching pod")
+	}
+	err := c.WithWatch.Get(ctx, key, obj, opts...)
+	return err
 }
 
 // Tests updating an Endpoints object.
