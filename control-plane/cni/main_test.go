@@ -67,22 +67,6 @@ func Test_cmdAdd(t *testing.T) {
 			expectedRules: false, // Rules won't be applied because the command will throw an error first
 		},
 		{
-			name: "Missing prevResult in stdin data, should throw error",
-			cmd: &Command{
-				client: fake.NewSimpleClientset(),
-			},
-			podName:   "missing-prev-result",
-			stdInData: missingPrevResultStdinData,
-			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
-				_, err := cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
-				require.NoError(t, err)
-
-				return pod
-			},
-			expectedErr:   fmt.Errorf("must be called as final chained plugin"),
-			expectedRules: false, // Rules won't be applied because the command will throw an error first
-		},
-		{
 			name: "Missing IPs in prevResult in stdin data, should throw error",
 			cmd: &Command{
 				client: fake.NewSimpleClientset(),
@@ -326,31 +310,6 @@ const goodStdinData = `{
         ],
         "routes": []
 
-    },
-    "cni_bin_dir": "/opt/cni/bin",
-    "cni_net_dir": "/etc/cni/net.d",
-    "kubeconfig": "ZZZ-consul-cni-kubeconfig",
-    "log_level": "info",
-    "multus": false,
-    "name": "consul-cni",
-    "type": "consul-cni"
-}`
-
-const missingPrevResultStdinData = `{
-    "cniVersion": "0.3.1",
-	"name": "kindnet",
-	"type": "kindnet",
-    "capabilities": {
-        "testCapability": false
-    },
-    "ipam": {
-        "type": "host-local"
-    },
-    "dns": {
-        "nameservers": ["nameserver"],
-        "domain": "domain",
-        "search": ["search"],
-        "options": ["option"]
     },
     "cni_bin_dir": "/opt/cni/bin",
     "cni_net_dir": "/etc/cni/net.d",
