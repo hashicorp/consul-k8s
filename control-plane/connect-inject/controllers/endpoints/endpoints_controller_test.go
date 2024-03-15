@@ -1767,10 +1767,10 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 			},
 		},
 		{
-			// This test has 3 addresses, but only 2 are backed by pod resources. This will cause Reconcile to error
-			// on the invalid address but continue and process the other addresses. We check for error specific to
-			// pod3 being non-existant at the end, and validate the other 2 addresses have service instances.
-			name:          "Endpoints with multiple addresses but one is invalid",
+			// This test has 3 addresses, but only 2 are backed by pod resources. This will cause Reconcile to
+			// deregister the instance associated with the non-existent pod and continue and process the other
+			// addresses. We validate the other 2 addresses have service instances.
+			name:          "Endpoints with multiple addresses but one is deleted",
 			svcName:       "service-created",
 			consulSvcName: "service-created",
 			k8sObjects: func() []runtime.Object {
@@ -1897,7 +1897,6 @@ func TestReconcileCreateEndpoint(t *testing.T) {
 					Type:        constants.ConsulKubernetesCheckType,
 				},
 			},
-			expErr: "1 error occurred:\n\t* pods \"pod3\" not found\n\n",
 		},
 		{
 			name:          "Every configurable field set: port, different Consul service name, meta, tags, upstreams, metrics",

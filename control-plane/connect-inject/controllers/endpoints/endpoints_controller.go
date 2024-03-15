@@ -196,7 +196,10 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
 					if k8serrors.IsNotFound(err) {
 						deregisterEndpointAddress[address.IP] = true
+						r.Log.Info("pod not found", "name", address.TargetRef.Name)
 					} else {
+						// If there was a different error fetching the pod, then log the error but don't deregister it
+						// since this could be a K8s API blip and we don't want to prematurely deregister.
 						deregisterEndpointAddress[address.IP] = false
 						r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
 						errs = multierror.Append(errs, err)
