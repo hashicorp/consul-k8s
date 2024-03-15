@@ -197,6 +197,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					if k8serrors.IsNotFound(err) {
 						deregisterEndpointAddress[address.IP] = true
 					} else {
+						deregisterEndpointAddress[address.IP] = false
 						r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
 						errs = multierror.Append(errs, err)
 					}
@@ -1636,5 +1637,5 @@ func deregister(address string, deregisterEndpointAddress map[string]bool) bool 
 	if ok {
 		return deregister
 	}
-	return false
+	return true
 }
