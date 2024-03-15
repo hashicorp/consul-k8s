@@ -20,7 +20,6 @@ import (
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -197,88 +196,8 @@ type Command struct {
 	Logger     *terratestLogger.Logger
 }
 
-func RunCommand(t testutil.TestingTB, command Command) (string, error) {
-	t.Helper()
-	cmd, err := exec.Command(command.Command, command.Args...).CombinedOutput()
-
-	// Check and remove finalizers in crds in the namespace
-	for _, arg := range command.Args {
-		if strings.Contains(arg, "delete") {
-			errCh := make(chan error)
-			go func() {
-				errCh <- getCRDRemoveFinalizers(t)
-			}()
-			if err := <-errCh; err != nil {
-				return "", err
-			}
-		}
-	}
-
-	return string(cmd), err
-}
-
-// getCRDRemoveFinalizers gets CRDs with finalizers and removes them.
-func getCRDRemoveFinalizers(t testutil.TestingTB) error {
-	t.Helper()
-	// Get CRD names with finalizers
-	crdNames, err := getCRDsWithFinalizers()
-	if err != nil {
-		return err
-	}
-
-	// Remove finalizers for each CRD with finalizers
-	if len(crdNames) > 0 {
-		if err := removeFinalizers(crdNames); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// CRD struct to parse CRD JSON output.
-type CRD struct {
-	Items []struct {
-		Metadata struct {
-			Name       string   `json:"name"`
-			Finalizers []string `json:"finalizers"`
-		} `json:"metadata"`
-	} `json:"items"`
-}
-
-// getCRDsWithFinalizers gets CRDs with finalizers.
-func getCRDsWithFinalizers() ([]string, error) {
-	cmd := exec.Command("kubectl", "get", "crd", "-o=json")
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("error executing command: %v", err)
-	}
-
-	var crds CRD
-	if err := json.Unmarshal(output, &crds); err != nil {
-		return nil, fmt.Errorf("error parsing JSON: %v", err)
-	}
-
-	var crdNames []string
-	for _, item := range crds.Items {
-		if len(item.Metadata.Finalizers) > 0 {
-			crdNames = append(crdNames, item.Metadata.Name)
-		}
-	}
-
-	return crdNames, nil
-}
-
-// removeFinalizers removes finalizers from CRDs.
-func removeFinalizers(crdNames []string) error {
-	for _, crd := range crdNames {
-		cmd := exec.Command("kubectl", "patch", "crd", crd, "--type=json", "-p=[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]")
-
-		err := cmd.Run()
-		if err != nil {
-			return fmt.Errorf("error removing finalizers from CRD %s: %v", crd, err)
-		}
-		fmt.Printf("Finalizers removed from CRD %s\n", crd)
-	}
-	return nil
+func RunCommand(r *retry.R, command Command) (string, error) {
+	r.Helper()
+	cmd, error := exec.Command(command.Command, command.Args...).CombinedOutput()
+	return string(cmd), error
 }
