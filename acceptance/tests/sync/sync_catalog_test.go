@@ -9,13 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/stretchr/testify/require"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/stretchr/testify/require"
 )
 
 // Test that sync catalog works in both the default installation and
@@ -105,7 +106,7 @@ func TestSyncCatalogWithIngress(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			helmValues := map[string]string{
 				"syncCatalog.enabled":          "true",
-				"syncCatalog.ingres.enabled":   "true",
+				"syncCatalog.ingress.enabled":  "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 			}
