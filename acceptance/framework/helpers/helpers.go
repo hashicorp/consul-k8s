@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
+	"github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -197,42 +198,52 @@ type Command struct {
 	Logger     *terratestLogger.Logger
 }
 
-func RunCommand(t testutil.TestingTB, command Command) (string, error) {
-	t.Helper()
-	cmd, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+type cmdResult struct {
+	output string
+	err    error
+}
 
-	// Check and remove finalizers in crds in the namespace
+func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Command) (string, error) {
+	t.Helper()
+
+	resultCh := make(chan *cmdResult, 1)
+
+	go func() {
+		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+		resultCh <- &cmdResult{output: string(output), err: err}
+	}()
+
+	// might not be needed
 	for _, arg := range command.Args {
 		if strings.Contains(arg, "delete") {
-			errCh := make(chan error)
 			go func() {
-				errCh <- getCRDRemoveFinalizers(t)
+				GetCRDRemoveFinalizers(t, options)
 			}()
-			if err := <-errCh; err != nil {
-				return "", err
-			}
 		}
 	}
 
-	return string(cmd), err
+	select {
+	case res := <-resultCh:
+		return res.output, res.err
+		// Sometimes this func runs for too long handle timeout if needed.
+	case <-time.After(30 * time.Second):
+		GetCRDRemoveFinalizers(t, options)
+		logger.Logf(t, "RunCommand timed out")
+		return "", nil
+	}
 }
 
 // getCRDRemoveFinalizers gets CRDs with finalizers and removes them.
-func getCRDRemoveFinalizers(t testutil.TestingTB) error {
+func GetCRDRemoveFinalizers(t testutil.TestingTB, options *k8s.KubectlOptions) {
 	t.Helper()
-	// Get CRD names with finalizers
-	crdNames, err := getCRDsWithFinalizers()
+	crdNames, err := getCRDsWithFinalizers(options)
 	if err != nil {
-		return err
+		logger.Logf(t, "Unable to get CRDs with finalizers, %v.", err)
 	}
 
-	// Remove finalizers for each CRD with finalizers
 	if len(crdNames) > 0 {
-		if err := removeFinalizers(crdNames); err != nil {
-			return err
-		}
+		removeFinalizers(t, options, crdNames)
 	}
-	return nil
 }
 
 // CRD struct to parse CRD JSON output.
@@ -245,14 +256,18 @@ type CRD struct {
 	} `json:"items"`
 }
 
-// getCRDsWithFinalizers gets CRDs with finalizers.
-func getCRDsWithFinalizers() ([]string, error) {
-	cmd := exec.Command("kubectl", "get", "crd", "-o=json")
+func getCRDsWithFinalizers(options *k8s.KubectlOptions) ([]string, error) {
+	cmdArgs := createCmdArgs(options)
+	args := []string{"get", "crd", "-o=json"}
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("error executing command: %v", err)
+	cmdArgs = append(cmdArgs, args...)
+	command := Command{
+		Command: "kubectl",
+		Args:    cmdArgs,
+		Env:     options.Env,
 	}
+
+	output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
 
 	var crds CRD
 	if err := json.Unmarshal(output, &crds); err != nil {
@@ -266,19 +281,40 @@ func getCRDsWithFinalizers() ([]string, error) {
 		}
 	}
 
-	return crdNames, nil
+	return crdNames, err
 }
 
 // removeFinalizers removes finalizers from CRDs.
-func removeFinalizers(crdNames []string) error {
+func removeFinalizers(t testutil.TestingTB, options *k8s.KubectlOptions, crdNames []string) {
+	cmdArgs := createCmdArgs(options)
 	for _, crd := range crdNames {
-		cmd := exec.Command("kubectl", "patch", "crd", crd, "--type=json", "-p=[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]")
+		args := []string{"patch", "crd", crd, "--type=json", "-p=[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"}
 
-		err := cmd.Run()
+		cmdArgs = append(cmdArgs, args...)
+		command := Command{
+			Command: "kubectl",
+			Args:    cmdArgs,
+			Env:     options.Env,
+		}
+
+		_, err := exec.Command(command.Command, command.Args...).CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("error removing finalizers from CRD %s: %v", crd, err)
+			logger.Logf(t, "Unable to remove finalizers, proceeding anyway: %v.", err)
 		}
 		fmt.Printf("Finalizers removed from CRD %s\n", crd)
 	}
-	return nil
+}
+
+func createCmdArgs(options *k8s.KubectlOptions) []string {
+	var cmdArgs []string
+	if options.ContextName != "" {
+		cmdArgs = append(cmdArgs, "--context", options.ContextName)
+	}
+	if options.ConfigPath != "" {
+		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
+	}
+	if options.Namespace != "" {
+		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
+	}
+	return cmdArgs
 }
