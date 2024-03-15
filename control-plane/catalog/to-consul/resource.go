@@ -756,6 +756,18 @@ func (t *ServiceResource) registerServiceInstance(
 			}
 			if subsetAddr.NodeName != nil {
 				r.Service.Meta[ConsulK8SNodeName] = *subsetAddr.NodeName
+				// Look up the node's ip address by getting node info
+				node, err := t.Client.CoreV1().Nodes().Get(t.Ctx, *subsetAddr.NodeName, metav1.GetOptions{})
+				if err != nil {
+					t.Log.Warn("error getting node info", "error", err)
+					continue
+				}
+				if region := node.Labels[corev1.LabelTopologyRegion]; region != "" {
+					r.Service.Meta[ConsulK8STopologyRegion] = region
+				}
+				if zone := node.Labels[corev1.LabelTopologyZone]; zone != "" {
+					r.Service.Meta[ConsulK8STopologyZone] = zone
+				}
 			}
 
 			r.Check = &consulapi.AgentCheck{

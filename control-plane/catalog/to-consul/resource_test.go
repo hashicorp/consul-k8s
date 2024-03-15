@@ -796,6 +796,8 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "8.8.8.8", actual[0].Service.Address)
 		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "us-east-2", actual[0].Service.Meta[ConsulK8STopologyRegion])
+		require.Equal(r, "us-east-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "k8s-sync", actual[0].Node)
 	})
 }
@@ -1131,6 +1133,9 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
+	// Insert the nodes
+	createNodes(t, client)
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -1140,6 +1145,8 @@ func TestServiceResource_clusterIP(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
 		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "us-east-2", actual[0].Service.Meta[ConsulK8STopologyRegion])
+		require.Equal(r, "us-east-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
 		require.Equal(r, 8080, actual[1].Service.Port)
@@ -1166,6 +1173,9 @@ func TestServiceResource_clusterIP_healthCheck(t *testing.T) {
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+
+	// Insert the nodes
+	createNodes(t, client)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1205,6 +1215,9 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
+	// Insert the nodes
+	createNodes(t, client)
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -1214,6 +1227,8 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 		require.Equal(r, "prefixfoo", actual[0].Service.Service)
 		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
 		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "us-east-2", actual[0].Service.Meta[ConsulK8STopologyRegion])
+		require.Equal(r, "us-east-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "prefixfoo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
 		require.Equal(r, 8080, actual[1].Service.Port)
@@ -1243,6 +1258,9 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
+	// Insert the nodes
+	createNodes(t, client)
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -1252,6 +1270,8 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
 		require.Equal(r, 2000, actual[0].Service.Port)
+		require.Equal(r, "us-east-2", actual[0].Service.Meta[ConsulK8STopologyRegion])
+		require.Equal(r, "us-east-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
 		require.Equal(r, 2000, actual[1].Service.Port)
@@ -1281,6 +1301,9 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
+	// Insert the nodes
+	createNodes(t, client)
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -1290,6 +1313,8 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
 		require.Equal(r, 4141, actual[0].Service.Port)
+		require.Equal(r, "us-east-2", actual[0].Service.Meta[ConsulK8STopologyRegion])
+		require.Equal(r, "us-east-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
 		require.Equal(r, 4141, actual[1].Service.Port)
@@ -1321,6 +1346,9 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
+	// Insert the nodes
+	createNodes(t, client)
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -1330,6 +1358,8 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
 		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "us-east-2", actual[0].Service.Meta[ConsulK8STopologyRegion])
+		require.Equal(r, "us-east-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
 		require.Equal(r, 8080, actual[1].Service.Port)
@@ -1388,6 +1418,9 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", testNamespace)
 
+	// Insert the nodes
+	createNodes(t, client)
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -1397,6 +1430,8 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
 		require.Equal(r, 8080, actual[0].Service.Port)
+		require.Equal(r, "us-east-2", actual[0].Service.Meta[ConsulK8STopologyRegion])
+		require.Equal(r, "us-east-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
 		require.Equal(r, 8080, actual[1].Service.Port)
@@ -1429,6 +1464,9 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
 
+	// Insert the nodes
+	createNodes(t, client)
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -1438,6 +1476,8 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
 		require.Equal(r, 2000, actual[0].Service.Port)
+		require.Equal(r, "us-east-2", actual[0].Service.Meta[ConsulK8STopologyRegion])
+		require.Equal(r, "us-east-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
 		require.Equal(r, 2000, actual[1].Service.Port)
@@ -1464,6 +1504,9 @@ func TestServiceResource_targetRefInMeta(t *testing.T) {
 
 	// Insert the endpoints
 	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+
+	// Insert the nodes
+	createNodes(t, client)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1950,6 +1993,7 @@ func TestServiceResource_addIngress(t *testing.T) {
 			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
 			require.NoError(t, err)
 			createEndpoints(t, client, "test-service", metav1.NamespaceDefault)
+			createNodes(t, client)
 			// Verify that the service name annotation is preferred
 			retry.Run(t, func(r *retry.R) {
 				syncer.Lock()
