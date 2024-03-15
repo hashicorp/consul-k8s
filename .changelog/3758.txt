@@ -1,0 +1,4 @@
+```release-note:bug
+control-plane: fix an issue where ACL token cleanup did not respect a pod's GracefulShutdownPeriodSeconds and
+tokens were invalidated immediately on pod entering Terminating state.
+```
