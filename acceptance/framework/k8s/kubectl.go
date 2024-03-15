@@ -67,7 +67,7 @@ func RunKubectlAndGetOutputWithLoggerE(t *testing.T, options *k8s.KubectlOptions
 	var output string
 	var err error
 	retry.RunWith(counter, t, func(r *retry.R) {
-		output, err = helpers.RunCommand(r, command)
+		output, err = helpers.RunCommand(r, options, command)
 		if err != nil {
 			// Want to retry on errors connecting to actual Kube API because
 			// these are intermittent.
