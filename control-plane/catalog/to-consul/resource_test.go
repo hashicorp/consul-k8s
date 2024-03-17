@@ -18,6 +18,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/utils/pointer"
@@ -45,6 +46,9 @@ func TestServiceResource_createDelete(t *testing.T) {
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
+
+	createNodes(t, client)
+	createEndpointSlice(t, client, svc.Name, metav1.NamespaceDefault)
 
 	// Delete
 	require.NoError(t, client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.Background(), "foo", metav1.DeleteOptions{}))
@@ -977,12 +981,12 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 
 	createNodes(t, client)
 
-	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
-
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
 	svc.Annotations = map[string]string{annotationServicePort: "rpc"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
+	createEndpointSlice(t, client, svc.Name, metav1.NamespaceDefault)
+
 	require.NoError(t, err)
 
 	// Verify what we got
@@ -2136,8 +2140,8 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 		context.Background(),
 		&discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: serviceName + "-",
-				Labels:       map[string]string{discoveryv1.LabelServiceName: serviceName},
+				Labels: map[string]string{discoveryv1.LabelServiceName: serviceName},
+				Name:   serviceName + "-" + rand.String(5),
 			},
 			AddressType: discoveryv1.AddressTypeIPv4,
 			Endpoints: []discoveryv1.Endpoint{
