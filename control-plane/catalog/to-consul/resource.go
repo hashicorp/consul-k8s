@@ -252,7 +252,6 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 					"key", key,
 					"err", err)
 				break
-
 			}
 
 			for _, endpointSlice := range endpointSliceList.Items {
@@ -741,10 +740,15 @@ func (t *ServiceResource) registerServiceInstance(
 			}
 		}
 		for _, endpoint := range endpointSlice.Endpoints {
-			// Used for adding node region label to an endpoint but only needs to called once
-			node, err := t.Client.CoreV1().Nodes().Get(t.Ctx, *endpoint.NodeName, metav1.GetOptions{})
-			if err != nil {
-				t.Log.Error("error getting node info", "error", err)
+			// Retrieve the node information for setting topology region in the synced Consul service
+			var node *corev1.Node
+			if endpoint.NodeName != nil {
+				var err error
+				// Retrieve the node information only if the NodeName is available.
+				node, err = t.Client.CoreV1().Nodes().Get(t.Ctx, *endpoint.NodeName, metav1.GetOptions{})
+				if err != nil {
+					t.Log.Error("error getting node info", "error", err)
+				}
 			}
 
 			for _, endpointAddr := range endpoint.Addresses {
@@ -793,12 +797,11 @@ func (t *ServiceResource) registerServiceInstance(
 				if endpoint.NodeName != nil {
 					r.Service.Meta[ConsulK8SNodeName] = *endpoint.NodeName
 				}
-				if node.Labels != nil {
-					if region := node.Labels[corev1.LabelTopologyRegion]; region != "" {
+				if node != nil && node.Labels != nil {
+					if region, ok := node.Labels[corev1.LabelTopologyRegion]; ok && region != "" {
 						r.Service.Meta[ConsulK8STopologyRegion] = region
 					}
 				}
-
 				if endpoint.Zone != nil {
 					r.Service.Meta[ConsulK8STopologyZone] = *endpoint.Zone
 				}
