@@ -17,7 +17,7 @@
 # go-discover builds the discover binary (which we don't currently publish
 # either).
 ARG GOLANG_VERSION
-FROM golang:${GOLANG_VERSION}-alpine as go-discover
+FROM golang:${GOLANG_VERSION}-alpine3.19 as go-discover
 RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@214571b6a5309addf3db7775f4ee8cf4d264fd5f
 
 # dev copies the binary from a local build
