@@ -7,6 +7,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	componentbaseconfig "k8s.io/component-base/config"
 	"net/http"
 	"os"
 	"os/signal"
@@ -71,6 +75,13 @@ type Command struct {
 	// Flags to support Kubernetes Ingress resources
 	flagEnableIngress   bool // Register services using the hostname from an ingress resource
 	flagLoadBalancerIPs bool // Use the load balancer IP of an ingress resource instead of the hostname
+
+	// Flags to support leaderElection
+	flagEnableLeaderElection        bool
+	flagLeaderElectionLeaseName     string
+	flagLeaderElectionLeaseDuration time.Duration
+	flagLeaderElectionRenewDeadline time.Duration
+	flagLeaderElectionRetryPeriod   time.Duration
 
 	clientset kubernetes.Interface
 
@@ -160,6 +171,23 @@ func (c *Command) init() {
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
 	c.flags.BoolVar(&c.flagLoadBalancerIPs, "loadBalancer-ips", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
+
+	c.flags.BoolVar(&c.flagEnableLeaderElection, "enable-leaderElection", false,
+		"Whether to run sync catalog in multi replica mode using leader election algorithm")
+	c.flags.StringVar(&c.flagLeaderElectionLeaseName, "leaderElection-lease-name", "consul-sync-catalog-lease",
+		"Whether to run sync catalog in multi replica mode using leader election algorithm")
+	c.flags.DurationVar(&c.flagLeaderElectionLeaseDuration, "leaderElection-lease-duration", 15*time.Second,
+		"leaseDuration is the duration that non-leader candidates will wait "+
+			"after observing a leadership renewal until attempting to acquire "+
+			"leadership of a led but unrenewed leader slot. This is effectively the "+
+			"maximum duration that a leader can be stopped before it is replaced by another candidate.")
+	c.flags.DurationVar(&c.flagLeaderElectionRenewDeadline, "leaderElection-renew-deadline", 10*time.Second,
+		"renewDeadline is the interval between attempts by the acting master to "+
+			"renew a leadership slot before it stops leading. This must be less "+
+			"than or equal to the lease duration.")
+	c.flags.DurationVar(&c.flagLeaderElectionRetryPeriod, "leaderElection-retry-period", 2*time.Second,
+		"retryPeriod is the duration the clients should wait between attempting "+
+			"acquisition and renewal of a leadership.")
 
 	c.consul = &flags.ConsulFlags{}
 	c.k8s = &flags.K8SFlags{}
@@ -267,7 +295,21 @@ func (c *Command) Run(args []string) int {
 
 	// Start the K8S-to-Consul syncer
 	var toConsulCh chan struct{}
-	if c.flagToConsul {
+
+	// Start Consul-to-K8S sync
+	var toK8SCh chan struct{}
+
+	lockID := generateLockID()
+
+	lock, err := c.generateLock(lockID)
+
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Unable to generate lock: %s", err))
+		cancelF()
+		return 1
+	}
+
+	syncToConsul := func(ctx context.Context) {
 		// Build the Consul sync and start it
 		syncer := &catalogtoconsul.ConsulSyncer{
 			ConsulClientConfig:      consulConfig,
@@ -281,7 +323,6 @@ func (c *Command) Run(args []string) int {
 			ConsulNodeName:          c.flagConsulNodeName,
 		}
 		go syncer.Run(ctx)
-
 		// Build the controller and start it
 		ctl := &controller.Controller{
 			Log: c.logger.Named("to-consul/controller"),
@@ -316,9 +357,7 @@ func (c *Command) Run(args []string) int {
 		}()
 	}
 
-	// Start Consul-to-K8S sync
-	var toK8SCh chan struct{}
-	if c.flagToK8S {
+	syncToK8S := func(ctx context.Context) {
 		sink := &catalogtok8s.K8SSink{
 			Client:    c.clientset,
 			Namespace: c.flagK8SWriteNamespace,
@@ -348,6 +387,48 @@ func (c *Command) Run(args []string) int {
 			defer close(toK8SCh)
 			ctl.Run(ctx.Done())
 		}()
+	}
+
+	if !c.flagEnableLeaderElection {
+		if c.flagToConsul {
+			syncToConsul(ctx)
+		}
+
+		if c.flagToK8S {
+			syncToK8S(ctx)
+		}
+	} else {
+		go leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+			Lock:            lock,
+			ReleaseOnCancel: false,
+			LeaseDuration:   c.flagLeaderElectionLeaseDuration,
+			RenewDeadline:   c.flagLeaderElectionRenewDeadline,
+			RetryPeriod:     c.flagLeaderElectionRetryPeriod,
+			Callbacks: leaderelection.LeaderCallbacks{
+				OnStartedLeading: func(leaderCtx context.Context) {
+					c.logger.Info("Started leading with unique lease holder id", lockID)
+
+					if c.flagToConsul {
+						syncToConsul(leaderCtx)
+					}
+
+					if c.flagToK8S {
+						syncToK8S(leaderCtx)
+					}
+				},
+				OnStoppedLeading: func() {
+					c.logger.Info("Stopped leading with unique lease holder id", lockID)
+				},
+				OnNewLeader: func(identity string) {
+					// Just got the lock
+					if identity == lockID {
+						c.logger.Info("Still same leader", lockID)
+						return
+					}
+					c.logger.Info("New leader elected", "new lock ID", identity, "old lock ID", lockID)
+				},
+			},
+		})
 	}
 
 	// Start healthcheck handler
@@ -416,6 +497,40 @@ func (c *Command) interrupt() {
 
 func (c *Command) sendSignal(sig os.Signal) {
 	c.sigCh <- sig
+}
+
+func (c *Command) generateLock(id string) (resourcelock.Interface, error) {
+
+	defaultLEConfig := componentbaseconfig.LeaderElectionConfiguration{
+		LeaderElect:       false,
+		LeaseDuration:     metav1.Duration{Duration: c.flagLeaderElectionLeaseDuration},
+		RenewDeadline:     metav1.Duration{Duration: c.flagLeaderElectionRenewDeadline},
+		RetryPeriod:       metav1.Duration{Duration: c.flagLeaderElectionRetryPeriod},
+		ResourceLock:      resourcelock.LeasesResourceLock,
+		ResourceName:      c.flagLeaderElectionLeaseName,
+		ResourceNamespace: c.flagK8SWriteNamespace,
+	}
+
+	return resourcelock.New(
+		defaultLEConfig.ResourceLock,
+		defaultLEConfig.ResourceNamespace,
+		defaultLEConfig.ResourceName,
+		c.clientset.CoreV1(),
+		c.clientset.CoordinationV1(),
+		resourcelock.ResourceLockConfig{
+			Identity: id,
+		},
+	)
+}
+
+func generateLockID() string {
+	// hostname is actually pod IP
+	hostname, err := os.Hostname()
+	if err != nil {
+		return string(uuid.NewUUID())
+	}
+	// making sure lockID is unique
+	return hostname + "_" + string(uuid.NewUUID())
 }
 
 func (c *Command) validateFlags() error {

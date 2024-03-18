@@ -45,4 +45,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  resourceNames:
+  - {{ template "consul.fullname" . }}-sync-catalog-lease
+  verbs: ["get", "patch", "delete", "create", "update"]
 {{- end }}

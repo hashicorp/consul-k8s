@@ -2078,6 +2078,18 @@ syncCatalog:
   # In either case an annotation can override the default.
   default: true
 
+  leaderElection:
+    # Leader election is still experimental and not enabled by default
+    enabled: false
+    # Number of replicas for the sync catalog deployment.
+    # For replicas > 1, this will run in [leader election mode](https://pkg.go.dev/k8s.io/client-go/tools/leaderelection)
+    # to avoid race condition where multiple replicas sync at the same time.
+    replicas: 3
+    # Options to [optimize leasing](https://pkg.go.dev/k8s.io/component-base/config#LeaderElectionConfiguration)
+    leaseDuration: 15s
+    renewDeadline: 10s
+    retryPeriod: 2s
+
   # Optional priorityClassName.
   priorityClassName: ""
 
