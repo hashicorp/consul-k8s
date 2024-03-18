@@ -39,6 +39,7 @@ repository {
         # NET-8174 (2024-02-26): Missing YAML Content Leads To Panic (requires malicious plugin)
         "GHSA-r53h-jv2g-vpx6", 
         "CVE-2024-26147", # alias
+        "GHSA-jw44-4f3j-q396", # alias
       ]
     }
   }
