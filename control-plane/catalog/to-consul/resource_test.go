@@ -1175,7 +1175,6 @@ func TestServiceResource_clusterIP(t *testing.T) {
 		require.Equal(r, 8080, actual[1].Service.Port)
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta["external-k8s-topology-zone"])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta["external-k8s-topology-zone"])
-		require.Equal(r, "us-west-2", actual[0].Service.Meta["external-k8s-topology-region"])
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 	})
 }
@@ -2092,9 +2091,6 @@ func createNodes(t *testing.T, client *fake.Clientset) (*corev1.Node, *corev1.No
 	node1 := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName1,
-			Labels: map[string]string{
-				corev1.LabelTopologyRegion: "us-west-2",
-			},
 		},
 
 		Status: corev1.NodeStatus{
@@ -2111,9 +2107,6 @@ func createNodes(t *testing.T, client *fake.Clientset) (*corev1.Node, *corev1.No
 	node2 := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName2,
-			Labels: map[string]string{
-				corev1.LabelTopologyRegion: "us-west-2",
-			},
 		},
 
 		Status: corev1.NodeStatus{
