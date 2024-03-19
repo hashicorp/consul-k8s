@@ -117,6 +117,9 @@ func NewHelmCluster(
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
 
+	// check and remove any CRDs with finalizers
+	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
 	helpers.Cleanup(t, h.noCleanupOnFailure, h.noCleanup, func() {
