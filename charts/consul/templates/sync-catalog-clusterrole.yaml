@@ -37,19 +37,6 @@ rules:
   - delete
   - create
 {{- end }}
-- apiGroups: ["discovery.k8s.io"]
-  resources:
-  - endpointslices
-  verbs:
-  - get
-  - list
-  - watch
-{{- if .Values.syncCatalog.toK8S }}
-  - update
-  - patch
-  - delete
-  - create
-{{- end }}
 - apiGroups: [ "" ]
   resources:
   - nodes
