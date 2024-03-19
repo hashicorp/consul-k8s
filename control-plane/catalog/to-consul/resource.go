@@ -34,12 +34,11 @@ const (
 
 	// ConsulK8SNS is the key used in the meta to record the namespace
 	// of the service/node registration.
-	ConsulK8SNS             = "external-k8s-ns"
-	ConsulK8SRefKind        = "external-k8s-ref-kind"
-	ConsulK8SRefValue       = "external-k8s-ref-name"
-	ConsulK8SNodeName       = "external-k8s-node-name"
-	ConsulK8STopologyRegion = "external-k8s-topology-region"
-	ConsulK8STopologyZone   = "external-k8s-topology-zone"
+	ConsulK8SNS           = "external-k8s-ns"
+	ConsulK8SRefKind      = "external-k8s-ref-kind"
+	ConsulK8SRefValue     = "external-k8s-ref-name"
+	ConsulK8SNodeName     = "external-k8s-node-name"
+	ConsulK8STopologyZone = "external-k8s-topology-zone"
 
 	// consulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckType = "kubernetes-readiness"
@@ -150,7 +149,7 @@ type ServiceResource struct {
 	// The outer map's keys represent service identifiers in the same format as serviceMap and maps
 	// each service to its related EndpointSlices. The inner map's keys are EndpointSlice name keys
 	// the format "<kube namespace>/<kube endpointslice name>".
-	endpointSlicesMap map[string]map[string]discoveryv1.EndpointSlice
+	endpointSlicesMap map[string]map[string]*discoveryv1.EndpointSlice
 
 	// EnableIngress enables syncing of the hostname from an Ingress resource
 	// to the service registration if an Ingress rule matches the service.
@@ -232,7 +231,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 
 	// If we care about endpoints, we should load the associated endpoint slices.
 	if t.shouldTrackEndpoints(key) {
-		allEndpointSlices := make(map[string]discoveryv1.EndpointSlice)
+		allEndpointSlices := make(map[string]*discoveryv1.EndpointSlice)
 		labelSelector := fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, service.Name)
 		continueToken := ""
 		limit := int64(100)
@@ -252,12 +251,11 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 					"key", key,
 					"err", err)
 				break
-
 			}
 
 			for _, endpointSlice := range endpointSliceList.Items {
 				endptKey := service.Namespace + "/" + endpointSlice.Name
-				allEndpointSlices[endptKey] = endpointSlice
+				allEndpointSlices[endptKey] = &endpointSlice
 			}
 
 			if endpointSliceList.Continue != "" {
@@ -268,7 +266,7 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 		}
 
 		if t.endpointSlicesMap == nil {
-			t.endpointSlicesMap = make(map[string]map[string]discoveryv1.EndpointSlice)
+			t.endpointSlicesMap = make(map[string]map[string]*discoveryv1.EndpointSlice)
 		}
 		t.endpointSlicesMap[key] = allEndpointSlices
 		t.Log.Debug("[ServiceResource.Upsert] adding service's endpoint slices to endpointSlicesMap", "key", key, "service", service, "endpointSlices", allEndpointSlices)
@@ -741,12 +739,6 @@ func (t *ServiceResource) registerServiceInstance(
 			}
 		}
 		for _, endpoint := range endpointSlice.Endpoints {
-			// Used for adding node region label to an endpoint but only needs to called once
-			node, err := t.Client.CoreV1().Nodes().Get(t.Ctx, *endpoint.NodeName, metav1.GetOptions{})
-			if err != nil {
-				t.Log.Error("error getting node info", "error", err)
-			}
-
 			for _, endpointAddr := range endpoint.Addresses {
 
 				var addr string
@@ -793,12 +785,6 @@ func (t *ServiceResource) registerServiceInstance(
 				if endpoint.NodeName != nil {
 					r.Service.Meta[ConsulK8SNodeName] = *endpoint.NodeName
 				}
-				if node.Labels != nil {
-					if region := node.Labels[corev1.LabelTopologyRegion]; region != "" {
-						r.Service.Meta[ConsulK8STopologyRegion] = region
-					}
-				}
-
 				if endpoint.Zone != nil {
 					r.Service.Meta[ConsulK8STopologyZone] = *endpoint.Zone
 				}
@@ -915,12 +901,12 @@ func (t *serviceEndpointsResource) Upsert(endptKey string, raw interface{}) erro
 
 	// We are tracking this service so let's keep track of the endpoints
 	if svc.endpointSlicesMap == nil {
-		svc.endpointSlicesMap = make(map[string]map[string]discoveryv1.EndpointSlice)
+		svc.endpointSlicesMap = make(map[string]map[string]*discoveryv1.EndpointSlice)
 	}
 	if _, ok := svc.endpointSlicesMap[svcKey]; !ok {
-		svc.endpointSlicesMap[svcKey] = make(map[string]discoveryv1.EndpointSlice)
+		svc.endpointSlicesMap[svcKey] = make(map[string]*discoveryv1.EndpointSlice)
 	}
-	svc.endpointSlicesMap[svcKey][endptKey] = *endpointSlice
+	svc.endpointSlicesMap[svcKey][endptKey] = endpointSlice
 
 	// Update the registration and trigger a sync
 	svc.generateRegistrations(svcKey)
