@@ -59,7 +59,7 @@ const (
 	apiTimeout        = 5 * time.Minute
 )
 
-var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate, api.JWTProvider}
+var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.FileSystemCertificate, api.JWTProvider}
 
 type Config struct {
 	ConsulClientConfig      *consul.Config

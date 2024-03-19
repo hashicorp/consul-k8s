@@ -24,10 +24,10 @@ const (
 	consulDataplaneDNSBindPort   = 8600
 	defaultPrometheusScrapePath  = "/metrics"
 	defaultEnvoyProxyConcurrency = 1
-	volumeName                   = "consul-connect-inject-data"
+	volumeNameForConnectInject   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string, mounts []corev1.VolumeMount) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -78,12 +78,7 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 				Value: "$(NODE_NAME)-virtual",
 			},
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
-			},
-		},
+		VolumeMounts:   mounts,
 		Args:           args,
 		ReadinessProbe: probe,
 	}
