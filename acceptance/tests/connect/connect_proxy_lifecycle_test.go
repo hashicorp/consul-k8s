@@ -11,14 +11,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type LifecycleShutdownConfig struct {
@@ -36,24 +37,22 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 	cfg := suite.Config()
 	cfg.SkipWhenOpenshiftAndCNI(t)
 
-	t.Skipf("TODO(flaky-1.17): NET-XXXX")
-
 	for _, testCfg := range []LifecycleShutdownConfig{
 		{secure: false, helmValues: map[string]string{
 			helmDrainListenersKey:     "true",
-			helmGracePeriodSecondsKey: "15",
+			helmGracePeriodSecondsKey: "5",
 		}},
 		{secure: true, helmValues: map[string]string{
 			helmDrainListenersKey:     "true",
-			helmGracePeriodSecondsKey: "15",
+			helmGracePeriodSecondsKey: "5",
 		}},
 		{secure: false, helmValues: map[string]string{
 			helmDrainListenersKey:     "false",
-			helmGracePeriodSecondsKey: "15",
+			helmGracePeriodSecondsKey: "5",
 		}},
 		{secure: true, helmValues: map[string]string{
 			helmDrainListenersKey:     "false",
-			helmGracePeriodSecondsKey: "15",
+			helmGracePeriodSecondsKey: "5",
 		}},
 		{secure: false, helmValues: map[string]string{
 			helmDrainListenersKey:     "false",
@@ -80,8 +79,8 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			gracePeriodSeconds, err = strconv.ParseInt(val, 10, 64)
 			require.NoError(t, err)
 		} else {
-			// Half of the helm default to speed tests up
-			gracePeriodSeconds = 15
+			// 5s should be a good amount of time to confirm the pod doesn't terminate
+			gracePeriodSeconds = 5
 		}
 
 		name := fmt.Sprintf("secure: %t, drainListeners: %t, gracePeriodSeconds: %d", testCfg.secure, drainListenersEnabled, gracePeriodSeconds)
@@ -140,7 +139,8 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			require.Len(t, pods.Items, 1)
 			clientPodName := pods.Items[0].Name
 
-			var terminationGracePeriod int64 = 60
+			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
+			var terminationGracePeriod int64 = 6
 			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
 			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
 			require.NoError(t, err)
@@ -155,23 +155,29 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			}
 
 			if gracePeriodSeconds > 0 {
-				// Ensure outbound requests are still successful during grace
-				// period.
-				retry.RunWith(&retry.Timer{Timeout: time.Duration(gracePeriodSeconds) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
-					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
-					require.NoError(r, err)
-					require.Condition(r, func() bool {
-						exists := false
-						if strings.Contains(output, "curl: (7) Failed to connect") {
-							exists = true
-						}
-						return !exists
-					})
-				})
+				// Ensure outbound requests are still successful during grace period.
+				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
+			gracePeriodLoop:
+				for {
+					select {
+					case <-gracePeriodTimer.C:
+						break gracePeriodLoop
+					default:
+						output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
+						require.NoError(t, err)
+						require.True(t, !strings.Contains(output, "curl: (7) Failed to connect"))
 
-				// If listener draining is enabled, ensure inbound
-				// requests are rejected during grace period.
-				// connHelper.TestConnectionSuccess(t)
+						// If listener draining is disabled, ensure inbound
+						// requests are accepted during grace period.
+						if !drainListenersEnabled {
+							connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+						}
+						// TODO: check that the connection is unsuccessful when drainListenersEnabled is true
+						// dans note: I found it isn't sufficient to use the existing TestConnectionFailureWithoutIntention
+
+						time.Sleep(2 * time.Second)
+					}
+				}
 			} else {
 				// Ensure outbound requests fail because proxy has terminated
 				retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
@@ -188,7 +194,10 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			}
 
 			logger.Log(t, "ensuring pod is deregistered after termination")
-			retry.Run(t, func(r *retry.R) {
+			// We wait an arbitrarily long time here. With the deployment rollout creating additional endpoints reconciles,
+			// This can cause the re-queued reconcile used to come back and clean up the service registration to be re-re-queued at
+			// 2-3X the intended grace period.
+			retry.RunWith(&retry.Timer{Timeout: time.Duration(30) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
 				for _, name := range []string{
 					"static-client",
 					"static-client-sidecar-proxy",
