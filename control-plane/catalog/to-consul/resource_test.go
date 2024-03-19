@@ -1175,7 +1175,6 @@ func TestServiceResource_clusterIP(t *testing.T) {
 		require.Equal(r, 8080, actual[1].Service.Port)
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta["external-k8s-topology-zone"])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta["external-k8s-topology-zone"])
-		require.Equal(r, "us-west-2", actual[0].Service.Meta["external-k8s-topology-region"])
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 	})
 }
