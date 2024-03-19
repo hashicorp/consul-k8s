@@ -29,6 +29,7 @@ func init() {
 
 type templateArgs struct {
 	EnableNamespaces bool
+	APIGatewayName   string
 }
 
 var (
@@ -42,6 +43,9 @@ mesh = "read"
 			policy = "read"
 		}
     service_prefix "" {
+      policy = "read"
+    }
+    service "{{.APIGatewayName}}" {
       policy = "write"
     }
 {{- if .EnableNamespaces }}
@@ -79,6 +83,12 @@ type Cache struct {
 	subscribers     map[string][]*Subscription
 	subscriberMutex *sync.Mutex
 
+	gatewayNameToPolicy map[string]*api.ACLPolicy
+	policyMutex         *sync.Mutex
+
+	gatewayNameToRole map[string]*api.ACLRole
+	aclRoleMutex      *sync.Mutex
+
 	namespacesEnabled       bool
 	crossNamespaceACLPolicy string
 
@@ -104,6 +114,10 @@ func New(config Config) *Cache {
 		cacheMutex:              &sync.Mutex{},
 		subscribers:             make(map[string][]*Subscription),
 		subscriberMutex:         &sync.Mutex{},
+		gatewayNameToPolicy:     make(map[string]*api.ACLPolicy),
+		policyMutex:             &sync.Mutex{},
+		gatewayNameToRole:       make(map[string]*api.ACLRole),
+		aclRoleMutex:            &sync.Mutex{},
 		kinds:                   Kinds,
 		synced:                  make(chan struct{}, len(Kinds)),
 		logger:                  config.Logger,
@@ -331,54 +345,97 @@ func (c *Cache) Write(ctx context.Context, entry api.ConfigEntry) error {
 	return nil
 }
 
-func (c *Cache) ensurePolicy(client *api.Client) (string, error) {
-	policy := c.gatewayPolicy()
+func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, error) {
+	c.policyMutex.Lock()
+	defer c.policyMutex.Unlock()
 
-	created, _, err := client.ACL().PolicyCreate(&policy, &api.WriteOptions{})
+	createPolicy := func() (string, error) {
+		policy := c.gatewayPolicy(gatewayName)
 
-	if isPolicyExistsErr(err, policy.Name) {
-		existing, _, err := client.ACL().PolicyReadByName(policy.Name, &api.QueryOptions{})
+		created, _, err := client.ACL().PolicyCreate(&policy, &api.WriteOptions{})
+
+		if isPolicyExistsErr(err, policy.Name) {
+			existing, _, err := client.ACL().PolicyReadByName(policy.Name, &api.QueryOptions{})
+			if err != nil {
+				return "", err
+			}
+			return existing.ID, nil
+		}
+
 		if err != nil {
 			return "", err
 		}
+
+		c.gatewayNameToPolicy[gatewayName] = created
+		return created.ID, nil
+	}
+
+	cachedPolicy, found := c.gatewayNameToPolicy[gatewayName]
+	if found {
+		existing, _, err := client.ACL().PolicyReadByName(cachedPolicy.Name, &api.QueryOptions{})
+
+		if existing == nil {
+			return createPolicy()
+		}
+
+		if err != nil {
+			return "", err
+		}
+
 		return existing.ID, nil
 	}
-	if err != nil {
-		return "", err
-	}
-	return created.ID, nil
+
+	return createPolicy()
 }
 
-func (c *Cache) ensureRole(client *api.Client) (string, error) {
-	policyID, err := c.ensurePolicy(client)
+func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, error) {
+	policyID, err := c.ensurePolicy(client, gatewayName)
 	if err != nil {
 		return "", err
 	}
 
-	aclRoleName := "managed-gateway-acl-role"
+	c.aclRoleMutex.Lock()
+	defer c.aclRoleMutex.Unlock()
 
-	aclRole, _, err := client.ACL().RoleReadByName(aclRoleName, &api.QueryOptions{})
+	createRole := func() (string, error) {
+		aclRoleName := fmt.Sprint("managed-gateway-acl-role-", gatewayName)
+		role := &api.ACLRole{
+			Name:        aclRoleName,
+			Description: "ACL Role for Managed API Gateways",
+			Policies:    []*api.ACLLink{{ID: policyID}},
+		}
+
+		_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
+		if err != nil {
+			return "", err
+		}
+		c.gatewayNameToRole[gatewayName] = role
+		return aclRoleName, err
+	}
+
+	cachedRole, found := c.gatewayNameToRole[gatewayName]
+
+	if !found {
+		return createRole()
+	}
+
+	aclRole, _, err := client.ACL().RoleReadByName(cachedRole.Name, &api.QueryOptions{})
 	if err != nil {
 		return "", err
 	}
+
 	if aclRole != nil {
-		return aclRoleName, nil
+		return cachedRole.Name, nil
 	}
 
-	role := &api.ACLRole{
-		Name:        aclRoleName,
-		Description: "ACL Role for Managed API Gateways",
-		Policies:    []*api.ACLLink{{ID: policyID}},
-	}
-
-	_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
-	return aclRoleName, err
+	return createRole()
 }
 
-func (c *Cache) gatewayPolicy() api.ACLPolicy {
+func (c *Cache) gatewayPolicy(gatewayName string) api.ACLPolicy {
 	var data bytes.Buffer
 	if err := gatewayTpl.Execute(&data, templateArgs{
 		EnableNamespaces: c.namespacesEnabled,
+		APIGatewayName:   gatewayName,
 	}); err != nil {
 		// just panic if we can't compile the simple template
 		// as it means something else is going severly wrong.
@@ -454,7 +511,7 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 		return err
 	}
 
-	role, err := c.ensureRole(client)
+	role, err := c.ensureRole(client, service)
 	if err != nil {
 		return ignoreACLsDisabled(err)
 	}
