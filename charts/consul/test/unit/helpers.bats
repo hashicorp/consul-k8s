@@ -454,15 +454,3 @@ load _helpers
   [ "$status" -eq 1 ]
   [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported." ]]
 }
-
-@test "connectInject/Deployment: fails if resource-apis is set and apiGateway is enabled" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/tests/test-runner.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'ui.enabled=false' \
-      --set 'apiGateway.enabled=true' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, apiGateway.enabled is currently unsupported." ]]
-}

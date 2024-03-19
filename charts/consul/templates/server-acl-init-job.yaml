@@ -304,10 +304,6 @@ spec:
             -partition-token-file=/vault/secrets/partition-token \
             {{- end }}
 
-            {{- if .Values.apiGateway.enabled }}
-            -api-gateway-controller=true \
-            {{- end }}
-
             {{- if .Values.global.enableConsulNamespaces }}
             -enable-namespaces=true \
             {{- /* syncCatalog must be enabled to set sync flags */}}

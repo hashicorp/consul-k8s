@@ -2811,8 +2811,6 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2831,8 +2829,6 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2852,8 +2848,6 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2876,8 +2870,6 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2894,29 +2886,6 @@ rollingUpdate:
   [ "$status" -eq 1 ]
   
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
-}
-
-@test "client/DaemonSet: fails when global.cloud.apiHost.secretName is set but global.cloud.apiHost.secretKey is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/api-gateway-controller-deployment.yaml  \
-      --set 'client.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.datacenter=dc-foo' \
-      --set 'global.domain=bar' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.apiHost.secretName=auth-url-name' \
-      .
-  [ "$status" -eq 1 ]
-  
-  [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
 @test "client/DaemonSet: fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set." {

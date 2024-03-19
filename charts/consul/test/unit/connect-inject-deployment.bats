@@ -2739,3 +2739,16 @@ reservedNameTest() {
 
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# Legacy apiGateway
+
+@test "apiGateway/Deployment: fails if apiGateway.enabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/api-gateway-controller-deployment.yaml  \
+      --set 'apiGateway.enabled=true' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "apiGateway.enabled is deprecated; use connectInject.apiGateway.enabled instead" ]]
+}
