@@ -4,6 +4,15 @@ load _helpers
 
 target=templates/gateway-resources-job.yaml
 
+@test "gatewayresources/Job: fails if .values.apiGateway is set" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'apiGateway.enabled=true' .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "[DEPRECATED and REMOVED] the apiGateway stanza is no longer supported as of Consul 1.19.0. Use connectInject.apiGateway instead." ]]
+}
+
 @test "gatewayresources/Job: enabled by default" {
     cd `chart_dir`
     local actual=$(helm template \

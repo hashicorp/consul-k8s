@@ -1,4 +1,4 @@
-{{ template "consul.validate_deprecated_apigateway_not_set" . }}
+{{- if .Values.apiGateway}}{{fail "[DEPRECATED and REMOVED] the apiGateway stanza is no longer supported as of Consul 1.19.0. Use connectInject.apiGateway instead."}}{{- end -}}
 {{- if .Values.connectInject.enabled }}
 apiVersion: batch/v1
 kind: Job
