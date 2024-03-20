@@ -224,10 +224,9 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 	select {
 	case res := <-resultCh:
 		if res.err != nil {
-			resErr := fmt.Errorf("error: %v\nOutput: %s", res.err, res.output)
-			return "", resErr
+			logger.Logf(t, "Output: %v.", res.output)
 		}
-		return res.output, nil
+		return res.output, res.err
 		// Sometimes this func runs for too long handle timeout if needed.
 	case <-time.After(320 * time.Second):
 		GetCRDRemoveFinalizers(t, options)
