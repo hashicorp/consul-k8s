@@ -878,21 +878,8 @@ func (t *serviceEndpointsResource) Upsert(endptKey string, raw interface{}) erro
 	svc.serviceLock.Lock()
 	defer svc.serviceLock.Unlock()
 
-	// Extract service name and format key
-	svcName := endpointSlice.Labels[discoveryv1.LabelServiceName]
+	// Extract service name and format the service key
 	svcKey := endpointSlice.Namespace + "/" + endpointSlice.Labels[discoveryv1.LabelServiceName]
-
-	if svc.serviceMap == nil {
-		svc.serviceMap = make(map[string]*corev1.Service)
-	}
-	var err error
-	if svc.serviceMap[svcKey] == nil {
-		svc.serviceMap[svcKey], err = t.Service.Client.CoreV1().Services(endpointSlice.Namespace).Get(t.Ctx, svcName, metav1.GetOptions{})
-		if err != nil {
-			t.Log.Error("issue getting service", "error", err)
-			return err
-		}
-	}
 
 	// Check if we care about endpoints for this service
 	if !svc.shouldTrackEndpoints(svcKey) {
