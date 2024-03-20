@@ -306,6 +306,7 @@ func (c *Command) Run(args []string) int {
 				ConsulNodeName:             c.flagConsulNodeName,
 				EnableIngress:              c.flagEnableIngress,
 				SyncLoadBalancerIPs:        c.flagLoadBalancerIPs,
+				Datacenter:                 c.consul.Datacenter,
 			},
 		}
 
