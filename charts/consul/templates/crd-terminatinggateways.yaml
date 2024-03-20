@@ -73,6 +73,10 @@ spec:
                         to use for TLS connections from the gateway to the linked
                         service.
                       type: string
+                    disableAutoHostRewrite:
+                      description: DisableAutoHostRewrite disables terminating gateways
+                        auto host rewrite feature when set to true.
+                      type: boolean
                     keyFile:
                       description: KeyFile is the optional path to a private key to
                         use for TLS connections from the gateway to the linked service.

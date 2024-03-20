@@ -49,11 +49,12 @@ func TestTerminatingGateway_MatchesConsul(t *testing.T) {
 				Spec: TerminatingGatewaySpec{
 					Services: []LinkedService{
 						{
-							Name:     "name",
-							CAFile:   "caFile",
-							CertFile: "certFile",
-							KeyFile:  "keyFile",
-							SNI:      "sni",
+							Name:                   "name",
+							CAFile:                 "caFile",
+							CertFile:               "certFile",
+							KeyFile:                "keyFile",
+							SNI:                    "sni",
+							DisableAutoHostRewrite: true,
 						},
 						{
 							Name: "*",
@@ -71,11 +72,12 @@ func TestTerminatingGateway_MatchesConsul(t *testing.T) {
 				},
 				Services: []capi.LinkedService{
 					{
-						Name:     "name",
-						CAFile:   "caFile",
-						CertFile: "certFile",
-						KeyFile:  "keyFile",
-						SNI:      "sni",
+						Name:                   "name",
+						CAFile:                 "caFile",
+						CertFile:               "certFile",
+						KeyFile:                "keyFile",
+						SNI:                    "sni",
+						DisableAutoHostRewrite: true,
 					},
 					{
 						Name: "*",
