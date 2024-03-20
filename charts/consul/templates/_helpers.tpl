@@ -505,7 +505,6 @@ Fails if global.experiments.resourceAPIs is set along with any of these unsuppor
 - meshGateway.enabled
 - ingressGateways.enabled
 - terminatingGateways.enabled
-- apiGateway.enabled
 
 Usage: {{ template "consul.validateResourceAPIs" . }}
 
