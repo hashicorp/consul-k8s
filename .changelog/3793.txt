@@ -1,0 +1,3 @@
+```release-note:improvement
+catalog: Respsect configured datacenter when registering services
+```
