@@ -474,6 +474,7 @@ func (c *Command) Run(args []string) int {
 		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
 		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+		LifecycleConfig:            lifecycleConfig,
 		EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
 		EnableWANFederation:        c.flagEnableFederation,
 		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
