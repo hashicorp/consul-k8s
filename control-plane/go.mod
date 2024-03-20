@@ -1,5 +1,7 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.10.1-0.20240312203720-262f4358003f
+
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.2
