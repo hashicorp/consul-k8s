@@ -371,6 +371,7 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 	}
 
 	cachedPolicy, found := c.gatewayNameToPolicy[gatewayName]
+
 	if !found {
 		return createPolicy()
 	}
