@@ -374,21 +374,21 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 	}
 
 	cachedPolicy, found := c.gatewayNameToPolicy[gatewayName]
-	if found {
-		existing, _, err := client.ACL().PolicyReadByName(cachedPolicy.Name, &api.QueryOptions{})
-
-		if existing == nil {
-			return createPolicy()
-		}
-
-		if err != nil {
-			return "", err
-		}
-
-		return existing.ID, nil
+	if !found {
+		return createPolicy()
 	}
 
-	return createPolicy()
+	existing, _, err := client.ACL().PolicyReadByName(cachedPolicy.Name, &api.QueryOptions{})
+
+	if existing == nil {
+		return createPolicy()
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	return existing.ID, nil
 }
 
 func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, error) {
