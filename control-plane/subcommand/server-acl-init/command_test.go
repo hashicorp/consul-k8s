@@ -2071,12 +2071,6 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 			Roles:       []string{resourcePrefix + "-sync-catalog-acl-role"},
 		},
 		{
-			TestName:    "API Gateway Controller",
-			TokenFlags:  []string{"-api-gateway-controller"},
-			PolicyNames: []string{"api-gateway-controller-policy"},
-			Roles:       []string{resourcePrefix + "-api-gateway-controller-acl-role"},
-		},
-		{
 			TestName:    "Snapshot Agent",
 			TokenFlags:  []string{"-snapshot-agent"},
 			PolicyNames: []string{"snapshot-agent-policy"},
@@ -2222,13 +2216,6 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			PolicyNames:      []string{"sync-catalog-policy-" + secondaryDatacenter},
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
-		},
-		{
-			TestName:         "API Gateway Controller",
-			TokenFlags:       []string{"-api-gateway-controller"},
-			PolicyNames:      []string{"api-gateway-controller-policy-" + secondaryDatacenter},
-			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-" + secondaryDatacenter},
-			GlobalAuthMethod: true,
 		},
 		{
 			TestName:         "Snapshot Agent",
@@ -2382,12 +2369,6 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			GlobalToken:   false,
 		},
 		{
-			ComponentName: "api-gateway-controller",
-			TokenFlags:    []string{"-api-gateway-controller"},
-			Roles:         []string{resourcePrefix + "-api-gateway-controller-acl-role"},
-			GlobalToken:   false,
-		},
-		{
 			ComponentName:      "snapshot-agent",
 			TokenFlags:         []string{"-snapshot-agent"},
 			Roles:              []string{resourcePrefix + "-snapshot-agent-acl-role"},
@@ -2517,13 +2498,6 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
 			GlobalAuthMethod: false,
 			GlobalToken:      false,
-		},
-		{
-			ComponentName:    "api-gateway-controller",
-			TokenFlags:       []string{"-api-gateway-controller"},
-			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-dc2"},
-			GlobalAuthMethod: true,
-			GlobalToken:      true,
 		},
 		{
 			ComponentName:      "snapshot-agent",

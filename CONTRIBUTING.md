@@ -14,7 +14,7 @@
     1. [Webhook](#webhook)
     1. [Update command.go](#update-commandgo)
     1. [Generating YAML](#generating-yaml)
-    1. [Updating consul-helm](#updating-consul-helm)
+    1. [Updating consul-helm](#updating-helm-chart)
     1. [Testing a new CRD](#testing-a-new-crd)
     1. [Update Consul K8s acceptance tests](#update-consul-k8s-acceptance-tests)
 1. [Adding a new ACL Token](#adding-a-new-acl-token)
