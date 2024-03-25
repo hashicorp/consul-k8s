@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -15,9 +16,12 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
+	"github.com/gruntwork-io/terratest/modules/k8s"
+	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -184,4 +188,136 @@ func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, 
 		Service:  service,
 	}, nil)
 	require.NoError(t, err)
+}
+
+type Command struct {
+	Command    string            // The command to run
+	Args       []string          // The args to pass to the command
+	WorkingDir string            // The working directory
+	Env        map[string]string // Additional environment variables to set
+	Logger     *terratestLogger.Logger
+}
+
+type cmdResult struct {
+	output string
+	err    error
+}
+
+func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Command) (string, error) {
+	t.Helper()
+
+	resultCh := make(chan *cmdResult, 1)
+
+	go func() {
+		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+		resultCh <- &cmdResult{output: string(output), err: err}
+	}()
+
+	// might not be needed
+	for _, arg := range command.Args {
+		if strings.Contains(arg, "delete") {
+			go func() {
+				GetCRDRemoveFinalizers(t, options)
+			}()
+		}
+	}
+
+	select {
+	case res := <-resultCh:
+		if res.err != nil {
+			logger.Logf(t, "Output: %v.", res.output)
+		}
+		return res.output, res.err
+		// Sometimes this func runs for too long handle timeout if needed.
+	case <-time.After(320 * time.Second):
+		GetCRDRemoveFinalizers(t, options)
+		logger.Logf(t, "RunCommand timed out")
+		return "", nil
+	}
+}
+
+// getCRDRemoveFinalizers gets CRDs with finalizers and removes them.
+func GetCRDRemoveFinalizers(t testutil.TestingTB, options *k8s.KubectlOptions) {
+	t.Helper()
+	crdNames, err := getCRDsWithFinalizers(options)
+	if err != nil {
+		logger.Logf(t, "Unable to get CRDs with finalizers, %v.", err)
+	}
+
+	if len(crdNames) > 0 {
+		removeFinalizers(t, options, crdNames)
+	}
+}
+
+// CRD struct to parse CRD JSON output.
+type CRD struct {
+	Items []struct {
+		Metadata struct {
+			Name       string   `json:"name"`
+			Finalizers []string `json:"finalizers"`
+		} `json:"metadata"`
+	} `json:"items"`
+}
+
+func getCRDsWithFinalizers(options *k8s.KubectlOptions) ([]string, error) {
+	cmdArgs := createCmdArgs(options)
+	args := []string{"get", "crd", "-o=json"}
+
+	cmdArgs = append(cmdArgs, args...)
+	command := Command{
+		Command: "kubectl",
+		Args:    cmdArgs,
+		Env:     options.Env,
+	}
+
+	output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+
+	var crds CRD
+	if err := json.Unmarshal(output, &crds); err != nil {
+		return nil, fmt.Errorf("error parsing JSON: %v", err)
+	}
+
+	var crdNames []string
+	for _, item := range crds.Items {
+		if len(item.Metadata.Finalizers) > 0 {
+			crdNames = append(crdNames, item.Metadata.Name)
+		}
+	}
+
+	return crdNames, err
+}
+
+// removeFinalizers removes finalizers from CRDs.
+func removeFinalizers(t testutil.TestingTB, options *k8s.KubectlOptions, crdNames []string) {
+	cmdArgs := createCmdArgs(options)
+	for _, crd := range crdNames {
+		args := []string{"patch", "crd", crd, "--type=json", "-p=[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"}
+
+		cmdArgs = append(cmdArgs, args...)
+		command := Command{
+			Command: "kubectl",
+			Args:    cmdArgs,
+			Env:     options.Env,
+		}
+
+		_, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+		if err != nil {
+			logger.Logf(t, "Unable to remove finalizers, proceeding anyway: %v.", err)
+		}
+		fmt.Printf("Finalizers removed from CRD %s\n", crd)
+	}
+}
+
+func createCmdArgs(options *k8s.KubectlOptions) []string {
+	var cmdArgs []string
+	if options.ContextName != "" {
+		cmdArgs = append(cmdArgs, "--context", options.ContextName)
+	}
+	if options.ConfigPath != "" {
+		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
+	}
+	if options.Namespace != "" {
+		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
+	}
+	return cmdArgs
 }
