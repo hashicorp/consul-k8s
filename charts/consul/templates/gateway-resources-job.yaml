@@ -101,7 +101,16 @@ spec:
             - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
             {{- end }}
             - -map-privileged-container-ports={{ .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
-            {{- end}}
+            {{- if (ne (.Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled | toString) "-") }}
+            - -enable-metrics={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled | toString }}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}
+            - -metrics-path={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
+            - -metrics-port={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
+            {{- end }}
+            {{- end }}
           resources:
             requests:
               memory: "50Mi"
