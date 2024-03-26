@@ -94,7 +94,9 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	}
 
 	annotations := map[string]string{
-		"consul.hashicorp.com/connect-inject": "false",
+		"consul.hashicorp.com/connect-inject":        "false",
+		constants.AnnotationGatewayConsulServiceName: gateway.Name,
+		constants.AnnotationGatewayKind:              "api-gateway",
 	}
 
 	metrics := common.GatewayMetricsConfig(gateway, gcc, config)
@@ -123,17 +125,8 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-<<<<<<< HEAD
 					Labels:      common.LabelsForGateway(&gateway),
 					Annotations: annotations,
-=======
-					Labels: common.LabelsForGateway(&gateway),
-					Annotations: map[string]string{
-						constants.AnnotationInject:                   "false",
-						constants.AnnotationGatewayConsulServiceName: gateway.Name,
-						constants.AnnotationGatewayKind:              "api-gateway",
-					},
->>>>>>> cc5850e4b2d9b1d132a442517b939b3266ee0c4d
 				},
 				Spec: corev1.PodSpec{
 					Volumes: []corev1.Volume{
