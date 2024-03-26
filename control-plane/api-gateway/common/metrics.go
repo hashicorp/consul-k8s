@@ -26,7 +26,12 @@ func gatewayMetricsEnabled(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassC
 	// first check our annotations, if something is there, then it means we've explicitly
 	// annotated metrics collection
 	if scrape, isSet := gateway.Annotations[constants.AnnotationEnableMetrics]; isSet {
-		return scrape == "true"
+		enabled, err := strconv.ParseBool(scrape)
+		if err == nil {
+			return enabled
+		}
+		// TODO: log an error
+		// we fall through to the other metrics enabled checks
 	}
 
 	// if it's not set on the annotation, then we check to see if it's set on the GatewayClassConfig
