@@ -7,5 +7,4 @@ resources:
   - serviceaccount.yaml
   - servicedefaults.yaml
   - psp-rolebinding.yaml
-  - anyuid-scc-rolebinding.yaml
   - privileged-scc-rolebinding.yaml
