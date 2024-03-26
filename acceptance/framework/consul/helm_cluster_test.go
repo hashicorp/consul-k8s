@@ -7,13 +7,15 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	runtimefake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 )
 
 // Test that if TestConfig has values that need to be provided
@@ -81,16 +83,16 @@ func (c *ctx) Name() string {
 	return ""
 }
 
-func (c *ctx) KubectlOptions(_ *testing.T) *k8s.KubectlOptions {
+func (c *ctx) KubectlOptions(_ testutil.TestingTB) *k8s.KubectlOptions {
 	return &k8s.KubectlOptions{}
 }
 func (c *ctx) KubectlOptionsForNamespace(ns string) *k8s.KubectlOptions {
 	return &k8s.KubectlOptions{}
 }
-func (c *ctx) KubernetesClient(_ *testing.T) kubernetes.Interface {
+func (c *ctx) KubernetesClient(_ testutil.TestingTB) kubernetes.Interface {
 	return fake.NewSimpleClientset()
 }
-func (c *ctx) ControllerRuntimeClient(_ *testing.T) client.Client {
+func (c *ctx) ControllerRuntimeClient(_ testutil.TestingTB) client.Client {
 	return runtimefake.NewClientBuilder().Build()
 }
 
