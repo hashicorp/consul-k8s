@@ -12,16 +12,9 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -32,6 +25,18 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 )
 
 // HelmCluster implements Cluster and uses Helm
@@ -45,6 +50,10 @@ type HelmCluster struct {
 	// SkipCheckForPreviousInstallations is a toggle for skipping the check
 	// if there are any previous installations of this Helm chart in the cluster.
 	SkipCheckForPreviousInstallations bool
+
+	// ChartPath is an option field that allows consumers to change the default
+	// chart path if so desired
+	ChartPath string
 
 	ctx                environment.TestContext
 	helmOptions        *helm.Options
@@ -64,6 +73,10 @@ func NewHelmCluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *HelmCluster {
+	if cfg.EnableRestrictedPSAEnforcement {
+		configureNamespace(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+	}
+
 	if cfg.EnablePodSecurityPolicies {
 		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
@@ -142,8 +155,15 @@ func (h *HelmCluster) Create(t *testing.T) {
 			logger.Logf(t, "Unable to update helm repository, proceeding anyway: %s.", err)
 		}
 	}
+	if h.ChartPath != "" {
+		chartName = h.ChartPath
+	}
 
-	helm.Install(t, h.helmOptions, chartName, h.releaseName)
+	// Retry the install in case previous tests have not finished cleaning up.
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
+		require.NoError(r, err)
+	})
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -193,7 +213,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	}
 
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.DeleteE(t, h.helmOptions, h.releaseName, false)
+		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
 		require.NoError(r, err)
 	})
 
@@ -205,13 +225,13 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		// graceful termination takes a long time and since this is an uninstall
 		// we don't care that they're stopped gracefully.
 		pods, err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, pod := range pods.Items {
 			if strings.Contains(pod.Name, h.releaseName) {
 				var gracePeriod int64 = 0
 				err := h.kubernetesClient.CoreV1().Pods(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
@@ -278,64 +298,64 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 		// Delete PVCs.
 		err = h.kubernetesClient.CoreV1().PersistentVolumeClaims(h.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 
 		// Delete any serviceaccounts that have h.releaseName in their name.
 		sas, err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, sa := range sas.Items {
 			if strings.Contains(sa.Name, h.releaseName) {
 				err := h.kubernetesClient.CoreV1().ServiceAccounts(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), sa.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
 
 		// Delete any roles that have h.releaseName in their name.
 		roles, err := h.kubernetesClient.RbacV1().Roles(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, role := range roles.Items {
 			if strings.Contains(role.Name, h.releaseName) {
 				err := h.kubernetesClient.RbacV1().Roles(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), role.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
 
 		// Delete any rolebindings that have h.releaseName in their name.
 		roleBindings, err := h.kubernetesClient.RbacV1().RoleBindings(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, roleBinding := range roleBindings.Items {
 			if strings.Contains(roleBinding.Name, h.releaseName) {
 				err := h.kubernetesClient.RbacV1().RoleBindings(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), roleBinding.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
 
 		// Delete any secrets that have h.releaseName in their name.
 		secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, secret := range secrets.Items {
 			if strings.Contains(secret.Name, h.releaseName) {
 				err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), secret.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
 
 		// Delete any jobs that have h.releaseName in their name.
 		jobs, err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "release=" + h.releaseName})
-		require.NoError(t, err)
+		require.NoError(r, err)
 		for _, job := range jobs.Items {
 			if strings.Contains(job.Name, h.releaseName) {
 				err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
-					require.NoError(t, err)
+					require.NoError(r, err)
 				}
 			}
 		}
@@ -458,6 +478,7 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
+// CreatePortForwardTunnel returns the local address:port of a tunnel to the consul server pod in the given release.
 func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, release ...string) string {
 	releaseName := h.releaseName
 	if len(release) > 0 {
@@ -465,6 +486,26 @@ func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, rele
 	}
 	serverPod := fmt.Sprintf("%s-consul-server-0", releaseName)
 	return portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, h.helmOptions.KubectlOptions, h.logger)
+}
+
+// ResourceClient returns a resource service grpc client for the given helm release.
+func (h *HelmCluster) ResourceClient(t *testing.T, secure bool, release ...string) (client pbresource.ResourceServiceClient) {
+	if secure {
+		panic("TODO: add support for secure resource client")
+	}
+	releaseName := h.releaseName
+	if len(release) > 0 {
+		releaseName = release[0]
+	}
+
+	// TODO: get grpc port from somewhere
+	localTunnelAddr := h.CreatePortForwardTunnel(t, 8502, releaseName)
+
+	// Create a grpc connection to the server pod.
+	grpcConn, err := grpc.Dial(localTunnelAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	resourceClient := pbresource.NewResourceServiceClient(grpcConn)
+	return resourceClient
 }
 
 func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...string) (client *api.Client, configAddress string) {
@@ -629,6 +670,35 @@ func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
+}
+
+func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	ctx := context.Background()
+
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   namespace,
+			Labels: map[string]string{},
+		},
+	}
+	if cfg.EnableRestrictedPSAEnforcement {
+		ns.ObjectMeta.Labels["pod-security.kubernetes.io/enforce"] = "restricted"
+		ns.ObjectMeta.Labels["pod-security.kubernetes.io/enforce-version"] = "latest"
+	}
+
+	_, createErr := client.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+	if createErr == nil {
+		logger.Logf(t, "Created namespace %s", namespace)
+		return
+	}
+
+	_, updateErr := client.CoreV1().Namespaces().Update(ctx, ns, metav1.UpdateOptions{})
+	if updateErr == nil {
+		logger.Logf(t, "Updated namespace %s", namespace)
+		return
+	}
+
+	require.Failf(t, "Failed to create or update namespace", "Namespace=%s, CreateError=%s, UpdateError=%s", namespace, createErr, updateErr)
 }
 
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
