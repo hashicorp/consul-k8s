@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -94,6 +95,10 @@ type Command struct {
 
 	flagMapPrivilegedContainerPorts int
 
+	flagEnableMetrics string
+	flagMetricsPort   string
+	flagMetricsPath   string
+
 	k8sClient client.Client
 
 	once sync.Once
@@ -155,6 +160,10 @@ func (c *Command) init() {
 		"The value to add to privileged container ports (< 1024) to avoid requiring addition privileges for the "+
 			"gateway container.",
 	)
+
+	c.flags.StringVar(&c.flagEnableMetrics, "enable-metrics", "", "specify as 'true' or 'false' to enable or disable metrics collection")
+	c.flags.StringVar(&c.flagMetricsPath, "metrics-path", "", "specify to set the path used for metrics scraping")
+	c.flags.StringVar(&c.flagMetricsPort, "metrics-port", "", "specify to set the port used for metrics scraping")
 
 	c.flags.StringVar(&c.flagGatewayConfigLocation, "gateway-config-file-location", gatewayConfigFilename,
 		"specify a different location for where the gateway config file is")
@@ -262,6 +271,17 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
+	if metricsEnabled, isSet := getMetricsEnabled(c.flagEnableMetrics); isSet {
+		classConfig.Spec.Metrics.Enabled = &metricsEnabled
+		if port, isValid := getScrapePort(c.flagMetricsPort); isValid {
+			port32 := int32(port)
+			classConfig.Spec.Metrics.Port = &port32
+		}
+		if path, isSet := getScrapePath(c.flagMetricsPath); isSet {
+			classConfig.Spec.Metrics.Path = &path
+		}
+	}
+
 	class := &gwv1beta1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{Name: c.flagGatewayClassName, Labels: labels},
 		Spec: gwv1beta1.GatewayClassSpec{
@@ -343,6 +363,18 @@ func (c *Command) validateFlags() error {
 	if c.flagServiceAnnotations != "" {
 		if err := yaml.Unmarshal([]byte(c.flagServiceAnnotations), &c.serviceAnnotations); err != nil {
 			return fmt.Errorf("error decoding service annotations: %w", err)
+		}
+	}
+
+	if c.flagEnableMetrics != "" {
+		if _, valid := getMetricsEnabled(c.flagEnableMetrics); !valid {
+			return errors.New("-enable-metrics must be either 'true' or 'false'")
+		}
+	}
+
+	if c.flagMetricsPort != "" {
+		if _, valid := getScrapePort(c.flagMetricsPort); !valid {
+			return errors.New("-metrics-port must be a valid unprivileged port number")
 		}
 	}
 
@@ -602,6 +634,35 @@ func exponentialBackoffWithMaxIntervalAndTime() *backoff.ExponentialBackOff {
 	backoff.MaxInterval = 1 * time.Second
 	backoff.Reset()
 	return backoff
+}
+
+func getScrapePort(v string) (int, bool) {
+	port, err := strconv.Atoi(v)
+	if err != nil {
+		// we only use the port if it's actually valid
+		return 0, false
+	}
+	if port < 1024 || port > 65535 {
+		return 0, false
+	}
+	return port, true
+}
+
+func getScrapePath(v string) (string, bool) {
+	if v == "" {
+		return "", false
+	}
+	return v, true
+}
+
+func getMetricsEnabled(v string) (bool, bool) {
+	if v == "true" {
+		return true, true
+	}
+	if v == "false" {
+		return false, true
+	}
+	return false, false
 }
 
 func nonZeroOrNil(v int) *int32 {

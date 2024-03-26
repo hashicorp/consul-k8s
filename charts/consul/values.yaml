@@ -2417,6 +2417,19 @@ connectInject:
         # @type: string
         service: null
 
+      # Metrics settings for gateways created with this gateway class configuration.
+      metrics:
+        # This value enables or disables metrics collection on a gateway, overriding the global gateway metrics collection settings.
+        # @type: boolean
+        enabled: "-"
+        # This value sets the port to use for scraping gateway metrics via prometheus, defaults to 20200 if not set. Must be in the port
+        # range of 1024-65535.
+        # @type: int
+        port: null
+        # This value sets the path to use for scraping gateway metrics via prometheus, defaults to /metrics if not set.
+        # @type: string
+        path: null
+        
       # The resource settings for Pods handling traffic for Gateway API.
       # @recurse: false
       # @type: map

@@ -22,12 +22,11 @@ const (
 	netBindCapability            = "NET_BIND_SERVICE"
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
-	defaultPrometheusScrapePath  = "/metrics"
 	defaultEnvoyProxyConcurrency = 1
 	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -38,7 +37,7 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(namespace, config, bearerTokenFile, name)
+	args, err := getDataplaneArgs(metrics, namespace, config, bearerTokenFile, name)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -100,6 +99,15 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 		Name:          "proxy-health",
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
+
+	if metrics.Enabled {
+		container.Ports = append(container.Ports, corev1.ContainerPort{
+			Name:          "prometheus",
+			ContainerPort: int32(metrics.Port),
+			Protocol:      corev1.ProtocolTCP,
+		})
+	}
+
 	// Configure the resource requests and limits for the proxy if they are set.
 	if gcc.Spec.DeploymentSpec.Resources != nil {
 		container.Resources = *gcc.Spec.DeploymentSpec.Resources
@@ -122,7 +130,7 @@ func consulDataplaneContainer(config common.HelmConfig, gcc v1alpha1.GatewayClas
 	return container, nil
 }
 
-func getDataplaneArgs(namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
+func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
@@ -170,9 +178,10 @@ func getDataplaneArgs(namespace string, config common.HelmConfig, bearerTokenFil
 
 	args = append(args, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000))
 
-	// Set a default scrape path that can be overwritten by the annotation.
-	prometheusScrapePath := defaultPrometheusScrapePath
-	args = append(args, "-telemetry-prom-scrape-path="+prometheusScrapePath)
+	if metrics.Enabled {
+		// Set up metrics collection.
+		args = append(args, "-telemetry-prom-scrape-path="+metrics.Path)
+	}
 
 	return args, nil
 }
