@@ -24,7 +24,7 @@ const (
 	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckName = "Kubernetes Readiness Check"
 
-	// metricsConfiguration is the configuration key for binding a prometheus port to the envoy instance
+	// metricsConfiguration is the configuration key for binding a prometheus port to the envoy instance.
 	metricsConfiguration = "envoy_prometheus_bind_addr"
 )
 
