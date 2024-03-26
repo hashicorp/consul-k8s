@@ -7,19 +7,20 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"k8s.io/apimachinery/pkg/types"
-
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -122,8 +123,17 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
+<<<<<<< HEAD
 					Labels:      common.LabelsForGateway(&gateway),
 					Annotations: annotations,
+=======
+					Labels: common.LabelsForGateway(&gateway),
+					Annotations: map[string]string{
+						constants.AnnotationInject:                   "false",
+						constants.AnnotationGatewayConsulServiceName: gateway.Name,
+						constants.AnnotationGatewayKind:              "api-gateway",
+					},
+>>>>>>> cc5850e4b2d9b1d132a442517b939b3266ee0c4d
 				},
 				Spec: corev1.PodSpec{
 					Volumes: []corev1.Volume{
@@ -173,13 +183,30 @@ func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) 
 	return b
 }
 
+// compareDeployments determines whether two Deployments are equal for all
+// of the fields that we care about. There are some differences between a
+// Deployment returned by the Kubernetes API and one that we would create
+// in memory which are perfectly fine. We want to ignore those differences.
 func compareDeployments(a, b *appsv1.Deployment) bool {
-	// since K8s adds a bunch of defaults when we create a deployment, check that
-	// they don't differ by the things that we may actually change, namely container
-	// ports
+	if len(b.Spec.Template.Spec.InitContainers) != len(a.Spec.Template.Spec.InitContainers) {
+		return false
+	}
+
+	for i, containerA := range a.Spec.Template.Spec.InitContainers {
+		containerB := b.Spec.Template.Spec.InitContainers[i]
+		if !cmp.Equal(containerA.Resources.Limits, containerB.Resources.Limits) {
+			return false
+		}
+
+		if !cmp.Equal(containerA.Resources.Requests, containerB.Resources.Requests) {
+			return false
+		}
+	}
+
 	if len(b.Spec.Template.Spec.Containers) != len(a.Spec.Template.Spec.Containers) {
 		return false
 	}
+
 	for i, container := range a.Spec.Template.Spec.Containers {
 		otherPorts := b.Spec.Template.Spec.Containers[i].Ports
 		if len(container.Ports) != len(otherPorts) {

@@ -1,0 +1,4 @@
+```release-note:bug
+control-plane: fix an issue where ACL tokens would prematurely be deleted and services would be deregistered if there
+was a K8s API error fetching the pod.
+```

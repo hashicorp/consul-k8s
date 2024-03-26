@@ -56,6 +56,37 @@ spec:
                 description: GatewayClassName is the name of the GatewayClass used
                   by the MeshGateway
                 type: string
+              listeners:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    port:
+                      format: int32
+                      maximum: 65535
+                      minimum: 0
+                      type: integer
+                    protocol:
+                      enum:
+                      - TCP
+                      type: string
+                  type: object
+                minItems: 1
+                type: array
+              workloads:
+                description: Selection of workloads to be configured as mesh gateways
+                properties:
+                  filter:
+                    type: string
+                  names:
+                    items:
+                      type: string
+                    type: array
+                  prefixes:
+                    items:
+                      type: string
+                    type: array
+                type: object
             type: object
           status:
             properties:

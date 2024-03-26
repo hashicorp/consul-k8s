@@ -9,13 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/stretchr/testify/require"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/stretchr/testify/require"
 )
 
 // Test that sync catalog works in both the default installation and
@@ -105,7 +106,7 @@ func TestSyncCatalogWithIngress(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			helmValues := map[string]string{
 				"syncCatalog.enabled":          "true",
-				"syncCatalog.ingres.enabled":   "true",
+				"syncCatalog.ingress.enabled":  "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 			}
@@ -118,12 +119,12 @@ func TestSyncCatalogWithIngress(t *testing.T) {
 				// Retry the kubectl apply because we've seen sporadic
 				// "connection refused" errors where the mutating webhook
 				// endpoint fails initially.
-				out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/ingress")
+				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", "../fixtures/bases/ingress")
 				require.NoError(r, err, out)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				helpers.Cleanup(r, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					// Ignore errors here because if the test ran as expected
 					// the custom resources will have been deleted.
-					k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/ingress")
+					k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "delete", "-k", "../fixtures/bases/ingress")
 				})
 			})
 

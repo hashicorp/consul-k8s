@@ -6,6 +6,8 @@ package common
 import (
 	"strings"
 	"time"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 const componentAuthMethod = "k8s-component-auth-method"
@@ -50,6 +52,8 @@ type HelmConfig struct {
 
 	// The default port to use for scraping prometheus metrics, passed from the helm chart via command-line flags to our controller.
 	DefaultPrometheusScrapePort string
+
+	InitContainerResources *v1.ResourceRequirements
 }
 
 type ConsulConfig struct {

@@ -145,38 +145,6 @@ partition_prefix "" {
 	return c.renderRules(anonTokenRulesTpl)
 }
 
-func (c *Command) apiGatewayControllerRules() (string, error) {
-	apiGatewayRulesTpl := `{{- if .EnablePartitions }}
-partition "{{ .PartitionName }}" {
-  mesh = "write"
-  acl = "write"
-{{- else }}
-operator = "write"
-acl = "write"
-{{- end }}
-
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
-  policy = "write"
-{{- end }}
-  service_prefix "" {
-    policy = "write"
-    intentions = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-{{- if .EnableNamespaces }}
-}
-{{- end }}
-{{- if .EnablePartitions }}
-}
-{{- end }}
-`
-
-	return c.renderRules(apiGatewayRulesTpl)
-}
-
 // This assumes users are using the default name for the service, i.e.
 // "mesh-gateway".
 func (c *Command) meshGatewayRules() (string, error) {
@@ -399,6 +367,32 @@ partition "default" {
 {{- end }}
 `
 	return c.renderRules(aclReplicationRulesTpl)
+}
+
+func (c *Command) datadogAgentRules() (string, error) {
+	ddAgentRulesTpl := `{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+{{- end }}
+  agent_prefix "" {
+    policy = "read"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+{{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+    service_prefix "" {
+      policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
+}
+{{- end }}
+`
+	return c.renderRules(ddAgentRulesTpl)
 }
 
 func (c *Command) rulesData() rulesData {

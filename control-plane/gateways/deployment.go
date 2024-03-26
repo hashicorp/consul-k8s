@@ -1,58 +1,85 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package gateways
 
 import (
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
-	globalDefaultInstances int32 = 1
+	globalDefaultInstances    int32 = 1
+	MeshGatewayAnnotationKind       = "mesh-gateway"
+	APIGatewayAnnotationKind        = "api-gateway"
 )
 
-func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
+func (b *gatewayBuilder[T]) Deployment() (*appsv1.Deployment, error) {
 	spec, err := b.deploymentSpec()
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      b.gateway.Name,
-			Namespace: b.gateway.Namespace,
-			Labels:    b.Labels(),
+			Name:        b.gateway.GetName(),
+			Namespace:   b.gateway.GetNamespace(),
+			Labels:      b.labelsForDeployment(),
+			Annotations: b.annotationsForDeployment(),
 		},
 		Spec: *spec,
 	}, err
 }
 
-func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
-	initContainer, err := initContainer(b.config, b.gateway.Name, b.gateway.Namespace)
+func (b *gatewayBuilder[T]) deploymentSpec() (*appsv1.DeploymentSpec, error) {
+	var (
+		deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
+		containerConfig  meshv2beta1.GatewayClassContainerConfig
+	)
+
+	// If GatewayClassConfig is not nil, use it to override the defaults for
+	// the deployment and container configs.
+	if b.gcc != nil {
+		deploymentConfig = b.gcc.Spec.Deployment
+		if deploymentConfig.Container != nil {
+			containerConfig = *b.gcc.Spec.Deployment.Container
+		}
+	}
+
+	initContainer, err := b.initContainer()
 	if err != nil {
 		return nil, err
 	}
 
-	var resources *corev1.ResourceRequirements
-	if b.gcc != nil {
-		resources = b.gcc.Spec.DeploymentSpec.Resources
-	}
-
-	container, err := consulDataplaneContainer(b.config, resources, b.gateway.Name, b.gateway.Namespace)
+	container, err := b.consulDataplaneContainer(containerConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &appsv1.DeploymentSpec{
-		//TODO NET-6721
-		Replicas: deploymentReplicaCount(nil, nil),
+		Replicas: deploymentReplicaCount(deploymentConfig.Replicas, nil),
 		Selector: &metav1.LabelSelector{
-			MatchLabels: b.Labels(),
+			MatchLabels: b.labelsForDeployment(),
 		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: b.Labels(),
+				Labels: b.labelsForDeployment(),
 				Annotations: map[string]string{
-					"consul.hashicorp.com/mesh-inject": "false",
+					// Indicate that this pod is a mesh gateway pod so that the Pod controller,
+					// consul-k8s CLI, etc. can key off of it
+					constants.AnnotationGatewayKind: b.gatewayKind,
+					// It's not logical to add a proxy sidecar since our workload is itself a proxy
+					constants.AnnotationMeshInject: "false",
+					// This functionality only applies when proxy sidecars are used
+					constants.AnnotationTransparentProxyOverwriteProbes: "false",
+					// This annotation determines which source to use to set the
+					// WAN address and WAN port for the Mesh Gateway service registration.
+					constants.AnnotationGatewayWANSource: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANSource],
+					// This annotation determines the WAN port for the Mesh Gateway service registration.
+					constants.AnnotationGatewayWANPort: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANPort],
+					// This annotation determines the address for the gateway when the source annotation is "Static".
+					constants.AnnotationGatewayWANAddress: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANAddress],
 				},
 			},
 			Spec: corev1.PodSpec{
@@ -70,42 +97,23 @@ func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 				Containers: []corev1.Container{
 					container,
 				},
-				Affinity: &corev1.Affinity{
-					PodAntiAffinity: &corev1.PodAntiAffinity{
-						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-							{
-								Weight: 1,
-								PodAffinityTerm: corev1.PodAffinityTerm{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: b.Labels(),
-									},
-									TopologyKey: "kubernetes.io/hostname",
-								},
-							},
-						},
-					},
-				},
-				NodeSelector:       nil,
-				Tolerations:        nil,
-				ServiceAccountName: b.serviceAccountName(),
+				Affinity:                  deploymentConfig.Affinity,
+				NodeSelector:              deploymentConfig.NodeSelector,
+				PriorityClassName:         deploymentConfig.PriorityClassName,
+				TopologySpreadConstraints: deploymentConfig.TopologySpreadConstraints,
+				HostNetwork:               deploymentConfig.HostNetwork,
+				Tolerations:               deploymentConfig.Tolerations,
+				ServiceAccountName:        b.serviceAccountName(),
+				DNSPolicy:                 deploymentConfig.DNSPolicy,
 			},
 		},
 	}, nil
 }
 
-func (b *meshGatewayBuilder) MergeDeployments(gcc *meshv2beta1.GatewayClassConfig, old, new *appsv1.Deployment) *appsv1.Deployment {
-	if old == nil {
-		return new
-	}
-	if !compareDeployments(old, new) {
-		old.Spec.Template = new.Spec.Template
-		new.Spec.Replicas = deploymentReplicaCount(nil, old.Spec.Replicas)
-	}
-
-	return new
-}
-
-func compareDeployments(a, b *appsv1.Deployment) bool {
+// areDeploymentsEqual determines whether two Deployments are the same in
+// the ways that we care about. This specifically ignores valid out-of-band
+// changes such as initContainer injection.
+func areDeploymentsEqual(a, b *appsv1.Deployment) bool {
 	// since K8s adds a bunch of defaults when we create a deployment, check that
 	// they don't differ by the things that we may actually change, namely container
 	// ports
@@ -139,11 +147,62 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
-func deploymentReplicaCount(deployment *pbmesh.Deployment, currentReplicas *int32) *int32 {
-	//TODO NET-6721 tamp replica count up and down based on min and max values
-	instanceValue := globalDefaultInstances
+func deploymentReplicaCount(replicas *meshv2beta1.GatewayClassReplicasConfig, currentReplicas *int32) *int32 {
+	// if we have the replicas config, use it
+	if replicas != nil && replicas.Default != nil && currentReplicas == nil {
+		return replicas.Default
+	}
+
+	// if we have the replicas config and the current replicas, use the min/max to ensure
+	// the current replicas are within the min/max range
+	if replicas != nil && currentReplicas != nil {
+		if replicas.Max != nil && *currentReplicas > *replicas.Max {
+			return replicas.Max
+		}
+
+		if replicas.Min != nil && *currentReplicas < *replicas.Min {
+			return replicas.Min
+		}
+
+		return currentReplicas
+	}
+
+	// if we don't have the replicas config, use the current replicas if we have them
 	if currentReplicas != nil {
 		return currentReplicas
 	}
-	return pointer.Int32(instanceValue)
+
+	// otherwise use the global default
+	return pointer.Int32(globalDefaultInstances)
+}
+
+// MergeDeployment is used to update an appsv1.Deployment without overwriting any
+// existing annotations or labels that were placed there by other vendors.
+//
+// based on https://github.com/kubernetes-sigs/controller-runtime/blob/4000e996a202917ad7d40f02ed8a2079a9ce25e9/pkg/controller/controllerutil/example_test.go
+func MergeDeployment(existing, desired *appsv1.Deployment) {
+	// Only overwrite fields if the Deployment doesn't exist yet
+	if existing.ObjectMeta.CreationTimestamp.IsZero() {
+		existing.ObjectMeta.OwnerReferences = desired.ObjectMeta.OwnerReferences
+		existing.Spec = desired.Spec
+		existing.Annotations = desired.Annotations
+		existing.Labels = desired.Labels
+		return
+	}
+
+	// Make sure we don't reconcile forever by overwriting valid out-of-band
+	// changes such as init container injection. If the deployments are
+	// sufficiently equal, we only update the annotations.
+	if !areDeploymentsEqual(existing, desired) {
+		desired.Spec.Replicas = deploymentReplicaCount(nil, existing.Spec.Replicas)
+		existing.Spec = desired.Spec
+	}
+
+	// If the Deployment already exists, add any desired annotations + labels to existing set
+	for k, v := range desired.ObjectMeta.Annotations {
+		existing.ObjectMeta.Annotations[k] = v
+	}
+	for k, v := range desired.ObjectMeta.Labels {
+		existing.ObjectMeta.Labels[k] = v
+	}
 }

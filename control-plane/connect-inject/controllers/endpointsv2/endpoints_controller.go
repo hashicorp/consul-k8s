@@ -375,7 +375,6 @@ func getServiceID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-			PeerName:  constants.DefaultConsulPeer,
 		},
 	}
 }
@@ -444,12 +443,7 @@ func getEffectiveTargetPort(targetPort intstr.IntOrString, prefixedPods selector
 	targetPortInt := int32(targetPort.IntValue())
 	var mostPrevalentContainerPort *corev1.ContainerPort
 	maxCount := 0
-	effectiveNameForPort := func(port *corev1.ContainerPort) string {
-		if port.Name != "" {
-			return port.Name
-		}
-		return targetPort.String()
-	}
+	effectiveNameForPort := inject.WorkloadPortName
 	for _, podData := range prefixedPods {
 		containerPort := getTargetContainerPort(targetPortInt, podData.samplePod)
 
@@ -493,7 +487,7 @@ func getEffectiveTargetPort(targetPort intstr.IntOrString, prefixedPods selector
 
 	// If still no match for the target port, fall back to string-ifying the target port name, which
 	// is what the PodController will do when converting unnamed ContainerPorts to Workload ports.
-	return targetPort.String()
+	return constants.UnnamedWorkloadPortNamePrefix + targetPort.String()
 }
 
 // getTargetContainerPort returns the pod ContainerPort matching the given numeric port value, or nil if none is found.

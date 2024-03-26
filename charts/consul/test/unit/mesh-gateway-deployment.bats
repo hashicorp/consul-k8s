@@ -1784,3 +1784,31 @@ key2: value2' \
     yq 'any(contains("-log-level=warn"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+#--------------------------------------------------------------------
+# security context
+
+@test "meshGateway/Deployment: don't drop ALL capabilities when hostNetwork=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.hostNetwork=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.capabilities.drop | length') -eq 0 ]
+}
+
+@test "meshGateway/Deployment: drop ALL capabilities when hostNetwork!=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.capabilities.drop[0]') = "ALL" ]
+}

@@ -255,3 +255,14 @@ load _helpers
       yq '.rules[4].apiGroups | index("mesh.consul.hashicorp.com")' | tee /dev/stderr)
   [ "${object}" == 0 ]
 }
+
+@test "connectInject/ClusterRole: adds permission to multicluster.consul.hashicorp.com with resource-apis in global.experiments" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments={resource-apis}' \
+      . | tee /dev/stderr |
+      yq '.rules[6].apiGroups | index("multicluster.consul.hashicorp.com")' | tee /dev/stderr)
+  [ "${object}" == 0 ]
+}

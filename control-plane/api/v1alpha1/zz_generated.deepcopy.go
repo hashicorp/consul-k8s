@@ -3442,6 +3442,11 @@ func (in *ServiceRouteDestination) DeepCopyInto(out *ServiceRouteDestination) {
 	*out = *in
 	out.IdleTimeout = in.IdleTimeout
 	out.RequestTimeout = in.RequestTimeout
+	if in.RetryOn != nil {
+		in, out := &in.RetryOn, &out.RetryOn
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.RetryOnStatusCodes != nil {
 		in, out := &in.RetryOnStatusCodes, &out.RetryOnStatusCodes
 		*out = make([]uint32, len(*in))

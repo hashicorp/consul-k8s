@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix issue where external annotations and labels are being incorrectly deleted on services controlled by the API Gateway
+```

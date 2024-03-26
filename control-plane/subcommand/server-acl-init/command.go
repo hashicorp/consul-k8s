@@ -60,14 +60,13 @@ type Command struct {
 	flagBindingRuleSelector string
 
 	flagCreateEntLicenseToken bool
+	flagCreateDDAgentToken    bool
 
 	flagSnapshotAgent bool
 
 	flagMeshGateway             bool
 	flagIngressGatewayNames     []string
 	flagTerminatingGatewayNames []string
-
-	flagAPIGatewayController bool
 
 	// Flags to configure Consul connection.
 	flagServerPort uint
@@ -172,8 +171,6 @@ func (c *Command) init() {
 		"Name of a terminating gateway that needs an acl token. May be specified multiple times. "+
 			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
 			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
-	c.flags.BoolVar(&c.flagAPIGatewayController, "api-gateway-controller", false,
-		"Toggle for configuring ACL login for the API gateway controller.")
 
 	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 
@@ -212,11 +209,15 @@ func (c *Command) init() {
 	c.flags.StringVar((*string)(&c.flagSecretsBackend), "secrets-backend", "kubernetes",
 		`The secrets backend to use. Either "vault" or "kubernetes". Defaults to "kubernetes"`)
 	c.flags.StringVar(&c.flagBootstrapTokenSecretName, "bootstrap-token-secret-name", "",
-		"The name of the Vault or Kuberenetes secret for the bootstrap token. This token must have `ac::write` permission "+
+		"The name of the Vault or Kubernetes secret for the bootstrap token. This token must have `ac::write` permission "+
 			"in order to create policies and tokens. If not provided or if the secret is empty, then this command will "+
 			"bootstrap ACLs and write the bootstrap token to this secret.")
 	c.flags.StringVar(&c.flagBootstrapTokenSecretKey, "bootstrap-token-secret-key", "",
-		"The key within the Vault or Kuberenetes secret containing the bootstrap token.")
+		"The key within the Vault or Kubernetes secret containing the bootstrap token.")
+	c.flags.BoolVar(&c.flagCreateDDAgentToken, "create-dd-agent-token", false,
+		"Enable ACL token creation for datadog agent integration"+
+			"Configures the following permissions to grant datadog agent metrics scraping permissions with Consul ACLs enabled"+
+			"agent_prefix \"\" {\n  policy = \"read\"\n}\nservice_prefix \"\" {\n  policy = \"read\"\n}\nnode_prefix \"\" {\n  policy = \"read\"\n}")
 
 	c.flags.DurationVar(&c.flagTimeout, "timeout", 10*time.Minute,
 		"How long we'll try to bootstrap ACLs for before timing out, e.g. 1ms, 2s, 3m")
@@ -584,28 +585,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	if c.flagAPIGatewayController {
-		rules, err := c.apiGatewayControllerRules()
-		if err != nil {
-			c.log.Error("Error templating api gateway rules", "err", err)
-			return 1
-		}
-		serviceAccountName := c.withPrefix("api-gateway-controller")
-
-		// API gateways require a global policy/token because they must
-		// create config-entry resources in the primary, even when deployed
-		// to a secondary datacenter
-		authMethodName := localComponentAuthMethodName
-		if !primary {
-			authMethodName = globalComponentAuthMethodName
-		}
-		err = c.createACLPolicyRoleAndBindingRule("api-gateway-controller", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, dynamicClient)
-		if err != nil {
-			c.log.Error(err.Error())
-			return 1
-		}
-	}
-
 	if c.flagMeshGateway {
 		rules, err := c.meshGatewayRules()
 		if err != nil {
@@ -674,6 +653,20 @@ func (c *Command) Run(args []string) int {
 		} else {
 			err = c.createGlobalACL(common.ACLReplicationTokenName, rules, consulDC, primary, dynamicClient)
 		}
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagCreateDDAgentToken {
+		var err error
+		rules, err := c.datadogAgentRules()
+		if err != nil {
+			c.log.Error("Error templating datadog agent metrics token rules", "err", err)
+			return 1
+		}
+		err = c.createLocalACL(common.DatadogAgentTokenName, rules, consulDC, primary, dynamicClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1

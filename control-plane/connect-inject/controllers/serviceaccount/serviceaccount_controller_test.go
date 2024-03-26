@@ -6,7 +6,6 @@ package serviceaccount
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/proto"
@@ -30,7 +29,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
@@ -226,13 +224,6 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 			DenyK8sNamespacesSet:  mapset.NewSetWith(),
 		},
 	}
-	resourceClient, err := consul.NewResourceServiceClient(sa.ConsulServerConnMgr)
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		_, _, err := testClient.APIClient.Partitions().Read(context.Background(), constants.DefaultConsulPartition, nil)
-		return err == nil
-	}, 5*time.Second, 500*time.Millisecond)
 
 	// Default ns and partition if not specified in test.
 	if tc.targetConsulNs == "" {
@@ -245,9 +236,9 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	// If existing resource specified, create it and ensure it exists.
 	if tc.existingResource != nil {
 		writeReq := &pbresource.WriteRequest{Resource: tc.existingResource}
-		_, err = resourceClient.Write(context.Background(), writeReq)
+		_, err := testClient.ResourceClient.Write(context.Background(), writeReq)
 		require.NoError(t, err)
-		test.ResourceHasPersisted(t, context.Background(), resourceClient, tc.existingResource.Id)
+		test.ResourceHasPersisted(t, context.Background(), testClient.ResourceClient, tc.existingResource.Id)
 	}
 
 	// Run actual reconcile and verify results.
@@ -264,7 +255,7 @@ func runReconcileCase(t *testing.T, tc reconcileCase) {
 	}
 	require.False(t, resp.Requeue)
 
-	expectedWorkloadIdentityMatches(t, resourceClient, tc.svcAccountName, tc.targetConsulNs, tc.targetConsulPartition, tc.expectedResource)
+	expectedWorkloadIdentityMatches(t, testClient.ResourceClient, tc.svcAccountName, tc.targetConsulNs, tc.targetConsulPartition, tc.expectedResource)
 }
 
 func expectedWorkloadIdentityMatches(t *testing.T, client pbresource.ResourceServiceClient, name, namespace, partition string, expectedResource *pbresource.Resource) {

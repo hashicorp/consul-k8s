@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -150,7 +149,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	r.Log.Info("retrieved", "name", pod.Name, "ns", pod.Namespace)
 
-	if inject.HasBeenMeshInjected(pod) {
+	if inject.HasBeenMeshInjected(pod) || inject.IsGateway(pod) {
 
 		// It is possible the pod was scheduled but doesn't have an allocated IP yet, so safely requeue
 		if pod.Status.PodIP == "" {
@@ -336,9 +335,11 @@ func (r *Controller) writeWorkload(ctx context.Context, pod corev1.Pod) error {
 	}
 	data := inject.ToProtoAny(workload)
 
+	resourceID := getWorkloadID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition())
+	r.Log.Info("registering workload with Consul", getLogFieldsForResource(resourceID)...)
 	req := &pbresource.WriteRequest{
 		Resource: &pbresource.Resource{
-			Id:       getWorkloadID(pod.GetName(), r.getConsulNamespace(pod.Namespace), r.getPartition()),
+			Id:       resourceID,
 			Metadata: metaFromPod(pod),
 			Data:     data,
 		},
@@ -617,10 +618,7 @@ func getWorkloadPorts(pod corev1.Pod) ([]string, map[string]*pbcatalog.WorkloadP
 
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
-			name := port.Name
-			if name == "" {
-				name = strconv.Itoa(int(port.ContainerPort))
-			}
+			name := inject.WorkloadPortName(&port)
 
 			// TODO: error check reserved "mesh" keyword and 20000
 
@@ -664,10 +662,16 @@ func parseLocality(node corev1.Node) *pbcatalog.Locality {
 
 func metaFromPod(pod corev1.Pod) map[string]string {
 	// TODO: allow custom workload metadata
-	return map[string]string{
+	meta := map[string]string{
 		constants.MetaKeyKubeNS:    pod.GetNamespace(),
 		constants.MetaKeyManagedBy: constants.ManagedByPodValue,
 	}
+
+	if gatewayKind := pod.Annotations[constants.AnnotationGatewayKind]; gatewayKind != "" {
+		meta[constants.MetaGatewayKind] = gatewayKind
+	}
+
+	return meta
 }
 
 // getHealthStatusFromPod checks the Pod for a "Ready" condition that is true.
@@ -704,10 +708,6 @@ func getWorkloadID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }
@@ -719,10 +719,6 @@ func getProxyConfigurationID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }
@@ -734,10 +730,6 @@ func getHealthStatusID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }
@@ -749,10 +741,14 @@ func getDestinationsID(name, namespace, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
+	}
+}
+
+func getLogFieldsForResource(id *pbresource.ID) []any {
+	return []any{
+		"name", id.Name,
+		"ns", id.Tenancy.Namespace,
+		"partition", id.Tenancy.Partition,
 	}
 }

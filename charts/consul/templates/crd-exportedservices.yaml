@@ -10,15 +10,13 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-  name: exportedservices.consul.hashicorp.com
+  name: exportedservices.multicluster.consul.hashicorp.com
 spec:
-  group: consul.hashicorp.com
+  group: multicluster.consul.hashicorp.com
   names:
     kind: ExportedServices
     listKind: ExportedServicesList
     plural: exportedservices
-    shortNames:
-    - exported-services
     singular: exportedservices
   scope: Namespaced
   versions:
@@ -35,10 +33,10 @@ spec:
       jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    name: v1alpha1
+    name: v2
     schema:
       openAPIV3Schema:
-        description: ExportedServices is the Schema for the exportedservices API
+        description: ExportedServices is the Schema for the Exported Services API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -53,44 +51,15 @@ spec:
           metadata:
             type: object
           spec:
-            description: ExportedServicesSpec defines the desired state of ExportedServices.
             properties:
-              services:
-                description: Services is a list of services to be exported and the
-                  list of partitions to expose them to.
+              consumers:
                 items:
-                  description: ExportedService manages the exporting of a service
-                    in the local partition to other partitions.
-                  properties:
-                    consumers:
-                      description: Consumers is a list of downstream consumers of
-                        the service to be exported.
-                      items:
-                        description: ServiceConsumer represents a downstream consumer
-                          of the service to be exported.
-                        properties:
-                          partition:
-                            description: Partition is the admin partition to export
-                              the service to.
-                            type: string
-                          peer:
-                            description: Peer is the name of the peer to export the
-                              service to.
-                            type: string
-                          samenessGroup:
-                            description: SamenessGroup is the name of the sameness
-                              group to export the service to.
-                            type: string
-                        type: object
-                      type: array
-                    name:
-                      description: Name is the name of the service to be exported.
-                      type: string
-                    namespace:
-                      description: Namespace is the namespace to export the service
-                        from.
-                      type: string
                   type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                type: array
+              services:
+                items:
+                  type: string
                 type: array
             type: object
           status:

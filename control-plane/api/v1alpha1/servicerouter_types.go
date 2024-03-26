@@ -75,6 +75,8 @@ type ServiceRouteMatch struct {
 }
 
 type ServiceRouteHTTPMatch struct {
+	// CaseInsensitive configures PathExact and PathPrefix matches to ignore upper/lower casing.
+	CaseInsensitive bool `json:"caseInsensitive,omitempty"`
 	// PathExact is an exact path to match on the HTTP request path.
 	PathExact string `json:"pathExact,omitempty"`
 	// PathPrefix is a path prefix to match on the HTTP request path.
@@ -151,6 +153,9 @@ type ServiceRouteDestination struct {
 	NumRetries uint32 `json:"numRetries,omitempty"`
 	// RetryOnConnectFailure allows for connection failure errors to trigger a retry.
 	RetryOnConnectFailure bool `json:"retryOnConnectFailure,omitempty"`
+	// RetryOn is a flat list of conditions for Consul to retry requests based on the response from an upstream service.
+	// Refer to the valid conditions here: https://developer.hashicorp.com/consul/docs/connect/config-entries/service-router#routes-destination-retryon
+	RetryOn []string `json:"retryOn,omitempty"`
 	// RetryOnStatusCodes is a flat list of http response status codes that are eligible for retry.
 	RetryOnStatusCodes []uint32 `json:"retryOnStatusCodes,omitempty"`
 	// Allow HTTP header manipulation to be configured.
@@ -355,6 +360,7 @@ func (in *ServiceRouteDestination) toConsul() *capi.ServiceRouteDestination {
 		RequestTimeout:        in.RequestTimeout.Duration,
 		NumRetries:            in.NumRetries,
 		RetryOnConnectFailure: in.RetryOnConnectFailure,
+		RetryOn:               in.RetryOn,
 		RetryOnStatusCodes:    in.RetryOnStatusCodes,
 		RequestHeaders:        in.RequestHeaders.toConsul(),
 		ResponseHeaders:       in.ResponseHeaders.toConsul(),
@@ -418,12 +424,13 @@ func (in *ServiceRouteHTTPMatch) toConsul() *capi.ServiceRouteHTTPMatch {
 		query = append(query, q.toConsul())
 	}
 	return &capi.ServiceRouteHTTPMatch{
-		PathExact:  in.PathExact,
-		PathPrefix: in.PathPrefix,
-		PathRegex:  in.PathRegex,
-		Header:     header,
-		QueryParam: query,
-		Methods:    in.Methods,
+		CaseInsensitive: in.CaseInsensitive,
+		PathExact:       in.PathExact,
+		PathPrefix:      in.PathPrefix,
+		PathRegex:       in.PathRegex,
+		Header:          header,
+		QueryParam:      query,
+		Methods:         in.Methods,
 	}
 }
 

@@ -148,6 +148,13 @@ spec:
                                 any existing header values of the same name.
                               type: object
                           type: object
+                        retryOn:
+                          description: 'RetryOn is a flat list of conditions for Consul
+                            to retry requests based on the response from an upstream
+                            service. Refer to the valid conditions here: https://developer.hashicorp.com/consul/docs/connect/config-entries/service-router#routes-destination-retryon'
+                          items:
+                            type: string
+                          type: array
                         retryOnConnectFailure:
                           description: RetryOnConnectFailure allows for connection
                             failure errors to trigger a retry.
@@ -178,6 +185,10 @@ spec:
                         http:
                           description: HTTP is a set of http-specific match criteria.
                           properties:
+                            caseInsensitive:
+                              description: CaseInsensitive configures PathExact and
+                                PathPrefix matches to ignore upper/lower casing.
+                              type: boolean
                             header:
                               description: Header is a set of criteria that can match
                                 on HTTP request headers. If more than one is configured

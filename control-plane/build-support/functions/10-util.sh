@@ -95,7 +95,7 @@ function have_gpg_key {
 
 function parse_version {
 	# Arguments:
-	#   $1 - Path to the top level Consul source
+	#   $1 - Path to the top level Consul K8s source
 	#   $2 - boolean value for whether the release version should be parsed from the source
 	#   $3 - boolean whether to use GIT_DESCRIBE and GIT_COMMIT environment variables
 	#   $4 - boolean whether to omit the version part of the version string. (optional)
@@ -190,7 +190,7 @@ function parse_version {
 
 function get_version {
 	# Arguments:
-	#   $1 - Path to the top level Consul source
+	#   $1 - Path to the top level Consul K8s source
 	#   $2 - Whether the release version should be parsed from source (optional)
 	#   $3 - Whether to use GIT_DESCRIBE and GIT_COMMIT environment variables
 	#
@@ -344,7 +344,7 @@ function normalize_git_url {
 
 function git_remote_url {
 	# Arguments:
-	#   $1 - Path to the top level Consul source
+	#   $1 - Path to the top level Consul K8s source
 	#   $2 - Remote name
 	#
 	# Returns:
@@ -380,7 +380,7 @@ function git_remote_url {
 
 function find_git_remote {
 	# Arguments:
-	#   $1 - Path to the top level Consul source
+	#   $1 - Path to the top level Consul K8s source
 	#
 	# Returns:
 	#   0 - success
@@ -482,7 +482,7 @@ function update_git_env {
 
 function git_push_ref {
 	# Arguments:
-	#   $1 - Path to the top level Consul source
+	#   $1 - Path to the top level Consul K8s source
 	#   $2 - Git ref (optional)
 	#   $3 - remote (optional - if not specified we will try to determine it)
 	#
@@ -629,7 +629,8 @@ function update_version_helm {
 		full_consul_version="$5-$3"
 		full_consul_dataplane_version="$7-$3"
 	elif test "$3" == "dev"; then
-		full_version="$2-$3"
+		full_version="${2%.*}-$3"
+		full_version_k8s_for_chart_version="$2-$3"
 		# strip off the last minor patch version so that the consul image can be set to something like 1.16-dev. The image
 		# is produced by Consul every night
 		full_consul_version="${5%.*}-$3"
@@ -637,7 +638,7 @@ function update_version_helm {
 	fi
 
 	sed_i ${SED_EXT} -e "s/(imageK8S:.*\/consul-k8s-control-plane:)[^\"]*/imageK8S: $4${full_version}/g" "${vfile}"
-	sed_i ${SED_EXT} -e "s/(version:[[:space:]]*)[^\"]*/\1${full_version}/g" "${cfile}"
+	sed_i ${SED_EXT} -e "s/(version:[[:space:]]*)[^\"]*/\1${full_version_k8s_for_chart_version}/g" "${cfile}"
 	sed_i ${SED_EXT} -e "s/(appVersion:[[:space:]]*)[^\"]*/\1${full_consul_version}/g" "${cfile}"
 	sed_i ${SED_EXT} -e "s/(image:.*\/consul-k8s-control-plane:)[^\"]*/image: $4${full_version}/g" "${cfile}"
 
@@ -659,7 +660,7 @@ function update_version_helm {
 
 function set_version {
 	# Arguments:
-	#   $1 - Path to top level Consul source
+	#   $1 - Path to top level Consul K8s source
 	#   $2 - The version of the release
 	#   $3 - The release date
 	#   $4 - The pre-release version
@@ -709,11 +710,13 @@ function set_version {
 
 function set_changelog {
 	# Arguments:
-	#   $1 - Path to top level Consul source
+	#   $1 - Path to top level Consul K8s source
 	#   $2 - Version
 	#   $3 - Release Date
 	#   $4 - The last git release tag
 	#   $5 - Pre-release version
+    #   $6 - The version of Consul corresponding to the release (only used for .0)
+    #   $7 - The version of Consul Dataplane corresponding to the release (only used for .0)
 	#
 	#
 	# Returns:
@@ -733,7 +736,13 @@ function set_changelog {
 		rel_date="$3"
 	fi
 	local last_release_date_git_tag=$4
-        local preReleaseVersion="-$5"
+
+	# Only set prerelease suffix if prerelease version is set
+    local preReleaseVersion="${5:+-${5}}"
+
+    local version_short="${version%\.*}"
+    local consul_version_short="${6%\.*}"
+    local consul_dataplane_version_short="${7%\.*}"
 
 	if test -z "${version}"; then
 		err "ERROR: Must specify a version to put into the changelog"
@@ -745,8 +754,19 @@ function set_changelog {
 		exit 1
 	fi
 
+	if [[ "${version}" =~ \.0$ ]]; then
+	    if [ -z "$version_short" ] || [ -z "$consul_version_short" ] || [ -z "$consul_dataplane_version_short" ]; then
+            echo "Error: Consul K8s, Consul or Consul Dataplane short version could not be detected."
+            exit 1
+        fi
+        compatibility_note="
+
+> NOTE: Consul K8s ${version_short}.x is compatible with Consul ${consul_version_short}.x and Consul Dataplane ${consul_dataplane_version_short}.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+"
+    fi
+
 	cat <<EOT | cat - "${curdir}"/CHANGELOG.MD >tmp && mv tmp "${curdir}"/CHANGELOG.MD
-## ${version}${preReleaseVersion} (${rel_date})
+## ${version}${preReleaseVersion} (${rel_date})${compatibility_note}
 $(changelog-build -last-release ${CONSUL_K8S_LAST_RELEASE_GIT_TAG} \
 		-entries-dir .changelog/ \
 		-changelog-template .changelog/changelog.tmpl \
@@ -758,13 +778,13 @@ EOT
 
 function prepare_release {
 	# Arguments:
-	#   $1 - Path to top level Consul source
+	#   $1 - Path to top level Consul K8s source
 	#   $2 - The version of the release
 	#   $3 - The release date
 	#   $4 - The last release git tag for this branch (eg. v1.1.0)
-  #   $5 - The consul version
+    #   $5 - The consul version
 	#   $6 - The consul-dataplane version
-  #   $7 - The pre-release version
+    #   $7 - The pre-release version
 	#
 	#
 	# Returns:
@@ -781,12 +801,12 @@ function prepare_release {
 
 	echo "prepare_release: dir:${curDir} consul-k8s:${version} consul:${consulVersion} consul-dataplane:${consulDataplaneVersion} date:"${releaseDate}" git tag:${lastGitTag}"
 	set_version "${curDir}" "${version}" "${releaseDate}" "${prereleaseVersion}" "hashicorp\/consul-k8s-control-plane:" "${consulVersion}" "hashicorp\/consul" "${consulDataplaneVersion}" "hashicorp\/consul-dataplane"
-	set_changelog "${curDir}" "${version}" "${releaseDate}" "${lastGitTag}" "${prereleaseVersion}"
+	set_changelog "${curDir}" "${version}" "${releaseDate}" "${lastGitTag}" "${prereleaseVersion}" "${consulVersion}" "${consulDataplaneVersion}"
 }
 
 function prepare_rc_branch {
   # Arguments:
-  #   $1 - Path to top level Consul source
+  #   $1 - Path to top level Consul K8s source
   #   $2 - The version of the release
   #   $3 - The release date
   #   $4 - The last release git tag for this branch (eg. v1.1.0)
@@ -813,7 +833,7 @@ function prepare_rc_branch {
 
 function prepare_dev {
 	# Arguments:
-	#   $1 - Path to top level Consul source
+	#   $1 - Path to top level Consul K8s source
 	#   $2 - The version of the release
 	#   $3 - The release date
 	#   $4 - The last release git tag for this branch (eg. v1.1.0) (Unused)
@@ -868,7 +888,7 @@ function git_staging_empty {
 
 function commit_dev_mode {
 	# Arguments:
-	#   $1 - Path to top level Consul source
+	#   $1 - Path to top level Consul K8s source
 	#
 	# Returns:
 	#   0 - success

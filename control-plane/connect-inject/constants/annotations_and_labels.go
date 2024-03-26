@@ -25,7 +25,8 @@ const (
 
 	// AnnotationGatewayKind is the key of the annotation that indicates pods
 	// that represent Consul Connect Gateways. This should be set to a
-	// value that is either "mesh", "ingress" or "terminating".
+	// value that is either "mesh-gateway", "ingress-gateway", "terminating-gateway",
+	// or "api-gateway".
 	AnnotationGatewayKind = "consul.hashicorp.com/gateway-kind"
 
 	// AnnotationGatewayConsulServiceName is the key of the annotation whose value
@@ -73,6 +74,11 @@ const (
 	// connections to.
 	AnnotationPort = "consul.hashicorp.com/connect-service-port"
 
+	// AnnotationProxyConfigMap allows for default values to be set in the opaque config map
+	// during proxy registration. The value for this annotation is expected to be valid json.
+	// Other annotations / configuration may overwrite the values in the map.
+	AnnotationProxyConfigMap = "consul.hashicorp.com/proxy-config-map"
+
 	// AnnotationUpstreams is a list of upstreams to register with the
 	// proxy in the format of `<service-name>:<local-port>,...`. The
 	// service name should map to a Consul service name and the local port
@@ -93,6 +99,14 @@ const (
 	// queries this instead of the application health check for the status of the application.
 	// Enable this only if the application does not support health checks.
 	AnnotationUseProxyHealthCheck = "consul.hashicorp.com/use-proxy-health-check"
+
+	// AnnotationSidecarProxyStartupFailureSeconds configures how long the k8s startup probe will wait for
+	// success before the proxy is considered to be unhealthy and the container is restarted.
+	AnnotationSidecarProxyStartupFailureSeconds = "consul.hashicorp.com/sidecar-proxy-startup-failure-seconds"
+
+	// AnnotationSidecarProxyLivenessFailureSeconds configures how long the k8s liveness probe will wait for
+	// before the proxy is considered to be unhealthy and the container is restarted.
+	AnnotationSidecarProxyLivenessFailureSeconds = "consul.hashicorp.com/sidecar-proxy-liveness-failure-seconds"
 
 	// annotations for sidecar proxy resource limits.
 	AnnotationSidecarProxyCPULimit      = "consul.hashicorp.com/sidecar-proxy-cpu-limit"

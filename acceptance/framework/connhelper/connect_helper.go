@@ -171,7 +171,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		&retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}, t,
 		func(r *retry.R) {
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
-				podList, err := c.Ctx.KubernetesClient(t).CoreV1().
+				podList, err := c.Ctx.KubernetesClient(r).CoreV1().
 					Pods(opts.Namespace).
 					List(context.Background(), metav1.ListOptions{
 						LabelSelector: labelSelector,
@@ -294,7 +294,7 @@ func (c *ConnectHelper) SetupAppNamespace(t *testing.T) {
 }
 
 // CreateResolverRedirect creates a resolver that redirects to a static-server, a corresponding k8s service,
-// and intentions. This helper is primarly used to ensure that the virtual-ips are persisted to consul properly.
+// and intentions. This helper is primarily used to ensure that the virtual-ips are persisted to consul properly.
 func (c *ConnectHelper) CreateResolverRedirect(t *testing.T) {
 	logger.Log(t, "creating resolver redirect")
 	opts := c.KubectlOptsForApp(t)

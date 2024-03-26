@@ -6,6 +6,9 @@
 {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+{{- if and .Values.externalServers.enabled .Values.global.cloud.enabled }}
+  {{- if and (gt (len .Values.externalServers.hosts) 0) (regexMatch ".+.hashicorp.cloud$" ( first .Values.externalServers.hosts )) }}{{fail "global.cloud.enabled cannot be used in combination with an HCP-managed cluster address in externalServers.hosts. global.cloud.enabled is for linked self-managed clusters."}}{{- end }}
+{{- end }}
 {{- if and .Values.externalServers.skipServerWatch (not .Values.externalServers.enabled) }}{{ fail "externalServers.enabled must be set if externalServers.skipServerWatch is true" }}{{ end -}}
 {{- $dnsEnabled := (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) -}}
 {{- $dnsRedirectionEnabled := (or (and (ne (.Values.dns.enableRedirection | toString) "-") .Values.dns.enableRedirection) (and (eq (.Values.dns.enableRedirection | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) -}}
@@ -137,7 +140,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              consul-k8s-control-plane inject-connect \
+              exec consul-k8s-control-plane inject-connect \
                 {{- if .Values.global.federation.enabled }}
                 -enable-federation \
                 {{- end }}
@@ -153,6 +156,9 @@ spec:
                 -listen=:8080 \
                 {{- if (mustHas "resource-apis" .Values.global.experiments) }}
                 -enable-resource-apis=true \
+                {{- end }}
+                {{- if (mustHas "v2tenancy" .Values.global.experiments) }}
+                -enable-v2tenancy=true \
                 {{- end }}
                 {{- range $k, $v := .Values.connectInject.consulNode.meta }}
                 -node-meta={{ $k }}={{ $v }} \
@@ -256,7 +262,8 @@ spec:
                 -default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds={{ .Values.connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds }} \
                 -default-sidecar-proxy-lifecycle-graceful-port={{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulPort }} \
                 -default-sidecar-proxy-lifecycle-graceful-shutdown-path="{{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulShutdownPath }}" \
-
+                -default-sidecar-proxy-startup-failure-seconds={{ .Values.connectInject.sidecarProxy.defaultStartupFailureSeconds }} \
+                -default-sidecar-proxy-liveness-failure-seconds={{ .Values.connectInject.sidecarProxy.defaultLivenessFailureSeconds }} \
                 {{- if .Values.connectInject.initContainer }}
                 {{- $initResources := .Values.connectInject.initContainer.resources }}
                 {{- if not (kindIs "invalid" $initResources.limits.memory) }}

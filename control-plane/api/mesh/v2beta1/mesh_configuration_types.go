@@ -1,5 +1,5 @@
-// // Copyright (c) HashiCorp, Inc.
-// // SPDX-License-Identifier: MPL-2.0
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
 package v2beta1
 
 import (
@@ -9,7 +9,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	inject "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -50,24 +49,20 @@ type MeshConfigurationList struct {
 	Items           []*MeshConfiguration `json:"items"`
 }
 
-func (in *MeshConfiguration) ResourceID(namespace, partition string) *pbresource.ID {
+func (in *MeshConfiguration) ResourceID(_, partition string) *pbresource.ID {
 	return &pbresource.ID{
 		Name: in.Name,
 		Type: pbmesh.MeshConfigurationType,
 		Tenancy: &pbresource.Tenancy{
+			// we don't pass a namespace here because MeshConfiguration is partition-scoped
 			Partition: partition,
-			Namespace: namespace,
-
-			// Because we are explicitly defining NS/partition, this will not default and must be explicit.
-			// At a future point, this will move out of the Tenancy block.
-			PeerName: constants.DefaultConsulPeer,
 		},
 	}
 }
 
-func (in *MeshConfiguration) Resource(namespace, partition string) *pbresource.Resource {
+func (in *MeshConfiguration) Resource(_, partition string) *pbresource.Resource {
 	return &pbresource.Resource{
-		Id:       in.ResourceID(namespace, partition),
+		Id:       in.ResourceID("", partition),
 		Data:     inject.ToProtoAny(&in.Spec),
 		Metadata: meshConfigMeta(),
 	}
@@ -91,9 +86,9 @@ func (in *MeshConfiguration) Finalizers() []string {
 	return in.ObjectMeta.Finalizers
 }
 
-func (in *MeshConfiguration) MatchesConsul(candidate *pbresource.Resource, namespace, partition string) bool {
+func (in *MeshConfiguration) MatchesConsul(candidate *pbresource.Resource, _, partition string) bool {
 	return cmp.Equal(
-		in.Resource(namespace, partition),
+		in.Resource("", partition),
 		candidate,
 		protocmp.IgnoreFields(&pbresource.Resource{}, "status", "generation", "version"),
 		protocmp.IgnoreFields(&pbresource.ID{}, "uid"),

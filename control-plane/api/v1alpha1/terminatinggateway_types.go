@@ -79,6 +79,9 @@ type LinkedService struct {
 
 	// SNI is the optional name to specify during the TLS handshake with a linked service.
 	SNI string `json:"sni,omitempty"`
+
+	//DisableAutoHostRewrite disables terminating gateways auto host rewrite feature when set to true.
+	DisableAutoHostRewrite bool `json:"disableAutoHostRewrite,omitempty"`
 }
 
 func (in *TerminatingGateway) GetObjectMeta() metav1.ObjectMeta {
@@ -218,12 +221,13 @@ func (in *TerminatingGateway) DefaultNamespaceFields(consulMeta common.ConsulMet
 
 func (in LinkedService) toConsul() capi.LinkedService {
 	return capi.LinkedService{
-		Namespace: in.Namespace,
-		Name:      in.Name,
-		CAFile:    in.CAFile,
-		CertFile:  in.CertFile,
-		KeyFile:   in.KeyFile,
-		SNI:       in.SNI,
+		Namespace:              in.Namespace,
+		Name:                   in.Name,
+		CAFile:                 in.CAFile,
+		CertFile:               in.CertFile,
+		KeyFile:                in.KeyFile,
+		SNI:                    in.SNI,
+		DisableAutoHostRewrite: in.DisableAutoHostRewrite,
 	}
 }
 

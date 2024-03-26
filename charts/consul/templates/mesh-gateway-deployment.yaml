@@ -1,4 +1,5 @@
 {{- if .Values.meshGateway.enabled }}
+{{- if not (mustHas "resource-apis" .Values.global.experiments) }}
 {{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
 {{- if and .Values.global.acls.manageSystemACLs (ne .Values.meshGateway.consulServiceName "") (ne .Values.meshGateway.consulServiceName "mesh-gateway") }}{{ fail "if global.acls.manageSystemACLs is true, meshGateway.consulServiceName cannot be set" }}{{ end -}}
 {{- if .Values.meshGateway.globalMode }}{{ fail "meshGateway.globalMode is no longer supported; instead, you must migrate to CRDs (see www.consul.io/docs/k8s/crds/upgrade-to-crds)" }}{{ end -}}
@@ -161,12 +162,12 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
-           -gateway-kind="mesh-gateway" \
-           -proxy-id-file=/consul/service/proxy-id \
-           -service-name={{ .Values.meshGateway.consulServiceName }} \
-           -log-level={{ default .Values.global.logLevel .Values.meshGateway.logLevel }} \
-           -log-json={{ .Values.global.logJSON }}
+          exec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
+            -gateway-kind="mesh-gateway" \
+            -proxy-id-file=/consul/service/proxy-id \
+            -service-name={{ .Values.meshGateway.consulServiceName }} \
+            -log-level={{ default .Values.global.logLevel .Values.meshGateway.logLevel }} \
+            -log-json={{ .Values.global.logJSON }}
         volumeMounts:
         - name: consul-service
           mountPath: /consul/service
@@ -183,6 +184,14 @@ spec:
       containers:
       - name: mesh-gateway
         image: {{ .Values.global.imageConsulDataplane | quote }}
+        securityContext:
+          capabilities:
+            {{ if not .Values.meshGateway.hostNetwork}}
+            drop:
+              - ALL
+            {{- end }}
+            add:
+              - NET_BIND_SERVICE
         {{- if .Values.meshGateway.resources }}
         resources:
             {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
@@ -308,4 +317,5 @@ spec:
       nodeSelector:
         {{ tpl .Values.meshGateway.nodeSelector . | indent 8 | trim }}
       {{- end }}
+{{- end }}
 {{- end }}

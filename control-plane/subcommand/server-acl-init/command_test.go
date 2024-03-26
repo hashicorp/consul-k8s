@@ -176,6 +176,14 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
 			LocalToken:  false,
 		},
+		{
+			TestName:    "Datadog Agent Token",
+			TokenFlags:  []string{"-create-dd-agent-token"},
+			PolicyNames: []string{"datadog-agent-metrics-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -325,6 +333,14 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
 			LocalToken:  true,
 		},
+		{
+			TestName:    "Datadog Agent Token",
+			TokenFlags:  []string{"-create-dd-agent-token"},
+			PolicyNames: []string{"datadog-agent-metrics-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -400,6 +416,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
+		},
+		{
+			TestName:    "Datadog Agent Token",
+			TokenFlags:  []string{"-create-dd-agent-token"},
+			PolicyNames: []string{"datadog-agent-metrics-token"},
+			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
 		},
 	}
 	for _, c := range cases {
@@ -2049,12 +2071,6 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 			Roles:       []string{resourcePrefix + "-sync-catalog-acl-role"},
 		},
 		{
-			TestName:    "API Gateway Controller",
-			TokenFlags:  []string{"-api-gateway-controller"},
-			PolicyNames: []string{"api-gateway-controller-policy"},
-			Roles:       []string{resourcePrefix + "-api-gateway-controller-acl-role"},
-		},
-		{
 			TestName:    "Snapshot Agent",
 			TokenFlags:  []string{"-snapshot-agent"},
 			PolicyNames: []string{"snapshot-agent-policy"},
@@ -2200,13 +2216,6 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			PolicyNames:      []string{"sync-catalog-policy-" + secondaryDatacenter},
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
-		},
-		{
-			TestName:         "API Gateway Controller",
-			TokenFlags:       []string{"-api-gateway-controller"},
-			PolicyNames:      []string{"api-gateway-controller-policy-" + secondaryDatacenter},
-			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-" + secondaryDatacenter},
-			GlobalAuthMethod: true,
 		},
 		{
 			TestName:         "Snapshot Agent",
@@ -2360,12 +2369,6 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			GlobalToken:   false,
 		},
 		{
-			ComponentName: "api-gateway-controller",
-			TokenFlags:    []string{"-api-gateway-controller"},
-			Roles:         []string{resourcePrefix + "-api-gateway-controller-acl-role"},
-			GlobalToken:   false,
-		},
-		{
 			ComponentName:      "snapshot-agent",
 			TokenFlags:         []string{"-snapshot-agent"},
 			Roles:              []string{resourcePrefix + "-snapshot-agent-acl-role"},
@@ -2495,13 +2498,6 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
 			GlobalAuthMethod: false,
 			GlobalToken:      false,
-		},
-		{
-			ComponentName:    "api-gateway-controller",
-			TokenFlags:       []string{"-api-gateway-controller"},
-			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-dc2"},
-			GlobalAuthMethod: true,
-			GlobalToken:      true,
 		},
 		{
 			ComponentName:      "snapshot-agent",

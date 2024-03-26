@@ -368,6 +368,26 @@ rules:
 - apiGroups:
   - mesh.consul.hashicorp.com
   resources:
+  - gatewayclassconfig
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - gatewayclassconfig/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
   - grpcroute
   verbs:
   - create
@@ -401,6 +421,26 @@ rules:
   - mesh.consul.hashicorp.com
   resources:
   - httproute/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - meshconfiguration
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - meshconfiguration/status
   verbs:
   - get
   - patch
@@ -466,23 +506,22 @@ rules:
   - patch
   - update
 - apiGroups:
-    - mesh.consul.hashicorp.com
+  - multicluster.consul.hashicorp.com
   resources:
-    - gatewayclassconfig
+  - exportedservices
   verbs:
-    - create
-    - delete
-    - get
-    - list
-    - patch
-    - update
-    - watch
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
-    - mesh.consul.hashicorp.com
+  - multicluster.consul.hashicorp.com
   resources:
-    - gatewayclassconfig/status
+  - exportedservices/status
   verbs:
-    - get
-    - patch
-    - update
-
+  - get
+  - patch
+  - update

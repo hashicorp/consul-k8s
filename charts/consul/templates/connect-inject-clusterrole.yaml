@@ -98,9 +98,11 @@ rules:
   resources:
     - gatewayclassconfigs
     - gatewayclasses
+    - meshconfigurations
     - grpcroutes
     - httproutes
     - meshgateways
+    - apigateways
     - tcproutes
     - proxyconfigurations
   verbs:
@@ -116,15 +118,41 @@ rules:
   resources:
     - gatewayclassconfigs/status
     - gatewayclasses/status
+    - meshconfigurations/status
     - grpcroutes/status
     - httproutes/status
     - meshgateways/status
+    - apigateways/status
     - tcproutes/status
     - proxyconfigurations/status
   verbs:
     - get
     - patch
     - update
+- apiGroups:
+    - multicluster.consul.hashicorp.com
+  resources:
+    - exportedservices
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - multicluster.consul.hashicorp.com
+  resources:
+    - exportedservices/status
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
 {{- end }}
 - apiGroups: [ "" ]
   resources: [ "secrets", "serviceaccounts", "endpoints", "services", "namespaces", "nodes" ]

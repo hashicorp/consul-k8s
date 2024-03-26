@@ -1,4 +1,5 @@
 {{- if and .Values.meshGateway.enabled }}
+{{- if not (mustHas "resource-apis" .Values.global.experiments) }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -30,4 +31,5 @@ spec:
   {{- if .Values.meshGateway.service.additionalSpec }}
   {{ tpl .Values.meshGateway.service.additionalSpec . | nindent 2 | trim }}
   {{- end }}
+{{- end }}
 {{- end }}

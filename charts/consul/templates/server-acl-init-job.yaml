@@ -181,7 +181,7 @@ spec:
         - |
           CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
-          consul-k8s-control-plane server-acl-init \
+          exec consul-k8s-control-plane server-acl-init \
             -log-level={{ default .Values.global.logLevel .Values.global.acls.logLevel}} \
             -log-json={{ .Values.global.logJSON }} \
             -resource-prefix=${CONSUL_FULLNAME} \
@@ -273,6 +273,10 @@ spec:
             -create-enterprise-license-token=true \
             {{- end }}
 
+            {{- if (and (not .Values.global.metrics.datadog.dogstatsd.enabled) .Values.global.metrics.datadog.enabled .Values.global.acls.manageSystemACLs) }}
+            -create-dd-agent-token=true \
+            {{- end }}
+
             {{- if .Values.server.snapshotAgent.enabled }}
             -snapshot-agent=true \
             {{- end }}
@@ -298,10 +302,6 @@ spec:
             {{- end }}
             {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.partitionToken.secretName }}
             -partition-token-file=/vault/secrets/partition-token \
-            {{- end }}
-
-            {{- if .Values.apiGateway.enabled }}
-            -api-gateway-controller=true \
             {{- end }}
 
             {{- if .Values.global.enableConsulNamespaces }}

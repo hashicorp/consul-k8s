@@ -74,7 +74,7 @@ func TestConsulDNS(t *testing.T) {
 			})
 
 			retry.Run(t, func(r *retry.R) {
-				logs, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), dnsTestPodArgs...)
+				logs, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), dnsTestPodArgs...)
 				require.NoError(r, err)
 
 				// When the `dig` request is successful, a section of it's response looks like the following:

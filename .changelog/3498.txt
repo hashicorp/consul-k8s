@@ -1,0 +1,3 @@
+```release-note:improvement
+cni: When CNI is enabled, set ReadOnlyRootFilesystem=true and AllowPrivilegeEscalation=false for mesh pod init containers and AllowPrivilegeEscalation=false for consul-dataplane containers (ReadOnlyRootFilesystem was already true for consul-dataplane containers).
+```
