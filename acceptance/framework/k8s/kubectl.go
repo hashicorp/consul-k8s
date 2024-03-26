@@ -13,6 +13,7 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
@@ -34,14 +35,14 @@ var kubeAPIConnectErrs = []string{
 
 // RunKubectlAndGetOutputE runs an arbitrary kubectl command provided via args
 // and returns its output and error.
-func RunKubectlAndGetOutputE(t *testing.T, options *k8s.KubectlOptions, args ...string) (string, error) {
+func RunKubectlAndGetOutputE(t testutil.TestingTB, options *k8s.KubectlOptions, args ...string) (string, error) {
 	return RunKubectlAndGetOutputWithLoggerE(t, options, terratestLogger.New(logger.TestLogger{}), args...)
 }
 
 // RunKubectlAndGetOutputWithLoggerE is the same as RunKubectlAndGetOutputE but
 // it also allows you to provide a custom logger. This is useful if the command output
 // contains sensitive information, for example, when you can pass logger.Discard.
-func RunKubectlAndGetOutputWithLoggerE(t *testing.T, options *k8s.KubectlOptions, logger *terratestLogger.Logger, args ...string) (string, error) {
+func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.KubectlOptions, logger *terratestLogger.Logger, args ...string) (string, error) {
 	var cmdArgs []string
 	if options.ContextName != "" {
 		cmdArgs = append(cmdArgs, "--context", options.ContextName)
@@ -119,6 +120,14 @@ func KubectlDeleteK(t *testing.T, options *k8s.KubectlOptions, kustomizeDir stri
 // KubectlScale takes a deployment and scales it to the provided number of replicas.
 func KubectlScale(t *testing.T, options *k8s.KubectlOptions, deployment string, replicas int) {
 	_, err := RunKubectlAndGetOutputE(t, options, "scale", kubectlTimeout, fmt.Sprintf("--replicas=%d", replicas), deployment)
+	require.NoError(t, err)
+}
+
+// KubectlLabel takes an object and applies the given label to it.
+// Example: `KubectlLabel(t, options, "node", nodeId, corev1.LabelTopologyRegion, "us-east-1")`.
+func KubectlLabel(t *testing.T, options *k8s.KubectlOptions, objectType string, objectId string, key string, value string) {
+	// `kubectl label` doesn't support timeouts
+	_, err := RunKubectlAndGetOutputE(t, options, "label", objectType, objectId, "--overwrite", fmt.Sprintf("%s=%s", key, value))
 	require.NoError(t, err)
 }
 

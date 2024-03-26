@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +18,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
@@ -110,7 +110,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					"static-server",
 					"static-server-sidecar-proxy",
 				} {
-					logger.Logf(t, "checking for %s service in Consul catalog", name)
+					logger.Logf(r, "checking for %s service in Consul catalog", name)
 					instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
 					r.Check(err)
 
@@ -181,7 +181,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			} else {
 				// Ensure outbound requests fail because proxy has terminated
 				retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
-					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
+					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
 					require.Error(r, err)
 					require.Condition(r, func() bool {
 						exists := false
@@ -202,7 +202,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					"static-client",
 					"static-client-sidecar-proxy",
 				} {
-					logger.Logf(t, "checking for %s service in Consul catalog", name)
+					logger.Logf(r, "checking for %s service in Consul catalog", name)
 					instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
 					r.Check(err)
 
@@ -221,7 +221,6 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 	cfg := suite.Config()
 
 	if cfg.EnableTransparentProxy {
-		// TODO t-eckert: Come back and review this with wise counsel.
 		t.Skip("Skipping test because transparent proxy is enabled")
 	}
 
@@ -258,7 +257,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 			"static-server",
 			"static-server-sidecar-proxy",
 		} {
-			logger.Logf(t, "checking for %s service in Consul catalog", name)
+			logger.Logf(r, "checking for %s service in Consul catalog", name)
 			instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
 			r.Check(err)
 
@@ -279,7 +278,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 				"job-client",
 				"job-client-sidecar-proxy",
 			} {
-				logger.Logf(t, "checking for %s service in Consul catalog", name)
+				logger.Logf(r, "checking for %s service in Consul catalog", name)
 				instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
 				r.Check(err)
 
@@ -321,7 +320,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 		if gracePeriod > 0 {
 			logger.Log(t, "Checking if connection successful within grace period...")
 			retry.RunWith(&retry.Timer{Timeout: time.Duration(gracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
-				output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
+				output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
 				require.NoError(r, err)
 				require.True(r, !strings.Contains(output, "curl: (7) Failed to connect"))
 			})
@@ -332,15 +331,15 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 		// Test that requests fail once grace period has ended, or there was no grace period set.
 		logger.Log(t, "Checking that requests fail now that proxy is killed...")
 		retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
-			output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
+			output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
 			require.Error(r, err)
 			require.True(r, strings.Contains(output, "curl: (7) Failed to connect"))
 		})
 
 		// Wait for the job to complete.
 		retry.RunWith(&retry.Timer{Timeout: 4 * time.Minute, Wait: 30 * time.Second}, t, func(r *retry.R) {
-			logger.Log(t, "Checking if job completed...")
-			jobs, err := ctx.KubernetesClient(t).BatchV1().Jobs(ns).List(
+			logger.Log(r, "Checking if job completed...")
+			jobs, err := ctx.KubernetesClient(r).BatchV1().Jobs(ns).List(
 				context.Background(),
 				metav1.ListOptions{
 					LabelSelector: "app=job-client",
@@ -372,7 +371,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 				"job-client",
 				"job-client-sidecar-proxy",
 			} {
-				logger.Logf(t, "checking for %s service in Consul catalog", name)
+				logger.Logf(r, "checking for %s service in Consul catalog", name)
 				instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
 				r.Check(err)
 
