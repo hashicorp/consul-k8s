@@ -6,6 +6,7 @@ package binding
 import (
 	"fmt"
 
+	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/api"
@@ -22,20 +23,32 @@ const (
 
 	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckName = "Kubernetes Readiness Check"
+
+	// metricsConfiguration is the configuration key for binding a prometheus port to the envoy instance.
+	metricsConfiguration = "envoy_prometheus_bind_addr"
 )
 
-func registrationsForPods(namespace string, gateway gwv1beta1.Gateway, pods []corev1.Pod) []api.CatalogRegistration {
+func registrationsForPods(metrics gatewaycommon.MetricsConfig, namespace string, gateway gwv1beta1.Gateway, pods []corev1.Pod) []api.CatalogRegistration {
 	registrations := []api.CatalogRegistration{}
 	for _, pod := range pods {
-		registrations = append(registrations, registrationForPod(namespace, gateway, pod))
+		registrations = append(registrations, registrationForPod(metrics, namespace, gateway, pod))
 	}
 	return registrations
 }
 
-func registrationForPod(namespace string, gateway gwv1beta1.Gateway, pod corev1.Pod) api.CatalogRegistration {
+func registrationForPod(metrics gatewaycommon.MetricsConfig, namespace string, gateway gwv1beta1.Gateway, pod corev1.Pod) api.CatalogRegistration {
 	healthStatus := api.HealthCritical
 	if isPodReady(pod) {
 		healthStatus = api.HealthPassing
+	}
+
+	var proxyConfigOverrides *api.AgentServiceConnectProxyConfig
+	if metrics.Enabled {
+		proxyConfigOverrides = &api.AgentServiceConnectProxyConfig{
+			Config: map[string]interface{}{
+				metricsConfiguration: fmt.Sprintf("%s:%d", pod.Status.PodIP, metrics.Port),
+			},
+		}
 	}
 
 	return api.CatalogRegistration{
@@ -50,6 +63,7 @@ func registrationForPod(namespace string, gateway gwv1beta1.Gateway, pod corev1.
 			Service:   gateway.Name,
 			Address:   pod.Status.PodIP,
 			Namespace: namespace,
+			Proxy:     proxyConfigOverrides,
 			Meta: map[string]string{
 				constants.MetaKeyPodName:         pod.Name,
 				constants.MetaKeyKubeNS:          pod.Namespace,

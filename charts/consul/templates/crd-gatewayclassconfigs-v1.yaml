@@ -131,6 +131,23 @@ spec:
                   for gateway containers
                 format: int32
                 type: integer
+              metrics:
+                description: Metrics defines how to configure the metrics for a gateway.
+                properties:
+                  enabled:
+                    description: Enable metrics for this class of gateways. If unspecified,
+                      will inherit behavior from the global Helm configuration.
+                    type: boolean
+                  path:
+                    description: The path used for metrics.
+                    type: string
+                  port:
+                    description: The port used for metrics.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1024
+                    type: integer
+                type: object
               nodeSelector:
                 additionalProperties:
                   type: string
