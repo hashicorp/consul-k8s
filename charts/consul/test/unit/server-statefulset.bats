@@ -1070,6 +1070,37 @@ load _helpers
   [ "${actual}" = "consul-server" ]
 }
 
+@test "server/StatefulSet: datadog unix socket path name rendering for hostPath volume and volumeMount using default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.metrics.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.volumes[] | select(.name=="dsdsocket") | .hostPath.path' | tee /dev/stderr)
+
+  [ "${actual}" = "/var/run/datadog" ]
+}
+
+@test "server/StatefulSet: datadog unix socket path name rendering for hostPath volume and volumeMount using non default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.metrics.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true' \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdAddr="/this/otherpath/datadog/dsd.socket"' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.volumes[] | select(.name=="dsdsocket") | .hostPath.path' | tee /dev/stderr)
+
+  [ "${actual}" = "/this/otherpath/datadog" ]
+}
+
 #--------------------------------------------------------------------
 # config-configmap
 
