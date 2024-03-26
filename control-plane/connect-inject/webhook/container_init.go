@@ -230,7 +230,39 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	}
 
 	if tproxyEnabled {
-		if !w.EnableCNI {
+		if w.EnableCNI {
+			// For non Openshift, we use the initContainersUserAndGroupID for the user and group id.
+			uid := int64(initContainersUserAndGroupID)
+			group := int64(initContainersUserAndGroupID)
+
+			// For Openshift with Transparent proxy + CNI, there is an annotation on the namespace that tells us what
+			// the user and group ids should be for the sidecar.
+			if w.EnableOpenShift {
+				var err error
+
+				uid, err = common.GetOpenShiftUID(&namespace)
+
+				if err != nil {
+					return corev1.Container{}, err
+				}
+				group, err = common.GetOpenShiftGroup(&namespace)
+				if err != nil {
+					return corev1.Container{}, err
+				}
+			}
+
+			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser:    pointer.Int64(uid),
+				RunAsGroup:   pointer.Int64(group),
+				RunAsNonRoot: pointer.Bool(true),
+				Privileged:   pointer.Bool(privileged),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				ReadOnlyRootFilesystem:   pointer.Bool(true),
+				AllowPrivilegeEscalation: pointer.Bool(false),
+			}
+		} else {
 			// Set redirect traffic config for the container so that we can apply iptables rules.
 			redirectTrafficConfig, err := w.iptablesConfigJSON(pod, namespace)
 			if err != nil {
@@ -253,18 +285,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
-			}
-		} else {
-			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-				RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-				RunAsNonRoot: pointer.Bool(true),
-				Privileged:   pointer.Bool(privileged),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
 			}
 		}
 	}

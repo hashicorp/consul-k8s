@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -897,7 +898,23 @@ func TestUpsert(t *testing.T) {
 				EnableOpenShift: true,
 				ImageDataplane:  "hashicorp/consul-dataplane",
 			},
-			initialResources: resources{},
+			initialResources: resources{
+				namespaces: []*corev1.Namespace{
+					{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Namespace",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "default",
+							Annotations: map[string]string{
+								constants.AnnotationOpenShiftUIDRange: "1000700000/100000",
+								constants.AnnotationOpenShiftGroups:   "1000700000/100000",
+							},
+						},
+					},
+				},
+			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -1192,6 +1209,11 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 				if helmConfig.InitContainerResources != nil {
 					assert.Equal(t, helmConfig.InitContainerResources.Limits, container.Resources.Limits)
 					assert.Equal(t, helmConfig.InitContainerResources.Requests, container.Resources.Requests)
+				}
+
+				if helmConfig.EnableOpenShift {
+					assert.Equal(t, container.SecurityContext.RunAsUser, pointer.Int64(1000700000))
+					assert.Equal(t, container.SecurityContext.RunAsGroup, pointer.Int64(1000700000))
 				}
 			}
 		}
