@@ -110,6 +110,7 @@ spec:
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
             - -metrics-port={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
             {{- end }}
+            {{- end }}
           resources:
             requests:
               memory: "50Mi"
