@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul.
+```
