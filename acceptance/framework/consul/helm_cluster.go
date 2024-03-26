@@ -678,16 +678,14 @@ func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.T
 }
 
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
-// allowing access to the anyuid and privileged Security Context Constraints on OpenShift.
+// allowing access to the privileged Security Context Constraints on OpenShift.
 func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
-	const anyuidClusterRole = "system:openshift:scc:anyuid"
 	const privilegedClusterRole = "system:openshift:scc:privileged"
-	anyuidRoleBinding := "anyuid-test"
 	privilegedRoleBinding := "privileged-test"
 
 	// A role binding to allow default service account in the installation namespace access to the SCCs.
 	{
-		for clusterRoleName, roleBindingName := range map[string]string{anyuidClusterRole: anyuidRoleBinding, privilegedClusterRole: privilegedRoleBinding} {
+		for clusterRoleName, roleBindingName := range map[string]string{privilegedClusterRole: privilegedRoleBinding} {
 			// Check if this cluster role binding already exists.
 			_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), roleBindingName, metav1.GetOptions{})
 
@@ -718,7 +716,6 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 	}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), anyuidRoleBinding, metav1.DeleteOptions{})
 		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), privilegedRoleBinding, metav1.DeleteOptions{})
 	})
 }
