@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Get the user id from the OpenShift annotation 'openshift.io/sa.scc.uid-range'
+// Get the user id from the OpenShift annotation 'openshift.io/sa.scc.uid-range'.
 func GetOpenShiftUID(ns *corev1.Namespace) (int64, error) {
 	annotation, ok := ns.Annotations[constants.AnnotationOpenShiftUIDRange]
 	if !ok {
