@@ -136,7 +136,7 @@ func Test_cmdAdd(t *testing.T) {
 			},
 			cmdArgs: &skel.CmdArgs{ContainerID: "some-container-id",
 				IfName: "eth0",
-				Args:   fmt.Sprintf("IPTABLES_CONFIG=%s", minimalIPTablesJSON(t)),
+				Args:   fmt.Sprintf("CONSUL_IPTABLES_CONFIG=%s", minimalIPTablesJSON(t)),
 				Path:   "/some/bin/path",
 			},
 			stdInData:     nomadStdinData,
