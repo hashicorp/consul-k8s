@@ -914,6 +914,28 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "client/DaemonSet: GRPC port 8502 is not configured when GRPC is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'client.grpc=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].ports[] | select (.containerPort == 8502)' | tee /dev/stderr)
+  [ "${actual}" == "" ]
+}
+
+@test "client/DaemonSet: GRPC port 8502 is configured when GRPC is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'client.grpc=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].ports[] | select (.containerPort == 8502)' | tee /dev/stderr)
+  [ "${actual}" != "" ]
+}
+
 @test "client/DaemonSet: init container is created when global.tls.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \
