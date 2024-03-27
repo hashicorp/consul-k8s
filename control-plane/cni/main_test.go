@@ -378,29 +378,16 @@ const missingIPsStdinData = `{
     "type": "consul-cni"
 }`
 
-// TODO: need to make this match what Nomad emits
 const nomadStdinData = `{
-    "cniVersion": "0.3.1",
-	"name": "kindnet",
-	"type": "kindnet",
-    "capabilities": {
-        "testCapability": false
-    },
-    "ipam": {
-        "type": "host-local"
-    },
-    "dns": {
-        "nameservers": ["nameserver"],
-        "domain": "domain",
-        "search": ["search"],
-        "options": ["option"]
-    },
+    "cniVersion": "0.4.0",
+    "dns": {},
     "prevResult": {
-        "cniversion": "0.3.1",
+        "cniversion": "0.4.0",
         "interfaces": [
             {
                 "name": "eth0",
-                "sandbox": "/tmp"
+                "mac": "aa:bb:cc:dd:ee:ff",
+                "sandbox": "/var/rum/netns/16c"
             }
         ],
         "ips": [
@@ -417,7 +404,7 @@ const nomadStdinData = `{
     "cni_bin_dir": "/opt/cni/bin",
     "cni_net_dir": "/etc/cni/net.d",
     "log_level": "info",
-    "name": "consul-cni",
+    "name": "nomad",
     "type": "consul-cni"
 }
 `

@@ -174,6 +174,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 
 	var iptablesCfg iptables.Config
 
+	// If cniArgsIPTablesCfg is populated we're on Nomad, otherwise we're on K8s
 	if cniArgsIPTablesCfg != "" {
 		var err error
 		iptablesCfg, err = parseIPTablesFromCNIArgs(cniArgsIPTablesCfg)
