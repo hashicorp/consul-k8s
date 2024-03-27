@@ -89,6 +89,23 @@ func TestOpenShiftUID(t *testing.T) {
 			Expected: 0,
 			Err:      fmt.Sprintf("unable to find annotation %s", constants.AnnotationOpenShiftUIDRange),
 		},
+		{
+			Name: "Empty",
+			Namespace: func() *corev1.Namespace {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "default",
+						Namespace: "default",
+						Annotations: map[string]string{
+							constants.AnnotationOpenShiftUIDRange: "",
+						},
+					},
+				}
+				return ns
+			},
+			Expected: 0,
+			Err:      "found annotation openshift.io/sa.scc.uid-range but it was empty",
+		},
 	}
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {

@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// Get the user id from the OpenShift annotation 'openshift.io/sa.scc.uid-range'.
+// GetOpenShiftUID gets the user id from the OpenShift annotation 'openshift.io/sa.scc.uid-range'.
 func GetOpenShiftUID(ns *corev1.Namespace) (int64, error) {
 	annotation, ok := ns.Annotations[constants.AnnotationOpenShiftUIDRange]
 	if !ok {
@@ -42,8 +42,9 @@ func GetOpenShiftUID(ns *corev1.Namespace) (int64, error) {
 	return uid, nil
 }
 
-// Parse the UID "range" from the annotation string. The annotation can either have a '/' or '-' as a separator.
-// '-' is the old style of UID from when it used to be an actual range.
+// parseOpenShiftUID parses the UID "range" from the annotation string. The annotation can either have a '/' or '-'
+// as a separator. '-' is the old style of UID from when it used to be an actual range.
+// Example annotation value: "1000700000/100000".
 func parseOpenShiftUID(val string) (int64, error) {
 	var uid int64
 	var err error
@@ -73,7 +74,7 @@ func parseOpenShiftUID(val string) (int64, error) {
 	return uid, nil
 }
 
-// Get the user id from the OpenShift annotation 'openshift.io/sa.scc.supplemental-groups'
+// GetOpenShiftGroup gets the group from OpenShift annotation 'openshift.io/sa.scc.supplemental-groups'
 // Fall back to the UID annotation if the group annotation does not exist. The values should
 // be the same.
 func GetOpenShiftGroup(ns *corev1.Namespace) (int64, error) {
@@ -101,8 +102,8 @@ func GetOpenShiftGroup(ns *corev1.Namespace) (int64, error) {
 	return uid, nil
 }
 
-// Parse the group from the annotation string. The annotation can either have a '/' or ',' as a separator.
-// ',' is the old style of UID from when it used to be an actual range.
+// parseOpenShiftGroup parses the group from the annotation string. The annotation can either have a '/' or ','
+// as a separator. ',' is the old style of UID from when it used to be an actual range.
 func parseOpenShiftGroup(val string) (int64, error) {
 	var group int64
 	var err error
