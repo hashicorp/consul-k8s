@@ -73,9 +73,9 @@ type CNIArgs struct {
 	// K8S_POD_INFRA_CONTAINER_ID is the runtime container ID that the pod runs under.
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
 
-	// IPTABLES_CONFIG is the runtime iptables configuration passed by
+	// CONSUL_IPTABLES_CONFIG is the runtime iptables configuration passed by
 	// orchestrator (ex. the Nomad client agent)
-	IPTABLES_CONFIG types.UnmarshallableString
+	CONSUL_IPTABLES_CONFIG types.UnmarshallableString
 }
 
 // PluginConf is is the configuration used by the plugin.
@@ -135,7 +135,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 
 	podNamespace := string(cniArgs.K8S_POD_NAMESPACE)
 	podName := string(cniArgs.K8S_POD_NAME)
-	cniArgsIPTablesCfg := string(cniArgs.IPTABLES_CONFIG)
+	cniArgsIPTablesCfg := string(cniArgs.CONSUL_IPTABLES_CONFIG)
 
 	// We should never encounter this unless there has been an error in the
 	// kubelet. A good safeguard.
