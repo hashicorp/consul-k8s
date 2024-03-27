@@ -219,7 +219,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(
 	// When transparent proxy is enabled, then consul-dataplane needs to run as our specific user
 	// so that traffic redirection will work.
 	if tproxyEnabled || !w.EnableOpenShift {
-		// In non-OpenShift environments we set the User and group ID for the sidecare to our values.
+		// In non-OpenShift environments we set the User and group ID for the sidecar to our values.
 		if !w.EnableOpenShift {
 			if pod.Spec.SecurityContext != nil {
 				// User container and consul-dataplane container cannot have the same UID.
@@ -271,9 +271,6 @@ func (w *MeshWebhook) consulDataplaneSidecar(
 			}
 		}
 	}
-
-	// When running tproxy and OpenShift,
-
 	return container, nil
 }
 
