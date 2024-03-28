@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: Add support for receiving iptables configuration via CNI arguments, to support Nomad transparent proxy
+```
