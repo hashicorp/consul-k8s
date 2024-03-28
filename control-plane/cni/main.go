@@ -14,6 +14,7 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
+	cpv "github.com/hashicorp/consul-k8s/control-plane/version"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
@@ -263,6 +264,7 @@ func cmdCheck(_ *skel.CmdArgs) error {
 
 func main() {
 	c := &Command{}
+	bv.BuildVersion = cpv.GetHumanVersion()
 	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("consul-cni"))
 }
 
