@@ -144,10 +144,8 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 
 		// http route checks
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
-		t.Log("Melisa httpRoute -----------------------", httpRoute.Status)
 		require.NoError(r, err)
 
-		t.Log("Melisa -----------------------", gateway.Status)
 		require.EqualValues(r, int32(1), gateway.Status.Listeners[0].AttachedRoutes)
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
