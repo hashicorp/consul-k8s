@@ -1,3 +1,31 @@
+## 1.4.1 (March 28, 2024)
+
+SECURITY:
+
+* Update `google.golang.org/protobuf` to v1.33.0 to address [CVE-2024-24786](https://nvd.nist.gov/vuln/detail/CVE-2024-24786). [[GH-3719](https://github.com/hashicorp/consul-k8s/issues/3719)]
+* Update the Consul Build Go base image to `alpine3.19`. This resolves CVEs
+[CVE-2023-52425](https://nvd.nist.gov/vuln/detail/CVE-2023-52425)
+[CVE-2023-52426⁠](https://nvd.nist.gov/vuln/detail/CVE-2023-52426) [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+* Upgrade to use Go `1.21.8`. This resolves CVEs
+[CVE-2024-24783](https://nvd.nist.gov/vuln/detail/CVE-2024-24783) (`crypto/x509`).
+[CVE-2023-45290](https://nvd.nist.gov/vuln/detail/CVE-2023-45290) (`net/http`).
+[CVE-2023-45289](https://nvd.nist.gov/vuln/detail/CVE-2023-45289) (`net/http`, `net/http/cookiejar`).
+[CVE-2024-24785](https://nvd.nist.gov/vuln/detail/CVE-2024-24785) (`html/template`).
+[CVE-2024-24784](https://nvd.nist.gov/vuln/detail/CVE-2024-24784) (`net/mail`). [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+
+IMPROVEMENTS:
+
+* api-gateway: Expose prometheus scrape metrics on api-gateway pods. [[GH-3811](https://github.com/hashicorp/consul-k8s/issues/3811)]
+* catalog: Topology zone and region information is now read from the Kubernetes endpoints and associated node and added to registered consul services under Metadata. [[GH-3693](https://github.com/hashicorp/consul-k8s/issues/3693)]
+
+BUG FIXES:
+
+* api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul. [[GH-3779](https://github.com/hashicorp/consul-k8s/issues/3779)]
+* control-plane: fix an issue where ACL token cleanup did not respect a pod's GracefulShutdownPeriodSeconds and
+tokens were invalidated immediately on pod entering Terminating state. [[GH-3736](https://github.com/hashicorp/consul-k8s/issues/3736)]
+* control-plane: fix an issue where ACL tokens would prematurely be deleted and services would be deregistered if there
+was a K8s API error fetching the pod. [[GH-3758](https://github.com/hashicorp/consul-k8s/issues/3758)]
+
 ## 1.4.0 (February 29, 2024)
 
 > NOTE: Consul K8s 1.4.x is compatible with Consul 1.18.x and Consul Dataplane 1.4.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.

@@ -393,12 +393,12 @@ github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFb
 github.com/hashicorp/consul/api v1.1.0/go.mod h1:VmuI/Lkw1nC05EYQWNKwWGbkg+FbDBtguAZLlVdkD9Q=
 github.com/hashicorp/consul/api v1.28.2 h1:mXfkRHrpHN4YY3RqL09nXU1eHKLNiuAN4kHvDQ16k/8=
 github.com/hashicorp/consul/api v1.28.2/go.mod h1:KyzqzgMEya+IZPcD65YFoOVAgPpbfERu4I/tzG6/ueE=
-github.com/hashicorp/consul/envoyextensions v0.5.2 h1:L5mYp/caTRHJyfTanIRk2J8phzqLfK2BCnrLxCIiPCA=
-github.com/hashicorp/consul/envoyextensions v0.5.2/go.mod h1:Y8PTEDOAEs/785atx6iAnmxfpTaXgZjnlXCDJMw+T64=
+github.com/hashicorp/consul/envoyextensions v0.6.0 h1:PtbJUVKBMSGKXnTdSIw1EGyjWvMrmFvXcZuVeIT79Ls=
+github.com/hashicorp/consul/envoyextensions v0.6.0/go.mod h1:MwSQg5WUuAle1bGsJWS6/z/RNvs8Ob0sNvFZ98l/+Mc=
 github.com/hashicorp/consul/sdk v0.1.1/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/consul/sdk v0.16.0 h1:SE9m0W6DEfgIVCJX7xU+iv/hUl4m/nxqMTnCdMxDpJ8=
-github.com/hashicorp/consul/troubleshoot v0.5.2 h1:gtRPoQIcIMJtdicRs0RvjRhfwkDD38iglSvNQAwlazY=
-github.com/hashicorp/consul/troubleshoot v0.5.2/go.mod h1:8UMoKivWLo2fQMSWGLqKOA97MS5lPZhwin6r9CPRlTc=
+github.com/hashicorp/consul/troubleshoot v0.6.0 h1:5PKcTBrx/XDHZBPhpLqldJFZYNiO+LDXdi26Aa1J6BI=
+github.com/hashicorp/consul/troubleshoot v0.6.0/go.mod h1:7fSd1Nn89vPxnZ8BiQTVS4fTygS42crtfm0psMoJJms=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
 github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
