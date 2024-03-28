@@ -142,6 +142,10 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
 		require.Len(r, gateway.Status.Listeners, 2)
 
+		// http route checks
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
+		require.NoError(r, err)
+
 		require.EqualValues(r, int32(1), gateway.Status.Listeners[0].AttachedRoutes)
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
@@ -151,10 +155,6 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		require.Len(r, gateway.Status.Addresses, 2)
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
-
-		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
-		require.NoError(r, err)
 
 		// check our finalizers
 		require.Len(r, httpRoute.Finalizers, 1)

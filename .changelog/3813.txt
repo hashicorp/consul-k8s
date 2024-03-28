@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift.
+```
