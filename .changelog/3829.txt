@@ -1,0 +1,3 @@
+```release-note:bug
+consul-cni: Fixed a bug where the output of `-version` did not include the version of the binary
+```
