@@ -1,13 +1,22 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+terraform {
+  required_providers {
+    azurerm = {
+      version = "3.90.0"
+    }
+    azuread = {
+      version = "2.47.0"
+    }
+  }
+}
+
 provider "azurerm" {
   features {}
 }
 
-provider "azuread" {
-  version = "1.4.0"
-}
+provider "azuread" {}
 
 data "azurerm_client_config" "current" {}
 
@@ -19,7 +28,7 @@ resource "random_id" "suffix" {
 resource "random_string" "domain" {
   count   = var.cluster_count
   special = false
-  number  = false
+  numeric = false
   upper   = false
   length  = 6
 }
@@ -44,13 +53,12 @@ resource "azurerm_virtual_network" "test" {
 }
 
 resource "azurerm_subnet" "master-subnet" {
-  count                                         = var.cluster_count
-  name                                          = "master-subnet"
-  resource_group_name                           = azurerm_resource_group.test[count.index].name
-  virtual_network_name                          = azurerm_virtual_network.test[count.index].name
-  address_prefixes                              = ["10.0.0.0/23"]
-  enforce_private_link_service_network_policies = true
-  service_endpoints                             = ["Microsoft.ContainerRegistry"]
+  count                = var.cluster_count
+  name                 = "master-subnet"
+  resource_group_name  = azurerm_resource_group.test[count.index].name
+  virtual_network_name = azurerm_virtual_network.test[count.index].name
+  address_prefixes     = ["10.0.0.0/23"]
+  service_endpoints    = ["Microsoft.ContainerRegistry"]
 }
 
 resource "azurerm_subnet" "worker-subnet" {
@@ -68,8 +76,8 @@ resource "azuread_application" "test" {
 }
 
 resource "azuread_service_principal" "test" {
-  count          = var.cluster_count
-  application_id = azuread_application.test[count.index].application_id
+  count     = var.cluster_count
+  client_id = azuread_application.test[count.index].application_id
 }
 
 resource "random_password" "password" {
@@ -81,12 +89,11 @@ resource "random_password" "password" {
 resource "azuread_service_principal_password" "test" {
   count                = var.cluster_count
   service_principal_id = azuread_service_principal.test[count.index].id
-  value                = random_password.password[count.index].result
   end_date             = "2099-01-01T01:02:03Z"
 }
 
 data "azuread_service_principal" "openshift_rp" {
-  application_id = local.openshift_resource_provider_application_id
+  client_id = local.openshift_resource_provider_application_id
 }
 
 resource "azurerm_role_assignment" "vnet_assignment" {
@@ -103,58 +110,50 @@ resource "azurerm_role_assignment" "rp_assignment" {
   principal_id         = data.azuread_service_principal.openshift_rp.object_id
 }
 
-resource "azurerm_template_deployment" "azure-arocluster" {
+resource "azurerm_redhat_openshift_cluster" "azure_arocluster" {
   count               = var.cluster_count
   name                = azurerm_resource_group.test[count.index].name
+  location            = var.location
   resource_group_name = azurerm_resource_group.test[count.index].name
 
-  template_body = file("./aro-template.json")
-
-  parameters = {
-    clusterName              = azurerm_resource_group.test[count.index].name
-    clusterResourceGroupName = join("-", [azurerm_resource_group.test[count.index].name, "MANAGED"])
-    location                 = var.location
-
-    tags = jsonencode(var.tags)
-
-    domain = random_string.domain[count.index].result
-
-    clientId     = azuread_application.test[count.index].application_id
-    clientSecret = azuread_service_principal_password.test[count.index].value
-
-    workerSubnetId = azurerm_subnet.worker-subnet[count.index].id
-    masterSubnetId = azurerm_subnet.master-subnet[count.index].id
+  cluster_profile {
+    domain  = random_string.domain[count.index].result
+    version = "4.13.23"
   }
 
-  timeouts {
-    create = "90m"
+  network_profile {
+    pod_cidr     = "10.128.0.0/14"
+    service_cidr = "172.30.0.0/16"
   }
 
-  deployment_mode = "Incremental"
+  main_profile {
+    vm_size   = "Standard_D8s_v3"
+    subnet_id = azurerm_subnet.master-subnet[count.index].id
+  }
+
+  api_server_profile {
+    visibility = "Public"
+  }
+
+  ingress_profile {
+    visibility = "Public"
+  }
+
+  worker_profile {
+    vm_size      = "Standard_D4s_v3"
+    disk_size_gb = 128
+    node_count   = 3
+    subnet_id    = azurerm_subnet.worker-subnet[count.index].id
+  }
+
+  service_principal {
+    client_id     = azuread_application.test[count.index].application_id
+    client_secret = azuread_service_principal_password.test[count.index].value
+  }
 
   depends_on = [
     azurerm_role_assignment.rp_assignment,
     azurerm_role_assignment.vnet_assignment,
   ]
-}
 
-resource "null_resource" "aro" {
-  count = var.cluster_count
-
-  triggers = {
-    aro_cluster = azurerm_template_deployment.azure-arocluster[count.index].name
-  }
-
-  provisioner "local-exec" {
-    command     = "./oc-login.sh ${self.triggers.aro_cluster} ${self.triggers.aro_cluster}"
-    interpreter = ["/bin/bash", "-c"]
-    on_failure  = continue
-  }
-
-  // We need to explicitly delete the cluster in a local-exec because deleting azurerm_template_deployment
-  // will not delete the cluster.
-  provisioner "local-exec" {
-    when    = destroy
-    command = "az aro delete --resource-group ${self.triggers.aro_cluster} --name ${self.triggers.aro_cluster} --yes"
-  }
 }
