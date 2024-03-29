@@ -1,0 +1,6 @@
+```release-note:security
+Upgrade vault/api to remove go-jose.v2 to resolve [GO-2024-2631](https://osv.dev/vulnerability/GO-2024-2631).
+```
+```release-note:security
+Upgrade docker/docker to 25.0.5+incompatible to resolve [GO-2024-2659](https://osv.dev/vulnerability/GO-2024-2659).
+```
