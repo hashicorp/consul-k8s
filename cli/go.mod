@@ -5,14 +5,14 @@ go 1.20
 require (
 	github.com/bgentry/speakeasy v0.1.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
-	github.com/fatih/color v1.14.1
+	github.com/fatih/color v1.16.0
 	github.com/google/go-cmp v0.5.9
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/consul/troubleshoot v0.6.0
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/hcp-sdk-go v0.62.1-0.20230913154003-cf69c0370c54
 	github.com/kr/text v0.2.0
-	github.com/mattn/go-isatty v0.0.17
+	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/cli v1.1.5
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/posener/complete v1.2.3
@@ -161,13 +161,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.19.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	go.starlark.net v0.0.0-20230128213706-3f75dec8e403 // indirect
-	golang.org/x/crypto v0.18.0 // indirect
+	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
-	golang.org/x/term v0.16.0 // indirect
+	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/term v0.17.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98 // indirect
