@@ -99,6 +99,19 @@ key2: value2' \
   [ "${actual}" = "/metrics" ]
 }
 
+@test "meshGateway/Deployment: when global.metrics.enabled=true, and mesh gateways annotation for prometheus path is specified, it uses the specified annotation rather than default." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'meshGateway.annotations=prometheus.io/path: /anew/path' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "/anew/path" ]
+}
+
 @test "meshGateway/Deployment: when global.metrics.enableGatewayMetrics=false, does not set annotations" {
   cd `chart_dir`
   local object=$(helm template \
