@@ -134,7 +134,9 @@ spec:
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
         {{- if not .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
         "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.server.annotations | fromYaml) "prometheus.io/path")}}
         "prometheus.io/path": "/v1/agent/metrics"
+        {{- end }}
         {{- if .Values.global.tls.enabled }}
         "prometheus.io/port": "8501"
         "prometheus.io/scheme": "https"
