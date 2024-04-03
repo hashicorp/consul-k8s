@@ -45,6 +45,8 @@ spec:
       containers:
         agent:
           env:
+            - name: DD_DOGSTATSD_METRICS_STATS_ENABLE
+              value: "true"
             - name: DD_OTLP_CONFIG_LOGS_ENABLED
               value: "true"
             - name: DD_DOGSTATSD_NON_LOCAL_TRAFFIC
