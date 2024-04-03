@@ -329,7 +329,7 @@ jobs:
 
   build-docker-ubi:
     name: Docker ${{ matrix.arch }} ${{ matrix.fips }} UBI builds
-    needs: [get-product-version, build]
+    needs: [get-product-version, get-go-version, build]
     runs-on: ubuntu-latest
     strategy:
       matrix:
