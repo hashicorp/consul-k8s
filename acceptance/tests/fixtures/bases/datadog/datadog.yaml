@@ -10,9 +10,9 @@ spec:
     logLevel: debug
     # Site is the Datadog intake site Agent data are sent to. Set to 'datadoghq.com' to
     # send data to the US1 site (default). Set to 'datadoghq.eu' to send data to the EU site.
-    # Set to 'http://fake-datadog.default.svc.cluster.local' to send data to the local testing API.
+    # fake-intake image is datadog spoof site URL used for testing.
     # Default: 'datadoghq.com'
-    site: datadoghq.com
+    site: http://fake-intake.datadog.svc.cluster.local
     credentials:
       apiSecret:
         secretName: datadog-secret
