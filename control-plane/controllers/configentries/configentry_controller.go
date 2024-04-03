@@ -225,6 +225,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 
 	requiresMigration := false
 	sourceDatacenter := entry.GetMeta()[common.DatacenterKey]
+	matchesConsul := configEntry.MatchesConsul(entry)
 
 	// Check if the config entry is managed by our datacenter.
 	// Do not process resource if the entry was not created within our datacenter
@@ -236,7 +237,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		// This functionality exists to help folks who are upgrading from older helm
 		// chart versions where they had previously created config entries themselves but
 		// now want to manage them through custom resources.
-		if configEntry.GetObjectMeta().Annotations[common.MigrateEntryKey] != common.MigrateEntryTrue {
+		if !matchesConsul && configEntry.GetObjectMeta().Annotations[common.MigrateEntryKey] != common.MigrateEntryTrue {
 			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError,
 				sourceDatacenterMismatchErr(sourceDatacenter))
 		}
@@ -244,7 +245,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		requiresMigration = true
 	}
 
-	if !configEntry.MatchesConsul(entry) {
+	if !matchesConsul {
 		if requiresMigration {
 			// If we're migrating this config entry but the custom resource
 			// doesn't match what's in Consul currently we error out so that
