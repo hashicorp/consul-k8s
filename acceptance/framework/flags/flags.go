@@ -114,12 +114,11 @@ func (t *TestFlags) init() {
 		"The enterprise license for Consul.")
 
 	flag.BoolVar(&t.flagEnableDatadog, "enable-datadog", false,
-		"If true, the test suite will run tests for datadog integration features. "+
-			"Note that some features will require setting the Datadog API and Application keys using the 'dd-api-key' and 'dd-app-key' flag below"+
-			"or the env vars DATADOG_API_KEY and DATADOG_APP_KEY")
-	flag.StringVar(&t.flagDatadogAPIKey, "dd-api-key", "",
+		"If true, the test suite will run tests for datadog integration features. ")
+
+	flag.StringVar(&t.flagDatadogAPIKey, "dd-api-key", "DD_FAKEAPIKEY",
 		"The Datadog Agent API Key used for datadog metrics tests.")
-	flag.StringVar(&t.flagDatadogAppKey, "dd-app-key", "",
+	flag.StringVar(&t.flagDatadogAppKey, "dd-app-key", "DD_FAKEAPPKEY",
 		"The Datadog Agent Application Key used for datadog metrics tests.")
 
 	flag.BoolVar(&t.flagEnableOpenshift, "enable-openshift", false,
@@ -171,13 +170,11 @@ func (t *TestFlags) init() {
 	if t.flagEnterpriseLicense == "" {
 		t.flagEnterpriseLicense = os.Getenv("CONSUL_ENT_LICENSE")
 	}
-
-	if t.flagDatadogAPIKey == "" {
-		t.flagDatadogAPIKey = os.Getenv("DATADOG_API_KEY")
+	if ddAPIKeyEnv, exists := os.LookupEnv("DATADOG_API_KEY"); exists {
+		t.flagDatadogAPIKey = ddAPIKeyEnv
 	}
-
-	if t.flagDatadogAppKey == "" {
-		t.flagDatadogAppKey = os.Getenv("DATADOG_APP_KEY")
+	if ddAPPKeyEnv, exists := os.LookupEnv("DATADOG_APP_KEY"); exists {
+		t.flagDatadogAppKey = ddAPPKeyEnv
 	}
 }
 
@@ -219,11 +216,9 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	// if the Version is empty consulVersion will be nil
 	consulVersion, _ := version.NewVersion(t.flagConsulVersion)
 	consulDataplaneVersion, _ := version.NewVersion(t.flagConsulDataplaneVersion)
-	//vaultserverVersion, _ := version.NewVersion(t.flagVaultServerVersion)
 	kubeEnvs := config.NewKubeTestConfigList(t.flagKubeconfigs, t.flagKubecontexts, t.flagKubeNamespaces)
 
 	c := &config.TestConfig{
-
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
 
