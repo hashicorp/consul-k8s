@@ -1,0 +1,3 @@
+```release-note:<bug>
+<helm>: fix the hardcoded server service name in the DataDog Auto-Discovery annotations
+```
