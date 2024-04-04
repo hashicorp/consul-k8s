@@ -383,6 +383,7 @@ jobs:
           workdir: control-plane
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
+            public.ecr.aws/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}-ubi
           dev_tags: |
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi-${{ github.sha }}
@@ -408,6 +409,14 @@ jobs:
           pkg_name: consul-k8s-control-plane_${{ env.version }}
           bin_name: consul-k8s-control-plane
           workdir: control-plane
+          tags: |
+            public.ecr.aws/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
+            docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
+          redhat_tag: quay.io/redhat-isv-containers/6486b1beabfc4e51588c0416:${{env.version}}-ubi # this is different than the non-FIPS one
           extra_build_args: |
             GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
-          redhat_tag: quay.io/redhat-isv-containers/6486b1beabfc4e51588c0416:${{env.version}}-ubi # this is different than the non-FIPS one
+          dev_tags: |
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.minor_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.minor_dev_tag }}-ubi-${{ github.sha }}
