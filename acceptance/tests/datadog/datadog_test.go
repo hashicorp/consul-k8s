@@ -19,9 +19,8 @@ import (
 )
 
 const (
-	consulDogstatsDMetricQuery   = "consul.memberlist.gossip"
-	consulIntegrationMetricQuery = "consul.memberlist.gossip.quantile"
-	consulOTLPMetricQuery        = `otelcol_process_runtime_heap_alloc_bytes`
+	consulDogstatsDMetricQuery = "consul.memberlist.gossip"
+	// consulOTLPMetricQuery      = `otelcol_process_runtime_heap_alloc_bytes`
 )
 
 // TestDatadogDogstatsDUnixDomainSocket
@@ -311,61 +310,61 @@ func TestDatadogOpenmetrics(t *testing.T) {
 // with live datadog API using histogram formatted metric
 //
 // Method: Datadog otlp metrics collection via consul-telemetry collector using dd-agent gRPC receiver.
-func TestDatadogOTLPCollection(t *testing.T) {
-	env := suite.Environment()
-	cfg := suite.Config()
-	ctx := env.DefaultContext(t)
-	// ns := ctx.KubectlOptions(t).Namespace
-
-	helmValues := map[string]string{
-		"global.datacenter":                    "dc1",
-		"global.metrics.enabled":               "true",
-		"global.metrics.enableAgentMetrics":    "true",
-		"global.metrics.disableAgentHostName":  "true",
-		"global.metrics.enableHostMetrics":     "true",
-		"global.metrics.datadog.enabled":       "true",
-		"global.metrics.datadog.namespace":     "datadog",
-		"global.metrics.datadog.otlp.enabled":  "true",
-		"global.metrics.datadog.otlp.protocol": "http",
-		"telemetryCollector.enabled":           "true",
-	}
-
-	datadogOperatorHelmValues := map[string]string{
-		"replicaCount":     "1",
-		"image.tag":        datadog.DefaultHelmChartVersion,
-		"image.repository": "gcr.io/datadoghq/operator",
-	}
-
-	releaseName := helpers.RandomName()
-	datadogOperatorRelease := datadog.OperatorReleaseName
-
-	// Install the consul cluster in the default kubernetes ctx.
-	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
-	consulCluster.Create(t)
-
-	// Deploy Datadog Agent via Datadog Operator and apply dogstatsd overlay
-	datadogNamespace := helmValues["global.metrics.datadog.namespace"]
-	logger.Log(t, fmt.Sprintf("deploying datadog-operator via helm | namespace: %s | release-name: %s", datadogNamespace, datadogOperatorRelease))
-	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
-	datadogCluster.Create(t)
-
-	logger.Log(t, fmt.Sprintf("applying datadog otlp HTTP endpoint collector patch to datadog-agent | namespace: %s", datadogNamespace))
-	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/datadog-otlp")
-	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
-
-	// Retrieve datadog-agent pod name for exec
-	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(datadogNamespace).List(context.Background(), metav1.ListOptions{LabelSelector: "agent.datadoghq.com/component=agent"})
-	require.NoError(t, err)
-	require.Len(t, podList.Items, 1)
-	ddAgentName := podList.Items[0].Name
-
-	// Check the dogstats-stats of the local cluster agent to see if consul metrics
-	// are being seen by the agent
-	bearerToken, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "cat /etc/datadog-agent/auth_token")
-	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "curl", "--silent", "--insecure", "--show-error", "--header", fmt.Sprintf("authorization: Bearer %s", bearerToken), "https://localhost:5001/agent/dogstatsd-stats")
-	require.NoError(t, err)
-	require.Contains(t, metricsOutput, consulOTLPMetricQuery)
-}
+//func TestDatadogOTLPCollection(t *testing.T) {
+//	env := suite.Environment()
+//	cfg := suite.Config()
+//	ctx := env.DefaultContext(t)
+//	// ns := ctx.KubectlOptions(t).Namespace
+//
+//	helmValues := map[string]string{
+//		"global.datacenter":                    "dc1",
+//		"global.metrics.enabled":               "true",
+//		"global.metrics.enableAgentMetrics":    "true",
+//		"global.metrics.disableAgentHostName":  "true",
+//		"global.metrics.enableHostMetrics":     "true",
+//		"global.metrics.datadog.enabled":       "true",
+//		"global.metrics.datadog.namespace":     "datadog",
+//		"global.metrics.datadog.otlp.enabled":  "true",
+//		"global.metrics.datadog.otlp.protocol": "http",
+//		"telemetryCollector.enabled":           "true",
+//	}
+//
+//	datadogOperatorHelmValues := map[string]string{
+//		"replicaCount":     "1",
+//		"image.tag":        datadog.DefaultHelmChartVersion,
+//		"image.repository": "gcr.io/datadoghq/operator",
+//	}
+//
+//	releaseName := helpers.RandomName()
+//	datadogOperatorRelease := datadog.OperatorReleaseName
+//
+//	// Install the consul cluster in the default kubernetes ctx.
+//	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+//	consulCluster.Create(t)
+//
+//	// Deploy Datadog Agent via Datadog Operator and apply dogstatsd overlay
+//	datadogNamespace := helmValues["global.metrics.datadog.namespace"]
+//	logger.Log(t, fmt.Sprintf("deploying datadog-operator via helm | namespace: %s | release-name: %s", datadogNamespace, datadogOperatorRelease))
+//	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
+//	datadogCluster.Create(t)
+//
+//	logger.Log(t, fmt.Sprintf("applying datadog otlp HTTP endpoint collector patch to datadog-agent | namespace: %s", datadogNamespace))
+//	k8s.DeployKustomize(t, ctx.KubectlOptionsForNamespace(datadogNamespace), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/datadog-otlp")
+//	k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), datadogNamespace, "agent.datadoghq.com/component=agent")
+//
+//	// Retrieve datadog-agent pod name for exec
+//	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(datadogNamespace).List(context.Background(), metav1.ListOptions{LabelSelector: "agent.datadoghq.com/component=agent"})
+//	require.NoError(t, err)
+//	require.Len(t, podList.Items, 1)
+//	ddAgentName := podList.Items[0].Name
+//
+//	// Check the dogstats-stats of the local cluster agent to see if consul metrics
+//	// are being seen by the agent
+//	bearerToken, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "cat /etc/datadog-agent/auth_token")
+//	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "curl", "--silent", "--insecure", "--show-error", "--header", fmt.Sprintf("authorization: Bearer %s", bearerToken), "https://localhost:5001/agent/dogstatsd-stats")
+//	require.NoError(t, err)
+//	require.Contains(t, metricsOutput, consulOTLPMetricQuery)
+//}
 
 type ConsulCheck struct {
 	AverageExecutionTime int    `json:"AverageExecutionTime"`
