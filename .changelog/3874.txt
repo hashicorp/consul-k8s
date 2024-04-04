@@ -1,0 +1,3 @@
+```release-note:sync-catalog
+Ignore Endpoints in terminating phase
+```
