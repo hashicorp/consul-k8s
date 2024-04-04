@@ -438,6 +438,8 @@ type Lifecycle struct {
 	DefaultShutdownGracePeriodSeconds   int    `yaml:"defaultShutdownGracePeriodSeconds"`
 	DefaultGracefulPort                 int    `yaml:"defaultGracefulPort"`
 	DefaultGracefulShutdownPath         string `yaml:"defaultGracefulShutdownPath"`
+	DefaultStartupGracePeriodSeconds    int    `yaml:"defaultStartupGracePeriodSeconds"`
+	DefaultGracefulStartupPath          string `yaml:"defaultGracefulStartupPath"`
 }
 
 type ConnectInject struct {
