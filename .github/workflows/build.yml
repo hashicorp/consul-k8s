@@ -154,12 +154,12 @@ jobs:
           ${{ matrix.env }} go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" -tags=${{ matrix.gotags }} .
           zip -r -j out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip dist/
 
-      - name: Upload built binaries 
+      - name: Upload built binaries
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           name: ${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
           path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
-            
+
       - name: Package rpm and deb files
         if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
         uses: hashicorp/actions-packaging-linux@v1
@@ -228,7 +228,7 @@ jobs:
             fi
             echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
 
-      - name: Upload debian packages 
+      - name: Upload debian packages
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
         with:
@@ -269,7 +269,7 @@ jobs:
         run: |
           echo "full_dev_tag=${{ env.version }}"
           echo "full_dev_tag=${{ env.version }}" >> $GITHUB_ENV
-          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" 
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')"
           echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" >> $GITHUB_ENV
 
       - name: Docker Build (Action)
@@ -287,7 +287,7 @@ jobs:
           target: release-default
           arch: ${{ matrix.goarch }}
           pkg_name: consul-k8s-control-plane_${{ env.version }}
-          bin_name: consul-k8s-control-plane 
+          bin_name: consul-k8s-control-plane
           workdir: control-plane
           tags: |
             docker.io/hashicorp/${{ env.repo }}-control-plane:${{ env.version }}
@@ -361,7 +361,7 @@ jobs:
         run: |
           echo "full_dev_tag=${{ env.version }}"
           echo "full_dev_tag=${{ env.version }}" >> $GITHUB_ENV
-          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" 
+          echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')"
           echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" >> $GITHUB_ENV
 
       - name: Docker Build (Action)
@@ -412,6 +412,14 @@ jobs:
           workdir: control-plane
           tags: |
             public.ecr.aws/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
+            docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
           redhat_tag: quay.io/redhat-isv-containers/6486b1beabfc4e51588c0416:${{env.version}}-ubi # this is different than the non-FIPS one
           extra_build_args: |
             GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
+tags: |
+            docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
+          dev_tags: |
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}-ubi-${{ github.sha }}
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.minor_dev_tag }}-ubi
+            docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.minor_dev_tag }}-ubi-${{ github.sha }}
