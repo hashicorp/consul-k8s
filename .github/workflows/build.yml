@@ -416,8 +416,6 @@ jobs:
           redhat_tag: quay.io/redhat-isv-containers/6486b1beabfc4e51588c0416:${{env.version}}-ubi # this is different than the non-FIPS one
           extra_build_args: |
             GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
-tags: |
-            docker.io/hashicorp/${{ env.repo }}-control-plane-fips:${{ env.version }}-ubi
           dev_tags: |
             docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}-ubi
             docker.io/hashicorppreview/${{ env.repo }}-control-plane-fips:${{ env.full_dev_tag }}-ubi-${{ github.sha }}
