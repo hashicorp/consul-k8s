@@ -1,3 +1,3 @@
 ```release-note:sync-catalog
-Ignore Endpoints in terminating phase
+Ignore Endpoints with terminating or non-ready condition
 ```
