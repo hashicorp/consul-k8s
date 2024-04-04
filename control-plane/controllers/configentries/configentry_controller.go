@@ -225,27 +225,26 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 
 	requiresMigration := false
 	sourceDatacenter := entry.GetMeta()[common.DatacenterKey]
-	matchesConsul := configEntry.MatchesConsul(entry)
 
-	// Check if the config entry is managed by our datacenter.
-	// Do not process resource if the entry was not created within our datacenter
-	// as it was created in a different cluster which will be managing that config entry.
-	if sourceDatacenter != r.DatacenterName {
+	if !configEntry.MatchesConsul(entry) {
+		// Check if the config entry is managed by our datacenter.
+		// Do not process resource if the entry was not created within our datacenter
+		// as it was created in a different cluster which will be managing that config entry.
+		if sourceDatacenter != r.DatacenterName {
 
-		// Note that there is a special case where we will migrate a config entry
-		// that wasn't created by the controller if it has the migrate-entry annotation set to true.
-		// This functionality exists to help folks who are upgrading from older helm
-		// chart versions where they had previously created config entries themselves but
-		// now want to manage them through custom resources.
-		if !matchesConsul && configEntry.GetObjectMeta().Annotations[common.MigrateEntryKey] != common.MigrateEntryTrue {
-			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError,
-				sourceDatacenterMismatchErr(sourceDatacenter))
+			// Note that there is a special case where we will migrate a config entry
+			// that wasn't created by the controller if it has the migrate-entry annotation set to true.
+			// This functionality exists to help folks who are upgrading from older helm
+			// chart versions where they had previously created config entries themselves but
+			// now want to manage them through custom resources.
+			if configEntry.GetObjectMeta().Annotations[common.MigrateEntryKey] != common.MigrateEntryTrue {
+				return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError,
+					sourceDatacenterMismatchErr(sourceDatacenter))
+			}
+
+			requiresMigration = true
 		}
 
-		requiresMigration = true
-	}
-
-	if !matchesConsul {
 		if requiresMigration {
 			// If we're migrating this config entry but the custom resource
 			// doesn't match what's in Consul currently we error out so that
