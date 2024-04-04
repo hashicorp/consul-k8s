@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -2154,10 +2155,21 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 					Conditions: discoveryv1.EndpointConditions{
 						Ready:       ptr.To(true),
 						Serving:     ptr.To(true),
-						Terminating: ptr.To(false),
+						Terminating: nil,
 					},
 					NodeName: &node2,
 					Zone:     ptr.To("us-west-2b"),
+				},
+				{
+					Addresses: []string{"3.3.3.3"},
+					Conditions: discoveryv1.EndpointConditions{
+						Ready:       pointer.Bool(false),
+						Serving:     pointer.Bool(false),
+						Terminating: pointer.Bool(true),
+					},
+					TargetRef: &targetRef,
+					NodeName:  &node1,
+					Zone:      pointer.String("us-west-2a"),
 				},
 			},
 			Ports: []discoveryv1.EndpointPort{
