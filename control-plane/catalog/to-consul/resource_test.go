@@ -2142,7 +2142,7 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 				{
 					Addresses: []string{"1.1.1.1"},
 					Conditions: discoveryv1.EndpointConditions{
-						Ready:       ptr.To(true),
+						Ready:       nil,
 						Serving:     ptr.To(true),
 						Terminating: ptr.To(false),
 					},

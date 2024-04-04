@@ -628,8 +628,10 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 		for _, endpointSlice := range endpointSliceList {
 			for _, endpoint := range endpointSlice.Endpoints {
-				if endpoint.Conditions.Terminating == nil || !*endpoint.Conditions.Terminating {
-
+				// Only consider endpoints that are ready
+				// nil represents an unknown state that can be interpreted as a non-terminating endpoint (assume ready or at least a state we shouldn't ignore)
+				// Ref: https://github.com/kubernetes/api/blob/5147c1a32f6a0b9b155bb84e59f933e0ff8a3792/discovery/v1/types.go#L128-L151
+				if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
 					// Check that the node name exists
 					// subsetAddr.NodeName is of type *string
 					if endpoint.NodeName == nil {
@@ -748,10 +750,10 @@ func (t *ServiceResource) registerServiceInstance(
 			}
 		}
 		for _, endpoint := range endpointSlice.Endpoints {
-			// Ignore endpoints in a terminating state
+			// Only consider endpoints that are ready
 			// nil represents an unknown state that can be interpreted as a non-terminating endpoint (assume ready or at least a state we shouldn't ignore)
 			// Ref: https://github.com/kubernetes/api/blob/5147c1a32f6a0b9b155bb84e59f933e0ff8a3792/discovery/v1/types.go#L128-L151
-			if endpoint.Conditions.Terminating == nil || !*endpoint.Conditions.Terminating {
+			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
 				for _, endpointAddr := range endpoint.Addresses {
 
 					var addr string
