@@ -1044,6 +1044,27 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "server/StatefulSet: when using a non-default server name, the server name is used in the datadog annotations" {
+  cd `chart_dir`
+  local annotations=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.image=hashicorp/consul-enterprise:1.17.0-ent' \
+      --set 'global.name=consul-test' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations' | tee /dev/stderr)
+
+  local actual=$( echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.checks"' | tee /dev/stderr )
+  [ -n "${actual}" ]
+
+  local actual=$(echo "$annotations" | \
+    yq -r '."ad.datadoghq.com/consul.checks"' | jq -r .consul.instances[0].url | tee /dev/stderr)
+  [ "${actual}" = ' "http://consul-test-server.default.svc:8500",' ]
+}
+
 
 @test "server/StatefulSet: datadog unified tagging labels get added when global.metrics.datadog.enabled=true" {
   cd `chart_dir`
