@@ -256,52 +256,8 @@ jobs:
           extra_build_args: |
             GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
 
-  build-docker-ubi-redhat-registry:
-    name: Docker ${{ matrix.arch }} UBI build for RedHat Registry
-    needs: [get-product-version, get-go-version, build]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: ["amd64"]
-    env:
-      repo: ${{ github.event.repository.name }}
-      version: ${{ needs.get-product-version.outputs.product-version }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
-          path: control-plane/dist/cni/linux/${{ matrix.arch }}
-      - name: extract consul-cni zip
-        env:
-          ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
-        run: |
-          cd "${ZIP_LOCATION}"
-          unzip -j *.zip
-      - name: Copy LICENSE
-        run:
-         cp LICENSE ./control-plane
-      - uses: hashicorp/actions-docker-build@76d2fc91532d816ca2660d8f3139e432ac3700fd
-        with:
-          smoke_test: |
-            TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
-            if [ "${TEST_VERSION}" != "v${version}" ]; then
-              echo "Test FAILED"
-              exit 1
-            fi
-            echo "Test PASSED"
-          version: ${{ env.version }}
-          target: ubi
-          arch: ${{ matrix.arch }}
-          pkg_name: consul-k8s-control-plane_${{ env.version }}
-          bin_name: consul-k8s-control-plane
-          workdir: control-plane
-          redhat_tag: quay.io/redhat-isv-containers/611ca2f89a9b407267837100:${{env.version}}-ubi
-          extra_build_args: |
-            GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
-
-  build-docker-ubi-dockerhub:
-    name: Docker ${{ matrix.arch }} UBI build for DockerHub
+  build-docker-ubi:
+    name: Docker ${{ matrix.arch }} UBI builds
     needs: [get-product-version, get-go-version, build]
     runs-on: ubuntu-latest
     strategy:
@@ -311,8 +267,8 @@ jobs:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: consul-cni_${{ needs.get-product-version.outputs.product-version }}_linux_${{ matrix.arch }}.zip
           path: control-plane/dist/cni/linux/${{ matrix.arch }}
@@ -320,7 +276,7 @@ jobs:
         env:
           ZIP_LOCATION: control-plane/dist/cni/linux/${{ matrix.arch }}
         run: |
-          cd ${ZIP_LOCATION}
+          cd "${ZIP_LOCATION}"
           unzip -j *.zip
       - name: Copy LICENSE
         run:
@@ -358,5 +314,6 @@ jobs:
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.full_dev_tag }}-ubi-${{ github.sha }}
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi
             docker.io/hashicorppreview/${{ env.repo }}-control-plane:${{ env.minor_dev_tag }}-ubi-${{ github.sha }}
+          redhat_tag: quay.io/redhat-isv-containers/611ca2f89a9b407267837100:${{env.version}}-ubi
           extra_build_args: |
             GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
