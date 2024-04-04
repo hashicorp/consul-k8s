@@ -1481,8 +1481,10 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 
 func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 	gracefulShutdownSeconds := 10
+	gracefulStartupSeconds := 10
 	gracefulPort := "20307"
 	gracefulShutdownPath := "/exit"
+	gracefulStartupPath := "/start"
 
 	cases := []struct {
 		name        string
@@ -1504,12 +1506,14 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultEnableProxyLifecycle:         true,
 					DefaultEnableShutdownDrainListeners: true,
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
 				},
 			},
 			annotations: nil,
-			expCmdArgs:  "graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit",
+			expCmdArgs:  "graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -startup-grace-period-seconds=10 -graceful-startup-path=/start",
 		},
 		{
 			name:    "no defaults, all annotations",
@@ -1518,10 +1522,12 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 				constants.AnnotationEnableSidecarProxyLifecycle:                       "true",
 				constants.AnnotationEnableSidecarProxyLifecycleShutdownDrainListeners: "true",
 				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   fmt.Sprint(gracefulShutdownSeconds),
+				constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds:    fmt.Sprint(gracefulStartupSeconds),
 				constants.AnnotationSidecarProxyLifecycleGracefulPort:                 gracefulPort,
 				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         gracefulShutdownPath,
+				constants.AnnotationSidecarProxyLifecycleGracefulStartupPath:          gracefulStartupPath,
 			},
-			expCmdArgs: "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit",
+			expCmdArgs: "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -startup-grace-period-seconds=10 -graceful-startup-path=/start",
 		},
 		{
 			name: "annotations override defaults",
@@ -1530,18 +1536,22 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultEnableProxyLifecycle:         false,
 					DefaultEnableShutdownDrainListeners: true,
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
 				},
 			},
 			annotations: map[string]string{
 				constants.AnnotationEnableSidecarProxyLifecycle:                       "true",
 				constants.AnnotationEnableSidecarProxyLifecycleShutdownDrainListeners: "false",
 				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   fmt.Sprint(gracefulShutdownSeconds + 5),
+				constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds:    fmt.Sprint(gracefulStartupSeconds + 5),
 				constants.AnnotationSidecarProxyLifecycleGracefulPort:                 "20317",
 				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         "/foo",
+				constants.AnnotationSidecarProxyLifecycleGracefulStartupPath:          "/bar",
 			},
-			expCmdArgs: "-graceful-port=20317 -shutdown-grace-period-seconds=15 -graceful-shutdown-path=/foo",
+			expCmdArgs: "-graceful-port=20317 -shutdown-grace-period-seconds=15 -graceful-shutdown-path=/foo -startup-grace-period-seconds=15 -graceful-startup-path=/bar",
 		},
 		{
 			name: "lifecycle disabled, no annotations",
@@ -1550,8 +1560,10 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultEnableProxyLifecycle:         false,
 					DefaultEnableShutdownDrainListeners: true,
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
 				},
 			},
 			annotations: nil,
@@ -1574,8 +1586,10 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultEnableProxyLifecycle:         true,
 					DefaultEnableShutdownDrainListeners: true,
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
 				},
 			},
 			annotations: map[string]string{
