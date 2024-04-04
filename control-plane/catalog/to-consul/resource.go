@@ -748,7 +748,8 @@ func (t *ServiceResource) registerServiceInstance(
 			}
 		}
 		for _, endpoint := range endpointSlice.Endpoints {
-			// From Kubernetes docs nil is an unknown state that can be interpreted as the endpoint being in a ready state
+			// From Kubernetes docs nil is an unknown state that can be interpreted as
+			// the endpoint being in a non-terminating state (assume ready or at least a state we shouldn't ignore)
 			// Ref: https://github.com/kubernetes/api/blob/5147c1a32f6a0b9b155bb84e59f933e0ff8a3792/discovery/v1/types.go#L129-L137
 			if endpoint.Conditions.Terminating == nil || !*endpoint.Conditions.Terminating {
 				for _, endpointAddr := range endpoint.Addresses {
