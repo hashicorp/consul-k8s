@@ -20,7 +20,7 @@ import (
 
 const (
 	consulDogstatsDMetricQuery = "consul.memberlist.gossip"
-	// consulOTLPMetricQuery      = `otelcol_process_runtime_heap_alloc_bytes`
+	// consulOTLPMetricQuery      = `otelcol_process_runtime_heap_alloc_bytes`.
 )
 
 // TestDatadogDogstatsDUnixDomainSocket
@@ -82,6 +82,7 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 	// are being seen by the agent
 	logger.Log(t, fmt.Sprintf("retrieving datadog-agent control api auth token from pod %s", ddAgentName))
 	bearerToken, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "cat", "/etc/datadog-agent/auth_token")
+	require.NoError(t, err)
 	// Retry because sometimes the merged metrics server takes a couple hundred milliseconds
 	// to start.
 	logger.Log(t, fmt.Sprintf("scraping datadog-agent /agent/dogstatsd-stats endpoint for %s | auth-token: %s", consulDogstatsDMetricQuery, bearerToken))
@@ -152,6 +153,7 @@ func TestDatadogDogstatsDUDP(t *testing.T) {
 	// are being seen by the agent
 	logger.Log(t, fmt.Sprintf("retrieving datadog-agent control api auth token from pod %s", ddAgentName))
 	bearerToken, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "cat", "/etc/datadog-agent/auth_token")
+	require.NoError(t, err)
 	// Retry because sometimes the merged metrics server takes a couple hundred milliseconds
 	// to start.
 	logger.Log(t, fmt.Sprintf("scraping datadog-agent /agent/dogstatsd-stats endpoint for %s | auth-token: %s", consulDogstatsDMetricQuery, bearerToken))
