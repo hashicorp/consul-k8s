@@ -88,8 +88,8 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 	logger.Log(t, fmt.Sprintf("scraping datadog-agent /agent/dogstatsd-stats endpoint for %s | auth-token: %s", consulDogstatsDMetricQuery, bearerToken))
 	retry.RunWith(&retry.Counter{Count: 20, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "curl", "--silent", "--insecure", "--show-error", "--header", fmt.Sprintf("authorization: Bearer %s", bearerToken), "https://localhost:5001/agent/dogstatsd-stats")
-		require.NoError(t, err)
-		require.Contains(t, metricsOutput, consulDogstatsDMetricQuery)
+		require.NoError(r, err)
+		require.Contains(r, metricsOutput, consulDogstatsDMetricQuery)
 	})
 }
 
@@ -159,8 +159,8 @@ func TestDatadogDogstatsDUDP(t *testing.T) {
 	logger.Log(t, fmt.Sprintf("scraping datadog-agent /agent/dogstatsd-stats endpoint for %s | auth-token: %s", consulDogstatsDMetricQuery, bearerToken))
 	retry.RunWith(&retry.Counter{Count: 20, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "curl", "--silent", "--insecure", "--show-error", "--header", fmt.Sprintf("authorization: Bearer %s", bearerToken), "https://localhost:5001/agent/dogstatsd-stats")
-		require.NoError(t, err)
-		require.Contains(t, metricsOutput, consulDogstatsDMetricQuery)
+		require.NoError(r, err)
+		require.Contains(r, metricsOutput, consulDogstatsDMetricQuery)
 	})
 }
 
@@ -223,7 +223,7 @@ func TestDatadogConsulChecks(t *testing.T) {
 	var metricsOutput string
 	retry.RunWith(&retry.Counter{Count: 20, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		metricsOutput, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "curl", "--silent", "--insecure", "--show-error", "--header", fmt.Sprintf("authorization: Bearer %s", bearerToken), "https://localhost:5001/agent/status")
-		require.NoError(t, err)
+		require.NoError(r, err)
 	})
 	var root Root
 	err = json.Unmarshal([]byte(metricsOutput), &root)
@@ -293,7 +293,7 @@ func TestDatadogOpenmetrics(t *testing.T) {
 	var metricsOutput string
 	retry.RunWith(&retry.Counter{Count: 20, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		metricsOutput, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptionsForNamespace(datadogNamespace), "exec", "pod/"+ddAgentName, "-c", "agent", "--", "curl", "--silent", "--insecure", "--show-error", "--header", fmt.Sprintf("authorization: Bearer %s", bearerToken), "https://localhost:5001/agent/status")
-		require.NoError(t, err)
+		require.NoError(r, err)
 	})
 	var root Root
 	err = json.Unmarshal([]byte(metricsOutput), &root)
