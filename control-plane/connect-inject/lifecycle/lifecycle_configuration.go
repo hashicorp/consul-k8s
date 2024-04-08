@@ -65,7 +65,7 @@ func (lc Config) ShutdownGracePeriodSeconds(pod corev1.Pod) (int, error) {
 	return shutdownGracePeriodSeconds, nil
 }
 
-// StartupGracePeriodSeconds returns how long the sidecar proxy should wait after startup, either via the default value in the meshWebhook, or if it's been
+// StartupGracePeriodSeconds returns how long to block application startup waiting for the sidecar proxy to be ready, either via the default value in the meshWebhook, or if it's been
 // overridden via the annotation.
 func (lc Config) StartupGracePeriodSeconds(pod corev1.Pod) (int, error) {
 	startupGracePeriodSeconds := lc.DefaultStartupGracePeriodSeconds
