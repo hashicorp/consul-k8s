@@ -87,14 +87,13 @@ type Command struct {
 	flagDefaultEnableSidecarProxyLifecycle                       bool
 	flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners bool
 	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
+	flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds    int
 	flagDefaultSidecarProxyLifecycleGracefulPort                 string
 	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
+	flagDefaultSidecarProxyLifecycleGracefulStartupPath          string
 
 	flagDefaultSidecarProxyStartupFailureSeconds  int
 	flagDefaultSidecarProxyLivenessFailureSeconds int
-
-	flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds int
-	flagDefaultSidecarProxyLifecycleGracefulStartupPath       string
 
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
