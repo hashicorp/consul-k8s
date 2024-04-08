@@ -86,15 +86,14 @@ type Command struct {
 	// Proxy lifecycle settings.
 	flagDefaultEnableSidecarProxyLifecycle                       bool
 	flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners bool
-	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
 	flagDefaultSidecarProxyLifecycleGracefulPort                 string
+	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
 	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
+	flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds    int
+	flagDefaultSidecarProxyLifecycleGracefulStartupPath          string
 
 	flagDefaultSidecarProxyStartupFailureSeconds  int
 	flagDefaultSidecarProxyLivenessFailureSeconds int
-
-	flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds int
-	flagDefaultSidecarProxyLifecycleGracefulStartupPath       string
 
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
