@@ -415,19 +415,19 @@ func TestLifecycleConfig_GracefulStartupPath(t *testing.T) {
 				return pod
 			},
 			LifecycleConfig: Config{
-				DefaultGracefulStartupPath: "/quit",
+				DefaultGracefulStartupPath: "/start",
 			},
-			Expected: "/quit",
+			Expected: "/start",
 			Err:      "",
 		},
 		{
-			Name: "Sidecar proxy lifecycle graceful port set via annotation",
+			Name: "Sidecar proxy lifecycle graceful startup path set via annotation",
 			Pod: func(pod *corev1.Pod) *corev1.Pod {
 				pod.Annotations[constants.AnnotationSidecarProxyLifecycleGracefulStartupPath] = "/custom-startup-path"
 				return pod
 			},
 			LifecycleConfig: Config{
-				DefaultGracefulStartupPath: "/quit",
+				DefaultGracefulStartupPath: "/start",
 			},
 			Expected: "/custom-startup-path",
 			Err:      "",
