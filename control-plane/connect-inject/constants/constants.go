@@ -62,7 +62,7 @@ const (
 	// DefaultGracefulShutdownPath is the default path that consul-dataplane uses for graceful shutdown.
 	DefaultGracefulShutdownPath = "/graceful_shutdown"
 
-	// DefaultGracefulStartupPath is the default path that consul-dataplane uses for graceful shutdown.
+	// DefaultGracefulStartupPath is the default path that consul-dataplane uses for graceful startup.
 	DefaultGracefulStartupPath = "/graceful_startup"
 
 	// DefaultWANPort is the default port that consul-dataplane uses for WAN.
