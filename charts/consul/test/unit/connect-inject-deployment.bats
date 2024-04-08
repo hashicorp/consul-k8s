@@ -1414,7 +1414,7 @@ load _helpers
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.sidecarProxy.lifecycle.defaultGracefulstartupPath=/start' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultGracefulStartupPath=/start' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
