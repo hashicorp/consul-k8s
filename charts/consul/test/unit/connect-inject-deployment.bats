@@ -1333,7 +1333,7 @@ load _helpers
   local cmd=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.sidecarProxy.lifecycle.defaultstartupGracePeriodSeconds=13' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultStartupGracePeriodSeconds=13' \
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
 
