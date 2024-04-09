@@ -57,7 +57,7 @@ func TestConsulDNS(t *testing.T) {
 
 			dnsServiceName := fmt.Sprintf("%s-%s", releaseName, "consul-dns")
 			if tc.enableDNSProxy {
-				dnsServiceName = fmt.Sprintf("%s-%s", releaseName, "consul-dns-proxy")
+				dnsServiceName += "proxy"
 			}
 			dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(context.Background(), dnsServiceName, metav1.GetOptions{})
 			require.NoError(t, err)

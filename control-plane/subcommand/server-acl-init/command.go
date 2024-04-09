@@ -160,7 +160,7 @@ func (c *Command) init() {
 		"[Enterprise Only] Toggle for configuring ACL login for the snapshot agent.")
 	c.flags.BoolVar(&c.flagMeshGateway, "mesh-gateway", false,
 		"Toggle for configuring ACL login for the mesh gateway.")
-	c.flags.BoolVar(&c.flagMeshGateway, "dns-proxy", false,
+	c.flags.BoolVar(&c.flagDNSProxy, "dns-proxy", false,
 		"Toggle for configuring ACL login for the DNS proxy.")
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagIngressGatewayNames), "ingress-gateway-name",
 		"Name of an ingress gateway that needs an acl token. May be specified multiple times. "+

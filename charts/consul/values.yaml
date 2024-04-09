@@ -2931,7 +2931,6 @@ meshGateway:
   # Override global log verbosity level for mesh-gateway-deployment pods. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
-  logLevel: ""
 
   # Number of replicas for the Deployment.
   replicas: 1
