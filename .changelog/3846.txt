@@ -1,0 +1,5 @@
+```release-note:improvement
+helm: only create the default Prometheus path annotation when it's not already specified within the component-specific
+annotations. For example if the `client.annotations` value sets prometheus.io/path annotation, don't overwrite it with
+the default value.
+```
