@@ -17,8 +17,10 @@ type Config struct {
 	DefaultEnableProxyLifecycle         bool
 	DefaultEnableShutdownDrainListeners bool
 	DefaultShutdownGracePeriodSeconds   int
+	DefaultStartupGracePeriodSeconds    int
 	DefaultGracefulPort                 string
 	DefaultGracefulShutdownPath         string
+	DefaultGracefulStartupPath          string
 }
 
 // EnableProxyLifecycle returns whether proxy lifecycle management is enabled either via the default value in the meshWebhook, or if it's been
@@ -63,6 +65,20 @@ func (lc Config) ShutdownGracePeriodSeconds(pod corev1.Pod) (int, error) {
 	return shutdownGracePeriodSeconds, nil
 }
 
+// StartupGracePeriodSeconds returns how long to block application startup waiting for the sidecar proxy to be ready, either via the default value in the meshWebhook, or if it's been
+// overridden via the annotation.
+func (lc Config) StartupGracePeriodSeconds(pod corev1.Pod) (int, error) {
+	startupGracePeriodSeconds := lc.DefaultStartupGracePeriodSeconds
+	if startupGracePeriodSecondsAnnotation, ok := pod.Annotations[constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds]; ok {
+		val, err := strconv.ParseUint(startupGracePeriodSecondsAnnotation, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("unable to parse annotation %q: %w", constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds, err)
+		}
+		startupGracePeriodSeconds = int(val)
+	}
+	return startupGracePeriodSeconds, nil
+}
+
 // GracefulPort returns the port on which consul-dataplane should serve the proxy lifecycle management HTTP endpoints, either via the default value in the meshWebhook, or
 // if it's been overridden via the annotation. It also validates the port is in the unprivileged port range.
 func (lc Config) GracefulPort(pod corev1.Pod) (int, error) {
@@ -92,4 +108,18 @@ func (lc Config) GracefulShutdownPath(pod corev1.Pod) string {
 	}
 
 	return lc.DefaultGracefulShutdownPath
+}
+
+// GracefulStartupPath returns the path on which consul-dataplane should serve the graceful startup HTTP endpoint, either via the default value in the meshWebhook, or
+// if it's been overridden via the annotation.
+func (lc Config) GracefulStartupPath(pod corev1.Pod) string {
+	if raw, ok := pod.Annotations[constants.AnnotationSidecarProxyLifecycleGracefulStartupPath]; ok && raw != "" {
+		return raw
+	}
+
+	if lc.DefaultGracefulStartupPath == "" {
+		return constants.DefaultGracefulStartupPath
+	}
+
+	return lc.DefaultGracefulStartupPath
 }

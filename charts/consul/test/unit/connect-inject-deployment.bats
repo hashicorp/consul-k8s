@@ -1315,6 +1315,33 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management startup grace period is set to 0 seconds" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-startup-grace-period-seconds=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management startup grace period can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultStartupGracePeriodSeconds=13' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-startup-grace-period-seconds=13"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "connectInject/Deployment: by default sidecar proxy lifecycle management port is set to 20600" {
   cd `chart_dir`
   local cmd=$(helm template \
@@ -1366,6 +1393,33 @@ load _helpers
 
   local actual=$(echo "$cmd" |
     yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-shutdown-path=\"/exit\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management graceful startup path is set to /graceful_startup" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-startup-path=\"/graceful_startup\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management graceful startup path can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultGracefulStartupPath=/start' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-startup-path=\"/start\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
