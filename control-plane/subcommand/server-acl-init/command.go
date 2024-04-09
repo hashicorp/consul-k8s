@@ -66,6 +66,8 @@ type Command struct {
 	flagIngressGatewayNames     []string
 	flagTerminatingGatewayNames []string
 
+	flagDNSProxy bool
+
 	// Flags to configure Consul connection.
 	flagServerPort uint
 
@@ -158,6 +160,8 @@ func (c *Command) init() {
 		"[Enterprise Only] Toggle for configuring ACL login for the snapshot agent.")
 	c.flags.BoolVar(&c.flagMeshGateway, "mesh-gateway", false,
 		"Toggle for configuring ACL login for the mesh gateway.")
+	c.flags.BoolVar(&c.flagMeshGateway, "dns-proxy", false,
+		"Toggle for configuring ACL login for the DNS proxy.")
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagIngressGatewayNames), "ingress-gateway-name",
 		"Name of an ingress gateway that needs an acl token. May be specified multiple times. "+
 			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
@@ -575,6 +579,21 @@ func (c *Command) Run(args []string) int {
 	if c.flagSnapshotAgent {
 		serviceAccountName := c.withPrefix("server")
 		if err := c.createACLPolicyRoleAndBindingRule("snapshot-agent", snapshotAgentRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagDNSProxy {
+		serviceAccountName := c.withPrefix("dns-proxy")
+
+		dnsProxyRules, err := c.injectRules()
+		if err != nil {
+			c.log.Error("Error templating inject rules", "err", err)
+			return 1
+		}
+
+		if err := c.createACLPolicyRoleAndBindingRule("dns-proxy", dnsProxyRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}

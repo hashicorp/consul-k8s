@@ -18,6 +18,15 @@ import (
 )
 
 func TestConsulDNS(t *testing.T) {
+	testCases := []struct {
+		secure         bool
+		enableDNSProxy bool
+	}{
+		{secure: false, enableDNSProxy: false},
+		{secure: false, enableDNSProxy: true},
+		{secure: true, enableDNSProxy: false},
+		{secure: true, enableDNSProxy: true},
+	}
 	cfg := suite.Config()
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set")
@@ -27,8 +36,8 @@ func TestConsulDNS(t *testing.T) {
 		t.Skipf("skipping because -use-aks is set")
 	}
 
-	for _, secure := range []bool{false, true} {
-		name := fmt.Sprintf("secure: %t", secure)
+	for _, tc := range testCases {
+		name := fmt.Sprintf("secure: %t", tc.secure)
 		t.Run(name, func(t *testing.T) {
 			env := suite.Environment()
 			ctx := env.DefaultContext(t)
@@ -36,8 +45,8 @@ func TestConsulDNS(t *testing.T) {
 
 			helmValues := map[string]string{
 				"dns.enabled":                  "true",
-				"global.tls.enabled":           strconv.FormatBool(secure),
-				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
+				"global.tls.enabled":           strconv.FormatBool(tc.secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(tc.secure),
 			}
 			cluster := consul.NewHelmCluster(t, helmValues, ctx, suite.Config(), releaseName)
 			cluster.Create(t)
@@ -45,7 +54,11 @@ func TestConsulDNS(t *testing.T) {
 			k8sClient := ctx.KubernetesClient(t)
 			contextNamespace := ctx.KubectlOptions(t).Namespace
 
-			dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(context.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
+			dnsServiceName := fmt.Sprintf("%s-%s", releaseName, "consul-dns")
+			if tc.enableDNSProxy {
+				dnsServiceName = fmt.Sprintf("%s-%s", releaseName, "consul-dns-proxy")
+			}
+			dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(context.Background(), dnsServiceName, metav1.GetOptions{})
 			require.NoError(t, err)
 
 			dnsIP := dnsService.Spec.ClusterIP
@@ -62,7 +75,7 @@ func TestConsulDNS(t *testing.T) {
 
 			dnsPodName := fmt.Sprintf("%s-dns-pod", releaseName)
 			dnsTestPodArgs := []string{
-				"run", "-it", dnsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s-consul-dns", releaseName), "consul.service.consul",
+				"run", "-it", dnsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", dnsServiceName, "consul.service.consul",
 			}
 
 			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {

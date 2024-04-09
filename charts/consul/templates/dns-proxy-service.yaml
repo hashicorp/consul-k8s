@@ -1,0 +1,39 @@
+{{- if .Values.dns.proxy.enabled }}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "consul.fullname" . }}-dns-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: dns-proxy
+{{- if .Values.dns.proxy.annotations }}
+  annotations:
+    {{ tpl .Values.dns.proxy.annotations . | nindent 4 | trim }}
+{{- end }}
+spec:
+  selector:
+    app: {{ template "consul.name" . }}
+    release: "{{ .Release.Name }}"
+    component: dns-proxy
+{{- if .Values.dns.type }}
+  type: {{ .Values.dns.type }}
+{{- end }}
+{{- if .Values.dns.clusterIP }}
+  clusterIP: {{ .Values.dns.clusterIP }}
+{{- end }}
+  ports:
+    - name: dns-tcp
+      port: 53
+      protocol: "TCP"
+      targetPort: dns-tcp
+    - name: dns-udp
+      port: 53
+      protocol: "UDP"
+      targetPort: dns-udp
+---
+{{- end }}

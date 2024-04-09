@@ -1914,6 +1914,10 @@ dns:
   # @type: string
   additionalSpec: null
 
+  proxy:
+    # @type: boolean
+    enabled: "-"
+
 # Values that configure the Consul UI.
 ui:
   # If true, the UI will be enabled. This will
@@ -2926,6 +2930,7 @@ meshGateway:
 
   # Override global log verbosity level for mesh-gateway-deployment pods. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
+  logLevel: ""
   logLevel: ""
 
   # Number of replicas for the Deployment.
