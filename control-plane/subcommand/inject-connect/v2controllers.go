@@ -50,8 +50,10 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
 		DefaultEnableShutdownDrainListeners: c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
 		DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
+		DefaultStartupGracePeriodSeconds:    c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds,
 		DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
 		DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
+		DefaultGracefulStartupPath:          c.flagDefaultSidecarProxyLifecycleGracefulStartupPath,
 	}
 
 	metricsConfig := metrics.Config{
