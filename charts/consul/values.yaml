@@ -1916,7 +1916,7 @@ dns:
 
   proxy:
     # @type: boolean
-    enabled: "-"
+    enabled: "false"
 
 # Values that configure the Consul UI.
 ui:

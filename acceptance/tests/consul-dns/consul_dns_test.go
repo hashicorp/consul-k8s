@@ -37,7 +37,7 @@ func TestConsulDNS(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		name := fmt.Sprintf("secure: %t", tc.secure)
+		name := fmt.Sprintf("secure: %t / dns-proxy: %t", tc.secure, tc.enableDNSProxy)
 		t.Run(name, func(t *testing.T) {
 			env := suite.Environment()
 			ctx := env.DefaultContext(t)
@@ -45,6 +45,7 @@ func TestConsulDNS(t *testing.T) {
 
 			helmValues := map[string]string{
 				"dns.enabled":                  "true",
+				"dns.proxy.enabled":            strconv.FormatBool(tc.enableDNSProxy),
 				"global.tls.enabled":           strconv.FormatBool(tc.secure),
 				"global.acls.manageSystemACLs": strconv.FormatBool(tc.secure),
 			}
@@ -73,9 +74,9 @@ func TestConsulDNS(t *testing.T) {
 				serverIPs = append(serverIPs, serverPod.Status.PodIP)
 			}
 
-			dnsPodName := fmt.Sprintf("%s-dns-pod", releaseName)
+			dnsToolsPodName := fmt.Sprintf("%s-dns-tools", releaseName)
 			dnsTestPodArgs := []string{
-				"run", "-it", dnsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", dnsServiceName, "consul.service.consul",
+				"run", "-it", dnsToolsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", dnsServiceName, "consul.service.consul",
 			}
 
 			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
@@ -83,7 +84,7 @@ func TestConsulDNS(t *testing.T) {
 				// This shouldn't cause any test pollution because the underlying
 				// objects are deployments, and so when other tests create these
 				// they should have different pod names.
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", dnsPodName)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", dnsToolsPodName)
 			})
 
 			retry.Run(t, func(r *retry.R) {
