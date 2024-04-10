@@ -338,6 +338,19 @@ load _helpers
   [ "${actual}" = "/metrics" ]
 }
 
+@test "terminatingGateways/Deployment: when global.metrics.enabled=true, and terminating gateways annotation for prometheus path is specified, it uses the specified annotation rather than default." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml  \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'terminatingGateways.defaults.annotations=prometheus.io/path: /anew/path' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "/anew/path" ]
+}
+
 @test "terminatingGateways/Deployment: when global.metrics.enableGatewayMetrics=false, does not set prometheus annotations" {
   cd `chart_dir`
   local object=$(helm template \

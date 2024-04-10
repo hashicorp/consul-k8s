@@ -300,6 +300,19 @@ load _helpers
   [ "${actual}" = "/metrics" ]
 }
 
+@test "ingressGateways/Deployment: when global.metrics.enabled=true, and ingress gateways annotation for prometheus path is specified, it uses the specified annotation rather than default." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/ingress-gateways-deployment.yaml  \
+      --set 'ingressGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'ingressGateways.defaults.annotations=prometheus.io/path: /anew/path' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "/anew/path" ]
+}
+
 @test "ingressGateways/Deployment: when global.metrics.enableGatewayMetrics=false, does not set proxy setting" {
   cd `chart_dir`
   local object=$(helm template \
