@@ -78,7 +78,9 @@ spec:
         {{- end }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
         "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.meshGateway.annotations | fromYaml) "prometheus.io/path")}}
         "prometheus.io/path": "/metrics"
+        {{- end }}
         "prometheus.io/port": "20200"
         {{- end }}
         {{- if .Values.meshGateway.annotations }}
