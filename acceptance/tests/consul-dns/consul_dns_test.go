@@ -18,15 +18,6 @@ import (
 )
 
 func TestConsulDNS(t *testing.T) {
-	testCases := []struct {
-		secure         bool
-		enableDNSProxy bool
-	}{
-		{secure: false, enableDNSProxy: false},
-		{secure: false, enableDNSProxy: true},
-		{secure: true, enableDNSProxy: false},
-		{secure: true, enableDNSProxy: true},
-	}
 	cfg := suite.Config()
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set")
@@ -36,8 +27,17 @@ func TestConsulDNS(t *testing.T) {
 		t.Skipf("skipping because -use-aks is set")
 	}
 
-	for _, tc := range testCases {
-		name := fmt.Sprintf("secure: %t / dns-proxy: %t", tc.secure, tc.enableDNSProxy)
+	cases := []struct {
+		secure         bool
+		enableDNSProxy bool
+	}{
+		{secure: false, enableDNSProxy: false},
+		{secure: false, enableDNSProxy: true},
+		{secure: true, enableDNSProxy: false},
+		{secure: true, enableDNSProxy: true},
+	}
+	for _, c := range cases {
+		name := fmt.Sprintf("secure: %t / enableDNSProxy: %t", c.secure, c.enableDNSProxy)
 		t.Run(name, func(t *testing.T) {
 			env := suite.Environment()
 			ctx := env.DefaultContext(t)
@@ -45,9 +45,9 @@ func TestConsulDNS(t *testing.T) {
 
 			helmValues := map[string]string{
 				"dns.enabled":                  "true",
-				"dns.proxy.enabled":            strconv.FormatBool(tc.enableDNSProxy),
-				"global.tls.enabled":           strconv.FormatBool(tc.secure),
-				"global.acls.manageSystemACLs": strconv.FormatBool(tc.secure),
+				"dns.proxy.enabled":            strconv.FormatBool(c.enableDNSProxy),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 			}
 			cluster := consul.NewHelmCluster(t, helmValues, ctx, suite.Config(), releaseName)
 			cluster.Create(t)
@@ -55,11 +55,11 @@ func TestConsulDNS(t *testing.T) {
 			k8sClient := ctx.KubernetesClient(t)
 			contextNamespace := ctx.KubectlOptions(t).Namespace
 
-			dnsServiceName := fmt.Sprintf("%s-%s", releaseName, "consul-dns")
-			if tc.enableDNSProxy {
-				dnsServiceName += "proxy"
+			dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
+			if c.enableDNSProxy {
+				dnsSvcName += "-proxy"
 			}
-			dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(context.Background(), dnsServiceName, metav1.GetOptions{})
+			dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
 			require.NoError(t, err)
 
 			dnsIP := dnsService.Spec.ClusterIP
@@ -74,9 +74,9 @@ func TestConsulDNS(t *testing.T) {
 				serverIPs = append(serverIPs, serverPod.Status.PodIP)
 			}
 
-			dnsToolsPodName := fmt.Sprintf("%s-dns-tools", releaseName)
+			dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod", releaseName)
 			dnsTestPodArgs := []string{
-				"run", "-it", dnsToolsPodName, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", dnsServiceName, "consul.service.consul",
+				"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s", dnsSvcName), "consul.service.consul",
 			}
 
 			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
@@ -84,7 +84,7 @@ func TestConsulDNS(t *testing.T) {
 				// This shouldn't cause any test pollution because the underlying
 				// objects are deployments, and so when other tests create these
 				// they should have different pod names.
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", dnsToolsPodName)
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
 			})
 
 			retry.Run(t, func(r *retry.R) {
