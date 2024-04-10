@@ -6,6 +6,9 @@ package consuldns
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"k8s.io/client-go/kubernetes"
 	"strconv"
 	"testing"
 
@@ -55,15 +58,6 @@ func TestConsulDNS(t *testing.T) {
 			k8sClient := ctx.KubernetesClient(t)
 			contextNamespace := ctx.KubectlOptions(t).Namespace
 
-			dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
-			if c.enableDNSProxy {
-				dnsSvcName += "-proxy"
-			}
-			dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
-			require.NoError(t, err)
-
-			dnsIP := dnsService.Spec.ClusterIP
-
 			consulServerList, err := k8sClient.CoreV1().Pods(contextNamespace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "app=consul,component=server",
 			})
@@ -74,41 +68,59 @@ func TestConsulDNS(t *testing.T) {
 				serverIPs = append(serverIPs, serverPod.Status.PodIP)
 			}
 
-			dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod", releaseName)
-			dnsTestPodArgs := []string{
-				"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s", dnsSvcName), "consul.service.consul",
-			}
-
-			helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
-				// Note: this delete command won't wait for pods to be fully terminated.
-				// This shouldn't cause any test pollution because the underlying
-				// objects are deployments, and so when other tests create these
-				// they should have different pod names.
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
-			})
-
-			retry.Run(t, func(r *retry.R) {
-				logs, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), dnsTestPodArgs...)
-				require.NoError(r, err)
-
-				// When the `dig` request is successful, a section of it's response looks like the following:
-				//
-				// ;; ANSWER SECTION:
-				// consul.service.consul.	0	IN	A	<consul-server-pod-ip>
-				//
-				// ;; Query time: 2 msec
-				// ;; SERVER: <dns-ip>#<dns-port>(<dns-ip>)
-				// ;; WHEN: Mon Aug 10 15:02:40 UTC 2020
-				// ;; MSG SIZE  rcvd: 98
-				//
-				// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
-
-				require.Contains(r, logs, fmt.Sprintf("SERVER: %s", dnsIP))
-				require.Contains(r, logs, "ANSWER SECTION:")
-				for _, ip := range serverIPs {
-					require.Contains(r, logs, fmt.Sprintf("consul.service.consul.\t0\tIN\tA\t%s", ip))
-				}
-			})
+			verifyDNS(t, releaseName, c.enableDNSProxy, k8sClient, contextNamespace, ctx, serverIPs, "consul.service.consul")
 		})
 	}
+}
+
+func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool,
+	k8sClient kubernetes.Interface, contextNamespace string, ctx environment.TestContext,
+	serverIPs []string, svcName string) {
+	logger.Log(t, "get the in cluster dns service or proxy.")
+	dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
+	if enableDNSProxy {
+		dnsSvcName += "-proxy"
+	}
+	dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
+	require.NoError(t, err)
+	dnsIP := dnsService.Spec.ClusterIP
+
+	logger.Log(t, "launch a pod to test the dns resolution.")
+	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod", releaseName)
+	dnsTestPodArgs := []string{
+		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s", dnsSvcName), svcName,
+	}
+
+	helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
+	})
+
+	retry.Run(t, func(r *retry.R) {
+		logger.Log(t, "run the dns utilize pod and query DNS for the service.")
+		logs, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), dnsTestPodArgs...)
+		require.NoError(r, err)
+
+		// When the `dig` request is successful, a section of it's response looks like the following:
+		//
+		// ;; ANSWER SECTION:
+		// consul.service.consul.	0	IN	A	<consul-server-pod-ip>
+		//
+		// ;; Query time: 2 msec
+		// ;; SERVER: <dns-ip>#<dns-port>(<dns-ip>)
+		// ;; WHEN: Mon Aug 10 15:02:40 UTC 2020
+		// ;; MSG SIZE  rcvd: 98
+		//
+		// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
+
+		logger.Log(t, "verify the DNS results.")
+		require.Contains(r, logs, fmt.Sprintf("SERVER: %s", dnsIP))
+		require.Contains(r, logs, "ANSWER SECTION:")
+		for _, ip := range serverIPs {
+			require.Contains(r, logs, fmt.Sprintf("%s.\t0\tIN\tA\t%s", svcName, ip))
+		}
+	})
 }
