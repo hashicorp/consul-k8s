@@ -191,9 +191,9 @@ spec:
             {{- if .Values.syncCatalog.ingress.loadBalancerIPs }}
             -loadBalancer-ips=true \
             {{- end }}
+            {{- end }}
             {{- if .Values.syncCatalog.syncLoadBalancerEndpoints }}
             -sync-lb-services-endpoints=true \
-            {{- end }}
             {{- end }}
         livenessProbe:
           httpGet:
