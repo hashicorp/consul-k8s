@@ -297,10 +297,16 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, bearer
 		args = append(args, fmt.Sprintf("-shutdown-grace-period-seconds=%d", shutdownGracePeriodSeconds))
 
 		gracefulShutdownPath := w.LifecycleConfig.GracefulShutdownPath(pod)
-		if err != nil {
-			return nil, fmt.Errorf("unable to determine proxy lifecycle graceful shutdown path: %w", err)
-		}
 		args = append(args, fmt.Sprintf("-graceful-shutdown-path=%s", gracefulShutdownPath))
+
+		startupGracePeriodSeconds, err := w.LifecycleConfig.StartupGracePeriodSeconds(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine proxy lifecycle startup grace period: %w", err)
+		}
+		args = append(args, fmt.Sprintf("-startup-grace-period-seconds=%d", startupGracePeriodSeconds))
+
+		gracefulStartupPath := w.LifecycleConfig.GracefulStartupPath(pod)
+		args = append(args, fmt.Sprintf("-graceful-startup-path=%s", gracefulStartupPath))
 	}
 
 	// Set a default scrape path that can be overwritten by the annotation.
