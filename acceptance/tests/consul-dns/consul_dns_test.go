@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"k8s.io/client-go/kubernetes"
 	"strconv"
 	"testing"
 
@@ -47,6 +46,7 @@ func TestConsulDNS(t *testing.T) {
 			releaseName := helpers.RandomName()
 
 			helmValues := map[string]string{
+				"global.logLevel":              "trace",
 				"dns.enabled":                  "true",
 				"dns.proxy.enabled":            strconv.FormatBool(c.enableDNSProxy),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
@@ -68,22 +68,32 @@ func TestConsulDNS(t *testing.T) {
 				serverIPs = append(serverIPs, serverPod.Status.PodIP)
 			}
 
-			verifyDNS(t, releaseName, c.enableDNSProxy, k8sClient, contextNamespace, ctx, serverIPs, "consul.service.consul")
+			verifyDNS(t, releaseName, c.enableDNSProxy, contextNamespace, ctx, "app=consul,component=server",
+				"consul.service.consul", "%s.\t0\tIN\tA\t%s")
 		})
 	}
 }
 
-func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool,
-	k8sClient kubernetes.Interface, contextNamespace string, ctx environment.TestContext,
-	serverIPs []string, svcName string) {
+func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespace string, ctx environment.TestContext,
+	podLabelSelector, svcName, aRecordPattern string) {
 	logger.Log(t, "get the in cluster dns service or proxy.")
 	dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
 	if enableDNSProxy {
 		dnsSvcName += "-proxy"
 	}
-	dnsService, err := k8sClient.CoreV1().Services(contextNamespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
+	dnsService, err := ctx.KubernetesClient(t).CoreV1().Services(ctx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
 	require.NoError(t, err)
 	dnsIP := dnsService.Spec.ClusterIP
+
+	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: podLabelSelector,
+	})
+	require.NoError(t, err)
+
+	servicePodIPs := make([]string, len(podList.Items))
+	for _, serverPod := range podList.Items {
+		servicePodIPs = append(servicePodIPs, serverPod.Status.PodIP)
+	}
 
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod", releaseName)
@@ -119,8 +129,8 @@ func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool,
 		logger.Log(t, "verify the DNS results.")
 		require.Contains(r, logs, fmt.Sprintf("SERVER: %s", dnsIP))
 		require.Contains(r, logs, "ANSWER SECTION:")
-		for _, ip := range serverIPs {
-			require.Contains(r, logs, fmt.Sprintf("%s.\t0\tIN\tA\t%s", svcName, ip))
+		for _, ip := range servicePodIPs {
+			require.Contains(r, logs, fmt.Sprintf(aRecordPattern, svcName, ip))
 		}
 	})
 }

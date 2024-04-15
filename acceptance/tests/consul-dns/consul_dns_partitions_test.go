@@ -4,13 +4,7 @@
 package consuldns
 
 import (
-	"context"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strconv"
-	"testing"
-	"time"
-
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -19,13 +13,16 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	"strconv"
+	"testing"
+	"time"
 )
 
 const staticServerName = "static-server"
 const staticServerNamespace = "ns1"
 
 // Test that Sync Catalog works in a default and ACLsEnabled installations for partitions.
-func TestPartitions_Sync(t *testing.T) {
+func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -45,18 +42,18 @@ func TestPartitions_Sync(t *testing.T) {
 		mirrorK8S            bool
 		ACLsEnabled          bool
 	}{
-		{
-			"default destination namespace",
-			defaultNamespace,
-			false,
-			false,
-		},
 		//{
-		//	"default destination namespace; ACLs and auto-encrypt enabled",
+		//	"default destination namespace",
 		//	defaultNamespace,
 		//	false,
-		//	true,
+		//	false,
 		//},
+		{
+			"default destination namespace; ACLs and auto-encrypt enabled",
+			defaultNamespace,
+			false,
+			true,
+		},
 		//{
 		//	"single destination namespace",
 		//	staticServerNamespace,
@@ -104,6 +101,7 @@ func TestPartitions_Sync(t *testing.T) {
 				"syncCatalog.addK8SNamespaceSuffix":                       "false",
 
 				"dns.enabled":           "true",
+				"dns.proxy.enabled":     "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
@@ -271,19 +269,6 @@ func TestPartitions_Sync(t *testing.T) {
 				}
 			})
 
-			logger.Log(t, "get server IPs from the primary cluster.")
-			primaryK8sClient := primaryClusterContext.KubernetesClient(t)
-			primaryContextNamespace := primaryClusterContext.KubectlOptions(t).Namespace
-			consulServerList, err := primaryK8sClient.CoreV1().Pods(primaryContextNamespace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "app=consul,component=server",
-			})
-			require.NoError(t, err)
-
-			serverIPs := make([]string, len(consulServerList.Items))
-			for _, serverPod := range consulServerList.Items {
-				serverIPs = append(serverIPs, serverPod.Status.PodIP)
-			}
-
 			logger.Log(t, "verify the service in the default partition of the Consul catalog.")
 			service, _, err := consulClient.Catalog().Service(staticServerName, "", defaultPartitionQueryOpts)
 			require.NoError(t, err)
@@ -291,7 +276,9 @@ func TestPartitions_Sync(t *testing.T) {
 			require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
 
 			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
-			verifyDNS(t, releaseName, false, primaryK8sClient, primaryContextNamespace, primaryClusterContext, serverIPs, staticServerName)
+			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext,
+				"app=static-server", fmt.Sprintf("%s.service.consul", staticServerName),
+				"%s. 0\tIN\tA\t%s")
 
 			logger.Log(t, "verify the service in the secondary partition of the Consul catalog.")
 			service, _, err = consulClient.Catalog().Service(staticServerName, "", secondaryPartitionQueryOpts)
@@ -300,9 +287,9 @@ func TestPartitions_Sync(t *testing.T) {
 			require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
 
 			logger.Log(t, "verify the service via DNS in the secondary partition of the Consul catalog.")
-			secondaryK8sClient := secondaryClusterContext.KubernetesClient(t)
-			secondaryContextNamespace := secondaryClusterContext.KubectlOptions(t).Namespace
-			verifyDNS(t, releaseName, false, secondaryK8sClient, secondaryContextNamespace, secondaryClusterContext, serverIPs, staticServerName)
+			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext,
+				"app=static-server", fmt.Sprintf("%s.service.consul", staticServerName),
+				"%s. 0\tIN\tA\t%s")
 		})
 	}
 }
