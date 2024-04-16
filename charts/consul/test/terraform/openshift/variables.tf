@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 variable "location" {
-  default     = "westus2"
+  default     = "eastus"
   description = "The Azure Region to create all resources in."
 }
 

@@ -73,11 +73,13 @@ resource "azurerm_subnet" "worker-subnet" {
 resource "azuread_application" "test" {
   count        = var.cluster_count
   display_name = "aro-consul-k8s-${random_id.suffix[count.index].dec}"
+  owners       = [data.azurerm_client_config.current.object_id]
 }
 
 resource "azuread_service_principal" "test" {
   count     = var.cluster_count
   client_id = azuread_application.test[count.index].application_id
+  owners    = [data.azurerm_client_config.current.object_id]
 }
 
 resource "random_password" "password" {

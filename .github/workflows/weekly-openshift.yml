@@ -1,0 +1,32 @@
+# Dispatch to the consul-k8s-workflows with a weekly cron
+#
+# A separate file is needed for each release because the cron schedules are different for each release.
+name: weekly-openshift
+on:
+  pull_request:
+
+on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    # Run weekly on Monday at 5AM UTC/1AM EST
+    - cron:  '0 5 * * 1'
+
+
+# these should be the only settings that you will ever need to change
+env:
+  BRANCH: "curtbushko/update-openshift-provider"
+  CONTEXT: "weekly"
+
+jobs:
+  openshift:
+    name: openshift
+    runs-on: ubuntu-latest
+    steps:
+    - uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+      name: openshift
+      with:
+        workflow: openshift.yml
+        repo: hashicorp/consul-k8s-workflows
+        ref: 'curtbushko/NET-197/openshift-nightly'
+        token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+        inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
