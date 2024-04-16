@@ -269,6 +269,13 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 				}
 			})
 
+			podLabelSelector := "app=static-server"
+			serviceRequestWithNoPartition := fmt.Sprintf("%s.service.consul", staticServerName)
+			// TODO(NET-8958): why does the proxy one note return tab characters?
+			serviceRequestInDefaultPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, defaultPartition)
+			serviceRequestInSecondaryPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition)
+			dnsUtilsPodIndex := 0
+
 			logger.Log(t, "verify the service in the default partition of the Consul catalog.")
 			service, _, err := consulClient.Catalog().Service(staticServerName, "", defaultPartitionQueryOpts)
 			require.NoError(t, err)
@@ -277,8 +284,14 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 
 			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
 			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext,
-				"app=static-server", fmt.Sprintf("%s.service.consul", staticServerName),
-				"%s. 0\tIN\tA\t%s")
+				podLabelSelector, serviceRequestWithNoPartition, true, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
+			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext,
+				podLabelSelector, serviceRequestInDefaultPartition, true, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
+			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext,
+				podLabelSelector, serviceRequestInSecondaryPartition, false, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
 
 			logger.Log(t, "verify the service in the secondary partition of the Consul catalog.")
 			service, _, err = consulClient.Catalog().Service(staticServerName, "", secondaryPartitionQueryOpts)
@@ -288,8 +301,18 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 
 			logger.Log(t, "verify the service via DNS in the secondary partition of the Consul catalog.")
 			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext,
-				"app=static-server", fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition),
-				"%s. 0 IN\tA %s")
+				podLabelSelector, serviceRequestInSecondaryPartition,
+				true, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
+
+			// TODO(NET-8958): should this return the local partition's version?
+			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext,
+				podLabelSelector, serviceRequestWithNoPartition, false, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
+			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext,
+				podLabelSelector, serviceRequestInDefaultPartition, false, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
+
 		})
 	}
 }

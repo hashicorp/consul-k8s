@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -69,13 +70,13 @@ func TestConsulDNS(t *testing.T) {
 			}
 
 			verifyDNS(t, releaseName, c.enableDNSProxy, contextNamespace, ctx, "app=consul,component=server",
-				"consul.service.consul", "%s.\t0\tIN\tA\t%s")
+				"consul.service.consul", true, 0)
 		})
 	}
 }
 
 func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespace string, ctx environment.TestContext,
-	podLabelSelector, svcName, aRecordPattern string) {
+	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
 	logger.Log(t, "get the in cluster dns service or proxy.")
 	dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
 	if enableDNSProxy {
@@ -96,7 +97,7 @@ func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespa
 	}
 
 	logger.Log(t, "launch a pod to test the dns resolution.")
-	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod", releaseName)
+	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 	dnsTestPodArgs := []string{
 		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s", dnsSvcName), svcName,
 	}
@@ -128,9 +129,23 @@ func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespa
 
 		logger.Log(t, "verify the DNS results.")
 		require.Contains(r, logs, fmt.Sprintf("SERVER: %s", dnsIP))
-		require.Contains(r, logs, "ANSWER SECTION:")
+		// strip logs of tabs, newlines and spaces to make it easier to assert on the content when there is a DNS match
+		strippedLogs := strings.Replace(logs, "\t", "", -1)
+		strippedLogs = strings.Replace(strippedLogs, "\n", "", -1)
+		strippedLogs = strings.Replace(strippedLogs, " ", "", -1)
 		for _, ip := range servicePodIPs {
-			require.Contains(r, logs, fmt.Sprintf(aRecordPattern, svcName, ip))
+			if ip != "" {
+				aRecordPattern := "%s.0INA%s"
+				if shouldResolveDNSRecord {
+					require.Contains(r, logs, "ANSWER SECTION:")
+					require.Contains(r, strippedLogs, fmt.Sprintf(aRecordPattern, svcName, ip))
+				} else {
+					require.NotContains(r, logs, "ANSWER SECTION:")
+					require.NotContains(r, strippedLogs, fmt.Sprintf(aRecordPattern, svcName, ip))
+					require.Contains(r, logs, "status: NXDOMAIN")
+					require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t0\tIN\tSOA\tns.consul. hostmaster.consul.")
+				}
+			}
 		}
 	})
 }
