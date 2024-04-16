@@ -229,7 +229,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			require.Equal(t, container.Env[4].Value, "$(POD_NAME)")
 			require.Equal(t, container.Env[5].Name, "DP_CREDENTIAL_LOGIN_META")
 			require.Equal(t, container.Env[5].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
-			require.Equal(t, container.Env[6].Name, "HOST_IP")
+			require.Equal(t, container.Env[7].Name, "HOST_IP")
 		})
 	}
 }
