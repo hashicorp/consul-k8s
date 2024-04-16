@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: add missing  `$HOST_IP` environment variable to to consul-dataplane sidecar containers
+```
