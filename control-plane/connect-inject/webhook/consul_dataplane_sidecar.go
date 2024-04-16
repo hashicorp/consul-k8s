@@ -140,12 +140,6 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				},
 			},
 			{
-				Name: "HOST_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-				},
-			},
-			{
 				Name:  "DP_CREDENTIAL_LOGIN_META",
 				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
 			},
@@ -158,6 +152,12 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			{
 				Name:  "DP_CREDENTIAL_LOGIN_META2",
 				Value: "pod-uid=$(POD_UID)",
+			},
+			{
+				Name: "HOST_IP",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
+				},
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
