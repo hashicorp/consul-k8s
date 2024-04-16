@@ -200,6 +200,72 @@ func TestLifecycleConfig_ShutdownGracePeriodSeconds(t *testing.T) {
 	}
 }
 
+func TestLifecycleConfig_StartupGracePeriodSeconds(t *testing.T) {
+	cases := []struct {
+		Name            string
+		Pod             func(*corev1.Pod) *corev1.Pod
+		LifecycleConfig Config
+		Expected        int
+		Err             string
+	}{
+		{
+			Name: "Sidecar proxy startup grace period set via meshWebhook",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			LifecycleConfig: Config{
+				DefaultStartupGracePeriodSeconds: 10,
+			},
+			Expected: 10,
+			Err:      "",
+		},
+		{
+			Name: "Sidecar proxy startup grace period set via annotation",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds] = "20"
+				return pod
+			},
+			LifecycleConfig: Config{
+				DefaultStartupGracePeriodSeconds: 10,
+			},
+			Expected: 20,
+			Err:      "",
+		},
+		{
+			Name: "Sidecar proxy startup grace period configured via invalid annotation, negative number",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds] = "-1"
+				return pod
+			},
+			Err: "unable to parse annotation \"consul.hashicorp.com/sidecar-proxy-lifecycle-startup-grace-period-seconds\": strconv.ParseUint: parsing \"-1\": invalid syntax",
+		},
+		{
+			Name: "Sidecar proxy startup grace period configured via invalid annotation, not-parseable string",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds] = "not-int"
+				return pod
+			},
+			Err: "unable to parse annotation \"consul.hashicorp.com/sidecar-proxy-lifecycle-startup-grace-period-seconds\": strconv.ParseUint: parsing \"not-int\": invalid syntax",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+			lc := tt.LifecycleConfig
+
+			actual, err := lc.StartupGracePeriodSeconds(*tt.Pod(minimal()))
+
+			if tt.Err == "" {
+				require.Equal(tt.Expected, actual)
+				require.NoError(err)
+			} else {
+				require.EqualError(err, tt.Err)
+			}
+		})
+	}
+}
+
 func TestLifecycleConfig_GracefulPort(t *testing.T) {
 	cases := []struct {
 		Name            string
@@ -321,6 +387,59 @@ func TestLifecycleConfig_GracefulShutdownPath(t *testing.T) {
 			lc := tt.LifecycleConfig
 
 			actual := lc.GracefulShutdownPath(*tt.Pod(minimal()))
+
+			require.Equal(tt.Expected, actual)
+		})
+	}
+}
+
+func TestLifecycleConfig_GracefulStartupPath(t *testing.T) {
+	cases := []struct {
+		Name            string
+		Pod             func(*corev1.Pod) *corev1.Pod
+		LifecycleConfig Config
+		Expected        string
+		Err             string
+	}{
+		{
+			Name: "Sidecar proxy lifecycle graceful startup path defaults to /graceful_startup",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			Expected: "/graceful_startup",
+			Err:      "",
+		},
+		{
+			Name: "Sidecar proxy lifecycle graceful startup path set via meshWebhook",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			LifecycleConfig: Config{
+				DefaultGracefulStartupPath: "/start",
+			},
+			Expected: "/start",
+			Err:      "",
+		},
+		{
+			Name: "Sidecar proxy lifecycle graceful startup path set via annotation",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationSidecarProxyLifecycleGracefulStartupPath] = "/custom-startup-path"
+				return pod
+			},
+			LifecycleConfig: Config{
+				DefaultGracefulStartupPath: "/start",
+			},
+			Expected: "/custom-startup-path",
+			Err:      "",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+			lc := tt.LifecycleConfig
+
+			actual := lc.GracefulStartupPath(*tt.Pod(minimal()))
 
 			require.Equal(tt.Expected, actual)
 		})

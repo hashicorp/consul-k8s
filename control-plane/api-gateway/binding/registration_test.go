@@ -6,6 +6,7 @@ package binding
 import (
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -68,7 +69,7 @@ func TestRegistrationsForPods_Health(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			registrations := registrationsForPods(tt.consulNamespace, tt.gateway, tt.pods)
+			registrations := registrationsForPods(common.MetricsConfig{}, tt.consulNamespace, tt.gateway, tt.pods)
 			require.Len(t, registrations, len(tt.expected))
 
 			for i := range registrations {

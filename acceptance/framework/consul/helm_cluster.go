@@ -26,16 +26,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
 )
 
 // HelmCluster implements Cluster and uses Helm
@@ -129,6 +130,9 @@ func NewHelmCluster(
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
 
+	// check and remove any CRDs with finalizers
+	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
 	helpers.Cleanup(t, h.noCleanupOnFailure, h.noCleanup, func() {
@@ -216,7 +220,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
-
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall
 		// we don't care that they're stopped gracefully.
@@ -237,7 +240,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, deployment := range deployments.Items {
 			if strings.Contains(deployment.Name, h.releaseName) {
-				err := h.kubernetesClient.AppsV1().Deployments(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), deployment.Name, metav1.DeleteOptions{})
+				err := h.kubernetesClient.AppsV1().
+					Deployments(h.helmOptions.KubectlOptions.Namespace).
+					Delete(context.Background(), deployment.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
 					require.NoError(r, err)
 				}
@@ -546,7 +551,6 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 					require.NoError(r, err)
 				}
 			})
-
 		}
 	}
 
@@ -698,47 +702,40 @@ func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.T
 }
 
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
-// allowing access to the anyuid and privileged Security Context Constraints on OpenShift.
+// allowing access to the privileged Security Context Constraints on OpenShift.
 func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
-	const anyuidClusterRole = "system:openshift:scc:anyuid"
 	const privilegedClusterRole = "system:openshift:scc:privileged"
-	anyuidRoleBinding := "anyuid-test"
 	privilegedRoleBinding := "privileged-test"
 
 	// A role binding to allow default service account in the installation namespace access to the SCCs.
-	{
-		for clusterRoleName, roleBindingName := range map[string]string{anyuidClusterRole: anyuidRoleBinding, privilegedClusterRole: privilegedRoleBinding} {
-			// Check if this cluster role binding already exists.
-			_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), roleBindingName, metav1.GetOptions{})
+	// Check if this cluster role binding already exists.
+	_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), privilegedRoleBinding, metav1.GetOptions{})
 
-			if errors.IsNotFound(err) {
-				roleBinding := &rbacv1.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: roleBindingName,
-					},
-					Subjects: []rbacv1.Subject{
-						{
-							Kind:      rbacv1.ServiceAccountKind,
-							Name:      "default",
-							Namespace: namespace,
-						},
-					},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "ClusterRole",
-						Name: clusterRoleName,
-					},
-				}
-
-				_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
-				require.NoError(t, err)
-			} else {
-				require.NoError(t, err)
-			}
+	if errors.IsNotFound(err) {
+		roleBinding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: privilegedRoleBinding,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      "default",
+					Namespace: namespace,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Kind: "ClusterRole",
+				Name: privilegedClusterRole,
+			},
 		}
+
+		_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
 	}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), anyuidRoleBinding, metav1.DeleteOptions{})
 		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), privilegedRoleBinding, metav1.DeleteOptions{})
 	})
 }
@@ -752,6 +749,10 @@ func defaultValues() map[string]string {
 		// (false positive).
 		"dns.enabled": "false",
 
+		// Adjust the default value from 30s to 1s since we have several tests that verify tokens are cleaned up,
+		// and many of them are using the default retryer (7s max).
+		"connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds": "1",
+
 		// Enable trace logs for servers and clients.
 		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
 		"client.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
@@ -760,7 +761,6 @@ func defaultValues() map[string]string {
 }
 
 func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName, secretKey, secret string) {
-
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
 		_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {

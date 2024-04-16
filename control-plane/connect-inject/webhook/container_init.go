@@ -255,16 +255,41 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				},
 			}
 		} else {
-			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-				RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-				RunAsNonRoot: pointer.Bool(true),
-				Privileged:   pointer.Bool(privileged),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+			if !w.EnableOpenShift {
+				container.SecurityContext = &corev1.SecurityContext{
+					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
+					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
+					RunAsNonRoot: pointer.Bool(true),
+					Privileged:   pointer.Bool(privileged),
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+					ReadOnlyRootFilesystem:   pointer.Bool(true),
+					AllowPrivilegeEscalation: pointer.Bool(false),
+				}
+			} else {
+				// Transparent proxy + CNI is set in OpenShift. There is an annotation on the namespace that tells us what
+				// the user and group ids should be for the sidecar.
+				uid, err := common.GetOpenShiftUID(&namespace)
+				if err != nil {
+					return corev1.Container{}, err
+				}
+				group, err := common.GetOpenShiftGroup(&namespace)
+				if err != nil {
+					return corev1.Container{}, err
+				}
+				container.SecurityContext = &corev1.SecurityContext{
+					RunAsUser:    pointer.Int64(uid),
+					RunAsGroup:   pointer.Int64(group),
+					RunAsNonRoot: pointer.Bool(true),
+					Privileged:   pointer.Bool(false),
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+					ReadOnlyRootFilesystem:   pointer.Bool(true),
+					AllowPrivilegeEscalation: pointer.Bool(false),
+				}
+
 			}
 		}
 	}

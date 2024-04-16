@@ -67,6 +67,9 @@ type BinderConfig struct {
 
 	// Policies is a list containing all GatewayPolicies that are part of the Gateway Deployment
 	Policies []v1alpha1.GatewayPolicy
+
+	// Configuration from helm.
+	HelmConfig common.HelmConfig
 }
 
 // Binder is used for generating a Snapshot of all operations that should occur both
@@ -199,7 +202,8 @@ func (b *Binder) Snapshot() *Snapshot {
 			OnUpdate: b.handleGatewaySyncStatus(snapshot, &b.config.Gateway, consulStatus),
 		})
 
-		registrations := registrationsForPods(entry.Namespace, b.config.Gateway, registrationPods)
+		metricsConfig := common.GatewayMetricsConfig(b.config.Gateway, *gatewayClassConfig, b.config.HelmConfig)
+		registrations := registrationsForPods(metricsConfig, entry.Namespace, b.config.Gateway, registrationPods)
 		snapshot.Consul.Registrations = registrations
 
 		// deregister any not explicitly registered service

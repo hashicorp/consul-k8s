@@ -1,3 +1,4 @@
+{{- if .Values.apiGateway}}{{fail "[DEPRECATED and REMOVED] the apiGateway stanza is no longer supported as of Consul 1.19.0. Use connectInject.apiGateway instead."}}{{- end -}}
 {{- if .Values.connectInject.enabled }}
 apiVersion: batch/v1
 kind: Job
@@ -51,29 +52,6 @@ spec:
             - -heritage={{ .Release.Service }}
             - -release-name={{ .Release.Name }}
             - -component=api-gateway
-            {{- if .Values.apiGateway.enabled }} # Override values from the old stanza. To be removed after ~1.18 (t-eckert 2023-05-19) NET-6263
-            {{- if .Values.apiGateway.managedGatewayClass.deployment }}
-            {{- if .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
-            - -deployment-default-instances={{ .Values.apiGateway.managedGatewayClass.deployment.defaultInstances }}
-            {{- end}}
-            {{- if .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
-            - -deployment-max-instances={{ .Values.apiGateway.managedGatewayClass.deployment.maxInstances }}
-            {{- end}}
-            {{- if .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
-            - -deployment-min-instances={{ .Values.apiGateway.managedGatewayClass.deployment.minInstances }}
-            {{- end}}
-            {{- end}}
-            {{- if .Values.apiGateway.managedGatewayClass.nodeSelector }}
-            - -node-selector={{ .Values.apiGateway.managedGatewayClass.nodeSelector }}
-            {{- end }}
-            {{- if .Values.apiGateway.managedGatewayClass.tolerations }}
-            - -tolerations={{ .Values.apiGateway.managedGatewayClass.tolerations }}
-            {{- end }}
-            {{- if .Values.apiGateway.managedGatewayClass.copyAnnotations.service }}
-            - -service-annotations={{ .Values.apiGateway.managedGatewayClass.copyAnnotations.service.annotations }}
-            {{- end }}
-            - -service-type={{ .Values.apiGateway.managedGatewayClass.serviceType }}
-            {{- else }} # the new stanza
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment }}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
             - -deployment-default-instances={{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
@@ -101,7 +79,15 @@ spec:
             - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
             {{- end }}
             - -map-privileged-container-ports={{ .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
-            {{- end}}
+            {{- if (ne (.Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled | toString) "-") }}
+            - -enable-metrics={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled | toString }}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}
+            - -metrics-path={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
+            - -metrics-port={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
+            {{- end }}
           resources:
             requests:
               memory: "50Mi"

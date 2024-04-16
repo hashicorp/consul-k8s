@@ -304,7 +304,6 @@ func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
 
 // Test that we pass the dns proxy flag to dataplane correctly.
 func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
-
 	// We only want the flag passed when DNS and tproxy are both enabled. DNS/tproxy can
 	// both be enabled/disabled with annotations/labels on the pod and namespace and then globally
 	// through the helm chart. To test this we use an outer loop with the possible DNS settings and then
@@ -365,7 +364,6 @@ func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
 	for i, dnsCase := range dnsCases {
 		for j, tproxyCase := range tproxyCases {
 			t.Run(fmt.Sprintf("dns=%d,tproxy=%d", i, j), func(t *testing.T) {
-
 				// Test setup.
 				h := MeshWebhook{
 					ConsulConfig:           &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
@@ -830,8 +828,8 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
+				RunAsUser:                pointer.Int64(1000700000),
+				RunAsGroup:               pointer.Int64(1000700000),
 				RunAsNonRoot:             pointer.Bool(true),
 				ReadOnlyRootFilesystem:   pointer.Bool(true),
 				AllowPrivilegeEscalation: pointer.Bool(false),
@@ -839,6 +837,19 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 		},
 	}
 	for name, c := range cases {
+		ns := corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        k8sNamespace,
+				Namespace:   k8sNamespace,
+				Annotations: map[string]string{},
+				Labels:      map[string]string{},
+			},
+		}
+
+		if c.openShiftEnabled {
+			ns.Annotations[constants.AnnotationOpenShiftUIDRange] = "1000700000/100000"
+			ns.Annotations[constants.AnnotationOpenShiftGroups] = "1000700000/100000"
+		}
 		t.Run(name, func(t *testing.T) {
 			w := MeshWebhook{
 				EnableTransparentProxy: c.tproxyEnabled,
@@ -847,6 +858,7 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			}
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
 					Annotations: map[string]string{
 						constants.AnnotationService: "foo",
 					},
@@ -860,7 +872,7 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 					},
 				},
 			}
-			ec, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
+			ec, err := w.consulDataplaneSidecar(ns, pod, multiPortInfo{})
 			require.NoError(t, err)
 			require.Equal(t, c.expSecurityContext, ec.SecurityContext)
 		})
@@ -887,7 +899,10 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t
 		},
 	}
 	_, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
-	require.EqualError(err, fmt.Sprintf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID))
+	require.EqualError(
+		err,
+		fmt.Sprintf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID),
+	)
 }
 
 // Test that if the user specifies a container with security context with the same uid as `sidecarUserAndGroupID` that we
@@ -924,9 +939,12 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 					},
 				},
 			},
-			webhook:       MeshWebhook{},
-			expErr:        true,
-			expErrMessage: fmt.Sprintf("container \"app\" has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed", sidecarUserAndGroupID),
+			webhook: MeshWebhook{},
+			expErr:  true,
+			expErrMessage: fmt.Sprintf(
+				"container \"app\" has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed",
+				sidecarUserAndGroupID,
+			),
 		},
 		{
 			name: "doesn't fail with envoy image",
@@ -1389,7 +1407,11 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 				},
 			},
 			expCmdArgs: "",
-			expErr:     fmt.Sprintf("must set one of %q or %q when providing prometheus TLS config", constants.AnnotationPrometheusCAFile, constants.AnnotationPrometheusCAPath),
+			expErr: fmt.Sprintf(
+				"must set one of %q or %q when providing prometheus TLS config",
+				constants.AnnotationPrometheusCAFile,
+				constants.AnnotationPrometheusCAPath,
+			),
 		},
 		{
 			name: "merge metrics with TLS enabled, missing cert gives an error",
@@ -1459,8 +1481,10 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 
 func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 	gracefulShutdownSeconds := 10
+	gracefulStartupSeconds := 10
 	gracefulPort := "20307"
 	gracefulShutdownPath := "/exit"
+	gracefulStartupPath := "/start"
 
 	cases := []struct {
 		name        string
@@ -1482,12 +1506,14 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultEnableProxyLifecycle:         true,
 					DefaultEnableShutdownDrainListeners: true,
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
 				},
 			},
 			annotations: nil,
-			expCmdArgs:  "graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit",
+			expCmdArgs:  "graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -startup-grace-period-seconds=10 -graceful-startup-path=/start",
 		},
 		{
 			name:    "no defaults, all annotations",
@@ -1496,10 +1522,12 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 				constants.AnnotationEnableSidecarProxyLifecycle:                       "true",
 				constants.AnnotationEnableSidecarProxyLifecycleShutdownDrainListeners: "true",
 				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   fmt.Sprint(gracefulShutdownSeconds),
+				constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds:    fmt.Sprint(gracefulStartupSeconds),
 				constants.AnnotationSidecarProxyLifecycleGracefulPort:                 gracefulPort,
 				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         gracefulShutdownPath,
+				constants.AnnotationSidecarProxyLifecycleGracefulStartupPath:          gracefulStartupPath,
 			},
-			expCmdArgs: "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit",
+			expCmdArgs: "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -startup-grace-period-seconds=10 -graceful-startup-path=/start",
 		},
 		{
 			name: "annotations override defaults",
@@ -1508,18 +1536,22 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultEnableProxyLifecycle:         false,
 					DefaultEnableShutdownDrainListeners: true,
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
 				},
 			},
 			annotations: map[string]string{
 				constants.AnnotationEnableSidecarProxyLifecycle:                       "true",
 				constants.AnnotationEnableSidecarProxyLifecycleShutdownDrainListeners: "false",
 				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   fmt.Sprint(gracefulShutdownSeconds + 5),
+				constants.AnnotationSidecarProxyLifecycleStartupGracePeriodSeconds:    fmt.Sprint(gracefulStartupSeconds + 5),
 				constants.AnnotationSidecarProxyLifecycleGracefulPort:                 "20317",
 				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         "/foo",
+				constants.AnnotationSidecarProxyLifecycleGracefulStartupPath:          "/bar",
 			},
-			expCmdArgs: "-graceful-port=20317 -shutdown-grace-period-seconds=15 -graceful-shutdown-path=/foo",
+			expCmdArgs: "-graceful-port=20317 -shutdown-grace-period-seconds=15 -graceful-shutdown-path=/foo -startup-grace-period-seconds=15 -graceful-startup-path=/bar",
 		},
 		{
 			name: "lifecycle disabled, no annotations",
@@ -1528,8 +1560,10 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultEnableProxyLifecycle:         false,
 					DefaultEnableShutdownDrainListeners: true,
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
 				},
 			},
 			annotations: nil,
@@ -1552,8 +1586,10 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 					DefaultEnableProxyLifecycle:         true,
 					DefaultEnableShutdownDrainListeners: true,
 					DefaultShutdownGracePeriodSeconds:   gracefulShutdownSeconds,
+					DefaultStartupGracePeriodSeconds:    gracefulStartupSeconds,
 					DefaultGracefulPort:                 gracefulPort,
 					DefaultGracefulShutdownPath:         gracefulShutdownPath,
+					DefaultGracefulStartupPath:          gracefulStartupPath,
 				},
 			},
 			annotations: map[string]string{

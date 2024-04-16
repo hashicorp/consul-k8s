@@ -748,6 +748,19 @@ load _helpers
   [ "${actual}" = "/v1/agent/metrics" ]
 }
 
+@test "server/Statefulset: when global.metrics.enabled=true, and server annotation for prometheus path is specified, it uses the specified annotation rather than default." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'server.annotations=prometheus.io/path: /anew/path' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "/anew/path" ]
+}
+
+
 @test "server/StatefulSet: when global.metrics.enableAgentMetrics=true, adds prometheus scheme=http annotation" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -1068,6 +1081,37 @@ load _helpers
   local actual=$( echo "$labels" | \
     yq -r '."tags.datadoghq.com/service"' | tee /dev/stderr )
   [ "${actual}" = "consul-server" ]
+}
+
+@test "server/StatefulSet: datadog unix socket path name rendering for hostPath volume and volumeMount using default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.metrics.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.volumes[] | select(.name=="dsdsocket") | .hostPath.path' | tee /dev/stderr)
+
+  [ "${actual}" = "/var/run/datadog" ]
+}
+
+@test "server/StatefulSet: datadog unix socket path name rendering for hostPath volume and volumeMount using non default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.metrics.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true' \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdAddr="/this/otherpath/datadog/dsd.socket"' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.volumes[] | select(.name=="dsdsocket") | .hostPath.path' | tee /dev/stderr)
+
+  [ "${actual}" = "/this/otherpath/datadog" ]
 }
 
 #--------------------------------------------------------------------
