@@ -288,8 +288,8 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 
 			logger.Log(t, "verify the service via DNS in the secondary partition of the Consul catalog.")
 			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext,
-				"app=static-server", fmt.Sprintf("%s.service.consul", staticServerName),
-				"%s. 0\tIN\tA\t%s")
+				"app=static-server", fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition),
+				"%s. 0 IN\tA %s")
 		})
 	}
 }
