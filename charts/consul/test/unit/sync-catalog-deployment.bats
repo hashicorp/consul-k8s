@@ -414,6 +414,29 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# syncLoadBalancerEndpoints
+
+@test "syncCatalog/Deployment: enable LB endpoints sync flag not passed when disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-lb-services-endpoints=true"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+@test "syncCatalog/Deployment: enable LB endpoints sync flag passed when enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.syncLoadBalancerEndpoints=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command | any(contains("-sync-lb-services-endpoints=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # affinity
 
 @test "syncCatalog/Deployment: affinity not set by default" {
