@@ -99,7 +99,7 @@ func NewHelmCluster(
 		configureNamespace(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
 
 		if cfg.DatadogAPIKey != "" || cfg.DatadogAppKey != "" {
-			CreateOrUpdateDatadogSecret(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
+			createOrUpdateDatadogSecret(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
 		}
 	}
 
@@ -680,12 +680,12 @@ func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg 
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
 }
 
-func CreateOrUpdateDatadogSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+func createOrUpdateDatadogSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	secretMap := map[string]string{
 		config.DatadogAPIKey: cfg.DatadogAPIKey,
 		config.DatadogAppKey: cfg.DatadogAppKey,
 	}
-	CreateMultiKeyK8sSecret(t, client, cfg, namespace, config.DatadogSecretName, secretMap)
+	createMultiKeyK8sSecret(t, client, cfg, namespace, config.DatadogSecretName, secretMap)
 }
 
 func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
@@ -800,7 +800,7 @@ func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.Test
 	})
 }
 
-func CreateMultiKeyK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName string, secretMap map[string]string) {
+func createMultiKeyK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName string, secretMap map[string]string) {
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
 		_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
