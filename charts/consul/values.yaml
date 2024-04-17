@@ -2193,6 +2193,10 @@ syncCatalog:
   # Set this to false to skip syncing ClusterIP services.
   syncClusterIPServices: true
 
+  # If true, LoadBalancer service endpoints instead of ingress addresses will be synced to Consul. 
+  # If false, LoadBalancer endpoints are not synced to Consul.
+  syncLoadBalancerEndpoints: false
+
   ingress:
     # Syncs the hostname from a Kubernetes Ingress resource to service registrations
     # when a rule matched a service. Currently only supports host based routing and
@@ -2868,8 +2872,10 @@ connectInject:
     # - `consul.hashicorp.com/enable-sidecar-proxy-lifecycle`
     # - `consul.hashicorp.com/enable-sidecar-proxy-shutdown-drain-listeners`
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-startup-grace-period-seconds`
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-port`
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-shutdown-path`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-startup-path`
     # @type: map
     lifecycle:
       # @type: boolean
@@ -2879,9 +2885,13 @@ connectInject:
       # @type: integer
       defaultShutdownGracePeriodSeconds: 30
       # @type: integer
+      defaultStartupGracePeriodSeconds: 0
+      # @type: integer
       defaultGracefulPort: 20600
       # @type: string
       defaultGracefulShutdownPath: "/graceful_shutdown"
+      # @type: string
+      defaultGracefulStartupPath: "/graceful_startup"
 
     # Configures how long the k8s startup probe will wait before the proxy is considered to be unhealthy and the container is restarted.
     # A value of zero disables the probe.

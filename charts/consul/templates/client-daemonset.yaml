@@ -93,7 +93,9 @@ spec:
         {{- end }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
         "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.client.annotations | fromYaml) "prometheus.io/path")}}
         "prometheus.io/path": "/v1/agent/metrics"
+        {{- end }}
         "prometheus.io/port": "8500"
         {{- end }}
     spec:

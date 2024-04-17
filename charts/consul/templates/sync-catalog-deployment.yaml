@@ -192,6 +192,9 @@ spec:
             -loadBalancer-ips=true \
             {{- end }}
             {{- end }}
+            {{- if .Values.syncCatalog.syncLoadBalancerEndpoints }}
+            -sync-lb-services-endpoints=true \
+            {{- end }}
         livenessProbe:
           httpGet:
             path: /health/ready
