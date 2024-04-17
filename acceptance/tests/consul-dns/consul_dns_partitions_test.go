@@ -283,13 +283,17 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 			require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
 
 			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
-			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext,
+			// default partition DNS queries should be able to use the static-server.service.consul to get the local partition's version of the service
+			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext, primaryClusterContext,
 				podLabelSelector, serviceRequestWithNoPartition, true, dnsUtilsPodIndex)
 			dnsUtilsPodIndex++
-			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext,
+			// default partition DNS queries should be able to use the static-server.service.default.ap.consul to get the local partition's version of the service
+			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext, primaryClusterContext,
 				podLabelSelector, serviceRequestInDefaultPartition, true, dnsUtilsPodIndex)
 			dnsUtilsPodIndex++
-			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext,
+			// default partition DNS queries should not be able to use the static-server.service.secondary.ap.consul
+			// to get the secondary partition's version of the service since it is not exported
+			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext, secondaryClusterContext,
 				podLabelSelector, serviceRequestInSecondaryPartition, false, dnsUtilsPodIndex)
 			dnsUtilsPodIndex++
 
@@ -300,17 +304,47 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 			require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
 
 			logger.Log(t, "verify the service via DNS in the secondary partition of the Consul catalog.")
-			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext,
+			// secondary partition DNS queries should be able to use the static-server.service.secondary.ap.consul to get the local partition's version of the service
+			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, secondaryClusterContext,
 				podLabelSelector, serviceRequestInSecondaryPartition,
 				true, dnsUtilsPodIndex)
 			dnsUtilsPodIndex++
 
 			// TODO(NET-8958): should this return the local partition's version?
-			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext,
+			// secondary partition DNS queries should not be able to use the static-server.service.consul
+			// to get the primary partition's version of the service since it is not exported
+			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, primaryClusterContext,
 				podLabelSelector, serviceRequestWithNoPartition, false, dnsUtilsPodIndex)
 			dnsUtilsPodIndex++
-			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext,
+			// secondary partition DNS queries should not be able to use the static-server.service.default.ap.consul
+			// to get the primary partition's version of the service since it is not exported
+			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, primaryClusterContext,
 				podLabelSelector, serviceRequestInDefaultPartition, false, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
+
+			// Now export services and verify that they are available in the other partition.
+
+			k8s.KubectlApplyK(t, primaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+			k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDeleteK(t, primaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+				k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+			})
+
+			// default partition DNS queries should be able to use the static-server.service.secondary.ap.consul
+			// to get the secondary partition's version of the service since it is now exported
+			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext, secondaryClusterContext,
+				podLabelSelector, serviceRequestInSecondaryPartition, true, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
+			// secondary partition DNS queries should be able to use the static-server.service.consul
+			// to get the primary partition's version of the service since it is now exported
+			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, primaryClusterContext,
+				podLabelSelector, serviceRequestWithNoPartition, true, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
+			// secondary partition DNS queries should be able to use the static-server.service.default.ap.consul
+			// to get the primary partition's version of the service since it is now exported
+			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, primaryClusterContext,
+				podLabelSelector, serviceRequestInDefaultPartition, true, dnsUtilsPodIndex)
 			dnsUtilsPodIndex++
 
 		})

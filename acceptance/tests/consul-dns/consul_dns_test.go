@@ -69,24 +69,24 @@ func TestConsulDNS(t *testing.T) {
 				serverIPs = append(serverIPs, serverPod.Status.PodIP)
 			}
 
-			verifyDNS(t, releaseName, c.enableDNSProxy, contextNamespace, ctx, "app=consul,component=server",
+			verifyDNS(t, releaseName, c.enableDNSProxy, contextNamespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
 		})
 	}
 }
 
-func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespace string, ctx environment.TestContext,
+func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespace string, requestingCtx, svcContext environment.TestContext,
 	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
 	logger.Log(t, "get the in cluster dns service or proxy.")
 	dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
 	if enableDNSProxy {
 		dnsSvcName += "-proxy"
 	}
-	dnsService, err := ctx.KubernetesClient(t).CoreV1().Services(ctx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
+	dnsService, err := requestingCtx.KubernetesClient(t).CoreV1().Services(requestingCtx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
 	require.NoError(t, err)
 	dnsIP := dnsService.Spec.ClusterIP
 
-	podList, err := ctx.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
+	podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: podLabelSelector,
 	})
 	require.NoError(t, err)
@@ -107,12 +107,12 @@ func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespa
 		// This shouldn't cause any test pollution because the underlying
 		// objects are deployments, and so when other tests create these
 		// they should have different pod names.
-		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
+		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
 	})
 
 	retry.Run(t, func(r *retry.R) {
 		logger.Log(t, "run the dns utilize pod and query DNS for the service.")
-		logs, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), dnsTestPodArgs...)
+		logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
 		require.NoError(r, err)
 
 		// When the `dig` request is successful, a section of it's response looks like the following:
