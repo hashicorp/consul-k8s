@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: support sync-lb-services-endpoints flag for syncCatalog
+```
