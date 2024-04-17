@@ -98,7 +98,7 @@ func NewHelmCluster(
 		datadogNamespace := helmValues["global.metrics.datadog.namespace"]
 		configureNamespace(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
 
-		if cfg.DatadogAPIKey != "" || cfg.DatadogAppKey != "" {
+		if cfg.EnableDatadog && (cfg.DatadogAPIKey != "" || cfg.DatadogAppKey != "") {
 			createOrUpdateDatadogSecret(t, ctx.KubernetesClient(t), cfg, datadogNamespace)
 		}
 	}

@@ -23,6 +23,7 @@ const (
 	// consulOTLPMetricQuery      = `otelcol_process_runtime_heap_alloc_bytes`.
 )
 
+// TODO: Refactor test cases into single function that accepts Helm Values, Fixture Name, and Validation Callback
 // TestDatadogDogstatsDUnixDomainSocket
 // Acceptance test to verify e2e metrics configuration works as expected
 // with live datadog API using histogram formatted metric
@@ -49,12 +50,6 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 		"global.metrics.datadog.dogstatsd.dogstatsdTags[2]":    acceptanceTestingTags,
 	}
 
-	datadogOperatorHelmValues := map[string]string{
-		"replicaCount":     "1",
-		"image.tag":        datadog.DefaultHelmChartVersion,
-		"image.repository": "gcr.io/datadoghq/operator",
-	}
-
 	releaseName := helpers.RandomName()
 	datadogOperatorRelease := datadog.OperatorReleaseName
 
@@ -65,7 +60,7 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 	// Deploy Datadog Agent via Datadog Operator and apply dogstatsd overlay
 	datadogNamespace := helmValues["global.metrics.datadog.namespace"]
 	logger.Log(t, fmt.Sprintf("deploying datadog-operator via helm | namespace: %s | release-name: %s", datadogNamespace, datadogOperatorRelease))
-	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
+	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, map[string]string{})
 	datadogCluster.Create(t)
 
 	logger.Log(t, fmt.Sprintf("applying dogstatd over unix domain sockets kustomization patch to datadog-agent | namespace: %s", datadogNamespace))
@@ -120,12 +115,6 @@ func TestDatadogDogstatsDUDP(t *testing.T) {
 		"global.metrics.datadog.dogstatsd.dogstatsdTags[2]":    acceptanceTestingTags,
 	}
 
-	datadogOperatorHelmValues := map[string]string{
-		"replicaCount":     "1",
-		"image.tag":        datadog.DefaultHelmChartVersion,
-		"image.repository": "gcr.io/datadoghq/operator",
-	}
-
 	releaseName := helpers.RandomName()
 	datadogOperatorRelease := datadog.OperatorReleaseName
 
@@ -136,7 +125,7 @@ func TestDatadogDogstatsDUDP(t *testing.T) {
 	// Deploy Datadog Agent via Datadog Operator and apply dogstatsd overlay.
 	datadogNamespace := helmValues["global.metrics.datadog.namespace"]
 	logger.Log(t, fmt.Sprintf("deploying datadog-operator via helm | namespace: %s | release-name: %s", datadogNamespace, datadogOperatorRelease))
-	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
+	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, map[string]string{})
 	datadogCluster.Create(t)
 
 	logger.Log(t, fmt.Sprintf("applying dogstatd over UDP kustomization patch to datadog-agent | namespace: %s", datadogNamespace))
@@ -184,12 +173,6 @@ func TestDatadogConsulChecks(t *testing.T) {
 		"global.metrics.datadog.namespace":    "datadog",
 	}
 
-	datadogOperatorHelmValues := map[string]string{
-		"replicaCount":     "1",
-		"image.tag":        datadog.DefaultHelmChartVersion,
-		"image.repository": "gcr.io/datadoghq/operator",
-	}
-
 	releaseName := helpers.RandomName()
 	datadogOperatorRelease := datadog.OperatorReleaseName
 
@@ -200,7 +183,7 @@ func TestDatadogConsulChecks(t *testing.T) {
 	// Deploy Datadog Agent via Datadog Operator and apply dogstatsd overlay.
 	datadogNamespace := helmValues["global.metrics.datadog.namespace"]
 	logger.Log(t, fmt.Sprintf("deploying datadog-operator via helm | namespace: %s | release-name: %s", datadogNamespace, datadogOperatorRelease))
-	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
+	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, map[string]string{})
 	datadogCluster.Create(t)
 
 	logger.Log(t, fmt.Sprintf("applying datadog consul integration patch to datadog-agent | namespace: %s", datadogNamespace))
@@ -254,12 +237,6 @@ func TestDatadogOpenmetrics(t *testing.T) {
 		"global.metrics.datadog.openMetricsPrometheus.enabled": "true",
 	}
 
-	datadogOperatorHelmValues := map[string]string{
-		"replicaCount":     "1",
-		"image.tag":        datadog.DefaultHelmChartVersion,
-		"image.repository": "gcr.io/datadoghq/operator",
-	}
-
 	releaseName := helpers.RandomName()
 	datadogOperatorRelease := datadog.OperatorReleaseName
 
@@ -270,7 +247,7 @@ func TestDatadogOpenmetrics(t *testing.T) {
 	// Deploy Datadog Agent via Datadog Operator and apply dogstatsd overlay
 	datadogNamespace := helmValues["global.metrics.datadog.namespace"]
 	logger.Log(t, fmt.Sprintf("deploying datadog-operator via helm | namespace: %s | release-name: %s", datadogNamespace, datadogOperatorRelease))
-	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, datadogOperatorHelmValues)
+	datadogCluster := datadog.NewDatadogCluster(t, ctx, cfg, datadogOperatorRelease, datadogNamespace, map[string]string{})
 	datadogCluster.Create(t)
 
 	logger.Log(t, fmt.Sprintf("applying datadog openmetrics patch to datadog-agent | namespace: %s", datadogNamespace))
