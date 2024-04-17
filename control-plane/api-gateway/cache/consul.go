@@ -359,6 +359,9 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 			if err != nil {
 				return "", err
 			}
+
+			// on an upgrade the cache will be empty so we need to write the policy to the cache
+			c.gatewayNameToPolicy[gatewayName] = existing
 			return existing.ID, nil
 		}
 
@@ -386,6 +389,8 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 		return "", err
 	}
 
+	// update cache with existing policy
+	c.gatewayNameToPolicy[gatewayName] = existing
 	return existing.ID, nil
 }
 
@@ -426,7 +431,8 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 	}
 
 	if aclRole != nil {
-		return cachedRole.Name, nil
+		c.gatewayNameToRole[gatewayName] = aclRole
+		return aclRole.Name, nil
 	}
 
 	return createRole()
