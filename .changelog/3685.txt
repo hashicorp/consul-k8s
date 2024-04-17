@@ -1,6 +1,3 @@
-```release-note:improvement
-helm: acceptance tests added for datadog integration features of consul-k8s
-```
 ```release-note:bug
 helm: corrected datadog openmetrics and consul-checks consul server URLs set during automation to use full consul deployment release name
 ```
