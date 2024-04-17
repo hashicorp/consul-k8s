@@ -39,7 +39,7 @@ type DatadogCluster struct {
 }
 
 // releaseLabelSelector returns label selector that selects all pods
-// from a Vault installation.
+// from a Datadog installation.
 func (d *DatadogCluster) releaseLabelSelector() string {
 	return fmt.Sprintf("%s=%s", releaseLabel, d.releaseName)
 }
