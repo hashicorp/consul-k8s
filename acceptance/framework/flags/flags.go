@@ -23,11 +23,9 @@ type TestFlags struct {
 	flagEnableEnterprise  bool
 	flagEnterpriseLicense string
 
-	flagEnableDatadog bool
-	flagDatadogAPIKey string
-	flagDatadogAppKey string
-
 	flagEnableOpenshift bool
+
+	flagSkipDatadogTests bool
 
 	flagEnablePodSecurityPolicies bool
 
@@ -113,14 +111,6 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagEnterpriseLicense, "enterprise-license", "",
 		"The enterprise license for Consul.")
 
-	flag.BoolVar(&t.flagEnableDatadog, "enable-datadog", false,
-		"If true, the test suite will run tests for datadog integration features. ")
-
-	flag.StringVar(&t.flagDatadogAPIKey, "dd-api-key", "DD_FAKEAPIKEY",
-		"The Datadog Agent API Key used for datadog metrics tests.")
-	flag.StringVar(&t.flagDatadogAppKey, "dd-app-key", "DD_FAKEAPPKEY",
-		"The Datadog Agent Application Key used for datadog metrics tests.")
-
 	flag.BoolVar(&t.flagEnableOpenshift, "enable-openshift", false,
 		"If true, the tests will automatically add Openshift Helm value for each Helm install.")
 
@@ -167,14 +157,11 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagDisablePeering, "disable-peering", false,
 		"If true, the peering tests will not run.")
 
+	flag.BoolVar(&t.flagSkipDatadogTests, "skip-datadog", false,
+		"If true, datadog acceptance tests will not run.")
+
 	if t.flagEnterpriseLicense == "" {
 		t.flagEnterpriseLicense = os.Getenv("CONSUL_ENT_LICENSE")
-	}
-	if ddAPIKeyEnv, exists := os.LookupEnv("DATADOG_API_KEY"); exists {
-		t.flagDatadogAPIKey = ddAPIKeyEnv
-	}
-	if ddAPPKeyEnv, exists := os.LookupEnv("DATADOG_APP_KEY"); exists {
-		t.flagDatadogAppKey = ddAPPKeyEnv
 	}
 }
 
@@ -222,14 +209,12 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
 
-		EnableDatadog: t.flagEnableDatadog,
-		DatadogAPIKey: t.flagDatadogAPIKey,
-		DatadogAppKey: t.flagDatadogAppKey,
-
 		KubeEnvs:           kubeEnvs,
 		EnableMultiCluster: t.flagEnableMultiCluster,
 
 		EnableOpenshift: t.flagEnableOpenshift,
+
+		SkipDataDogTests: t.flagSkipDatadogTests,
 
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
 

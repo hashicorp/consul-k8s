@@ -20,7 +20,6 @@ import (
 
 const (
 	consulDogstatsDMetricQuery = "consul.memberlist.gossip"
-	// consulOTLPMetricQuery      = `otelcol_process_runtime_heap_alloc_bytes`.
 )
 
 // TODO: Refactor test cases into single function that accepts Helm Values, Fixture Name, and Validation Callback
@@ -33,6 +32,10 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
+
+	if cfg.SkipDataDogTests {
+		t.Skipf("skipping this test because -skip-datadog is set")
+	}
 
 	acceptanceTestingTags := "acceptance_test:unix_domain_sockets"
 	helmValues := map[string]string{
@@ -97,6 +100,10 @@ func TestDatadogDogstatsDUDP(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
+
+	if cfg.SkipDataDogTests {
+		t.Skipf("skipping this test because -skip-datadog is set")
+	}
 
 	acceptanceTestingTags := "acceptance_test:dogstatsd_udp"
 	helmValues := map[string]string{
@@ -163,6 +170,10 @@ func TestDatadogConsulChecks(t *testing.T) {
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
 
+	if cfg.SkipDataDogTests {
+		t.Skipf("skipping this test because -skip-datadog is set")
+	}
+
 	helmValues := map[string]string{
 		"global.datacenter":                   "dc1",
 		"global.metrics.enabled":              "true",
@@ -225,6 +236,10 @@ func TestDatadogOpenmetrics(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
+
+	if cfg.SkipDataDogTests {
+		t.Skipf("skipping this test because -skip-datadog is set")
+	}
 
 	helmValues := map[string]string{
 		"global.datacenter":                                    "dc1",
