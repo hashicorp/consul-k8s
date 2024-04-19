@@ -1,0 +1,4 @@
+
+resources:
+  - fake-intake.yaml
+  - datadog.yaml
