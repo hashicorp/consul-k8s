@@ -32,6 +32,7 @@ ARG CNI_BIN_NAME=consul-cni
 ARG VERSION
 ARG TARGETARCH
 ARG TARGETOS
+ARG PRODUCT_NAME=$BIN_NAME
 
 LABEL name=${BIN_NAME} \
       maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
@@ -42,7 +43,6 @@ LABEL name=${BIN_NAME} \
       description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
       org.opencontainers.image.licenses="MPL-2.0"
 
-RUN mkdir -p /usr/share/doc/$PRODUCT_NAME
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
 # Set ARGs as ENV so that they can be used in ENTRYPOINT/CMD
@@ -84,6 +84,7 @@ FROM alpine:3.18 AS release-default
 ARG BIN_NAME=consul-k8s-control-plane
 ARG CNI_BIN_NAME=consul-cni
 ARG PRODUCT_VERSION
+ARG PRODUCT_NAME=$BIN_NAME
 
 LABEL name=${BIN_NAME} \
       maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
@@ -94,7 +95,6 @@ LABEL name=${BIN_NAME} \
       description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
       org.opencontainers.image.licenses="MPL-2.0"
 
-RUN mkdir -p /usr/share/doc/$PRODUCT_NAME
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
 # Set ARGs as ENV so that they can be used in ENTRYPOINT/CMD
@@ -161,7 +161,6 @@ LABEL name=$PRODUCT_NAME \
       description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
       org.opencontainers.image.licenses="MPL-2.0"
 
-RUN mkdir -p /usr/share/doc/$PRODUCT_NAME
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
 # Set ARGs as ENV so that they can be used in ENTRYPOINT/CMD
