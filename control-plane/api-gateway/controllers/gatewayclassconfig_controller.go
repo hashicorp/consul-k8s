@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -117,12 +116,12 @@ func (r *GatewayClassConfigController) SetupWithManager(ctx context.Context, mgr
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.GatewayClassConfig{}).
 		// Watch for changes to GatewayClass objects associated with this config for purposes of finalizer removal.
-		Watches(source.NewKindWithCache(&gwv1beta1.GatewayClass{}, mgr.GetCache()), r.transformGatewayClassToGatewayClassConfig(ctx)).
+		Watches(&gwv1beta1.GatewayClass{}, r.transformGatewayClassToGatewayClassConfig()).
 		Complete(r)
 }
 
-func (r *GatewayClassConfigController) transformGatewayClassToGatewayClassConfig(ctx context.Context) handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+func (r *GatewayClassConfigController) transformGatewayClassToGatewayClassConfig() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 		gc := o.(*gwv1beta1.GatewayClass)
 
 		pr := gc.Spec.ParametersRef

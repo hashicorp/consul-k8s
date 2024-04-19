@@ -52,10 +52,8 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
 		DefaultEnableShutdownDrainListeners: c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
 		DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
-		DefaultStartupGracePeriodSeconds:    c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds,
 		DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
 		DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
-		DefaultGracefulStartupPath:          c.flagDefaultSidecarProxyLifecycleGracefulStartupPath,
 	}
 
 	metricsConfig := metrics.Config{
@@ -288,8 +286,6 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		setupLog.Error(err, "unable to create controller", "controller", common.ExportedServices)
 		return err
 	}
-
-	mgr.GetWebhookServer().CertDir = c.flagCertDir
 
 	mgr.GetWebhookServer().Register("/mutate",
 		&ctrlRuntimeWebhook.Admission{Handler: &webhookv2.MeshWebhook{

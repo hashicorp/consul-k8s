@@ -230,8 +230,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				FieldSelector: fields.OneTermEqualSelector(Gatewaypolicy_GatewayIndex, gwNamespaceName.String()),
 			})
 
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 			v := &GatewayPolicyWebhook{
 				Logger:  logrtest.New(t),
 				decoder: decoder,

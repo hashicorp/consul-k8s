@@ -269,8 +269,8 @@ func TestTransformEndpoints(t *testing.T) {
 				allowK8sNamespacesSet: allowSet,
 			}
 
-			fn := controller.transformEndpoints(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.endpoints))
+			fn := controller.transformEndpoints
+			require.ElementsMatch(t, tt.expected, fn(context.Background(), tt.endpoints))
 		})
 	}
 }
@@ -409,8 +409,8 @@ func TestTransformHTTPRoute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			controller := GatewayController{}
 
-			fn := controller.transformHTTPRoute(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.route))
+			fn := controller.transformHTTPRoute
+			require.ElementsMatch(t, tt.expected, fn(context.Background(), tt.route))
 		})
 	}
 }
@@ -549,8 +549,8 @@ func TestTransformTCPRoute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			controller := GatewayController{}
 
-			fn := controller.transformTCPRoute(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.route))
+			fn := controller.transformTCPRoute
+			require.ElementsMatch(t, tt.expected, fn(context.Background(), tt.route))
 		})
 	}
 }
@@ -635,8 +635,8 @@ func TestTransformSecret(t *testing.T) {
 				Client: fakeClient,
 			}
 
-			fn := controller.transformSecret(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.secret))
+			fn := controller.transformSecret
+			require.ElementsMatch(t, tt.expected, fn(context.Background(), tt.secret))
 		})
 	}
 }
