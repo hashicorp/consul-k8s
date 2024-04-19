@@ -1,0 +1,3 @@
+```release-note:improvement
+terminating-gateways: Remove unnecessary permissions from terminating gateways role
+```
