@@ -5,6 +5,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -1683,16 +1684,37 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 	kubeNS := "default"
 
 	cases := []struct {
-		datacenterAnnotation string
-		expErr               string
+		name                    string
+		datacenterAnnotation    string
+		expErr                  error
+		expReason               string
+		makeDifferentFromConsul bool
 	}{
 		{
-			datacenterAnnotation: "",
-			expErr:               "config entry already exists in Consul",
+			name:                    "when dc annotation is blank and the config entry does not match consul, then error is thrown, entry is not synced and reason is it is externally managed.",
+			datacenterAnnotation:    "",
+			makeDifferentFromConsul: true,
+			expErr:                  errors.New("config entry already exists in Consul"),
+			expReason:               "ExternallyManagedConfigError",
 		},
 		{
-			datacenterAnnotation: "other-datacenter",
-			expErr:               "config entry managed in different datacenter: \"other-datacenter\"",
+			name:                    "when dc annotation is not blank and the config entry matches consul, then error is not thrown and it is marked as synced",
+			datacenterAnnotation:    "",
+			makeDifferentFromConsul: false,
+			expErr:                  nil,
+		},
+		{
+			name:                    "when dc annotation is not blank and the config entry does not match consul, then error is thrown, entry is not synced and reason is it is externally managed.",
+			datacenterAnnotation:    "other-datacenter",
+			makeDifferentFromConsul: true,
+			expErr:                  errors.New("config entry managed in different datacenter: \"other-datacenter\""),
+			expReason:               "ExternallyManagedConfigError",
+		},
+		{
+			name:                    "when dc annotation is not blank and the config entry matches consul, then error is not thrown and it is marked as synced",
+			datacenterAnnotation:    "other-datacenter",
+			makeDifferentFromConsul: false,
+			expErr:                  nil,
 		},
 	}
 
@@ -1713,6 +1735,11 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 			}
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
+
+			// Change the config entry so protocol is https instead of http if test case says to
+			if c.makeDifferentFromConsul {
+				svcDefaults.Spec.Protocol = "https"
+			}
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1749,7 +1776,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
-				req.EqualError(err, c.expErr)
+				req.Equal(err, c.expErr)
 				req.False(resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
@@ -1761,9 +1788,17 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				err = fakeClient.Get(ctx, namespacedName, svcDefaults)
 				req.NoError(err)
 				status, reason, errMsg := svcDefaults.SyncedCondition()
-				req.Equal(corev1.ConditionFalse, status)
-				req.Equal("ExternallyManagedConfigError", reason)
-				req.Equal(errMsg, c.expErr)
+				expectedStatus := corev1.ConditionFalse
+				if !c.makeDifferentFromConsul {
+					expectedStatus = corev1.ConditionTrue
+				}
+				req.Equal(expectedStatus, status)
+				if !c.makeDifferentFromConsul {
+					req.Equal(c.expReason, reason)
+				}
+				if c.expErr != nil {
+					req.Equal(errMsg, c.expErr.Error())
+				}
 			}
 		})
 	}
