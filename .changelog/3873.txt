@@ -1,0 +1,3 @@
+```release-note:improvement
+ConfigEntries controller: Only error for config entries from different datacenters when the config entries are different
+```
