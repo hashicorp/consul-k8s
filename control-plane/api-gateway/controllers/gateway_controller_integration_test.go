@@ -151,7 +151,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			gwSub := resourceCache.Subscribe(ctx, api.APIGateway, gwCtrl.transformConsulGateway)
 			httpRouteSub := resourceCache.Subscribe(ctx, api.HTTPRoute, gwCtrl.transformConsulHTTPRoute(ctx))
 			tcpRouteSub := resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
-			inlineCertSub := resourceCache.Subscribe(ctx, api.InlineCertificate, gwCtrl.transformConsulFileSystemCertificate(ctx))
+			fileSystemCertSub := resourceCache.Subscribe(ctx, api.FileSystemCertificate, gwCtrl.transformConsulFileSystemCertificate(ctx))
 
 			cert := tc.certFn(t, ctx, k8sClient, tc.namespace)
 			k8sGWObj := tc.gwFn(t, ctx, k8sClient, tc.namespace)
@@ -225,7 +225,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 							tcpRouteDone = true
 							w.Done()
 						}
-					case <-inlineCertSub.Events():
+					case <-fileSystemCertSub.Events():
 					}
 				}
 			}(wg)
@@ -255,7 +255,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			gwRef := gwCtrl.Translator.ConfigEntryReference(api.APIGateway, gwNamespaceName)
 			httpRouteRef := gwCtrl.Translator.ConfigEntryReference(api.HTTPRoute, httpRouteNamespaceName)
 			tcpRouteRef := gwCtrl.Translator.ConfigEntryReference(api.TCPRoute, tcpRouteNamespaceName)
-			certRef := gwCtrl.Translator.ConfigEntryReference(api.InlineCertificate, certNamespaceName)
+			certRef := gwCtrl.Translator.ConfigEntryReference(api.FileSystemCertificate, certNamespaceName)
 
 			curGWModifyIndex := resourceCache.Get(gwRef).GetModifyIndex()
 			curHTTPRouteModifyIndex := resourceCache.Get(httpRouteRef).GetModifyIndex()
