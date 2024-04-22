@@ -667,8 +667,6 @@ func (s *ResourceMap) TranslateFileSystemCertificate(key types.NamespacedName) {
 			}
 		},
 	})
-
-	return
 }
 
 func (s *ResourceMap) Mutations() []*ConsulUpdateOperation {
