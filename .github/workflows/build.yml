@@ -144,6 +144,7 @@ jobs:
         working-directory: ${{ matrix.component }}
         run: |
           mkdir -p dist out
+          echo "Current working directory: $GITHUB_WORKSPACE"
           cp LICENSE dist/LICENSE.txt
 
           export GIT_COMMIT=$(git rev-parse --short HEAD)
