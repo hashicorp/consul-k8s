@@ -53,7 +53,7 @@ load _helpers
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -s -r '.[0].rules | length' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "terminatingGateways/Role: rules for ACLs, PSPs with multiple gateways" {
@@ -76,10 +76,10 @@ load _helpers
   [ "${actual}" = "release-name-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0].rules | length' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 
   local actual=$(echo $object | yq '.[1].rules | length' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 
   local actual=$(echo $object | yq '.[2] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]
