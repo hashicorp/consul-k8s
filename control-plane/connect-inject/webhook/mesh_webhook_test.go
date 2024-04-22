@@ -1188,7 +1188,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 		Group:   "",
 		Version: "v1",
 	}, &corev1.Pod{})
-	decoder  := admission.NewDecoder(s)
+	decoder := admission.NewDecoder(s)
 
 	cases := []struct {
 		Name    string
