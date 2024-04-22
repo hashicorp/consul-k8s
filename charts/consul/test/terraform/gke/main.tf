@@ -4,15 +4,14 @@
 terraform {
   required_providers {
     google = {
-      source  = "hashicorp/google"
-      version = "~> 3.49.0"
+      version = "~> 5.3.0"
     }
   }
 }
 
 provider "google" {
   project = var.project
-  zone = var.zone
+  zone    = var.zone
 }
 
 resource "random_id" "suffix" {
@@ -22,7 +21,7 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.25."
+  version_prefix = "1.27."
 }
 
 resource "google_container_cluster" "cluster" {
