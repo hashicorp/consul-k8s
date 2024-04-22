@@ -145,6 +145,7 @@ jobs:
         working-directory: ${{ matrix.component }}
         run: |
           mkdir -p dist out
+          cp LICENSE dist/LICENSE.txt
 
           export GIT_COMMIT=$(git rev-parse --short HEAD)
           export GIT_DIRTY=$(test -n "$(git status --porcelain)" && echo "+CHANGES")
@@ -160,6 +161,13 @@ jobs:
           name: ${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
           path: ${{ matrix.component}}/out/${{ matrix.pkg_name }}_${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}_${{ matrix.goos }}_${{ matrix.goarch }}.zip
 
+      - name: Copy license file
+        env:
+          LICENSE_DIR: ".release/linux/package/usr/share/doc/${{ env.PKG_NAME }}"
+        run: |
+          mkdir -p "$LICENSE_DIR"
+          cp LICENSE "$LICENSE_DIR/LICENSE.txt"
+
       - name: Package rpm and deb files
         if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
         uses: hashicorp/actions-packaging-linux@v1
@@ -174,6 +182,7 @@ jobs:
           binary: "${{ matrix.component }}/dist/${{ matrix.pkg_name }}"
           deb_depends: "openssl"
           rpm_depends: "openssl"
+          config_dir: ".release/linux/package/"
 
       - name: Set package names
         if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
@@ -263,6 +272,9 @@ jobs:
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
+      - name: Copy LICENSE
+        run:
+          cp LICENSE ./control-plane
 
       # This naming convention will be used ONLY for per-commit dev images
       - name: Set docker dev tag
