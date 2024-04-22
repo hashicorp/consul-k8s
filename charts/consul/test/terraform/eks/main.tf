@@ -1,9 +1,17 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+terraform {
+  required_providers {
+    aws = {
+      version = ">= 2.28.1"
+    }
+  }
+
+} 
+
 provider "aws" {
-  version = ">= 2.28.1"
-  region  = var.region
+  region = var.region
 
   assume_role {
     role_arn = var.role_arn
@@ -117,12 +125,13 @@ resource "aws_iam_role_policy_attachment" "csi" {
 }
 
 resource "aws_eks_addon" "csi-driver" {
-  count                    = var.cluster_count
-  cluster_name             = module.eks[count.index].cluster_id
-  addon_name               = "aws-ebs-csi-driver"
-  addon_version            = "v1.15.0-eksbuild.1"
-  service_account_role_arn = aws_iam_role.csi-driver-role[count.index].arn
-  resolve_conflicts        = "OVERWRITE"
+  count                       = var.cluster_count
+  cluster_name                = module.eks[count.index].cluster_id
+  addon_name                  = "aws-ebs-csi-driver"
+  addon_version               = "v1.15.0-eksbuild.1"
+  service_account_role_arn    = aws_iam_role.csi-driver-role[count.index].arn
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
 }
 
 data "aws_eks_cluster" "cluster" {
