@@ -55,19 +55,19 @@ var (
 )
 
 type resourceMapResources struct {
-	grants                   []gwv1beta1.ReferenceGrant
-	secrets                  []corev1.Secret
-	gateways                 []gwv1beta1.Gateway
-	httpRoutes               []gwv1beta1.HTTPRoute
-	tcpRoutes                []gwv1alpha2.TCPRoute
-	meshServices             []v1alpha1.MeshService
-	services                 []types.NamespacedName
-	jwtProviders             []*v1alpha1.JWTProvider
-	gatewayPolicies          []*v1alpha1.GatewayPolicy
-	externalAuthFilters      []*v1alpha1.RouteAuthFilter
-	consulInlineCertificates []api.InlineCertificateConfigEntry
-	consulHTTPRoutes         []api.HTTPRouteConfigEntry
-	consulTCPRoutes          []api.TCPRouteConfigEntry
+	grants                       []gwv1beta1.ReferenceGrant
+	secrets                      []corev1.Secret
+	gateways                     []gwv1beta1.Gateway
+	httpRoutes                   []gwv1beta1.HTTPRoute
+	tcpRoutes                    []gwv1alpha2.TCPRoute
+	meshServices                 []v1alpha1.MeshService
+	services                     []types.NamespacedName
+	jwtProviders                 []*v1alpha1.JWTProvider
+	gatewayPolicies              []*v1alpha1.GatewayPolicy
+	externalAuthFilters          []*v1alpha1.RouteAuthFilter
+	consulFileSystemCertificates []api.FileSystemCertificateConfigEntry
+	consulHTTPRoutes             []api.HTTPRouteConfigEntry
+	consulTCPRoutes              []api.TCPRouteConfigEntry
 }
 
 func newTestResourceMap(t *testing.T, resources resourceMapResources) *common.ResourceMap {
@@ -644,7 +644,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 						},
 					},
 				},
-				consulInlineCertificates: []api.InlineCertificateConfigEntry{
+				consulFileSystemCertificates: []api.FileSystemCertificateConfigEntry{
 					*certificateOne,
 					*certificateTwo,
 				},
@@ -3133,7 +3133,7 @@ func controlledBinder(config BinderConfig) BinderConfig {
 	return config
 }
 
-func generateTestCertificate(t *testing.T, namespace, name string) (*api.InlineCertificateConfigEntry, corev1.Secret) {
+func generateTestCertificate(t *testing.T, namespace, name string) (*api.FileSystemCertificateConfigEntry, corev1.Secret) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, common.MinKeyLength)
 	require.NoError(t, err)
 
@@ -3180,8 +3180,7 @@ func generateTestCertificate(t *testing.T, namespace, name string) (*api.InlineC
 		},
 	}
 
-	certificate, err := (common.ResourceTranslator{}).ToInlineCertificate(secret)
-	require.NoError(t, err)
+	certificate := (common.ResourceTranslator{}).ToFileSystemCertificate(secret)
 
 	return certificate, secret
 }
