@@ -31,11 +31,95 @@ type Registration struct {
 
 // RegistrationSpec specifies the desired state of the Config CRD.
 type RegistrationSpec struct {
-	Name      string `json:"name"`
-	Port      int    `json:"port"`
-	Address   string `json:"address"`
-	Namespace string `json:"namespace,omitempty"`
-	Partition string `json:"partition,omitempty"`
+	ID              string            `json:"id,omitempty"`
+	Node            string            `json:"node,omitempty"`
+	Address         string            `json:"address,omitempty"`
+	TaggedAddresses map[string]string `json:"taggedAddresses,omitempty"`
+	NodeMeta        map[string]string `json:"nodeMeta,omitempty"`
+	Datacenter      string            `json:"datacenter,omitempty"`
+	Service         Service           `json:"service,omitempty"`
+	HealthChecks    []HealthCheck     `json:"checks,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+type Service struct {
+	ID                string                    `json:"id,omitempty"`
+	Name              string                    `json:"name"`
+	Tags              []string                  `json:"tags,omitempty"`
+	Meta              map[string]string         `json:"meta,omitempty"`
+	Port              int                       `json:"port"`
+	Address           string                    `json:"address"`
+	SocketPath        string                    `json:"socketPath,omitempty"`
+	TaggedAddresses   map[string]ServiceAddress `json:"taggedAddresses,omitempty"`
+	Weights           Weights                   `json:"weights,omitempty"`
+	EnableTagOverride bool                      `json:"enableTagOverride,omitempty"`
+	ContentHash       string                    `json:"contentHash,omitempty"`
+	Datacenter        string                    `json:"datacenter,omitempty"`
+	Locality          Locality                  `json:"locality,omitempty"`
+	Namespace         string                    `json:"namespace,omitempty"`
+	Partition         string                    `json:"partition,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+type ServiceAddress struct {
+	Address string `json:"address"`
+	Port    int    `json:"port"`
+}
+
+// +k8s:deepcopy-gen=true
+
+type Weights struct {
+	Passing int `json:"passing"`
+	Warning int `json:"warning"`
+}
+
+// +k8s:deepcopy-gen=true
+
+type Locality struct {
+	Region string `json:"region,omitempty"`
+	Zone   string `json:"zone,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// HealthCheck is used to represent a single check
+type HealthCheck struct {
+	Node        string                 `json:"node"`
+	CheckID     string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Status      string                 `json:"status"`
+	Notes       string                 `json:"notes,omitempty"`
+	Output      string                 `json:"output,omitempty"`
+	ServiceID   string                 `json:"serviceId"`
+	ServiceName string                 `json:"serviceName"`
+	ServiceTags []string               `json:"serviceTags,omitempty"`
+	Type        string                 `json:"type,omitempty"`
+	Namespace   string                 `json:"namespace,omitempty"`
+	Partition   string                 `json:"partition,omitempty"`
+	ExposedPort int                    `json:"exposedPort,omitempty"`
+	Definition  *HealthCheckDefinition `json:"definition,omitempty"`
+}
+
+// HealthCheckDefinition is used to store the details about
+// a health check's execution.
+type HealthCheckDefinition struct {
+	HTTP                                   string              `json:"http,omitempty"`
+	Header                                 map[string][]string `json:"header,omitempty"`
+	Method                                 string              `json:"method,omitempty"`
+	Body                                   string              `json:"body,omitempty"`
+	TLSServerName                          string              `json:"tlsServerName,omitempty"`
+	TLSSkipVerify                          bool                `json:"tlsSkipVerify,omitempty"`
+	TCP                                    string              `json:"tcp,omitempty"`
+	TCPUseTLS                              bool                `json:"tcpUseTLS,omitempty"`
+	UDP                                    string              `json:"udp,omitempty"`
+	GRPC                                   string              `json:"grpc,omitempty"`
+	OSService                              string              `json:"osService,omitempty"`
+	GRPCUseTLS                             bool                `json:"grpcUseTLS,omitempty"`
+	IntervalDuration                       string              `json:"intervalDuration"`
+	TimeoutDuration                        string              `json:"timeoutDuration"`
+	DeregisterCriticalServiceAfterDuration string              `json:"dereigsterCriticalServiceAfterDuration"`
 }
 
 // +kubebuilder:object:root=true
