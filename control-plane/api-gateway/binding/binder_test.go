@@ -282,7 +282,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 						Protocol: "http",
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{{
-								Kind: api.InlineCertificate,
+								Kind: api.FileSystemCertificate,
 								Name: "secret-one",
 							}},
 						},
@@ -771,7 +771,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 			expectedConsulDeletions: []api.ResourceReference{
 				{Kind: api.HTTPRoute, Name: "http-route-one"},
 				{Kind: api.TCPRoute, Name: "tcp-route-one"},
-				{Kind: api.InlineCertificate, Name: "secret-two"},
+				{Kind: api.FileSystemCertificate, Name: "secret-two"},
 				{Kind: api.APIGateway, Name: "gateway-deleted"},
 			},
 		},
