@@ -89,8 +89,10 @@ type Command struct {
 	flagDefaultEnableSidecarProxyLifecycle                       bool
 	flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners bool
 	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
+	flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds    int
 	flagDefaultSidecarProxyLifecycleGracefulPort                 string
 	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
+	flagDefaultSidecarProxyLifecycleGracefulStartupPath          string
 
 	flagDefaultSidecarProxyStartupFailureSeconds  int
 	flagDefaultSidecarProxyLivenessFailureSeconds int
@@ -256,8 +258,10 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagDefaultEnableSidecarProxyLifecycle, "default-enable-sidecar-proxy-lifecycle", false, "Default for enabling sidecar proxy lifecycle management.")
 	c.flagSet.BoolVar(&c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners, "default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners", false, "Default for enabling sidecar proxy listener draining of inbound connections during shutdown.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds, "default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds", 0, "Default sidecar proxy shutdown grace period in seconds.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds, "default-sidecar-proxy-lifecycle-startup-grace-period-seconds", 0, "Default sidecar proxy startup grace period in seconds.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulPort, "default-sidecar-proxy-lifecycle-graceful-port", strconv.Itoa(constants.DefaultGracefulPort), "Default port for sidecar proxy lifecycle management HTTP endpoints.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath, "default-sidecar-proxy-lifecycle-graceful-shutdown-path", "/graceful_shutdown", "Default sidecar proxy lifecycle management graceful shutdown path.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulStartupPath, "default-sidecar-proxy-lifecycle-graceful-startup-path", "/graceful_startup", "Default sidecar proxy lifecycle management graceful startup path.")
 
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyStartupFailureSeconds, "default-sidecar-proxy-startup-failure-seconds", 0, "Default number of seconds for the k8s startup probe to fail before the proxy container is restarted. Zero disables the probe.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLivenessFailureSeconds, "default-sidecar-proxy-liveness-failure-seconds", 0, "Default number of seconds for the k8s liveness probe to fail before the proxy container is restarted. Zero disables the probe.")

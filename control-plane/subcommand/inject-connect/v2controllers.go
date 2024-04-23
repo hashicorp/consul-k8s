@@ -6,6 +6,7 @@ package connectinject
 import (
 	"context"
 
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -25,7 +26,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	namespacev2 "github.com/hashicorp/consul-k8s/control-plane/tenancy/namespace"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
 )
 
 func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
@@ -52,8 +52,10 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
 		DefaultEnableShutdownDrainListeners: c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
 		DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
+		DefaultStartupGracePeriodSeconds:    c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds,
 		DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
 		DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
+		DefaultGracefulStartupPath:          c.flagDefaultSidecarProxyLifecycleGracefulStartupPath,
 	}
 
 	metricsConfig := metrics.Config{
