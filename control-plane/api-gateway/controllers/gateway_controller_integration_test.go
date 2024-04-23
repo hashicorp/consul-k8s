@@ -113,7 +113,9 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			k8sClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s)).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithStatusSubresource(&gwv1beta1.Gateway{}, &gwv1beta1.HTTPRoute{}, &gwv1alpha2.TCPRoute{}, &v1alpha1.RouteAuthFilter{})
+			k8sClient := registerFieldIndexersForTest(fakeClient).Build()
 			consulTestServerClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			ctx, cancel := context.WithCancel(context.Background())
 
