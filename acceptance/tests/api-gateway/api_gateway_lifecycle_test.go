@@ -279,7 +279,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// make sure our certificate exists
 	logger.Log(t, "checking that the certificate is synchronized to Consul")
-	checkConsulExists(t, consulClient, api.InlineCertificate, certificateName)
+	checkConsulExists(t, consulClient, api.FileSystemCertificate, certificateName)
 
 	// delete the certificate in Kubernetes
 	logger.Log(t, "deleting the certificate in Kubernetes")
@@ -288,7 +288,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// make sure the certificate no longer exists in Consul
 	logger.Log(t, "checking that the certificate is deleted from Consul")
-	checkConsulNotExists(t, consulClient, api.InlineCertificate, certificateName)
+	checkConsulNotExists(t, consulClient, api.FileSystemCertificate, certificateName)
 }
 
 func checkConsulNotExists(t *testing.T, client *api.Client, kind, name string, namespace ...string) {
