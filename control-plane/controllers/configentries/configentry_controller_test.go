@@ -1962,8 +1962,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update service-defaults with deletion timestamp so that it attempts deletion on reconcile.
-	defaults.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	err = fakeClient.Update(ctx, defaults)
+	err = fakeClient.Delete(ctx, defaults)
 	require.NoError(t, err)
 
 	// Reconcile should fail as the service-splitter still required the service-defaults causing the delete operation on Consul to fail.
