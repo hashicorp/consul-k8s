@@ -321,7 +321,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			Client: mgr.GetClient(),
 			Logger: ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
 		}
-		acceptorHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+		_ = acceptorHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors",
 			&ctrlRuntimeWebhook.Admission{Handler: acceptorHook})
 
@@ -329,7 +329,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			Client: mgr.GetClient(),
 			Logger: ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
 		}
-		dialerHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+		_ = dialerHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringdialers",
 			&ctrlRuntimeWebhook.Admission{Handler: dialerHook})
 	}
@@ -377,7 +377,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		LogLevel:                   c.flagLogLevel,
 		LogJSON:                    c.flagLogJSON,
 	}
-	meshWebhook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = meshWebhook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate",
 		&ctrlRuntimeWebhook.Admission{Handler: meshWebhook})
 
@@ -398,7 +398,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceDefaults),
 		ConsulMeta: consulMeta,
 	}
-	defaultsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = defaultsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults", &ctrlRuntimeWebhook.Admission{Handler: defaultsHook})
 
 	resolverHook := &v1alpha1.ServiceResolverWebhook{
@@ -406,7 +406,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceResolver),
 		ConsulMeta: consulMeta,
 	}
-	resolverHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = resolverHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
 		&ctrlRuntimeWebhook.Admission{Handler: resolverHook})
 
@@ -415,7 +415,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ProxyDefaults),
 		ConsulMeta: consulMeta,
 	}
-	proxyDefaultsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = proxyDefaultsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
 		&ctrlRuntimeWebhook.Admission{Handler: proxyDefaultsHook})
 
@@ -424,7 +424,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.Mesh),
 		ConsulMeta: consulMeta,
 	}
-	meshHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = meshHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
 		&ctrlRuntimeWebhook.Admission{Handler: meshHook})
 
@@ -433,7 +433,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ExportedServices),
 		ConsulMeta: consulMeta,
 	}
-	expSvcsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = expSvcsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-exportedservices",
 		&ctrlRuntimeWebhook.Admission{Handler: expSvcsHook})
 
@@ -442,7 +442,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceRouter),
 		ConsulMeta: consulMeta,
 	}
-	routerHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = routerHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
 		&ctrlRuntimeWebhook.Admission{Handler: routerHook})
 
@@ -463,7 +463,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.IngressGateway),
 		ConsulMeta: consulMeta,
 	}
-	ingressGWHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = ingressGWHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
 		&ctrlRuntimeWebhook.Admission{Handler: ingressGWHook})
 
@@ -472,7 +472,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.TerminatingGateway),
 		ConsulMeta: consulMeta,
 	}
-	termGWHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = termGWHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggateway",
 		&ctrlRuntimeWebhook.Admission{Handler: termGWHook})
 
@@ -481,7 +481,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.SamenessGroup),
 		ConsulMeta: consulMeta,
 	}
-	samenessHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = samenessHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-samenessgroup",
 		&ctrlRuntimeWebhook.Admission{Handler: samenessHook})
 
@@ -490,7 +490,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.JWTProvider),
 		ConsulMeta: consulMeta,
 	}
-	jwtHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = jwtHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-jwtprovider",
 		&ctrlRuntimeWebhook.Admission{Handler: jwtHook})
 
@@ -499,7 +499,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ControlPlaneRequestLimit),
 		ConsulMeta: consulMeta,
 	}
-	reqLimitsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = reqLimitsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-controlplanerequestlimits",
 		&ctrlRuntimeWebhook.Admission{Handler: reqLimitsHook})
 
@@ -508,7 +508,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.GatewayPolicy),
 		ConsulMeta: consulMeta,
 	}
-	gwPolicyHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = gwPolicyHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/validate-v1alpha1-gatewaypolicy",
 		&ctrlRuntimeWebhook.Admission{Handler: gwPolicyHook})
 

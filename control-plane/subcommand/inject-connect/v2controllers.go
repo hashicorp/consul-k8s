@@ -331,7 +331,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		LogLevel:                     c.flagLogLevel,
 		LogJSON:                      c.flagLogJSON,
 	}
-	meshWebhook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = meshWebhook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate",
 		&ctrlRuntimeWebhook.Admission{Handler: meshWebhook})
 
@@ -340,7 +340,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		Logger:              ctrl.Log.WithName("webhooks").WithName(common.TrafficPermissions),
 		ConsulTenancyConfig: consulTenancyConfig,
 	}
-	trafficPermsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = trafficPermsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-trafficpermissions",
 		&ctrlRuntimeWebhook.Admission{Handler: trafficPermsHook})
 
@@ -349,7 +349,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		Logger:              ctrl.Log.WithName("webhooks").WithName(common.ProxyConfiguration),
 		ConsulTenancyConfig: consulTenancyConfig,
 	}
-	proxyCfgHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = proxyCfgHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-proxyconfigurations",
 		&ctrlRuntimeWebhook.Admission{Handler: proxyCfgHook})
 
@@ -358,25 +358,22 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		Logger:              ctrl.Log.WithName("webhooks").WithName(common.HTTPRoute),
 		ConsulTenancyConfig: consulTenancyConfig,
 	}
-	httpRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = httpRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-httproute",
 		&ctrlRuntimeWebhook.Admission{Handler: httpRouteHook})
 
-	grpcRouteHook := &meshv2beta1.GRPCRouteWebhook{
+	(&meshv2beta1.GRPCRouteWebhook{
 		Client:              mgr.GetClient(),
 		Logger:              ctrl.Log.WithName("webhooks").WithName(common.GRPCRoute),
 		ConsulTenancyConfig: consulTenancyConfig,
-	}
-	grpcRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v2beta1-grpcroute",
-		&ctrlRuntimeWebhook.Admission{Handler: grpcRouteHook})
+	}).SetupWithManager(mgr)
 
 	tcpRouteHook := &meshv2beta1.TCPRouteWebhook{
 		Client:              mgr.GetClient(),
 		Logger:              ctrl.Log.WithName("webhooks").WithName(common.TCPRoute),
 		ConsulTenancyConfig: consulTenancyConfig,
 	}
-	tcpRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
+	_ = tcpRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-tcproute",
 		&ctrlRuntimeWebhook.Admission{Handler: tcpRouteHook})
 
