@@ -10,6 +10,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -289,79 +290,95 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
+	meshWebhook := &webhookv2.MeshWebhook{
+		Clientset:                    c.clientset,
+		ReleaseNamespace:             c.flagReleaseNamespace,
+		ConsulConfig:                 consulConfig,
+		ConsulServerConnMgr:          watcher,
+		ImageConsul:                  c.flagConsulImage,
+		ImageConsulDataplane:         c.flagConsulDataplaneImage,
+		EnvoyExtraArgs:               c.flagEnvoyExtraArgs,
+		ImageConsulK8S:               c.flagConsulK8sImage,
+		RequireAnnotation:            !c.flagDefaultInject,
+		AuthMethod:                   c.flagACLAuthMethod,
+		ConsulCACert:                 string(c.caCertPem),
+		TLSEnabled:                   c.consul.UseTLS,
+		ConsulAddress:                c.consul.Addresses,
+		SkipServerWatch:              c.consul.SkipServerWatch,
+		ConsulTLSServerName:          c.consul.TLSServerName,
+		DefaultProxyCPURequest:       c.sidecarProxyCPURequest,
+		DefaultProxyCPULimit:         c.sidecarProxyCPULimit,
+		DefaultProxyMemoryRequest:    c.sidecarProxyMemoryRequest,
+		DefaultProxyMemoryLimit:      c.sidecarProxyMemoryLimit,
+		DefaultEnvoyProxyConcurrency: c.flagDefaultEnvoyProxyConcurrency,
+		LifecycleConfig:              lifecycleConfig,
+		MetricsConfig:                metricsConfig,
+		InitContainerResources:       c.initContainerResources,
+		ConsulPartition:              c.consul.Partition,
+		AllowK8sNamespacesSet:        allowK8sNamespaces,
+		DenyK8sNamespacesSet:         denyK8sNamespaces,
+		EnableNamespaces:             c.flagEnableNamespaces,
+		ConsulDestinationNamespace:   c.flagConsulDestinationNamespace,
+		EnableK8SNSMirroring:         c.flagEnableK8SNSMirroring,
+		K8SNSMirroringPrefix:         c.flagK8SNSMirroringPrefix,
+		CrossNamespaceACLPolicy:      c.flagCrossNamespaceACLPolicy,
+		EnableTransparentProxy:       c.flagDefaultEnableTransparentProxy,
+		EnableCNI:                    c.flagEnableCNI,
+		TProxyOverwriteProbes:        c.flagTransparentProxyDefaultOverwriteProbes,
+		EnableConsulDNS:              c.flagEnableConsulDNS,
+		EnableOpenShift:              c.flagEnableOpenShift,
+		Log:                          ctrl.Log.WithName("handler").WithName("consul-mesh"),
+		LogLevel:                     c.flagLogLevel,
+		LogJSON:                      c.flagLogJSON,
+	}
+	meshWebhook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate",
-		&ctrlRuntimeWebhook.Admission{Handler: &webhookv2.MeshWebhook{
-			Clientset:                    c.clientset,
-			ReleaseNamespace:             c.flagReleaseNamespace,
-			ConsulConfig:                 consulConfig,
-			ConsulServerConnMgr:          watcher,
-			ImageConsul:                  c.flagConsulImage,
-			ImageConsulDataplane:         c.flagConsulDataplaneImage,
-			EnvoyExtraArgs:               c.flagEnvoyExtraArgs,
-			ImageConsulK8S:               c.flagConsulK8sImage,
-			RequireAnnotation:            !c.flagDefaultInject,
-			AuthMethod:                   c.flagACLAuthMethod,
-			ConsulCACert:                 string(c.caCertPem),
-			TLSEnabled:                   c.consul.UseTLS,
-			ConsulAddress:                c.consul.Addresses,
-			SkipServerWatch:              c.consul.SkipServerWatch,
-			ConsulTLSServerName:          c.consul.TLSServerName,
-			DefaultProxyCPURequest:       c.sidecarProxyCPURequest,
-			DefaultProxyCPULimit:         c.sidecarProxyCPULimit,
-			DefaultProxyMemoryRequest:    c.sidecarProxyMemoryRequest,
-			DefaultProxyMemoryLimit:      c.sidecarProxyMemoryLimit,
-			DefaultEnvoyProxyConcurrency: c.flagDefaultEnvoyProxyConcurrency,
-			LifecycleConfig:              lifecycleConfig,
-			MetricsConfig:                metricsConfig,
-			InitContainerResources:       c.initContainerResources,
-			ConsulPartition:              c.consul.Partition,
-			AllowK8sNamespacesSet:        allowK8sNamespaces,
-			DenyK8sNamespacesSet:         denyK8sNamespaces,
-			EnableNamespaces:             c.flagEnableNamespaces,
-			ConsulDestinationNamespace:   c.flagConsulDestinationNamespace,
-			EnableK8SNSMirroring:         c.flagEnableK8SNSMirroring,
-			K8SNSMirroringPrefix:         c.flagK8SNSMirroringPrefix,
-			CrossNamespaceACLPolicy:      c.flagCrossNamespaceACLPolicy,
-			EnableTransparentProxy:       c.flagDefaultEnableTransparentProxy,
-			EnableCNI:                    c.flagEnableCNI,
-			TProxyOverwriteProbes:        c.flagTransparentProxyDefaultOverwriteProbes,
-			EnableConsulDNS:              c.flagEnableConsulDNS,
-			EnableOpenShift:              c.flagEnableOpenShift,
-			Log:                          ctrl.Log.WithName("handler").WithName("consul-mesh"),
-			LogLevel:                     c.flagLogLevel,
-			LogJSON:                      c.flagLogJSON,
-		}})
+		&ctrlRuntimeWebhook.Admission{Handler: meshWebhook})
 
+	trafficPermsHook := &authv2beta1.TrafficPermissionsWebhook{
+		Client:              mgr.GetClient(),
+		Logger:              ctrl.Log.WithName("webhooks").WithName(common.TrafficPermissions),
+		ConsulTenancyConfig: consulTenancyConfig,
+	}
+	trafficPermsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-trafficpermissions",
-		&ctrlRuntimeWebhook.Admission{Handler: &authv2beta1.TrafficPermissionsWebhook{
-			Client:              mgr.GetClient(),
-			Logger:              ctrl.Log.WithName("webhooks").WithName(common.TrafficPermissions),
-			ConsulTenancyConfig: consulTenancyConfig,
-		}})
+		&ctrlRuntimeWebhook.Admission{Handler: trafficPermsHook})
+
+	proxyCfgHook := &meshv2beta1.ProxyConfigurationWebhook{
+		Client:              mgr.GetClient(),
+		Logger:              ctrl.Log.WithName("webhooks").WithName(common.ProxyConfiguration),
+		ConsulTenancyConfig: consulTenancyConfig,
+	}
+	proxyCfgHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-proxyconfigurations",
-		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.ProxyConfigurationWebhook{
-			Client:              mgr.GetClient(),
-			Logger:              ctrl.Log.WithName("webhooks").WithName(common.ProxyConfiguration),
-			ConsulTenancyConfig: consulTenancyConfig,
-		}})
+		&ctrlRuntimeWebhook.Admission{Handler: proxyCfgHook})
+
+	httpRouteHook := &meshv2beta1.HTTPRouteWebhook{
+		Client:              mgr.GetClient(),
+		Logger:              ctrl.Log.WithName("webhooks").WithName(common.HTTPRoute),
+		ConsulTenancyConfig: consulTenancyConfig,
+	}
+	httpRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-httproute",
-		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.HTTPRouteWebhook{
-			Client:              mgr.GetClient(),
-			Logger:              ctrl.Log.WithName("webhooks").WithName(common.HTTPRoute),
-			ConsulTenancyConfig: consulTenancyConfig,
-		}})
+		&ctrlRuntimeWebhook.Admission{Handler: httpRouteHook})
+
+	grpcRouteHook := &meshv2beta1.GRPCRouteWebhook{
+		Client:              mgr.GetClient(),
+		Logger:              ctrl.Log.WithName("webhooks").WithName(common.GRPCRoute),
+		ConsulTenancyConfig: consulTenancyConfig,
+	}
+	grpcRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-grpcroute",
-		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.GRPCRouteWebhook{
-			Client:              mgr.GetClient(),
-			Logger:              ctrl.Log.WithName("webhooks").WithName(common.GRPCRoute),
-			ConsulTenancyConfig: consulTenancyConfig,
-		}})
+		&ctrlRuntimeWebhook.Admission{Handler: grpcRouteHook})
+
+	tcpRouteHook := &meshv2beta1.TCPRouteWebhook{
+		Client:              mgr.GetClient(),
+		Logger:              ctrl.Log.WithName("webhooks").WithName(common.TCPRoute),
+		ConsulTenancyConfig: consulTenancyConfig,
+	}
+	tcpRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
 	mgr.GetWebhookServer().Register("/mutate-v2beta1-tcproute",
-		&ctrlRuntimeWebhook.Admission{Handler: &meshv2beta1.TCPRouteWebhook{
-			Client:              mgr.GetClient(),
-			Logger:              ctrl.Log.WithName("webhooks").WithName(common.TCPRoute),
-			ConsulTenancyConfig: consulTenancyConfig,
-		}})
+		&ctrlRuntimeWebhook.Admission{Handler: tcpRouteHook})
 
 	if err := mgr.AddReadyzCheck("ready", webhook.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
 		setupLog.Error(err, "unable to create readiness check")

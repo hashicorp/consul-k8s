@@ -57,7 +57,7 @@ var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.Name
 type MeshWebhook struct {
 	Clientset kubernetes.Interface
 
-	// ConsulClientConfig is the config to create a Consul API client.
+	// ConsulConfig is the config to create a Consul API client.
 	ConsulConfig *consul.Config
 
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
