@@ -102,7 +102,7 @@ func TestExportedServicesController_createsExportedServices(tt *testing.T) {
 			testClient.TestServer.WaitForServiceIntentions(t)
 			consulClient := testClient.APIClient
 
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).WithStatusSubresource(exportedServices).Build()
 
 			controller := &configentries.ExportedServicesController{
 				Client: fakeClient,
@@ -217,7 +217,7 @@ func TestExportedServicesController_updatesExportedServices(tt *testing.T) {
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
 			consulClient := testClient.APIClient
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).WithStatusSubresource(exportedServices).Build()
 
 			controller := &configentries.ExportedServicesController{
 				Client: fakeClient,
@@ -355,7 +355,7 @@ func TestExportedServicesController_deletesExportedServices(tt *testing.T) {
 			testClient.TestServer.WaitForServiceIntentions(t)
 			consulClient := testClient.APIClient
 
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(exportedServices).WithStatusSubresource(exportedServices).Build()
 
 			controller := &configentries.ExportedServicesController{
 				Client: fakeClient,
