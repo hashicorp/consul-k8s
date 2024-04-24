@@ -271,9 +271,6 @@ jobs:
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
-      - name: Copy LICENSE
-        run:
-          cp $GITHUB_WORKSPACE/LICENSE $GITHUB_WORKSPACE/control-plane
 
       # This naming convention will be used ONLY for per-commit dev images
       - name: Set docker dev tag
@@ -363,9 +360,6 @@ jobs:
         run: |
           cd "${ZIP_LOCATION}"
           unzip -j *.zip
-      - name: Copy LICENSE
-        run:
-          cp LICENSE ./control-plane
 
       # This naming convention will be used ONLY for per-commit dev images
       - name: Set docker dev tag
