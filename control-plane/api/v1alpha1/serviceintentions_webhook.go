@@ -99,11 +99,6 @@ func (v *ServiceIntentionsWebhook) Handle(ctx context.Context, req admission.Req
 	return admission.Patched(fmt.Sprintf("valid %s request", svcIntentions.KubeKind()), defaultingPatches...)
 }
 
-func (v *ServiceIntentionsWebhook) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
-}
-
 func (v *ServiceIntentionsWebhook) SetupWithManager(mgr ctrl.Manager) {
 	v.decoder = admission.NewDecoder(mgr.GetScheme())
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceintentions", &admission.Webhook{Handler: v})

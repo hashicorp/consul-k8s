@@ -11,8 +11,6 @@ import (
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
@@ -317,24 +315,18 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			return err
 		}
 
-		acceptorHook := &v1alpha1.PeeringAcceptorWebhook{
+		(&v1alpha1.PeeringAcceptorWebhook{
 			Client: mgr.GetClient(),
 			Logger: ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
-		}
-		_ = acceptorHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors",
-			&ctrlRuntimeWebhook.Admission{Handler: acceptorHook})
+		}).SetupWithManager(mgr)
 
-		dialerHook := &v1alpha1.PeeringDialerWebhook{
+		(&v1alpha1.PeeringDialerWebhook{
 			Client: mgr.GetClient(),
 			Logger: ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
-		}
-		_ = dialerHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringdialers",
-			&ctrlRuntimeWebhook.Admission{Handler: dialerHook})
+		}).SetupWithManager(mgr)
 	}
 
-	meshWebhook := &webhook.MeshWebhook{
+	(&webhook.MeshWebhook{
 		Clientset:                                c.clientset,
 		ReleaseNamespace:                         c.flagReleaseNamespace,
 		ConsulConfig:                             consulConfig,
@@ -376,10 +368,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		Log:                        ctrl.Log.WithName("handler").WithName("connect"),
 		LogLevel:                   c.flagLogLevel,
 		LogJSON:                    c.flagLogJSON,
-	}
-	_ = meshWebhook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate",
-		&ctrlRuntimeWebhook.Admission{Handler: meshWebhook})
+	}).SetupWithManager(mgr)
 
 	consulMeta := apicommon.ConsulMeta{
 		PartitionsEnabled:    c.flagEnablePartitions,
@@ -392,59 +381,41 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 
 	// Note: The path here should be identical to the one on the kubebuilder
 	// annotation in each webhook file.
-
-	defaultsHook := &v1alpha1.ServiceDefaultsWebhook{
+	(&v1alpha1.ServiceDefaultsWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceDefaults),
 		ConsulMeta: consulMeta,
-	}
-	_ = defaultsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults", &ctrlRuntimeWebhook.Admission{Handler: defaultsHook})
+	}).SetupWithManager(mgr)
 
-	resolverHook := &v1alpha1.ServiceResolverWebhook{
+	(&v1alpha1.ServiceResolverWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceResolver),
 		ConsulMeta: consulMeta,
-	}
-	_ = resolverHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-		&ctrlRuntimeWebhook.Admission{Handler: resolverHook})
+	}).SetupWithManager(mgr)
 
-	proxyDefaultsHook := &v1alpha1.ProxyDefaultsWebhook{
+	(&v1alpha1.ProxyDefaultsWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ProxyDefaults),
 		ConsulMeta: consulMeta,
-	}
-	_ = proxyDefaultsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
-		&ctrlRuntimeWebhook.Admission{Handler: proxyDefaultsHook})
+	}).SetupWithManager(mgr)
 
-	meshHook := &v1alpha1.MeshWebhook{
+	(&v1alpha1.MeshWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.Mesh),
 		ConsulMeta: consulMeta,
-	}
-	_ = meshHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
-		&ctrlRuntimeWebhook.Admission{Handler: meshHook})
+	}).SetupWithManager(mgr)
 
-	expSvcsHook := &v1alpha1.ExportedServicesWebhook{
+	(&v1alpha1.ExportedServicesWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ExportedServices),
 		ConsulMeta: consulMeta,
-	}
-	_ = expSvcsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-exportedservices",
-		&ctrlRuntimeWebhook.Admission{Handler: expSvcsHook})
+	}).SetupWithManager(mgr)
 
-	routerHook := &v1alpha1.ServiceRouterWebhook{
+	(&v1alpha1.ServiceRouterWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceRouter),
 		ConsulMeta: consulMeta,
-	}
-	_ = routerHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
-		&ctrlRuntimeWebhook.Admission{Handler: routerHook})
+	}).SetupWithManager(mgr)
 
 	(&v1alpha1.ServiceSplitterWebhook{
 		Client:     mgr.GetClient(),
@@ -458,59 +429,41 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		ConsulMeta: consulMeta,
 	}).SetupWithManager(mgr)
 
-	ingressGWHook := &v1alpha1.IngressGatewayWebhook{
+	(&v1alpha1.IngressGatewayWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.IngressGateway),
 		ConsulMeta: consulMeta,
-	}
-	_ = ingressGWHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
-		&ctrlRuntimeWebhook.Admission{Handler: ingressGWHook})
+	}).SetupWithManager(mgr)
 
-	termGWHook := &v1alpha1.TerminatingGatewayWebhook{
+	(&v1alpha1.TerminatingGatewayWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.TerminatingGateway),
 		ConsulMeta: consulMeta,
-	}
-	_ = termGWHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggateway",
-		&ctrlRuntimeWebhook.Admission{Handler: termGWHook})
+	}).SetupWithManager(mgr)
 
-	samenessHook := &v1alpha1.SamenessGroupWebhook{
+	(&v1alpha1.SamenessGroupWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.SamenessGroup),
 		ConsulMeta: consulMeta,
-	}
-	_ = samenessHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-samenessgroup",
-		&ctrlRuntimeWebhook.Admission{Handler: samenessHook})
+	}).SetupWithManager(mgr)
 
-	jwtHook := &v1alpha1.JWTProviderWebhook{
+	(&v1alpha1.JWTProviderWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.JWTProvider),
 		ConsulMeta: consulMeta,
-	}
-	_ = jwtHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-jwtprovider",
-		&ctrlRuntimeWebhook.Admission{Handler: jwtHook})
+	}).SetupWithManager(mgr)
 
-	reqLimitsHook := &v1alpha1.ControlPlaneRequestLimitWebhook{
+	(&v1alpha1.ControlPlaneRequestLimitWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ControlPlaneRequestLimit),
 		ConsulMeta: consulMeta,
-	}
-	_ = reqLimitsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-controlplanerequestlimits",
-		&ctrlRuntimeWebhook.Admission{Handler: reqLimitsHook})
+	}).SetupWithManager(mgr)
 
-	gwPolicyHook := &v1alpha1.GatewayPolicyWebhook{
+	(&v1alpha1.GatewayPolicyWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.GatewayPolicy),
 		ConsulMeta: consulMeta,
-	}
-	_ = gwPolicyHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/validate-v1alpha1-gatewaypolicy",
-		&ctrlRuntimeWebhook.Admission{Handler: gwPolicyHook})
+	}).SetupWithManager(mgr)
 
 	if c.flagEnableWebhookCAUpdate {
 		err = c.updateWebhookCABundle(ctx)

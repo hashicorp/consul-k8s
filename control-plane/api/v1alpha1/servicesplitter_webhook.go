@@ -58,11 +58,6 @@ func (v *ServiceSplitterWebhook) List(ctx context.Context) ([]common.ConfigEntry
 	return entries, nil
 }
 
-func (v *ServiceSplitterWebhook) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
-}
-
 func (v *ServiceSplitterWebhook) SetupWithManager(mgr ctrl.Manager) {
 	v.decoder = admission.NewDecoder(mgr.GetScheme())
 	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicesplitter", &admission.Webhook{Handler: v})

@@ -9,8 +9,6 @@ import (
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -290,7 +288,7 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	meshWebhook := &webhookv2.MeshWebhook{
+	(&webhookv2.MeshWebhook{
 		Clientset:                    c.clientset,
 		ReleaseNamespace:             c.flagReleaseNamespace,
 		ConsulConfig:                 consulConfig,
@@ -330,37 +328,25 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		Log:                          ctrl.Log.WithName("handler").WithName("consul-mesh"),
 		LogLevel:                     c.flagLogLevel,
 		LogJSON:                      c.flagLogJSON,
-	}
-	_ = meshWebhook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate",
-		&ctrlRuntimeWebhook.Admission{Handler: meshWebhook})
+	}).SetupWithManager(mgr)
 
-	trafficPermsHook := &authv2beta1.TrafficPermissionsWebhook{
+	(&authv2beta1.TrafficPermissionsWebhook{
 		Client:              mgr.GetClient(),
 		Logger:              ctrl.Log.WithName("webhooks").WithName(common.TrafficPermissions),
 		ConsulTenancyConfig: consulTenancyConfig,
-	}
-	_ = trafficPermsHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v2beta1-trafficpermissions",
-		&ctrlRuntimeWebhook.Admission{Handler: trafficPermsHook})
+	}).SetupWithManager(mgr)
 
-	proxyCfgHook := &meshv2beta1.ProxyConfigurationWebhook{
+	(&meshv2beta1.ProxyConfigurationWebhook{
 		Client:              mgr.GetClient(),
 		Logger:              ctrl.Log.WithName("webhooks").WithName(common.ProxyConfiguration),
 		ConsulTenancyConfig: consulTenancyConfig,
-	}
-	_ = proxyCfgHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v2beta1-proxyconfigurations",
-		&ctrlRuntimeWebhook.Admission{Handler: proxyCfgHook})
+	}).SetupWithManager(mgr)
 
-	httpRouteHook := &meshv2beta1.HTTPRouteWebhook{
+	(&meshv2beta1.HTTPRouteWebhook{
 		Client:              mgr.GetClient(),
 		Logger:              ctrl.Log.WithName("webhooks").WithName(common.HTTPRoute),
 		ConsulTenancyConfig: consulTenancyConfig,
-	}
-	_ = httpRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v2beta1-httproute",
-		&ctrlRuntimeWebhook.Admission{Handler: httpRouteHook})
+	}).SetupWithManager(mgr)
 
 	(&meshv2beta1.GRPCRouteWebhook{
 		Client:              mgr.GetClient(),
@@ -368,14 +354,11 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		ConsulTenancyConfig: consulTenancyConfig,
 	}).SetupWithManager(mgr)
 
-	tcpRouteHook := &meshv2beta1.TCPRouteWebhook{
+	(&meshv2beta1.TCPRouteWebhook{
 		Client:              mgr.GetClient(),
 		Logger:              ctrl.Log.WithName("webhooks").WithName(common.TCPRoute),
 		ConsulTenancyConfig: consulTenancyConfig,
-	}
-	_ = tcpRouteHook.InjectDecoder(admission.NewDecoder(mgr.GetScheme()))
-	mgr.GetWebhookServer().Register("/mutate-v2beta1-tcproute",
-		&ctrlRuntimeWebhook.Admission{Handler: tcpRouteHook})
+	}).SetupWithManager(mgr)
 
 	if err := mgr.AddReadyzCheck("ready", webhook.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
 		setupLog.Error(err, "unable to create readiness check")
