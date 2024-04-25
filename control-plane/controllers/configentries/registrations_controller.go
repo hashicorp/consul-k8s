@@ -6,6 +6,9 @@ package configentries
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
+	"time"
 
 	"github.com/go-logr/logr"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,7 +20,6 @@ import (
 	capi "github.com/hashicorp/consul/api"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
@@ -56,29 +58,98 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	regReq := &capi.CatalogRegistration{
-		Node:            "node-virtual",
-		Address:         "127.0.0.1",
-		TaggedAddresses: map[string]string{},
-		NodeMeta:        map[string]string{},
-		Datacenter:      "",
+		ID:              registration.Spec.ID,
+		Node:            registration.Spec.Node,
+		Address:         registration.Spec.Address,
+		TaggedAddresses: maps.Clone(registration.Spec.TaggedAddresses),
+		NodeMeta:        maps.Clone(registration.Spec.NodeMeta),
+		Datacenter:      registration.Spec.Datacenter,
 		Service: &capi.AgentService{
-			ID:      fmt.Sprintf("%s-1234", registration.Spec.Service.Name),
-			Service: registration.Spec.Service.Name,
-			Address: registration.Spec.Service.Address,
-			Port:    registration.Spec.Service.Port,
+			ID:                registration.Spec.Service.ID,
+			Service:           registration.Spec.Service.Name,
+			Tags:              slices.Clone(registration.Spec.Service.Tags),
+			Meta:              maps.Clone(registration.Spec.Service.Meta),
+			Port:              registration.Spec.Service.Port,
+			Address:           registration.Spec.Service.Address,
+			SocketPath:        registration.Spec.Service.SocketPath,
+			TaggedAddresses:   copyTaggedAddresses(registration.Spec.Service.TaggedAddresses),
+			Weights:           capi.AgentWeights(registration.Spec.Service.Weights),
+			EnableTagOverride: registration.Spec.Service.EnableTagOverride,
+			Namespace:         registration.Spec.Service.Namespace,
+			Partition:         registration.Spec.Service.Partition,
+			Locality:          copyLocality(registration.Spec.Service.Locality),
 		},
-		SkipNodeUpdate: false,
-		Partition:      "",
-		Locality:       &capi.Locality{},
+		Check:          copyHealthCheck(registration.Spec.HealthCheck),
+		SkipNodeUpdate: registration.Spec.SkipNodeUpdate,
+		Partition:      registration.Spec.Partition,
 	}
 
+	fmt.Println(regReq)
 	_, err = client.Catalog().Register(regReq, nil)
 	if err != nil {
 		log.Error(err, "error registering service", "svcName", regReq.Service.Service)
 		return ctrl.Result{}, err
 	}
 
+	log.Info("Successfully registered service", "svcName", regReq.Service.Service)
 	return ctrl.Result{}, nil
+}
+
+func copyTaggedAddresses(taggedAddresses map[string]v1alpha1.ServiceAddress) map[string]capi.ServiceAddress {
+	if taggedAddresses == nil {
+		return nil
+	}
+	result := make(map[string]capi.ServiceAddress, len(taggedAddresses))
+	for k, v := range taggedAddresses {
+		result[k] = capi.ServiceAddress(v)
+	}
+	return result
+}
+
+func copyLocality(locality *v1alpha1.Locality) *capi.Locality {
+	if locality == nil {
+		return nil
+	}
+	return &capi.Locality{
+		Region: locality.Region,
+		Zone:   locality.Zone,
+	}
+}
+
+func copyHealthCheck(healthCheck *v1alpha1.HealthCheck) *capi.AgentCheck {
+	if healthCheck == nil {
+		return nil
+	}
+
+	// TODO: handle error
+	intervalDuration, _ := time.ParseDuration(healthCheck.Definition.IntervalDuration)
+	timeoutDuration, _ := time.ParseDuration(healthCheck.Definition.TimeoutDuration)
+	deregisterAfter, _ := time.ParseDuration(healthCheck.Definition.DeregisterCriticalServiceAfterDuration)
+
+	return &capi.AgentCheck{
+		CheckID:   healthCheck.CheckID,
+		Name:      healthCheck.Name,
+		Type:      healthCheck.Type,
+		Status:    healthCheck.Status,
+		ServiceID: healthCheck.ServiceID,
+		Output:    healthCheck.Output,
+		Namespace: healthCheck.Namespace,
+		Definition: capi.HealthCheckDefinition{
+			HTTP:                                   healthCheck.Definition.HTTP,
+			TCP:                                    healthCheck.Definition.TCP,
+			GRPC:                                   healthCheck.Definition.GRPC,
+			GRPCUseTLS:                             healthCheck.Definition.GRPCUseTLS,
+			Method:                                 healthCheck.Definition.Method,
+			Header:                                 healthCheck.Definition.Header,
+			Body:                                   healthCheck.Definition.Body,
+			TLSServerName:                          healthCheck.Definition.TLSServerName,
+			TLSSkipVerify:                          healthCheck.Definition.TLSSkipVerify,
+			OSService:                              healthCheck.Definition.OSService,
+			IntervalDuration:                       intervalDuration,
+			TimeoutDuration:                        timeoutDuration,
+			DeregisterCriticalServiceAfterDuration: deregisterAfter,
+		},
+	}
 }
 
 func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger {
@@ -90,5 +161,5 @@ func (r *RegistrationsController) UpdateStatus(ctx context.Context, obj client.O
 }
 
 func (r *RegistrationsController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &consulv1alpha1.Registration{}, r)
+	return setupWithManager(mgr, &v1alpha1.Registration{}, r)
 }

@@ -38,7 +38,9 @@ type RegistrationSpec struct {
 	NodeMeta        map[string]string `json:"nodeMeta,omitempty"`
 	Datacenter      string            `json:"datacenter,omitempty"`
 	Service         Service           `json:"service,omitempty"`
-	HealthChecks    []HealthCheck     `json:"checks,omitempty"`
+	SkipNodeUpdate  bool              `json:"skipNodeUpdate,omitempty"`
+	Partition       string            `json:"partition,omitempty"`
+	HealthCheck     *HealthCheck      `json:"check,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -54,9 +56,7 @@ type Service struct {
 	TaggedAddresses   map[string]ServiceAddress `json:"taggedAddresses,omitempty"`
 	Weights           Weights                   `json:"weights,omitempty"`
 	EnableTagOverride bool                      `json:"enableTagOverride,omitempty"`
-	ContentHash       string                    `json:"contentHash,omitempty"`
-	Datacenter        string                    `json:"datacenter,omitempty"`
-	Locality          Locality                  `json:"locality,omitempty"`
+	Locality          *Locality                 `json:"locality,omitempty"`
 	Namespace         string                    `json:"namespace,omitempty"`
 	Partition         string                    `json:"partition,omitempty"`
 }
@@ -86,20 +86,19 @@ type Locality struct {
 
 // HealthCheck is used to represent a single check
 type HealthCheck struct {
-	Node        string                 `json:"node"`
-	CheckID     string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Status      string                 `json:"status"`
-	Notes       string                 `json:"notes,omitempty"`
-	Output      string                 `json:"output,omitempty"`
-	ServiceID   string                 `json:"serviceId"`
-	ServiceName string                 `json:"serviceName"`
-	ServiceTags []string               `json:"serviceTags,omitempty"`
-	Type        string                 `json:"type,omitempty"`
-	Namespace   string                 `json:"namespace,omitempty"`
-	Partition   string                 `json:"partition,omitempty"`
-	ExposedPort int                    `json:"exposedPort,omitempty"`
-	Definition  *HealthCheckDefinition `json:"definition,omitempty"`
+	Node        string                `json:"node"`
+	CheckID     string                `json:"checkId"`
+	Name        string                `json:"name"`
+	Status      string                `json:"status"`
+	Notes       string                `json:"notes,omitempty"`
+	Output      string                `json:"output,omitempty"`
+	ServiceID   string                `json:"serviceId"`
+	ServiceName string                `json:"serviceName"`
+	Type        string                `json:"type,omitempty"`
+	ExposedPort int                   `json:"exposedPort,omitempty"`
+	Definition  HealthCheckDefinition `json:"definition"`
+	Namespace   string                `json:"namespace,omitempty"`
+	Partition   string                `json:"partition,omitempty"`
 }
 
 // HealthCheckDefinition is used to store the details about
@@ -119,7 +118,7 @@ type HealthCheckDefinition struct {
 	GRPCUseTLS                             bool                `json:"grpcUseTLS,omitempty"`
 	IntervalDuration                       string              `json:"intervalDuration"`
 	TimeoutDuration                        string              `json:"timeoutDuration"`
-	DeregisterCriticalServiceAfterDuration string              `json:"dereigsterCriticalServiceAfterDuration"`
+	DeregisterCriticalServiceAfterDuration string              `json:"deregisterCriticalServiceAfterDuration"`
 }
 
 // +kubebuilder:object:root=true

@@ -38,90 +38,85 @@ spec:
             properties:
               address:
                 type: string
-              checks:
-                items:
-                  description: HealthCheck is used to represent a single check
-                  properties:
-                    definition:
-                      description: HealthCheckDefinition is used to store the details
-                        about a health check's execution.
-                      properties:
-                        body:
-                          type: string
-                        dereigsterCriticalServiceAfterDuration:
-                          type: string
-                        grpc:
-                          type: string
-                        grpcUseTLS:
-                          type: boolean
-                        header:
-                          additionalProperties:
-                            items:
-                              type: string
-                            type: array
-                          type: object
-                        http:
-                          type: string
-                        intervalDuration:
-                          type: string
-                        method:
-                          type: string
-                        osService:
-                          type: string
-                        tcp:
-                          type: string
-                        tcpUseTLS:
-                          type: boolean
-                        timeoutDuration:
-                          type: string
-                        tlsServerName:
-                          type: string
-                        tlsSkipVerify:
-                          type: boolean
-                        udp:
-                          type: string
-                      required:
-                      - dereigsterCriticalServiceAfterDuration
-                      - intervalDuration
-                      - timeoutDuration
-                      type: object
-                    exposedPort:
-                      type: integer
-                    id:
-                      type: string
-                    name:
-                      type: string
-                    namespace:
-                      type: string
-                    node:
-                      type: string
-                    notes:
-                      type: string
-                    output:
-                      type: string
-                    partition:
-                      type: string
-                    serviceId:
-                      type: string
-                    serviceName:
-                      type: string
-                    serviceTags:
-                      items:
+              check:
+                description: HealthCheck is used to represent a single check
+                properties:
+                  checkId:
+                    type: string
+                  definition:
+                    description: HealthCheckDefinition is used to store the details
+                      about a health check's execution.
+                    properties:
+                      body:
                         type: string
-                      type: array
-                    status:
-                      type: string
-                    type:
-                      type: string
-                  required:
-                  - id
-                  - name
-                  - node
-                  - serviceId
-                  - serviceName
-                  - status
-                  type: object
-                type: array
+                      deregisterCriticalServiceAfterDuration:
+                        type: string
+                      grpc:
+                        type: string
+                      grpcUseTLS:
+                        type: boolean
+                      header:
+                        additionalProperties:
+                          items:
+                            type: string
+                          type: array
+                        type: object
+                      http:
+                        type: string
+                      intervalDuration:
+                        type: string
+                      method:
+                        type: string
+                      osService:
+                        type: string
+                      tcp:
+                        type: string
+                      tcpUseTLS:
+                        type: boolean
+                      timeoutDuration:
+                        type: string
+                      tlsServerName:
+                        type: string
+                      tlsSkipVerify:
+                        type: boolean
+                      udp:
+                        type: string
+                    required:
+                    - deregisterCriticalServiceAfterDuration
+                    - intervalDuration
+                    - timeoutDuration
+                    type: object
+                  exposedPort:
+                    type: integer
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  node:
+                    type: string
+                  notes:
+                    type: string
+                  output:
+                    type: string
+                  partition:
+                    type: string
+                  serviceId:
+                    type: string
+                  serviceName:
+                    type: string
+                  status:
+                    type: string
+                  type:
+                    type: string
+                required:
+                - checkId
+                - definition
+                - name
+                - node
+                - serviceId
+                - serviceName
+                - status
+                type: object
               datacenter:
                 type: string
               id:
@@ -132,13 +127,11 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              partition:
+                type: string
               service:
                 properties:
                   address:
-                    type: string
-                  contentHash:
-                    type: string
-                  datacenter:
                     type: string
                   enableTagOverride:
                     type: boolean
@@ -196,6 +189,8 @@ spec:
                 - name
                 - port
                 type: object
+              skipNodeUpdate:
+                type: boolean
               taggedAddresses:
                 additionalProperties:
                   type: string
