@@ -133,7 +133,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 
 	args := []string{"exec", resourceType + sourceApp, "-c", sourceApp, "--", "curl", "-vvvsSf"}
 	args = append(args, curlArgs...)
-	t.Log(t, "Running kubectl command: kubectl", args)
+
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		output, err := RunKubectlAndGetOutputE(r, options, args...)
 		if expectSuccess {
