@@ -5,7 +5,6 @@ package configentries
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"slices"
 	"time"
@@ -24,6 +23,8 @@ import (
 )
 
 var _ Controller = (*RegistrationsController)(nil)
+
+const registrationFinalizer = "registration.finalizers.consul.hashicorp.com"
 
 // RegistrationsController is the controller for Registrations resources.
 type RegistrationsController struct {
@@ -48,6 +49,7 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		if !k8serrors.IsNotFound(err) {
 			log.Error(err, "unable to get registration")
 		}
+		log.Error(err, "unable to get registration")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -55,6 +57,33 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	if err != nil {
 		log.Error(err, "error initializing consul client")
 		return ctrl.Result{}, err
+	}
+
+	log.Info("Registration", "registration", registration)
+	// deletion request
+	if !registration.ObjectMeta.DeletionTimestamp.IsZero() {
+		log.Info("Deregistering service")
+		err = r.deregisterService(ctx, log, client, registration)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
+	log.Info("Registering service")
+	err = r.registerService(ctx, log, client, registration)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *RegistrationsController) registerService(ctx context.Context, log logr.Logger, client *capi.Client, registration v1alpha1.Registration) error {
+	patch := r.AddFinalizersPatch(&registration, registrationFinalizer)
+	err := r.Patch(ctx, &registration, patch)
+	if err != nil {
+		return err
 	}
 
 	regReq := &capi.CatalogRegistration{
@@ -84,15 +113,39 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		Partition:      registration.Spec.Partition,
 	}
 
-	fmt.Println(regReq)
 	_, err = client.Catalog().Register(regReq, nil)
 	if err != nil {
 		log.Error(err, "error registering service", "svcName", regReq.Service.Service)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	log.Info("Successfully registered service", "svcName", regReq.Service.Service)
-	return ctrl.Result{}, nil
+	return nil
+}
+
+func (r *RegistrationsController) deregisterService(ctx context.Context, log logr.Logger, client *capi.Client, registration v1alpha1.Registration) error {
+	patch := r.RemoveFinalizersPatch(&registration, registrationFinalizer)
+	if err := r.Patch(ctx, &registration, patch); err != nil {
+		return err
+	}
+
+	deregReq := &capi.CatalogDeregistration{
+		Node:       registration.Spec.Node,
+		Address:    registration.Spec.Address,
+		Datacenter: registration.Spec.Datacenter,
+		ServiceID:  registration.Spec.Service.ID,
+		CheckID:    registration.Spec.HealthCheck.CheckID,
+		Namespace:  registration.Spec.Service.Namespace,
+		Partition:  registration.Spec.Service.Partition,
+	}
+	_, err := client.Catalog().Deregister(deregReq, nil)
+	if err != nil {
+		log.Error(err, "error deregistering service", "svcID", deregReq.ServiceID)
+		return err
+	}
+
+	log.Info("Successfully deregistered service", "svcID", deregReq.ServiceID)
+	return nil
 }
 
 func copyTaggedAddresses(taggedAddresses map[string]v1alpha1.ServiceAddress) map[string]capi.ServiceAddress {
