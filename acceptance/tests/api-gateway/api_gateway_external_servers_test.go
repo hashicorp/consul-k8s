@@ -76,24 +76,24 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	require.NoError(t, err)
 	logger.Log(t, "set consul config entry")
 
-	logger.Log(t, "creating api-gateway resources")
-	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-	require.NoError(t, err, out)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		// Ignore errors here because if the test ran as expected
-		// the custom resources will have been deleted.
-		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
-	})
-
 	// Create certificate secret, we do this separately since
 	// applying the secret will make an invalid certificate that breaks other tests
 	logger.Log(t, "creating certificate secret")
-	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+	})
+
+	logger.Log(t, "creating api-gateway resources")
+	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
+	require.NoError(t, err, out)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		// Ignore errors here because if the test ran as expected
+		// the custom resources will have been deleted.
+		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
 	})
 
 	logger.Log(t, "patching route to target server")
