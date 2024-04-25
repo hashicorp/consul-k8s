@@ -1,0 +1,5 @@
+```release-note:security
+Upgrade `helm/v3` to 3.14.4. This resolves the following security vulnerabilities:
+[CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
+[CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147)
+```
