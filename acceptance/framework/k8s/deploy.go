@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
 // Deploy creates a Kubernetes deployment by applying configuration stored at filepath,
@@ -137,7 +138,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		output, err := RunKubectlAndGetOutputE(r, options, args...)
 		if expectSuccess {
-			require.NoError(r, err)
+			require.NoErrorf(r, err, "Received unexpected error w/ output: %s", output)
 			require.Contains(r, output, expectedOutput)
 		} else {
 			require.Error(r, err)
