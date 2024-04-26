@@ -1,0 +1,72 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# https://github.com/DataDog/datadog-operator/blob/main/docs/configuration.v2alpha1.md
+apiVersion: datadoghq.com/v2alpha1
+kind: DatadogAgent
+metadata:
+  name: datadog
+spec:
+  global:
+    clusterName: dc1
+    registry: gcr.io/datadoghq
+    logLevel: debug
+    # Site is the Datadog intake site Agent data are sent to. Set to 'datadoghq.com' to
+    # send data to the US1 site (default). Set to 'datadoghq.eu' to send data to the EU site.
+    # fake-intake image is datadog spoof site URL used for testing.
+    # Default: 'datadoghq.com'
+    site: http://fake-intake.datadog.svc.cluster.local
+    credentials:
+      apiSecret:
+        secretName: datadog-secret
+        keyName: api-key
+      appSecret:
+        secretName: datadog-secret
+        keyName: app-key
+    # Requirement for kind cluster as tls verification prevents the agent from
+    # being able to obtain hostname from hostnameFile
+    # ref: https://docs.datadoghq.com/agent/troubleshooting/hostname_containers/?tab=operator
+    kubelet:
+      tlsVerify: false
+  features:
+    dogstatsd:
+      unixDomainSocketConfig:
+        enabled: false
+      hostPortConfig:
+        enabled: false
+    clusterChecks:
+      enabled: false
+      useClusterChecksRunners: false
+    admissionController:
+      enabled: false
+      mutateUnlabelled: false
+    apm:
+      enabled: false
+    # features.npm.enabled: false
+    # required as the /etc/passwd rootfs is mounted for this
+    # see: https://github.com/DataDog/helm-charts/issues/273
+    npm:
+      enabled: false
+    logCollection:
+      enabled: false
+      containerCollectAll: false
+    # features.processDiscovery.enabled: false
+    # required as the /etc/passwd rootfs is mounted for this
+    # see: https://github.com/DataDog/helm-charts/issues/273
+    processDiscovery:
+      enabled: false
+    # features.liveProcessCollection.enabled: false
+    # required as the /etc/passwd rootfs is mounted for this
+    # see: https://github.com/DataDog/helm-charts/issues/273
+    liveProcessCollection:
+      enabled: false
+    liveContainerCollection:
+      enabled: false
+    orchestratorExplorer:
+      enabled: false
+    prometheusScrape:
+      enabled: false
+      enableServiceEndpoints: false
+  override:
+      clusterAgent:
+        replicas: 0

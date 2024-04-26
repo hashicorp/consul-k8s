@@ -1,0 +1,58 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: datadoghq.com/v2alpha1
+kind: DatadogAgent
+metadata:
+  name: datadog
+spec:
+  features:
+    dogstatsd:
+      unixDomainSocketConfig:
+        enabled: false
+      hostPortConfig:
+        enabled: true
+        hostPort: 8125
+      mapperProfiles:
+        configData: |-
+          - name: consul
+            prefix: "consul."
+            mappings:
+              - match: 'consul\.raft\.replication\.appendEntries\.logs\.([0-9a-f-]+)'
+                match_type: "regex"
+                name: "consul.raft.replication.appendEntries.logs"
+                tags:
+                  peer_id: "$1"
+              - match: 'consul\.raft\.replication\.appendEntries\.rpc\.([0-9a-f-]+)'
+                match_type: "regex"
+                name: "consul.raft.replication.appendEntries.rpc"
+                tags:
+                  peer_id: "$1"
+              - match: 'consul\.raft\.replication\.heartbeat\.([0-9a-f-]+)'
+                match_type: "regex"
+                name: "consul.raft.replication.heartbeat"
+                tags:
+                  peer_id: "$1"
+  override:
+    nodeAgent:
+      annotations:
+        'consul.hashicorp.com/connect-inject': 'false'
+        'consul.hashicorp.com/transparent-proxy': 'false'
+      tolerations:
+        - operator: Exists
+      env:
+        - name: DD_HISTOGRAM_PERCENTILES
+          value: '0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90 0.95 0.99'
+        - name: DD_SECRET_BACKEND_COMMAND
+          value: /readsecret_multiple_providers.sh
+      containers:
+        agent:
+          env:
+            - name: DD_DOGSTATSD_METRICS_STATS_ENABLE
+              value: "true"
+            - name: DD_OTLP_CONFIG_LOGS_ENABLED
+              value: "true"
+            - name: DD_DOGSTATSD_NON_LOCAL_TRAFFIC
+              value: "true"
+            - name: DD_USE_V2_API_SERIES
+              value: "true"
