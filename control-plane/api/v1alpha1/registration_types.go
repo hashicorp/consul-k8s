@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -14,6 +15,7 @@ func init() {
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
 
 // Registration defines the.
 type Registration struct {
@@ -25,6 +27,20 @@ type Registration struct {
 
 	// Spec defines the desired state of Registration.
 	Spec RegistrationSpec `json:"spec,omitempty"`
+
+	Status RegistrationStatus `json:"status,omitempty"`
+}
+
+// RegistrationStatus defines the observed state of Registration.
+type RegistrationStatus struct {
+	// Conditions indicate the latest available observations of a resource's current state.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions Conditions `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	// LastSyncedTime is the last time the resource successfully synced with Consul.
+	// +optional
+	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty" description:"last time the condition transitioned from one status to another"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -130,4 +146,16 @@ type RegistrationList struct {
 
 	// Items is the list of Configs.
 	Items []Registration `json:"items"`
+}
+
+func (r *Registration) SetSyncedCondition(status corev1.ConditionStatus, reason string, message string) {
+	r.Status.Conditions = Conditions{
+		{
+			Type:               ConditionSynced,
+			Status:             status,
+			LastTransitionTime: metav1.Now(),
+			Reason:             reason,
+			Message:            message,
+		},
+	}
 }

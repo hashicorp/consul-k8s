@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -21,8 +23,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
-
-var _ Controller = (*RegistrationsController)(nil)
 
 const registrationFinalizer = "registration.finalizers.consul.hashicorp.com"
 
@@ -43,13 +43,12 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	log := r.Log.V(1).WithValues("registration", req.NamespacedName)
 	log.Info("Reconciling Registaration")
 
-	var registration v1alpha1.Registration
+	registration := &v1alpha1.Registration{}
 	// get the gateway
-	if err := r.Client.Get(ctx, req.NamespacedName, &registration); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, registration); err != nil {
 		if !k8serrors.IsNotFound(err) {
 			log.Error(err, "unable to get registration")
 		}
-		log.Error(err, "unable to get registration")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -67,21 +66,27 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+		r.updateStatusError(ctx, registration, "ConsulErrorDeregistration", err)
 		return ctrl.Result{}, nil
 	}
 
 	log.Info("Registering service")
 	err = r.registerService(ctx, log, client, registration)
 	if err != nil {
+		r.updateStatusError(ctx, registration, "ConsulErrorRegistration", err)
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, nil
+	err = r.updateStatus(ctx, req.NamespacedName)
+	if err != nil {
+		log.Error(err, "failed to update status")
+	}
+	return ctrl.Result{}, err
 }
 
-func (r *RegistrationsController) registerService(ctx context.Context, log logr.Logger, client *capi.Client, registration v1alpha1.Registration) error {
-	patch := r.AddFinalizersPatch(&registration, registrationFinalizer)
-	err := r.Patch(ctx, &registration, patch)
+func (r *RegistrationsController) registerService(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	patch := r.AddFinalizersPatch(registration, registrationFinalizer)
+	err := r.Patch(ctx, registration, patch)
 	if err != nil {
 		return err
 	}
@@ -123,9 +128,9 @@ func (r *RegistrationsController) registerService(ctx context.Context, log logr.
 	return nil
 }
 
-func (r *RegistrationsController) deregisterService(ctx context.Context, log logr.Logger, client *capi.Client, registration v1alpha1.Registration) error {
-	patch := r.RemoveFinalizersPatch(&registration, registrationFinalizer)
-	if err := r.Patch(ctx, &registration, patch); err != nil {
+func (r *RegistrationsController) deregisterService(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	patch := r.RemoveFinalizersPatch(registration, registrationFinalizer)
+	if err := r.Patch(ctx, registration, patch); err != nil {
 		return err
 	}
 
@@ -209,8 +214,29 @@ func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger 
 	return r.Log.WithValues("request", name)
 }
 
-func (r *RegistrationsController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-	return r.Status().Update(ctx, obj, opts...)
+func (r *RegistrationsController) updateStatusError(ctx context.Context, registration *v1alpha1.Registration, reason string, reconcileErr error) {
+	registration.SetSyncedCondition(corev1.ConditionFalse, reason, reconcileErr.Error())
+	err := r.Status().Update(ctx, registration)
+	if err != nil {
+		r.Log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
+	}
+}
+
+func (r *RegistrationsController) updateStatus(ctx context.Context, req types.NamespacedName) error {
+	registration := &v1alpha1.Registration{}
+	err := r.Get(ctx, req, registration)
+	if err != nil {
+		return err
+	}
+
+	registration.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
+	registration.SetSyncedCondition(corev1.ConditionTrue, "", "")
+	err = r.Status().Update(ctx, registration)
+	if err != nil {
+		r.Log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
+		return err
+	}
+	return nil
 }
 
 func (r *RegistrationsController) SetupWithManager(mgr ctrl.Manager) error {
