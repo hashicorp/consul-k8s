@@ -125,7 +125,7 @@ func TestContainerEnvVars(t *testing.T) {
 			"Multiple upstreams comma separated and carriage return malformed upstream",
 			`static-server7890,
                        static-server2:7892
-                       static-server3:7893`,
+static-server3:7893`,
 			[]corev1.EnvVar{
 				{
 					Name:  "STATIC_SERVER2_CONNECT_SERVICE_HOST",
