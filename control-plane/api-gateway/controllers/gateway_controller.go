@@ -136,7 +136,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	// fetch our inline certificates from cache, this needs to happen
+	// fetch our file-system-certificates from cache, this needs to happen
 	// here since the certificates need to be reference counted before
 	// the gateways.
 	r.fetchConsulFileSystemCertificates(resources)
