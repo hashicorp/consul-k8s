@@ -20,7 +20,9 @@ func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) []corev1.EnvVar {
 	}
 
 	var result []corev1.EnvVar
-	for _, raw := range strings.Split(raw, ",") {
+	for _, raw := range strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ' ' // Split either comma separated or space separated
+	}) {
 		parts := strings.SplitN(raw, ":", 3)
 		if len(parts) < 2 {
 			continue
