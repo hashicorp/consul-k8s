@@ -25,6 +25,7 @@ func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) []corev1.EnvVar {
 	}) {
 		parts := strings.SplitN(raw, ":", 3)
 		if len(parts) < 2 {
+			w.Log.Error(fmt.Errorf("ustream URL is malformed, skipping it: %s", raw), "malformed upstream")
 			continue
 		}
 		port, _ := common.PortValue(pod, strings.TrimSpace(parts[1]))
