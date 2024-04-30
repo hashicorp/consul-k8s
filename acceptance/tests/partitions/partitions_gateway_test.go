@@ -219,8 +219,19 @@ func TestPartitions_Gateway(t *testing.T) {
 	logger.Log(t, "creating static-client pod in secondary partition cluster")
 	k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
+	// Create certificate secret, we do this separately since
+	// applying the secret will make an invalid certificate that breaks other tests
+	logger.Log(t, "creating certificate secret")
+	out, err := k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+	require.NoError(t, err, out)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		// Ignore errors here because if the test ran as expected
+		// the custom resources will have been deleted.
+		k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+	})
+
 	logger.Log(t, "creating api-gateway resources")
-	out, err := k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-k", "../fixtures/bases/api-gateway")
+	out, err = k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-k", "../fixtures/bases/api-gateway")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
