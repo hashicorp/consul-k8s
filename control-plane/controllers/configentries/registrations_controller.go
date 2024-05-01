@@ -64,7 +64,11 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 			r.updateStatusError(ctx, registration, "ConsulErrorDeregistration", err)
 			return ctrl.Result{}, err
 		}
-		r.updateStatus(ctx, req.NamespacedName)
+		err := r.updateStatus(ctx, req.NamespacedName)
+		if err != nil {
+			log.Error(err, "failed to update status")
+		}
+
 		return ctrl.Result{}, nil
 	}
 

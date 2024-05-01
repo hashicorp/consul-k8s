@@ -96,6 +96,7 @@ func TestReconcile_Success(tt *testing.T) {
 	}
 
 	for name, tc := range cases {
+		tc := tc
 		tt.Run(name, func(t *testing.T) {
 			t.Parallel()
 			s := runtime.NewScheme()
@@ -218,6 +219,7 @@ func TestReconcile_Failure(tt *testing.T) {
 	}
 
 	for name, tc := range cases {
+		tc := tc
 		tt.Run(name, func(t *testing.T) {
 			t.Parallel()
 			s := runtime.NewScheme()
