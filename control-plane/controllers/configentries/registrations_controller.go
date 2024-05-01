@@ -22,7 +22,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
-const registrationFinalizer = "registration.finalizers.consul.hashicorp.com"
+const RegistrationFinalizer = "registration.finalizers.consul.hashicorp.com"
 
 // RegistrationsController is the controller for Registrations resources.
 type RegistrationsController struct {
@@ -84,7 +84,7 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 }
 
 func (r *RegistrationsController) registerService(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
-	patch := r.AddFinalizersPatch(registration, registrationFinalizer)
+	patch := r.AddFinalizersPatch(registration, RegistrationFinalizer)
 	err := r.Patch(ctx, registration, patch)
 	if err != nil {
 		return err
@@ -102,11 +102,6 @@ func (r *RegistrationsController) registerService(ctx context.Context, log logr.
 }
 
 func (r *RegistrationsController) deregisterService(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
-	patch := r.RemoveFinalizersPatch(registration, registrationFinalizer)
-	if err := r.Patch(ctx, registration, patch); err != nil {
-		return err
-	}
-
 	deRegReq := registration.ToCatalogDeregistration()
 	_, err := client.Catalog().Deregister(deRegReq, nil)
 	if err != nil {
@@ -114,6 +109,10 @@ func (r *RegistrationsController) deregisterService(ctx context.Context, log log
 		return err
 	}
 
+	patch := r.RemoveFinalizersPatch(registration, RegistrationFinalizer)
+	if err := r.Patch(ctx, registration, patch); err != nil {
+		return err
+	}
 	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
 	return nil
 }
