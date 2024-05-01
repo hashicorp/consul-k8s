@@ -1,0 +1,19 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: datadoghq.com/v2alpha1
+kind: DatadogAgent
+metadata:
+  name: datadog
+spec:
+  features:
+    # Sets: DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT:  0.0.0.0:4317                                                                                                                                              │
+    #       DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT:  0.0.0.0:4318
+    otlp:
+      receiver:
+        protocols:
+          # Set to "0.0.0.0" as per the below reference docs
+          # ref: https://docs.datadoghq.com/opentelemetry/otlp_ingest_in_the_agent/?tab=host#enabling-otlp-ingestion-on-the-datadog-agent
+          grpc:
+            enabled: true
+            endpoint: "0.0.0.0:4317"
