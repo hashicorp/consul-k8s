@@ -184,9 +184,9 @@ func TestToCatalogRegistration(tt *testing.T) {
 						GRPC:                                   "/grpc-health-check",
 						GRPCUseTLS:                             true,
 						OSService:                              "osservice-name",
-						IntervalDuration:                       toDuration("5s"),
-						TimeoutDuration:                        toDuration("10s"),
-						DeregisterCriticalServiceAfterDuration: toDuration("30s"),
+						IntervalDuration:                       toDuration(tt, "5s"),
+						TimeoutDuration:                        toDuration(tt, "10s"),
+						DeregisterCriticalServiceAfterDuration: toDuration(tt, "30s"),
 					},
 					Namespace: "n1",
 					Partition: "p1",
@@ -211,7 +211,79 @@ func TestToCatalogRegistration(tt *testing.T) {
 	}
 }
 
-func toDuration(d string) time.Duration {
-	duration, _ := time.ParseDuration(d)
+func TestToCatalogDeregistration(tt *testing.T) {
+	cases := map[string]struct {
+		registration *Registration
+		expected     *capi.CatalogDeregistration
+	}{
+		"with health check": {
+			registration: &Registration{
+				Spec: RegistrationSpec{
+					ID:         "node-id",
+					Node:       "node-virtual",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: Service{
+						ID:        "service-id",
+						Namespace: "n1",
+						Partition: "p1",
+					},
+					HealthCheck: &HealthCheck{
+						CheckID: "checkID",
+					},
+				},
+			},
+			expected: &capi.CatalogDeregistration{
+				Node:       "node-virtual",
+				Address:    "127.0.0.1",
+				Datacenter: "dc1",
+				ServiceID:  "service-id",
+				CheckID:    "checkID",
+				Namespace:  "n1",
+				Partition:  "p1",
+			},
+		},
+		"no health check": {
+			registration: &Registration{
+				Spec: RegistrationSpec{
+					ID:         "node-id",
+					Node:       "node-virtual",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: Service{
+						ID:        "service-id",
+						Namespace: "n1",
+						Partition: "p1",
+					},
+				},
+			},
+			expected: &capi.CatalogDeregistration{
+				Node:       "node-virtual",
+				Address:    "127.0.0.1",
+				Datacenter: "dc1",
+				ServiceID:  "service-id",
+				CheckID:    "",
+				Namespace:  "n1",
+				Partition:  "p1",
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		tt.Run(name, func(t *testing.T) {
+			t.Parallel()
+			actual := tc.registration.ToCatalogDeregistration()
+			require.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func toDuration(t *testing.T, d string) time.Duration {
+	t.Helper()
+	duration, err := time.ParseDuration(d)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return duration
 }
