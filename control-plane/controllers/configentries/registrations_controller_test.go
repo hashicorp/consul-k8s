@@ -94,6 +94,7 @@ func TestReconcile_Success(tt *testing.T) {
 
 	for name, tc := range cases {
 		tt.Run(name, func(t *testing.T) {
+			t.Parallel()
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Registration{})
 			ctx := context.Background()
@@ -215,6 +216,7 @@ func TestReconcile_Failure(tt *testing.T) {
 
 	for name, tc := range cases {
 		tt.Run(name, func(t *testing.T) {
+			t.Parallel()
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Registration{})
 			ctx := context.Background()
