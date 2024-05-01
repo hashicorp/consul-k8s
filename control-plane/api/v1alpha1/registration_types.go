@@ -4,6 +4,12 @@
 package v1alpha1
 
 import (
+	"maps"
+	"slices"
+	"time"
+
+	capi "github.com/hashicorp/consul/api"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -146,6 +152,109 @@ type RegistrationList struct {
 
 	// Items is the list of Configs.
 	Items []Registration `json:"items"`
+}
+
+func (r *Registration) ToCatalogRegistration() *capi.CatalogRegistration {
+	return &capi.CatalogRegistration{
+		ID:              r.Spec.ID,
+		Node:            r.Spec.Node,
+		Address:         r.Spec.Address,
+		TaggedAddresses: maps.Clone(r.Spec.TaggedAddresses),
+		NodeMeta:        maps.Clone(r.Spec.NodeMeta),
+		Datacenter:      r.Spec.Datacenter,
+		Service: &capi.AgentService{
+			ID:                r.Spec.Service.ID,
+			Service:           r.Spec.Service.Name,
+			Tags:              slices.Clone(r.Spec.Service.Tags),
+			Meta:              maps.Clone(r.Spec.Service.Meta),
+			Port:              r.Spec.Service.Port,
+			Address:           r.Spec.Service.Address,
+			SocketPath:        r.Spec.Service.SocketPath,
+			TaggedAddresses:   copyTaggedAddresses(r.Spec.Service.TaggedAddresses),
+			Weights:           capi.AgentWeights(r.Spec.Service.Weights),
+			EnableTagOverride: r.Spec.Service.EnableTagOverride,
+			Namespace:         r.Spec.Service.Namespace,
+			Partition:         r.Spec.Service.Partition,
+			Locality:          copyLocality(r.Spec.Service.Locality),
+		},
+		Check:          copyHealthCheck(r.Spec.HealthCheck),
+		SkipNodeUpdate: r.Spec.SkipNodeUpdate,
+		Partition:      r.Spec.Partition,
+	}
+}
+
+func copyTaggedAddresses(taggedAddresses map[string]ServiceAddress) map[string]capi.ServiceAddress {
+	if taggedAddresses == nil {
+		return nil
+	}
+	result := make(map[string]capi.ServiceAddress, len(taggedAddresses))
+	for k, v := range taggedAddresses {
+		result[k] = capi.ServiceAddress(v)
+	}
+	return result
+}
+
+func copyLocality(locality *Locality) *capi.Locality {
+	if locality == nil {
+		return nil
+	}
+	return &capi.Locality{
+		Region: locality.Region,
+		Zone:   locality.Zone,
+	}
+}
+
+func copyHealthCheck(healthCheck *HealthCheck) *capi.AgentCheck {
+	if healthCheck == nil {
+		return nil
+	}
+
+	// TODO: handle error
+	intervalDuration, _ := time.ParseDuration(healthCheck.Definition.IntervalDuration)
+	timeoutDuration, _ := time.ParseDuration(healthCheck.Definition.TimeoutDuration)
+	deregisterAfter, _ := time.ParseDuration(healthCheck.Definition.DeregisterCriticalServiceAfterDuration)
+
+	return &capi.AgentCheck{
+		CheckID:   healthCheck.CheckID,
+		Name:      healthCheck.Name,
+		Type:      healthCheck.Type,
+		Status:    healthCheck.Status,
+		ServiceID: healthCheck.ServiceID,
+		Output:    healthCheck.Output,
+		Namespace: healthCheck.Namespace,
+		Definition: capi.HealthCheckDefinition{
+			HTTP:                                   healthCheck.Definition.HTTP,
+			TCP:                                    healthCheck.Definition.TCP,
+			GRPC:                                   healthCheck.Definition.GRPC,
+			GRPCUseTLS:                             healthCheck.Definition.GRPCUseTLS,
+			Method:                                 healthCheck.Definition.Method,
+			Header:                                 healthCheck.Definition.Header,
+			Body:                                   healthCheck.Definition.Body,
+			TLSServerName:                          healthCheck.Definition.TLSServerName,
+			TLSSkipVerify:                          healthCheck.Definition.TLSSkipVerify,
+			OSService:                              healthCheck.Definition.OSService,
+			IntervalDuration:                       intervalDuration,
+			TimeoutDuration:                        timeoutDuration,
+			DeregisterCriticalServiceAfterDuration: deregisterAfter,
+		},
+	}
+}
+
+func (r *Registration) ToCatalogDeregistration() *capi.CatalogDeregistration {
+	checkID := ""
+	if r.Spec.HealthCheck != nil {
+		checkID = r.Spec.HealthCheck.CheckID
+	}
+
+	return &capi.CatalogDeregistration{
+		Node:       r.Spec.Node,
+		Address:    r.Spec.Address,
+		Datacenter: r.Spec.Datacenter,
+		ServiceID:  r.Spec.Service.ID,
+		CheckID:    checkID,
+		Namespace:  r.Spec.Service.Namespace,
+		Partition:  r.Spec.Service.Partition,
+	}
 }
 
 func (r *Registration) SetSyncedCondition(status corev1.ConditionStatus, reason string, message string) {

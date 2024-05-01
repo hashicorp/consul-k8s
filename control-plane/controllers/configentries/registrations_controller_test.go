@@ -6,12 +6,14 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -24,14 +26,58 @@ import (
 )
 
 func TestReconcile(tt *testing.T) {
+	deletionTime := metav1.Now()
 	cases := map[string]struct {
-		regName           string
-		regID             string
+		registration      *v1alpha1.Registration
 		consulShouldError bool
 	}{
-		"success": {
-			regName:           "test-reg",
-			regID:             "test-reg-id",
+		"success on registration": {
+			registration: &v1alpha1.Registration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Registration",
+					APIVersion: "consul.hashicorp.com/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-registration",
+				},
+				Spec: v1alpha1.RegistrationSpec{
+					ID:         "node-id",
+					Node:       "virtual-node",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: v1alpha1.Service{
+						ID:      "service-id",
+						Name:    "service-name",
+						Port:    8080,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+			consulShouldError: false,
+		},
+		"success on deregistration": {
+			registration: &v1alpha1.Registration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Registration",
+					APIVersion: "consul.hashicorp.com/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-registration",
+					DeletionTimestamp: &deletionTime,
+				},
+				Spec: v1alpha1.RegistrationSpec{
+					ID:         "node-id",
+					Node:       "virtual-node",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: v1alpha1.Service{
+						ID:      "service-id",
+						Name:    "service-name",
+						Port:    8080,
+						Address: "127.0.0.1",
+					},
+				},
+			},
 			consulShouldError: false,
 		},
 	}
@@ -49,43 +95,20 @@ func TestReconcile(tt *testing.T) {
 				}
 				w.WriteHeader(200)
 			}))
-			defer consulServer.Close()
 
 			parsedURL, err := url.Parse(consulServer.URL)
 			require.NoError(t, err)
+			host := strings.Split(parsedURL.Host, ":")[0]
 
 			port, err := strconv.Atoi(parsedURL.Port())
 			require.NoError(t, err)
 
 			testClient := &test.TestServerClient{
-				Cfg:     &consul.Config{APIClientConfig: &capi.Config{}, HTTPPort: port},
-				Watcher: test.MockConnMgrForIPAndPort(t, parsedURL.Host, port, false),
+				Cfg:     &consul.Config{APIClientConfig: &capi.Config{Address: host}, HTTPPort: port},
+				Watcher: test.MockConnMgrForIPAndPort(t, host, port, false),
 			}
 
-			reg := &v1alpha1.Registration{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Registration",
-					APIVersion: "consul.hashicorp.com/v1alpha1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      tc.regName,
-					Namespace: name,
-				},
-				Spec: v1alpha1.RegistrationSpec{
-					ID:         "node-id",
-					Node:       "virtual-node",
-					Address:    "127.0.0.1",
-					Datacenter: "dc1",
-					Service: v1alpha1.Service{
-						ID:      tc.regID,
-						Name:    tc.regName,
-						Port:    8080,
-						Address: "127.0.0.1",
-					},
-				},
-			}
-
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(reg).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.registration).Build()
 
 			controller := &configentries.RegistrationsController{
 				Client:              fakeClient,
@@ -95,8 +118,12 @@ func TestReconcile(tt *testing.T) {
 				ConsulServerConnMgr: testClient.Watcher,
 			}
 
-			_, err = controller.Reconcile(ctx, ctrl.Request{})
+			_, err = controller.Reconcile(ctx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: tc.registration.Name, Namespace: tc.registration.Namespace},
+			})
 			require.NoError(t, err)
+
+			consulServer.Close()
 		})
 	}
 }
