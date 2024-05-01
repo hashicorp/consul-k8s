@@ -42,7 +42,7 @@ func TestToCatalogRegistration(tt *testing.T) {
 				},
 			},
 		},
-		"maximal registration - http health check": {
+		"maximal registration": {
 			registration: &Registration{
 				Spec: RegistrationSpec{
 					ID:      "node-id",
@@ -97,10 +97,17 @@ func TestToCatalogRegistration(tt *testing.T) {
 						ExposedPort: 19000,
 						Definition: HealthCheckDefinition{
 							HTTP: "/health",
+							TCP:  "tcp-check",
 							Header: map[string][]string{
 								"Content-Type": {"application/json"},
 							},
 							Method:                                 "GET",
+							TLSServerName:                          "my-secure-tls-server",
+							TLSSkipVerify:                          true,
+							Body:                                   "some-body",
+							GRPC:                                   "/grpc-health-check",
+							GRPCUseTLS:                             true,
+							OSService:                              "osservice-name",
 							IntervalDuration:                       "5s",
 							TimeoutDuration:                        "10s",
 							DeregisterCriticalServiceAfterDuration: "30s",
@@ -166,10 +173,17 @@ func TestToCatalogRegistration(tt *testing.T) {
 					ExposedPort: 19000,
 					Definition: capi.HealthCheckDefinition{
 						HTTP: "/health",
+						TCP:  "tcp-check",
 						Header: map[string][]string{
 							"Content-Type": {"application/json"},
 						},
 						Method:                                 "GET",
+						TLSServerName:                          "my-secure-tls-server",
+						TLSSkipVerify:                          true,
+						Body:                                   "some-body",
+						GRPC:                                   "/grpc-health-check",
+						GRPCUseTLS:                             true,
+						OSService:                              "osservice-name",
 						IntervalDuration:                       toDuration("5s"),
 						TimeoutDuration:                        toDuration("10s"),
 						DeregisterCriticalServiceAfterDuration: toDuration("30s"),
