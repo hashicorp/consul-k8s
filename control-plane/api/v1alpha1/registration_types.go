@@ -63,6 +63,7 @@ type RegistrationSpec struct {
 	SkipNodeUpdate  bool              `json:"skipNodeUpdate,omitempty"`
 	Partition       string            `json:"partition,omitempty"`
 	HealthCheck     *HealthCheck      `json:"check,omitempty"`
+	Locality        *Locality         `json:"locality,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -180,6 +181,7 @@ func (r *Registration) ToCatalogRegistration() *capi.CatalogRegistration {
 		Check:          copyHealthCheck(r.Spec.HealthCheck),
 		SkipNodeUpdate: r.Spec.SkipNodeUpdate,
 		Partition:      r.Spec.Partition,
+		Locality:       copyLocality(r.Spec.Locality),
 	}
 }
 
@@ -215,13 +217,18 @@ func copyHealthCheck(healthCheck *HealthCheck) *capi.AgentCheck {
 	deregisterAfter, _ := time.ParseDuration(healthCheck.Definition.DeregisterCriticalServiceAfterDuration)
 
 	return &capi.AgentCheck{
-		CheckID:   healthCheck.CheckID,
-		Name:      healthCheck.Name,
-		Type:      healthCheck.Type,
-		Status:    healthCheck.Status,
-		ServiceID: healthCheck.ServiceID,
-		Output:    healthCheck.Output,
-		Namespace: healthCheck.Namespace,
+		Node:        healthCheck.Node,
+		Notes:       healthCheck.Notes,
+		ServiceName: healthCheck.ServiceName,
+		CheckID:     healthCheck.CheckID,
+		Name:        healthCheck.Name,
+		Type:        healthCheck.Type,
+		Status:      healthCheck.Status,
+		ServiceID:   healthCheck.ServiceID,
+		ExposedPort: healthCheck.ExposedPort,
+		Output:      healthCheck.Output,
+		Namespace:   healthCheck.Namespace,
+		Partition:   healthCheck.Partition,
 		Definition: capi.HealthCheckDefinition{
 			HTTP:                                   healthCheck.Definition.HTTP,
 			TCP:                                    healthCheck.Definition.TCP,
