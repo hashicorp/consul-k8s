@@ -23,7 +23,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Registration defines the.
+        description: Registration defines the resource for working with service registrations.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -43,7 +43,7 @@ spec:
               address:
                 type: string
               check:
-                description: HealthCheck is used to represent a single check
+                description: HealthCheck is used to represent a single check.
                 properties:
                   checkId:
                     type: string
@@ -125,6 +125,13 @@ spec:
                 type: string
               id:
                 type: string
+              locality:
+                properties:
+                  region:
+                    type: string
+                  zone:
+                    type: string
+                type: object
               node:
                 type: string
               nodeMeta:

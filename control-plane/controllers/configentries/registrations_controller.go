@@ -42,7 +42,7 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	log.Info("Reconciling Registaration")
 
 	registration := &v1alpha1.Registration{}
-	// get the gateway
+	// get the registration
 	if err := r.Client.Get(ctx, req.NamespacedName, registration); err != nil {
 		if !k8serrors.IsNotFound(err) {
 			log.Error(err, "unable to get registration")
@@ -56,7 +56,6 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Registration", "registration", registration)
 	// deletion request
 	if !registration.ObjectMeta.DeletionTimestamp.IsZero() {
 		log.Info("Deregistering service")
@@ -85,12 +84,14 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 
 func (r *RegistrationsController) registerService(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	patch := r.AddFinalizersPatch(registration, RegistrationFinalizer)
+
 	err := r.Patch(ctx, registration, patch)
 	if err != nil {
 		return err
 	}
 
 	regReq := registration.ToCatalogRegistration()
+
 	_, err = client.Catalog().Register(regReq, nil)
 	if err != nil {
 		log.Error(err, "error registering service", "svcName", regReq.Service.Service)
@@ -103,6 +104,7 @@ func (r *RegistrationsController) registerService(ctx context.Context, log logr.
 
 func (r *RegistrationsController) deregisterService(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	deRegReq := registration.ToCatalogDeregistration()
+
 	_, err := client.Catalog().Deregister(deRegReq, nil)
 	if err != nil {
 		log.Error(err, "error deregistering service", "svcID", deRegReq.ServiceID)
@@ -110,6 +112,7 @@ func (r *RegistrationsController) deregisterService(ctx context.Context, log log
 	}
 
 	patch := r.RemoveFinalizersPatch(registration, RegistrationFinalizer)
+
 	if err := r.Patch(ctx, registration, patch); err != nil {
 		return err
 	}
@@ -123,6 +126,8 @@ func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger 
 
 func (r *RegistrationsController) updateStatusError(ctx context.Context, registration *v1alpha1.Registration, reason string, reconcileErr error) {
 	registration.SetSyncedCondition(corev1.ConditionFalse, reason, reconcileErr.Error())
+	registration.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
+
 	err := r.Status().Update(ctx, registration)
 	if err != nil {
 		r.Log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
@@ -131,6 +136,7 @@ func (r *RegistrationsController) updateStatusError(ctx context.Context, registr
 
 func (r *RegistrationsController) updateStatus(ctx context.Context, req types.NamespacedName) error {
 	registration := &v1alpha1.Registration{}
+
 	err := r.Get(ctx, req, registration)
 	if err != nil {
 		return err
@@ -138,6 +144,7 @@ func (r *RegistrationsController) updateStatus(ctx context.Context, req types.Na
 
 	registration.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
 	registration.SetSyncedCondition(corev1.ConditionTrue, "", "")
+
 	err = r.Status().Update(ctx, registration)
 	if err != nil {
 		r.Log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)

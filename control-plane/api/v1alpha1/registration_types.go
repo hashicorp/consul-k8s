@@ -23,7 +23,7 @@ func init() {
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
 
-// Registration defines the.
+// Registration defines the resource for working with service registrations.
 type Registration struct {
 	// Standard Kubernetes resource metadata.
 	metav1.TypeMeta `json:",inline"`
@@ -107,7 +107,7 @@ type Locality struct {
 
 // +k8s:deepcopy-gen=true
 
-// HealthCheck is used to represent a single check
+// HealthCheck is used to represent a single check.
 type HealthCheck struct {
 	Node        string                `json:"node"`
 	CheckID     string                `json:"checkId"`
@@ -155,6 +155,7 @@ type RegistrationList struct {
 	Items []Registration `json:"items"`
 }
 
+// ToCatalogRegistration converts a Registration to a Consul CatalogRegistration.
 func (r *Registration) ToCatalogRegistration() *capi.CatalogRegistration {
 	return &capi.CatalogRegistration{
 		ID:              r.Spec.ID,
@@ -247,6 +248,7 @@ func copyHealthCheck(healthCheck *HealthCheck) *capi.AgentCheck {
 	}
 }
 
+// ToCatalogDeregistration converts a Registration to a Consul CatalogDergistration.
 func (r *Registration) ToCatalogDeregistration() *capi.CatalogDeregistration {
 	checkID := ""
 	if r.Spec.HealthCheck != nil {
@@ -264,6 +266,7 @@ func (r *Registration) ToCatalogDeregistration() *capi.CatalogDeregistration {
 	}
 }
 
+// SetSyncedCondition sets the synced condition on the Registration.
 func (r *Registration) SetSyncedCondition(status corev1.ConditionStatus, reason string, message string) {
 	r.Status.Conditions = Conditions{
 		{
