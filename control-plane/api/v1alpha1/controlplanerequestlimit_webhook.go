@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 	admissionv1 "k8s.io/api/admission/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -77,7 +78,7 @@ func (v *ControlPlaneRequestLimitWebhook) List(ctx context.Context) ([]common.Co
 	return entries, nil
 }
 
-func (v *ControlPlaneRequestLimitWebhook) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
+func (v *ControlPlaneRequestLimitWebhook) SetupWithManager(mgr ctrl.Manager) {
+	v.decoder = admission.NewDecoder(mgr.GetScheme())
+	mgr.GetWebhookServer().Register("/mutate-v1alpha1-controlplanerequestlimits", &admission.Webhook{Handler: v})
 }

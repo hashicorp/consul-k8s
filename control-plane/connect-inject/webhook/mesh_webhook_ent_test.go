@@ -11,8 +11,6 @@ import (
 
 	"github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -22,6 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 // This tests the checkAndCreate namespace function that is called
@@ -40,8 +41,7 @@ func TestHandler_MutateWithNamespaces(t *testing.T) {
 	}
 	s := runtime.NewScheme()
 	s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
-	decoder, err := admission.NewDecoder(s)
-	require.NoError(t, err)
+	decoder := admission.NewDecoder(s)
 
 	cases := []struct {
 		Name               string
@@ -286,8 +286,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 
 	s := runtime.NewScheme()
 	s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
-	decoder, err := admission.NewDecoder(s)
-	require.NoError(t, err)
+	decoder := admission.NewDecoder(s)
 
 	cases := []struct {
 		Name               string
@@ -518,7 +517,7 @@ func TestHandler_MutateWithNamespaces_ACLs(t *testing.T) {
 				Rules:       crossNamespaceRules,
 			}
 
-			_, _, err = client.ACL().PolicyCreate(&policyTmpl, &api.WriteOptions{})
+			_, _, err := client.ACL().PolicyCreate(&policyTmpl, &api.WriteOptions{})
 			require.NoError(t, err)
 
 			// Mutate!
@@ -597,10 +596,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
-
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 
 			webhook := MeshWebhook{
 				Log:                        logrtest.NewTestLogger(t),
