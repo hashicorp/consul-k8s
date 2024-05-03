@@ -1539,9 +1539,9 @@ func Test_Run(t *testing.T) {
 	tcpRoute := setupTCPRoute()
 	tcpRoutes := []*api.TCPRouteConfigEntry{tcpRoute}
 
-	// setup inline certs
-	inlineCert := setupInlineCertificate()
-	certs := []*api.InlineCertificateConfigEntry{inlineCert}
+	// setup file-system certs
+	fileSystemCert := setupFileSystemCertificate()
+	certs := []*api.FileSystemCertificateConfigEntry{fileSystemCert}
 
 	// setup jwt providers
 	jwtProvider := setupJWTProvider()
@@ -1573,7 +1573,7 @@ func Test_Run(t *testing.T) {
 				return
 			}
 			fmt.Fprintln(w, string(val))
-		case "/v1/config/inline-certificate":
+		case "/v1/config/file-system-certificate":
 			val, err := json.Marshal(certs)
 			if err != nil {
 				w.WriteHeader(500)
@@ -1627,7 +1627,7 @@ func Test_Run(t *testing.T) {
 	}
 
 	expectedCache := loadedReferenceMaps([]api.ConfigEntry{
-		gw, tcpRoute, httpRouteOne, httpRouteTwo, inlineCert, jwtProvider,
+		gw, tcpRoute, httpRouteOne, httpRouteTwo, fileSystemCert, jwtProvider,
 	})
 
 	ctx, cancelFn := context.WithCancel(context.Background())
@@ -1677,11 +1677,11 @@ func Test_Run(t *testing.T) {
 	})
 
 	certNsn := types.NamespacedName{
-		Name:      inlineCert.Name,
-		Namespace: inlineCert.Namespace,
+		Name:      fileSystemCert.Name,
+		Namespace: fileSystemCert.Namespace,
 	}
 
-	certSubscriber := c.Subscribe(ctx, api.InlineCertificate, func(cfe api.ConfigEntry) []types.NamespacedName {
+	certSubscriber := c.Subscribe(ctx, api.FileSystemCertificate, func(cfe api.ConfigEntry) []types.NamespacedName {
 		return []types.NamespacedName{
 			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
 		}
@@ -1968,10 +1968,10 @@ func setupTCPRoute() *api.TCPRouteConfigEntry {
 	}
 }
 
-func setupInlineCertificate() *api.InlineCertificateConfigEntry {
-	return &api.InlineCertificateConfigEntry{
-		Kind:        api.InlineCertificate,
-		Name:        "inline-cert",
+func setupFileSystemCertificate() *api.FileSystemCertificateConfigEntry {
+	return &api.FileSystemCertificateConfigEntry{
+		Kind:        api.FileSystemCertificate,
+		Name:        "file-system-cert",
 		Certificate: "cert",
 		PrivateKey:  "super secret",
 		Meta: map[string]string{
