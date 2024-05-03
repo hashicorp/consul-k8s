@@ -33,7 +33,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 	testCases := []struct {
 		name string
 		// k8sObjects is the list of Kubernetes resources that will be present in the cluster at runtime
-		k8sObjects []runtime.Object
+		k8sObjects []client.Object
 		// request is the request that will be provided to MeshGatewayController.Reconcile
 		request ctrl.Request
 		// expectedErr is the error we expect MeshGatewayController.Reconcile to return
@@ -46,7 +46,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		// ServiceAccount
 		{
 			name: "MeshGateway created with no existing ServiceAccount",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "consul",
@@ -79,7 +79,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		},
 		{
 			name: "MeshGateway created with existing ServiceAccount not owned by gateway",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -115,7 +115,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		// Role
 		{
 			name: "MeshGateway created with no existing Role",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "consul",
@@ -148,7 +148,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		},
 		{
 			name: "MeshGateway created with existing Role not owned by gateway",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -183,7 +183,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		},
 		{
 			name: "MeshGateway created with existing Role owned by gateway",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -226,7 +226,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		// RoleBinding
 		{
 			name: "MeshGateway created with no existing RoleBinding",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "consul",
@@ -259,7 +259,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		},
 		{
 			name: "MeshGateway created with existing RoleBinding not owned by gateway",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -294,7 +294,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		},
 		{
 			name: "MeshGateway created with existing RoleBinding owned by gateway",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -337,7 +337,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		// Deployment
 		{
 			name: "MeshGateway created with no existing Deployment",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "consul",
@@ -370,7 +370,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		},
 		{
 			name: "MeshGateway created with existing Deployment not owned by gateway",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -405,7 +405,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		},
 		{
 			name: "MeshGateway created with existing Deployment owned by gateway",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -448,7 +448,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		// Service
 		{
 			name: "MeshGateway created with no existing Service",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "consul",
@@ -481,7 +481,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		},
 		{
 			name: "MeshGateway created with existing Service not owned by gateway",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -516,7 +516,7 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 		},
 		{
 			name: "MeshGateway created with existing Service owned by gateway",
-			k8sObjects: []runtime.Object{
+			k8sObjects: []client.Object{
 				&v2beta1.MeshGateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -571,7 +571,8 @@ func TestMeshGatewayController_Reconcile(t *testing.T) {
 			require.NoError(t, v2beta1.AddMeshToScheme(s))
 			s.AddKnownTypes(v2beta1.MeshGroupVersion, &v2beta1.MeshGateway{}, &v2beta1.GatewayClass{}, &v2beta1.GatewayClassConfig{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).
-				WithRuntimeObjects(testCase.k8sObjects...).
+				WithObjects(testCase.k8sObjects...).
+				WithStatusSubresource(testCase.k8sObjects...).
 				Build()
 
 			controller := MeshGatewayController{

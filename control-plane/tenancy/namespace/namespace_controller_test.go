@@ -15,17 +15,18 @@ import (
 	"google.golang.org/grpc/status"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
+	"github.com/hashicorp/consul/sdk/testutil"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
-	"github.com/hashicorp/consul/sdk/testutil"
 )
 
 func TestReconcileCreateNamespace(t *testing.T) {
@@ -55,11 +56,14 @@ func testReconcileCreateNamespace(t *testing.T, testCases []createTestCase) {
 		// Create the default kube namespace and kube namespace under test.
 		kubeNS := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: tc.kubeNamespace}}
 		kubeDefaultNS := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: metav1.NamespaceDefault}}
-		kubeObjects := []runtime.Object{
+		kubeObjects := []client.Object{
 			&kubeNS,
 			&kubeDefaultNS,
 		}
-		fakeClient := fake.NewClientBuilder().WithRuntimeObjects(kubeObjects...).Build()
+		fakeClient := fake.NewClientBuilder().
+			WithObjects(kubeObjects...).
+			WithStatusSubresource(kubeObjects...).
+			Build()
 
 		// Fire up consul server with v2tenancy enabled
 		testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
