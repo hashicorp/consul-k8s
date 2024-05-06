@@ -21,7 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/gateways"
@@ -88,9 +87,9 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ServiceAccount{}).
 		Watches(
-			source.NewKindWithCache(&meshv2beta1.GatewayClass{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				gateways, err := r.getGatewaysReferencingGatewayClass(context.Background(), o.(*meshv2beta1.GatewayClass))
+			&meshv2beta1.GatewayClass{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+				gateways, err := r.getGatewaysReferencingGatewayClass(ctx, o.(*meshv2beta1.GatewayClass))
 				if err != nil {
 					return nil
 				}
@@ -106,16 +105,16 @@ func (r *MeshGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 				return requests
 			})).
 		Watches(
-			source.NewKindWithCache(&meshv2beta1.GatewayClassConfig{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-				classes, err := r.getGatewayClassesReferencingGatewayClassConfig(context.Background(), o.(*meshv2beta1.GatewayClassConfig))
+			&meshv2beta1.GatewayClassConfig{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+				classes, err := r.getGatewayClassesReferencingGatewayClassConfig(ctx, o.(*meshv2beta1.GatewayClassConfig))
 				if err != nil {
 					return nil
 				}
 
 				var requests []reconcile.Request
 				for _, class := range classes.Items {
-					gateways, err := r.getGatewaysReferencingGatewayClass(context.Background(), class)
+					gateways, err := r.getGatewaysReferencingGatewayClass(ctx, class)
 					if err != nil {
 						continue
 					}
