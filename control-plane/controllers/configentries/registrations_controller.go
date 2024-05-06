@@ -5,6 +5,8 @@ package configentries
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -79,6 +81,15 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	// if there is an ACL token then we can assume that `manageSystemACLs` has been set and we should handle
+	// the acl setup
+	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
+		err = r.updateTermGWACLRole(ctx, log, client, registration)
+	}
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	err = r.updateStatus(ctx, req.NamespacedName)
 	if err != nil {
 		log.Error(err, "failed to update status")
@@ -124,6 +135,62 @@ func (r *RegistrationsController) deregisterService(ctx context.Context, log log
 		return err
 	}
 	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
+	return nil
+}
+
+func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	roles, _, err := client.ACL().RoleList(nil)
+	if err != nil {
+		return err
+	}
+
+	var role *capi.ACLRole
+	for _, r := range roles {
+		if strings.HasSuffix(r.Name, "terminating-gateway-acl-role") {
+			fmt.Printf("Role: %v\n", r)
+			role = r
+			break
+		}
+	}
+
+	if role == nil {
+		log.Info("terminating gateway role not found")
+		return nil
+	}
+
+	policy := &capi.ACLPolicy{
+		Name:        fmt.Sprintf("%s-write-policy", registration.Spec.Service.Name),
+		Description: "Write policy for terminating gateways for external service",
+		Rules:       `service "zoidberg" { policy = "write" }`,
+		Datacenters: []string{registration.Spec.Datacenter},
+		Namespace:   registration.Spec.Service.Namespace,
+		Partition:   registration.Spec.Service.Partition,
+	}
+
+	existingPolicy, _, err := client.ACL().PolicyReadByName(policy.Name, nil)
+	if err != nil {
+		log.Error(err, "error reading policy")
+		return err
+	}
+
+	if existingPolicy == nil {
+		policy, _, err = client.ACL().PolicyCreate(policy, nil)
+		if err != nil {
+			log.Error(err, "error creating policy")
+			return err
+		}
+	} else {
+		policy = existingPolicy
+	}
+
+	role.Policies = append(role.Policies, &capi.ACLRolePolicyLink{Name: policy.Name, ID: policy.ID})
+
+	_, _, err = client.ACL().RoleUpdate(role, nil)
+	if err != nil {
+		log.Error(err, "error updating role")
+		return err
+	}
+
 	return nil
 }
 
