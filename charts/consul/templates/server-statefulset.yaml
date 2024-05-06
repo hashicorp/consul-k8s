@@ -47,8 +47,10 @@ spec:
     rollingUpdate:
       partition: {{ .Values.server.updatePartition }}
   {{- end }}
+  {{- if .Values.server.usePersistentVolume }}
   {{- if and (semverCompare ">= 1.23-0" .Capabilities.KubeVersion.Version) (.Values.server.persistentVolumeClaimRetentionPolicy) }}
   persistentVolumeClaimRetentionPolicy: {{ toYaml .Values.server.persistentVolumeClaimRetentionPolicy | nindent 4 }}
+  {{- end }}
   {{- end }}
   selector:
     matchLabels:
@@ -226,6 +228,10 @@ spec:
         {{- toYaml .Values.server.securityContext | nindent 8 }}
       {{- end }}
       volumes:
+        {{- if not .Values.server.usePersistentVolume }}
+        - name: data-empty-dir
+          emptyDir: {}
+        {{- end }}
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-server-config
@@ -521,7 +527,11 @@ spec:
                 -hcl="experiments=[{{ $commaSeparatedValues }}]"
                 {{- end }}
           volumeMounts:
+            {{- if .Values.server.usePersistentVolume }}
             - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
+            {{- else }}
+            - name: data-empty-dir
+            {{- end }}
               mountPath: /consul/data
             - name: config
               mountPath: /consul/config
@@ -734,6 +744,7 @@ spec:
       nodeSelector:
         {{ tpl .Values.server.nodeSelector . | indent 8 | trim }}
       {{- end }}
+  {{- if .Values.server.usePersistentVolume }}
   volumeClaimTemplates:
     - metadata:
         name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
@@ -746,4 +757,5 @@ spec:
         {{- if .Values.server.storageClass }}
         storageClassName: {{ .Values.server.storageClass }}
         {{- end }}
+  {{- end }}
 {{- end }}
