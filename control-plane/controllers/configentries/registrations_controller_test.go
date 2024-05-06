@@ -120,7 +120,11 @@ func TestReconcile_Success(tt *testing.T) {
 				Watcher: test.MockConnMgrForIPAndPort(t, host, port, false),
 			}
 
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.registration).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(s).
+				WithRuntimeObjects(tc.registration).
+				WithStatusSubresource(&v1alpha1.Registration{}).
+				Build()
 
 			controller := &configentries.RegistrationsController{
 				Client:              fakeClient,
@@ -243,7 +247,11 @@ func TestReconcile_Failure(tt *testing.T) {
 				Watcher: test.MockConnMgrForIPAndPort(t, host, port, false),
 			}
 
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.registration).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(s).
+				WithRuntimeObjects(tc.registration).
+				WithStatusSubresource(&v1alpha1.Registration{}).
+				Build()
 
 			controller := &configentries.RegistrationsController{
 				Client:              fakeClient,
