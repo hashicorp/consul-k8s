@@ -17,14 +17,131 @@ func TestContainerEnvVars(t *testing.T) {
 	cases := []struct {
 		Name     string
 		Upstream string
+		required []corev1.EnvVar
 	}{
 		{
 			"Upstream with datacenter",
 			"static-server:7890:dc1",
+			[]corev1.EnvVar{
+				{
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_PORT",
+					Value: "7890",
+				},
+			},
 		},
 		{
 			"Upstream without datacenter",
 			"static-server:7890",
+			[]corev1.EnvVar{
+				{
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_PORT",
+					Value: "7890",
+				},
+			},
+		},
+		{
+			"Multiple upstreams comma separated",
+			"static-server:7890, static-server2:7892",
+			[]corev1.EnvVar{
+				{
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_PORT",
+					Value: "7890",
+				},
+				{
+					Name:  "STATIC_SERVER2_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER2_CONNECT_SERVICE_PORT",
+					Value: "7892",
+				},
+			},
+		},
+		{
+			"Multiple upstreams comma separated",
+			"static-server:7890, static-server2:7892 static-server3:7893",
+			[]corev1.EnvVar{
+				{
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_PORT",
+					Value: "7890",
+				},
+				{
+					Name:  "STATIC_SERVER2_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER2_CONNECT_SERVICE_PORT",
+					Value: "7892",
+				},
+				{
+					Name:  "STATIC_SERVER3_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER3_CONNECT_SERVICE_PORT",
+					Value: "7893",
+				},
+			},
+		},
+		{
+			"Multiple upstreams comma separated and carriage return",
+			`static-server:7890,
+                       static-server2:7892
+                       static-server3:7893`,
+			[]corev1.EnvVar{
+				{
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER_CONNECT_SERVICE_PORT",
+					Value: "7890",
+				},
+				{
+					Name:  "STATIC_SERVER2_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER2_CONNECT_SERVICE_PORT",
+					Value: "7892",
+				},
+				{
+					Name:  "STATIC_SERVER3_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER3_CONNECT_SERVICE_PORT",
+					Value: "7893",
+				},
+			},
+		},
+		{
+			"Multiple upstreams comma separated and carriage return malformed upstream",
+			`static-server7890,
+                       static-server2:7892
+static-server3:7893`,
+			[]corev1.EnvVar{
+				{
+					Name:  "STATIC_SERVER2_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER2_CONNECT_SERVICE_PORT",
+					Value: "7892",
+				},
+				{
+					Name:  "STATIC_SERVER3_CONNECT_SERVICE_HOST",
+					Value: "127.0.0.1",
+				}, {
+					Name:  "STATIC_SERVER3_CONNECT_SERVICE_PORT",
+					Value: "7893",
+				},
+			},
 		},
 	}
 
@@ -42,15 +159,7 @@ func TestContainerEnvVars(t *testing.T) {
 				},
 			})
 
-			require.ElementsMatch(envVars, []corev1.EnvVar{
-				{
-					Name:  "STATIC_SERVER_CONNECT_SERVICE_HOST",
-					Value: "127.0.0.1",
-				}, {
-					Name:  "STATIC_SERVER_CONNECT_SERVICE_PORT",
-					Value: "7890",
-				},
-			})
+			require.ElementsMatch(envVars, tt.required)
 		})
 	}
 }
