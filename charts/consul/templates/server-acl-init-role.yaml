@@ -14,14 +14,14 @@ metadata:
     component: server-acl-init
 rules:
 - apiGroups:
-    - core
+  - core
   resources:
   - secrets
   verbs:
   - create
   - get
 - apiGroups:
-    - core
+  - core
   resources:
   - serviceaccounts
   resourceNames:
