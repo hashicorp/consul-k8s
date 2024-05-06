@@ -13,15 +13,13 @@ metadata:
     release: {{ .Release.Name }}
     component: server-acl-init
 rules:
-- apiGroups:
-  - core
+- apiGroups: [ "" ]
   resources:
   - secrets
   verbs:
   - create
   - get
-- apiGroups:
-  - core
+- apiGroups: [ "" ]
   resources:
   - serviceaccounts
   resourceNames:
