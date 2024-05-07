@@ -35,8 +35,10 @@ import (
 )
 
 type serverResponseConfig struct {
-	registering bool
-	aclEnabled  bool
+	registering     bool
+	aclEnabled      bool
+	errOnRegister   bool
+	errOnDeregister bool
 }
 
 func TestReconcile_Success(tt *testing.T) {
@@ -46,7 +48,7 @@ func TestReconcile_Success(tt *testing.T) {
 		serverResponseConfig serverResponseConfig
 		expectedConditions   []v1alpha1.Condition
 	}{
-		"success on registration": {
+		"registering - success on registration": {
 			registration: &v1alpha1.Registration{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Registration",
@@ -77,7 +79,7 @@ func TestReconcile_Success(tt *testing.T) {
 				Message: "",
 			}},
 		},
-		"success on registration -- ACLs enabled": {
+		"registering -- ACLs enabled and policy does not exist": {
 			registration: &v1alpha1.Registration{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Registration",
@@ -111,7 +113,7 @@ func TestReconcile_Success(tt *testing.T) {
 				Message: "",
 			}},
 		},
-		"success on deregistration": {
+		"deregistering": {
 			registration: &v1alpha1.Registration{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Registration",
@@ -141,7 +143,7 @@ func TestReconcile_Success(tt *testing.T) {
 			},
 			expectedConditions: []v1alpha1.Condition{},
 		},
-		"success on deregistration - ACLs enabled": {
+		"deregistering - ACLs enabled": {
 			registration: &v1alpha1.Registration{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Registration",
@@ -220,10 +222,11 @@ func TestReconcile_Success(tt *testing.T) {
 func TestReconcile_Failure(tt *testing.T) {
 	deletionTime := metav1.Now()
 	cases := map[string]struct {
-		registration       *v1alpha1.Registration
-		expectedConditions []v1alpha1.Condition
+		registration         *v1alpha1.Registration
+		serverResponseConfig serverResponseConfig
+		expectedConditions   []v1alpha1.Condition
 	}{
-		"failure on registration": {
+		"registering - registration call to consul fails": {
 			registration: &v1alpha1.Registration{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Registration",
@@ -246,6 +249,10 @@ func TestReconcile_Failure(tt *testing.T) {
 					},
 				},
 			},
+			serverResponseConfig: serverResponseConfig{
+				registering:   true,
+				errOnRegister: true,
+			},
 			expectedConditions: []v1alpha1.Condition{{
 				Type:    "Synced",
 				Status:  v1.ConditionFalse,
@@ -253,6 +260,10 @@ func TestReconcile_Failure(tt *testing.T) {
 				Message: "",
 			}},
 		},
+		//"registering - terminating gateway acl role not found": {},
+		//"registering - error reading policy": {},
+		//"registering - policy does not exist - error creating policy": {},
+		//"registering - error updating role": {},
 		"failure on deregistration": {
 			registration: &v1alpha1.Registration{
 				TypeMeta: metav1.TypeMeta{
@@ -277,6 +288,9 @@ func TestReconcile_Failure(tt *testing.T) {
 					},
 				},
 			},
+			serverResponseConfig: serverResponseConfig{
+				errOnDeregister: true,
+			},
 			expectedConditions: []v1alpha1.Condition{{
 				Type:    "Synced",
 				Status:  v1.ConditionFalse,
@@ -294,22 +308,8 @@ func TestReconcile_Failure(tt *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Registration{})
 			ctx := context.Background()
 
-			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(500)
-			}))
+			consulServer, testClient := fakeConsulServer(t, tc.serverResponseConfig, tc.registration.Spec.Service.Name)
 			defer consulServer.Close()
-
-			parsedURL, err := url.Parse(consulServer.URL)
-			require.NoError(t, err)
-			host := strings.Split(parsedURL.Host, ":")[0]
-
-			port, err := strconv.Atoi(parsedURL.Port())
-			require.NoError(t, err)
-
-			testClient := &test.TestServerClient{
-				Cfg:     &consul.Config{APIClientConfig: &capi.Config{Address: host}, HTTPPort: port},
-				Watcher: test.MockConnMgrForIPAndPort(t, host, port, false),
-			}
 
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(s).
@@ -325,7 +325,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				ConsulServerConnMgr: testClient.Watcher,
 			}
 
-			_, err = controller.Reconcile(ctx, ctrl.Request{
+			_, err := controller.Reconcile(ctx, ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: tc.registration.Name, Namespace: tc.registration.Namespace},
 			})
 			require.Error(t, err)
@@ -373,10 +373,18 @@ func buildMux(t *testing.T, cfg serverResponseConfig, serviceName string) http.H
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/catalog/register", func(w http.ResponseWriter, r *http.Request) {
+		if cfg.errOnRegister {
+			w.WriteHeader(500)
+			return
+		}
 		w.WriteHeader(200)
 	})
 
 	mux.HandleFunc("/v1/catalog/deregister", func(w http.ResponseWriter, r *http.Request) {
+		if cfg.errOnDeregister {
+			w.WriteHeader(500)
+			return
+		}
 		w.WriteHeader(200)
 	})
 
