@@ -284,6 +284,17 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
+	if err := (&controllers.RegistrationsController{
+		Client:              mgr.GetClient(),
+		ConsulClientConfig:  consulConfig,
+		ConsulServerConnMgr: watcher,
+		Scheme:              mgr.GetScheme(),
+		Log:                 ctrl.Log.WithName("controller").WithName(apicommon.Registration),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", apicommon.Registration)
+		return err
+	}
+
 	if err := mgr.AddReadyzCheck("ready", webhook.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
 		setupLog.Error(err, "unable to create readiness check", "controller", endpoints.Controller{})
 		return err

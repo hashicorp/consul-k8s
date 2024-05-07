@@ -28,6 +28,7 @@ const (
 	ControlPlaneRequestLimit string = "controlplanerequestlimit"
 	RouteAuthFilter          string = "routeauthfilter"
 	GatewayPolicy            string = "gatewaypolicy"
+	Registration             string = "registration"
 
 	// V2 resources.
 	TrafficPermissions string = "trafficpermissions"
