@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -18,6 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestHandle_ServiceIntentions_Create(t *testing.T) {
@@ -248,8 +249,7 @@ func TestHandle_ServiceIntentions_Create(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 
 			validator := &ServiceIntentionsWebhook{
 				Client:  client,
@@ -437,8 +437,7 @@ func TestHandle_ServiceIntentions_Update(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 
 			validator := &ServiceIntentionsWebhook{
 				Client:  client,
@@ -597,8 +596,7 @@ func TestHandle_ServiceIntentions_Patches(t *testing.T) {
 				s := runtime.NewScheme()
 				s.AddKnownTypes(GroupVersion, &ServiceIntentions{}, &ServiceIntentionsList{})
 				client := fake.NewClientBuilder().WithScheme(s).Build()
-				decoder, err := admission.NewDecoder(s)
-				require.NoError(t, err)
+				decoder := admission.NewDecoder(s)
 
 				validator := &ServiceIntentionsWebhook{
 					Client:  client,

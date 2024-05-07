@@ -8,9 +8,9 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
@@ -59,7 +59,7 @@ func (v *GRPCRouteWebhook) List(ctx context.Context) ([]common.ConsulResource, e
 	return entries, nil
 }
 
-func (v *GRPCRouteWebhook) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
+func (v *GRPCRouteWebhook) SetupWithManager(mgr ctrl.Manager) {
+	v.decoder = admission.NewDecoder(mgr.GetScheme())
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-grpcroute", &admission.Webhook{Handler: v})
 }
