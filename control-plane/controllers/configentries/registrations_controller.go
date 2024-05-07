@@ -92,9 +92,10 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	// the acl setup
 	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
 		err = r.updateTermGWACLRole(log, client, registration)
-	}
-	if err != nil {
-		return ctrl.Result{}, err
+		if err != nil {
+			r.updateStatusError(ctx, registration, "ConsulErrorACL", err)
+			return ctrl.Result{}, err
+		}
 	}
 
 	err = r.updateStatus(ctx, req.NamespacedName)

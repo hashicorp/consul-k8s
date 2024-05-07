@@ -35,10 +35,11 @@ import (
 )
 
 type serverResponseConfig struct {
-	registering     bool
-	aclEnabled      bool
-	errOnRegister   bool
-	errOnDeregister bool
+	registering      bool
+	aclEnabled       bool
+	errOnRegister    bool
+	errOnDeregister  bool
+	temGWRoleMissing bool
 }
 
 func TestReconcile_Success(tt *testing.T) {
@@ -260,7 +261,41 @@ func TestReconcile_Failure(tt *testing.T) {
 				Message: "",
 			}},
 		},
-		//"registering - terminating gateway acl role not found": {},
+		"registering - terminating gateway acl role not found": {
+			registration: &v1alpha1.Registration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Registration",
+					APIVersion: "consul.hashicorp.com/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-registration",
+					Finalizers: []string{configentries.RegistrationFinalizer},
+				},
+				Spec: v1alpha1.RegistrationSpec{
+					ID:         "node-id",
+					Node:       "virtual-node",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: v1alpha1.Service{
+						ID:      "service-id",
+						Name:    "service-name",
+						Port:    8080,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+			serverResponseConfig: serverResponseConfig{
+				registering:      true,
+				aclEnabled:       true,
+				temGWRoleMissing: true,
+			},
+			expectedConditions: []v1alpha1.Condition{{
+				Type:    "Synced",
+				Status:  v1.ConditionFalse,
+				Reason:  "ConsulErrorACL",
+				Message: "",
+			}},
+		},
 		//"registering - error reading policy": {},
 		//"registering - policy does not exist - error creating policy": {},
 		//"registering - error updating role": {},
@@ -392,6 +427,31 @@ func buildMux(t *testing.T, cfg serverResponseConfig, serviceName string) http.H
 	require.NoError(t, err)
 
 	mux.HandleFunc("/v1/acl/roles", func(w http.ResponseWriter, r *http.Request) {
+		entries := []*capi.ACLRole{
+			{
+				ID:          "754a8717-46e9-9f18-7f76-28dc0afafd19",
+				Name:        "consul-consul-connect-inject-acl-role",
+				Description: "ACL Role for consul-consul-connect-injector",
+				Policies: []*capi.ACLLink{
+					{
+						ID:   "38511a9f-a309-11e2-7f67-7fea12056e7c",
+						Name: "connect-inject-policy",
+					},
+				},
+			},
+		}
+
+		if cfg.temGWRoleMissing {
+			val, err := json.Marshal(entries)
+			if err != nil {
+				w.WriteHeader(500)
+				return
+			}
+			w.WriteHeader(200)
+			w.Write(val)
+			return
+		}
+
 		termGWPolicies := []*capi.ACLLink{
 			{
 				ID:   "b7e377d9-5e2b-b99c-3f06-139584cf47f8",
@@ -406,25 +466,15 @@ func buildMux(t *testing.T, cfg serverResponseConfig, serviceName string) http.H
 			})
 		}
 
-		entries := []*capi.ACLRole{
-			{
-				ID:          "754a8717-46e9-9f18-7f76-28dc0afafd19",
-				Name:        "consul-consul-connect-inject-acl-role",
-				Description: "ACL Role for consul-consul-connect-injector",
-				Policies: []*capi.ACLLink{
-					{
-						ID:   "38511a9f-a309-11e2-7f67-7fea12056e7c",
-						Name: "connect-inject-policy",
-					},
-				},
-			},
-			{
-				ID:          "61fc5051-96e9-7b67-69b5-98f7f6682563",
-				Name:        "consul-consul-terminating-gateway-acl-role",
-				Description: "ACL Role for consul-consul-terminating-gateway",
-				Policies:    termGWPolicies,
-			},
+		termGWRole := &capi.ACLRole{
+			ID:          "61fc5051-96e9-7b67-69b5-98f7f6682563",
+			Name:        "consul-consul-terminating-gateway-acl-role",
+			Description: "ACL Role for consul-consul-terminating-gateway",
+			Policies:    termGWPolicies,
 		}
+
+		entries = append(entries, termGWRole)
+
 		val, err := json.Marshal(entries)
 		if err != nil {
 			w.WriteHeader(500)
