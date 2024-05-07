@@ -94,7 +94,10 @@ func (r *RegistrationsController) registerService(ctx context.Context, log logr.
 		return err
 	}
 
-	regReq := registration.ToCatalogRegistration()
+	regReq, err := registration.ToCatalogRegistration()
+	if err != nil {
+		return err
+	}
 
 	_, err = client.Catalog().Register(regReq, nil)
 	if err != nil {

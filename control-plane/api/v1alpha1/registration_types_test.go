@@ -208,7 +208,8 @@ func TestToCatalogRegistration(tt *testing.T) {
 		tc := tc
 		tt.Run(name, func(t *testing.T) {
 			t.Parallel()
-			actual := tc.registration.ToCatalogRegistration()
+			actual, err := tc.registration.ToCatalogRegistration()
+			require.NoError(t, err)
 			require.Equal(t, tc.expected, actual)
 		})
 	}

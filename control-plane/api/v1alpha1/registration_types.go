@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	"errors"
 	"maps"
 	"slices"
 	"time"
@@ -146,17 +147,22 @@ type HealthCheckDefinition struct {
 
 // +kubebuilder:object:root=true
 
-// RegistrationList is a list of Config resources.
+// RegistrationList is a list of Registration resources.
 type RegistrationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	// Items is the list of Configs.
+	// Items is the list of Registrations.
 	Items []Registration `json:"items"`
 }
 
 // ToCatalogRegistration converts a Registration to a Consul CatalogRegistration.
-func (r *Registration) ToCatalogRegistration() *capi.CatalogRegistration {
+func (r *Registration) ToCatalogRegistration() (*capi.CatalogRegistration, error) {
+	check, err := copyHealthCheck(r.Spec.HealthCheck)
+	if err != nil {
+		return nil, err
+	}
+
 	return &capi.CatalogRegistration{
 		ID:              r.Spec.ID,
 		Node:            r.Spec.Node,
@@ -179,11 +185,11 @@ func (r *Registration) ToCatalogRegistration() *capi.CatalogRegistration {
 			Partition:         r.Spec.Service.Partition,
 			Locality:          copyLocality(r.Spec.Service.Locality),
 		},
-		Check:          copyHealthCheck(r.Spec.HealthCheck),
+		Check:          check,
 		SkipNodeUpdate: r.Spec.SkipNodeUpdate,
 		Partition:      r.Spec.Partition,
 		Locality:       copyLocality(r.Spec.Locality),
-	}
+	}, nil
 }
 
 func copyTaggedAddresses(taggedAddresses map[string]ServiceAddress) map[string]capi.ServiceAddress {
@@ -207,15 +213,32 @@ func copyLocality(locality *Locality) *capi.Locality {
 	}
 }
 
-func copyHealthCheck(healthCheck *HealthCheck) *capi.AgentCheck {
+var (
+	ErrInvalidInterval       = errors.New("invalid value for IntervalDuration")
+	ErrInvalidTimeout        = errors.New("invalid value for TimeoutDuration")
+	ErrInvalidDergisterAfter = errors.New("invalid value for DeregisterCriticalServiceAfterDuration")
+)
+
+func copyHealthCheck(healthCheck *HealthCheck) (*capi.AgentCheck, error) {
 	if healthCheck == nil {
-		return nil
+		return nil, nil
 	}
 
 	// TODO: handle error
-	intervalDuration, _ := time.ParseDuration(healthCheck.Definition.IntervalDuration)
-	timeoutDuration, _ := time.ParseDuration(healthCheck.Definition.TimeoutDuration)
-	deregisterAfter, _ := time.ParseDuration(healthCheck.Definition.DeregisterCriticalServiceAfterDuration)
+	intervalDuration, err := time.ParseDuration(healthCheck.Definition.IntervalDuration)
+	if err != nil {
+		return nil, ErrInvalidInterval
+	}
+
+	timeoutDuration, err := time.ParseDuration(healthCheck.Definition.TimeoutDuration)
+	if err != nil {
+		return nil, ErrInvalidTimeout
+	}
+
+	deregisterAfter, err := time.ParseDuration(healthCheck.Definition.DeregisterCriticalServiceAfterDuration)
+	if err != nil {
+		return nil, ErrInvalidDergisterAfter
+	}
 
 	return &capi.AgentCheck{
 		Node:        healthCheck.Node,
@@ -245,10 +268,10 @@ func copyHealthCheck(healthCheck *HealthCheck) *capi.AgentCheck {
 			TimeoutDuration:                        timeoutDuration,
 			DeregisterCriticalServiceAfterDuration: deregisterAfter,
 		},
-	}
+	}, nil
 }
 
-// ToCatalogDeregistration converts a Registration to a Consul CatalogDergistration.
+// ToCatalogDeregistration converts a Registration to a Consul CatalogDeregistration.
 func (r *Registration) ToCatalogDeregistration() *capi.CatalogDeregistration {
 	checkID := ""
 	if r.Spec.HealthCheck != nil {
