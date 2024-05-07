@@ -1,0 +1,3 @@
+```release-note:bug
+Create Consul service with mode transparent-proxy even when a cluster IP is not assigned to the service..
+```
