@@ -5,7 +5,9 @@ package configentries
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -66,9 +68,14 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 			r.updateStatusError(ctx, registration, "ConsulErrorDeregistration", err)
 			return ctrl.Result{}, err
 		}
-		err := r.updateStatus(ctx, req.NamespacedName)
+
+		// if there is an ACL token then we can assume that `manageSystemACLs` has been set and we should handle
+		// the acl setup
+		if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
+			err = r.removeTermGWACLRole(log, client, registration)
+		}
 		if err != nil {
-			log.Error(err, "failed to update status")
+			return ctrl.Result{}, err
 		}
 
 		return ctrl.Result{}, nil
@@ -84,7 +91,7 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	// if there is an ACL token then we can assume that `manageSystemACLs` has been set and we should handle
 	// the acl setup
 	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
-		err = r.updateTermGWACLRole(ctx, log, client, registration)
+		err = r.updateTermGWACLRole(log, client, registration)
 	}
 	if err != nil {
 		return ctrl.Result{}, err
@@ -138,7 +145,7 @@ func (r *RegistrationsController) deregisterService(ctx context.Context, log log
 	return nil
 }
 
-func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+func (r *RegistrationsController) updateTermGWACLRole(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	roles, _, err := client.ACL().RoleList(nil)
 	if err != nil {
 		return err
@@ -147,7 +154,6 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 	var role *capi.ACLRole
 	for _, r := range roles {
 		if strings.HasSuffix(r.Name, "terminating-gateway-acl-role") {
-			fmt.Printf("Role: %v\n", r)
 			role = r
 			break
 		}
@@ -155,7 +161,7 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 
 	if role == nil {
 		log.Info("terminating gateway role not found")
-		return nil
+		return errors.New("terminating gateway role not found")
 	}
 
 	policy := &capi.ACLPolicy{
@@ -188,6 +194,54 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 	_, _, err = client.ACL().RoleUpdate(role, nil)
 	if err != nil {
 		log.Error(err, "error updating role")
+		return err
+	}
+
+	return nil
+}
+
+func (r *RegistrationsController) removeTermGWACLRole(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	roles, _, err := client.ACL().RoleList(nil)
+	if err != nil {
+		return err
+	}
+
+	var role *capi.ACLRole
+	for _, r := range roles {
+		if strings.HasSuffix(r.Name, "terminating-gateway-acl-role") {
+			fmt.Printf("Role: %v\n", r)
+			role = r
+			break
+		}
+	}
+
+	if role == nil {
+		return errors.New("terminating gateway role not found")
+	}
+
+	var policyID string
+
+	role.Policies = slices.DeleteFunc(role.Policies, func(i *capi.ACLRolePolicyLink) bool {
+		if i.Name == fmt.Sprintf("%s-write-policy", registration.Spec.Service.Name) {
+			policyID = i.ID
+			return true
+		}
+		return false
+	})
+
+	if policyID == "" {
+		return errors.New("policy not found")
+	}
+
+	_, _, err = client.ACL().RoleUpdate(role, nil)
+	if err != nil {
+		log.Error(err, "error updating role")
+		return err
+	}
+
+	_, err = client.ACL().PolicyDelete(policyID, nil)
+	if err != nil {
+		log.Error(err, "error deleting service policy")
 		return err
 	}
 
