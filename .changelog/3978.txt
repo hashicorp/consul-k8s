@@ -1,0 +1,3 @@
+```release-note:bug
+connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error
+```
