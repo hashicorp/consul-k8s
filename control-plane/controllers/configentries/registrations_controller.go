@@ -84,29 +84,6 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
-	log.Info("Deregistering service")
-	err := r.deregisterService(log, client, registration)
-	if err != nil {
-		r.updateStatusError(ctx, log, registration, ConsulErrorDeregistration, err)
-		return err
-	}
-	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
-		err = r.removeTermGWACLRole(log, client, registration)
-		if err != nil {
-			r.updateStatusError(ctx, log, registration, ConsulErrorACL, err)
-			return err
-		}
-	}
-	patch := r.RemoveFinalizersPatch(registration, RegistrationFinalizer)
-	err = r.Patch(ctx, registration, patch)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (r *RegistrationsController) handleRegistration(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	log.Info("Registering service")
 	err := r.registerService(log, client, registration)
@@ -141,19 +118,6 @@ func (r *RegistrationsController) registerService(log logr.Logger, client *capi.
 	}
 
 	log.Info("Successfully registered service", "svcName", regReq.Service.Service)
-	return nil
-}
-
-func (r *RegistrationsController) deregisterService(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
-	deRegReq := registration.ToCatalogDeregistration()
-
-	_, err := client.Catalog().Deregister(deRegReq, nil)
-	if err != nil {
-		log.Error(err, "error deregistering service", "svcID", deRegReq.ServiceID)
-		return err
-	}
-
-	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
 	return nil
 }
 
@@ -212,6 +176,42 @@ func (r *RegistrationsController) updateTermGWACLRole(log logr.Logger, client *c
 	return nil
 }
 
+func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	log.Info("Deregistering service")
+	err := r.deregisterService(log, client, registration)
+	if err != nil {
+		r.updateStatusError(ctx, log, registration, ConsulErrorDeregistration, err)
+		return err
+	}
+	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
+		err = r.removeTermGWACLRole(log, client, registration)
+		if err != nil {
+			r.updateStatusError(ctx, log, registration, ConsulErrorACL, err)
+			return err
+		}
+	}
+	patch := r.RemoveFinalizersPatch(registration, RegistrationFinalizer)
+	err = r.Patch(ctx, registration, patch)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *RegistrationsController) deregisterService(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	deRegReq := registration.ToCatalogDeregistration()
+
+	_, err := client.Catalog().Deregister(deRegReq, nil)
+	if err != nil {
+		log.Error(err, "error deregistering service", "svcID", deRegReq.ServiceID)
+		return err
+	}
+
+	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
+	return nil
+}
+
 func (r *RegistrationsController) removeTermGWACLRole(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	roles, _, err := client.ACL().RoleList(nil)
 	if err != nil {
@@ -263,8 +263,8 @@ func (r *RegistrationsController) removeTermGWACLRole(log logr.Logger, client *c
 	return nil
 }
 
-func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger {
-	return r.Log.WithValues("request", name)
+func servicePolicyName(name string) string {
+	return fmt.Sprintf("%s-write-policy", name)
 }
 
 func (r *RegistrationsController) updateStatusError(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration, reason string, reconcileErr error) {
@@ -296,10 +296,10 @@ func (r *RegistrationsController) updateStatus(ctx context.Context, log logr.Log
 	return nil
 }
 
-func (r *RegistrationsController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &v1alpha1.Registration{}, r)
+func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger {
+	return r.Log.WithValues("request", name)
 }
 
-func servicePolicyName(name string) string {
-	return fmt.Sprintf("%s-write-policy", name)
+func (r *RegistrationsController) SetupWithManager(mgr ctrl.Manager) error {
+	return setupWithManager(mgr, &v1alpha1.Registration{}, r)
 }
