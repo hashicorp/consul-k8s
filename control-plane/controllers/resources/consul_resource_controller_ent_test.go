@@ -12,12 +12,6 @@ import (
 	"github.com/go-logr/logr"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -27,6 +21,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 
 	pbauth "github.com/hashicorp/consul/proto-public/pbauth/v2beta1"
 	"github.com/hashicorp/consul/proto-public/pbresource"
@@ -135,7 +136,7 @@ func TestConsulResourceController_UpdatesConsulResourceEnt(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.resource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.resource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.resource).WithStatusSubresource(c.resource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}

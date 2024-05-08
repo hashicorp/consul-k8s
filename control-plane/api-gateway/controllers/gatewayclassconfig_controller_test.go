@@ -56,6 +56,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "consul-api-gateway",
 						DeletionTimestamp: &deletionTimestamp,
+						Finalizers:        []string{gatewayClassConfigFinalizer},
 					},
 				}
 				return []runtime.Object{&gatewayClassConfig}
@@ -68,6 +69,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "consul-api-gateway",
 						DeletionTimestamp: &deletionTimestamp,
+						Finalizers:        []string{gatewayClassConfigFinalizer},
 					},
 				}
 				gatewayClass := gwv1beta1.GatewayClass{
@@ -98,7 +100,10 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 			require.NoError(t, gwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.k8sObjects()...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(tt.k8sObjects()...).
+				WithStatusSubresource(&v1alpha1.GatewayClassConfig{}).
+				Build()
 
 			// Create the gateway class config controller.
 			gcc := &GatewayClassConfigController{
