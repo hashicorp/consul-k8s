@@ -19,6 +19,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capi "github.com/hashicorp/consul/api"
 
@@ -93,7 +95,7 @@ func (r *RegistrationsController) handleRegistration(ctx context.Context, log lo
 		return err
 	}
 	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
-		err = r.updateTermGWACLRole(log, client, registration)
+		err = r.updateTermGWACLRole(ctx, log, client, registration)
 		if err != nil {
 			r.updateStatusError(ctx, log, registration, ConsulErrorACL, err)
 			return err
@@ -122,23 +124,30 @@ func (r *RegistrationsController) registerService(log logr.Logger, client *capi.
 	return nil
 }
 
-func (r *RegistrationsController) updateTermGWACLRole(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
-	roles, _, err := client.ACL().RoleList(nil)
+func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	termGWList := &v1alpha1.TerminatingGatewayList{}
+	err := r.Client.List(ctx, termGWList)
 	if err != nil {
 		return err
 	}
 
-	var role *capi.ACLRole
-	for _, r := range roles {
-		if strings.HasSuffix(r.Name, "terminating-gateway-acl-role") {
-			role = r
-			break
+	termGWsToUpdate := make([]v1alpha1.TerminatingGateway, 0, len(termGWList.Items))
+	for _, termGW := range termGWList.Items {
+		for _, svc := range termGW.Spec.Services {
+			if svc.Name == registration.Spec.Service.Name {
+				termGWsToUpdate = append(termGWsToUpdate, termGW)
+			}
 		}
 	}
 
-	if role == nil {
-		log.Info("terminating gateway role not found")
-		return errors.New("terminating gateway role not found")
+	if len(termGWsToUpdate) == 0 {
+		log.Info("terminating gateway not found")
+		return nil
+	}
+
+	roles, _, err := client.ACL().RoleList(nil)
+	if err != nil {
+		return err
 	}
 
 	policy := &capi.ACLPolicy{
@@ -157,7 +166,7 @@ func (r *RegistrationsController) updateTermGWACLRole(log logr.Logger, client *c
 	}
 
 	// existingPolicy will never be nil beause of how PolicyReadByName works so we need to check if the ID is empty
-	if existingPolicy.ID == "" {
+	if existingPolicy == nil {
 		policy, _, err = client.ACL().PolicyCreate(policy, nil)
 		if err != nil {
 			return fmt.Errorf("error creating policy: %w", err)
@@ -166,12 +175,27 @@ func (r *RegistrationsController) updateTermGWACLRole(log logr.Logger, client *c
 		policy = existingPolicy
 	}
 
-	role.Policies = append(role.Policies, &capi.ACLRolePolicyLink{Name: policy.Name, ID: policy.ID})
+	for _, termGW := range termGWsToUpdate {
+		var role *capi.ACLRole
+		for _, r := range roles {
+			if strings.HasSuffix(r.Name, fmt.Sprintf("-%s-acl-role", termGW.Name)) {
+				role = r
+				break
+			}
+		}
 
-	_, _, err = client.ACL().RoleUpdate(role, nil)
-	if err != nil {
-		log.Error(err, "error updating role")
-		return err
+		if role == nil {
+			log.Info("terminating gateway role not found")
+			return errors.New("terminating gateway role not found")
+		}
+
+		role.Policies = append(role.Policies, &capi.ACLRolePolicyLink{Name: policy.Name, ID: policy.ID})
+
+		_, _, err = client.ACL().RoleUpdate(role, nil)
+		if err != nil {
+			log.Error(err, "error updating role")
+			return err
+		}
 	}
 
 	return nil
@@ -302,5 +326,22 @@ func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger 
 }
 
 func (r *RegistrationsController) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).For(&v1alpha1.Registration{}).Complete(r)
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&v1alpha1.Registration{}).
+		Watches(&v1alpha1.TerminatingGateway{}, handler.EnqueueRequestsFromMapFunc(r.transformTerminatingGateways)).
+		Complete(r)
+}
+
+func (r *RegistrationsController) transformTerminatingGateways(ctx context.Context, o client.Object) []reconcile.Request {
+	termGW := o.(*v1alpha1.TerminatingGateway)
+	reqs := make([]reconcile.Request, 0, len(termGW.Spec.Services))
+	for _, svc := range termGW.Spec.Services {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      svc.Name,
+				Namespace: svc.Namespace,
+			},
+		})
+	}
+	return reqs
 }
