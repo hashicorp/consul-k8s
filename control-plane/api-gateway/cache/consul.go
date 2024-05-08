@@ -420,7 +420,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 
 		_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
 		if err != nil && !isRoleExistsErr(err, aclRoleName) {
-			//don't error out in the case that the role already exists
+			//don't error out in the case that the role already exists.
 			return "", err
 		}
 
@@ -601,7 +601,7 @@ func isPolicyExistsErr(err error, policyName string) bool {
 	return isExistsErr(err, "Policy", policyName)
 }
 
-// isExistsErr returns true if err is due to trying to call an API for a given type and it already exists
+// isExistsErr returns true if err is due to trying to call an API for a given type and it already exists.
 func isExistsErr(err error, typeName, name string) bool {
 	return err != nil &&
 		strings.Contains(err.Error(), "Unexpected response code: 500") &&
