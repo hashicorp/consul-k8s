@@ -35,11 +35,16 @@ import (
 )
 
 type serverResponseConfig struct {
-	registering      bool
-	aclEnabled       bool
-	errOnRegister    bool
-	errOnDeregister  bool
-	temGWRoleMissing bool
+	registering       bool
+	aclEnabled        bool
+	errOnRegister     bool
+	errOnDeregister   bool
+	errOnPolicyRead   bool
+	errOnPolicyWrite  bool
+	errOnPolicyDelete bool
+	errOnRoleUpdate   bool
+	policyExists      bool
+	temGWRoleMissing  bool
 }
 
 func TestReconcile_Success(tt *testing.T) {
@@ -106,6 +111,41 @@ func TestReconcile_Success(tt *testing.T) {
 			serverResponseConfig: serverResponseConfig{
 				registering: true,
 				aclEnabled:  true,
+			},
+			expectedConditions: []v1alpha1.Condition{{
+				Type:    "Synced",
+				Status:  v1.ConditionTrue,
+				Reason:  "",
+				Message: "",
+			}},
+		},
+		"registering -- ACLs enabled and policy does exists": {
+			registration: &v1alpha1.Registration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Registration",
+					APIVersion: "consul.hashicorp.com/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-registration",
+					Finalizers: []string{configentries.RegistrationFinalizer},
+				},
+				Spec: v1alpha1.RegistrationSpec{
+					ID:         "node-id",
+					Node:       "virtual-node",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: v1alpha1.Service{
+						ID:      "service-id",
+						Name:    "service-name",
+						Port:    8080,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+			serverResponseConfig: serverResponseConfig{
+				registering:  true,
+				aclEnabled:   true,
+				policyExists: true,
 			},
 			expectedConditions: []v1alpha1.Condition{{
 				Type:    "Synced",
@@ -257,7 +297,7 @@ func TestReconcile_Failure(tt *testing.T) {
 			expectedConditions: []v1alpha1.Condition{{
 				Type:    "Synced",
 				Status:  v1.ConditionFalse,
-				Reason:  "ConsulErrorRegistration",
+				Reason:  configentries.ConsulErrorRegistration,
 				Message: "",
 			}},
 		},
@@ -292,14 +332,117 @@ func TestReconcile_Failure(tt *testing.T) {
 			expectedConditions: []v1alpha1.Condition{{
 				Type:    "Synced",
 				Status:  v1.ConditionFalse,
-				Reason:  "ConsulErrorACL",
+				Reason:  configentries.ConsulErrorACL,
 				Message: "",
 			}},
 		},
-		//"registering - error reading policy": {},
-		//"registering - policy does not exist - error creating policy": {},
-		//"registering - error updating role": {},
-		"failure on deregistration": {
+		"registering - error reading policy": {
+			registration: &v1alpha1.Registration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Registration",
+					APIVersion: "consul.hashicorp.com/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-registration",
+					Finalizers: []string{configentries.RegistrationFinalizer},
+				},
+				Spec: v1alpha1.RegistrationSpec{
+					ID:         "node-id",
+					Node:       "virtual-node",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: v1alpha1.Service{
+						ID:      "service-id",
+						Name:    "service-name",
+						Port:    8080,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+			serverResponseConfig: serverResponseConfig{
+				registering:     true,
+				aclEnabled:      true,
+				errOnPolicyRead: true,
+				policyExists:    true,
+			},
+			expectedConditions: []v1alpha1.Condition{{
+				Type:    "Synced",
+				Status:  v1.ConditionFalse,
+				Reason:  configentries.ConsulErrorACL,
+				Message: "",
+			}},
+		},
+		"registering - policy does not exist - error creating policy": {
+			registration: &v1alpha1.Registration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Registration",
+					APIVersion: "consul.hashicorp.com/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-registration",
+					Finalizers: []string{configentries.RegistrationFinalizer},
+				},
+				Spec: v1alpha1.RegistrationSpec{
+					ID:         "node-id",
+					Node:       "virtual-node",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: v1alpha1.Service{
+						ID:      "service-id",
+						Name:    "service-name",
+						Port:    8080,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+			serverResponseConfig: serverResponseConfig{
+				registering:      true,
+				aclEnabled:       true,
+				errOnPolicyWrite: true,
+			},
+			expectedConditions: []v1alpha1.Condition{{
+				Type:    "Synced",
+				Status:  v1.ConditionFalse,
+				Reason:  configentries.ConsulErrorACL,
+				Message: "",
+			}},
+		},
+		"registering - error updating role": {
+			registration: &v1alpha1.Registration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Registration",
+					APIVersion: "consul.hashicorp.com/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-registration",
+					Finalizers: []string{configentries.RegistrationFinalizer},
+				},
+				Spec: v1alpha1.RegistrationSpec{
+					ID:         "node-id",
+					Node:       "virtual-node",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: v1alpha1.Service{
+						ID:      "service-id",
+						Name:    "service-name",
+						Port:    8080,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+			serverResponseConfig: serverResponseConfig{
+				registering:     true,
+				aclEnabled:      true,
+				errOnRoleUpdate: true,
+			},
+			expectedConditions: []v1alpha1.Condition{{
+				Type:    "Synced",
+				Status:  v1.ConditionFalse,
+				Reason:  configentries.ConsulErrorACL,
+				Message: "",
+			}},
+		},
+		"deregistering": {
 			registration: &v1alpha1.Registration{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Registration",
@@ -329,7 +472,77 @@ func TestReconcile_Failure(tt *testing.T) {
 			expectedConditions: []v1alpha1.Condition{{
 				Type:    "Synced",
 				Status:  v1.ConditionFalse,
-				Reason:  "ConsulErrorDeregistration",
+				Reason:  configentries.ConsulErrorDeregistration,
+				Message: "",
+			}},
+		},
+		"deregistering - ACLs enabled - terminating-gateway error updating role": {
+			registration: &v1alpha1.Registration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Registration",
+					APIVersion: "consul.hashicorp.com/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-registration",
+					Finalizers:        []string{configentries.RegistrationFinalizer},
+					DeletionTimestamp: &deletionTime,
+				},
+				Spec: v1alpha1.RegistrationSpec{
+					ID:         "node-id",
+					Node:       "virtual-node",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: v1alpha1.Service{
+						ID:      "service-id",
+						Name:    "service-name",
+						Port:    8080,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+			serverResponseConfig: serverResponseConfig{
+				aclEnabled:      true,
+				errOnRoleUpdate: true,
+			},
+			expectedConditions: []v1alpha1.Condition{{
+				Type:    "Synced",
+				Status:  v1.ConditionFalse,
+				Reason:  configentries.ConsulErrorACL,
+				Message: "",
+			}},
+		},
+		"deregistering - ACLs enabled - terminating-gateway error deleting policy": {
+			registration: &v1alpha1.Registration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Registration",
+					APIVersion: "consul.hashicorp.com/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-registration",
+					Finalizers:        []string{configentries.RegistrationFinalizer},
+					DeletionTimestamp: &deletionTime,
+				},
+				Spec: v1alpha1.RegistrationSpec{
+					ID:         "node-id",
+					Node:       "virtual-node",
+					Address:    "127.0.0.1",
+					Datacenter: "dc1",
+					Service: v1alpha1.Service{
+						ID:      "service-id",
+						Name:    "service-name",
+						Port:    8080,
+						Address: "127.0.0.1",
+					},
+				},
+			},
+			serverResponseConfig: serverResponseConfig{
+				aclEnabled:        true,
+				errOnPolicyDelete: true,
+			},
+			expectedConditions: []v1alpha1.Condition{{
+				Type:    "Synced",
+				Status:  v1.ConditionFalse,
+				Reason:  configentries.ConsulErrorACL,
 				Message: "",
 			}},
 		},
@@ -485,6 +698,11 @@ func buildMux(t *testing.T, cfg serverResponseConfig, serviceName string) http.H
 	})
 
 	mux.HandleFunc("/v1/acl/role/", func(w http.ResponseWriter, r *http.Request) {
+		if cfg.errOnRoleUpdate {
+			w.WriteHeader(500)
+			return
+		}
+
 		role := &capi.ACLRole{
 			ID:          "61fc5051-96e9-7b67-69b5-98f7f6682563",
 			Name:        "consul-consul-terminating-gateway-acl-role",
@@ -510,10 +728,17 @@ func buildMux(t *testing.T, cfg serverResponseConfig, serviceName string) http.H
 	})
 
 	mux.HandleFunc("/v1/acl/policy/name/", func(w http.ResponseWriter, r *http.Request) {
-		policy := &capi.ACLPolicy{
-			ID:   policyID,
-			Name: fmt.Sprintf("%s-write-policy", serviceName),
+		if cfg.errOnPolicyRead {
+			w.WriteHeader(500)
+			return
 		}
+
+		policy := &capi.ACLPolicy{}
+		if cfg.policyExists {
+			policy.ID = policyID
+			policy.Name = fmt.Sprintf("%s-write-policy", serviceName)
+		}
+
 		val, err := json.Marshal(policy)
 		if err != nil {
 			w.WriteHeader(500)
@@ -524,7 +749,32 @@ func buildMux(t *testing.T, cfg serverResponseConfig, serviceName string) http.H
 	})
 
 	mux.HandleFunc("/v1/acl/policy/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
+		switch r.Method {
+		case "GET":
+			if cfg.errOnPolicyWrite {
+				w.WriteHeader(500)
+				return
+			}
+
+			policy := &capi.ACLPolicy{
+				ID:   policyID,
+				Name: fmt.Sprintf("%s-write-policy", serviceName),
+			}
+
+			val, err := json.Marshal(policy)
+			if err != nil {
+				w.WriteHeader(500)
+				return
+			}
+			w.WriteHeader(200)
+			w.Write(val)
+		case "DELETE":
+			if cfg.errOnPolicyDelete {
+				w.WriteHeader(500)
+				return
+			}
+			w.WriteHeader(200)
+		}
 	})
 
 	return mux

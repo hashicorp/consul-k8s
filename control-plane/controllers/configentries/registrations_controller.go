@@ -28,14 +28,21 @@ import (
 
 const RegistrationFinalizer = "registration.finalizers.consul.hashicorp.com"
 
+// Status Reasons
+const (
+	ConsulErrorRegistration   = "ConsulErrorRegistration"
+	ConsulErrorDeregistration = "ConsulErrorDeregistration"
+	ConsulErrorACL            = "ConsulErrorACL"
+)
+
 // RegistrationsController is the controller for Registrations resources.
 type RegistrationsController struct {
 	client.Client
 	FinalizerPatcher
-	Log                 logr.Logger
 	Scheme              *runtime.Scheme
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
+	Log                 logr.Logger
 }
 
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicerouters,verbs=get;list;watch;create;update;patch;delete
@@ -62,57 +69,66 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// deletion request
 	if !registration.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("Deregistering service")
-		err = r.deregisterService(ctx, log, client, registration)
-		if err != nil {
-			r.updateStatusError(ctx, registration, "ConsulErrorDeregistration", err)
-			return ctrl.Result{}, err
-		}
-
-		// if there is an ACL token then we can assume that `manageSystemACLs` has been set and we should handle
-		// the acl setup
-		if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
-			err = r.removeTermGWACLRole(log, client, registration)
-		}
+		err := r.handleDeletion(ctx, log, client, registration)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-
 		return ctrl.Result{}, nil
 	}
 
-	log.Info("Registering service")
-	err = r.registerService(ctx, log, client, registration)
+	// registration request
+	err = r.handleRegistration(ctx, log, client, registration)
 	if err != nil {
-		r.updateStatusError(ctx, registration, "ConsulErrorRegistration", err)
 		return ctrl.Result{}, err
 	}
-
-	// if there is an ACL token then we can assume that `manageSystemACLs` has been set and we should handle
-	// the acl setup
-	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
-		err = r.updateTermGWACLRole(log, client, registration)
-		if err != nil {
-			r.updateStatusError(ctx, registration, "ConsulErrorACL", err)
-			return ctrl.Result{}, err
-		}
-	}
-
-	err = r.updateStatus(ctx, req.NamespacedName)
-	if err != nil {
-		log.Error(err, "failed to update status")
-	}
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
 }
 
-func (r *RegistrationsController) registerService(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
-	patch := r.AddFinalizersPatch(registration, RegistrationFinalizer)
-
-	err := r.Patch(ctx, registration, patch)
+func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	log.Info("Deregistering service")
+	err := r.deregisterService(log, client, registration)
+	if err != nil {
+		r.updateStatusError(ctx, log, registration, ConsulErrorDeregistration, err)
+		return err
+	}
+	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
+		err = r.removeTermGWACLRole(log, client, registration)
+		if err != nil {
+			r.updateStatusError(ctx, log, registration, ConsulErrorACL, err)
+			return err
+		}
+	}
+	patch := r.RemoveFinalizersPatch(registration, RegistrationFinalizer)
+	err = r.Patch(ctx, registration, patch)
 	if err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func (r *RegistrationsController) handleRegistration(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	log.Info("Registering service")
+	err := r.registerService(log, client, registration)
+	if err != nil {
+		r.updateStatusError(ctx, log, registration, ConsulErrorRegistration, err)
+		return err
+	}
+	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
+		err = r.updateTermGWACLRole(log, client, registration)
+		if err != nil {
+			r.updateStatusError(ctx, log, registration, ConsulErrorACL, err)
+			return err
+		}
+	}
+	err = r.updateStatus(ctx, log, registration.NamespacedName())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *RegistrationsController) registerService(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	regReq, err := registration.ToCatalogRegistration()
 	if err != nil {
 		return err
@@ -128,7 +144,7 @@ func (r *RegistrationsController) registerService(ctx context.Context, log logr.
 	return nil
 }
 
-func (r *RegistrationsController) deregisterService(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+func (r *RegistrationsController) deregisterService(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	deRegReq := registration.ToCatalogDeregistration()
 
 	_, err := client.Catalog().Deregister(deRegReq, nil)
@@ -137,11 +153,6 @@ func (r *RegistrationsController) deregisterService(ctx context.Context, log log
 		return err
 	}
 
-	patch := r.RemoveFinalizersPatch(registration, RegistrationFinalizer)
-
-	if err := r.Patch(ctx, registration, patch); err != nil {
-		return err
-	}
 	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
 	return nil
 }
@@ -166,7 +177,7 @@ func (r *RegistrationsController) updateTermGWACLRole(log logr.Logger, client *c
 	}
 
 	policy := &capi.ACLPolicy{
-		Name:        fmt.Sprintf("%s-write-policy", registration.Spec.Service.Name),
+		Name:        servicePolicyName(registration.Spec.Service.Name),
 		Description: "Write policy for terminating gateways for external service",
 		Rules:       `service "zoidberg" { policy = "write" }`,
 		Datacenters: []string{registration.Spec.Datacenter},
@@ -180,11 +191,11 @@ func (r *RegistrationsController) updateTermGWACLRole(log logr.Logger, client *c
 		return err
 	}
 
-	if existingPolicy == nil {
+	// existingPolicy will never be nil beause of how PolicyReadByName works so we need to check if the ID is empty
+	if existingPolicy.ID == "" {
 		policy, _, err = client.ACL().PolicyCreate(policy, nil)
 		if err != nil {
-			log.Error(err, "error creating policy")
-			return err
+			return fmt.Errorf("error creating policy: %w", err)
 		}
 	} else {
 		policy = existingPolicy
@@ -217,13 +228,15 @@ func (r *RegistrationsController) removeTermGWACLRole(log logr.Logger, client *c
 	}
 
 	if role == nil {
-		return errors.New("terminating gateway role not found")
+		log.Info("terminating gateway role not found")
+		return nil
 	}
 
 	var policyID string
 
+	expectedPolicyName := servicePolicyName(registration.Spec.Service.Name)
 	role.Policies = slices.DeleteFunc(role.Policies, func(i *capi.ACLRolePolicyLink) bool {
-		if i.Name == fmt.Sprintf("%s-write-policy", registration.Spec.Service.Name) {
+		if i.Name == expectedPolicyName {
 			policyID = i.ID
 			return true
 		}
@@ -231,7 +244,8 @@ func (r *RegistrationsController) removeTermGWACLRole(log logr.Logger, client *c
 	})
 
 	if policyID == "" {
-		return errors.New("policy not found")
+		log.Info("policy not found on terminating gateway role", "policyName", expectedPolicyName)
+		return nil
 	}
 
 	_, _, err = client.ACL().RoleUpdate(role, nil)
@@ -253,17 +267,17 @@ func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger 
 	return r.Log.WithValues("request", name)
 }
 
-func (r *RegistrationsController) updateStatusError(ctx context.Context, registration *v1alpha1.Registration, reason string, reconcileErr error) {
+func (r *RegistrationsController) updateStatusError(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration, reason string, reconcileErr error) {
 	registration.SetSyncedCondition(corev1.ConditionFalse, reason, reconcileErr.Error())
 	registration.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
 
 	err := r.Status().Update(ctx, registration)
 	if err != nil {
-		r.Log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
+		log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
 	}
 }
 
-func (r *RegistrationsController) updateStatus(ctx context.Context, req types.NamespacedName) error {
+func (r *RegistrationsController) updateStatus(ctx context.Context, log logr.Logger, req types.NamespacedName) error {
 	registration := &v1alpha1.Registration{}
 
 	err := r.Get(ctx, req, registration)
@@ -276,7 +290,7 @@ func (r *RegistrationsController) updateStatus(ctx context.Context, req types.Na
 
 	err = r.Status().Update(ctx, registration)
 	if err != nil {
-		r.Log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
+		log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
 		return err
 	}
 	return nil
@@ -284,4 +298,8 @@ func (r *RegistrationsController) updateStatus(ctx context.Context, req types.Na
 
 func (r *RegistrationsController) SetupWithManager(mgr ctrl.Manager) error {
 	return setupWithManager(mgr, &v1alpha1.Registration{}, r)
+}
+
+func servicePolicyName(name string) string {
+	return fmt.Sprintf("%s-write-policy", name)
 }
