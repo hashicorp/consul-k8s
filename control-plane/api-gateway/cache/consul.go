@@ -394,6 +394,10 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 	return existing.ID, nil
 }
 
+func getACLRoleName(gatewayName string) string {
+	return fmt.Sprint("managed-gateway-acl-role-", gatewayName)
+}
+
 func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, error) {
 	policyID, err := c.ensurePolicy(client, gatewayName)
 	if err != nil {
@@ -404,7 +408,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 	defer c.aclRoleMutex.Unlock()
 
 	createRole := func() (string, error) {
-		aclRoleName := fmt.Sprint("managed-gateway-acl-role-", gatewayName)
+		aclRoleName := getACLRoleName(gatewayName)
 		role := &api.ACLRole{
 			Name:        aclRoleName,
 			Description: "ACL Role for Managed API Gateways",
@@ -412,11 +416,13 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 		}
 
 		_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
-		if err != nil {
+		if err != nil && !isRoleExistsErr(err, aclRoleName) {
+			//don't error out in the case that the role already exists
 			return "", err
 		}
+
 		c.gatewayNameToRole[gatewayName] = role
-		return aclRoleName, err
+		return aclRoleName, nil
 	}
 
 	cachedRole, found := c.gatewayNameToRole[gatewayName]
@@ -589,7 +595,18 @@ func ignoreACLsDisabled(err error) error {
 // isPolicyExistsErr returns true if err is due to trying to call the
 // policy create API when the policy already exists.
 func isPolicyExistsErr(err error, policyName string) bool {
+	return isExistsErr(err, "Policy", policyName)
+}
+
+// isExistsErr returns true if err is due to trying to call an API for a given type and it already exists
+func isExistsErr(err error, typeName, name string) bool {
 	return err != nil &&
 		strings.Contains(err.Error(), "Unexpected response code: 500") &&
-		strings.Contains(err.Error(), fmt.Sprintf("Invalid Policy: A Policy with Name %q already exists", policyName))
+		strings.Contains(err.Error(), fmt.Sprintf("Invalid %s: A %s with Name %q already exists", typeName, typeName, name))
+}
+
+// isRoleExistsErr returns true if err is due to trying to call the
+// role create API when the role already exists.
+func isRoleExistsErr(err error, roleName string) bool {
+	return isExistsErr(err, "Role", roleName)
 }
