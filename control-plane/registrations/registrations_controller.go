@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package configentries
+package registrations
 
 import (
 	"context"
@@ -24,6 +24,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 )
 
 const RegistrationFinalizer = "registration.finalizers.consul.hashicorp.com"
@@ -38,7 +39,7 @@ const (
 // RegistrationsController is the controller for Registrations resources.
 type RegistrationsController struct {
 	client.Client
-	FinalizerPatcher
+	configentries.FinalizerPatcher
 	Scheme              *runtime.Scheme
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
@@ -301,5 +302,5 @@ func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger 
 }
 
 func (r *RegistrationsController) SetupWithManager(mgr ctrl.Manager) error {
-	return setupWithManager(mgr, &v1alpha1.Registration{}, r)
+	return ctrl.NewControllerManagedBy(mgr).For(&v1alpha1.Registration{}).Complete(r)
 }
