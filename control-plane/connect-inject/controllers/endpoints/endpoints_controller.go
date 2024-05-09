@@ -582,7 +582,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 
 	if tproxyEnabled {
 		var k8sService corev1.Service
-
+		proxyService.Proxy.Mode = api.ProxyModeTransparent
 		err = r.Client.Get(r.Context, types.NamespacedName{Name: serviceEndpoints.Name, Namespace: serviceEndpoints.Namespace}, &k8sService)
 		if err != nil {
 			return nil, nil, err
@@ -625,7 +625,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 			service.TaggedAddresses = taggedAddresses
 			proxyService.TaggedAddresses = taggedAddresses
 
-			proxyService.Proxy.Mode = api.ProxyModeTransparent
 		} else {
 			r.Log.Info("skipping syncing service cluster IP to Consul", "name", k8sService.Name, "ns", k8sService.Namespace, "ip", k8sService.Spec.ClusterIP)
 		}
