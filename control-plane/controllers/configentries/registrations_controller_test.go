@@ -53,6 +53,7 @@ func TestReconcile_Success(tt *testing.T) {
 		registration         *v1alpha1.Registration
 		terminatingGateways  []runtime.Object
 		serverResponseConfig serverResponseConfig
+		expectedFinalizers   []string
 		expectedConditions   []v1alpha1.Condition
 	}{
 		"registering - success on registration": {
@@ -93,6 +94,7 @@ func TestReconcile_Success(tt *testing.T) {
 				},
 			},
 			serverResponseConfig: serverResponseConfig{registering: true},
+			expectedFinalizers:   []string{configentries.RegistrationFinalizer},
 			expectedConditions: []v1alpha1.Condition{{
 				Type:    "Synced",
 				Status:  v1.ConditionTrue,
@@ -141,6 +143,7 @@ func TestReconcile_Success(tt *testing.T) {
 				registering: true,
 				aclEnabled:  true,
 			},
+			expectedFinalizers: []string{configentries.RegistrationFinalizer},
 			expectedConditions: []v1alpha1.Condition{{
 				Type:    "Synced",
 				Status:  v1.ConditionTrue,
@@ -190,6 +193,7 @@ func TestReconcile_Success(tt *testing.T) {
 				aclEnabled:   true,
 				policyExists: true,
 			},
+			expectedFinalizers: []string{configentries.RegistrationFinalizer},
 			expectedConditions: []v1alpha1.Condition{{
 				Type:    "Synced",
 				Status:  v1.ConditionTrue,
@@ -329,6 +333,8 @@ func TestReconcile_Success(tt *testing.T) {
 					t.Errorf("unexpected condition diff: %s", diff)
 				}
 			}
+
+			require.ElementsMatch(t, fetchedReg.Finalizers, tc.expectedFinalizers)
 		})
 	}
 }
@@ -776,6 +782,8 @@ func TestReconcile_Failure(tt *testing.T) {
 					t.Errorf("unexpected condition diff: %s", diff)
 				}
 			}
+
+			require.ElementsMatch(t, fetchedReg.Finalizers, []string{configentries.RegistrationFinalizer})
 		})
 	}
 }
