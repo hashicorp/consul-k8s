@@ -21,7 +21,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
-	"github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	controllers "github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -285,7 +284,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&configentries.RegistrationsController{
+	if err := (&controllers.RegistrationsController{
 		Client:              mgr.GetClient(),
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,
