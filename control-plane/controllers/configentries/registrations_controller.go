@@ -5,7 +5,6 @@ package configentries
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -23,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capi "github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -88,7 +88,14 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 
 func (r *RegistrationsController) handleRegistration(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	log.Info("Registering service")
-	err := r.registerService(log, client, registration)
+
+	patch := r.AddFinalizersPatch(registration, RegistrationFinalizer)
+	err := r.Patch(ctx, registration, patch)
+	if err != nil {
+		return err
+	}
+
+	err = r.registerService(log, client, registration)
 	if err != nil {
 		r.updateStatusError(ctx, log, registration, ConsulErrorRegistration, err)
 		return err
@@ -133,6 +140,7 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 	termGWList := &v1alpha1.TerminatingGatewayList{}
 	err := r.Client.List(ctx, termGWList)
 	if err != nil {
+		log.Error(err, "error listing terminating gateways")
 		return err
 	}
 
@@ -150,6 +158,7 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 
 	roles, _, err := client.ACL().RoleList(nil)
 	if err != nil {
+		log.Error(err, "error reading role list")
 		return err
 	}
 
@@ -177,6 +186,8 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 		policy = existingPolicy
 	}
 
+	mErr := &multierror.Error{}
+
 	for _, termGW := range termGWsToUpdate {
 		var role *capi.ACLRole
 		for _, r := range roles {
@@ -187,20 +198,22 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 		}
 
 		if role == nil {
-			log.Info("terminating gateway role not found")
-			return errors.New("terminating gateway role not found")
+			log.Info("terminating gateway role not found", "terminatingGatewayName", termGW.Name)
+			mErr = multierror.Append(mErr, fmt.Errorf("terminating gateway role not found for %q", termGW.Name))
+			continue
 		}
 
 		role.Policies = append(role.Policies, &capi.ACLRolePolicyLink{Name: policy.Name, ID: policy.ID})
 
 		_, _, err = client.ACL().RoleUpdate(role, nil)
 		if err != nil {
-			log.Error(err, "error updating role")
-			return err
+			log.Error(err, "error updating role", "roleName", role.Name)
+			mErr = multierror.Append(mErr, fmt.Errorf("error updating role %q", role.Name))
+			continue
 		}
 	}
 
-	return nil
+	return mErr.ErrorOrNil()
 }
 
 func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
@@ -263,6 +276,7 @@ func (r *RegistrationsController) removeTermGWACLRole(ctx context.Context, log l
 		return err
 	}
 
+	mErr := &multierror.Error{}
 	for _, termGW := range termGWsToUpdate {
 		var role *capi.ACLRole
 		for _, r := range roles {
@@ -273,8 +287,9 @@ func (r *RegistrationsController) removeTermGWACLRole(ctx context.Context, log l
 		}
 
 		if role == nil {
-			log.Info("terminating gateway role not found")
-			return errors.New("terminating gateway role not found")
+			log.Info("terminating gateway role not found", "terminatingGatewayName", termGW.Name)
+			mErr = multierror.Append(mErr, fmt.Errorf("terminating gateway role not found for %q", termGW.Name))
+			continue
 		}
 
 		var policyID string
@@ -289,24 +304,26 @@ func (r *RegistrationsController) removeTermGWACLRole(ctx context.Context, log l
 		})
 
 		if policyID == "" {
-			log.Info("policy not found on terminating gateway role", "policyName", expectedPolicyName)
-			return nil
+			log.Info("policy not found on terminating gateway role", "policyName", expectedPolicyName, "terminatingGatewayName", termGW.Name)
+			continue
 		}
 
 		_, _, err = client.ACL().RoleUpdate(role, nil)
 		if err != nil {
-			log.Error(err, "error updating role")
-			return err
+			log.Error(err, "error updating role", "roleName", role.Name)
+			mErr = multierror.Append(mErr, fmt.Errorf("error updating role %q", role.Name))
+			continue
 		}
 
 		_, err = client.ACL().PolicyDelete(policyID, nil)
 		if err != nil {
-			log.Error(err, "error deleting service policy")
-			return err
+			log.Error(err, "error deleting service policy", "policyID", policyID, "policyName", expectedPolicyName)
+			mErr = multierror.Append(mErr, fmt.Errorf("error deleting service ACL policy %q", policyID))
+			continue
 		}
 	}
 
-	return nil
+	return mErr.ErrorOrNil()
 }
 
 func servicePolicyName(name string) string {
@@ -346,23 +363,43 @@ func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger 
 	return r.Log.WithValues("request", name)
 }
 
-func (r *RegistrationsController) SetupWithManager(mgr ctrl.Manager) error {
+func (r *RegistrationsController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.Registration{}, "registrationName", indexerFn); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.Registration{}).
 		Watches(&v1alpha1.TerminatingGateway{}, handler.EnqueueRequestsFromMapFunc(r.transformTerminatingGateways)).
 		Complete(r)
 }
 
+func indexerFn(o client.Object) []string {
+	reg := o.(*v1alpha1.Registration)
+	return []string{reg.Spec.Service.Name}
+}
+
 func (r *RegistrationsController) transformTerminatingGateways(ctx context.Context, o client.Object) []reconcile.Request {
 	termGW := o.(*v1alpha1.TerminatingGateway)
 	reqs := make([]reconcile.Request, 0, len(termGW.Spec.Services))
 	for _, svc := range termGW.Spec.Services {
-		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      svc.Name,
-				Namespace: svc.Namespace,
-			},
-		})
+		// lookup registrationList by service name add add it to the reconcile request
+		registrationList := &v1alpha1.RegistrationList{}
+
+		err := r.Client.List(ctx, registrationList, client.MatchingFields{"registrationName": svc.Name})
+		if err != nil {
+			r.Log.Error(err, "error listing registrations by service name", "serviceName", svc.Name)
+			continue
+		}
+
+		for _, reg := range registrationList.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      reg.Name,
+					Namespace: reg.Namespace,
+				},
+			})
+		}
 	}
 	return reqs
 }

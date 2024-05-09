@@ -21,9 +21,9 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	controllers "github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
-	"github.com/hashicorp/consul-k8s/control-plane/registrations"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -285,13 +285,13 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&registrations.RegistrationsController{
+	if err := (&configentries.RegistrationsController{
 		Client:              mgr.GetClient(),
 		ConsulClientConfig:  consulConfig,
 		ConsulServerConnMgr: watcher,
 		Scheme:              mgr.GetScheme(),
 		Log:                 ctrl.Log.WithName("controller").WithName(apicommon.Registration),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.Registration)
 		return err
 	}
