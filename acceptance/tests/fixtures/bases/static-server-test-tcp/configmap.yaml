@@ -1,0 +1,22 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: static-server-config
+data:
+  config: |
+    {
+      local_certs
+      skip_install_trust
+      auto_https disable_redirects
+    }
+    static-server-hostname.virtual.server.consul {
+      log
+      respond  "hello world"
+    }
+    :80 {
+      log
+      respond  "hello world"
+    }

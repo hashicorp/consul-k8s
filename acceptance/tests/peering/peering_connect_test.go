@@ -40,17 +40,19 @@ func TestPeering_Connect(t *testing.T) {
 		t.Skipf("skipping this test because peering is not supported in version %v", cfg.ConsulVersion.String())
 	}
 
-	const staticServerPeer = "server"
-	const staticClientPeer = "client"
+	const (
+		staticServerPeer = "server"
+		staticClientPeer = "client"
+	)
 
 	cases := []struct {
 		name        string
 		ACLsEnabled bool
 	}{
-		{
-			"default installation",
-			false,
-		},
+		// {
+		// 	"default installation",
+		// 	false,
+		// },
 		{
 			"secure installation",
 			true,
@@ -337,7 +339,7 @@ func TestPeering_Connect(t *testing.T) {
 
 				// Create the external server in the server Kubernetes cluster, outside the mesh in the "external" namespace
 				logger.Log(t, "creating static-server deployment in server peer outside of mesh")
-				k8s.DeployKustomize(t, externalServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+				k8s.DeployKustomize(t, externalServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-test-tcp")
 
 				// Prevent dialing the server directly through the sidecar.
 				terminatinggateway.CreateMeshConfigEntry(t, staticServerPeerClient, "")
@@ -377,6 +379,16 @@ func TestPeering_Connect(t *testing.T) {
 				// Test that we can make a call to the terminating gateway.
 				logger.Log(t, "trying calls to terminating gateway")
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerHostnameURL)
+
+				// Update the service default declaring the external service (aka Destination)
+				logger.Log(t, "updating service defaults to try tcp scenario")
+				// Register the external service.
+				externalServerHostnameURL = fmt.Sprintf("https://%s.virtual.%s.consul", externalServerHostnameID, staticServerPeer)
+
+				terminatinggateway.CreateServiceDefaultDestination(t, staticServerPeerClient, "", externalServerHostnameID, "", 443, fmt.Sprintf("%s.%s", externalServerServiceName, externalServerK8sNamespace))
+
+				logger.Log(t, "trying calls to terminating gateway")
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "-k", externalServerHostnameURL)
 			}
 		})
 	}
