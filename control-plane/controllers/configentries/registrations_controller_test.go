@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package registrations_test
+package configentries_test
 
 import (
 	"context"
@@ -51,6 +51,7 @@ func TestReconcile_Success(tt *testing.T) {
 	deletionTime := metav1.Now()
 	cases := map[string]struct {
 		registration         *v1alpha1.Registration
+		terminatingGateways  []runtime.Object
 		serverResponseConfig serverResponseConfig
 		expectedConditions   []v1alpha1.Condition
 	}{
@@ -74,6 +75,20 @@ func TestReconcile_Success(tt *testing.T) {
 						Name:    "service-name",
 						Port:    8080,
 						Address: "127.0.0.1",
+					},
+				},
+			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
 					},
 				},
 			},
@@ -108,6 +123,20 @@ func TestReconcile_Success(tt *testing.T) {
 					},
 				},
 			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
+					},
+				},
+			},
 			serverResponseConfig: serverResponseConfig{
 				registering: true,
 				aclEnabled:  true,
@@ -139,6 +168,20 @@ func TestReconcile_Success(tt *testing.T) {
 						Name:    "service-name",
 						Port:    8080,
 						Address: "127.0.0.1",
+					},
+				},
+			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
 					},
 				},
 			},
@@ -178,6 +221,20 @@ func TestReconcile_Success(tt *testing.T) {
 					},
 				},
 			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
+					},
+				},
+			},
 			serverResponseConfig: serverResponseConfig{
 				registering: false,
 				aclEnabled:  false,
@@ -208,6 +265,20 @@ func TestReconcile_Success(tt *testing.T) {
 					},
 				},
 			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
+					},
+				},
+			},
 			serverResponseConfig: serverResponseConfig{
 				registering: false,
 				aclEnabled:  true,
@@ -221,15 +292,17 @@ func TestReconcile_Success(tt *testing.T) {
 		tt.Run(name, func(t *testing.T) {
 			t.Parallel()
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Registration{})
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Registration{}, &v1alpha1.TerminatingGateway{}, &v1alpha1.TerminatingGatewayList{})
 			ctx := context.Background()
 
 			consulServer, testClient := fakeConsulServer(t, tc.serverResponseConfig, tc.registration.Spec.Service.Name)
 			defer consulServer.Close()
 
+			runtimeObjs := []runtime.Object{tc.registration}
+			runtimeObjs = append(runtimeObjs, tc.terminatingGateways...)
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(s).
-				WithRuntimeObjects(tc.registration).
+				WithRuntimeObjects(runtimeObjs...).
 				WithStatusSubresource(&v1alpha1.Registration{}).
 				Build()
 
@@ -264,6 +337,7 @@ func TestReconcile_Failure(tt *testing.T) {
 	deletionTime := metav1.Now()
 	cases := map[string]struct {
 		registration         *v1alpha1.Registration
+		terminatingGateways  []runtime.Object
 		serverResponseConfig serverResponseConfig
 		expectedConditions   []v1alpha1.Condition
 	}{
@@ -287,6 +361,20 @@ func TestReconcile_Failure(tt *testing.T) {
 						Name:    "service-name",
 						Port:    8080,
 						Address: "127.0.0.1",
+					},
+				},
+			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
 					},
 				},
 			},
@@ -324,6 +412,20 @@ func TestReconcile_Failure(tt *testing.T) {
 					},
 				},
 			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
+					},
+				},
+			},
 			serverResponseConfig: serverResponseConfig{
 				registering:      true,
 				aclEnabled:       true,
@@ -356,6 +458,20 @@ func TestReconcile_Failure(tt *testing.T) {
 						Name:    "service-name",
 						Port:    8080,
 						Address: "127.0.0.1",
+					},
+				},
+			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
 					},
 				},
 			},
@@ -395,6 +511,20 @@ func TestReconcile_Failure(tt *testing.T) {
 					},
 				},
 			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
+					},
+				},
+			},
 			serverResponseConfig: serverResponseConfig{
 				registering:      true,
 				aclEnabled:       true,
@@ -427,6 +557,20 @@ func TestReconcile_Failure(tt *testing.T) {
 						Name:    "service-name",
 						Port:    8080,
 						Address: "127.0.0.1",
+					},
+				},
+			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
 					},
 				},
 			},
@@ -466,6 +610,20 @@ func TestReconcile_Failure(tt *testing.T) {
 					},
 				},
 			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
+					},
+				},
+			},
 			serverResponseConfig: serverResponseConfig{
 				errOnDeregister: true,
 			},
@@ -497,6 +655,20 @@ func TestReconcile_Failure(tt *testing.T) {
 						Name:    "service-name",
 						Port:    8080,
 						Address: "127.0.0.1",
+					},
+				},
+			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
 					},
 				},
 			},
@@ -535,6 +707,20 @@ func TestReconcile_Failure(tt *testing.T) {
 					},
 				},
 			},
+			terminatingGateways: []runtime.Object{
+				&v1alpha1.TerminatingGateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "terminating-gateway",
+					},
+					Spec: v1alpha1.TerminatingGatewaySpec{
+						Services: []v1alpha1.LinkedService{
+							{
+								Name: "service-name",
+							},
+						},
+					},
+				},
+			},
 			serverResponseConfig: serverResponseConfig{
 				aclEnabled:        true,
 				errOnPolicyDelete: true,
@@ -553,15 +739,17 @@ func TestReconcile_Failure(tt *testing.T) {
 		tt.Run(name, func(t *testing.T) {
 			t.Parallel()
 			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Registration{})
+			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.Registration{}, &v1alpha1.TerminatingGateway{}, &v1alpha1.TerminatingGatewayList{})
 			ctx := context.Background()
 
 			consulServer, testClient := fakeConsulServer(t, tc.serverResponseConfig, tc.registration.Spec.Service.Name)
 			defer consulServer.Close()
 
+			runtimeObjs := []runtime.Object{tc.registration}
+			runtimeObjs = append(runtimeObjs, tc.terminatingGateways...)
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(s).
-				WithRuntimeObjects(tc.registration).
+				WithRuntimeObjects(runtimeObjs...).
 				WithStatusSubresource(&v1alpha1.Registration{}).
 				Build()
 
@@ -733,10 +921,14 @@ func buildMux(t *testing.T, cfg serverResponseConfig, serviceName string) http.H
 			return
 		}
 
-		policy := &capi.ACLPolicy{}
-		if cfg.policyExists {
-			policy.ID = policyID
-			policy.Name = fmt.Sprintf("%s-write-policy", serviceName)
+		if !cfg.policyExists {
+			w.WriteHeader(404)
+			return
+		}
+
+		policy := &capi.ACLPolicy{
+			ID:   policyID,
+			Name: fmt.Sprintf("%s-write-policy", serviceName),
 		}
 
 		val, err := json.Marshal(policy)

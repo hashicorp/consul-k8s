@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package registrations
+package configentries
 
 import (
 	"context"
@@ -26,7 +26,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 )
 
 const RegistrationFinalizer = "registration.finalizers.consul.hashicorp.com"
@@ -41,7 +40,7 @@ const (
 // RegistrationsController is the controller for Registrations resources.
 type RegistrationsController struct {
 	client.Client
-	configentries.FinalizerPatcher
+	FinalizerPatcher
 	Scheme              *runtime.Scheme
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
@@ -124,6 +123,12 @@ func (r *RegistrationsController) registerService(log logr.Logger, client *capi.
 	return nil
 }
 
+func termGWContainsService(registration *v1alpha1.Registration) func(v1alpha1.LinkedService) bool {
+	return func(svc v1alpha1.LinkedService) bool {
+		return svc.Name == registration.Spec.Service.Name
+	}
+}
+
 func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	termGWList := &v1alpha1.TerminatingGatewayList{}
 	err := r.Client.List(ctx, termGWList)
@@ -133,10 +138,8 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 
 	termGWsToUpdate := make([]v1alpha1.TerminatingGateway, 0, len(termGWList.Items))
 	for _, termGW := range termGWList.Items {
-		for _, svc := range termGW.Spec.Services {
-			if svc.Name == registration.Spec.Service.Name {
-				termGWsToUpdate = append(termGWsToUpdate, termGW)
-			}
+		if slices.ContainsFunc(termGW.Spec.Services, termGWContainsService(registration)) {
+			termGWsToUpdate = append(termGWsToUpdate, termGW)
 		}
 	}
 
@@ -153,7 +156,7 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 	policy := &capi.ACLPolicy{
 		Name:        servicePolicyName(registration.Spec.Service.Name),
 		Description: "Write policy for terminating gateways for external service",
-		Rules:       `service "zoidberg" { policy = "write" }`,
+		Rules:       fmt.Sprintf(`service %q { policy = "write" }`, registration.Spec.Service.Name),
 		Datacenters: []string{registration.Spec.Datacenter},
 		Namespace:   registration.Spec.Service.Namespace,
 		Partition:   registration.Spec.Service.Partition,
@@ -165,7 +168,6 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 		return err
 	}
 
-	// existingPolicy will never be nil beause of how PolicyReadByName works so we need to check if the ID is empty
 	if existingPolicy == nil {
 		policy, _, err = client.ACL().PolicyCreate(policy, nil)
 		if err != nil {
@@ -209,7 +211,7 @@ func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.L
 		return err
 	}
 	if r.ConsulClientConfig.APIClientConfig.Token != "" || r.ConsulClientConfig.APIClientConfig.TokenFile != "" {
-		err = r.removeTermGWACLRole(log, client, registration)
+		err = r.removeTermGWACLRole(ctx, log, client, registration)
 		if err != nil {
 			r.updateStatusError(ctx, log, registration, ConsulErrorACL, err)
 			return err
@@ -237,52 +239,71 @@ func (r *RegistrationsController) deregisterService(log logr.Logger, client *cap
 	return nil
 }
 
-func (r *RegistrationsController) removeTermGWACLRole(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+func (r *RegistrationsController) removeTermGWACLRole(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
+	termGWList := &v1alpha1.TerminatingGatewayList{}
+	err := r.Client.List(ctx, termGWList)
+	if err != nil {
+		return err
+	}
+
+	termGWsToUpdate := make([]v1alpha1.TerminatingGateway, 0, len(termGWList.Items))
+	for _, termGW := range termGWList.Items {
+		if slices.ContainsFunc(termGW.Spec.Services, termGWContainsService(registration)) {
+			termGWsToUpdate = append(termGWsToUpdate, termGW)
+		}
+	}
+
+	if len(termGWsToUpdate) == 0 {
+		log.Info("terminating gateway not found")
+		return nil
+	}
+
 	roles, _, err := client.ACL().RoleList(nil)
 	if err != nil {
 		return err
 	}
 
-	var role *capi.ACLRole
-	for _, r := range roles {
-		if strings.HasSuffix(r.Name, "terminating-gateway-acl-role") {
-			fmt.Printf("Role: %v\n", r)
-			role = r
-			break
+	for _, termGW := range termGWsToUpdate {
+		var role *capi.ACLRole
+		for _, r := range roles {
+			if strings.HasSuffix(r.Name, fmt.Sprintf("-%s-acl-role", termGW.Name)) {
+				role = r
+				break
+			}
 		}
-	}
 
-	if role == nil {
-		log.Info("terminating gateway role not found")
-		return nil
-	}
-
-	var policyID string
-
-	expectedPolicyName := servicePolicyName(registration.Spec.Service.Name)
-	role.Policies = slices.DeleteFunc(role.Policies, func(i *capi.ACLRolePolicyLink) bool {
-		if i.Name == expectedPolicyName {
-			policyID = i.ID
-			return true
+		if role == nil {
+			log.Info("terminating gateway role not found")
+			return errors.New("terminating gateway role not found")
 		}
-		return false
-	})
 
-	if policyID == "" {
-		log.Info("policy not found on terminating gateway role", "policyName", expectedPolicyName)
-		return nil
-	}
+		var policyID string
 
-	_, _, err = client.ACL().RoleUpdate(role, nil)
-	if err != nil {
-		log.Error(err, "error updating role")
-		return err
-	}
+		expectedPolicyName := servicePolicyName(registration.Spec.Service.Name)
+		role.Policies = slices.DeleteFunc(role.Policies, func(i *capi.ACLRolePolicyLink) bool {
+			if i.Name == expectedPolicyName {
+				policyID = i.ID
+				return true
+			}
+			return false
+		})
 
-	_, err = client.ACL().PolicyDelete(policyID, nil)
-	if err != nil {
-		log.Error(err, "error deleting service policy")
-		return err
+		if policyID == "" {
+			log.Info("policy not found on terminating gateway role", "policyName", expectedPolicyName)
+			return nil
+		}
+
+		_, _, err = client.ACL().RoleUpdate(role, nil)
+		if err != nil {
+			log.Error(err, "error updating role")
+			return err
+		}
+
+		_, err = client.ACL().PolicyDelete(policyID, nil)
+		if err != nil {
+			log.Error(err, "error deleting service policy")
+			return err
+		}
 	}
 
 	return nil
