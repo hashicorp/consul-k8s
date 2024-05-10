@@ -30,7 +30,7 @@ import (
 
 const RegistrationFinalizer = "registration.finalizers.consul.hashicorp.com"
 
-// Status Reasons
+// Status Reasons.
 const (
 	ConsulErrorRegistration   = "ConsulErrorRegistration"
 	ConsulErrorDeregistration = "ConsulErrorDeregistration"
