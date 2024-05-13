@@ -30,7 +30,7 @@ type RegistrationWebhook struct {
 	client.Client
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-gatewaypolicy,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=gatewaypolicies,versions=v1alpha1,name=validate-gatewaypolicy.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-registration,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=registrations,versions=v1alpha1,name=validate-registration.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
 func (v *RegistrationWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	resource := &Registration{}
