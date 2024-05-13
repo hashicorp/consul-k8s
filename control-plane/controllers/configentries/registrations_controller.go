@@ -12,6 +12,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,6 +93,7 @@ type RegistrationCache struct {
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
 	Services            mapset.Set
+	UpdateChan          chan string
 }
 
 func newCache() *RegistrationCache {
@@ -100,10 +102,10 @@ func newCache() *RegistrationCache {
 	}
 }
 
-// we need an Add which will handle writing the registration to consul and adding to the cache,
-// we also need a remove which deregistrers in consul and removes from the set
 // all functionality in the reconcile loop should be moved to this cache
 // we need a sync.Once to handle populating the cache at boot with services that are not managed by consul-k8s-endpoints-controller
+// the watch function should add to cache all services that come in from the blocking query and then take all the ones that don't match and set status on them
+// to indicate that consul dereigstered them and then remove them from the cache
 
 func (c *RegistrationCache) Add(ctx context.Context, log logr.Logger, reg *v1alpha1.Registration) error {
 	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
@@ -152,7 +154,7 @@ func (c *RegistrationCache) watchForServices(ctx context.Context, log logr.Logge
 		case <-ctx.Done():
 			return
 		default:
-			_, meta, err := client.Catalog().Services(opts.WithContext(ctx))
+			entries, meta, err := client.Catalog().Services(opts.WithContext(ctx))
 			if err != nil {
 				// if we timeout we don't care about the error message because it's expected to happen on long polls
 				// any other error we want to alert on
@@ -164,8 +166,17 @@ func (c *RegistrationCache) watchForServices(ctx context.Context, log logr.Logge
 				continue
 			}
 
+			consulSvcs := mapset.NewSet(maps.Keys(entries))
+			for _, svc := range consulSvcs.ToSlice() {
+				name := svc.(string)
+				c.Services.Add(name)
+			}
+			diffs := c.Services.Difference(consulSvcs)
+			for _, svc := range diffs.ToSlice() {
+				c.UpdateChan <- svc.(string)
+				consulSvcs.Remove(svc)
+			}
 			opts.WaitIndex = meta.LastIndex
-
 		}
 	}
 }
