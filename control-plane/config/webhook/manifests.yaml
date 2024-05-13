@@ -473,5 +473,5 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - registrations
+    - registration
   sideEffects: None

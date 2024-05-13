@@ -39,6 +39,7 @@ func (v *RegistrationWebhook) Handle(ctx context.Context, req admission.Request)
 		return admission.Errored(http.StatusBadRequest, decodeErr)
 	}
 
+	v.Logger.Info("validating registration", "name", resource.Name, "timeout", resource.Spec.HealthCheck.Definition.TimeoutDuration)
 	var err error
 	err = errors.Join(err, validateRequiredFields(resource))
 	err = errors.Join(err, validateHealthChecks(resource))
@@ -50,6 +51,7 @@ func (v *RegistrationWebhook) Handle(ctx context.Context, req admission.Request)
 }
 
 func (v *RegistrationWebhook) SetupWithManager(mgr ctrl.Manager) {
+	v.Logger.Info("setting up registration webhook")
 	v.decoder = admission.NewDecoder(mgr.GetScheme())
 	mgr.GetWebhookServer().Register("/validate-v1alpha1-registration", &admission.Webhook{Handler: v})
 }
@@ -101,15 +103,15 @@ func validateHealthChecks(registration *Registration) error {
 	}
 
 	if registration.Spec.HealthCheck.Definition.TimeoutDuration != "" {
-		_, parseErr = time.ParseDuration(registration.Spec.HealthCheck.Definition.TimeoutDuration)
-		if parseErr != nil {
+		_, timeoutErr := time.ParseDuration(registration.Spec.HealthCheck.Definition.TimeoutDuration)
+		if timeoutErr != nil {
 			err = errors.Join(err, fmt.Errorf("invalid registration.Spec.HealthCheck.Definition.TimeoutDuration value: %q", registration.Spec.HealthCheck.Definition.TimeoutDuration))
 		}
 	}
 
 	if registration.Spec.HealthCheck.Definition.DeregisterCriticalServiceAfterDuration != "" {
-		_, parseErr = time.ParseDuration(registration.Spec.HealthCheck.Definition.DeregisterCriticalServiceAfterDuration)
-		if parseErr != nil {
+		_, deregCriticalErr := time.ParseDuration(registration.Spec.HealthCheck.Definition.DeregisterCriticalServiceAfterDuration)
+		if deregCriticalErr != nil {
 			err = errors.Join(err, fmt.Errorf("invalid registration.Spec.HealthCheck.Definition.DeregisterCriticalServiceAfterDuration value: %q", registration.Spec.HealthCheck.Definition.DeregisterCriticalServiceAfterDuration))
 		}
 	}
