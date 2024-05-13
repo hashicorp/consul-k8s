@@ -363,8 +363,11 @@ func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger 
 	return r.Log.WithValues("request", name)
 }
 
+const registrationByServiceNameIndex = "registrationName"
+
 func (r *RegistrationsController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.Registration{}, "registrationName", indexerFn); err != nil {
+	// setup the index to lookup registrations by service name
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.Registration{}, registrationByServiceNameIndex, indexerFn); err != nil {
 		return err
 	}
 
@@ -383,10 +386,10 @@ func (r *RegistrationsController) transformTerminatingGateways(ctx context.Conte
 	termGW := o.(*v1alpha1.TerminatingGateway)
 	reqs := make([]reconcile.Request, 0, len(termGW.Spec.Services))
 	for _, svc := range termGW.Spec.Services {
-		// lookup registrationList by service name add add it to the reconcile request
+		// lookup registrationList by service name and add it to the reconcile request
 		registrationList := &v1alpha1.RegistrationList{}
 
-		err := r.Client.List(ctx, registrationList, client.MatchingFields{"registrationName": svc.Name})
+		err := r.Client.List(ctx, registrationList, client.MatchingFields{registrationByServiceNameIndex: svc.Name})
 		if err != nil {
 			r.Log.Error(err, "error listing registrations by service name", "serviceName", svc.Name)
 			continue
