@@ -13,6 +13,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func init() {
@@ -286,6 +287,13 @@ func (r *Registration) ToCatalogDeregistration() *capi.CatalogDeregistration {
 		CheckID:    checkID,
 		Namespace:  r.Spec.Service.Namespace,
 		Partition:  r.Spec.Service.Partition,
+	}
+}
+
+func (r *Registration) NamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: r.Namespace,
+		Name:      r.Name,
 	}
 }
 
