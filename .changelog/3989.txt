@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Fix ArgoCD hooks related annotation on init Job, they must be added at Job definition and not tempalte level.
+```
