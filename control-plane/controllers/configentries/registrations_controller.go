@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,6 +43,7 @@ type RegistrationsController struct {
 	client.Client
 	FinalizerPatcher
 	Scheme              *runtime.Scheme
+	Cache               *RegistrationCache
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
 	Log                 logr.Logger
@@ -86,6 +88,89 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
+type RegistrationCache struct {
+	ConsulClientConfig  *consul.Config
+	ConsulServerConnMgr consul.ServerConnectionManager
+	Services            mapset.Set
+}
+
+func newCache() *RegistrationCache {
+	return &RegistrationCache{
+		Services: mapset.NewSet(),
+	}
+}
+
+// we need an Add which will handle writing the registration to consul and adding to the cache,
+// we also need a remove which deregistrers in consul and removes from the set
+// all functionality in the reconcile loop should be moved to this cache
+// we need a sync.Once to handle populating the cache at boot with services that are not managed by consul-k8s-endpoints-controller
+
+func (c *RegistrationCache) Add(ctx context.Context, log logr.Logger, reg *v1alpha1.Registration) error {
+	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
+	if err != nil {
+		return err
+	}
+
+	regReq, err := reg.ToCatalogRegistration()
+	if err != nil {
+		return err
+	}
+
+	_, err = client.Catalog().Register(regReq, nil)
+	if err != nil {
+		log.Error(err, "error registering service", "svcName", regReq.Service.Service)
+		return err
+	}
+
+	log.Info("Successfully registered service", "svcName", regReq.Service.Service)
+
+	c.Services.Add(reg.Spec.Service.Name)
+	return nil
+}
+
+func (c *RegistrationCache) Delete(ctx context.Context, log logr.Logger, reg *v1alpha1.Registration) error {
+	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
+	if err != nil {
+		return err
+	}
+
+	deRegReq := reg.ToCatalogDeregistration()
+	_, err = client.Catalog().Deregister(deRegReq, nil)
+	if err != nil {
+		log.Error(err, "error deregistering service", "svcID", deRegReq.ServiceID)
+		return err
+	}
+
+	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
+	return nil
+}
+
+func (c *RegistrationCache) watchForDereg(ctx context.Context, log logr.Logger, client *capi.Client) {
+	opts := &capi.QueryOptions{Filter: "ServiceMeta.managed-by != consul-k8s-endpoints-controller"}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			_, meta, err := client.Catalog().Services(opts.WithContext(ctx))
+			if err != nil {
+				// if we timeout we don't care about the error message because it's expected to happen on long polls
+				// any other error we want to alert on
+				if !strings.Contains(strings.ToLower(err.Error()), "timeout") &&
+					!strings.Contains(strings.ToLower(err.Error()), "no such host") &&
+					!strings.Contains(strings.ToLower(err.Error()), "connection refused") {
+					log.Error(err, "error fetching registrations")
+				}
+				continue
+			}
+
+			opts.WaitIndex = meta.LastIndex
+
+		}
+	}
+}
+
 func (r *RegistrationsController) handleRegistration(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	log.Info("Registering service")
 
@@ -95,7 +180,7 @@ func (r *RegistrationsController) handleRegistration(ctx context.Context, log lo
 		return err
 	}
 
-	err = r.registerService(log, client, registration)
+	err = r.Cache.Add(ctx, log, registration)
 	if err != nil {
 		r.updateStatusError(ctx, log, registration, ConsulErrorRegistration, err)
 		return err
@@ -111,22 +196,6 @@ func (r *RegistrationsController) handleRegistration(ctx context.Context, log lo
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (r *RegistrationsController) registerService(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
-	regReq, err := registration.ToCatalogRegistration()
-	if err != nil {
-		return err
-	}
-
-	_, err = client.Catalog().Register(regReq, nil)
-	if err != nil {
-		log.Error(err, "error registering service", "svcName", regReq.Service.Service)
-		return err
-	}
-
-	log.Info("Successfully registered service", "svcName", regReq.Service.Service)
 	return nil
 }
 
@@ -218,7 +287,7 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 
 func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	log.Info("Deregistering service")
-	err := r.deregisterService(log, client, registration)
+	err := r.Cache.Delete(ctx, log, registration)
 	if err != nil {
 		r.updateStatusError(ctx, log, registration, ConsulErrorDeregistration, err)
 		return err
@@ -236,19 +305,6 @@ func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.L
 		return err
 	}
 
-	return nil
-}
-
-func (r *RegistrationsController) deregisterService(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
-	deRegReq := registration.ToCatalogDeregistration()
-
-	_, err := client.Catalog().Deregister(deRegReq, nil)
-	if err != nil {
-		log.Error(err, "error deregistering service", "svcID", deRegReq.ServiceID)
-		return err
-	}
-
-	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
 	return nil
 }
 

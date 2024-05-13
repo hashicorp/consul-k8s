@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -311,9 +312,14 @@ func TestReconcile_Success(tt *testing.T) {
 				Build()
 
 			controller := &configentries.RegistrationsController{
-				Client:              fakeClient,
-				Log:                 logrtest.NewTestLogger(t),
-				Scheme:              s,
+				Client: fakeClient,
+				Log:    logrtest.NewTestLogger(t),
+				Scheme: s,
+				Cache: &configentries.RegistrationCache{
+					Services:            mapset.NewSet(),
+					ConsulClientConfig:  testClient.Cfg,
+					ConsulServerConnMgr: testClient.Watcher,
+				},
 				ConsulClientConfig:  testClient.Cfg,
 				ConsulServerConnMgr: testClient.Watcher,
 			}
@@ -760,9 +766,14 @@ func TestReconcile_Failure(tt *testing.T) {
 				Build()
 
 			controller := &configentries.RegistrationsController{
-				Client:              fakeClient,
-				Log:                 logrtest.NewTestLogger(t),
-				Scheme:              s,
+				Client: fakeClient,
+				Log:    logrtest.NewTestLogger(t),
+				Scheme: s,
+				Cache: &configentries.RegistrationCache{
+					Services:            mapset.NewSet(),
+					ConsulClientConfig:  testClient.Cfg,
+					ConsulServerConnMgr: testClient.Watcher,
+				},
 				ConsulClientConfig:  testClient.Cfg,
 				ConsulServerConnMgr: testClient.Watcher,
 			}
