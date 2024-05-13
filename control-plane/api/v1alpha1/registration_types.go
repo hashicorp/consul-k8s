@@ -301,3 +301,7 @@ func (r *Registration) SetSyncedCondition(status corev1.ConditionStatus, reason 
 		},
 	}
 }
+
+func (r *Registration) KubernetesName() string {
+	return r.ObjectMeta.Name
+}
