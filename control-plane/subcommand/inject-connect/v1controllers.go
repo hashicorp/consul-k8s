@@ -290,7 +290,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		ConsulServerConnMgr: watcher,
 		Scheme:              mgr.GetScheme(),
 		Log:                 ctrl.Log.WithName("controller").WithName(apicommon.Registration),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.Registration)
 		return err
 	}
