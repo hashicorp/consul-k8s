@@ -124,7 +124,6 @@ func (c *RegistrationCache) Add(ctx context.Context, log logr.Logger, reg *v1alp
 
 	log.Info("Successfully registered service", "svcName", regReq.Service.Service)
 
-	c.Services.Add(reg.Spec.Service.Name)
 	return nil
 }
 
@@ -145,7 +144,7 @@ func (c *RegistrationCache) Delete(ctx context.Context, log logr.Logger, reg *v1
 	return nil
 }
 
-func (c *RegistrationCache) watchForDereg(ctx context.Context, log logr.Logger, client *capi.Client) {
+func (c *RegistrationCache) watchForServices(ctx context.Context, log logr.Logger, client *capi.Client) {
 	opts := &capi.QueryOptions{Filter: "ServiceMeta.managed-by != consul-k8s-endpoints-controller"}
 
 	for {
