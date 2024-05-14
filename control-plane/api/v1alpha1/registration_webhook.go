@@ -39,8 +39,8 @@ func (v *RegistrationWebhook) Handle(ctx context.Context, req admission.Request)
 		return admission.Errored(http.StatusBadRequest, decodeErr)
 	}
 
-	v.Logger.Info("validating registration", "name", resource.Name, "timeout", resource.Spec.HealthCheck.Definition.TimeoutDuration)
 	var err error
+
 	err = errors.Join(err, validateRequiredFields(resource))
 	err = errors.Join(err, validateHealthChecks(resource))
 	if err != nil {

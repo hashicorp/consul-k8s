@@ -19,9 +19,9 @@ import (
 
 func TestValidateRegistration(t *testing.T) {
 	cases := map[string]struct {
-		newResource   *Registration
-		expAllow      bool
-		expErrMessage string
+		newResource        *Registration
+		expectedToAllow    bool
+		expectedErrMessage string
 	}{
 		"valid with health check, status 'passing'": {
 			newResource: &Registration{
@@ -41,7 +41,7 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow: true,
+			expectedToAllow: true,
 		},
 		"valid with health check, status 'warning'": {
 			newResource: &Registration{
@@ -61,7 +61,7 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow: true,
+			expectedToAllow: true,
 		},
 		"valid with health check, status 'critical'": {
 			newResource: &Registration{
@@ -81,7 +81,7 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow: true,
+			expectedToAllow: true,
 		},
 		"valid without health check": {
 			newResource: &Registration{
@@ -95,7 +95,7 @@ func TestValidateRegistration(t *testing.T) {
 					HealthCheck: nil,
 				},
 			},
-			expAllow: true,
+			expectedToAllow: true,
 		},
 		"invalid, missing node field": {
 			newResource: &Registration{
@@ -109,8 +109,8 @@ func TestValidateRegistration(t *testing.T) {
 					HealthCheck: nil,
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "registration.Spec.Node is required",
+			expectedToAllow:    false,
+			expectedErrMessage: "registration.Spec.Node is required",
 		},
 		"invalid, missing address field": {
 			newResource: &Registration{
@@ -124,8 +124,8 @@ func TestValidateRegistration(t *testing.T) {
 					HealthCheck: nil,
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "registration.Spec.Address is required",
+			expectedToAllow:    false,
+			expectedErrMessage: "registration.Spec.Address is required",
 		},
 		"invalid, missing service.name field": {
 			newResource: &Registration{
@@ -139,8 +139,8 @@ func TestValidateRegistration(t *testing.T) {
 					HealthCheck: nil,
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "registration.Spec.Service.Name is required",
+			expectedToAllow:    false,
+			expectedErrMessage: "registration.Spec.Service.Name is required",
 		},
 		"invalid, health check is set and name is missing": {
 			newResource: &Registration{
@@ -160,8 +160,8 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "registration.Spec.HealthCheck.Name is required",
+			expectedToAllow:    false,
+			expectedErrMessage: "registration.Spec.HealthCheck.Name is required",
 		},
 		"invalid, health check is set and intervalDuration is missing": {
 			newResource: &Registration{
@@ -181,8 +181,8 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "invalid registration.Spec.HealthCheck.Definition.IntervalDuration value: \"\"",
+			expectedToAllow:    false,
+			expectedErrMessage: "invalid registration.Spec.HealthCheck.Definition.IntervalDuration value: \"\"",
 		},
 		"invalid, health check is set and intervalDuration is invalid duration type": {
 			newResource: &Registration{
@@ -202,8 +202,8 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "invalid registration.Spec.HealthCheck.Definition.IntervalDuration value: \"150\"",
+			expectedToAllow:    false,
+			expectedErrMessage: "invalid registration.Spec.HealthCheck.Definition.IntervalDuration value: \"150\"",
 		},
 		"invalid, health check is set and timeoutDuration is invalid duration type": {
 			newResource: &Registration{
@@ -224,8 +224,8 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "invalid registration.Spec.HealthCheck.Definition.TimeoutDuration value: \"150\"",
+			expectedToAllow:    false,
+			expectedErrMessage: "invalid registration.Spec.HealthCheck.Definition.TimeoutDuration value: \"150\"",
 		},
 		"invalid, health check is set and deregisterCriticalServiceAfterDuration is invalid duration type": {
 			newResource: &Registration{
@@ -247,8 +247,8 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "invalid registration.Spec.HealthCheck.Definition.DeregisterCriticalServiceAfterDuration value: \"40\"",
+			expectedToAllow:    false,
+			expectedErrMessage: "invalid registration.Spec.HealthCheck.Definition.DeregisterCriticalServiceAfterDuration value: \"40\"",
 		},
 		"invalid, health check is set and status is not 'passing', 'critical', or 'warning'": {
 			newResource: &Registration{
@@ -268,8 +268,8 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "invalid registration.Spec.HealthCheck.Status value, must be 'passing', 'warning', or 'critical', actual: \"wrong\"",
+			expectedToAllow:    false,
+			expectedErrMessage: "invalid registration.Spec.HealthCheck.Status value, must be 'passing', 'warning', or 'critical', actual: \"wrong\"",
 		},
 		"everything that can go wrong has gone wrong": {
 			newResource: &Registration{
@@ -291,8 +291,8 @@ func TestValidateRegistration(t *testing.T) {
 					},
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "registration.Spec.Node is required\nregistration.Spec.Service.Name is required\nregistration.Spec.Address is required\nregistration.Spec.HealthCheck.Name is required\ninvalid registration.Spec.HealthCheck.Status value, must be 'passing', 'warning', or 'critical', actual: \"wrong\"\ninvalid registration.Spec.HealthCheck.Definition.IntervalDuration value: \"10\"\ninvalid registration.Spec.HealthCheck.Definition.TimeoutDuration value: \"150\"\ninvalid registration.Spec.HealthCheck.Definition.DeregisterCriticalServiceAfterDuration value: \"40\"",
+			expectedToAllow:    false,
+			expectedErrMessage: "registration.Spec.Node is required\nregistration.Spec.Service.Name is required\nregistration.Spec.Address is required\nregistration.Spec.HealthCheck.Name is required\ninvalid registration.Spec.HealthCheck.Status value, must be 'passing', 'warning', or 'critical', actual: \"wrong\"\ninvalid registration.Spec.HealthCheck.Definition.IntervalDuration value: \"10\"\ninvalid registration.Spec.HealthCheck.Definition.TimeoutDuration value: \"150\"\ninvalid registration.Spec.HealthCheck.Definition.DeregisterCriticalServiceAfterDuration value: \"40\"",
 		},
 	}
 	for name, c := range cases {
@@ -321,9 +321,9 @@ func TestValidateRegistration(t *testing.T) {
 				},
 			})
 
-			require.Equal(t, c.expAllow, response.Allowed)
-			if c.expErrMessage != "" {
-				require.Equal(t, c.expErrMessage, response.AdmissionResponse.Result.Message)
+			require.Equal(t, c.expectedToAllow, response.Allowed)
+			if c.expectedErrMessage != "" {
+				require.Equal(t, c.expectedErrMessage, response.AdmissionResponse.Result.Message)
 			}
 		})
 	}
