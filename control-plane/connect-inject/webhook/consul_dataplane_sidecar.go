@@ -97,9 +97,10 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	}
 
 	container := corev1.Container{
-		Name:      containerName,
-		Image:     w.ImageConsulDataplane,
-		Resources: resources,
+		Name:            containerName,
+		Image:           w.ImageConsulDataplane,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
+		Resources:       resources,
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
 		// consul-dataplane can write files to it. Otherwise, it wouldn't be able to
 		// because we set file system to be read-only.

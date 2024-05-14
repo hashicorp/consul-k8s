@@ -246,6 +246,7 @@ This template is for an init container.
 {{- define "consul.getAutoEncryptClientCA" -}}
 - name: get-auto-encrypt-client-ca
   image: {{ .Values.global.imageK8S }}
+  {{ template "consul.imagePullPolicy" . }}
   command:
     - "/bin/sh"
     - "-ec"
@@ -632,7 +633,9 @@ Usage: {{ template "consul.dogstatsdAaddressInfo" . }}
 
 {{- define "consul.dogstatsdAaddressInfo" -}}
 {{- if (and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled) }}
-        "dogstatsd_addr": "{{- if eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" }}unix://{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr }}{{- else }}{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}{{- if ne ( .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | int ) 0 }}:{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | toString }}{{- end }}{{- end }}",{{- end }}
+        "dogstatsd_addr": "{{- if eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" }}
+        unix://{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr }}{{- else }}
+        {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}{{- if ne ( .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | int ) 0 }}:{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | toString }}{{- end }}{{- end }}",{{- end }}
 {{- end -}}
 
 {{/*
@@ -682,4 +685,22 @@ Usage: {{ template "consul.versionInfo" }}
     {{- $sanitizedVersion = $versionInfo }}
 {{- end -}}
 {{- printf "%s" $sanitizedVersion | trunc 63 | quote }}
+{{- end -}}
+
+{{/*
+Sets the imagePullPolicy for all Consul images (consul, consul-dataplane, consul-k8s, consul-telemetry-collector)
+Valid values are:
+    IfNotPresent
+    Always
+    Never
+    In the case of empty, see https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy for details
+
+Usage: {{ template "consul.imagePullPolicy" . }} TODO: melisa should we name this differently ?
+*/}}
+{{- define "consul.imagePullPolicy" -}}
+{{ if or (eq .Values.global.imagePullPolicy "IfNotPresent") (eq .Values.global.imagePullPolicy "Always") (eq .Values.global.imagePullPolicy "Never")}}imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+{{ else if eq .Values.global.imagePullPolicy "" }}
+{{ else }}
+{{fail "imagePullPolicy can only be IfNotPresent, Always, Never, or empty" }}
+{{ end }}
 {{- end -}}

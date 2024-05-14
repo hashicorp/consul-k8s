@@ -54,6 +54,7 @@ type Command struct {
 	flagConsulImage           string // Docker image for Consul
 	flagConsulDataplaneImage  string // Docker image for Envoy
 	flagConsulK8sImage        string // Docker image for consul-k8s
+	flagGlobalImagePullPolicy string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
 	flagEnvoyExtraArgs        string // Extra envoy args when starting envoy
 	flagEnableWebhookCAUpdate bool
@@ -194,6 +195,8 @@ func (c *Command) init() {
 		"Docker image for Consul Dataplane.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
+	c.flagSet.StringVar(&c.flagGlobalImagePullPolicy, "global-image-pull-policy", "",
+		"ImagePullPolicy for all images used by Consul (consul, consul-dataplane, consul-k8s).")
 	c.flagSet.BoolVar(&c.flagEnablePeering, "enable-peering", false, "Enable cluster peering controllers.")
 	c.flagSet.BoolVar(&c.flagEnableFederation, "enable-federation", false, "Enable Consul WAN Federation.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",

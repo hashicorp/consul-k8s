@@ -86,7 +86,10 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.5-dev
+  imageK8S: ""
+
+  # The image pull policy that will be used for all
+  imagePullPolicy: ""
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
