@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
@@ -66,6 +67,8 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	log.Info("reg status", "status", registration.Status)
+
 	client, err := consul.NewClientFromConnMgr(r.ConsulClientConfig, r.ConsulServerConnMgr)
 	if err != nil {
 		log.Error(err, "error initializing consul client")
@@ -89,94 +92,22 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-type RegistrationCache struct {
-	ConsulClientConfig  *consul.Config
-	ConsulServerConnMgr consul.ServerConnectionManager
-	Services            mapset.Set
-	UpdateChan          chan string
-}
-
-func newCache() *RegistrationCache {
-	return &RegistrationCache{
-		Services: mapset.NewSet(),
-	}
-}
-
-// all functionality in the reconcile loop should be moved to this cache
-// we need a sync.Once to handle populating the cache at boot with services that are not managed by consul-k8s-endpoints-controller
-// the watch function should add to cache all services that come in from the blocking query and then take all the ones that don't match and set status on them
-// to indicate that consul dereigstered them and then remove them from the cache
-
-func (c *RegistrationCache) Add(ctx context.Context, log logr.Logger, reg *v1alpha1.Registration) error {
-	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
-	if err != nil {
-		return err
-	}
-
-	regReq, err := reg.ToCatalogRegistration()
-	if err != nil {
-		return err
-	}
-
-	_, err = client.Catalog().Register(regReq, nil)
-	if err != nil {
-		log.Error(err, "error registering service", "svcName", regReq.Service.Service)
-		return err
-	}
-
-	log.Info("Successfully registered service", "svcName", regReq.Service.Service)
-
-	return nil
-}
-
-func (c *RegistrationCache) Delete(ctx context.Context, log logr.Logger, reg *v1alpha1.Registration) error {
-	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
-	if err != nil {
-		return err
-	}
-
-	deRegReq := reg.ToCatalogDeregistration()
-	_, err = client.Catalog().Deregister(deRegReq, nil)
-	if err != nil {
-		log.Error(err, "error deregistering service", "svcID", deRegReq.ServiceID)
-		return err
-	}
-
-	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
-	return nil
-}
-
-func (c *RegistrationCache) watchForServices(ctx context.Context, log logr.Logger, client *capi.Client) {
-	opts := &capi.QueryOptions{Filter: "ServiceMeta.managed-by != consul-k8s-endpoints-controller"}
-
+func (c *RegistrationsController) watchForDeregistrations(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
-			entries, meta, err := client.Catalog().Services(opts.WithContext(ctx))
+		case svc := <-c.Cache.UpdateChan:
+			// get all registrations for the service
+			regList := &v1alpha1.RegistrationList{}
+			err := c.Client.List(context.Background(), regList, client.MatchingFields{registrationByServiceNameIndex: svc})
 			if err != nil {
-				// if we timeout we don't care about the error message because it's expected to happen on long polls
-				// any other error we want to alert on
-				if !strings.Contains(strings.ToLower(err.Error()), "timeout") &&
-					!strings.Contains(strings.ToLower(err.Error()), "no such host") &&
-					!strings.Contains(strings.ToLower(err.Error()), "connection refused") {
-					log.Error(err, "error fetching registrations")
-				}
+				c.Log.Error(err, "error listing registrations by service name", "serviceName", svc)
 				continue
 			}
-
-			consulSvcs := mapset.NewSet(maps.Keys(entries))
-			for _, svc := range consulSvcs.ToSlice() {
-				name := svc.(string)
-				c.Services.Add(name)
+			for _, reg := range regList.Items {
+				c.updateStatusError(context.Background(), c.Log, &reg, ConsulErrorDeregistration, fmt.Errorf("service %q was deregistered by consul", reg.Spec.Service.Name))
 			}
-			diffs := c.Services.Difference(consulSvcs)
-			for _, svc := range diffs.ToSlice() {
-				c.UpdateChan <- svc.(string)
-				consulSvcs.Remove(svc)
-			}
-			opts.WaitIndex = meta.LastIndex
 		}
 	}
 }
@@ -190,7 +121,7 @@ func (r *RegistrationsController) handleRegistration(ctx context.Context, log lo
 		return err
 	}
 
-	err = r.Cache.Add(ctx, log, registration)
+	err = r.Cache.RegisterService(ctx, log, registration)
 	if err != nil {
 		r.updateStatusError(ctx, log, registration, ConsulErrorRegistration, err)
 		return err
@@ -297,7 +228,7 @@ func (r *RegistrationsController) updateTermGWACLRole(ctx context.Context, log l
 
 func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) error {
 	log.Info("Deregistering service")
-	err := r.Cache.Delete(ctx, log, registration)
+	err := r.Cache.DeregisterService(ctx, log, registration)
 	if err != nil {
 		r.updateStatusError(ctx, log, registration, ConsulErrorDeregistration, err)
 		return err
@@ -432,6 +363,12 @@ func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger 
 const registrationByServiceNameIndex = "registrationName"
 
 func (r *RegistrationsController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	// setup the cache
+	go r.Cache.Run(ctx, r.Log)
+	r.Cache.WaitSynced(ctx)
+
+	go r.watchForDeregistrations(ctx)
+
 	// setup the index to lookup registrations by service name
 	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.Registration{}, registrationByServiceNameIndex, indexerFn); err != nil {
 		return err
@@ -471,4 +408,125 @@ func (r *RegistrationsController) transformTerminatingGateways(ctx context.Conte
 		}
 	}
 	return reqs
+}
+
+type RegistrationCache struct {
+	ConsulClientConfig  *consul.Config
+	ConsulServerConnMgr consul.ServerConnectionManager
+	Services            mapset.Set[string]
+	synced              chan struct{}
+	UpdateChan          chan string
+}
+
+func NewRegistrationCache(consulClientConfig *consul.Config, consulServerConnMgr consul.ServerConnectionManager) *RegistrationCache {
+	return &RegistrationCache{
+		ConsulClientConfig:  consulClientConfig,
+		ConsulServerConnMgr: consulServerConnMgr,
+		Services:            mapset.NewSet[string](),
+		UpdateChan:          make(chan string),
+		synced:              make(chan struct{}),
+	}
+}
+
+// we need a sync.Once to handle populating the cache at boot with services that are not managed by consul-k8s-endpoints-controller
+// the watch function should add to cache all services that come in from the blocking query and then take all the ones that don't match and set status on them
+// to indicate that consul dereigstered them and then remove them from the cache
+
+func (c *RegistrationCache) RegisterService(ctx context.Context, log logr.Logger, reg *v1alpha1.Registration) error {
+	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
+	if err != nil {
+		return err
+	}
+
+	regReq, err := reg.ToCatalogRegistration()
+	if err != nil {
+		return err
+	}
+
+	_, err = client.Catalog().Register(regReq, nil)
+	if err != nil {
+		log.Error(err, "error registering service", "svcName", regReq.Service.Service)
+		return err
+	}
+
+	log.Info("Successfully registered service", "svcName", regReq.Service.Service)
+
+	return nil
+}
+
+func (c *RegistrationCache) DeregisterService(ctx context.Context, log logr.Logger, reg *v1alpha1.Registration) error {
+	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
+	if err != nil {
+		return err
+	}
+
+	deRegReq := reg.ToCatalogDeregistration()
+	_, err = client.Catalog().Deregister(deRegReq, nil)
+	if err != nil {
+		log.Error(err, "error deregistering service", "svcID", deRegReq.ServiceID)
+		return err
+	}
+
+	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
+	return nil
+}
+
+// WaitSynced is used to coordinate with the caller when the cache is initially filled.
+func (c *RegistrationCache) WaitSynced(ctx context.Context) {
+	select {
+	case <-c.synced:
+		fmt.Println("synced")
+		return
+	case <-ctx.Done():
+		return
+	}
+}
+
+func (c *RegistrationCache) Run(ctx context.Context, log logr.Logger) {
+	once := &sync.Once{}
+	opts := &capi.QueryOptions{Filter: "ServiceMeta[\"managed-by\"] != \"consul-k8s-endpoints-controller\""}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+
+			client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
+			if err != nil {
+				log.Error(err, "error initializing consul client")
+				continue
+			}
+			entries, meta, err := client.Catalog().Services(opts.WithContext(ctx))
+			if err != nil {
+				// if we timeout we don't care about the error message because it's expected to happen on long polls
+				// any other error we want to alert on
+				if !strings.Contains(strings.ToLower(err.Error()), "timeout") &&
+					!strings.Contains(strings.ToLower(err.Error()), "no such host") &&
+					!strings.Contains(strings.ToLower(err.Error()), "connection refused") {
+					log.Error(err, "error fetching registrations")
+				}
+				continue
+			}
+
+			consulSvcs := mapset.NewSet(maps.Keys(entries)...)
+			for _, svc := range consulSvcs.ToSlice() {
+				name := svc
+				c.Services.Add(name)
+			}
+
+			diffs := c.Services.Difference(consulSvcs)
+			for _, svc := range diffs.ToSlice() {
+				log.Info("consul deregistered service", "svcName", svc)
+				c.UpdateChan <- svc
+				consulSvcs.Remove(svc)
+			}
+
+			opts.WaitIndex = meta.LastIndex
+			once.Do(func() {
+				log.Info("Initial sync complete")
+				c.synced <- struct{}{}
+			})
+		}
+	}
 }
