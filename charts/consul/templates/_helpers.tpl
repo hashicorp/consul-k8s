@@ -633,9 +633,7 @@ Usage: {{ template "consul.dogstatsdAaddressInfo" . }}
 
 {{- define "consul.dogstatsdAaddressInfo" -}}
 {{- if (and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled) }}
-        "dogstatsd_addr": "{{- if eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" }}
-        unix://{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr }}{{- else }}
-        {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}{{- if ne ( .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | int ) 0 }}:{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | toString }}{{- end }}{{- end }}",{{- end }}
+        "dogstatsd_addr": "{{- if eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" }}unix://{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr }}{{- else }}{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}{{- if ne ( .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | int ) 0 }}:{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | toString }}{{- end }}{{- end }}",{{- end }}
 {{- end -}}
 
 {{/*
