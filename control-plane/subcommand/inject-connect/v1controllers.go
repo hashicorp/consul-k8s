@@ -476,6 +476,12 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		ConsulMeta: consulMeta,
 	}).SetupWithManager(mgr)
 
+	(&v1alpha1.RegistrationWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.Registration),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
 	if c.flagEnableWebhookCAUpdate {
 		err = c.updateWebhookCABundle(ctx)
 		if err != nil {
