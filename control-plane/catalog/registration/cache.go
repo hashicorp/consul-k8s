@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
-	"golang.org/x/exp/maps"
 )
 
 const NotInServiceMeshFilter = "ServiceMeta[\"managed-by\"] != \"consul-k8s-endpoints-controller\""
@@ -21,7 +20,8 @@ const NotInServiceMeshFilter = "ServiceMeta[\"managed-by\"] != \"consul-k8s-endp
 type RegistrationCache struct {
 	ConsulClientConfig  *consul.Config
 	ConsulServerConnMgr consul.ServerConnectionManager
-	Services            mapset.Set[string]
+	serviceMtx          *sync.Mutex
+	Services            map[string]*v1alpha1.Registration
 	synced              chan struct{}
 	UpdateChan          chan string
 }
@@ -30,7 +30,8 @@ func NewRegistrationCache(consulClientConfig *consul.Config, consulServerConnMgr
 	return &RegistrationCache{
 		ConsulClientConfig:  consulClientConfig,
 		ConsulServerConnMgr: consulServerConnMgr,
-		Services:            mapset.NewSet[string](),
+		serviceMtx:          &sync.Mutex{},
+		Services:            make(map[string]*v1alpha1.Registration),
 		UpdateChan:          make(chan string),
 		synced:              make(chan struct{}),
 	}
@@ -74,17 +75,18 @@ func (c *RegistrationCache) run(ctx context.Context, log logr.Logger) {
 				continue
 			}
 
-			consulSvcs := mapset.NewSet(maps.Keys(entries)...)
-			for _, svc := range consulSvcs.ToSlice() {
-				name := svc
-				c.Services.Add(name)
+			diffs := mapset.NewSet[string]()
+			c.serviceMtx.Lock()
+			for svc := range c.Services {
+				if _, ok := entries[svc]; !ok {
+					diffs.Add(svc)
+				}
 			}
+			c.serviceMtx.Unlock()
 
-			diffs := c.Services.Difference(consulSvcs)
 			for _, svc := range diffs.ToSlice() {
 				log.Info("consul deregistered service", "svcName", svc)
 				c.UpdateChan <- svc
-				consulSvcs.Remove(svc)
 			}
 
 			opts.WaitIndex = meta.LastIndex
@@ -94,6 +96,13 @@ func (c *RegistrationCache) run(ctx context.Context, log logr.Logger) {
 			})
 		}
 	}
+}
+
+func (c *RegistrationCache) get(svcName string) (*v1alpha1.Registration, bool) {
+	c.serviceMtx.Lock()
+	defer c.serviceMtx.Unlock()
+	val, ok := c.Services[svcName]
+	return val, ok
 }
 
 func (c *RegistrationCache) aclsEnabled() bool {
@@ -116,6 +125,10 @@ func (c *RegistrationCache) registerService(log logr.Logger, reg *v1alpha1.Regis
 		log.Error(err, "error registering service", "svcName", regReq.Service.Service)
 		return err
 	}
+
+	c.serviceMtx.Lock()
+	defer c.serviceMtx.Unlock()
+	c.Services[reg.Spec.Service.Name] = reg
 
 	log.Info("Successfully registered service", "svcName", regReq.Service.Service)
 
@@ -200,6 +213,10 @@ func (c *RegistrationCache) deregisterService(log logr.Logger, reg *v1alpha1.Reg
 		log.Error(err, "error deregistering service", "svcID", deRegReq.ServiceID)
 		return err
 	}
+
+	c.serviceMtx.Lock()
+	defer c.serviceMtx.Unlock()
+	delete(c.Services, reg.Spec.Service.Name)
 
 	log.Info("Successfully deregistered service", "svcID", deRegReq.ServiceID)
 	return nil

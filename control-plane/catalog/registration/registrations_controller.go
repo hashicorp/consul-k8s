@@ -26,7 +26,10 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 )
 
-const RegistrationFinalizer = "registration.finalizers.consul.hashicorp.com"
+const (
+	RegistrationFinalizer          = "registration.finalizers.consul.hashicorp.com"
+	registrationByServiceNameIndex = "registrationName"
+)
 
 var (
 	ErrRegisteringService   = fmt.Errorf("error registering service")
@@ -62,8 +65,17 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	log.Info("reg status", "status", registration.Status)
+	cachedRegistration, ok := r.Cache.get(registration.Spec.Service.Name)
+	if slices.ContainsFunc(registration.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Type == ConditionDeregistered }) {
+		if ok && registration.EqualExceptStatus(cachedRegistration) {
+			log.Info("Registration is in sync")
+			// registration is already in sync so we do nothing, this happens when consul deregisters a service
+			// and we update the status to show that consul deregistered it
+			return ctrl.Result{}, nil
+		}
+	}
 
+	log.Info("need to reconcile")
 	client, err := consul.NewClientFromConnMgr(r.ConsulClientConfig, r.ConsulServerConnMgr)
 	if err != nil {
 		log.Error(err, "error initializing consul client")
@@ -72,7 +84,6 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// deletion request
 	if !registration.ObjectMeta.DeletionTimestamp.IsZero() {
-
 		result := r.handleDeletion(ctx, log, client, registration)
 
 		if result.hasErrors() {
@@ -106,7 +117,7 @@ func (c *RegistrationsController) watchForDeregistrations(ctx context.Context) {
 				continue
 			}
 			for _, reg := range regList.Items {
-				c.UpdateStatus(context.Background(), c.Log, &reg, Result{Registering: false})
+				c.UpdateStatus(context.Background(), c.Log, &reg, Result{Registering: false, ConsulDeregistered: true})
 			}
 		}
 	}
@@ -180,7 +191,7 @@ func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.L
 	err := r.Cache.deregisterService(log, registration)
 	if err != nil {
 		result.Sync = err
-		result.Registration = fmt.Errorf("%w: %s", ErrDeregisteringService, err)
+		result.Deregistration = fmt.Errorf("%w: %s", ErrDeregisteringService, err)
 		return result
 	}
 
@@ -237,8 +248,6 @@ func (r *RegistrationsController) UpdateStatus(ctx context.Context, log logr.Log
 func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger {
 	return r.Log.WithValues("request", name)
 }
-
-const registrationByServiceNameIndex = "registrationName"
 
 func (r *RegistrationsController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// setup the cache

@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -22,15 +23,17 @@ const (
 	ConsulErrorRegistration   = "ConsulErrorRegistration"
 	ConsulErrorDeregistration = "ConsulErrorDeregistration"
 	ConsulErrorACL            = "ConsulErrorACL"
-	ConsulDerigistration      = "ConsulDeregistration"
+	ConsulDeregistration      = "ConsulDeregistration"
 )
 
 type Result struct {
-	Registering  bool
-	Sync         error
-	Registration error
-	ACLUpdate    error
-	Finalizer    error
+	Registering        bool
+	ConsulDeregistered bool
+	Sync               error
+	Registration       error
+	Deregistration     error
+	ACLUpdate          error
+	Finalizer          error
 }
 
 func (r Result) hasErrors() bool {
@@ -46,59 +49,78 @@ func (r Result) errors() error {
 func syncedCondition(result Result) v1alpha1.Condition {
 	if result.Sync != nil {
 		return v1alpha1.Condition{
-			Type:    ConditionSynced,
-			Status:  corev1.ConditionFalse,
-			Reason:  SyncError,
-			Message: result.Sync.Error(),
+			Type:               ConditionSynced,
+			Status:             corev1.ConditionFalse,
+			Reason:             SyncError,
+			Message:            result.Sync.Error(),
+			LastTransitionTime: metav1.Now(),
 		}
 	}
 	return v1alpha1.Condition{
-		Type:   ConditionSynced,
-		Status: corev1.ConditionTrue,
+		Type:               ConditionSynced,
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
 	}
 }
 
 func registrationCondition(result Result) v1alpha1.Condition {
 	if result.Registration != nil {
 		return v1alpha1.Condition{
-			Type:    ConditionRegistered,
-			Status:  corev1.ConditionFalse,
-			Reason:  ConsulErrorRegistration,
-			Message: result.Registration.Error(),
+			Type:               ConditionRegistered,
+			Status:             corev1.ConditionFalse,
+			Reason:             ConsulErrorRegistration,
+			Message:            result.Registration.Error(),
+			LastTransitionTime: metav1.Now(),
 		}
 	}
 	return v1alpha1.Condition{
-		Type:   ConditionRegistered,
-		Status: corev1.ConditionTrue,
+		Type:               ConditionRegistered,
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
 	}
 }
 
 func deregistrationCondition(result Result) v1alpha1.Condition {
-	if result.Registration != nil {
+	if result.Deregistration != nil {
 		return v1alpha1.Condition{
-			Type:    ConditionDeregistered,
-			Status:  corev1.ConditionFalse,
-			Reason:  ConsulErrorDeregistration,
-			Message: result.Registration.Error(),
+			Type:               ConditionDeregistered,
+			Status:             corev1.ConditionFalse,
+			Reason:             ConsulErrorDeregistration,
+			Message:            result.Deregistration.Error(),
+			LastTransitionTime: metav1.Now(),
 		}
 	}
+
+	var (
+		reason  string
+		message string
+	)
+	if result.ConsulDeregistered {
+		reason = ConsulDeregistration
+		message = "Consul deregistered this service"
+	}
 	return v1alpha1.Condition{
-		Type:   ConditionDeregistered,
-		Status: corev1.ConditionTrue,
+		Type:               ConditionDeregistered,
+		Status:             corev1.ConditionTrue,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
 	}
 }
 
 func aclCondition(result Result) v1alpha1.Condition {
 	if result.ACLUpdate != nil {
 		return v1alpha1.Condition{
-			Type:    ConditionACLsUpdated,
-			Status:  corev1.ConditionFalse,
-			Reason:  ConsulErrorACL,
-			Message: result.ACLUpdate.Error(),
+			Type:               ConditionACLsUpdated,
+			Status:             corev1.ConditionFalse,
+			Reason:             ConsulErrorACL,
+			Message:            result.ACLUpdate.Error(),
+			LastTransitionTime: metav1.Now(),
 		}
 	}
 	return v1alpha1.Condition{
-		Type:   ConditionACLsUpdated,
-		Status: corev1.ConditionTrue,
+		Type:               ConditionACLsUpdated,
+		Status:             corev1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
 	}
 }

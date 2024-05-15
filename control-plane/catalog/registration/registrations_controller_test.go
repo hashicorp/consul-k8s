@@ -14,7 +14,6 @@ import (
 	"strings"
 	"testing"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -348,14 +347,10 @@ func TestReconcile_Success(tt *testing.T) {
 				Build()
 
 			controller := &registration.RegistrationsController{
-				Client: fakeClient,
-				Log:    logrtest.NewTestLogger(t),
-				Scheme: s,
-				Cache: &registration.RegistrationCache{
-					Services:            mapset.NewSet[string](),
-					ConsulClientConfig:  testClient.Cfg,
-					ConsulServerConnMgr: testClient.Watcher,
-				},
+				Client:              fakeClient,
+				Log:                 logrtest.NewTestLogger(t),
+				Scheme:              s,
+				Cache:               registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
 				ConsulClientConfig:  testClient.Cfg,
 				ConsulServerConnMgr: testClient.Watcher,
 			}
@@ -874,14 +869,10 @@ func TestReconcile_Failure(tt *testing.T) {
 				Build()
 
 			controller := &registration.RegistrationsController{
-				Client: fakeClient,
-				Log:    logrtest.NewTestLogger(t),
-				Scheme: s,
-				Cache: &registration.RegistrationCache{
-					Services:            mapset.NewSet[string](),
-					ConsulClientConfig:  testClient.Cfg,
-					ConsulServerConnMgr: testClient.Watcher,
-				},
+				Client:              fakeClient,
+				Log:                 logrtest.NewTestLogger(t),
+				Scheme:              s,
+				Cache:               registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
 				ConsulClientConfig:  testClient.Cfg,
 				ConsulServerConnMgr: testClient.Watcher,
 			}
