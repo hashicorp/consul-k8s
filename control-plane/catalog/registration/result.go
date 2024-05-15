@@ -10,9 +10,10 @@ import (
 
 // Conditions
 const (
-	ConditionSynced      = "Synced"
-	ConditionRegistered  = "Registered"
-	ConditionACLsUpdated = "ACLsUpdated"
+	ConditionSynced       = "Synced"
+	ConditionRegistered   = "Registered"
+	ConditionDeregistered = "Deregistered"
+	ConditionACLsUpdated  = "ACLsUpdated"
 )
 
 // Status Reasons.
@@ -25,6 +26,7 @@ const (
 )
 
 type Result struct {
+	Registering  bool
 	Sync         error
 	Registration error
 	ACLUpdate    error
@@ -58,20 +60,30 @@ func syncedCondition(result Result) v1alpha1.Condition {
 
 func registrationCondition(result Result) v1alpha1.Condition {
 	if result.Registration != nil {
-		reason := ConsulErrorRegistration
-		if errors.Is(result.Sync, ErrDeregisteringService) {
-			reason = ConsulErrorDeregistration
-		}
-
 		return v1alpha1.Condition{
 			Type:    ConditionRegistered,
 			Status:  corev1.ConditionFalse,
-			Reason:  reason,
+			Reason:  ConsulErrorRegistration,
 			Message: result.Registration.Error(),
 		}
 	}
 	return v1alpha1.Condition{
 		Type:   ConditionRegistered,
+		Status: corev1.ConditionTrue,
+	}
+}
+
+func deregistrationCondition(result Result) v1alpha1.Condition {
+	if result.Registration != nil {
+		return v1alpha1.Condition{
+			Type:    ConditionDeregistered,
+			Status:  corev1.ConditionFalse,
+			Reason:  ConsulErrorDeregistration,
+			Message: result.Registration.Error(),
+		}
+	}
+	return v1alpha1.Condition{
+		Type:   ConditionDeregistered,
 		Status: corev1.ConditionTrue,
 	}
 }

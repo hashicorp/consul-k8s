@@ -728,9 +728,9 @@ func TestReconcile_Failure(tt *testing.T) {
 					Reason: registration.SyncError,
 				},
 				{
-					Type:   registration.ConditionRegistered,
+					Type:   registration.ConditionDeregistered,
 					Status: v1.ConditionFalse,
-					Reason: registration.ConsulErrorRegistration,
+					Reason: registration.ConsulErrorDeregistration,
 				},
 			},
 		},
@@ -783,7 +783,7 @@ func TestReconcile_Failure(tt *testing.T) {
 					Reason: registration.SyncError,
 				},
 				{
-					Type:   registration.ConditionRegistered,
+					Type:   registration.ConditionDeregistered,
 					Status: v1.ConditionTrue,
 				},
 				{
@@ -842,7 +842,7 @@ func TestReconcile_Failure(tt *testing.T) {
 					Reason: registration.SyncError,
 				},
 				{
-					Type:   registration.ConditionRegistered,
+					Type:   registration.ConditionDeregistered,
 					Status: v1.ConditionTrue,
 				},
 				{

@@ -115,30 +115,39 @@ func (c *RegistrationsController) watchForDeregistrations(ctx context.Context) {
 func (r *RegistrationsController) handleRegistration(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) Result {
 	log.Info("Registering service")
 
+	result := Result{Registering: true}
+
 	patch := r.AddFinalizersPatch(registration, RegistrationFinalizer)
 	err := r.Patch(ctx, registration, patch)
 	if err != nil {
 		err = fmt.Errorf("error adding finalizer: %w", err)
-		return Result{Finalizer: err}
+		result.Finalizer = err
+		return result
 	}
 
 	err = r.Cache.RegisterService(ctx, log, registration)
 	if err != nil {
-		return Result{Sync: err, Registration: fmt.Errorf("%w: %s", ErrRegisteringService, err)}
+		result.Sync = err
+		result.Registration = fmt.Errorf("%w: %s", ErrRegisteringService, err)
+		return result
 	}
 
 	if r.Cache.ACLsEnabled() {
 		termGWsToUpdate, err := r.terminatingGatewaysToUpdate(ctx, log, registration)
 		if err != nil {
-			return Result{Sync: err, ACLUpdate: fmt.Errorf("%w: %s", ErrUpdatingACLRoles, err)}
+			result.Sync = err
+			result.ACLUpdate = fmt.Errorf("%w: %s", ErrUpdatingACLRoles, err)
+			return result
 		}
 
 		err = r.Cache.updateTermGWACLRole(log, client, registration, termGWsToUpdate)
 		if err != nil {
-			return Result{Sync: err, ACLUpdate: fmt.Errorf("%w: %s", ErrUpdatingACLRoles, err)}
+			result.Sync = err
+			result.ACLUpdate = fmt.Errorf("%w: %s", ErrUpdatingACLRoles, err)
+			return result
 		}
 	}
-	return Result{}
+	return result
 }
 
 func (r *RegistrationsController) terminatingGatewaysToUpdate(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration) ([]v1alpha1.TerminatingGateway, error) {
@@ -167,37 +176,50 @@ func termGWContainsService(registration *v1alpha1.Registration) func(v1alpha1.Li
 
 func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) Result {
 	log.Info("Deregistering service")
+	result := Result{Registering: false}
 	err := r.Cache.DeregisterService(ctx, log, registration)
 	if err != nil {
-		return Result{Sync: err, Registration: fmt.Errorf("%w: %s", ErrDeregisteringService, err)}
+		result.Sync = err
+		result.Registration = fmt.Errorf("%w: %s", ErrDeregisteringService, err)
+		return result
 	}
 
 	if r.Cache.ACLsEnabled() {
 		termGWsToUpdate, err := r.terminatingGatewaysToUpdate(ctx, log, registration)
 		if err != nil {
-			return Result{Sync: err, ACLUpdate: fmt.Errorf("%w: %s", ErrRemovingACLRoles, err)}
+			result.Sync = err
+			result.ACLUpdate = fmt.Errorf("%w: %s", ErrRemovingACLRoles, err)
+			return result
 		}
 
 		err = r.Cache.removeTermGWACLRole(log, client, registration, termGWsToUpdate)
 		if err != nil {
-			return Result{Sync: err, ACLUpdate: fmt.Errorf("%w: %s", ErrRemovingACLRoles, err)}
+			result.Sync = err
+			result.ACLUpdate = fmt.Errorf("%w: %s", ErrRemovingACLRoles, err)
+			return result
 		}
 	}
 
 	patch := r.RemoveFinalizersPatch(registration, RegistrationFinalizer)
 	err = r.Patch(ctx, registration, patch)
 	if err != nil {
-		return Result{Finalizer: err}
+		result.Finalizer = err
+		return result
 	}
 
-	return Result{}
+	return result
 }
 
 func (r *RegistrationsController) UpdateStatus(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration, result Result) error {
 	registration.Status.LastSyncedTime = &metav1.Time{Time: time.Now()}
 	registration.Status.Conditions = v1alpha1.Conditions{
 		syncedCondition(result),
-		registrationCondition(result),
+	}
+
+	if result.Registering {
+		registration.Status.Conditions = append(registration.Status.Conditions, registrationCondition(result))
+	} else {
+		registration.Status.Conditions = append(registration.Status.Conditions, deregistrationCondition(result))
 	}
 
 	if r.Cache.ACLsEnabled() {
