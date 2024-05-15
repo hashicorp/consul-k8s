@@ -445,6 +445,16 @@ func (c *Command) validateFlags() error {
 		return errors.New("-consul-dataplane-image must be set")
 	}
 
+	switch corev1.PullPolicy(c.flagGlobalImagePullPolicy) {
+	case corev1.PullAlways:
+	case corev1.PullNever:
+	case corev1.PullIfNotPresent:
+	case "":
+		break
+	default:
+		return errors.New("-global-image-pull-policy must be `IfNotPresent`, `Always`, `Never`, or `` ")
+	}
+
 	// In Consul 1.17, multiport beta shipped with v2 catalog + mesh resources backed by v1 tenancy
 	// and acls (experiments=[resource-apis]).
 	//
