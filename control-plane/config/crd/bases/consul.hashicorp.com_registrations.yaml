@@ -82,9 +82,7 @@ spec:
                       udp:
                         type: string
                     required:
-                    - deregisterCriticalServiceAfterDuration
                     - intervalDuration
-                    - timeoutDuration
                     type: object
                   exposedPort:
                     type: integer
@@ -112,7 +110,6 @@ spec:
                 - checkId
                 - definition
                 - name
-                - node
                 - serviceId
                 - serviceName
                 - status

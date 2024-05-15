@@ -28,4 +28,20 @@ webhooks:
       name: {{ template "consul.fullname" . }}-connect-injector
       namespace: {{ .Release.Namespace }}
       path: /validate-v1alpha1-gatewaypolicy
+- name: validate-registration.consul.hashicorp.com
+  matchPolicy: Equivalent
+  rules:
+  - operations: [ "CREATE" , "UPDATE" ]
+    apiGroups: [ "consul.hashicorp.com" ]
+    apiVersions: [ "v1alpha1" ]
+    resources: [ "registrations" ]
+  failurePolicy: Fail
+  sideEffects: None
+  admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /validate-v1alpha1-registration
 {{- end }}
