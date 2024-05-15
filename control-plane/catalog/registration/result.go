@@ -109,15 +109,22 @@ func deregistrationCondition(result Result) v1alpha1.Condition {
 }
 
 func aclCondition(result Result) v1alpha1.Condition {
-	if result.ACLUpdate != nil {
+	if result.ACLUpdate != nil || result.ConsulDeregistered {
+		reason := ConsulErrorACL
+		message := result.ACLUpdate.Error()
+		if result.ConsulDeregistered {
+			reason = ConsulDeregistration
+			message = "Consul deregistered this service, acls were not removed"
+		}
 		return v1alpha1.Condition{
 			Type:               ConditionACLsUpdated,
 			Status:             corev1.ConditionFalse,
-			Reason:             ConsulErrorACL,
-			Message:            result.ACLUpdate.Error(),
+			Reason:             reason,
+			Message:            message,
 			LastTransitionTime: metav1.Now(),
 		}
 	}
+
 	return v1alpha1.Condition{
 		Type:               ConditionACLsUpdated,
 		Status:             corev1.ConditionTrue,
