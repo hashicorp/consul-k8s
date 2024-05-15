@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-// Conditions
+// Conditions.
 const (
 	ConditionSynced       = "Synced"
 	ConditionRegistered   = "Registered"

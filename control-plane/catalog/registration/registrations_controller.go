@@ -77,7 +77,10 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		result := r.handleDeletion(ctx, log, registration)
 
 		if result.hasErrors() {
-			r.UpdateStatus(ctx, log, registration, result)
+			err := r.UpdateStatus(ctx, log, registration, result)
+			if err != nil {
+				log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
+			}
 			return ctrl.Result{}, result.errors()
 		}
 		return ctrl.Result{}, nil
@@ -85,7 +88,10 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// registration request
 	result := r.handleRegistration(ctx, log, registration)
-	r.UpdateStatus(ctx, log, registration, result)
+	err := r.UpdateStatus(ctx, log, registration, result)
+	if err != nil {
+		log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
+	}
 	if result.hasErrors() {
 		return ctrl.Result{}, result.errors()
 	}
@@ -107,7 +113,11 @@ func (c *RegistrationsController) watchForDeregistrations(ctx context.Context) {
 				continue
 			}
 			for _, reg := range regList.Items {
-				c.UpdateStatus(context.Background(), c.Log, &reg, Result{Registering: false, ConsulDeregistered: true})
+
+				err := c.UpdateStatus(context.Background(), c.Log, &reg, Result{Registering: false, ConsulDeregistered: true})
+				if err != nil {
+					c.Log.Error(err, "failed to update Registration status", "name", reg.Name, "namespace", reg.Namespace)
+				}
 			}
 		}
 	}
@@ -229,7 +239,6 @@ func (r *RegistrationsController) UpdateStatus(ctx context.Context, log logr.Log
 
 	err := r.Status().Update(ctx, registration)
 	if err != nil {
-		log.Error(err, "failed to update Registration status", "name", registration.Name, "namespace", registration.Namespace)
 		return err
 	}
 	return nil
