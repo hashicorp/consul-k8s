@@ -340,7 +340,14 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
 1. Replace the names
 1. Ensure you've correctly replaced the names in the kubebuilder annotation, ensure the plurality is correct
     ```go
-    // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-ingressgateway,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=ingressgateways,versions=v1alpha1,name=mutate-ingressgateway.consul.hashicorp.com,webhookVersions=v1beta1,sideEffects=None
+      // +kubebuilder:webhook:verbs=create;update,path=/mutate-v1alpha1-ingressgateway,mutating=true,failurePolicy=fail,groups=consul.hashicorp.com,resources=ingressgateways,versions=v1alpha1,name=mutate-ingressgateway.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+    ```
+1. Ensure you update the path to match the annotation in the `SetupWithManager` method:
+    ```go
+    func (v *IngressGatewayWebhook) SetupWithManager(mgr ctrl.Manager) {
+      v.decoder = admission.NewDecoder(mgr.GetScheme())
+      mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway", &admission.Webhook{Handler: v})
+}
     ```
 
 ### Update command.go
@@ -362,16 +369,13 @@ rebase the branch on main, fixing any conflicts along the way before the code ca
         return 1
     }
     ```
-1. Update `control-plane/subcommand/inject-connect/command.go` and add your webhook (the path should match the kubebuilder annotation):
+1. Update `control-plane/subcommand/inject-connect/command.go` and add your webhook
     ```go
-    mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
-        &webhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
-            Client:                     mgr.GetClient(),
-            ConsulClient:               consulClient,
-            Logger:                     ctrl.Log.WithName("webhooks").WithName(common.IngressGateway),
-            EnableConsulNamespaces:     c.flagEnableNamespaces,
-            EnableNSMirroring:          c.flagEnableNSMirroring,
-        }})
+    (&v1alpha1.IngressGatewayWebhook
+      Client:     mgr.GetClient(),
+      Logger:     ctrl.Log.WithName("webhooks").WithName(common.IngressGateway),
+      ConsulMeta: consulMeta,
+    }).SetupWithManager(mgr)
     ```
 
 ### Generating YAML

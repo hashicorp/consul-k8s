@@ -109,7 +109,7 @@ type Locality struct {
 
 // HealthCheck is used to represent a single check.
 type HealthCheck struct {
-	Node        string                `json:"node"`
+	Node        string                `json:"node,omitempty"`
 	CheckID     string                `json:"checkId"`
 	Name        string                `json:"name"`
 	Status      string                `json:"status"`
@@ -140,8 +140,8 @@ type HealthCheckDefinition struct {
 	OSService                              string              `json:"osService,omitempty"`
 	GRPCUseTLS                             bool                `json:"grpcUseTLS,omitempty"`
 	IntervalDuration                       string              `json:"intervalDuration"`
-	TimeoutDuration                        string              `json:"timeoutDuration"`
-	DeregisterCriticalServiceAfterDuration string              `json:"deregisterCriticalServiceAfterDuration"`
+	TimeoutDuration                        string              `json:"timeoutDuration,omitempty"`
+	DeregisterCriticalServiceAfterDuration string              `json:"deregisterCriticalServiceAfterDuration,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -568,4 +568,8 @@ func (h HealthCheckDefinition) Equal(other HealthCheckDefinition) bool {
 	}
 
 	return true
+}
+
+func (r *Registration) KubernetesName() string {
+	return r.ObjectMeta.Name
 }
