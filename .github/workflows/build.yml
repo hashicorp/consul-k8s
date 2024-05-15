@@ -281,7 +281,7 @@ jobs:
           echo "minor_dev_tag=$(echo ${{ env.version }}| sed -E 's/([0-9]+\.[0-9]+)\.[0-9]+(-[0-9a-zA-Z\+\.]+)?$/\1\2/')" >> $GITHUB_ENV
 
       - name: Docker Build (Action)
-        uses: hashicorp/actions-docker-build@76d2fc91532d816ca2660d8f3139e432ac3700fd
+        uses: hashicorp/actions-docker-build@v2
         if: ${{ !matrix.fips }}
         with:
           smoke_test: |
@@ -309,7 +309,7 @@ jobs:
             GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
 
       - name: Docker FIPS Build (Action)
-        uses: hashicorp/actions-docker-build@76d2fc91532d816ca2660d8f3139e432ac3700fd
+        uses: hashicorp/actions-docker-build@v2
         if: ${{ matrix.fips }}
         with:
           smoke_test: |
@@ -371,7 +371,7 @@ jobs:
 
       - name: Docker Build (Action)
         if: ${{ !matrix.fips }}
-        uses: hashicorp/actions-docker-build@76d2fc91532d816ca2660d8f3139e432ac3700fd
+        uses: hashicorp/actions-docker-build@v2
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
@@ -399,7 +399,7 @@ jobs:
             GOLANG_VERSION=${{ needs.get-go-version.outputs.go-version }}
       - name: Docker FIPS Build (Action)
         if: ${{ matrix.fips }}
-        uses: hashicorp/actions-docker-build@76d2fc91532d816ca2660d8f3139e432ac3700fd
+        uses: hashicorp/actions-docker-build@v2
         with:
           smoke_test: |
             TEST_VERSION="$(docker run "${IMAGE_NAME}" consul-k8s-control-plane version  | awk '{print $2}')"
