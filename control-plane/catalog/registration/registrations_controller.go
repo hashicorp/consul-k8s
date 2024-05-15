@@ -106,7 +106,7 @@ func (c *RegistrationsController) watchForDeregistrations(ctx context.Context) {
 				continue
 			}
 			for _, reg := range regList.Items {
-				c.UpdateStatus(context.Background(), c.Log, &reg, Result{Registration: fmt.Errorf("service %q was deregistered by consul", reg.Spec.Service.Name)})
+				c.UpdateStatus(context.Background(), c.Log, &reg, Result{Registering: false})
 			}
 		}
 	}
@@ -125,14 +125,14 @@ func (r *RegistrationsController) handleRegistration(ctx context.Context, log lo
 		return result
 	}
 
-	err = r.Cache.RegisterService(ctx, log, registration)
+	err = r.Cache.registerService(log, registration)
 	if err != nil {
 		result.Sync = err
 		result.Registration = fmt.Errorf("%w: %s", ErrRegisteringService, err)
 		return result
 	}
 
-	if r.Cache.ACLsEnabled() {
+	if r.Cache.aclsEnabled() {
 		termGWsToUpdate, err := r.terminatingGatewaysToUpdate(ctx, log, registration)
 		if err != nil {
 			result.Sync = err
@@ -177,14 +177,14 @@ func termGWContainsService(registration *v1alpha1.Registration) func(v1alpha1.Li
 func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) Result {
 	log.Info("Deregistering service")
 	result := Result{Registering: false}
-	err := r.Cache.DeregisterService(ctx, log, registration)
+	err := r.Cache.deregisterService(log, registration)
 	if err != nil {
 		result.Sync = err
 		result.Registration = fmt.Errorf("%w: %s", ErrDeregisteringService, err)
 		return result
 	}
 
-	if r.Cache.ACLsEnabled() {
+	if r.Cache.aclsEnabled() {
 		termGWsToUpdate, err := r.terminatingGatewaysToUpdate(ctx, log, registration)
 		if err != nil {
 			result.Sync = err
@@ -222,7 +222,7 @@ func (r *RegistrationsController) UpdateStatus(ctx context.Context, log logr.Log
 		registration.Status.Conditions = append(registration.Status.Conditions, deregistrationCondition(result))
 	}
 
-	if r.Cache.ACLsEnabled() {
+	if r.Cache.aclsEnabled() {
 		registration.Status.Conditions = append(registration.Status.Conditions, aclCondition(result))
 	}
 
@@ -242,8 +242,8 @@ const registrationByServiceNameIndex = "registrationName"
 
 func (r *RegistrationsController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// setup the cache
-	go r.Cache.Run(ctx, r.Log)
-	r.Cache.WaitSynced(ctx)
+	go r.Cache.run(ctx, r.Log)
+	r.Cache.waitSynced(ctx)
 
 	go r.watchForDeregistrations(ctx)
 

@@ -36,8 +36,8 @@ func NewRegistrationCache(consulClientConfig *consul.Config, consulServerConnMgr
 	}
 }
 
-// WaitSynced is used to coordinate with the caller when the cache is initially filled.
-func (c *RegistrationCache) WaitSynced(ctx context.Context) {
+// waitSynced is used to coordinate with the caller when the cache is initially filled.
+func (c *RegistrationCache) waitSynced(ctx context.Context) {
 	select {
 	case <-c.synced:
 		fmt.Println("synced")
@@ -47,7 +47,7 @@ func (c *RegistrationCache) WaitSynced(ctx context.Context) {
 	}
 }
 
-func (c *RegistrationCache) Run(ctx context.Context, log logr.Logger) {
+func (c *RegistrationCache) run(ctx context.Context, log logr.Logger) {
 	once := &sync.Once{}
 	opts := &capi.QueryOptions{Filter: NotInServiceMeshFilter}
 
@@ -96,11 +96,11 @@ func (c *RegistrationCache) Run(ctx context.Context, log logr.Logger) {
 	}
 }
 
-func (c *RegistrationCache) ACLsEnabled() bool {
+func (c *RegistrationCache) aclsEnabled() bool {
 	return c.ConsulClientConfig.APIClientConfig.Token != "" || c.ConsulClientConfig.APIClientConfig.TokenFile != ""
 }
 
-func (c *RegistrationCache) RegisterService(ctx context.Context, log logr.Logger, reg *v1alpha1.Registration) error {
+func (c *RegistrationCache) registerService(log logr.Logger, reg *v1alpha1.Registration) error {
 	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
 	if err != nil {
 		return err
@@ -188,7 +188,7 @@ func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, client *capi.Cl
 	return mErr.ErrorOrNil()
 }
 
-func (c *RegistrationCache) DeregisterService(ctx context.Context, log logr.Logger, reg *v1alpha1.Registration) error {
+func (c *RegistrationCache) deregisterService(log logr.Logger, reg *v1alpha1.Registration) error {
 	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
 	if err != nil {
 		return err
