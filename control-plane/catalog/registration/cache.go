@@ -2,6 +2,7 @@ package registration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	capi "github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-multierror"
 )
 
 const NotInServiceMeshFilter = "ServiceMeta[\"managed-by\"] != \"consul-k8s-endpoints-controller\""
@@ -41,7 +41,6 @@ func NewRegistrationCache(consulClientConfig *consul.Config, consulServerConnMgr
 func (c *RegistrationCache) waitSynced(ctx context.Context) {
 	select {
 	case <-c.synced:
-		fmt.Println("synced")
 		return
 	case <-ctx.Done():
 		return
@@ -135,10 +134,15 @@ func (c *RegistrationCache) registerService(log logr.Logger, reg *v1alpha1.Regis
 	return nil
 }
 
-func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration, termGWsToUpdate []v1alpha1.TerminatingGateway) error {
+func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, registration *v1alpha1.Registration, termGWsToUpdate []v1alpha1.TerminatingGateway) error {
 	if len(termGWsToUpdate) == 0 {
 		log.Info("terminating gateway not found")
 		return nil
+	}
+
+	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
+	if err != nil {
+		return err
 	}
 
 	roles, _, err := client.ACL().RoleList(nil)
@@ -171,8 +175,7 @@ func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, client *capi.Cl
 		policy = existingPolicy
 	}
 
-	mErr := &multierror.Error{}
-
+	var mErr error
 	for _, termGW := range termGWsToUpdate {
 		var role *capi.ACLRole
 		for _, r := range roles {
@@ -184,7 +187,7 @@ func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, client *capi.Cl
 
 		if role == nil {
 			log.Info("terminating gateway role not found", "terminatingGatewayName", termGW.Name)
-			mErr = multierror.Append(mErr, fmt.Errorf("terminating gateway role not found for %q", termGW.Name))
+			mErr = errors.Join(mErr, fmt.Errorf("terminating gateway role not found for %q", termGW.Name))
 			continue
 		}
 
@@ -193,12 +196,12 @@ func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, client *capi.Cl
 		_, _, err = client.ACL().RoleUpdate(role, nil)
 		if err != nil {
 			log.Error(err, "error updating role", "roleName", role.Name)
-			mErr = multierror.Append(mErr, fmt.Errorf("error updating role %q", role.Name))
+			mErr = errors.Join(mErr, fmt.Errorf("error updating role %q", role.Name))
 			continue
 		}
 	}
 
-	return mErr.ErrorOrNil()
+	return mErr
 }
 
 func (c *RegistrationCache) deregisterService(log logr.Logger, reg *v1alpha1.Registration) error {
@@ -222,10 +225,15 @@ func (c *RegistrationCache) deregisterService(log logr.Logger, reg *v1alpha1.Reg
 	return nil
 }
 
-func (c *RegistrationCache) removeTermGWACLRole(log logr.Logger, client *capi.Client, registration *v1alpha1.Registration, termGWsToUpdate []v1alpha1.TerminatingGateway) error {
+func (c *RegistrationCache) removeTermGWACLRole(log logr.Logger, registration *v1alpha1.Registration, termGWsToUpdate []v1alpha1.TerminatingGateway) error {
 	if len(termGWsToUpdate) == 0 {
 		log.Info("terminating gateway not found")
 		return nil
+	}
+
+	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
+	if err != nil {
+		return err
 	}
 
 	roles, _, err := client.ACL().RoleList(nil)
@@ -233,7 +241,7 @@ func (c *RegistrationCache) removeTermGWACLRole(log logr.Logger, client *capi.Cl
 		return err
 	}
 
-	mErr := &multierror.Error{}
+	var mErr error
 	for _, termGW := range termGWsToUpdate {
 		var role *capi.ACLRole
 		for _, r := range roles {
@@ -245,7 +253,7 @@ func (c *RegistrationCache) removeTermGWACLRole(log logr.Logger, client *capi.Cl
 
 		if role == nil {
 			log.Info("terminating gateway role not found", "terminatingGatewayName", termGW.Name)
-			mErr = multierror.Append(mErr, fmt.Errorf("terminating gateway role not found for %q", termGW.Name))
+			mErr = errors.Join(mErr, fmt.Errorf("terminating gateway role not found for %q", termGW.Name))
 			continue
 		}
 
@@ -268,19 +276,19 @@ func (c *RegistrationCache) removeTermGWACLRole(log logr.Logger, client *capi.Cl
 		_, _, err = client.ACL().RoleUpdate(role, nil)
 		if err != nil {
 			log.Error(err, "error updating role", "roleName", role.Name)
-			mErr = multierror.Append(mErr, fmt.Errorf("error updating role %q", role.Name))
+			mErr = errors.Join(mErr, fmt.Errorf("error updating role %q", role.Name))
 			continue
 		}
 
 		_, err = client.ACL().PolicyDelete(policyID, nil)
 		if err != nil {
 			log.Error(err, "error deleting service policy", "policyID", policyID, "policyName", expectedPolicyName)
-			mErr = multierror.Append(mErr, fmt.Errorf("error deleting service ACL policy %q", policyID))
+			mErr = errors.Join(mErr, fmt.Errorf("error deleting service ACL policy %q", policyID))
 			continue
 		}
 	}
 
-	return mErr.ErrorOrNil()
+	return mErr
 }
 
 func servicePolicyName(name string) string {

@@ -347,12 +347,10 @@ func TestReconcile_Success(tt *testing.T) {
 				Build()
 
 			controller := &registration.RegistrationsController{
-				Client:              fakeClient,
-				Log:                 logrtest.NewTestLogger(t),
-				Scheme:              s,
-				Cache:               registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
-				ConsulClientConfig:  testClient.Cfg,
-				ConsulServerConnMgr: testClient.Watcher,
+				Client: fakeClient,
+				Log:    logrtest.NewTestLogger(t),
+				Scheme: s,
+				Cache:  registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
 			}
 
 			_, err := controller.Reconcile(ctx, ctrl.Request{
@@ -869,12 +867,10 @@ func TestReconcile_Failure(tt *testing.T) {
 				Build()
 
 			controller := &registration.RegistrationsController{
-				Client:              fakeClient,
-				Log:                 logrtest.NewTestLogger(t),
-				Scheme:              s,
-				Cache:               registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
-				ConsulClientConfig:  testClient.Cfg,
-				ConsulServerConnMgr: testClient.Watcher,
+				Client: fakeClient,
+				Log:    logrtest.NewTestLogger(t),
+				Scheme: s,
+				Cache:  registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
 			}
 
 			_, err := controller.Reconcile(ctx, ctrl.Request{

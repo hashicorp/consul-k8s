@@ -286,12 +286,10 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 	}
 
 	if err := (&registration.RegistrationsController{
-		Client:              mgr.GetClient(),
-		ConsulClientConfig:  consulConfig,
-		ConsulServerConnMgr: watcher,
-		Scheme:              mgr.GetScheme(),
-		Cache:               registration.NewRegistrationCache(consulConfig, watcher),
-		Log:                 ctrl.Log.WithName("controller").WithName(apicommon.Registration),
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Cache:  registration.NewRegistrationCache(consulConfig, watcher),
+		Log:    ctrl.Log.WithName("controller").WithName(apicommon.Registration),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.Registration)
 		return err

@@ -19,10 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	capi "github.com/hashicorp/consul/api"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 )
 
@@ -42,11 +39,9 @@ var (
 type RegistrationsController struct {
 	client.Client
 	configentries.FinalizerPatcher
-	Scheme              *runtime.Scheme
-	Cache               *RegistrationCache
-	ConsulClientConfig  *consul.Config
-	ConsulServerConnMgr consul.ServerConnectionManager
-	Log                 logr.Logger
+	Scheme *runtime.Scheme
+	Cache  *RegistrationCache
+	Log    logr.Logger
 }
 
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicerouters,verbs=get;list;watch;create;update;patch;delete
@@ -76,15 +71,10 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	log.Info("need to reconcile")
-	client, err := consul.NewClientFromConnMgr(r.ConsulClientConfig, r.ConsulServerConnMgr)
-	if err != nil {
-		log.Error(err, "error initializing consul client")
-		return ctrl.Result{}, err
-	}
 
 	// deletion request
 	if !registration.ObjectMeta.DeletionTimestamp.IsZero() {
-		result := r.handleDeletion(ctx, log, client, registration)
+		result := r.handleDeletion(ctx, log, registration)
 
 		if result.hasErrors() {
 			r.UpdateStatus(ctx, log, registration, result)
@@ -94,7 +84,7 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// registration request
-	result := r.handleRegistration(ctx, log, client, registration)
+	result := r.handleRegistration(ctx, log, registration)
 	r.UpdateStatus(ctx, log, registration, result)
 	if result.hasErrors() {
 		return ctrl.Result{}, result.errors()
@@ -123,7 +113,7 @@ func (c *RegistrationsController) watchForDeregistrations(ctx context.Context) {
 	}
 }
 
-func (r *RegistrationsController) handleRegistration(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) Result {
+func (r *RegistrationsController) handleRegistration(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration) Result {
 	log.Info("Registering service")
 
 	result := Result{Registering: true}
@@ -151,7 +141,7 @@ func (r *RegistrationsController) handleRegistration(ctx context.Context, log lo
 			return result
 		}
 
-		err = r.Cache.updateTermGWACLRole(log, client, registration, termGWsToUpdate)
+		err = r.Cache.updateTermGWACLRole(log, registration, termGWsToUpdate)
 		if err != nil {
 			result.Sync = err
 			result.ACLUpdate = fmt.Errorf("%w: %s", ErrUpdatingACLRoles, err)
@@ -185,7 +175,7 @@ func termGWContainsService(registration *v1alpha1.Registration) func(v1alpha1.Li
 	}
 }
 
-func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, client *capi.Client, registration *v1alpha1.Registration) Result {
+func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration) Result {
 	log.Info("Deregistering service")
 	result := Result{Registering: false}
 	err := r.Cache.deregisterService(log, registration)
@@ -203,7 +193,7 @@ func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.L
 			return result
 		}
 
-		err = r.Cache.removeTermGWACLRole(log, client, registration, termGWsToUpdate)
+		err = r.Cache.removeTermGWACLRole(log, registration, termGWsToUpdate)
 		if err != nil {
 			result.Sync = err
 			result.ACLUpdate = fmt.Errorf("%w: %s", ErrRemovingACLRoles, err)
