@@ -11,9 +11,7 @@ import (
 
 	capi "github.com/hashicorp/consul/api"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func init() {
@@ -290,24 +288,286 @@ func (r *Registration) ToCatalogDeregistration() *capi.CatalogDeregistration {
 	}
 }
 
-func (r *Registration) NamespacedName() types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: r.Namespace,
-		Name:      r.Name,
+func (r *Registration) EqualExceptStatus(other *Registration) bool {
+	if r == nil || other == nil {
+		return false
 	}
+
+	if r.Spec.ID != other.Spec.ID {
+		return false
+	}
+
+	if r.Spec.Node != other.Spec.Node {
+		return false
+	}
+
+	if r.Spec.Address != other.Spec.Address {
+		return false
+	}
+
+	if !maps.Equal(r.Spec.TaggedAddresses, other.Spec.TaggedAddresses) {
+		return false
+	}
+
+	if !maps.Equal(r.Spec.NodeMeta, other.Spec.NodeMeta) {
+		return false
+	}
+
+	if r.Spec.Datacenter != other.Spec.Datacenter {
+		return false
+	}
+
+	if !r.Spec.Service.Equal(&other.Spec.Service) {
+		return false
+	}
+
+	if r.Spec.SkipNodeUpdate != other.Spec.SkipNodeUpdate {
+		return false
+	}
+
+	if r.Spec.Partition != other.Spec.Partition {
+		return false
+	}
+
+	if !r.Spec.HealthCheck.Equal(other.Spec.HealthCheck) {
+		return false
+	}
+
+	if !r.Spec.Locality.Equal(other.Spec.Locality) {
+		return false
+	}
+
+	return true
 }
 
-// SetSyncedCondition sets the synced condition on the Registration.
-func (r *Registration) SetSyncedCondition(status corev1.ConditionStatus, reason string, message string) {
-	r.Status.Conditions = Conditions{
-		{
-			Type:               ConditionSynced,
-			Status:             status,
-			LastTransitionTime: metav1.Now(),
-			Reason:             reason,
-			Message:            message,
-		},
+func (s *Service) Equal(other *Service) bool {
+	if s == nil && other == nil {
+		return true
 	}
+
+	if s == nil || other == nil {
+		return false
+	}
+
+	if s.ID != other.ID {
+		return false
+	}
+
+	if s.Name != other.Name {
+		return false
+	}
+
+	if !slices.Equal(s.Tags, other.Tags) {
+		return false
+	}
+
+	if !maps.Equal(s.Meta, other.Meta) {
+		return false
+	}
+
+	if s.Port != other.Port {
+		return false
+	}
+
+	if s.Address != other.Address {
+		return false
+	}
+
+	if s.SocketPath != other.SocketPath {
+		return false
+	}
+
+	if !maps.Equal(s.TaggedAddresses, other.TaggedAddresses) {
+		return false
+	}
+
+	if !s.Weights.Equal(other.Weights) {
+		return false
+	}
+
+	if s.EnableTagOverride != other.EnableTagOverride {
+		return false
+	}
+
+	if s.Namespace != other.Namespace {
+		return false
+	}
+
+	if s.Partition != other.Partition {
+		return false
+	}
+
+	if !s.Locality.Equal(other.Locality) {
+		return false
+	}
+	return true
+}
+
+func (l *Locality) Equal(other *Locality) bool {
+	if l == nil && other == nil {
+		return true
+	}
+
+	if l == nil || other == nil {
+		return false
+	}
+	if l.Region != other.Region {
+		return false
+	}
+	if l.Zone != other.Zone {
+		return false
+	}
+	return true
+}
+
+func (w Weights) Equal(other Weights) bool {
+	if w.Passing != other.Passing {
+		return false
+	}
+
+	if w.Warning != other.Warning {
+		return false
+	}
+	return true
+}
+
+func (h *HealthCheck) Equal(other *HealthCheck) bool {
+	if h == nil && other == nil {
+		return true
+	}
+
+	if h == nil || other == nil {
+		return false
+	}
+
+	if h.Node != other.Node {
+		return false
+	}
+
+	if h.CheckID != other.CheckID {
+		return false
+	}
+
+	if h.Name != other.Name {
+		return false
+	}
+
+	if h.Status != other.Status {
+		return false
+	}
+
+	if h.Notes != other.Notes {
+		return false
+	}
+
+	if h.Output != other.Output {
+		return false
+	}
+
+	if h.ServiceID != other.ServiceID {
+		return false
+	}
+
+	if h.ServiceName != other.ServiceName {
+		return false
+	}
+
+	if h.Type != other.Type {
+		return false
+	}
+
+	if h.ExposedPort != other.ExposedPort {
+		return false
+	}
+
+	if h.Namespace != other.Namespace {
+		return false
+	}
+
+	if h.Partition != other.Partition {
+		return false
+	}
+
+	if !h.Definition.Equal(other.Definition) {
+		return false
+	}
+
+	return true
+}
+
+func (h HealthCheckDefinition) Equal(other HealthCheckDefinition) bool {
+	if h.HTTP != other.HTTP {
+		return false
+	}
+
+	if len(h.Header) != len(other.Header) {
+		return false
+	}
+
+	for k, v := range h.Header {
+		otherValues, ok := other.Header[k]
+		if !ok {
+			return false
+		}
+
+		if !slices.Equal(v, otherValues) {
+			return false
+		}
+	}
+
+	if h.Method != other.Method {
+		return false
+	}
+
+	if h.Body != other.Body {
+		return false
+	}
+
+	if h.TLSServerName != other.TLSServerName {
+		return false
+	}
+
+	if h.TLSSkipVerify != other.TLSSkipVerify {
+		return false
+	}
+
+	if h.TCP != other.TCP {
+		return false
+	}
+
+	if h.TCPUseTLS != other.TCPUseTLS {
+		return false
+	}
+
+	if h.UDP != other.UDP {
+		return false
+	}
+
+	if h.GRPC != other.GRPC {
+		return false
+	}
+
+	if h.OSService != other.OSService {
+		return false
+	}
+
+	if h.GRPCUseTLS != other.GRPCUseTLS {
+		return false
+	}
+
+	if h.IntervalDuration != other.IntervalDuration {
+		return false
+	}
+
+	if h.TimeoutDuration != other.TimeoutDuration {
+		return false
+	}
+
+	if h.DeregisterCriticalServiceAfterDuration != other.DeregisterCriticalServiceAfterDuration {
+		return false
+	}
+
+	return true
 }
 
 func (r *Registration) KubernetesName() string {

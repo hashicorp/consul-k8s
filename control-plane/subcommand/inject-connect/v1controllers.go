@@ -16,6 +16,7 @@ import (
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/catalog/registration"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -285,12 +286,11 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllers.RegistrationsController{
-		Client:              mgr.GetClient(),
-		ConsulClientConfig:  consulConfig,
-		ConsulServerConnMgr: watcher,
-		Scheme:              mgr.GetScheme(),
-		Log:                 ctrl.Log.WithName("controller").WithName(apicommon.Registration),
+	if err := (&registration.RegistrationsController{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Cache:  registration.NewRegistrationCache(consulConfig, watcher),
+		Log:    ctrl.Log.WithName("controller").WithName(apicommon.Registration),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.Registration)
 		return err

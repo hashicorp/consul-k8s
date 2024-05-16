@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package configentries_test
+package registration_test
 
 import (
 	"context"
@@ -29,8 +29,8 @@ import (
 	"github.com/hashicorp/go-uuid"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/catalog/registration"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
@@ -64,7 +64,7 @@ func TestReconcile_Success(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-registration",
-					Finalizers: []string{configentries.RegistrationFinalizer},
+					Finalizers: []string{registration.RegistrationFinalizer},
 				},
 				Spec: v1alpha1.RegistrationSpec{
 					ID:         "node-id",
@@ -94,13 +94,21 @@ func TestReconcile_Success(tt *testing.T) {
 				},
 			},
 			serverResponseConfig: serverResponseConfig{registering: true},
-			expectedFinalizers:   []string{configentries.RegistrationFinalizer},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionTrue,
-				Reason:  "",
-				Message: "",
-			}},
+			expectedFinalizers:   []string{registration.RegistrationFinalizer},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:    v1alpha1.ConditionSynced,
+					Status:  v1.ConditionTrue,
+					Reason:  "",
+					Message: "",
+				},
+				{
+					Type:    registration.ConditionRegistered,
+					Status:  v1.ConditionTrue,
+					Reason:  "",
+					Message: "",
+				},
+			},
 		},
 		"registering -- ACLs enabled and policy does not exist": {
 			registration: &v1alpha1.Registration{
@@ -110,7 +118,7 @@ func TestReconcile_Success(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-registration",
-					Finalizers: []string{configentries.RegistrationFinalizer},
+					Finalizers: []string{registration.RegistrationFinalizer},
 				},
 				Spec: v1alpha1.RegistrationSpec{
 					ID:         "node-id",
@@ -143,13 +151,27 @@ func TestReconcile_Success(tt *testing.T) {
 				registering: true,
 				aclEnabled:  true,
 			},
-			expectedFinalizers: []string{configentries.RegistrationFinalizer},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionTrue,
-				Reason:  "",
-				Message: "",
-			}},
+			expectedFinalizers: []string{registration.RegistrationFinalizer},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:    v1alpha1.ConditionSynced,
+					Status:  v1.ConditionTrue,
+					Reason:  "",
+					Message: "",
+				},
+				{
+					Type:    registration.ConditionRegistered,
+					Status:  v1.ConditionTrue,
+					Reason:  "",
+					Message: "",
+				},
+				{
+					Type:    registration.ConditionACLsUpdated,
+					Status:  v1.ConditionTrue,
+					Reason:  "",
+					Message: "",
+				},
+			},
 		},
 		"registering -- ACLs enabled and policy does exists": {
 			registration: &v1alpha1.Registration{
@@ -159,7 +181,7 @@ func TestReconcile_Success(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-registration",
-					Finalizers: []string{configentries.RegistrationFinalizer},
+					Finalizers: []string{registration.RegistrationFinalizer},
 				},
 				Spec: v1alpha1.RegistrationSpec{
 					ID:         "node-id",
@@ -193,13 +215,27 @@ func TestReconcile_Success(tt *testing.T) {
 				aclEnabled:   true,
 				policyExists: true,
 			},
-			expectedFinalizers: []string{configentries.RegistrationFinalizer},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionTrue,
-				Reason:  "",
-				Message: "",
-			}},
+			expectedFinalizers: []string{registration.RegistrationFinalizer},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:    v1alpha1.ConditionSynced,
+					Status:  v1.ConditionTrue,
+					Reason:  "",
+					Message: "",
+				},
+				{
+					Type:    registration.ConditionRegistered,
+					Status:  v1.ConditionTrue,
+					Reason:  "",
+					Message: "",
+				},
+				{
+					Type:    registration.ConditionACLsUpdated,
+					Status:  v1.ConditionTrue,
+					Reason:  "",
+					Message: "",
+				},
+			},
 		},
 		"deregistering": {
 			registration: &v1alpha1.Registration{
@@ -209,7 +245,7 @@ func TestReconcile_Success(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-registration",
-					Finalizers:        []string{configentries.RegistrationFinalizer},
+					Finalizers:        []string{registration.RegistrationFinalizer},
 					DeletionTimestamp: &deletionTime,
 				},
 				Spec: v1alpha1.RegistrationSpec{
@@ -253,7 +289,7 @@ func TestReconcile_Success(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-registration",
-					Finalizers:        []string{configentries.RegistrationFinalizer},
+					Finalizers:        []string{registration.RegistrationFinalizer},
 					DeletionTimestamp: &deletionTime,
 				},
 				Spec: v1alpha1.RegistrationSpec{
@@ -310,12 +346,11 @@ func TestReconcile_Success(tt *testing.T) {
 				WithStatusSubresource(&v1alpha1.Registration{}).
 				Build()
 
-			controller := &configentries.RegistrationsController{
-				Client:              fakeClient,
-				Log:                 logrtest.NewTestLogger(t),
-				Scheme:              s,
-				ConsulClientConfig:  testClient.Cfg,
-				ConsulServerConnMgr: testClient.Watcher,
+			controller := &registration.RegistrationsController{
+				Client: fakeClient,
+				Log:    logrtest.NewTestLogger(t),
+				Scheme: s,
+				Cache:  registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
 			}
 
 			_, err := controller.Reconcile(ctx, ctrl.Request{
@@ -355,7 +390,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-registration",
-					Finalizers: []string{configentries.RegistrationFinalizer},
+					Finalizers: []string{registration.RegistrationFinalizer},
 				},
 				Spec: v1alpha1.RegistrationSpec{
 					ID:         "node-id",
@@ -388,12 +423,18 @@ func TestReconcile_Failure(tt *testing.T) {
 				registering:   true,
 				errOnRegister: true,
 			},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionFalse,
-				Reason:  configentries.ConsulErrorRegistration,
-				Message: "",
-			}},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:   v1alpha1.ConditionSynced,
+					Status: v1.ConditionFalse,
+					Reason: registration.SyncError,
+				},
+				{
+					Type:   registration.ConditionRegistered,
+					Status: v1.ConditionFalse,
+					Reason: registration.ConsulErrorRegistration,
+				},
+			},
 		},
 		"registering - terminating gateway acl role not found": {
 			registration: &v1alpha1.Registration{
@@ -403,7 +444,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-registration",
-					Finalizers: []string{configentries.RegistrationFinalizer},
+					Finalizers: []string{registration.RegistrationFinalizer},
 				},
 				Spec: v1alpha1.RegistrationSpec{
 					ID:         "node-id",
@@ -437,12 +478,22 @@ func TestReconcile_Failure(tt *testing.T) {
 				aclEnabled:       true,
 				temGWRoleMissing: true,
 			},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionFalse,
-				Reason:  configentries.ConsulErrorACL,
-				Message: "",
-			}},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:   v1alpha1.ConditionSynced,
+					Status: v1.ConditionFalse,
+					Reason: registration.SyncError,
+				},
+				{
+					Type:   registration.ConditionRegistered,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   registration.ConditionACLsUpdated,
+					Status: v1.ConditionFalse,
+					Reason: registration.ConsulErrorACL,
+				},
+			},
 		},
 		"registering - error reading policy": {
 			registration: &v1alpha1.Registration{
@@ -452,7 +503,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-registration",
-					Finalizers: []string{configentries.RegistrationFinalizer},
+					Finalizers: []string{registration.RegistrationFinalizer},
 				},
 				Spec: v1alpha1.RegistrationSpec{
 					ID:         "node-id",
@@ -487,12 +538,22 @@ func TestReconcile_Failure(tt *testing.T) {
 				errOnPolicyRead: true,
 				policyExists:    true,
 			},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionFalse,
-				Reason:  configentries.ConsulErrorACL,
-				Message: "",
-			}},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:   v1alpha1.ConditionSynced,
+					Status: v1.ConditionFalse,
+					Reason: registration.SyncError,
+				},
+				{
+					Type:   registration.ConditionRegistered,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   registration.ConditionACLsUpdated,
+					Status: v1.ConditionFalse,
+					Reason: registration.ConsulErrorACL,
+				},
+			},
 		},
 		"registering - policy does not exist - error creating policy": {
 			registration: &v1alpha1.Registration{
@@ -502,7 +563,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-registration",
-					Finalizers: []string{configentries.RegistrationFinalizer},
+					Finalizers: []string{registration.RegistrationFinalizer},
 				},
 				Spec: v1alpha1.RegistrationSpec{
 					ID:         "node-id",
@@ -536,12 +597,22 @@ func TestReconcile_Failure(tt *testing.T) {
 				aclEnabled:       true,
 				errOnPolicyWrite: true,
 			},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionFalse,
-				Reason:  configentries.ConsulErrorACL,
-				Message: "",
-			}},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:   v1alpha1.ConditionSynced,
+					Status: v1.ConditionFalse,
+					Reason: registration.SyncError,
+				},
+				{
+					Type:   registration.ConditionRegistered,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   registration.ConditionACLsUpdated,
+					Status: v1.ConditionFalse,
+					Reason: registration.ConsulErrorACL,
+				},
+			},
 		},
 		"registering - error updating role": {
 			registration: &v1alpha1.Registration{
@@ -551,7 +622,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-registration",
-					Finalizers: []string{configentries.RegistrationFinalizer},
+					Finalizers: []string{registration.RegistrationFinalizer},
 				},
 				Spec: v1alpha1.RegistrationSpec{
 					ID:         "node-id",
@@ -585,12 +656,22 @@ func TestReconcile_Failure(tt *testing.T) {
 				aclEnabled:      true,
 				errOnRoleUpdate: true,
 			},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionFalse,
-				Reason:  configentries.ConsulErrorACL,
-				Message: "",
-			}},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:   v1alpha1.ConditionSynced,
+					Status: v1.ConditionFalse,
+					Reason: registration.SyncError,
+				},
+				{
+					Type:   registration.ConditionRegistered,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   registration.ConditionACLsUpdated,
+					Status: v1.ConditionFalse,
+					Reason: registration.ConsulErrorACL,
+				},
+			},
 		},
 		"deregistering": {
 			registration: &v1alpha1.Registration{
@@ -600,7 +681,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-registration",
-					Finalizers:        []string{configentries.RegistrationFinalizer},
+					Finalizers:        []string{registration.RegistrationFinalizer},
 					DeletionTimestamp: &deletionTime,
 				},
 				Spec: v1alpha1.RegistrationSpec{
@@ -633,12 +714,18 @@ func TestReconcile_Failure(tt *testing.T) {
 			serverResponseConfig: serverResponseConfig{
 				errOnDeregister: true,
 			},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionFalse,
-				Reason:  configentries.ConsulErrorDeregistration,
-				Message: "",
-			}},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:   v1alpha1.ConditionSynced,
+					Status: v1.ConditionFalse,
+					Reason: registration.SyncError,
+				},
+				{
+					Type:   registration.ConditionDeregistered,
+					Status: v1.ConditionFalse,
+					Reason: registration.ConsulErrorDeregistration,
+				},
+			},
 		},
 		"deregistering - ACLs enabled - terminating-gateway error updating role": {
 			registration: &v1alpha1.Registration{
@@ -648,7 +735,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-registration",
-					Finalizers:        []string{configentries.RegistrationFinalizer},
+					Finalizers:        []string{registration.RegistrationFinalizer},
 					DeletionTimestamp: &deletionTime,
 				},
 				Spec: v1alpha1.RegistrationSpec{
@@ -682,12 +769,22 @@ func TestReconcile_Failure(tt *testing.T) {
 				aclEnabled:      true,
 				errOnRoleUpdate: true,
 			},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionFalse,
-				Reason:  configentries.ConsulErrorACL,
-				Message: "",
-			}},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:   v1alpha1.ConditionSynced,
+					Status: v1.ConditionFalse,
+					Reason: registration.SyncError,
+				},
+				{
+					Type:   registration.ConditionDeregistered,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   registration.ConditionACLsUpdated,
+					Status: v1.ConditionFalse,
+					Reason: registration.ConsulErrorACL,
+				},
+			},
 		},
 		"deregistering - ACLs enabled - terminating-gateway error deleting policy": {
 			registration: &v1alpha1.Registration{
@@ -697,7 +794,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-registration",
-					Finalizers:        []string{configentries.RegistrationFinalizer},
+					Finalizers:        []string{registration.RegistrationFinalizer},
 					DeletionTimestamp: &deletionTime,
 				},
 				Spec: v1alpha1.RegistrationSpec{
@@ -731,12 +828,22 @@ func TestReconcile_Failure(tt *testing.T) {
 				aclEnabled:        true,
 				errOnPolicyDelete: true,
 			},
-			expectedConditions: []v1alpha1.Condition{{
-				Type:    "Synced",
-				Status:  v1.ConditionFalse,
-				Reason:  configentries.ConsulErrorACL,
-				Message: "",
-			}},
+			expectedConditions: []v1alpha1.Condition{
+				{
+					Type:   v1alpha1.ConditionSynced,
+					Status: v1.ConditionFalse,
+					Reason: registration.SyncError,
+				},
+				{
+					Type:   registration.ConditionDeregistered,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   registration.ConditionACLsUpdated,
+					Status: v1.ConditionFalse,
+					Reason: registration.ConsulErrorACL,
+				},
+			},
 		},
 	}
 
@@ -759,12 +866,11 @@ func TestReconcile_Failure(tt *testing.T) {
 				WithStatusSubresource(&v1alpha1.Registration{}).
 				Build()
 
-			controller := &configentries.RegistrationsController{
-				Client:              fakeClient,
-				Log:                 logrtest.NewTestLogger(t),
-				Scheme:              s,
-				ConsulClientConfig:  testClient.Cfg,
-				ConsulServerConnMgr: testClient.Watcher,
+			controller := &registration.RegistrationsController{
+				Client: fakeClient,
+				Log:    logrtest.NewTestLogger(t),
+				Scheme: s,
+				Cache:  registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
 			}
 
 			_, err := controller.Reconcile(ctx, ctrl.Request{
@@ -783,7 +889,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				}
 			}
 
-			require.ElementsMatch(t, fetchedReg.Finalizers, []string{configentries.RegistrationFinalizer})
+			require.ElementsMatch(t, fetchedReg.Finalizers, []string{registration.RegistrationFinalizer})
 		})
 	}
 }
