@@ -622,7 +622,5 @@ func isRoleExistsErr(err error, roleName string) bool {
 // isPolicyExistsErr returns true if err is due to trying to call the
 // policy create API when the policy already exists.
 func isPolicyExistsErr(err error, policyName string) bool {
-	return err != nil &&
-		strings.Contains(err.Error(), "Unexpected response code: 500") &&
-		strings.Contains(err.Error(), fmt.Sprintf("Invalid Policy: A Policy with Name %q already exists", policyName))
+	return isExistsErr(err, "Policy", policyName)
 }
