@@ -17,7 +17,7 @@ jobs:
     name: api-gateway-conformance
     runs-on: ubuntu-latest
     steps:
-      - uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+      - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
         name: conformance
         with:
           workflow: api-gateway-conformance.yml
