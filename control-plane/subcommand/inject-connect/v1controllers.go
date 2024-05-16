@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
@@ -313,64 +312,60 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			return err
 		}
 
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors",
-			&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.PeeringAcceptorWebhook{
-				Client: mgr.GetClient(),
-				Logger: ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
-			}})
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringdialers",
-			&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.PeeringDialerWebhook{
-				Client: mgr.GetClient(),
-				Logger: ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
-			}})
+		(&v1alpha1.PeeringAcceptorWebhook{
+			Client: mgr.GetClient(),
+			Logger: ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
+		}).SetupWithManager(mgr)
+
+		(&v1alpha1.PeeringDialerWebhook{
+			Client: mgr.GetClient(),
+			Logger: ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
+		}).SetupWithManager(mgr)
 	}
 
-	mgr.GetWebhookServer().CertDir = c.flagCertDir
-
-	mgr.GetWebhookServer().Register("/mutate",
-		&ctrlRuntimeWebhook.Admission{Handler: &webhook.MeshWebhook{
-			Clientset:                                c.clientset,
-			ReleaseNamespace:                         c.flagReleaseNamespace,
-			ConsulConfig:                             consulConfig,
-			ConsulServerConnMgr:                      watcher,
-			ImageConsul:                              c.flagConsulImage,
-			ImageConsulDataplane:                     c.flagConsulDataplaneImage,
-			EnvoyExtraArgs:                           c.flagEnvoyExtraArgs,
-			ImageConsulK8S:                           c.flagConsulK8sImage,
-			RequireAnnotation:                        !c.flagDefaultInject,
-			AuthMethod:                               c.flagACLAuthMethod,
-			ConsulCACert:                             string(c.caCertPem),
-			TLSEnabled:                               c.consul.UseTLS,
-			ConsulAddress:                            c.consul.Addresses,
-			SkipServerWatch:                          c.consul.SkipServerWatch,
-			ConsulTLSServerName:                      c.consul.TLSServerName,
-			DefaultProxyCPURequest:                   c.sidecarProxyCPURequest,
-			DefaultProxyCPULimit:                     c.sidecarProxyCPULimit,
-			DefaultProxyMemoryRequest:                c.sidecarProxyMemoryRequest,
-			DefaultProxyMemoryLimit:                  c.sidecarProxyMemoryLimit,
-			DefaultEnvoyProxyConcurrency:             c.flagDefaultEnvoyProxyConcurrency,
-			DefaultSidecarProxyStartupFailureSeconds: c.flagDefaultSidecarProxyStartupFailureSeconds,
-			DefaultSidecarProxyLivenessFailureSeconds: c.flagDefaultSidecarProxyLivenessFailureSeconds,
-			LifecycleConfig:            lifecycleConfig,
-			MetricsConfig:              metricsConfig,
-			InitContainerResources:     c.initContainerResources,
-			ConsulPartition:            c.consul.Partition,
-			AllowK8sNamespacesSet:      allowK8sNamespaces,
-			DenyK8sNamespacesSet:       denyK8sNamespaces,
-			EnableNamespaces:           c.flagEnableNamespaces,
-			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-			EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
-			K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
-			CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-			EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
-			EnableCNI:                  c.flagEnableCNI,
-			TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
-			EnableConsulDNS:            c.flagEnableConsulDNS,
-			EnableOpenShift:            c.flagEnableOpenShift,
-			Log:                        ctrl.Log.WithName("handler").WithName("connect"),
-			LogLevel:                   c.flagLogLevel,
-			LogJSON:                    c.flagLogJSON,
-		}})
+	(&webhook.MeshWebhook{
+		Clientset:                                c.clientset,
+		ReleaseNamespace:                         c.flagReleaseNamespace,
+		ConsulConfig:                             consulConfig,
+		ConsulServerConnMgr:                      watcher,
+		ImageConsul:                              c.flagConsulImage,
+		ImageConsulDataplane:                     c.flagConsulDataplaneImage,
+		EnvoyExtraArgs:                           c.flagEnvoyExtraArgs,
+		ImageConsulK8S:                           c.flagConsulK8sImage,
+		RequireAnnotation:                        !c.flagDefaultInject,
+		AuthMethod:                               c.flagACLAuthMethod,
+		ConsulCACert:                             string(c.caCertPem),
+		TLSEnabled:                               c.consul.UseTLS,
+		ConsulAddress:                            c.consul.Addresses,
+		SkipServerWatch:                          c.consul.SkipServerWatch,
+		ConsulTLSServerName:                      c.consul.TLSServerName,
+		DefaultProxyCPURequest:                   c.sidecarProxyCPURequest,
+		DefaultProxyCPULimit:                     c.sidecarProxyCPULimit,
+		DefaultProxyMemoryRequest:                c.sidecarProxyMemoryRequest,
+		DefaultProxyMemoryLimit:                  c.sidecarProxyMemoryLimit,
+		DefaultEnvoyProxyConcurrency:             c.flagDefaultEnvoyProxyConcurrency,
+		DefaultSidecarProxyStartupFailureSeconds: c.flagDefaultSidecarProxyStartupFailureSeconds,
+		DefaultSidecarProxyLivenessFailureSeconds: c.flagDefaultSidecarProxyLivenessFailureSeconds,
+		LifecycleConfig:            lifecycleConfig,
+		MetricsConfig:              metricsConfig,
+		InitContainerResources:     c.initContainerResources,
+		ConsulPartition:            c.consul.Partition,
+		AllowK8sNamespacesSet:      allowK8sNamespaces,
+		DenyK8sNamespacesSet:       denyK8sNamespaces,
+		EnableNamespaces:           c.flagEnableNamespaces,
+		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
+		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
+		CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
+		EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
+		EnableCNI:                  c.flagEnableCNI,
+		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
+		EnableConsulDNS:            c.flagEnableConsulDNS,
+		EnableOpenShift:            c.flagEnableOpenShift,
+		Log:                        ctrl.Log.WithName("handler").WithName("connect"),
+		LogLevel:                   c.flagLogLevel,
+		LogJSON:                    c.flagLogJSON,
+	}).SetupWithManager(mgr)
 
 	consulMeta := apicommon.ConsulMeta{
 		PartitionsEnabled:    c.flagEnablePartitions,
@@ -383,91 +378,89 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 
 	// Note: The path here should be identical to the one on the kubebuilder
 	// annotation in each webhook file.
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceDefaultsWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceDefaults),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceResolver),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ProxyDefaults),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.MeshWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.Mesh),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-exportedservices",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ExportedServicesWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ExportedServices),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceRouter),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicesplitter",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceSplitterWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceSplitter),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceintentions",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceIntentions),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.IngressGateway),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggateway",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.TerminatingGatewayWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.TerminatingGateway),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-samenessgroup",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.SamenessGroupWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.SamenessGroup),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-jwtprovider",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.JWTProviderWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.JWTProvider),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-controlplanerequestlimits",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ControlPlaneRequestLimitWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ControlPlaneRequestLimit),
-			ConsulMeta: consulMeta,
-		}})
+	(&v1alpha1.ServiceDefaultsWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceDefaults),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
 
-	mgr.GetWebhookServer().Register("/validate-v1alpha1-gatewaypolicy",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.GatewayPolicyWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.GatewayPolicy),
-			ConsulMeta: consulMeta,
-		}})
+	(&v1alpha1.ServiceResolverWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceResolver),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.ProxyDefaultsWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ProxyDefaults),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.MeshWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.Mesh),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.ExportedServicesWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ExportedServices),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.ServiceRouterWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceRouter),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.ServiceSplitterWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceSplitter),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.ServiceIntentionsWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceIntentions),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.IngressGatewayWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.IngressGateway),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.TerminatingGatewayWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.TerminatingGateway),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.SamenessGroupWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.SamenessGroup),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.JWTProviderWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.JWTProvider),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.ControlPlaneRequestLimitWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ControlPlaneRequestLimit),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.GatewayPolicyWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.GatewayPolicy),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
 
 	if c.flagEnableWebhookCAUpdate {
 		err = c.updateWebhookCABundle(ctx)
