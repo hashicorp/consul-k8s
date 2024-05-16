@@ -133,8 +133,6 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.Gateway{}, client.InNamespace(namespace))
 	})
 
-	
-
 	// Ensure it exists.
 	logger.Log(t, "checking that gateway is synchronized to Consul")
 	checkConsulExists(t, consulClient, api.APIGateway, gatewayName)
