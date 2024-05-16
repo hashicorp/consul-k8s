@@ -88,7 +88,9 @@ global:
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
   imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.5-dev
 
-  # The image pull policy that will be used for all
+  # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
+  # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
+  # @default: ""
   imagePullPolicy: ""
 
   # The name of the datacenter that the agents should
