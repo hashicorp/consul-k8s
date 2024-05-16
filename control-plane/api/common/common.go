@@ -28,16 +28,14 @@ const (
 	ControlPlaneRequestLimit string = "controlplanerequestlimit"
 	RouteAuthFilter          string = "routeauthfilter"
 	GatewayPolicy            string = "gatewaypolicy"
-	Registration             string = "registration"
 
-	// V2 resources.
+	// V2 config entries.
 	TrafficPermissions string = "trafficpermissions"
 	GRPCRoute          string = "grpcroute"
 	HTTPRoute          string = "httproute"
 	TCPRoute           string = "tcproute"
 	ProxyConfiguration string = "proxyconfiguration"
 	MeshGateway        string = "meshgateway"
-	APIGateway         string = "apigateway"
 	GatewayClass       string = "gatewayclass"
 	GatewayClassConfig string = "gatewayclassconfig"
 	MeshConfiguration  string = "meshconfiguration"

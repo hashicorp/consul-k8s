@@ -27,7 +27,7 @@ const (
 	volumeName                   = "consul-mesh-inject-data"
 )
 
-func (b *gatewayBuilder[T]) consulDataplaneContainer(containerConfig v2beta1.GatewayClassContainerConfig) (corev1.Container, error) {
+func (b *meshGatewayBuilder) consulDataplaneContainer(containerConfig v2beta1.GatewayClassContainerConfig) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -56,7 +56,7 @@ func (b *gatewayBuilder[T]) consulDataplaneContainer(containerConfig v2beta1.Gat
 	}
 
 	container := corev1.Container{
-		Name:  b.gateway.GetName(),
+		Name:  b.gateway.Name,
 		Image: b.config.ImageDataplane,
 
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
@@ -117,7 +117,16 @@ func (b *gatewayBuilder[T]) consulDataplaneContainer(containerConfig v2beta1.Gat
 		ContainerPort: int32(constants.ProxyDefaultHealthPort),
 	})
 
-	container.Ports = append(container.Ports, b.gateway.ListenersToContainerPorts(containerConfig.PortModifier, containerConfig.HostPort)...)
+	// Configure the wan port.
+	wanPort := corev1.ContainerPort{
+		Name:          "wan",
+		ContainerPort: int32(constants.DefaultWANPort),
+		HostPort:      containerConfig.HostPort,
+	}
+
+	wanPort.ContainerPort = 443 + containerConfig.PortModifier
+
+	container.Ports = append(container.Ports, wanPort)
 
 	// Configure the resource requests and limits for the proxy if they are set.
 	if resources != nil {
@@ -140,7 +149,7 @@ func (b *gatewayBuilder[T]) consulDataplaneContainer(containerConfig v2beta1.Gat
 	return container, nil
 }
 
-func (b *gatewayBuilder[T]) dataplaneArgs(bearerTokenFile string) ([]string, error) {
+func (b *meshGatewayBuilder) dataplaneArgs(bearerTokenFile string) ([]string, error) {
 	args := []string{
 		"-addresses", b.config.ConsulConfig.Address,
 		"-grpc-port=" + strconv.Itoa(b.config.ConsulConfig.GRPCPort),
@@ -149,14 +158,14 @@ func (b *gatewayBuilder[T]) dataplaneArgs(bearerTokenFile string) ([]string, err
 		"-envoy-concurrency=" + defaultEnvoyProxyConcurrency,
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(b.gateway.GetNamespace(), b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(b.gateway.Namespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.ConsulDestinationNamespace, b.config.ConsulTenancyConfig.EnableConsulNamespaces, b.config.ConsulTenancyConfig.NSMirroringPrefix)
 
 	if b.config.AuthMethod != "" {
 		args = append(args,
 			"-credential-type=login",
 			"-login-auth-method="+b.config.AuthMethod,
 			"-login-bearer-token-path="+bearerTokenFile,
-			"-login-meta="+fmt.Sprintf("gateway=%s/%s", b.gateway.GetNamespace(), b.gateway.GetName()),
+			"-login-meta="+fmt.Sprintf("gateway=%s/%s", b.gateway.Namespace, b.gateway.Name),
 		)
 		if b.config.ConsulTenancyConfig.ConsulPartition != "" {
 			args = append(args, "-login-partition="+b.config.ConsulTenancyConfig.ConsulPartition)

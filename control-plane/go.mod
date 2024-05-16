@@ -1,12 +1,11 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.10.1-0.20240422130714-057ad7e95280
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.10.1-0.20240312203720-262f4358003f
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.2
 	github.com/deckarep/golang-set v1.7.1
-	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-logr/logr v1.2.4
@@ -14,7 +13,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
-	github.com/hashicorp/consul/api v1.10.1-0.20240422130714-057ad7e95280
+	github.com/hashicorp/consul/api v1.28.2
 	github.com/hashicorp/consul/proto-public v0.6.0
 	github.com/hashicorp/consul/sdk v0.16.0
 	github.com/hashicorp/go-bexpr v0.1.11

@@ -18,9 +18,7 @@ type HelmConfig struct {
 	// ImageDataplane is the Consul Dataplane image to use in gateway deployments.
 	ImageDataplane string
 	// ImageConsulK8S is the Consul Kubernetes Control Plane image to use in gateway deployments.
-	ImageConsulK8S string
-	// GlobalImagePullPolicy is the pull policy to use for all images used in gateway deployments.
-	GlobalImagePullPolicy      string
+	ImageConsulK8S             string
 	ConsulDestinationNamespace string
 	NamespaceMirroringPrefix   string
 	EnableNamespaces           bool

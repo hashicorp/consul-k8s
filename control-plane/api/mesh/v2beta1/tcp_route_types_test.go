@@ -379,7 +379,7 @@ func TestTCPRoute_ObjectMeta(t *testing.T) {
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 // TODO: add when implemented
-//func TestTCPRoute_DefaultNamespaceFields(t *testing.T)
+// func TestTCPRoute_DefaultNamespaceFields(t *testing.T)
 
 func TestTCPRoute_Validate(t *testing.T) {
 	cases := []struct {

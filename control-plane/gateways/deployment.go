@@ -15,16 +15,15 @@ import (
 
 const (
 	globalDefaultInstances    int32 = 1
-	MeshGatewayAnnotationKind       = "mesh-gateway"
-	APIGatewayAnnotationKind        = "api-gateway"
+	meshGatewayAnnotationKind       = "mesh-gateway"
 )
 
-func (b *gatewayBuilder[T]) Deployment() (*appsv1.Deployment, error) {
+func (b *meshGatewayBuilder) Deployment() (*appsv1.Deployment, error) {
 	spec, err := b.deploymentSpec()
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        b.gateway.GetName(),
-			Namespace:   b.gateway.GetNamespace(),
+			Name:        b.gateway.Name,
+			Namespace:   b.gateway.Namespace,
 			Labels:      b.labelsForDeployment(),
 			Annotations: b.annotationsForDeployment(),
 		},
@@ -32,7 +31,7 @@ func (b *gatewayBuilder[T]) Deployment() (*appsv1.Deployment, error) {
 	}, err
 }
 
-func (b *gatewayBuilder[T]) deploymentSpec() (*appsv1.DeploymentSpec, error) {
+func (b *meshGatewayBuilder) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 	var (
 		deploymentConfig meshv2beta1.GatewayClassDeploymentConfig
 		containerConfig  meshv2beta1.GatewayClassContainerConfig
@@ -68,18 +67,18 @@ func (b *gatewayBuilder[T]) deploymentSpec() (*appsv1.DeploymentSpec, error) {
 				Annotations: map[string]string{
 					// Indicate that this pod is a mesh gateway pod so that the Pod controller,
 					// consul-k8s CLI, etc. can key off of it
-					constants.AnnotationGatewayKind: b.gatewayKind,
+					constants.AnnotationGatewayKind: meshGatewayAnnotationKind,
 					// It's not logical to add a proxy sidecar since our workload is itself a proxy
 					constants.AnnotationMeshInject: "false",
 					// This functionality only applies when proxy sidecars are used
 					constants.AnnotationTransparentProxyOverwriteProbes: "false",
 					// This annotation determines which source to use to set the
 					// WAN address and WAN port for the Mesh Gateway service registration.
-					constants.AnnotationGatewayWANSource: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANSource],
+					constants.AnnotationGatewayWANSource: b.gateway.Annotations[constants.AnnotationGatewayWANSource],
 					// This annotation determines the WAN port for the Mesh Gateway service registration.
-					constants.AnnotationGatewayWANPort: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANPort],
+					constants.AnnotationGatewayWANPort: b.gateway.Annotations[constants.AnnotationGatewayWANPort],
 					// This annotation determines the address for the gateway when the source annotation is "Static".
-					constants.AnnotationGatewayWANAddress: b.gateway.GetAnnotations()[constants.AnnotationGatewayWANAddress],
+					constants.AnnotationGatewayWANAddress: b.gateway.Annotations[constants.AnnotationGatewayWANAddress],
 				},
 			},
 			Spec: corev1.PodSpec{

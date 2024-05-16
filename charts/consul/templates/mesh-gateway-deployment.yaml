@@ -128,7 +128,6 @@ spec:
       initContainers:
       - name: mesh-gateway-init
         image: {{ .Values.global.imageK8S }}
-        {{ template "consul.imagePullPolicy" . }}
         env:
         - name: NAMESPACE
           valueFrom:
@@ -187,7 +186,6 @@ spec:
       containers:
       - name: mesh-gateway
         image: {{ .Values.global.imageConsulDataplane | quote }}
-        {{ template "consul.imagePullPolicy" . }}
         securityContext:
           capabilities:
             {{ if not .Values.meshGateway.hostNetwork}}

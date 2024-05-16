@@ -201,11 +201,6 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := resourceControllers.RegisterGatewayFieldIndexes(ctx, mgr); err != nil {
-		setupLog.Error(err, "unable to register field indexes")
-		return err
-	}
-
 	if err := (&resourceControllers.MeshConfigurationController{
 		Controller: consulResourceController,
 		Client:     mgr.GetClient(),
@@ -216,46 +211,33 @@ func (c *Command) configureV2Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	gatewayConfig := gateways.GatewayConfig{
-		ConsulConfig: common.ConsulConfig{
-			Address:    c.consul.Addresses,
-			GRPCPort:   consulConfig.GRPCPort,
-			HTTPPort:   consulConfig.HTTPPort,
-			APITimeout: consulConfig.APITimeout,
-		},
-		ImageDataplane:      c.flagConsulDataplaneImage,
-		ImageConsulK8S:      c.flagConsulK8sImage,
-		ConsulTenancyConfig: consulTenancyConfig,
-		PeeringEnabled:      c.flagEnablePeering,
-		EnableOpenShift:     c.flagEnableOpenShift,
-		AuthMethod:          c.consul.ConsulLogin.AuthMethod,
-		LogLevel:            c.flagLogLevel,
-		LogJSON:             c.flagLogJSON,
-		TLSEnabled:          c.consul.UseTLS,
-		ConsulTLSServerName: c.consul.TLSServerName,
-		ConsulCACert:        string(c.caCertPem),
-		SkipServerWatch:     c.consul.SkipServerWatch,
-	}
-
 	if err := (&resourceControllers.MeshGatewayController{
-		Controller:    consulResourceController,
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controller").WithName(common.MeshGateway),
-		Scheme:        mgr.GetScheme(),
-		GatewayConfig: gatewayConfig,
+		Controller: consulResourceController,
+		Client:     mgr.GetClient(),
+		Log:        ctrl.Log.WithName("controller").WithName(common.MeshGateway),
+		Scheme:     mgr.GetScheme(),
+		GatewayConfig: gateways.GatewayConfig{
+			ConsulConfig: common.ConsulConfig{
+				Address:    c.consul.Addresses,
+				GRPCPort:   consulConfig.GRPCPort,
+				HTTPPort:   consulConfig.HTTPPort,
+				APITimeout: consulConfig.APITimeout,
+			},
+			ImageDataplane:      c.flagConsulDataplaneImage,
+			ImageConsulK8S:      c.flagConsulK8sImage,
+			ConsulTenancyConfig: consulTenancyConfig,
+			PeeringEnabled:      c.flagEnablePeering,
+			EnableOpenShift:     c.flagEnableOpenShift,
+			AuthMethod:          c.consul.ConsulLogin.AuthMethod,
+			LogLevel:            c.flagLogLevel,
+			LogJSON:             c.flagLogJSON,
+			TLSEnabled:          c.consul.UseTLS,
+			ConsulTLSServerName: c.consul.TLSServerName,
+			ConsulCACert:        string(c.caCertPem),
+			SkipServerWatch:     c.consul.SkipServerWatch,
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", common.MeshGateway)
-		return err
-	}
-
-	if err := (&resourceControllers.APIGatewayController{
-		Controller:    consulResourceController,
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controller").WithName(common.APIGateway),
-		Scheme:        mgr.GetScheme(),
-		GatewayConfig: gatewayConfig,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", common.APIGateway)
 		return err
 	}
 

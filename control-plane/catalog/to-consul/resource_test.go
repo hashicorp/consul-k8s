@@ -2091,6 +2091,9 @@ func createNodes(t *testing.T, client *fake.Clientset) (*corev1.Node, *corev1.No
 	node1 := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName1,
+			Labels: map[string]string{
+				corev1.LabelTopologyRegion: "us-west-2",
+			},
 		},
 
 		Status: corev1.NodeStatus{
@@ -2107,6 +2110,9 @@ func createNodes(t *testing.T, client *fake.Clientset) (*corev1.Node, *corev1.No
 	node2 := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName2,
+			Labels: map[string]string{
+				corev1.LabelTopologyRegion: "us-west-2",
+			},
 		},
 
 		Status: corev1.NodeStatus{

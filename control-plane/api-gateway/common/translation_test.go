@@ -303,7 +303,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:      api.FileSystemCertificate,
+									Kind:      api.InlineCertificate,
 									Name:      listenerOneCertName,
 									Namespace: listenerOneCertConsulNamespace,
 								},
@@ -321,7 +321,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:      api.FileSystemCertificate,
+									Kind:      api.InlineCertificate,
 									Name:      listenerTwoCertName,
 									Namespace: listenerTwoCertConsulNamespace,
 								},

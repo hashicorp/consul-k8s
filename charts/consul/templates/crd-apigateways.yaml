@@ -114,6 +114,13 @@ spec:
                                       provide the wildcard value \"*\" to list resources
                                       across all partitions."
                                     type: string
+                                  peerName:
+                                    description: "PeerName identifies which peer the
+                                      resource is imported from. https://developer.hashicorp.com/consul/docs/connect/cluster-peering
+                                      \n When using the List and WatchList endpoints,
+                                      provide the wildcard value \"*\" to list resources
+                                      across all peers."
+                                    type: string
                                 type: object
                               type:
                                 description: Type identifies the resource's type.
@@ -189,110 +196,41 @@ spec:
             type: object
           status:
             properties:
-              addresses:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
                 items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
                   properties:
-                    type:
-                      default: IPAddress
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
                       type: string
-                    value:
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
                       type: string
-                  required:
-                  - type
-                  - value
-                  type: object
-                type: array
-              listeners:
-                items:
-                  properties:
-                    attachedRoutes:
-                      format: int32
-                      type: integer
-                    name:
+                    reason:
+                      description: The reason for the condition's last transition.
                       type: string
                     status:
-                      properties:
-                        conditions:
-                          description: Conditions indicate the latest available observations
-                            of a resource's current state.
-                          items:
-                            description: 'Conditions define a readiness condition
-                              for a Consul resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
-                            properties:
-                              lastTransitionTime:
-                                description: LastTransitionTime is the last time the
-                                  condition transitioned from one status to another.
-                                format: date-time
-                                type: string
-                              message:
-                                description: A human readable message indicating details
-                                  about the transition.
-                                type: string
-                              reason:
-                                description: The reason for the condition's last transition.
-                                type: string
-                              status:
-                                description: Status of the condition, one of True,
-                                  False, Unknown.
-                                type: string
-                              type:
-                                description: Type of condition.
-                                type: string
-                            required:
-                            - status
-                            - type
-                            type: object
-                          type: array
-                        lastSyncedTime:
-                          description: LastSyncedTime is the last time the resource
-                            successfully synced with Consul.
-                          format: date-time
-                          type: string
-                      type: object
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
                   required:
-                  - attachedRoutes
-                  - name
+                  - status
+                  - type
                   type: object
                 type: array
-              status:
-                properties:
-                  conditions:
-                    description: Conditions indicate the latest available observations
-                      of a resource's current state.
-                    items:
-                      description: 'Conditions define a readiness condition for a
-                        Consul resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
-                      properties:
-                        lastTransitionTime:
-                          description: LastTransitionTime is the last time the condition
-                            transitioned from one status to another.
-                          format: date-time
-                          type: string
-                        message:
-                          description: A human readable message indicating details
-                            about the transition.
-                          type: string
-                        reason:
-                          description: The reason for the condition's last transition.
-                          type: string
-                        status:
-                          description: Status of the condition, one of True, False,
-                            Unknown.
-                          type: string
-                        type:
-                          description: Type of condition.
-                          type: string
-                      required:
-                      - status
-                      - type
-                      type: object
-                    type: array
-                  lastSyncedTime:
-                    description: LastSyncedTime is the last time the resource successfully
-                      synced with Consul.
-                    format: date-time
-                    type: string
-                type: object
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
             type: object
         type: object
     served: true

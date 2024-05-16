@@ -269,7 +269,7 @@ func main() {
 }
 
 // createK8sClient configures the command's Kubernetes API client if it doesn't
-// already exist.
+// already exist
 func (c *Command) createK8sClient(cfg *PluginConf) error {
 	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
 	if err != nil {

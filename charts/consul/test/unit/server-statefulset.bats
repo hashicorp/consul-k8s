@@ -823,7 +823,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .consul.instances | jq -r .[0].url | tee /dev/stderr)"
-  [ "${actual}" = http://release-name-consul-server.default.svc:8500 ]
+  [ "${actual}" = "http://consul-server.consul.svc:8500" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .consul.instances | jq -r .[0].new_leader_checks | tee /dev/stderr)"
@@ -866,7 +866,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .consul.instances | jq -r .[0].url | tee /dev/stderr)"
-  [ "${actual}" = "https://release-name-consul-server.default.svc:8501" ]
+  [ "${actual}" = "https://consul-server.default.svc:8501" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .consul.instances | jq -r .[0].tls_cert | tee /dev/stderr)"
@@ -933,7 +933,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
-  [ "${actual}" = "http://release-name-consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
+  [ "${actual}" = "http://consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].headers | tee /dev/stderr)"
@@ -971,7 +971,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
-  [ "${actual}" = "https://release-name-consul-server.default.svc:8501/v1/agent/metrics?format=prometheus" ]
+  [ "${actual}" = "https://consul-server.default.svc:8501/v1/agent/metrics?format=prometheus" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].headers | tee /dev/stderr)"
@@ -1020,7 +1020,7 @@ load _helpers
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r .[0].openmetrics_endpoint | tee /dev/stderr)"
-  [ "${actual}" = "http://release-name-consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
+  [ "${actual}" = "http://consul-server.default.svc:8500/v1/agent/metrics?format=prometheus" ]
 
   local actual="$( echo "$consul_checks" | \
     jq -r .openmetrics.instances | jq -r '.[0].headers["X-Consul-Token"]' | tee /dev/stderr)"
@@ -1081,37 +1081,6 @@ load _helpers
   local actual=$( echo "$labels" | \
     yq -r '."tags.datadoghq.com/service"' | tee /dev/stderr )
   [ "${actual}" = "consul-server" ]
-}
-
-@test "server/StatefulSet: datadog unix socket path name rendering for hostPath volume and volumeMount using default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml \
-      --set 'global.metrics.enabled=true'  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadog.enabled=true' \
-      --set 'global.metrics.datadog.dogstatsd.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.volumes[] | select(.name=="dsdsocket") | .hostPath.path' | tee /dev/stderr)
-
-  [ "${actual}" = "/var/run/datadog" ]
-}
-
-@test "server/StatefulSet: datadog unix socket path name rendering for hostPath volume and volumeMount using non default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-statefulset.yaml \
-      --set 'global.metrics.enabled=true'  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'global.metrics.enableAgentMetrics=true'  \
-      --set 'global.metrics.datadog.enabled=true' \
-      --set 'global.metrics.datadog.dogstatsd.enabled=true' \
-      --set 'global.metrics.datadog.dogstatsd.dogstatsdAddr="/this/otherpath/datadog/dsd.socket"' \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.volumes[] | select(.name=="dsdsocket") | .hostPath.path' | tee /dev/stderr)
-
-  [ "${actual}" = "/this/otherpath/datadog" ]
 }
 
 #--------------------------------------------------------------------
@@ -1385,7 +1354,6 @@ load _helpers
       "drop": ["ALL"],
       "add": ["NET_BIND_SERVICE"]
     },
-    "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
     "seccompProfile": {
       "type": "RuntimeDefault"
@@ -1418,7 +1386,6 @@ load _helpers
       "drop": ["ALL"],
       "add": ["NET_BIND_SERVICE"]
     },
-    "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
     "seccompProfile": {
       "type": "RuntimeDefault"

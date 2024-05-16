@@ -137,7 +137,6 @@ spec:
       containers:
       - name: server-acl-init-job
         image: {{ .Values.global.imageK8S }}
-        {{ template "consul.imagePullPolicy" . }}
         {{- if not .Values.server.containerSecurityContext.aclInit }}
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
         {{- end }}
@@ -303,6 +302,10 @@ spec:
             {{- end }}
             {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.partitionToken.secretName }}
             -partition-token-file=/vault/secrets/partition-token \
+            {{- end }}
+
+            {{- if .Values.apiGateway.enabled }}
+            -api-gateway-controller=true \
             {{- end }}
 
             {{- if .Values.global.enableConsulNamespaces }}

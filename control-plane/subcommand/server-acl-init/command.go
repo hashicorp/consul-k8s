@@ -68,6 +68,8 @@ type Command struct {
 	flagIngressGatewayNames     []string
 	flagTerminatingGatewayNames []string
 
+	flagAPIGatewayController bool
+
 	// Flags to configure Consul connection.
 	flagServerPort uint
 
@@ -171,6 +173,8 @@ func (c *Command) init() {
 		"Name of a terminating gateway that needs an acl token. May be specified multiple times. "+
 			"[Enterprise Only] If using Consul namespaces and registering the gateway outside of the "+
 			"default namespace, specify the value in the form <GatewayName>.<ConsulNamespace>.")
+	c.flags.BoolVar(&c.flagAPIGatewayController, "api-gateway-controller", false,
+		"Toggle for configuring ACL login for the API gateway controller.")
 
 	c.flags.UintVar(&c.flagServerPort, "server-port", 8500, "The HTTP or HTTPS port of the Consul server. Defaults to 8500.")
 
@@ -580,6 +584,28 @@ func (c *Command) Run(args []string) int {
 	if c.flagSnapshotAgent {
 		serviceAccountName := c.withPrefix("server")
 		if err := c.createACLPolicyRoleAndBindingRule("snapshot-agent", snapshotAgentRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagAPIGatewayController {
+		rules, err := c.apiGatewayControllerRules()
+		if err != nil {
+			c.log.Error("Error templating api gateway rules", "err", err)
+			return 1
+		}
+		serviceAccountName := c.withPrefix("api-gateway-controller")
+
+		// API gateways require a global policy/token because they must
+		// create config-entry resources in the primary, even when deployed
+		// to a secondary datacenter
+		authMethodName := localComponentAuthMethodName
+		if !primary {
+			authMethodName = globalComponentAuthMethodName
+		}
+		err = c.createACLPolicyRoleAndBindingRule("api-gateway-controller", rules, consulDC, primaryDC, globalPolicy, primary, authMethodName, serviceAccountName, dynamicClient)
+		if err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}

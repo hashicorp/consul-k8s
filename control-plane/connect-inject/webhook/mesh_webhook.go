@@ -75,9 +75,6 @@ type MeshWebhook struct {
 	// This image is used for the consul-sidecar container.
 	ImageConsulK8S string
 
-	// GlobalImagePullPolicy is the pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
-	GlobalImagePullPolicy string
-
 	// Optional: set when you need extra options to be set when running envoy
 	// See a list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
 	EnvoyExtraArgs string

@@ -107,9 +107,7 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 		annotations[constants.AnnotationPrometheusPort] = strconv.Itoa(metrics.Port)
 	}
 
-	volumes, mounts := volumesAndMounts(gateway)
-
-	container, err := consulDataplaneContainer(metrics, config, gcc, gateway.Name, gateway.Namespace, mounts)
+	container, err := consulDataplaneContainer(metrics, config, gcc, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +129,14 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
-					Volumes: volumes,
+					Volumes: []corev1.Volume{
+						{
+							Name: volumeName,
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
+							},
+						},
+					},
 					InitContainers: []corev1.Container{
 						initContainer,
 					},

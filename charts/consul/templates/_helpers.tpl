@@ -19,7 +19,6 @@ as well as the global.name setting.
 {{- if not .Values.global.enablePodSecurityPolicies -}}
 securityContext:
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
   capabilities:
     drop:
     - ALL
@@ -246,7 +245,6 @@ This template is for an init container.
 {{- define "consul.getAutoEncryptClientCA" -}}
 - name: get-auto-encrypt-client-ca
   image: {{ .Values.global.imageK8S }}
-  {{ template "consul.imagePullPolicy" . }}
   command:
     - "/bin/sh"
     - "-ec"
@@ -507,6 +505,7 @@ Fails if global.experiments.resourceAPIs is set along with any of these unsuppor
 - meshGateway.enabled
 - ingressGateways.enabled
 - terminatingGateways.enabled
+- apiGateway.enabled
 
 Usage: {{ template "consul.validateResourceAPIs" . }}
 
@@ -538,6 +537,9 @@ Usage: {{ template "consul.validateResourceAPIs" . }}
 {{- end }}
 {{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.terminatingGateways.enabled ) }}
 {{fail "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.apiGateway.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, apiGateway.enabled is currently unsupported."}}
 {{- end }}
 {{- end }}
 
@@ -682,23 +684,5 @@ Usage: {{ template "consul.versionInfo" }}
 {{- else }}
     {{- $sanitizedVersion = $versionInfo }}
 {{- end -}}
-{{- printf "%s" $sanitizedVersion | trunc 63 | quote }}
-{{- end -}}
-
-{{/*
-Sets the imagePullPolicy for all Consul images (consul, consul-dataplane, consul-k8s, consul-telemetry-collector)
-Valid values are:
-    IfNotPresent
-    Always
-    Never
-    In the case of empty, see https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy for details
-
-Usage: {{ template "consul.imagePullPolicy" . }} TODO: melisa should we name this differently ?
-*/}}
-{{- define "consul.imagePullPolicy" -}}
-{{ if or (eq .Values.global.imagePullPolicy "IfNotPresent") (eq .Values.global.imagePullPolicy "Always") (eq .Values.global.imagePullPolicy "Never")}}imagePullPolicy: {{ .Values.global.imagePullPolicy }}
-{{ else if eq .Values.global.imagePullPolicy "" }}
-{{ else }}
-{{fail "imagePullPolicy can only be IfNotPresent, Always, Never, or empty" }}
-{{ end }}
+{{- printf "%s" $sanitizedVersion | quote }}
 {{- end -}}

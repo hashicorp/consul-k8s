@@ -191,7 +191,7 @@ func (s *ResourceMap) Certificate(key types.NamespacedName) *corev1.Secret {
 	if !s.certificates.Contains(key) {
 		return nil
 	}
-	consulKey := NormalizeMeta(s.toConsulReference(api.FileSystemCertificate, key))
+	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
 	if secret, ok := s.certificateGateways[consulKey]; ok {
 		return secret.secret
 	}
@@ -201,7 +201,7 @@ func (s *ResourceMap) Certificate(key types.NamespacedName) *corev1.Secret {
 func (s *ResourceMap) ReferenceCountCertificate(secret corev1.Secret) {
 	key := client.ObjectKeyFromObject(&secret)
 	s.certificates.Add(key)
-	consulKey := NormalizeMeta(s.toConsulReference(api.FileSystemCertificate, key))
+	consulKey := NormalizeMeta(s.toConsulReference(api.InlineCertificate, key))
 	if _, ok := s.certificateGateways[consulKey]; !ok {
 		s.certificateGateways[consulKey] = &certificate{
 			secret:   &secret,
@@ -231,7 +231,7 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 
 				set.certificates.Add(certificateKey)
 
-				consulCertificateKey := s.toConsulReference(api.FileSystemCertificate, certificateKey)
+				consulCertificateKey := s.toConsulReference(api.InlineCertificate, certificateKey)
 				certificate, ok := s.certificateGateways[NormalizeMeta(consulCertificateKey)]
 				if ok {
 					certificate.gateways.Add(key)
@@ -270,7 +270,7 @@ func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceRefe
 				// the route altogether
 				toGC = append(toGC, id)
 			}
-		case api.FileSystemCertificate:
+		case api.InlineCertificate:
 			if s.processedCertificates.Contains(id) {
 				continue
 			}
@@ -323,7 +323,7 @@ func (s *ResourceMap) ReferenceCountConsulTCPRoute(route api.TCPRouteConfigEntry
 	s.consulTCPRoutes[NormalizeMeta(key)] = set
 }
 
-func (s *ResourceMap) ReferenceCountConsulCertificate(cert api.FileSystemCertificateConfigEntry) {
+func (s *ResourceMap) ReferenceCountConsulCertificate(cert api.InlineCertificateConfigEntry) {
 	key := s.objectReference(&cert)
 
 	var referenced *certificate
@@ -644,29 +644,36 @@ func (s *ResourceMap) CanGCTCPRouteOnUnbind(id api.ResourceReference) bool {
 	return true
 }
 
-func (s *ResourceMap) TranslateFileSystemCertificate(key types.NamespacedName) {
-	consulKey := s.toConsulReference(api.FileSystemCertificate, key)
+func (s *ResourceMap) TranslateInlineCertificate(key types.NamespacedName) error {
+	consulKey := s.toConsulReference(api.InlineCertificate, key)
 
 	certificate, ok := s.certificateGateways[NormalizeMeta(consulKey)]
 	if !ok {
-		return
+		return nil
 	}
 
 	if certificate.secret == nil {
-		return
+		return nil
 	}
 
-	// add to the processed set so that we don't GC it.
+	consulCertificate, err := s.translator.ToInlineCertificate(*certificate.secret)
+	if err != nil {
+		return err
+	}
+
+	// add to the processed set so we don't GC it.
 	s.processedCertificates.Add(consulKey)
 	s.consulMutations = append(s.consulMutations, &ConsulUpdateOperation{
-		Entry: s.translator.ToFileSystemCertificate(*certificate.secret),
+		Entry: consulCertificate,
 		// just swallow the error and log it since we can't propagate status back on a certificate.
-		OnUpdate: func(err error) {
+		OnUpdate: func(error) {
 			if err != nil {
 				s.logger.Error(err, "error syncing certificate to Consul")
 			}
 		},
 	})
+
+	return nil
 }
 
 func (s *ResourceMap) Mutations() []*ConsulUpdateOperation {

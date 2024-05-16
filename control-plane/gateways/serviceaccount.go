@@ -8,17 +8,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (b *gatewayBuilder[T]) ServiceAccount() *corev1.ServiceAccount {
+func (b *meshGatewayBuilder) ServiceAccount() *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        b.serviceAccountName(),
-			Namespace:   b.gateway.GetNamespace(),
+			Namespace:   b.gateway.Namespace,
 			Labels:      b.labelsForServiceAccount(),
 			Annotations: b.annotationsForServiceAccount(),
 		},
 	}
 }
 
-func (b *gatewayBuilder[T]) serviceAccountName() string {
-	return b.gateway.GetName()
+func (b *meshGatewayBuilder) serviceAccountName() string {
+	return b.gateway.Name
 }

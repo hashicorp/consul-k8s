@@ -597,7 +597,7 @@ func TestGRPCRoute_ObjectMeta(t *testing.T) {
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 // TODO: add when implemented
-//func TestGRPCRoute_DefaultNamespaceFields(t *testing.T)
+// func TestGRPCRoute_DefaultNamespaceFields(t *testing.T)
 
 func TestGRPCRoute_Validate(t *testing.T) {
 	cases := []struct {

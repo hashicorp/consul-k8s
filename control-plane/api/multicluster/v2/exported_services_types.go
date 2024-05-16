@@ -57,6 +57,7 @@ func (in *ExportedServices) ResourceID(_, partition string) *pbresource.ID {
 		Tenancy: &pbresource.Tenancy{
 			Partition: partition,
 			Namespace: "", // Namespace is always unset because ExportedServices is partition-scoped
+
 		},
 	}
 }

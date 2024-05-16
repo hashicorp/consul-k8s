@@ -4,15 +4,6 @@ load _helpers
 
 target=templates/gateway-resources-job.yaml
 
-@test "gatewayresources/Job: fails if .values.apiGateway is set" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/tests/test-runner.yaml \
-      --set 'apiGateway.enabled=true' .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "[DEPRECATED and REMOVED] the apiGateway stanza is no longer supported as of Consul 1.19.0. Use connectInject.apiGateway instead." ]]
-}
-
 @test "gatewayresources/Job: enabled by default" {
     cd `chart_dir`
     local actual=$(helm template \
@@ -38,6 +29,33 @@ target=templates/gateway-resources-job.yaml
         . | tee /dev/stderr |
         yq '.spec.template.spec.containers[0].image == "foo"' | tee /dev/stderr)
     [ "$actual" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# fallback configuration
+# to be removed in 1.17 (t-eckert 2023-05-23)
+
+@test "gatewayresources/Job: fallback configuration is used when apiGateway.enabled is true" {
+  cd `chart_dir`
+  local spec=$(helm template \
+      -s $target  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=testing' \
+      --set 'apiGateway.managedGatewayClass.nodeSelector=foo: bar' \
+      --set 'apiGateway.managedGatewayClass.tolerations=- key: bar' \
+      --set 'apiGateway.managedGatewayClass.copyAnnotations.service.annotations=- bingo' \
+      --set 'apiGateway.managedGatewayClass.serviceType=LoadBalancer' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$spec" | jq '.[9] | ."-node-selector=foo"')
+  [ "${actual}" = "\"bar\"" ]
+
+  local actual=$(echo "$spec" | jq '.[10] | ."-tolerations=- key"')
+  [ "${actual}" = "\"bar\"" ]
+
+  local actual=$(echo "$spec" | jq '.[11]')
+  [ "${actual}" = "\"-service-annotations=- bingo\"" ]
 }
 
 #--------------------------------------------------------------------

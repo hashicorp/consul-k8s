@@ -88,10 +88,10 @@ func TestRun_MeshServices(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			//tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
-			//t.Cleanup(func() {
+			// tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
+			// t.Cleanup(func() {
 			//	_ = os.RemoveAll(tokenFile)
-			//})
+			// })
 
 			// Create test consulServer server.
 			var serverCfg *testutil.TestServerConfig
@@ -117,11 +117,11 @@ func TestRun_MeshServices(t *testing.T) {
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 			}
-			//if tt.aclsEnabled {
+			// if tt.aclsEnabled {
 			//	flags = append(flags, "-auth-method-name", test.AuthMethod,
 			//		"-service-account-name", tt.serviceAccountName,
 			//		"-acl-token-sink", tokenFile) //TODO: what happens if this is unspecified? We don't need this file
-			//}
+			// }
 
 			// Run the command.
 			code := cmd.Run(flags)
@@ -133,7 +133,7 @@ func TestRun_MeshServices(t *testing.T) {
 
 			// TODO: Can we remove the tokenFile from this workflow?
 			// consul-dataplane performs it's own login using the Serviceaccount bearer token
-			//if tt.aclsEnabled {
+			// if tt.aclsEnabled {
 			//	// Validate the ACL token was written.
 			//	tokenData, err := os.ReadFile(tokenFile)
 			//	require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestRun_MeshServices(t *testing.T) {
 			//	token, _, err := consulClient.ACL().TokenReadSelf(nil)
 			//	require.NoError(t, err)
 			//	require.Equal(t, "token created via login: {\"pod\":\"default-ns/counting-pod\"}", token.Description)
-			//}
+			// }
 		})
 	}
 }

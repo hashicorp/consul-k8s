@@ -136,10 +136,10 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	// fetch our file-system-certificates from cache, this needs to happen
+	// fetch our inline certificates from cache, this needs to happen
 	// here since the certificates need to be reference counted before
 	// the gateways.
-	r.fetchConsulFileSystemCertificates(resources)
+	r.fetchConsulInlineCertificates(resources)
 
 	// add our current gateway even if it's not controlled by us so we
 	// can garbage collect any resources for it.
@@ -471,8 +471,8 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&handler.EnqueueRequestForObject{},
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for FileSystemCertificates
-			&source.Channel{Source: c.Subscribe(ctx, api.FileSystemCertificate, r.transformConsulFileSystemCertificate(ctx)).Events()},
+			// Subscribe to changes from Consul for InlineCertificates
+			&source.Channel{Source: c.Subscribe(ctx, api.InlineCertificate, r.transformConsulInlineCertificate(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
 		WatchesRawSource(
@@ -654,7 +654,7 @@ func (r *GatewayController) transformConsulTCPRoute(ctx context.Context) func(en
 	}
 }
 
-func (r *GatewayController) transformConsulFileSystemCertificate(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
+func (r *GatewayController) transformConsulInlineCertificate(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
 	return func(entry api.ConfigEntry) []types.NamespacedName {
 		certificateKey := api.ResourceReference{
 			Kind:      entry.GetKind(),
@@ -1206,8 +1206,8 @@ func (c *GatewayController) fetchConsulTCPRoutes(ref api.ResourceReference, reso
 	}
 }
 
-func (c *GatewayController) fetchConsulFileSystemCertificates(resources *common.ResourceMap) {
-	for _, cert := range configEntriesTo[*api.FileSystemCertificateConfigEntry](c.cache.List(api.FileSystemCertificate)) {
+func (c *GatewayController) fetchConsulInlineCertificates(resources *common.ResourceMap) {
+	for _, cert := range configEntriesTo[*api.InlineCertificateConfigEntry](c.cache.List(api.InlineCertificate)) {
 		resources.ReferenceCountConsulCertificate(*cert)
 	}
 }

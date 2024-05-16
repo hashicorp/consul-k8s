@@ -196,7 +196,7 @@ func realMain(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		toDeleteVPCs = append(toDeleteVPCs, vpcsOutput.Vpcs...)
+		toDeleteVPCs = append(vpcsOutput.Vpcs)
 		nextToken = vpcsOutput.NextToken
 		if nextToken == nil {
 			break
@@ -366,11 +366,6 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
-
-		if err != nil {
-			return err
-		}
-
 		vpcPeeringConnectionsToDelete := append(vpcPeeringConnectionsWithAcceptor.VpcPeeringConnections, vpcPeeringConnectionsWithRequester.VpcPeeringConnections...)
 
 		// Delete NAT gateways.
@@ -382,11 +377,9 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
-
 		if err != nil {
 			return err
 		}
-
 		for _, gateway := range natGateways.NatGateways {
 			fmt.Printf("NAT gateway: Destroying... [id=%s]\n", *gateway.NatGatewayId)
 			_, err = ec2Client.DeleteNatGatewayWithContext(ctx, &ec2.DeleteNatGatewayInput{
@@ -491,11 +484,6 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
-
-		if err != nil {
-			return err
-		}
-
 		for _, igw := range igws.InternetGateways {
 			fmt.Printf("Internet gateway: Detaching from VPC... [id=%s]\n", *igw.InternetGatewayId)
 			if err := destroyBackoff(ctx, "Internet Gateway", *igw.InternetGatewayId, func() error {
@@ -523,37 +511,6 @@ func realMain(ctx context.Context) error {
 			fmt.Printf("Internet gateway: Destroyed [id=%s]\n", *igw.InternetGatewayId)
 		}
 
-		// Delete network interfaces
-		networkInterfaces, err := ec2Client.DescribeNetworkInterfacesWithContext(ctx, &ec2.DescribeNetworkInterfacesInput{
-			Filters: []*ec2.Filter{
-				{
-					Name:   aws.String("vpc-id"),
-					Values: []*string{vpcID},
-				},
-			},
-		})
-
-		if err != nil {
-			return err
-		}
-
-		for _, networkInterface := range networkInterfaces.NetworkInterfaces {
-			fmt.Printf("Network Interface: Destroying... [id=%s]\n", *networkInterface.NetworkInterfaceId)
-			if err := destroyBackoff(ctx, "Network Interface", *networkInterface.NetworkInterfaceId, func() error {
-				_, err := ec2Client.DeleteNetworkInterfaceWithContext(ctx, &ec2.DeleteNetworkInterfaceInput{
-					NetworkInterfaceId: networkInterface.NetworkInterfaceId,
-				})
-				if err != nil {
-					return err
-				}
-				return nil
-			}); err != nil {
-				return err
-			}
-
-			fmt.Printf("Network interface: Destroyed [id=%s]\n", *networkInterface.NetworkInterfaceId)
-		}
-
 		// Delete subnets.
 		subnets, err := ec2Client.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
 			Filters: []*ec2.Filter{
@@ -563,11 +520,6 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
-
-		if err != nil {
-			return err
-		}
-
 		for _, subnet := range subnets.Subnets {
 			fmt.Printf("Subnet: Destroying... [id=%s]\n", *subnet.SubnetId)
 			if err := destroyBackoff(ctx, "Subnet", *subnet.SubnetId, func() error {
@@ -595,11 +547,6 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
-
-		if err != nil {
-			return err
-		}
-
 		for _, routeTable := range routeTables.RouteTables {
 			// Find out if this is the main route table.
 			var mainRouteTable bool
@@ -633,11 +580,6 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
-
-		if err != nil {
-			return err
-		}
-
 		for _, sg := range sgs.SecurityGroups {
 			if len(sg.IpPermissions) > 0 {
 				revokeSGInput := &ec2.RevokeSecurityGroupIngressInput{GroupId: sg.GroupId}

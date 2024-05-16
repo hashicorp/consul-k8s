@@ -37,7 +37,6 @@ spec:
   containers:
     - name: consul-test
       image: "{{ .Values.global.image }}"
-      {{ template "consul.imagePullPolicy" . }}
       env:
         - name: HOST_IP
           valueFrom:

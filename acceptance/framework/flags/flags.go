@@ -25,8 +25,6 @@ type TestFlags struct {
 
 	flagEnableOpenshift bool
 
-	flagSkipDatadogTests bool
-
 	flagEnablePodSecurityPolicies bool
 
 	flagEnableCNI                      bool
@@ -157,9 +155,6 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagDisablePeering, "disable-peering", false,
 		"If true, the peering tests will not run.")
 
-	flag.BoolVar(&t.flagSkipDatadogTests, "skip-datadog", false,
-		"If true, datadog acceptance tests will not run.")
-
 	if t.flagEnterpriseLicense == "" {
 		t.flagEnterpriseLicense = os.Getenv("CONSUL_ENT_LICENSE")
 	}
@@ -203,9 +198,11 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	// if the Version is empty consulVersion will be nil
 	consulVersion, _ := version.NewVersion(t.flagConsulVersion)
 	consulDataplaneVersion, _ := version.NewVersion(t.flagConsulDataplaneVersion)
+	//vaultserverVersion, _ := version.NewVersion(t.flagVaultServerVersion)
 	kubeEnvs := config.NewKubeTestConfigList(t.flagKubeconfigs, t.flagKubecontexts, t.flagKubeNamespaces)
 
 	c := &config.TestConfig{
+
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
 
@@ -213,8 +210,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		EnableMultiCluster: t.flagEnableMultiCluster,
 
 		EnableOpenshift: t.flagEnableOpenshift,
-
-		SkipDataDogTests: t.flagSkipDatadogTests,
 
 		EnablePodSecurityPolicies: t.flagEnablePodSecurityPolicies,
 

@@ -103,9 +103,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
 	container := corev1.Container{
-		Name:            initContainerName,
-		Image:           w.ImageConsulK8S,
-		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
+		Name:  initContainerName,
+		Image: w.ImageConsulK8S,
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAME",

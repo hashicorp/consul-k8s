@@ -8,11 +8,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (b *gatewayBuilder[T]) Role() *rbacv1.Role {
+func (b *meshGatewayBuilder) Role() *rbacv1.Role {
 	return &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        b.gateway.GetName(),
-			Namespace:   b.gateway.GetNamespace(),
+			Name:        b.gateway.Name,
+			Namespace:   b.gateway.Namespace,
 			Labels:      b.labelsForRole(),
 			Annotations: b.annotationsForRole(),
 		},
@@ -20,11 +20,11 @@ func (b *gatewayBuilder[T]) Role() *rbacv1.Role {
 	}
 }
 
-func (b *gatewayBuilder[T]) RoleBinding() *rbacv1.RoleBinding {
+func (b *meshGatewayBuilder) RoleBinding() *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        b.gateway.GetName(),
-			Namespace:   b.gateway.GetNamespace(),
+			Name:        b.gateway.Name,
+			Namespace:   b.gateway.Namespace,
 			Labels:      b.labelsForRoleBinding(),
 			Annotations: b.annotationsForRoleBinding(),
 		},
@@ -32,8 +32,8 @@ func (b *gatewayBuilder[T]) RoleBinding() *rbacv1.RoleBinding {
 			{
 				APIGroup:  "",
 				Kind:      rbacv1.ServiceAccountKind,
-				Name:      b.gateway.GetName(),
-				Namespace: b.gateway.GetNamespace(),
+				Name:      b.gateway.Name,
+				Namespace: b.gateway.Namespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{

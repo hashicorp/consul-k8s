@@ -604,7 +604,7 @@ func TestTrafficPermissions_ObjectMeta(t *testing.T) {
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 // TODO: add when implemented
-//func TestTrafficPermissions_DefaultNamespaceFields(t *testing.T)
+// func TestTrafficPermissions_DefaultNamespaceFields(t *testing.T)
 
 func TestTrafficPermissions_Validate(t *testing.T) {
 	cases := []struct {

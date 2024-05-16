@@ -391,7 +391,7 @@ func getServicePorts(service corev1.Service, prefixedPods selectorPodData, exact
 		//
 		// If we otherwise see repeat port values in a K8s service, we pass along and allow Consul to fail validation.
 		if p.Protocol == corev1.ProtocolTCP {
-			//TODO(NET-5705): Error check reserved "mesh" target port
+			// TODO(NET-5705): Error check reserved "mesh" target port
 			ports = append(ports, &pbcatalog.ServicePort{
 				VirtualPort: uint32(p.Port),
 				TargetPort:  getEffectiveTargetPort(p.TargetPort, prefixedPods, exactNamePods),
@@ -436,7 +436,7 @@ func getEffectiveTargetPort(targetPort intstr.IntOrString, prefixedPods selector
 	// very expensive operation to repeat every time endpoints change, and we don't expect the target port to change
 	// often if ever across pod/deployment lifecycles.
 	//
-	//TODO(NET-5706) in GA, we intend to change port selection to allow for Consul TargetPort to be numeric. If we
+	// TODO(NET-5706) in GA, we intend to change port selection to allow for Consul TargetPort to be numeric. If we
 	// retain the port selection model used here beyond GA, we should consider updating it to also consider pod health,
 	// s.t. when the selected port name changes between deployments of a ReplicaSet, we route traffic to ports
 	// belonging to the set most able to serve traffic, rather than simply the largest one.

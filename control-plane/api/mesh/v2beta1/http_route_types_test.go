@@ -803,7 +803,7 @@ func TestHTTPRoute_ObjectMeta(t *testing.T) {
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 // TODO: add when implemented
-//func TestHTTPRoute_DefaultNamespaceFields(t *testing.T)
+// func TestHTTPRoute_DefaultNamespaceFields(t *testing.T)
 
 func TestHTTPRoute_Validate(t *testing.T) {
 	cases := []struct {

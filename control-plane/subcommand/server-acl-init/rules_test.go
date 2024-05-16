@@ -5,6 +5,7 @@ package serveraclinit
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -138,6 +139,82 @@ partition_prefix "" {
 
 			require.NoError(t, err)
 			require.Equal(t, tt.Expected, rules)
+		})
+	}
+}
+
+func TestAPIGatewayControllerRules(t *testing.T) {
+	cases := []struct {
+		Name             string
+		EnableNamespaces bool
+		Partition        string
+		Expected         string
+	}{
+		{
+			Name: "Namespaces are disabled",
+			Expected: `
+operator = "write"
+acl = "write"
+  service_prefix "" {
+    policy = "write"
+    intentions = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }`,
+		},
+		{
+			Name:             "Namespaces are enabled",
+			EnableNamespaces: true,
+			Expected: `
+operator = "write"
+acl = "write"
+namespace_prefix "" {
+  policy = "write"
+  service_prefix "" {
+    policy = "write"
+    intentions = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}`,
+		},
+		{
+			Name:             "Namespaces are enabled, partitions enabled",
+			EnableNamespaces: true,
+			Partition:        "Default",
+			Expected: `
+partition "Default" {
+  mesh = "write"
+  acl = "write"
+namespace_prefix "" {
+  policy = "write"
+  service_prefix "" {
+    policy = "write"
+    intentions = "write"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+}
+}`,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			cmd := Command{
+				flagEnableNamespaces: tt.EnableNamespaces,
+				consulFlags: &flags.ConsulFlags{
+					Partition: tt.Partition,
+				},
+			}
+
+			meshGatewayRules, err := cmd.apiGatewayControllerRules()
+
+			require.NoError(t, err)
+			require.Equal(t, tt.Expected, strings.Trim(meshGatewayRules, " "))
 		})
 	}
 }

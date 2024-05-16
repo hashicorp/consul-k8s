@@ -23,10 +23,10 @@ const (
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
 	defaultEnvoyProxyConcurrency = 1
-	volumeNameForConnectInject   = "consul-connect-inject-data"
+	volumeName                   = "consul-connect-inject-data"
 )
 
-func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string, mounts []corev1.VolumeMount) (corev1.Container, error) {
+func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -53,9 +53,8 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	}
 
 	container := corev1.Container{
-		Name:            name,
-		Image:           config.ImageDataplane,
-		ImagePullPolicy: corev1.PullPolicy(config.GlobalImagePullPolicy),
+		Name:  name,
+		Image: config.ImageDataplane,
 
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
 		// consul-dataplane can write files to it. Otherwise, it wouldn't be able to
@@ -78,7 +77,12 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 				Value: "$(NODE_NAME)-virtual",
 			},
 		},
-		VolumeMounts:   mounts,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+			},
+		},
 		Args:           args,
 		ReadinessProbe: probe,
 	}

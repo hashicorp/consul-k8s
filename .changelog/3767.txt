@@ -1,3 +1,0 @@
-```release-note:feature
-gateways: api-gateway now uses the Consul file-system-certificate by default for TLS
-```

@@ -509,7 +509,7 @@ func TestProxyConfiguration_ObjectMeta(t *testing.T) {
 
 // Test defaulting behavior when namespaces are enabled as well as disabled.
 // TODO: add when implemented
-//func TestProxyConfiguration_DefaultNamespaceFields(t *testing.T)
+// func TestProxyConfiguration_DefaultNamespaceFields(t *testing.T)
 
 func constructProxyConfigurationResource(tp *pbmesh.ProxyConfiguration, name, namespace, partition string) *pbresource.Resource {
 	data := inject.ToProtoAny(tp)

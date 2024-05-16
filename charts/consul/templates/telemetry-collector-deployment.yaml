@@ -143,7 +143,7 @@ spec:
               -service-name=""
 
         image: {{ .Values.global.imageK8S }}
-        {{ template "consul.imagePullPolicy" . }}
+        imagePullPolicy: IfNotPresent
         {{- if .Values.telemetryCollector.initContainer.resources }}
         resources:
           {{- toYaml .Values.telemetryCollector.initContainer.resources | nindent 12 }}
@@ -171,7 +171,7 @@ spec:
       containers:
       - name: consul-telemetry-collector
         image: {{ .Values.telemetryCollector.image }}
-        {{ template "consul.imagePullPolicy" . }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
         ports:
         - containerPort: 9090
           name: metrics
@@ -256,13 +256,9 @@ spec:
             {{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}
             - name: CO_OTEL_HTTP_ENDPOINT
               value: "http://$(HOST_IP):4318"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://$(HOST_IP):4318"
             {{- else if eq (.Values.global.metrics.datadog.otlp.protocol | lower) "grpc" }}
             - name: CO_OTEL_HTTP_ENDPOINT
-              value: "http://$(HOST_IP):4317"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://$(HOST_IP):4317"
+              value: "grpc://$(HOST_IP):4317"
             {{- end }}
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.telemetryCollector | nindent 12 }}
@@ -299,7 +295,7 @@ spec:
       # consul-dataplane container
       - name: consul-dataplane
         image: "{{ .Values.global.imageConsulDataplane }}"
-        {{ template "consul.imagePullPolicy" . }}
+        imagePullPolicy: IfNotPresent
         command:
           - consul-dataplane
         args:

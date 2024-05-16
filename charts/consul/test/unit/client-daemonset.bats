@@ -2824,6 +2824,8 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2842,6 +2844,8 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2861,6 +2865,8 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2883,6 +2889,8 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
+      --set 'apiGateway.enabled=true' \
+      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
