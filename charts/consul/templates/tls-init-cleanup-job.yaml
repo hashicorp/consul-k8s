@@ -49,6 +49,7 @@ spec:
       containers:
         - name: tls-init-cleanup
           image: "{{ .Values.global.image }}"
+          {{ template "consul.imagePullPolicy" . }}
           {{- if not .Values.server.containerSecurityContext.tlsInit }}
           {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           {{- end }}

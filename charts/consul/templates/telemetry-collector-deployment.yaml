@@ -143,7 +143,7 @@ spec:
               -service-name=""
 
         image: {{ .Values.global.imageK8S }}
-        imagePullPolicy: IfNotPresent
+        {{ template "consul.imagePullPolicy" . }}
         {{- if .Values.telemetryCollector.initContainer.resources }}
         resources:
           {{- toYaml .Values.telemetryCollector.initContainer.resources | nindent 12 }}
@@ -171,7 +171,7 @@ spec:
       containers:
       - name: consul-telemetry-collector
         image: {{ .Values.telemetryCollector.image }}
-        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        {{ template "consul.imagePullPolicy" . }}
         ports:
         - containerPort: 9090
           name: metrics
@@ -299,7 +299,7 @@ spec:
       # consul-dataplane container
       - name: consul-dataplane
         image: "{{ .Values.global.imageConsulDataplane }}"
-        imagePullPolicy: IfNotPresent
+        {{ template "consul.imagePullPolicy" . }}
         command:
           - consul-dataplane
         args:

@@ -38,6 +38,7 @@ spec:
       containers:
         - name: gateway-cleanup
           image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
           {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           command:
             - consul-k8s-control-plane
