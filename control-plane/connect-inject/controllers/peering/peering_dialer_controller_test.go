@@ -321,7 +321,10 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			s := runtime.NewScheme()
 			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
 
 			// Create the peering dialer controller
 			controller := &PeeringDialerController{
@@ -537,7 +540,10 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			s := runtime.NewScheme()
 			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
 
 			// Create the peering dialer controller
 			controller := &PeeringDialerController{
@@ -754,7 +760,10 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 	s := runtime.NewScheme()
 	corev1.AddToScheme(s)
 	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).
+		WithRuntimeObjects(k8sObjects...).
+		WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+		Build()
 
 	// Create test consul server.
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
@@ -897,7 +906,10 @@ func TestDialerUpdateStatus(t *testing.T) {
 			s := runtime.NewScheme()
 			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
 			// Create the peering dialer controller.
 			controller := &PeeringDialerController{
 				Client: fakeClient,
@@ -1010,7 +1022,11 @@ func TestDialerUpdateStatusError(t *testing.T) {
 			s := runtime.NewScheme()
 			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
+
 			// Create the peering dialer controller.
 			controller := &PeeringDialerController{
 				Client: fakeClient,
@@ -1027,6 +1043,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 			}
 			err := fakeClient.Get(context.Background(), dialerName, dialer)
 			require.NoError(t, err)
+			require.Len(t, dialer.Status.Conditions, 1)
 			require.Equal(t, tt.expStatus.Conditions[0].Message, dialer.Status.Conditions[0].Message)
 
 		})
@@ -1295,12 +1312,15 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 			s := runtime.NewScheme()
 			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.dialers).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(tt.secret, &tt.dialers).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
 			controller := PeeringDialerController{
 				Client: fakeClient,
 				Log:    logrtest.New(t),
 			}
-			result := controller.requestsForPeeringTokens(tt.secret)
+			result := controller.requestsForPeeringTokens(context.Background(), tt.secret)
 
 			require.Equal(t, tt.result, result)
 		})

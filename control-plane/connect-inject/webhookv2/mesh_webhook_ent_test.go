@@ -59,10 +59,7 @@ func TestHandler_MutateWithNamespaces_Annotation(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
-
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 
 			webhook := MeshWebhook{
 				Log:                        logrtest.NewTestLogger(t),

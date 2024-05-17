@@ -210,7 +210,10 @@ func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(c.configEntryResource).
+				WithStatusSubresource(c.configEntryResource).
+				Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -431,7 +434,10 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(c.configEntryResource).
+				WithStatusSubresource(c.configEntryResource).
+				Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -618,7 +624,10 @@ func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResourceWithDeletion).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(c.configEntryResourceWithDeletion).
+				WithStatusSubresource(c.configEntryResourceWithDeletion).
+				Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -826,7 +835,10 @@ func TestConfigEntryController_createsConfigEntry_consulNamespaces(tt *testing.T
 				testClient.TestServer.WaitForServiceIntentions(t)
 				consulClient := testClient.APIClient
 
-				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
+				fakeClient := fake.NewClientBuilder().WithScheme(s).
+					WithRuntimeObjects(in.KubeResource).
+					WithStatusSubresource(in.KubeResource).
+					Build()
 
 				r := in.GetController(
 					fakeClient,
@@ -1088,7 +1100,10 @@ func TestConfigEntryController_updatesConfigEntry_consulNamespaces(tt *testing.T
 				testClient.TestServer.WaitForServiceIntentions(t)
 				consulClient := testClient.APIClient
 
-				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
+				fakeClient := fake.NewClientBuilder().WithScheme(s).
+					WithRuntimeObjects(in.KubeResource).
+					WithStatusSubresource(in.KubeResource).
+					Build()
 
 				r := in.GetControllerFunc(
 					fakeClient,
@@ -1337,7 +1352,10 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 				testClient.TestServer.WaitForServiceIntentions(t)
 				consulClient := testClient.APIClient
 
-				fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(in.KubeResource).Build()
+				fakeClient := fake.NewClientBuilder().WithScheme(s).
+					WithRuntimeObjects(in.KubeResource).
+					WithStatusSubresource(in.KubeResource).
+					Build()
 
 				r := in.GetControllerFunc(
 					fakeClient,

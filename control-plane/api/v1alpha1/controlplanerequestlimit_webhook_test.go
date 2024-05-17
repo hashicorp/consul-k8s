@@ -117,8 +117,7 @@ func TestValidateControlPlaneRequestLimit(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ControlPlaneRequestLimit{}, &ControlPlaneRequestLimitList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 
 			validator := &ControlPlaneRequestLimitWebhook{
 				Client:  client,
