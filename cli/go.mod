@@ -2,6 +2,8 @@ module github.com/hashicorp/consul-k8s/cli
 
 go 1.21
 
+toolchain go1.21.4
+
 require (
 	github.com/bgentry/speakeasy v0.1.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
