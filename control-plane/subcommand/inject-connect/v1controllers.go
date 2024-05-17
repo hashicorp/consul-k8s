@@ -16,6 +16,7 @@ import (
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/catalog/registration"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -117,6 +118,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			},
 			ImageDataplane:              c.flagConsulDataplaneImage,
 			ImageConsulK8S:              c.flagConsulK8sImage,
+			GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
 			ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
 			NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
 			EnableNamespaces:            c.flagEnableNamespaces,
@@ -284,12 +286,11 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	if err := (&controllers.RegistrationsController{
-		Client:              mgr.GetClient(),
-		ConsulClientConfig:  consulConfig,
-		ConsulServerConnMgr: watcher,
-		Scheme:              mgr.GetScheme(),
-		Log:                 ctrl.Log.WithName("controller").WithName(apicommon.Registration),
+	if err := (&registration.RegistrationsController{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Cache:  registration.NewRegistrationCache(consulConfig, watcher),
+		Log:    ctrl.Log.WithName("controller").WithName(apicommon.Registration),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.Registration)
 		return err
@@ -338,47 +339,48 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 	}
 
 	(&webhook.MeshWebhook{
-		Clientset:                                c.clientset,
-		ReleaseNamespace:                         c.flagReleaseNamespace,
-		ConsulConfig:                             consulConfig,
-		ConsulServerConnMgr:                      watcher,
-		ImageConsul:                              c.flagConsulImage,
-		ImageConsulDataplane:                     c.flagConsulDataplaneImage,
-		EnvoyExtraArgs:                           c.flagEnvoyExtraArgs,
-		ImageConsulK8S:                           c.flagConsulK8sImage,
-		RequireAnnotation:                        !c.flagDefaultInject,
-		AuthMethod:                               c.flagACLAuthMethod,
-		ConsulCACert:                             string(c.caCertPem),
-		TLSEnabled:                               c.consul.UseTLS,
-		ConsulAddress:                            c.consul.Addresses,
-		SkipServerWatch:                          c.consul.SkipServerWatch,
-		ConsulTLSServerName:                      c.consul.TLSServerName,
-		DefaultProxyCPURequest:                   c.sidecarProxyCPURequest,
-		DefaultProxyCPULimit:                     c.sidecarProxyCPULimit,
-		DefaultProxyMemoryRequest:                c.sidecarProxyMemoryRequest,
-		DefaultProxyMemoryLimit:                  c.sidecarProxyMemoryLimit,
-		DefaultEnvoyProxyConcurrency:             c.flagDefaultEnvoyProxyConcurrency,
-		DefaultSidecarProxyStartupFailureSeconds: c.flagDefaultSidecarProxyStartupFailureSeconds,
+		Clientset:                                 c.clientset,
+		ReleaseNamespace:                          c.flagReleaseNamespace,
+		ConsulConfig:                              consulConfig,
+		ConsulServerConnMgr:                       watcher,
+		ImageConsul:                               c.flagConsulImage,
+		ImageConsulDataplane:                      c.flagConsulDataplaneImage,
+		EnvoyExtraArgs:                            c.flagEnvoyExtraArgs,
+		ImageConsulK8S:                            c.flagConsulK8sImage,
+		GlobalImagePullPolicy:                     c.flagGlobalImagePullPolicy,
+		RequireAnnotation:                         !c.flagDefaultInject,
+		AuthMethod:                                c.flagACLAuthMethod,
+		ConsulCACert:                              string(c.caCertPem),
+		TLSEnabled:                                c.consul.UseTLS,
+		ConsulAddress:                             c.consul.Addresses,
+		SkipServerWatch:                           c.consul.SkipServerWatch,
+		ConsulTLSServerName:                       c.consul.TLSServerName,
+		DefaultProxyCPURequest:                    c.sidecarProxyCPURequest,
+		DefaultProxyCPULimit:                      c.sidecarProxyCPULimit,
+		DefaultProxyMemoryRequest:                 c.sidecarProxyMemoryRequest,
+		DefaultProxyMemoryLimit:                   c.sidecarProxyMemoryLimit,
+		DefaultEnvoyProxyConcurrency:              c.flagDefaultEnvoyProxyConcurrency,
+		DefaultSidecarProxyStartupFailureSeconds:  c.flagDefaultSidecarProxyStartupFailureSeconds,
 		DefaultSidecarProxyLivenessFailureSeconds: c.flagDefaultSidecarProxyLivenessFailureSeconds,
-		LifecycleConfig:            lifecycleConfig,
-		MetricsConfig:              metricsConfig,
-		InitContainerResources:     c.initContainerResources,
-		ConsulPartition:            c.consul.Partition,
-		AllowK8sNamespacesSet:      allowK8sNamespaces,
-		DenyK8sNamespacesSet:       denyK8sNamespaces,
-		EnableNamespaces:           c.flagEnableNamespaces,
-		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-		EnableK8SNSMirroring:       c.flagEnableK8SNSMirroring,
-		K8SNSMirroringPrefix:       c.flagK8SNSMirroringPrefix,
-		CrossNamespaceACLPolicy:    c.flagCrossNamespaceACLPolicy,
-		EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
-		EnableCNI:                  c.flagEnableCNI,
-		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
-		EnableConsulDNS:            c.flagEnableConsulDNS,
-		EnableOpenShift:            c.flagEnableOpenShift,
-		Log:                        ctrl.Log.WithName("handler").WithName("connect"),
-		LogLevel:                   c.flagLogLevel,
-		LogJSON:                    c.flagLogJSON,
+		LifecycleConfig:                           lifecycleConfig,
+		MetricsConfig:                             metricsConfig,
+		InitContainerResources:                    c.initContainerResources,
+		ConsulPartition:                           c.consul.Partition,
+		AllowK8sNamespacesSet:                     allowK8sNamespaces,
+		DenyK8sNamespacesSet:                      denyK8sNamespaces,
+		EnableNamespaces:                          c.flagEnableNamespaces,
+		ConsulDestinationNamespace:                c.flagConsulDestinationNamespace,
+		EnableK8SNSMirroring:                      c.flagEnableK8SNSMirroring,
+		K8SNSMirroringPrefix:                      c.flagK8SNSMirroringPrefix,
+		CrossNamespaceACLPolicy:                   c.flagCrossNamespaceACLPolicy,
+		EnableTransparentProxy:                    c.flagDefaultEnableTransparentProxy,
+		EnableCNI:                                 c.flagEnableCNI,
+		TProxyOverwriteProbes:                     c.flagTransparentProxyDefaultOverwriteProbes,
+		EnableConsulDNS:                           c.flagEnableConsulDNS,
+		EnableOpenShift:                           c.flagEnableOpenShift,
+		Log:                                       ctrl.Log.WithName("handler").WithName("connect"),
+		LogLevel:                                  c.flagLogLevel,
+		LogJSON:                                   c.flagLogJSON,
 	}).SetupWithManager(mgr)
 
 	consulMeta := apicommon.ConsulMeta{

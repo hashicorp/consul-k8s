@@ -1,0 +1,3 @@
+```release-note:feature
+helm: adds ability to set the Image Pull Policy for all Consul images (consul, consul-k8s, consul-dataplane, consul-telemetry-collector)
+```

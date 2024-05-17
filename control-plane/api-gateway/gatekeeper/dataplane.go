@@ -53,8 +53,9 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	}
 
 	container := corev1.Container{
-		Name:  name,
-		Image: config.ImageDataplane,
+		Name:            name,
+		Image:           config.ImageDataplane,
+		ImagePullPolicy: corev1.PullPolicy(config.GlobalImagePullPolicy),
 
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
 		// consul-dataplane can write files to it. Otherwise, it wouldn't be able to
