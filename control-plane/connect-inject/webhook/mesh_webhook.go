@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -57,7 +58,7 @@ var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.Name
 type MeshWebhook struct {
 	Clientset kubernetes.Interface
 
-	// ConsulClientConfig is the config to create a Consul API client.
+	// ConsulConfig is the config to create a Consul API client.
 	ConsulConfig *consul.Config
 
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
@@ -726,9 +727,9 @@ func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod co
 	return nil
 }
 
-func (w *MeshWebhook) InjectDecoder(d *admission.Decoder) error {
-	w.decoder = d
-	return nil
+func (w *MeshWebhook) SetupWithManager(mgr ctrl.Manager) {
+	w.decoder = admission.NewDecoder(mgr.GetScheme())
+	mgr.GetWebhookServer().Register("/mutate", &admission.Webhook{Handler: w})
 }
 
 func sliceContains(slice []string, entry string) bool {

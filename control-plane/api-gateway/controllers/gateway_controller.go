@@ -10,8 +10,6 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +32,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/gatekeeper"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 )
@@ -405,54 +404,54 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
 		Watches(
-			source.NewKindWithCache(&gwv1beta1.ReferenceGrant{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant(ctx)),
+			&gwv1beta1.ReferenceGrant{},
+			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
 		).
 		Watches(
-			source.NewKindWithCache(&gwv1beta1.GatewayClass{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass(ctx)),
+			&gwv1beta1.GatewayClass{},
+			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass),
 		).
 		Watches(
-			source.NewKindWithCache(&gwv1beta1.HTTPRoute{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformHTTPRoute(ctx)),
+			&gwv1beta1.HTTPRoute{},
+			handler.EnqueueRequestsFromMapFunc(r.transformHTTPRoute),
 		).
 		Watches(
-			source.NewKindWithCache(&gwv1alpha2.TCPRoute{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformTCPRoute(ctx)),
+			&gwv1alpha2.TCPRoute{},
+			handler.EnqueueRequestsFromMapFunc(r.transformTCPRoute),
 		).
 		Watches(
-			source.NewKindWithCache(&corev1.Secret{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformSecret(ctx)),
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.transformSecret),
 		).
 		Watches(
-			source.NewKindWithCache(&v1alpha1.MeshService{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformMeshService(ctx)),
+			&v1alpha1.MeshService{},
+			handler.EnqueueRequestsFromMapFunc(r.transformMeshService),
 		).
 		Watches(
-			source.NewKindWithCache(&corev1.Endpoints{}, mgr.GetCache()),
-			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints(ctx)),
+			&corev1.Endpoints{},
+			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints),
 		).
 		Watches(
-			&source.Kind{Type: &corev1.Pod{}},
-			handler.EnqueueRequestsFromMapFunc(r.transformPods(ctx)),
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(r.transformPods),
 			builder.WithPredicates(predicate),
 		).
-		Watches(
+		WatchesRawSource(
 			// Subscribe to changes from Consul for APIGateways
 			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
-		Watches(
+		WatchesRawSource(
 			// Subscribe to changes from Consul for HTTPRoutes
 			&source.Channel{Source: c.Subscribe(ctx, api.HTTPRoute, r.transformConsulHTTPRoute(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
-		Watches(
+		WatchesRawSource(
 			// Subscribe to changes from Consul for TCPRoutes
 			&source.Channel{Source: c.Subscribe(ctx, api.TCPRoute, r.transformConsulTCPRoute(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
 		).
-		Watches(
+		WatchesRawSource(
 			// Subscribe to changes from Consul for InlineCertificates
 			&source.Channel{Source: c.Subscribe(ctx, api.InlineCertificate, r.transformConsulInlineCertificate(ctx)).Events()},
 			&handler.EnqueueRequestForObject{},
@@ -461,87 +460,75 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
 // class, then return a list of reconcile Requests for it.
-func (r *GatewayController) transformGatewayClass(ctx context.Context) func(o client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		gatewayClass := o.(*gwv1beta1.GatewayClass)
-		gatewayList := &gwv1beta1.GatewayList{}
-		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gatewayClass.Name),
-		}); err != nil {
-			return nil
-		}
-		return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
+func (r *GatewayController) transformGatewayClass(ctx context.Context, o client.Object) []reconcile.Request {
+	gatewayClass := o.(*gwv1beta1.GatewayClass)
+	gatewayList := &gwv1beta1.GatewayList{}
+	if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gatewayClass.Name),
+	}); err != nil {
+		return nil
 	}
+	return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
 }
 
 // transformHTTPRoute will check the HTTPRoute object for a matching
 // class, then return a list of reconcile Requests for Gateways referring to it.
-func (r *GatewayController) transformHTTPRoute(ctx context.Context) func(o client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		route := o.(*gwv1beta1.HTTPRoute)
+func (r *GatewayController) transformHTTPRoute(ctx context.Context, o client.Object) []reconcile.Request {
+	route := o.(*gwv1beta1.HTTPRoute)
 
-		refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
-		statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
-			return parentStatus.ParentRef
-		})))
-		return append(refs, statusRefs...)
-	}
+	refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
+	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+		return parentStatus.ParentRef
+	})))
+	return append(refs, statusRefs...)
 }
 
 // transformTCPRoute will check the TCPRoute object for a matching
 // class, then return a list of reconcile Requests for Gateways referring to it.
-func (r *GatewayController) transformTCPRoute(ctx context.Context) func(o client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		route := o.(*gwv1alpha2.TCPRoute)
+func (r *GatewayController) transformTCPRoute(ctx context.Context, o client.Object) []reconcile.Request {
+	route := o.(*gwv1alpha2.TCPRoute)
 
-		refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
-		statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
-			return parentStatus.ParentRef
-		})))
-		return append(refs, statusRefs...)
-	}
+	refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
+	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+		return parentStatus.ParentRef
+	})))
+	return append(refs, statusRefs...)
 }
 
 // transformSecret will check the Secret object for a matching
 // class, then return a list of reconcile Requests for Gateways referring to it.
-func (r *GatewayController) transformSecret(ctx context.Context) func(o client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		secret := o.(*corev1.Secret)
-		gatewayList := &gwv1beta1.GatewayList{}
-		if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, client.ObjectKeyFromObject(secret).String()),
-		}); err != nil {
-			return nil
-		}
-		return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
+func (r *GatewayController) transformSecret(ctx context.Context, o client.Object) []reconcile.Request {
+	secret := o.(*corev1.Secret)
+	gatewayList := &gwv1beta1.GatewayList{}
+	if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, client.ObjectKeyFromObject(secret).String()),
+	}); err != nil {
+		return nil
 	}
+	return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
 }
 
 // transformReferenceGrant will check the ReferenceGrant object for a matching
 // class, then return a list of reconcile Requests for Gateways referring to it.
-func (r *GatewayController) transformReferenceGrant(ctx context.Context) func(o client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		// just re-reconcile all gateways for now ideally this will filter down to gateways
-		// affected, but technically the blast radius is gateways in the namespace + referencing
-		// the namespace + the routes that bind to them.
-		gatewayList := &gwv1beta1.GatewayList{}
-		if err := r.Client.List(ctx, gatewayList); err != nil {
-			return nil
-		}
-
-		return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
+func (r *GatewayController) transformReferenceGrant(ctx context.Context, o client.Object) []reconcile.Request {
+	// just re-reconcile all gateways for now ideally this will filter down to gateways
+	// affected, but technically the blast radius is gateways in the namespace + referencing
+	// the namespace + the routes that bind to them.
+	gatewayList := &gwv1beta1.GatewayList{}
+	if err := r.Client.List(ctx, gatewayList); err != nil {
+		return nil
 	}
+
+	return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
 }
 
 // transformMeshService will return a list of gateways that are referenced
 // by a TCPRoute or HTTPRoute that references the mesh service.
-func (r *GatewayController) transformMeshService(ctx context.Context) func(o client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		service := o.(*v1alpha1.MeshService)
-		key := client.ObjectKeyFromObject(service).String()
+func (r *GatewayController) transformMeshService(ctx context.Context, o client.Object) []reconcile.Request {
+	service := o.(*v1alpha1.MeshService)
+	key := client.ObjectKeyFromObject(service).String()
 
-		return r.gatewaysForRoutesReferencing(ctx, TCPRoute_MeshServiceIndex, HTTPRoute_MeshServiceIndex, key)
-	}
+	return r.gatewaysForRoutesReferencing(ctx, TCPRoute_MeshServiceIndex, HTTPRoute_MeshServiceIndex, key)
 }
 
 // transformConsulGateway will return a list of gateways that this corresponds to.
@@ -626,33 +613,29 @@ func gatewayReferencesCertificate(certificateKey api.ResourceReference, gateway 
 	return false
 }
 
-func (r *GatewayController) transformPods(ctx context.Context) func(o client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		pod := o.(*corev1.Pod)
+func (r *GatewayController) transformPods(ctx context.Context, o client.Object) []reconcile.Request {
+	pod := o.(*corev1.Pod)
 
-		if gateway, managed := common.GatewayFromPod(pod); managed {
-			return []reconcile.Request{
-				{NamespacedName: gateway},
-			}
+	if gateway, managed := common.GatewayFromPod(pod); managed {
+		return []reconcile.Request{
+			{NamespacedName: gateway},
 		}
-
-		return nil
 	}
+
+	return nil
 }
 
 // transformEndpoints will return a list of gateways that are referenced
 // by a TCPRoute or HTTPRoute that references the service.
-func (r *GatewayController) transformEndpoints(ctx context.Context) func(o client.Object) []reconcile.Request {
-	return func(o client.Object) []reconcile.Request {
-		key := client.ObjectKeyFromObject(o)
-		endpoints := o.(*corev1.Endpoints)
+func (r *GatewayController) transformEndpoints(ctx context.Context, o client.Object) []reconcile.Request {
+	key := client.ObjectKeyFromObject(o)
+	endpoints := o.(*corev1.Endpoints)
 
-		if shouldIgnore(key.Namespace, r.denyK8sNamespacesSet, r.allowK8sNamespacesSet) || isLabeledIgnore(endpoints.Labels) {
-			return nil
-		}
-
-		return r.gatewaysForRoutesReferencing(ctx, TCPRoute_ServiceIndex, HTTPRoute_ServiceIndex, key.String())
+	if shouldIgnore(key.Namespace, r.denyK8sNamespacesSet, r.allowK8sNamespacesSet) || isLabeledIgnore(endpoints.Labels) {
+		return nil
 	}
+
+	return r.gatewaysForRoutesReferencing(ctx, TCPRoute_ServiceIndex, HTTPRoute_ServiceIndex, key.String())
 }
 
 // gatewaysForRoutesReferencing returns a mapping of all gateways that are referenced by routes that
