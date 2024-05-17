@@ -420,8 +420,24 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 
 		_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
 		if err != nil && !isRoleExistsErr(err, aclRoleName) {
-			//don't error out in the case that the role already exists.
+			// don't error out in the case that the role already exists.
 			return "", err
+		}
+
+		if err != nil && isRoleExistsErr(err, aclRoleName) {
+			role, _, err := client.ACL().RoleReadByName(role.Name, &api.QueryOptions{})
+			if err != nil {
+				return "", err
+			}
+
+			role.Policies = []*api.ACLLink{{ID: policyID}}
+			role, _, err = client.ACL().RoleUpdate(role, &api.WriteOptions{})
+			if err != nil {
+				return "", err
+			}
+
+			c.gatewayNameToRole[gatewayName] = role
+			return aclRoleName, err
 		}
 
 		c.gatewayNameToRole[gatewayName] = role
