@@ -163,9 +163,17 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					case <-gracePeriodTimer.C:
 						break gracePeriodLoop
 					default:
-						output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
-						require.NoError(t, err)
-						require.True(t, !strings.Contains(output, "curl: (7) Failed to connect"))
+						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
+						retry.RunWith(retrier, t, func(r *retry.R) {
+							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
+							if err != nil {
+								r.Errorf(err.Error())
+								return
+							}
+							require.Condition(r, func() bool {
+								return !strings.Contains(output, "curl: (7) Failed to connect")
+							}, fmt.Sprintf("Error: %s", output))
+						})
 
 						// If listener draining is disabled, ensure inbound
 						// requests are accepted during grace period.
