@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,7 +60,7 @@ func (v *TrafficPermissionsWebhook) List(ctx context.Context) ([]common.MeshConf
 	return entries, nil
 }
 
-func (v *TrafficPermissionsWebhook) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
+func (v *TrafficPermissionsWebhook) SetupWithManager(mgr ctrl.Manager) {
+	v.decoder = admission.NewDecoder(mgr.GetScheme())
+	mgr.GetWebhookServer().Register("/mutate-v2beta1-trafficpermissions", &admission.Webhook{Handler: v})
 }
