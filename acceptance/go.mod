@@ -2,6 +2,8 @@ module github.com/hashicorp/consul-k8s/acceptance
 
 go 1.21.1
 
+toolchain go1.22.0
+
 require (
 	github.com/google/uuid v1.3.0
 	github.com/gruntwork-io/terratest v0.46.7
