@@ -1,3 +1,40 @@
+## 1.3.5- (May 20, 2024)
+
+SECURITY:
+
+* Upgrade Go to use 1.21.10. This addresses CVEs 
+[CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-24787) and
+[CVE-2024-24788](https://nvd.nist.gov/vuln/detail/CVE-2024-24788) [[GH-3980](https://github.com/hashicorp/consul-k8s/issues/3980)]
+* Upgrade `helm/v3` to 3.14.4. This resolves the following security vulnerabilities:
+[CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
+[CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147) [[GH-3935](https://github.com/hashicorp/consul-k8s/issues/3935)]
+* Upgrade to use Go `1.21.9`. This resolves CVE
+[CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`http2`). [[GH-3902](https://github.com/hashicorp/consul-k8s/issues/3902)]
+* Upgrade to use golang.org/x/net `v0.24.0`. This resolves CVE
+[CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`x/net`). [[GH-3902](https://github.com/hashicorp/consul-k8s/issues/3902)]
+
+FEATURES:
+
+* Add support for configuring graceful startup proxy lifecycle management settings. [[GH-3878](https://github.com/hashicorp/consul-k8s/issues/3878)]
+
+IMPROVEMENTS:
+
+* control-plane: support <space>, <comma> and <\n> as upstream separators. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+* ConfigEntries controller: Only error for config entries from different datacenters when the config entries are different [[GH-3873](https://github.com/hashicorp/consul-k8s/issues/3873)]
+* control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-3813](https://github.com/hashicorp/consul-k8s/issues/3813)]
+* helm: only create the default Prometheus path annotation when it's not already specified within the component-specific
+annotations. For example if the `client.annotations` value sets prometheus.io/path annotation, don't overwrite it with
+the default value. [[GH-3846](https://github.com/hashicorp/consul-k8s/issues/3846)]
+* helm: support sync-lb-services-endpoints flag for syncCatalog [[GH-3905](https://github.com/hashicorp/consul-k8s/issues/3905)]
+* terminating-gateways: Remove unnecessary permissions from terminating gateways role [[GH-3928](https://github.com/hashicorp/consul-k8s/issues/3928)]
+
+BUG FIXES:
+
+* Create Consul service with mode transparent-proxy even when a cluster IP is not assigned to the service.. [[GH-3974](https://github.com/hashicorp/consul-k8s/issues/3974)]
+* api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul when upgrading between versions. [[GH-3918](https://github.com/hashicorp/consul-k8s/issues/3918)]
+* api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4001](https://github.com/hashicorp/consul-k8s/issues/4001)]
+* control-plane: fix a panic when an upstream annotation is malformed. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+
 ## 1.3.4 (March 28, 2024)
 
 SECURITY:
