@@ -1,3 +1,22 @@
+## 1.1.12 (May 20, 2024)
+
+SECURITY:
+
+* Upgrade Go to use 1.21.10. This addresses CVEs 
+[CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-24787) and
+[CVE-2024-24788](https://nvd.nist.gov/vuln/detail/CVE-2024-24788) [[GH-3980](https://github.com/hashicorp/consul-k8s/issues/3980)]
+* Upgrade `helm/v3` to 3.14.4. This resolves the following security vulnerabilities:
+[CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
+[CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147) [[GH-3935](https://github.com/hashicorp/consul-k8s/issues/3935)]
+* Upgrade to use Go `1.21.9`. This resolves CVE
+[CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`http2`). [[GH-3900](https://github.com/hashicorp/consul-k8s/issues/3900)]
+* Upgrade to use golang.org/x/net `v0.24.0`. This resolves CVE
+[CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`x/net`). [[GH-3900](https://github.com/hashicorp/consul-k8s/issues/3900)]
+
+IMPROVEMENTS:
+
+* ConfigEntries controller: Only error for config entries from different datacenters when the config entries are different [[GH-3873](https://github.com/hashicorp/consul-k8s/issues/3873)]
+
 ## 1.1.11 (March 28, 2024)
 
 SECURITY:
