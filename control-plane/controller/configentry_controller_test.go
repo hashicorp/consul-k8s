@@ -441,7 +441,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -918,7 +918,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1318,7 +1318,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResourceWithDeletion).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResourceWithDeletion).WithStatusSubresource(c.configEntryResourceWithDeletion).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1379,7 +1379,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 
 	s := runtime.NewScheme()
 	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(svcDefaults).WithStatusSubresource(svcDefaults).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	testClient.TestServer.WaitForServiceIntentions(t)
@@ -1452,7 +1452,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 
 	// The config entry exists in kube but its status will be nil.
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(svcDefaults).WithStatusSubresource(svcDefaults).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	testClient.TestServer.WaitForServiceIntentions(t)
@@ -1545,7 +1545,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				},
 			}
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(svcDefaults).WithStatusSubresource(svcDefaults).Build()
 
 			// Change the config entry so protocol is https instead of http if test case says to
 			if c.makeDifferentFromConsul {
@@ -1642,7 +1642,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 				},
 			}
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaultsWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaultsWithDeletion).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(svcDefaultsWithDeletion).WithStatusSubresource(svcDefaultsWithDeletion).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1724,7 +1724,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 		},
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(defaults, splitter).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(defaults, splitter).WithStatusSubresource(defaults, splitter).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	testClient.TestServer.WaitForServiceIntentions(t)
@@ -1773,8 +1773,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update service-defaults with deletion timestamp so that it attempts deletion on reconcile.
-	defaults.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	err = fakeClient.Update(ctx, defaults)
+	err = fakeClient.Delete(ctx, defaults)
 	require.NoError(t, err)
 
 	// Reconcile should fail as the service-splitter still required the service-defaults causing the delete operation on Consul to fail.
@@ -1856,7 +1855,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{})
 
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(&c.KubeResource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(&c.KubeResource).WithStatusSubresource(&c.KubeResource).Build()
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
 			consulClient := testClient.APIClient

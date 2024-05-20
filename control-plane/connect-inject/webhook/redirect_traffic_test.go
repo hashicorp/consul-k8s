@@ -11,8 +11,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -21,6 +19,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 const (
@@ -34,8 +35,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		Group:   "",
 		Version: "v1",
 	}, &corev1.Pod{})
-	decoder, err := admission.NewDecoder(s)
-	require.NoError(t, err)
+	decoder := admission.NewDecoder(s)
 	cases := []struct {
 		name       string
 		webhook    MeshWebhook
@@ -389,7 +389,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err = c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
+			err := c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
 
 			// Only compare annotation and iptables config on successful runs
 			if c.expErr == nil {
