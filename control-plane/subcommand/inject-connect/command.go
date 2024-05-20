@@ -800,12 +800,11 @@ func (c *Command) Run(args []string) int {
 		ConsulMeta: consulMeta,
 	}).SetupWithManager(mgr)
 
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceResolver),
-			ConsulMeta: consulMeta,
-		}})
+	(&v1alpha1.ServiceResolverWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceResolver),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
 
 	(&v1alpha1.ProxyDefaultsWebhook{
 		Client:     mgr.GetClient(),
