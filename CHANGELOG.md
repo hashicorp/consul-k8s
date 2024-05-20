@@ -37,8 +37,6 @@ BUG FIXES:
 * consul-cni: Fixed a bug where the output of `-version` did not include the version of the binary [[GH-3829](https://github.com/hashicorp/consul-k8s/issues/3829)]
 * control-plane: fix a panic when an upstream annotation is malformed. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
 
-## 1.4.2 (May 20, 2024)
-
 
 ## 1.4.1 (March 28, 2024)
 
