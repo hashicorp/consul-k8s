@@ -171,7 +171,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	r.Log.Info("retrieved", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+	r.Log.Info("retrieved", "k8s-svc-endpoints-name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 
 	// If the endpoints object has the label "consul.hashicorp.com/service-ignore" set to true, deregister all instances in Consul for this service.
 	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
@@ -196,11 +196,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
 					if k8serrors.IsNotFound(err) {
 						deregisterEndpointAddress[address.IP] = true
+						r.Log.Info("** 1 deregister[] set to true for address", "pod", address.TargetRef.Name, "pod-ns", address.TargetRef.Namespace, "ip", address.IP)
 						r.Log.Info("pod not found", "name", address.TargetRef.Name)
 					} else {
 						// If there was a different error fetching the pod, then log the error but don't deregister it
 						// since this could be a K8s API blip and we don't want to prematurely deregister.
 						deregisterEndpointAddress[address.IP] = false
+						r.Log.Info("** 2 deregister[] set to false for address", "pod", address.TargetRef.Name, "pod-ns", address.TargetRef.Namespace, "ip", address.IP)
 						r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
 						errs = multierror.Append(errs, err)
 					}
@@ -212,6 +214,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 					// Set up the deregisterEndpointAddress to deregister service instances that don't match the annotation.
 					deregisterEndpointAddress[address.IP] = true
+					r.Log.Info("** 3 deregister[] set to true for address", "pod", address.TargetRef.Name, "pod-ns", address.TargetRef.Namespace, "ip", address.IP)
 					continue
 				}
 
@@ -230,6 +233,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						}
 						// Build the deregisterEndpointAddress map up for deregistering service instances later.
 						deregisterEndpointAddress[pod.Status.PodIP] = false
+						r.Log.Info("** 4 deregister[] set to false for address", "pod", address.TargetRef.Name, "pod-ns", address.TargetRef.Namespace, "ip", address.IP)
 					} else {
 						r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 						nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
@@ -258,6 +262,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					}
 					// Build the deregisterEndpointAddress map up for deregistering service instances later.
 					deregisterEndpointAddress[pod.Status.PodIP] = false
+					r.Log.Info("** 5 deregister[] set to false for address", "pod", address.TargetRef.Name, "pod-ns", address.TargetRef.Namespace, "ip", pod.Status.PodIP)
 				}
 			}
 		}
@@ -302,8 +307,8 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		}
 
 		// Register the service instance with Consul.
-		r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
-			"id", serviceRegistration.Service.ID)
+		r.Log.Info("registering service with Consul", "csl-svc-name", serviceRegistration.Service.Service,
+			"csl-svc-id", serviceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(serviceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register service", "name", serviceRegistration.Service.Service)
@@ -311,15 +316,15 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		}
 
 		// Add manual ip to the VIP table
-		r.Log.Info("adding manual ip to virtual ip table in Consul", "name", serviceRegistration.Service.Service,
-			"id", serviceRegistration.ID)
+		r.Log.Info("adding manual ip to virtual ip table in Consul", "csl-svc-name", serviceRegistration.Service.Service,
+			"csl-svc-id", serviceRegistration.ID)
 		err = assignServiceVirtualIP(r.Context, apiClient, serviceRegistration.Service)
 		if err != nil {
 			r.Log.Error(err, "failed to add ip to virtual ip table", "name", serviceRegistration.Service.Service)
 		}
 
 		// Register the proxy service instance with Consul.
-		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service, "id", proxyServiceRegistration.Service.ID)
+		r.Log.Info("registering proxy service with Consul", "csl-svc-name", proxyServiceRegistration.Service.Service, "csl-svc-id", proxyServiceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(proxyServiceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Service.Service)
@@ -951,6 +956,8 @@ func (r *Controller) deregisterService(
 	k8sSvcName string,
 	k8sSvcNamespace string,
 	deregisterEndpointAddress map[string]bool) (time.Duration, error) {
+	r.Log.Info("** deregister called for service", "k8s-svc-name", k8sSvcName, "k8s-svc-ns", k8sSvcNamespace)
+	r.Log.Info("** deregister with map", "deregister-ep-address-map", deregisterEndpointAddress)
 
 	// Get services matching metadata from Consul
 	serviceInstances, err := r.serviceInstances(apiClient, k8sSvcName, k8sSvcNamespace)
@@ -968,6 +975,7 @@ func (r *Controller) deregisterService(
 		var serviceDeregistered bool
 
 		if deregister(svc.ServiceAddress, deregisterEndpointAddress) {
+			r.Log.Info("** deregister was set to true on this address", "csl-svc-name", svc.ServiceName, "csl-svc-id", svc.ServiceID, "csl-svc-address", svc.ServiceAddress)
 			// If graceful shutdown is enabled, continue to the next service instance and
 			// mark that an event requeue is needed. We should requeue at the longest time interval
 			// to prevent excessive re-queues. Also, updating the health status in Consul to Critical
@@ -981,8 +989,10 @@ func (r *Controller) deregisterService(
 			// set requeue response, then continue to the next service instance
 			if podShutdownDuration > requeueAfter {
 				requeueAfter = podShutdownDuration
+				r.Log.Info("** pod shutdown duration was longer than requeue time, resetting requeue time to be the shutdown duration", "csl-svc-name", svc.ServiceName, "csl-svc-id", svc.ServiceID, "csl-svc-address", svc.ServiceAddress)
 			}
 			if podShutdownDuration > 0 {
+				r.Log.Info("** pod shutdown duration was greater than zero, skipping this service instance", "csl-svc-name", svc.ServiceName, "csl-svc-id", svc.ServiceID, "csl-svc-address", svc.ServiceAddress)
 				continue
 			}
 
@@ -1021,7 +1031,7 @@ func (r *Controller) deregisterService(
 	}
 
 	if requeueAfter > 0 {
-		r.Log.Info("re-queueing event for graceful shutdown", "name", k8sSvcName, "k8sNamespace", k8sSvcNamespace, "requeueAfter", requeueAfter)
+		r.Log.Info("** re-queueing event for graceful shutdown", "k8s-svc-name", k8sSvcName, "k8sNamespace", k8sSvcNamespace, "requeueAfter", requeueAfter)
 	}
 
 	return requeueAfter, errs
@@ -1041,6 +1051,7 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 	var pod corev1.Pod
 	err := r.Client.Get(ctx, types.NamespacedName{Name: podName, Namespace: k8sNamespace}, &pod)
 	if k8serrors.IsNotFound(err) {
+		r.Log.Info("** pod not found, already deleted", "pod-name", podName, "k8sNamespace", k8sNamespace)
 		return 0, nil
 	}
 	if err != nil {
@@ -1048,6 +1059,7 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 		return 0, fmt.Errorf("failed to get terminating pod %s/%s: %w", k8sNamespace, podName, err)
 	}
 
+	r.Log.Info("** getting shutdown period seconds for pod", "pod-name", podName, "k8sNamespace", k8sNamespace)
 	shutdownSeconds, err := r.getGracefulShutdownPeriodSecondsForPod(pod)
 	if err != nil {
 		r.Log.Error(err, "failed to get graceful shutdown period for pod", "name", pod, "k8sNamespace", k8sNamespace)
@@ -1073,8 +1085,8 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 			SkipNodeUpdate: true,
 		}
 
-		r.Log.Info("updating health status of service with Consul to critical in order to drain inbound traffic", "name", svc.ServiceName,
-			"id", svc.ServiceID, "pod", podName, "k8sNamespace", pod.Namespace)
+		r.Log.Info("** updating health status of service with Consul to critical in order to drain inbound traffic", "csl-svc-name", svc.ServiceName,
+			"csl-svc-id", svc.ServiceID, "pod", podName, "k8sNamespace", pod.Namespace)
 		_, err = apiClient.Catalog().Register(serviceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to update service health status to critical", "name", svc.ServiceName, "pod", podName)
