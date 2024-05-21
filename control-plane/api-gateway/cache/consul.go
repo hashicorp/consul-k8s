@@ -424,6 +424,21 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 			return "", err
 		}
 
+		if err != nil && isRoleExistsErr(err, aclRoleName) {
+			role, _, err := client.ACL().RoleReadByName(role.Name, &api.QueryOptions{})
+			if err != nil {
+				return "", err
+			}
+
+			role.Policies = []*api.ACLLink{{ID: policyID}}
+			role, _, err = client.ACL().RoleUpdate(role, &api.WriteOptions{})
+			if err != nil {
+				return "", err
+			}
+			c.gatewayNameToRole[gatewayName] = role
+			return aclRoleName, err
+		}
+
 		c.gatewayNameToRole[gatewayName] = role
 		return aclRoleName, nil
 	}
@@ -595,11 +610,23 @@ func ignoreACLsDisabled(err error) error {
 	return err
 }
 
+// isExistsErr returns true if err is due to trying to call an API for a given type and it already exists.
+func isExistsErr(err error, typeName, name string) bool {
+	return err != nil &&
+		strings.Contains(err.Error(), "Unexpected response code: 500") &&
+		strings.Contains(err.Error(), fmt.Sprintf("Invalid %s: A %s with Name %q already exists", typeName, typeName, name))
+}
+
+// isRoleExistsErr returns true if err is due to trying to call the
+// role create API when the role already exists.
+func isRoleExistsErr(err error, roleName string) bool {
+	return isExistsErr(err, "Role", roleName)
+}
+
 // isPolicyExistsErr returns true if err is due to trying to call the
 // policy create API when the policy already exists.
 func isPolicyExistsErr(err error, policyName string) bool {
 	return isExistsErr(err, "Policy", policyName)
-}
 
 // isExistsErr returns true if err is due to trying to call an API for a given type and it already exists.
 func isExistsErr(err error, typeName, name string) bool {

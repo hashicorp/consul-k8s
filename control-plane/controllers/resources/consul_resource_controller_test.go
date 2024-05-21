@@ -139,7 +139,7 @@ func TestConsulResourceController_CreatesConsulResource(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v2beta1.AuthGroupVersion, c.resource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.resource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.resource).WithStatusSubresource(c.resource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
@@ -277,7 +277,7 @@ func TestConsulResourceController_UpdatesConsulResource(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.resource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.resource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.resource).WithStatusSubresource(c.resource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
@@ -392,7 +392,7 @@ func TestConsulResourceController_DeletesConsulResource(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v2beta1.AuthGroupVersion, c.resource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.resource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.resource).WithStatusSubresource(c.resource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 				c.Experiments = []string{"resource-apis"}
@@ -458,7 +458,7 @@ func TestConsulResourceController_ErrorUpdatesSyncStatus(t *testing.T) {
 
 	s := runtime.NewScheme()
 	s.AddKnownTypes(v2beta1.AuthGroupVersion, trafficpermissions)
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissions).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(trafficpermissions).WithStatusSubresource(trafficpermissions).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
@@ -537,7 +537,7 @@ func TestConsulResourceController_SetsSyncedToTrue(t *testing.T) {
 	s.AddKnownTypes(v2beta1.AuthGroupVersion, trafficpermissions)
 
 	// The config entry exists in kube but its status will be nil.
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissions).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(trafficpermissions).WithStatusSubresource(trafficpermissions).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
@@ -610,7 +610,7 @@ func TestConsulResourceController_DoesNotCreateUnownedResource(t *testing.T) {
 		},
 	}
 	s.AddKnownTypes(v2beta1.AuthGroupVersion, trafficpermissions)
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissions).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(trafficpermissions).WithStatusSubresource(trafficpermissions).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
@@ -711,7 +711,7 @@ func TestConsulResourceController_doesNotDeleteUnownedConfig(t *testing.T) {
 		},
 	}
 	s.AddKnownTypes(v2beta1.AuthGroupVersion, trafficpermissionsWithDeletion)
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(trafficpermissionsWithDeletion).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(trafficpermissionsWithDeletion).WithStatusSubresource(trafficpermissionsWithDeletion).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.Experiments = []string{"resource-apis"}
