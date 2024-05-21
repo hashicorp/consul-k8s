@@ -19,6 +19,17 @@ container {
   secrets {
     all = true
   }
+
+  triage {
+    suppress {
+      vulnerabilites = [
+        # 2024-05-21: temporary triage for alpine:3.18 base image (openssl)
+        "CVE-2024-0727",
+        "CVE-2023-6129",
+        "CVE-2023-5678"
+      ]
+    }
+  }
 }
 
 binary {
