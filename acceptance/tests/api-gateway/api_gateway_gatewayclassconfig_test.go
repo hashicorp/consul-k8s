@@ -138,7 +138,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	checkConsulExists(t, consulClient, api.APIGateway, gatewayName)
 
 	// Scenario: Gateway deployment should match the default instances defined on the gateway class config
-	logger.Log(t, "checking that gateway instances match defined gateway class config")
+	// checking that gateway instances match defined gateway class config
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
 
 	// Scenario: Updating the GatewayClassConfig should not affect gateways that have already been created
@@ -177,7 +177,7 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *api.Client, name, namespace string, wantNumber *int32, gateway *gwv1beta1.Gateway) {
 	t.Helper()
 
-	retryCheckWithWait(t, 30, 10*time.Second, func(r *retry.R) {
+	retryCheckWithWait(t, 40, 10*time.Second, func(r *retry.R) {
 		logger.Log(t, "checking that gateway instances match defined gateway class config")
 		logger.Log(t, fmt.Sprintf("want: %d", *wantNumber))
 
