@@ -420,8 +420,24 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 
 		_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
 		if err != nil && !isRoleExistsErr(err, aclRoleName) {
-			//don't error out in the case that the role already exists.
+			// don't error out in the case that the role already exists.
 			return "", err
+		}
+
+		if err != nil && isRoleExistsErr(err, aclRoleName) {
+			role, _, err := client.ACL().RoleReadByName(role.Name, &api.QueryOptions{})
+			if err != nil {
+				return "", err
+			}
+
+			role.Policies = []*api.ACLLink{{ID: policyID}}
+			role, _, err = client.ACL().RoleUpdate(role, &api.WriteOptions{})
+			if err != nil {
+				return "", err
+			}
+
+			c.gatewayNameToRole[gatewayName] = role
+			return aclRoleName, err
 		}
 
 		c.gatewayNameToRole[gatewayName] = role
@@ -459,7 +475,7 @@ func (c *Cache) gatewayPolicy(gatewayName string) api.ACLPolicy {
 	}
 
 	return api.ACLPolicy{
-		Name:        "api-gateway-token-policy",
+		Name:        fmt.Sprint("api-gateway-policy-for-", gatewayName),
 		Description: "API Gateway token Policy",
 		Rules:       data.String(),
 	}
@@ -595,12 +611,6 @@ func ignoreACLsDisabled(err error) error {
 	return err
 }
 
-// isPolicyExistsErr returns true if err is due to trying to call the
-// policy create API when the policy already exists.
-func isPolicyExistsErr(err error, policyName string) bool {
-	return isExistsErr(err, "Policy", policyName)
-}
-
 // isExistsErr returns true if err is due to trying to call an API for a given type and it already exists.
 func isExistsErr(err error, typeName, name string) bool {
 	return err != nil &&
@@ -612,4 +622,10 @@ func isExistsErr(err error, typeName, name string) bool {
 // role create API when the role already exists.
 func isRoleExistsErr(err error, roleName string) bool {
 	return isExistsErr(err, "Role", roleName)
+}
+
+// isPolicyExistsErr returns true if err is due to trying to call the
+// policy create API when the policy already exists.
+func isPolicyExistsErr(err error, policyName string) bool {
+	return isExistsErr(err, "Policy", policyName)
 }
