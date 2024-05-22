@@ -2,16 +2,16 @@
 
 SECURITY:
 
-* Upgrade Go to use 1.21.10. This addresses CVEs
-  [CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-24787) and
-  [CVE-2024-24788](https://nvd.nist.gov/vuln/detail/CVE-2024-24788) [[GH-3980](https://github.com/hashicorp/consul-k8s/issues/3980)]
+* Upgrade Go to use 1.21.10. This addresses CVEs 
+[CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-24787) and
+[CVE-2024-24788](https://nvd.nist.gov/vuln/detail/CVE-2024-24788) [[GH-3980](https://github.com/hashicorp/consul-k8s/issues/3980)]
 * Upgrade `helm/v3` to 3.14.4. This resolves the following security vulnerabilities:
-  [CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
-  [CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147) [[GH-3935](https://github.com/hashicorp/consul-k8s/issues/3935)]
+[CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
+[CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147) [[GH-3935](https://github.com/hashicorp/consul-k8s/issues/3935)]
 * Upgrade to use Go `1.21.9`. This resolves CVE
-  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`http2`). [[GH-3893](https://github.com/hashicorp/consul-k8s/issues/3893)]
+[CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`http2`). [[GH-3893](https://github.com/hashicorp/consul-k8s/issues/3893)]
 * Upgrade to use golang.org/x/net `v0.24.0`. This resolves CVE
-  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`x/net`). [[GH-3893](https://github.com/hashicorp/consul-k8s/issues/3893)]
+[CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`x/net`). [[GH-3893](https://github.com/hashicorp/consul-k8s/issues/3893)]
 
 FEATURES:
 
@@ -24,8 +24,8 @@ IMPROVEMENTS:
 * control-plane: Add support for receiving iptables configuration via CNI arguments, to support Nomad transparent proxy [[GH-3795](https://github.com/hashicorp/consul-k8s/issues/3795)]
 * control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-3813](https://github.com/hashicorp/consul-k8s/issues/3813)]
 * helm: only create the default Prometheus path annotation when it's not already specified within the component-specific
-  annotations. For example if the `client.annotations` value sets prometheus.io/path annotation, don't overwrite it with
-  the default value. [[GH-3846](https://github.com/hashicorp/consul-k8s/issues/3846)]
+annotations. For example if the `client.annotations` value sets prometheus.io/path annotation, don't overwrite it with
+the default value. [[GH-3846](https://github.com/hashicorp/consul-k8s/issues/3846)]
 * helm: support sync-lb-services-endpoints flag for syncCatalog [[GH-3905](https://github.com/hashicorp/consul-k8s/issues/3905)]
 * terminating-gateways: Remove unnecessary permissions from terminating gateways role [[GH-3928](https://github.com/hashicorp/consul-k8s/issues/3928)]
 
@@ -36,6 +36,7 @@ BUG FIXES:
 * api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4000](https://github.com/hashicorp/consul-k8s/issues/4000)]
 * consul-cni: Fixed a bug where the output of `-version` did not include the version of the binary [[GH-3829](https://github.com/hashicorp/consul-k8s/issues/3829)]
 * control-plane: fix a panic when an upstream annotation is malformed. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+* connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error [[GH-3978](https://github.com/hashicorp/consul-k8s/issues/3978)]
 
 ## 1.4.1 (March 28, 2024)
 
