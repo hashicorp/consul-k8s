@@ -63,6 +63,7 @@ BUG FIXES:
 tokens were invalidated immediately on pod entering Terminating state. [[GH-3736](https://github.com/hashicorp/consul-k8s/issues/3736)]
 * control-plane: fix an issue where ACL tokens would prematurely be deleted and services would be deregistered if there
 was a K8s API error fetching the pod. [[GH-3758](https://github.com/hashicorp/consul-k8s/issues/3758)]
+* connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error [[GH-3978](https://github.com/hashicorp/consul-k8s/issues/3978)]
 
 NOTES:
 
