@@ -397,6 +397,10 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 	return existing.ID, nil
 }
 
+func getACLRoleName(gatewayName string) string {
+	return fmt.Sprint("managed-gateway-acl-role-", gatewayName)
+}
+
 func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, error) {
 	policyID, err := c.ensurePolicy(client, gatewayName)
 	if err != nil {
@@ -407,7 +411,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 	defer c.aclRoleMutex.Unlock()
 
 	createRole := func() (string, error) {
-		aclRoleName := fmt.Sprint("managed-gateway-acl-role-", gatewayName)
+		aclRoleName := getACLRoleName(gatewayName)
 		role := &api.ACLRole{
 			Name:        aclRoleName,
 			Description: "ACL Role for Managed API Gateways",
@@ -416,7 +420,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 
 		_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
 		if err != nil && !isRoleExistsErr(err, aclRoleName) {
-			// don't error out in the case that the role already exists.
+			//don't error out in the case that the role already exists.
 			return "", err
 		}
 
@@ -436,7 +440,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 		}
 
 		c.gatewayNameToRole[gatewayName] = role
-		return aclRoleName, err
+		return aclRoleName, nil
 	}
 
 	cachedRole, found := c.gatewayNameToRole[gatewayName]
