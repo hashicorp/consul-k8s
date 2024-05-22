@@ -302,6 +302,7 @@ func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
 
 // Test that we pass the dns proxy flag to dataplane correctly.
 func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
+
 	// We only want the flag passed when DNS and tproxy are both enabled. DNS/tproxy can
 	// both be enabled/disabled with annotations/labels on the pod and namespace and then globally
 	// through the helm chart. To test this we use an outer loop with the possible DNS settings and then
@@ -362,6 +363,7 @@ func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
 	for i, dnsCase := range dnsCases {
 		for j, tproxyCase := range tproxyCases {
 			t.Run(fmt.Sprintf("dns=%d,tproxy=%d", i, j), func(t *testing.T) {
+
 				// Test setup.
 				h := MeshWebhook{
 					ConsulConfig:           &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
@@ -826,8 +828,8 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(1000700000),
-				RunAsGroup:               pointer.Int64(1000700000),
+				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
+				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
 				RunAsNonRoot:             pointer.Bool(true),
 				ReadOnlyRootFilesystem:   pointer.Bool(true),
 				AllowPrivilegeEscalation: pointer.Bool(false),
@@ -835,19 +837,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 		},
 	}
 	for name, c := range cases {
-		ns := corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        k8sNamespace,
-				Namespace:   k8sNamespace,
-				Annotations: map[string]string{},
-				Labels:      map[string]string{},
-			},
-		}
-
-		if c.openShiftEnabled {
-			ns.Annotations[constants.AnnotationOpenShiftUIDRange] = "1000700000/100000"
-			ns.Annotations[constants.AnnotationOpenShiftGroups] = "1000700000/100000"
-		}
 		t.Run(name, func(t *testing.T) {
 			w := MeshWebhook{
 				EnableTransparentProxy: c.tproxyEnabled,
@@ -856,7 +845,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			}
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: ns.Name,
 					Annotations: map[string]string{
 						constants.AnnotationService: "foo",
 					},
@@ -870,7 +858,7 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 					},
 				},
 			}
-			ec, err := w.consulDataplaneSidecar(ns, pod, multiPortInfo{})
+			ec, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
 			require.Equal(t, c.expSecurityContext, ec.SecurityContext)
 		})
@@ -897,10 +885,7 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t
 		},
 	}
 	_, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
-	require.EqualError(
-		err,
-		fmt.Sprintf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID),
-	)
+	require.EqualError(err, fmt.Sprintf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID))
 }
 
 // Test that if the user specifies a container with security context with the same uid as `sidecarUserAndGroupID` that we
@@ -937,12 +922,9 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 					},
 				},
 			},
-			webhook: MeshWebhook{},
-			expErr:  true,
-			expErrMessage: fmt.Sprintf(
-				"container \"app\" has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed",
-				sidecarUserAndGroupID,
-			),
+			webhook:       MeshWebhook{},
+			expErr:        true,
+			expErrMessage: fmt.Sprintf("container \"app\" has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed", sidecarUserAndGroupID),
 		},
 		{
 			name: "doesn't fail with envoy image",
@@ -1366,11 +1348,7 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 				},
 			},
 			expCmdArgs: "",
-			expErr: fmt.Sprintf(
-				"must set one of %q or %q when providing prometheus TLS config",
-				constants.AnnotationPrometheusCAFile,
-				constants.AnnotationPrometheusCAPath,
-			),
+			expErr:     fmt.Sprintf("must set one of %q or %q when providing prometheus TLS config", constants.AnnotationPrometheusCAFile, constants.AnnotationPrometheusCAPath),
 		},
 		{
 			name: "merge metrics with TLS enabled, missing cert gives an error",
