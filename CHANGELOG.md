@@ -1,3 +1,32 @@
+## 1.2.8 (May 20, 2024)
+
+SECURITY:
+
+* Upgrade Go to use 1.21.10. This addresses CVEs
+  [CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-24787) and
+  [CVE-2024-24788](https://nvd.nist.gov/vuln/detail/CVE-2024-24788) [[GH-3980](https://github.com/hashicorp/consul-k8s/issues/3980)]
+* Upgrade `helm/v3` to 3.14.4. This resolves the following security vulnerabilities:
+  [CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
+  [CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147) [[GH-3935](https://github.com/hashicorp/consul-k8s/issues/3935)]
+* Upgrade to use Go `1.21.9`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`http2`). [[GH-3901](https://github.com/hashicorp/consul-k8s/issues/3901)]
+* Upgrade to use golang.org/x/net `v0.24.0`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`x/net`). [[GH-3901](https://github.com/hashicorp/consul-k8s/issues/3901)]
+
+IMPROVEMENTS:
+
+* ConfigEntries controller: Only error for config entries from different datacenters when the config entries are different [[GH-3873](https://github.com/hashicorp/consul-k8s/issues/3873)]
+* control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-3813](https://github.com/hashicorp/consul-k8s/issues/3813)]
+* helm: only create the default Prometheus path annotation when it's not already specified within the component-specific
+  annotations. For example if the `client.annotations` value sets prometheus.io/path annotation, don't overwrite it with
+  the default value. [[GH-3846](https://github.com/hashicorp/consul-k8s/issues/3846)]
+* helm: support sync-lb-services-endpoints flag for syncCatalog [[GH-3905](https://github.com/hashicorp/consul-k8s/issues/3905)]
+
+BUG FIXES:
+
+* api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul when upgrading between versions. [[GH-3918](https://github.com/hashicorp/consul-k8s/issues/3918)]
+* api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4002](https://github.com/hashicorp/consul-k8s/issues/4002)]
+
 ## 1.2.7 (March 28, 2024)
 
 SECURITY:
