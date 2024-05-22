@@ -359,7 +359,7 @@ ifndef CONSUL_K8S_RELEASE_DATE
 	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
 ifndef CONSUL_K8S_NEXT_RELEASE_VERSION
-	$(error CONSUL_K8S_RELEASE_VERSION is required)
+	$(error CONSUL_K8S_NEXT_RELEASE_VERSION is required)
 endif
 ifndef CONSUL_K8S_CONSUL_VERSION
 	$(error CONSUL_K8S_CONSUL_VERSION is required)
