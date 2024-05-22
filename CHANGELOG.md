@@ -34,6 +34,7 @@ BUG FIXES:
 * api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul when upgrading between versions. [[GH-3918](https://github.com/hashicorp/consul-k8s/issues/3918)]
 * api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4001](https://github.com/hashicorp/consul-k8s/issues/4001)]
 * control-plane: fix a panic when an upstream annotation is malformed. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+* connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error [[GH-3978](https://github.com/hashicorp/consul-k8s/issues/3978)]
 
 ## 1.3.4 (March 28, 2024)
 
