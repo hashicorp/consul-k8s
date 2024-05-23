@@ -169,7 +169,7 @@ jobs:
           cp $GITHUB_WORKSPACE/LICENSE "$LICENSE_DIR/LICENSE.txt"
 
       - name: Package rpm and deb files
-        if: matrix.goos == 'linux' && matrix.component != 'controlplane' && matrix.skip_packaging != 'true'
+        if: matrix.goos == 'linux' && matrix.component != 'control-plane' && matrix.skip_packaging != 'true'
         uses: hashicorp/actions-packaging-linux@v1
         with:
           name: consul-k8s${{ matrix.pkg_suffix }}
@@ -185,20 +185,20 @@ jobs:
           config_dir: ".release/linux/package/"
 
       - name: Set package names
-        if: matrix.goos == 'linux' && matrix.component != 'controlplane' && matrix.skip_packaging != 'true'
+        if: matrix.goos == 'linux' && matrix.component != 'control-plane' && matrix.skip_packaging != 'true'
         run: |
           echo "RPM_PACKAGE=$(basename out/*.rpm)" >> $GITHUB_ENV
           echo "DEB_PACKAGE=$(basename out/*.deb)" >> $GITHUB_ENV
 
       - name: Enable docker runtime emulation for testing packages
-        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true' && matrix.goarch != 'amd64'
+        if: matrix.goos == 'linux' && matrix.component != 'control-plane' && matrix.skip_packaging != 'true' && matrix.goarch != 'amd64'
         run: |
           docker run --privileged \
                      --rm \
                      docker.mirror.hashicorp.services/tonistiigi/binfmt@sha256:5540f38542290735d17da57d7084f684c62336105d018c605058daf03e4c8256 --install ${{ matrix.goarch }}
 
       - name: Test rpm package on platforms on UBI
-        if: matrix.goos == 'linux' && matrix.component != 'controlplane' && matrix.skip_packaging != 'true'
+        if: matrix.goos == 'linux' && matrix.component != 'control-plane' && matrix.skip_packaging != 'true'
         uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
           image: registry.access.redhat.com/ubi9/ubi:latest
@@ -215,13 +215,13 @@ jobs:
 
       - name: Upload rpm package
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
-        if: matrix.goos == 'linux' && matrix.component != 'controlplane' && matrix.skip_packaging != 'true'
+        if: matrix.goos == 'linux' && matrix.component != 'control-plane' && matrix.skip_packaging != 'true'
         with:
           name: ${{ env.RPM_PACKAGE }}
           path: out/${{ env.RPM_PACKAGE }}
 
       - name: Test debian package
-        if: matrix.goos == 'linux' && matrix.component != 'controlplane' && matrix.skip_packaging != 'true'
+        if: matrix.goos == 'linux' && matrix.component != 'control-plane' && matrix.skip_packaging != 'true'
         uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
           image: ubuntu:latest
@@ -239,7 +239,7 @@ jobs:
 
       - name: Upload debian packages
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
-        if: matrix.goos == 'linux' && matrix.component != 'controlplane' && matrix.skip_packaging != 'true'
+        if: matrix.goos == 'linux' && matrix.component != 'control-plane' && matrix.skip_packaging != 'true'
         with:
           name: ${{ env.DEB_PACKAGE }}
           path: out/${{ env.DEB_PACKAGE }}
