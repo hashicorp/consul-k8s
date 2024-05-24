@@ -293,7 +293,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			}
 
 			var expectedSecurityContext *corev1.SecurityContext
-			if c.cniEnabled && !c.openShiftEnabled {
+			if c.cniEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{
 					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
 					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
@@ -315,34 +315,8 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 						Add: []corev1.Capability{netAdminCapability},
 					},
 				}
-			} else if c.cniEnabled && c.openShiftEnabled {
-				// When cni + openShift
-				expectedSecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(1000700000),
-					RunAsGroup:   pointer.Int64(1000700000),
-					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(privileged),
-					Capabilities: &corev1.Capabilities{
-						Drop: []corev1.Capability{"ALL"},
-					},
-					ReadOnlyRootFilesystem:   pointer.Bool(true),
-					AllowPrivilegeEscalation: pointer.Bool(false),
-				}
 			}
-			ns := corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        k8sNamespace,
-					Namespace:   k8sNamespace,
-					Annotations: map[string]string{},
-					Labels:      map[string]string{},
-				},
-			}
-
-			if c.openShiftEnabled {
-				ns.Annotations[constants.AnnotationOpenShiftUIDRange] = "1000700000/100000"
-				ns.Annotations[constants.AnnotationOpenShiftGroups] = "1000700000/100000"
-			}
-
+			ns := testNS
 			ns.Labels = c.namespaceLabel
 			container, err := w.containerInit(ns, *pod, multiPortInfo{})
 			require.NoError(t, err)
@@ -811,8 +785,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 					serviceName:  "web-admin",
 				},
 			},
-			[]string{
-				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -multiport=true \
@@ -850,8 +823,7 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 					serviceName:  "web-admin",
 				},
 			},
-			[]string{
-				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -service-account-name="web" \
@@ -950,6 +922,7 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 					}
 				}
 			}
+
 		})
 	}
 }
