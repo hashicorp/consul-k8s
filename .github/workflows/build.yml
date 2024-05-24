@@ -235,7 +235,7 @@ jobs:
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         if: matrix.goos == 'linux' && matrix.skip_packaging != 'true'
         with:
-          name: rpm-packages
+          name: ${{ env.RPM_PACKAGE }}
           path: out/${{ env.RPM_PACKAGE }}
 
       - name: Test consul-k8s CLI debian package
@@ -259,7 +259,7 @@ jobs:
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         if: matrix.goos == 'linux' && matrix.skip_packaging != 'true'
         with:
-          name: deb-packages
+          name: ${{ env.DEB_PACKAGE }}
           path: out/${{ env.DEB_PACKAGE }}
 
   build-docker:
